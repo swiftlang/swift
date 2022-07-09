@@ -20,6 +20,10 @@ set(LLVM_ENABLE_ASSERTIONS YES CACHE BOOL "")
 
 set(ENABLE_X86_RELAX_RELOCATIONS YES CACHE BOOL "")
 
+# NOTE(compnerd) we can hardcode the default target triple since the cache files
+# are target dependent.
+set(LLVM_DEFAULT_TARGET_TRIPLE x86_64-unknown-windows-msvc CACHE STRING "")
+
 set(LLVM_APPEND_VC_REV NO CACHE BOOL "")
 set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR YES CACHE BOOL "")
 set(LLVM_ENABLE_PYTHON YES CACHE BOOL "")
@@ -39,6 +43,7 @@ foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_SANITIZERS NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
 endforeach()
+
 set(LLVM_TARGETS_TO_BUILD AArch64 ARM WebAssembly X86 CACHE STRING "")
 
 # Disable certain targets to reduce the configure time or to avoid configuration
@@ -61,6 +66,8 @@ set(LLVM_TOOL_LLVM_SHLIB_BUILD NO CACHE BOOL "")
 # Avoid swig dependency for lldb
 set(LLDB_ALLOW_STATIC_BINDINGS YES CACHE BOOL "")
 set(LLDB_USE_STATIC_BINDINGS YES CACHE BOOL "")
+set(LLDB_ENABLE_PYTHON YES CACHE BOOL "")
+set(LLDB_EMBED_PYTHON_HOME NO CACHE BOOL "")
 
 # This requires perl which may not be available on Windows
 set(SWIFT_INCLUDE_DOCS NO CACHE BOOL "")

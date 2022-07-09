@@ -17,15 +17,17 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/SILValue.h"
+#include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DistributedActor.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -384,13 +386,6 @@ namespace {
 
   using BlockStates = BasicBlockData<LiveOutBlockState>;
 
-  enum class ActorInitKind {
-    None,           // not an actor init
-    Plain,          // synchronous, not isolated to global-actor
-    PlainAsync,     // asynchronous, not isolated to global-actor
-    GlobalActorIsolated  // isolated to global-actor (sync or async).
-  };
-
   /// LifetimeChecker - This is the main heavy lifting for definite
   /// initialization checking of a memory object.
   class LifetimeChecker {
@@ -451,6 +446,21 @@ namespace {
     void doIt();
 
   private:
+    /// Injects `hop_to_executor` instructions into the function after
+    /// `self` becomes fully initialized, only if the current function
+    /// is an actor initializer that requires this, and if TheMemory
+    /// corresponds to `self`.
+    void injectActorHops();
+
+    /// Given an initializing block and the live-in availability of TheMemory,
+    /// this function injects a `hop_to_executor` instruction soon after the
+    /// first non-load use of TheMemory that fully-initializes it.
+    /// An "initializing block" is one that definitely contains a such a
+    /// non-load use, e.g., because its live-in set is *not* all-Yes, but its
+    /// live-out set is all-Yes.
+    void injectActorHopForBlock(SILLocation loc,
+                                SILBasicBlock *initializingBlock,
+                                AvailabilitySet const &liveInAvailability);
 
     void emitSelfConsumedDiagnostic(SILInstruction *Inst);
 
@@ -476,7 +486,6 @@ namespace {
                             bool *FailedSelfUse = nullptr,
                             bool *FullyUninitialized = nullptr);
 
-
     void handleStoreUse(unsigned UseID);
     void handleLoadUse(const DIMemoryUse &Use);
     void handleLoadForTypeOfSelfUse(DIMemoryUse &Use);
@@ -486,21 +495,6 @@ namespace {
 
     bool diagnoseReturnWithoutInitializingStoredProperties(
         const SILInstruction *Inst, SILLocation loc, const DIMemoryUse &Use);
-
-    /// Returns true iff the use involves 'self' in a restricted kind of
-    /// actor initializer. If a non-null Kind pointer was passed in,
-    /// then the specific kind of restricted actor initializer will be
-    /// written out. Otherwise, the None initializer kind will be written out.
-    bool isRestrictedActorInitSelf(const DIMemoryUse& Use,
-                               ActorInitKind *Kind = nullptr) const;
-
-    void reportIllegalUseForActorInit(const DIMemoryUse &Use,
-                                      ActorInitKind ActorKind,
-                                      StringRef ProblemDesc,
-                                      bool suggestConvenienceInit) const;
-
-    void handleLoadUseFailureForActorInit(const DIMemoryUse &Use,
-                                          ActorInitKind ActorKind) const;
 
     void handleLoadUseFailure(const DIMemoryUse &Use,
                               bool SuperInitDone,
@@ -543,6 +537,7 @@ namespace {
     void diagnoseRefElementAddr(RefElementAddrInst *REI);
     bool diagnoseMethodCall(const DIMemoryUse &Use,
                             bool SuperInitDone);
+    void diagnoseBadExplicitStore(SILInstruction *Inst);
     
     bool isBlockIsReachableFromEntry(const SILBasicBlock *BB);
   };
@@ -580,6 +575,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     case DIUseKind::InOutSelfArgument:
     case DIUseKind::PartialStore:
     case DIUseKind::SelfInit:
+    case DIUseKind::BadExplicitStore:
       break;
     }
 
@@ -693,6 +689,9 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
 
+  SmallVector<std::function<void()>, 2> delayedNotes;
+  bool emittedNote = false;
+
   for (unsigned i = Use.FirstElement, e = Use.FirstElement+Use.NumElements;
        i != e; ++i) {
     if (Liveness.get(i) == DIKind::Yes) continue;
@@ -705,13 +704,34 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
     auto *Decl = TheMemory.getPathStringToElement(i, Name);
     SILLocation Loc = Use.Inst->getLoc();
 
-    // If we found a non-implicit declaration, use its source location.
-    if (Decl && !Decl->isImplicit())
-      Loc = SILLocation(Decl);
+    if (Decl) {
+      // If we found a non-implicit declaration, use its source location.
+      if (!Decl->isImplicit())
+        Loc = SILLocation(Decl);
+
+      // If it's marked @_compilerInitialized, delay emission of the note.
+      if (Decl->getAttrs().hasAttribute<CompilerInitializedAttr>()) {
+        delayedNotes.push_back([=](){
+          diagnose(Module, Loc, diag::stored_property_not_initialized,
+             StringRef(Name));
+        });
+        continue;
+      }
+    }
 
     diagnose(Module, Loc, diag::stored_property_not_initialized,
              StringRef(Name));
+    emittedNote = true;
   }
+
+  // Drop the notes for @_compilerInitialized decls if we emitted a note for
+  // other ones that do not have that attr.
+  if (emittedNote)
+    return;
+
+  // otherwise, emit delayed notes.
+  for (auto &emitter : delayedNotes)
+    emitter();
 }
 
 /// Given a use that has at least one uninitialized element in it, produce a
@@ -783,6 +803,279 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
     diagnose(Module, TheMemory.getLoc(), diag::variable_defined_here, isLet);
 }
 
+void LifetimeChecker::diagnoseBadExplicitStore(SILInstruction *Inst) {
+  if (!shouldEmitError(Inst))
+    return;
+
+  diagnose(Module, Inst->getLoc(), diag::explicit_store_of_compilerinitialized);
+}
+
+/// Determines whether the given function is a constructor that belogs to a
+/// distributed actor declaration.
+/// \returns nullptr if false, and the class decl for the actor otherwise.
+static ClassDecl* getDistributedActorOfCtor(SILFunction &F) {
+  auto *context = F.getDeclContext();
+  if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(context->getAsDecl()))
+    if (auto *cls = dyn_cast<ClassDecl>(ctor->getDeclContext()->getAsDecl()))
+      if (cls->isDistributedActor())
+        return cls;
+  return nullptr;
+}
+
+/// Injects a hop_to_executor instruction after the specified insertion point.
+static void injectHopToExecutorAfter(SILLocation loc,
+                                     SILBasicBlock::iterator insertPt,
+                                     DIMemoryObjectInfo &TheMemory) {
+
+  LLVM_DEBUG(llvm::dbgs() << "hop-injector: requested insertion after "
+                          << *insertPt);
+
+  // While insertAfter can handle terminators, it cannot handle ones that lead
+  // to a block with multiple predecessors. I don't expect that a terminator
+  // could initialize a stored property at all: a try_apply passed the property
+  // as an inout would not be a valid use until _after_ the property has been
+  // initialized.
+  assert(!isa<TermInst>(*insertPt) && "unexpected hop-inject after terminator");
+
+  auto injectAfter = [&](SILInstruction *insertPt) -> void {
+    LLVM_DEBUG(llvm::dbgs() << "hop-injector: injecting after " << *insertPt);
+    SILBuilderWithScope::insertAfter(insertPt, [&](SILBuilder &b) {
+
+      SILLocation genLoc = loc.asAutoGenerated();
+      const bool delegating = !TheMemory.isNonDelegatingInit();
+      SILValue val = TheMemory.getUninitializedValue();
+      auto &F = b.getFunction();
+
+      // delegating inits always have an alloc we need to load it from.
+      if (delegating)
+        val = b.createLoad(genLoc, val, LoadOwnershipQualifier::Copy);
+
+      SILValue actor = b.createBeginBorrow(genLoc, val);
+
+      b.createHopToExecutor(genLoc, actor, /*mandatory=*/false);
+
+      // Distributed actors also need to notify their transport immediately
+      // after performing the hop.
+      if (!delegating) {
+        if (auto *actorDecl = getDistributedActorOfCtor(F)) {
+          SILValue systemRef = refDistributedActorSystem(b, genLoc,
+                                                         actorDecl, actor);
+          emitActorReadyCall(b, genLoc, actor, systemRef);
+        }
+      }
+
+      b.createEndBorrow(genLoc, actor);
+
+      if (delegating)
+        b.createDestroyValue(genLoc, val);
+    });
+  };
+
+  //////
+  // NOTE: We prefer to inject a hop outside of any access regions, so that
+  // the dynamic access-set is empty. This is a best-effort to avoid injecting
+  // it inside of a region, but does not account for overlapping accesses, etc.
+  // But, I cannot think of a way to create an overlapping access with a stored
+  // property when it is first initialized, because it's not valid to pass those
+  // inout or capture them in a closure. - kavon
+
+  SILInstruction *cur = &*insertPt;
+  BeginAccessInst *access = nullptr;
+
+  // Finds begin_access instructions that need hops placed after its end_access.
+  auto getBeginAccess = [](SILValue v) -> BeginAccessInst * {
+    return dyn_cast<BeginAccessInst>(getAccessScope(v));
+  };
+
+  // If this insertion-point is after a store-like instruction, look for a
+  // begin_access corresponding to the destination.
+  if (auto *store = dyn_cast<StoreInst>(cur)) {
+    access = getBeginAccess(store->getDest());
+  } else if (auto *assign = dyn_cast<AssignInst>(cur)) {
+    access = getBeginAccess(assign->getDest());
+  }
+
+  // If we found a begin_access, then we need to inject the hop after
+  // all of the corresponding end_accesses.
+  if (access) {
+    for (auto *endAccess : access->getEndAccesses())
+      injectAfter(endAccess);
+
+    return;
+  }
+
+  //////
+  // Otherwise, we just put the hop after the original insertion point.
+  return injectAfter(cur);
+}
+
+void LifetimeChecker::injectActorHopForBlock(
+    SILLocation loc, SILBasicBlock *block,
+    AvailabilitySet const &liveInAvailability) {
+  // Tracks status of each element of TheMemory as we scan through the block,
+  // starting with the initial availability at the block's entry-point.
+  AvailabilitySet localAvail = liveInAvailability;
+
+  auto bbi = block->begin(); // our cursor and eventual insertion-point.
+  const auto bbe = block->end();
+  for (; bbi != bbe; ++bbi) {
+    auto *inst = &*bbi;
+
+    auto result = NonLoadUses.find(inst);
+    if (result == NonLoadUses.end())
+      continue; // not a possible store
+
+    // Mark the tuple elements involved in this use as defined.
+    for (unsigned use : result->second) {
+      auto const &instUse = Uses[use];
+      for (unsigned i = instUse.FirstElement;
+           i < instUse.FirstElement + instUse.NumElements; ++i)
+        localAvail.set(i, DIKind::Yes);
+    }
+
+    // Stop if we found the instruction that initializes TheMemory.
+    if (localAvail.isAllYes())
+      break;
+  }
+
+  // Make sure we found the initializing use of TheMemory.
+  assert(bbi != bbe && "this block is not initializing?");
+
+  injectHopToExecutorAfter(loc, bbi, TheMemory);
+}
+
+static bool isFailableInitReturnUseOfEnum(EnumInst *EI);
+
+void LifetimeChecker::injectActorHops() {
+  auto ctor = TheMemory.getActorInitSelf();
+
+  // Must be `self` within an actor's initializer.
+  if (!ctor)
+    return;
+
+  // Must not be an init that uses flow-sensitive isolation.
+  if (usesFlowSensitiveIsolation(ctor))
+    return;
+
+  // Must be an async initializer.
+  if (!ctor->hasAsync())
+    return;
+
+  // Must be an initializer that is isolated to self.
+  switch (getActorIsolation(ctor)) {
+    case ActorIsolation::ActorInstance:
+      break;
+
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+    case ActorIsolation::GlobalActorUnsafe:
+    case ActorIsolation::GlobalActor:
+      return;
+  }
+
+  // Even if there are no stored properties to initialize, we still need a hop.
+  // We insert this directly after the mark_uninitialized instruction, so
+  // that it happens as early as `self` is available.`
+  if (TheMemory.getNumElements() == 0) {
+    auto *selfDef = TheMemory.getUninitializedValue(); // FIXME: this might be wrong for convenience inits (rdar://87485045)
+    return injectHopToExecutorAfter(ctor, selfDef->getIterator(), TheMemory);
+  }
+
+  // Returns true iff a block returns normally from the initializer,
+  // which means that it returns `self` in some way (perhaps optional-wrapped).
+  auto returnsSelf = [](SILBasicBlock &block) -> bool {
+    auto term = block.getTerminator();
+    auto kind = term->getTermKind();
+
+    // Does this block return directly?
+    if (kind == TermKind::ReturnInst)
+      return true;
+
+
+    // Does this block return `self` wrapped in an Optional?
+    // The pattern would look like:
+    //
+    // thisBB:
+    //   ...
+    //   %x = enum $Optional<Dactor>, #Optional.some!enumelt
+    //   br exitBB(%x : $Optional<Dactor>)
+    //
+    // exitBB(%y : $Optional<Dactor>):
+    //   return %y : $Optional<Dactor>
+    //
+    if (kind == TermKind::BranchInst)
+      if (term->getNumOperands() == 1)
+        if (auto *passedVal = term->getOperand(0)->getDefiningInstruction())
+          if (auto *ei = dyn_cast<EnumInst>(passedVal))
+            if (isFailableInitReturnUseOfEnum(ei))
+              // Once we've reached this point, we know it's an Optional enum.
+              // To determine whether it's .some or .none, we can just check
+              // the number of operands.
+              return ei->getNumOperands() == 1; // is it .some ?
+
+    return false;
+  };
+
+  /////
+  // Step 1: Find initializing blocks, which are blocks that contain a store
+  // to TheMemory that fully-initializes it, and build the Map.
+
+  // We determine whether a block is "initializing" by inspecting the "in" and
+  // "out" availability sets of the block. If the block goes from No / Partial
+  // "in" to Yes "out", then some instruction in the block caused TheMemory to
+  // become fully-initialized, so we record that block and its in-availability
+  // to scan the block more precisely later in the next Step.
+  for (auto &block : F) {
+    auto &info = getBlockInfo(&block);
+
+    if (!info.HasNonLoadUse) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "hop-injector: rejecting bb" << block.getDebugID()
+                 << " b/c no non-load uses.\n");
+      continue; // could not be an initializing block.
+    }
+
+    // Determine if this `block` is initializing, that is:
+    //
+    //     InAvailability ≡ merge(OutAvailability(predecessors(block)))
+    //                    ≠ Yes
+    //               AND
+    //     OutAvailability(block) = Yes OR returnsSelf(block)
+    //
+    // A block with no predecessors has in-avail of non-Yes.
+    // A block with no successors has an out-avail of non-Yes, since
+    // availability is not computed for it.
+
+    auto outSet = info.OutAvailability;
+    if (!outSet.isAllYes() && !returnsSelf(block)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "hop-injector: rejecting bb" << block.getDebugID()
+                 << " b/c non-Yes OUT avail\n");
+      continue; // then this block never sees TheMemory initialized.
+    }
+
+    AvailabilitySet inSet(outSet.size());
+    auto const &predecessors = block.getPredecessorBlocks();
+    for (auto *pred : predecessors)
+      inSet.mergeIn(getBlockInfo(pred).OutAvailability);
+
+    if (inSet.isAllYes()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "hop-injector: rejecting bb" << block.getDebugID()
+                 << " b/c all-Yes IN avail\n");
+      continue; // then this block always sees TheMemory initialized.
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "hop-injector: bb" << block.getDebugID()
+                            << " is initializing block with in-availability: "
+                            << inSet << "\n");
+
+    // Step 2: Scan the initializing block to find the first non-load use that
+    // fully-initializes TheMemory, and insert the hop there.
+    injectActorHopForBlock(ctor, &block, inSet);
+  }
+}
+
 void LifetimeChecker::doIt() {
   // With any escapes tallied up, we can work through all the uses, checking
   // for definitive initialization, promoting loads, rewriting assigns, and
@@ -845,11 +1138,18 @@ void LifetimeChecker::doIt() {
     case DIUseKind::TypeOfSelf:
       handleTypeOfSelfUse(Use);
       break;
+
+    case DIUseKind::BadExplicitStore:
+      diagnoseBadExplicitStore(Inst);
+      break;
     }
   }
 
   // If we emitted an error, there is no reason to proceed with load promotion.
   if (!EmittedErrorLocs.empty()) return;
+
+  // Insert hop_to_executor instructions for actor initializers, if needed.
+  injectActorHops();
 
   // If the memory object has nontrivial type, then any destroy/release of the
   // memory object will destruct the memory.  If the memory (or some element
@@ -888,13 +1188,9 @@ void LifetimeChecker::doIt() {
 
 void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
   bool IsSuperInitComplete, FailedSelfUse;
-  ActorInitKind ActorKind = ActorInitKind::None;
   // If the value is not definitively initialized, emit an error.
   if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse))
     return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
-  // Check if it involves 'self' in a restricted actor init.
-  if (isRestrictedActorInitSelf(Use, &ActorKind))
-    return handleLoadUseFailureForActorInit(Use, ActorKind);
 }
 
 static void replaceValueMetatypeInstWithMetatypeArgument(
@@ -1081,6 +1377,8 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     SILValue addr;
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst))
       addr = copyAddr->getDest();
+    else if (auto *moveAddr = dyn_cast<MarkUnresolvedMoveAddrInst>(inst))
+      addr = moveAddr->getDest();
     else if (auto *assign = dyn_cast<AssignInst>(inst))
       addr = assign->getDest();
     else if (auto *assign = dyn_cast<AssignByWrapperInst>(inst))
@@ -1203,7 +1501,6 @@ static FullApplySite findApply(SILInstruction *I, bool &isSelfParameter) {
 
 void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   bool IsSuperInitDone, FailedSelfUse;
-  ActorInitKind ActorKind = ActorInitKind::None;
 
   // inout uses are generally straight-forward: the memory must be initialized
   // before the "address" is passed as an l-value.
@@ -1221,11 +1518,6 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     diagnoseInitError(Use, diagID);
     return;
   }
-
-  // 'self' cannot be passed 'inout' from some kinds of actor initializers.
-  if (isRestrictedActorInitSelf(Use, &ActorKind))
-    reportIllegalUseForActorInit(Use, ActorKind, "be passed 'inout'",
-                                 /*suggestConvenienceInit=*/false);
 
   // One additional check: 'let' properties may never be passed inout, because
   // they are only allowed to have their initial value set, not a subsequent
@@ -1393,16 +1685,9 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   // The value must be fully initialized at all escape points.  If not, diagnose
   // the error.
   bool SuperInitDone, FailedSelfUse, FullyUninitialized;
-  ActorInitKind ActorKind = ActorInitKind::None;
 
   if (isInitializedAtUse(Use, &SuperInitDone, &FailedSelfUse,
                          &FullyUninitialized)) {
-
-    // no escaping uses of 'self' are allowed in restricted actor inits.
-    if (isRestrictedActorInitSelf(Use, &ActorKind))
-      reportIllegalUseForActorInit(Use, ActorKind, "be captured by a closure",
-                                   /*suggestConvenienceInit=*/true);
-
     return;
   }
 
@@ -1786,100 +2071,6 @@ bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
   return true;
 }
 
-bool LifetimeChecker::isRestrictedActorInitSelf(const DIMemoryUse& Use,
-                                            ActorInitKind *Kind) const {
-
-  auto result = [&](ActorInitKind k, bool isRestricted) -> bool {
-    if (Kind)
-      *Kind = k;
-    return isRestricted;
-  };
-
-  // Currently: being synchronous, or global-actor isolated, means the actor's
-  // self is restricted within the init.
-  if (auto *ctor = TheMemory.isActorInitSelf()) {
-    if (getActorIsolation(ctor).isGlobalActor())  // global-actor isolated?
-      return result(ActorInitKind::GlobalActorIsolated, true);
-    else if (!ctor->hasAsync()) // synchronous?
-      return result(ActorInitKind::Plain, true);
-    else
-      return result(ActorInitKind::PlainAsync, false);
-  }
-
-  return result(ActorInitKind::None, false);
-}
-
-void LifetimeChecker::reportIllegalUseForActorInit(
-                                           const DIMemoryUse &Use,
-                                           ActorInitKind ActorKind,
-                                           StringRef ProblemDesc,
-                                           bool suggestConvenienceInit) const {
-  switch(ActorKind) {
-  case ActorInitKind::None:
-  case ActorInitKind::PlainAsync:
-    llvm::report_fatal_error("this actor init is never problematic!");
-
-  case ActorInitKind::Plain:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_actor_init,
-             false, ProblemDesc);
-    break;
-
-  case ActorInitKind::GlobalActorIsolated:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_actor_init,
-             true, ProblemDesc);
-    break;
-  }
-
-  if (suggestConvenienceInit)
-    diagnose(Module, Use.Inst->getLoc(), diag::actor_convenience_init);
-}
-
-void LifetimeChecker::handleLoadUseFailureForActorInit(
-                                           const DIMemoryUse &Use,
-                                           ActorInitKind ActorKind) const {
-  assert(TheMemory.isAnyInitSelf());
-  SILInstruction *Inst = Use.Inst;
-
-  // While enum instructions have no side-effects, they do wrap-up `self`
-  // such that it can escape our analysis. So, enum instruction uses are only
-  // acceptable if the enum is part of a specific pattern of usage that is
-  // generated for a failable initializer.
-  if (auto *enumInst = dyn_cast<EnumInst>(Inst)) {
-    if (isFailableInitReturnUseOfEnum(enumInst))
-      return;
-
-    // Otherwise, if the use has no possibility of side-effects, then its OK.
-  } else if (!Inst->mayHaveSideEffects()) {
-    return;
-
-  // While loads can have side-effects, we are not concerned by them here.
-  } else if (isa<LoadInst>(Inst)) {
-    return;
-  }
-
-  // Everything else is disallowed!
-  switch(ActorKind) {
-  case ActorInitKind::None:
-  case ActorInitKind::PlainAsync:
-    llvm::report_fatal_error("this actor init is never problematic!");
-
-  case ActorInitKind::Plain:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, false);
-    break;
-
-  case ActorInitKind::GlobalActorIsolated:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, true);
-    break;
-  }
-
-  // We cannot easily determine which argument in the call the use of 'self'
-  // appears in. If we could, then we could determine whether the callee
-  // is 'isolated' to that parameter, in order to avoid suggesting a convenience
-  // init in those cases. Thus, the phrasing of the note should be informative.
-  if (isa<ApplyInst>(Inst))
-    diagnose(Module, Use.Inst->getLoc(), diag::actor_convenience_init);
-}
-
 /// Check and diagnose various failures when a load use is not fully
 /// initialized.
 ///
@@ -2106,7 +2297,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     CA->setIsInitializationOfDest(InitKind);
     return;
   }
-  
+
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   if (auto *SW = dyn_cast<Store##Name##Inst>(Inst)) { \
     if (SW->isInitializationOfDest()) \
@@ -2187,18 +2378,6 @@ static void emitDefaultActorDestroy(SILBuilder &B, SILLocation loc,
   B.createEndBorrow(loc, self);
 }
 
-static void emitDistributedActorDestroy(SILBuilder &B, SILLocation loc,
-                                        SILValue self) {
-  auto builtinName = B.getASTContext().getIdentifier(
-    getBuiltinName(BuiltinValueKind::DestroyDistributedActor));
-  auto resultTy = B.getModule().Types.getEmptyTupleType();
-
-  self = B.createBeginBorrow(loc, self);
-  B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
-                  { self });
-  B.createEndBorrow(loc, self);
-}
-
 void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
                                                   bool consumed,
                                              SILBasicBlock::iterator InsertPt) {
@@ -2255,9 +2434,6 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     if (!TheMemory.isDelegatingInit()) {
       auto classDecl = TheMemory.getASTType().getClassOrBoundGenericClass();
       if (classDecl && classDecl->isRootDefaultActor()) {
-        if (classDecl->isDistributedActor())
-          emitDistributedActorDestroy(B, Loc, Pointer);
-        else
           emitDefaultActorDestroy(B, Loc, Pointer);
       }
     }
@@ -2644,6 +2820,104 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   return ControlVariableAddr;
 }
 
+/// Move the end_borrow that guards an alloc_box's lifetime to before the
+/// dealloc_box in the CFG diamond that is created for destruction when it is
+/// not statically known whether the value is initialized.
+///
+/// In the following context
+///
+///    %box = alloc_box
+///    %mark_uninit = mark_uninitialized %box
+///    %lifetime = begin_borrow [lexical] %mark_uninit
+///    %proj_box = project_box %lifetime
+///
+/// We are replacing a
+///
+///     destroy_value %mark_uninit
+///
+/// with a
+///
+///     destroy_addr %proj_box
+///
+/// That's a problem, though, because by SILGen construction the
+/// destroy_value is always preceded by an end_borrow
+///
+///     end_borrow %lifetime
+///     destroy_value %mark_uninit
+///
+/// Consequently, it's not sufficient to just replace the destroy_value
+/// %mark_uninit with a destroy_addr %proj_box (or to replace it with a diamond
+/// where one branch has that destroy_addr) because the destroy_addr is a use
+/// of %proj_box which must be within the lexical lifetime of the box.
+///
+/// On the other side, we are hemmed in by the fact that the end_borrow must
+/// precede the dealloc_box which will be created in the diamond.  So we
+/// couldn't simply start inserting before the end_borrow (because the bottom
+/// of the diamond contains a dealloc_box, so we would have an end_borrow after
+/// the dealloc_box).
+///
+/// At this point, we have the following code:
+///
+///       end_borrow %lifetime
+///       %initialized = load %addr
+///       cond_br %initialized, yes, no
+///
+///     yes:
+///       destroy_addr %proj_box
+///       br bottom
+///
+///     no:
+///       br bottom
+///
+///     bottom:
+///       br keep_going
+///
+///     keep_going:
+///
+/// So just move the end_borrow to the right position, at the top of the bottom
+/// block.  The caller will then add the dealloc_box.
+static bool adjustAllocBoxEndBorrow(SILInstruction *previous,
+                                    SILValue destroyedAddr,
+                                    SILBuilderWithScope &builder) {
+  // This fixup only applies if we're destroying a project_box.
+  auto *pbi = dyn_cast<ProjectBoxInst>(destroyedAddr);
+  if (!pbi)
+    return false;
+
+  // This fixup only applies if we're destroying a project_box of the lexical
+  // lifetime of an alloc_box.
+  auto *lifetime = dyn_cast<BeginBorrowInst>(pbi->getOperand());
+  if (!lifetime)
+    return false;
+  assert(lifetime->isLexical());
+  assert(isa<AllocBoxInst>(
+      cast<MarkUninitializedInst>(lifetime->getOperand())->getOperand()));
+
+  // Scan the block backwards from previous, looking for an end_borrow.  SILGen
+  // will emit the sequence
+  //
+  //     end_borrow %lifetime
+  //     destroy_value %mark_uninit
+  //
+  // but other passes may have moved them apart.
+  EndBorrowInst *ebi = nullptr;
+  for (auto *instruction = previous; instruction;
+       instruction = instruction->getPreviousInstruction()) {
+    auto *candidate = dyn_cast<EndBorrowInst>(instruction);
+    if (!candidate)
+      continue;
+    auto *bbi = dyn_cast<BeginBorrowInst>(candidate->getOperand());
+    if (bbi != lifetime)
+      continue;
+    ebi = candidate;
+  }
+  if (!ebi)
+    return false;
+
+  ebi->moveBefore(&*builder.getInsertionPoint());
+  return true;
+}
+
 /// Process any destroy_addr and strong_release instructions that are invoked on
 /// a partially initialized value.  This generates code to destroy the elements
 /// that are known to be alive, ignore the ones that are known to be dead, and
@@ -2664,7 +2938,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
   // Utilities.
 
-  auto destroyMemoryElement = [&](SILLocation Loc, unsigned Elt) {
+  auto destroyMemoryElement = [&](SILLocation Loc, unsigned Elt) -> SILValue {
     using EndScopeKind = DIMemoryObjectInfo::EndScopeKind;
     SmallVector<std::pair<SILValue, EndScopeKind>, 4> EndScopeList;
     SILValue EltPtr =
@@ -2687,12 +2961,14 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       }
       llvm_unreachable("Covered switch isn't covered!");
     }
+    return EltPtr;
   };
 
   // Destroy all the allocation's fields, not including the allocation
   // itself, if we have a class initializer.
-  auto destroyMemoryElements = [&](SILLocation Loc,
+  auto destroyMemoryElements = [&](SILInstruction *Release, SILLocation Loc,
                                    AvailabilitySet Availability) {
+    auto *Previous = Release->getPreviousInstruction();
     // Delegating initializers don't model the fields of the class.
     if (TheMemory.isClassInitSelf() && TheMemory.isDelegatingInit())
       return;
@@ -2732,9 +3008,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       // Set up the initialized release block.
       B.setInsertionPoint(ReleaseBlock->begin());
-      destroyMemoryElement(Loc, Elt);
+      auto EltPtr = destroyMemoryElement(Loc, Elt);
 
       B.setInsertionPoint(ContBlock->begin());
+      adjustAllocBoxEndBorrow(Previous, EltPtr, B);
     }
   };
 
@@ -2811,10 +3088,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
         B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
-        destroyMemoryElements(Loc, Availability);
+        destroyMemoryElements(Release, Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
       } else {
-        destroyMemoryElements(Loc, Availability);
+        destroyMemoryElements(Release, Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
         // The original strong_release or destroy_addr instruction is
@@ -2839,7 +3116,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       // self.init or super.init was not called. If we're in the super.init
       // case, destroy any initialized fields.
-      destroyMemoryElements(Loc, Availability);
+      destroyMemoryElements(Release, Loc, Availability);
       processUninitializedRelease(Release, false, B.getInsertionPoint());
       break;
 
@@ -2886,7 +3163,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
         B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
-        destroyMemoryElements(Loc, Availability);
+        destroyMemoryElements(Release, Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
         break;
@@ -2921,7 +3198,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
         B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
-        destroyMemoryElements(Loc, Availability);
+        destroyMemoryElements(Release, Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
         break;

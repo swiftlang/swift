@@ -8,7 +8,7 @@ let suite = TestSuite("Diffing")
 
 // This availability test has to be this awkward because of
 // rdar://problem/48450376 - Availability checks don't apply to top-level code
-if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+if #available(SwiftStdlib 5.1, *) {
 
   suite.test("Diffing empty collections") {
     let a = [Int]()
@@ -628,6 +628,9 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
                 expectEqual(a, b.applying(diff.inverse())!)
               }}}}}}
   }
+}
+
+if #available(SwiftStdlib 5.2, *) {
 
   suite.test("Fast applicator error condition") {
     let bear = "bear"
@@ -690,6 +693,9 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
       .insert(offset: base.count, element: 4, associatedWith: nil)
     ])!))
   }
+}
+
+if #available(SwiftStdlib 5.1, *) {
 
   suite.test("Fast applicator fuzzer") {
     func makeArray() -> [Int] {

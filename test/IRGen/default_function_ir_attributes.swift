@@ -56,7 +56,7 @@ func foo() {}
 
 //   helper function: __swift_instantiateConcreteTypeFromMangledName
 // CHECK-LABEL: define {{.*}} @__swift_instantiateConcreteTypeFromMangledName(
-// CHECK-SAME: [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME:#[0-9]+]]
+// CHECK-SAME: [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME:#[0-9]+]]
 
 func use_metadata() -> Any.Type {
   return ((C) -> Int).self
@@ -96,7 +96,7 @@ func test_class_existential_cast_3(value: AnyObject) -> C & CP0 {
 
 //   metadata accessor
 // CHECK-LABEL: define {{.*}} @"$s30default_function_ir_attributes1CCMa"(
-// CHECK-SAME: [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME]]
+// CHECK-SAME: [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME:#[0-9]+]]
 
 //   helper function: dynamic_cast_existential_1_superclass_conditional
 // CHECK-LABEL: define {{.*}} @dynamic_cast_existential_1_superclass_conditional(
@@ -119,35 +119,35 @@ func test_computed_key_path_sil_thunks() -> KeyPath<S, Int> {
 }
 
 //   helper function: IR-generated key path getter
-// CHECK-LABEL: define {{.*}} @keypath_get(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_get(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path setter
-// CHECK-LABEL: define {{.*}} @keypath_set(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_set(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path arg layout accessor
-// CHECK-LABEL: define {{.*}} @keypath_get_arg_layout(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_get_arg_layout(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path destroy function
-// CHECK-LABEL: define {{.*}} @keypath_destroy(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_destroy(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path copy function
-// CHECK-LABEL: define {{.*}} @keypath_copy(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_copy(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path equals function
-// CHECK-LABEL: define {{.*}} @keypath_equals(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_equals(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path hash function
-// CHECK-LABEL: define {{.*}} @keypath_hash(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_hash(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path argument initializer
-// CHECK-LABEL: define {{.*}} @keypath_arg_init(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_arg_init(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 func test_computed_key_path_generic_thunks<T: P0 & Hashable>(value: T) -> KeyPath<S, Int> {
@@ -164,7 +164,7 @@ func test_computed_key_path_generic_thunks<T: P0 & Hashable>(value: T) -> KeyPat
 
 //   helper function: __swift_instantiateGenericMetadata
 // CHECK-LABEL: define {{.*}} @__swift_instantiateGenericMetadata(
-// CHECK-SAME: [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME]]
+// CHECK-SAME: [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME]]
 
 //   Use the presence of a target-cpu attribute as a litmus for
 //   whether constructInitialAttributes was called, since it's very
@@ -172,4 +172,5 @@ func test_computed_key_path_generic_thunks<T: P0 & Hashable>(value: T) -> KeyPat
 // CHECK: attributes [[ATTRS_SIMPLE]] = { [[CUSTOM_ATTRS:.*target-cpu.*]] }{{$}}
 // CHECK-DAG: attributes [[ATTRS_NOINLINE_NOUNWIND]] = { noinline nounwind {{.*target-cpu.*}} }
 // CHECK-DAG: attributes [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME]] = { noinline nounwind readnone {{.*}}"frame-pointer"="none"{{.*target-cpu.*}} }
+// CHECK-DAG: attributes [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME]] = { noinline nounwind readonly willreturn {{.*}}"frame-pointer"="none"{{.*target-cpu.*}} }
 // CHECK-DAG: attributes [[ATTRS_NOUNWIND]] = { nounwind [[CUSTOM_ATTRS]] }{{$}}

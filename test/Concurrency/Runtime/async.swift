@@ -1,14 +1,12 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// rdar://76038845
-// UNSUPPORTED: use_os_stdlib
-
-// rdar://79670222 : This test fails on iphonesimulator-x86_64
-// UNSUPPORTED: OS=ios && CPU=x86_64
+// rdar://82123254
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 import StdlibUnittest
@@ -22,7 +20,7 @@ import StdlibUnittest
 
 var asyncTests = TestSuite("Async")
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor MyActor {
   func synchronous() { }
 
@@ -34,7 +32,7 @@ actor MyActor {
   }
 }
 
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
   let actor = MyActor()
 
   asyncTests.test("Detach") {

@@ -164,7 +164,7 @@ extension UnavailableSwiftClass : SomeSwiftProtocol {
 
 func checkSwiftProtocolConformance() {
   // Make sure the runtime doesn't crash in the presence of a conformance
-  // record for a class that doesn't exsit at runtime.
+  // record for a class that doesn't exist at runtime.
   let x: Any = 42
   _blackHole(x as? SomeSwiftProtocol)
 }

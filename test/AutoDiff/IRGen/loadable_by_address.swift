@@ -4,6 +4,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 // `isLargeLoadableType` depends on the ABI and differs between architectures.
 // REQUIRES: CPU=x86_64
 

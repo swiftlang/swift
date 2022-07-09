@@ -337,7 +337,7 @@ Having the call context register be callee-saved is advantageous. It keeps the r
 
 Throwing functions communicate error values to their callers through the *error* register on some platforms. The error register holds a pointer to the error value if an error occurred, otherwise 0. The caller of a throwing function is expected to quickly check for 0 before continuing on with non-error code, otherwise branching to code to handle or propagate the error. Using a callee-saved register for the error register enables free conversion from non-throwing to throwing functions, which is required to honor the subtyping relationship.
 
-The specific registers used in these roles are documented in [another document on register usage](https://github.com/apple/swift/blob/main/docs/ABI/RegisterUsage.md).
+The specific registers used in these roles are documented in [the calling convention summary document](ABI/CallConvSummary.rst).
 
 ### <a name="function-signature-lowering"></a>Function Signature Lowering
 

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/reasync.swiftmodule %S/Inputs/reasync.swift -enable-experimental-concurrency -verify-syntax-tree
+// RUN: %target-swift-frontend -emit-module-path %t/reasync.swiftmodule %S/Inputs/reasync.swift -enable-experimental-concurrency -disable-availability-checking -verify-syntax-tree
 // RUN: %target-build-swift %s -I %t -o %t/main -module-name main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main

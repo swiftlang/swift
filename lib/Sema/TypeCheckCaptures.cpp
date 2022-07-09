@@ -107,8 +107,8 @@ public:
         // Pseudogeneric classes don't use their generic parameters so we
         // don't need to visit them.
         if (ObjC) {
-          if (auto clas = dyn_cast_or_null<ClassDecl>(ty->getAnyNominal())) {
-            if (clas->usesObjCGenericsModel()) {
+          if (auto clazz = dyn_cast_or_null<ClassDecl>(ty->getAnyNominal())) {
+            if (clazz->isTypeErasedGenericClass()) {
               return Action::SkipChildren;
             }
           }
@@ -177,6 +177,14 @@ public:
   /// if invalid.
   void addCapture(CapturedValue capture) {
     auto VD = capture.getDecl();
+    
+    if (auto var = dyn_cast<VarDecl>(VD)) {
+      // `async let` variables cannot currently be captured.
+      if (var->isAsyncLet()) {
+        Context.Diags.diagnose(capture.getLoc(), diag::capture_async_let_not_supported);
+        return;
+      }
+    }
 
     // Check to see if we already have an entry for this decl.
     unsigned &entryNumber = captureEntryNumber[VD];
@@ -529,8 +537,8 @@ public:
       if (!toTy || toTy->hasError())
         return false;
 
-      if (auto clas = dyn_cast_or_null<ClassDecl>(toTy->getAnyNominal())) {
-        if (clas->usesObjCGenericsModel()) {
+      if (auto clazz = dyn_cast_or_null<ClassDecl>(toTy->getAnyNominal())) {
+        if (clazz->isTypeErasedGenericClass()) {
           return false;
         }
       }
@@ -657,8 +665,8 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   // Extensions of generic ObjC functions can't use generic parameters from
   // their context.
   if (AFD && finder.hasGenericParamCaptures()) {
-    if (auto Clas = AFD->getParent()->getSelfClassDecl()) {
-      if (Clas->usesObjCGenericsModel()) {
+    if (auto clazz = AFD->getParent()->getSelfClassDecl()) {
+      if (clazz->isTypeErasedGenericClass()) {
         AFD->diagnose(diag::objc_generic_extension_using_type_parameter);
 
         // If it's possible, suggest adding @objc.

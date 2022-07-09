@@ -27,11 +27,12 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Indenting.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -83,7 +84,13 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
 
   // Filter out benign diagnostics for editing.
-  if (Info.ID == diag::lex_editor_placeholder.ID)
+  // oslog_invalid_log_message is spuriously output for live issues as modules
+  // in the index build are built without function bodies (including inline
+  // functions). OSLogOptimization expects SIL for bodies and hence errors
+  // when there isn't any. Ignore in live issues for now and re-evaluate if
+  // this (not having SIL for inline functions) becomes a more widespread issue.
+  if (Info.ID == diag::lex_editor_placeholder.ID ||
+      Info.ID == diag::oslog_invalid_log_message.ID)
     return;
 
   bool IsNote = (Info.Kind == DiagnosticKind::Note);
@@ -238,14 +245,18 @@ SwiftEditorDocumentFileMap::getByUnresolvedName(StringRef FilePath) {
 }
 
 SwiftEditorDocumentRef
-SwiftEditorDocumentFileMap::findByPath(StringRef FilePath) {
+SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
   SwiftEditorDocumentRef EditorDoc;
 
-  std::string ResolvedPath = SwiftLangSupport::resolvePathSymlinks(FilePath);
+  std::string Scratch;
+  if (!IsRealpath) {
+    Scratch = SwiftLangSupport::resolvePathSymlinks(FilePath);
+    FilePath = Scratch;
+  }
   Queue.dispatchSync([&]{
     for (auto &Entry : Docs) {
       if (Entry.getKey() == FilePath ||
-          Entry.getValue().ResolvedPath == ResolvedPath) {
+          Entry.getValue().ResolvedPath == FilePath) {
         EditorDoc = Entry.getValue().DocRef;
         break;
       }
@@ -601,7 +612,12 @@ struct SwiftSemanticToken {
     return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
   }
 };
+#if !defined(_MSC_VER)
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
+// FIXME: MSVC doesn't pack bitfields with different underlying types.
+// Giving up to check this in MSVC for now, becasue static_assert is only for
+// keeping low memory usage.
+#endif
 
 class SwiftDocumentSemanticInfo :
     public ThreadSafeRefCountedBase<SwiftDocumentSemanticInfo> {
@@ -643,7 +659,7 @@ public:
   void setCompilerArgs(ArrayRef<const char *> Args) {
     if (auto ASTMgr = this->ASTMgr.lock()) {
       InvokRef =
-          ASTMgr->getInvocation(Args, Filename, CompilerArgsError);
+          ASTMgr->getTypecheckInvocation(Args, Filename, CompilerArgsError);
     }
   }
 
@@ -652,7 +668,8 @@ public:
                         Optional<std::vector<DiagnosticEntryInfo>> &Diags,
                         ArrayRef<DiagnosticEntryInfo> ParserDiags);
 
-  void processLatestSnapshotAsync(EditableTextBufferRef EditableBuffer);
+  void processLatestSnapshotAsync(EditableTextBufferRef EditableBuffer,
+                                  SourceKitCancellationToken CancellationToken);
 
   void updateSemanticInfo(std::vector<SwiftSemanticToken> Toks,
                           std::vector<DiagnosticEntryInfo> Diags,
@@ -708,18 +725,16 @@ public:
           SM, BufferID, CompInv.getMainFileSyntaxParsingCache(), syntaxArena);
     }
 
-    Parser.reset(
-                 new ParserUnit(SM, SourceFileKind::Main, BufferID,
-                     CompInv.getLangOptions(),
-                     CompInv.getTypeCheckerOptions(),
-                     CompInv.getModuleName(),
-                     SynTreeCreator,
-                     CompInv.getMainFileSyntaxParsingCache())
-    );
+    Parser.reset(new ParserUnit(
+        SM, SourceFileKind::Main, BufferID, CompInv.getLangOptions(),
+        CompInv.getTypeCheckerOptions(), CompInv.getSILOptions(),
+        CompInv.getModuleName(), SynTreeCreator,
+        CompInv.getMainFileSyntaxParsingCache()));
 
     registerParseRequestFunctions(Parser->getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(
         Parser->getParser().Context.evaluator);
+    registerClangImporterRequestFunctions(Parser->getParser().Context.evaluator);
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
 
     IncrementalParsingEnabled =
@@ -729,8 +744,17 @@ public:
 
   void parseIfNeeded() {
     if (!IsParsed) {
-      Parser->parse();
-      IsParsed = true;
+      // Perform parsing on a deep stack that's the same size as the main thread
+      // during normal compilation to avoid stack overflows.
+      static WorkQueue BigStackQueue{
+          WorkQueue::Dequeuing::Concurrent,
+          "SwiftDocumentSyntaxInfo::parseIfNeeded.BigStackQueue"};
+      BigStackQueue.dispatchSync(
+          [this]() {
+            Parser->parse();
+            IsParsed = true;
+          },
+          /*isStackDeep=*/true);
     }
   }
 
@@ -953,9 +977,12 @@ public:
   }
 
   void annotate(const Decl *D, bool IsRef, CharSourceRange Range) {
+    if (!Range.isValid())
+      return;
+
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
-    auto Kind = CodeCompletionResult::getCodeCompletionDeclKind(D);
+    auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
     bool IsSystem = D->getModuleContext()->isSystemModule();
     SemaToks.emplace_back(Kind, ByteOffset, Length, IsRef, IsSystem);
   }
@@ -971,11 +998,14 @@ class AnnotAndDiagASTConsumer : public SwiftASTConsumer {
 
 public:
   std::vector<SwiftSemanticToken> SemaToks;
+  SourceKitCancellationToken CancellationToken;
 
   AnnotAndDiagASTConsumer(EditableTextBufferRef EditableBuffer,
-                          RefPtr<SwiftDocumentSemanticInfo> SemaInfoRef)
-    : EditableBuffer(std::move(EditableBuffer)),
-      SemaInfoRef(std::move(SemaInfoRef)) { }
+                          RefPtr<SwiftDocumentSemanticInfo> SemaInfoRef,
+                          SourceKitCancellationToken CancellationToken)
+      : EditableBuffer(std::move(EditableBuffer)),
+        SemaInfoRef(std::move(SemaInfoRef)),
+        CancellationToken(CancellationToken) {}
 
   void failed(StringRef Error) override {
     LOG_WARN_FUNC("sema annotations failed: " << Error);
@@ -1011,7 +1041,8 @@ public:
       // Save time if we already know we processed this AST version.
       if (DocSnapshot->getStamp() != EditableBuffer->getSnapshot()->getStamp()){
         // Handle edits that occurred after we processed the AST.
-        SemaInfoRef->processLatestSnapshotAsync(EditableBuffer);
+        SemaInfoRef->processLatestSnapshotAsync(EditableBuffer,
+                                                CancellationToken);
       }
       return;
     }
@@ -1034,7 +1065,8 @@ public:
 
     if (DocSnapshot->getStamp() != EditableBuffer->getSnapshot()->getStamp()) {
       // Handle edits that occurred after we processed the AST.
-      SemaInfoRef->processLatestSnapshotAsync(EditableBuffer);
+      SemaInfoRef->processLatestSnapshotAsync(EditableBuffer,
+                                              CancellationToken);
     }
   }
 };
@@ -1042,15 +1074,16 @@ public:
 } // anonymous namespace
 
 void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
-    EditableTextBufferRef EditableBuffer) {
+    EditableTextBufferRef EditableBuffer,
+    SourceKitCancellationToken CancellationToken) {
 
   SwiftInvocationRef Invok = InvokRef;
   if (!Invok)
     return;
 
   RefPtr<SwiftDocumentSemanticInfo> SemaInfoRef = this;
-  auto Consumer = std::make_shared<AnnotAndDiagASTConsumer>(EditableBuffer,
-                                                            SemaInfoRef);
+  auto Consumer = std::make_shared<AnnotAndDiagASTConsumer>(
+      EditableBuffer, SemaInfoRef, CancellationToken);
 
   // Semantic annotation queries for a particular document should cancel
   // previously queued queries for the same document. Each document has a
@@ -1058,7 +1091,7 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
   const void *OncePerASTToken = SemaInfoRef.get();
   if (auto ASTMgr = this->ASTMgr.lock()) {
     ASTMgr->processASTAsync(Invok, std::move(Consumer), OncePerASTToken,
-                            fileSystem);
+                            CancellationToken, fileSystem);
   }
 }
 
@@ -1597,29 +1630,30 @@ private:
   /// For example, if the CallExpr is enclosed in another expression or statement
   /// such as "outer(inner(<#closure#>))", or "if inner(<#closure#>)", then trailing
   /// closure should not be applied to the inner call.
-  std::pair<Expr*, bool> enclosingCallExprArg(SourceFile &SF, SourceLoc SL) {
+  std::pair<ArgumentList *, bool> enclosingCallExprArg(SourceFile &SF,
+                                                       SourceLoc SL) {
 
     class CallExprFinder : public SourceEntityWalker {
     public:
       const SourceManager &SM;
       SourceLoc TargetLoc;
-      std::pair<Expr *, Expr*> EnclosingCallAndArg;
+      std::pair<Expr *, ArgumentList *> EnclosingCallAndArg;
       Expr *OuterExpr;
       Stmt *OuterStmt;
       explicit CallExprFinder(const SourceManager &SM)
         :SM(SM) { }
 
       bool checkCallExpr(Expr *E) {
-        Expr* Arg = nullptr;
+        ArgumentList *Args = nullptr;
         if (auto *CE = dyn_cast<CallExpr>(E)) {
           // Call expression can have argument.
-          Arg = CE->getArg();
+          Args = CE->getArgs();
         }
-        if (!Arg)
+        if (!Args)
           return false;
         if (EnclosingCallAndArg.first)
           OuterExpr = EnclosingCallAndArg.first;
-        EnclosingCallAndArg = {E, Arg};
+        EnclosingCallAndArg = {E, Args};
         return true;
       }
 
@@ -1683,7 +1717,7 @@ private:
 
       bool shouldWalkInactiveConfigRegion() override { return true; }
 
-      Expr *findEnclosingCallArg(SourceFile &SF, SourceLoc SL) {
+      ArgumentList *findEnclosingCallArg(SourceFile &SF, SourceLoc SL) {
         EnclosingCallAndArg = {nullptr, nullptr};
         OuterExpr = nullptr;
         OuterStmt = nullptr;
@@ -1694,16 +1728,16 @@ private:
     };
 
     CallExprFinder CEFinder(SM);
-    auto *CE = CEFinder.findEnclosingCallArg(SF, SL);
+    auto *Args = CEFinder.findEnclosingCallArg(SF, SL);
 
-    if (!CE)
-      return std::make_pair(CE, false);
+    if (!Args)
+      return std::make_pair(Args, false);
     if (CEFinder.OuterExpr)
-      return std::make_pair(CE, false);
+      return std::make_pair(Args, false);
     if (CEFinder.OuterStmt)
-      return std::make_pair(CE, false);
+      return std::make_pair(Args, false);
 
-    return std::make_pair(CE, true);
+    return std::make_pair(Args, true);
   }
 
   struct ParamClosureInfo {
@@ -1712,19 +1746,21 @@ private:
     bool isWrappedWithBraces = false;
   };
 
-  /// Scan the given TupleExpr collecting parameter closure information and
+  /// Scan the given ArgumentList collecting argument closure information and
   /// returning the index of the given target placeholder (if found).
-  Optional<unsigned> scanTupleExpr(TupleExpr *TE, SourceLoc targetPlaceholderLoc,
-                                   std::vector<ParamClosureInfo> &outParams) {
-    if (TE->getElements().empty())
+  Optional<unsigned>
+  scanArgumentList(ArgumentList *Args, SourceLoc targetPlaceholderLoc,
+                   std::vector<ParamClosureInfo> &outParams) {
+    if (Args->empty())
       return llvm::None;
 
     outParams.clear();
-    outParams.reserve(TE->getNumElements());
+    outParams.reserve(Args->size());
 
     Optional<unsigned> targetPlaceholderIndex;
 
-    for (Expr *E : TE->getElements()) {
+    for (auto Arg : *Args) {
+      auto *E = Arg.getExpr();
       outParams.emplace_back();
       auto &outParam = outParams.back();
 
@@ -1770,10 +1806,10 @@ public:
   /// a typed completion placeholder in a function call.
   /// For example: foo.bar(aaa, <#T##(Int, Int) -> Bool#>).
   bool scan(SourceFile &SF, unsigned BufID, unsigned Offset, unsigned Length,
-            std::function<void(Expr *Args, bool UseTrailingClosure,
+            std::function<void(ArgumentList *Args, bool UseTrailingClosure,
                                bool isWrappedWithBraces, const ClosureInfo &)>
                 OneClosureCallback,
-            std::function<void(TupleExpr *Args, unsigned FirstTrailingIndex,
+            std::function<void(ArgumentList *Args, unsigned FirstTrailingIndex,
                                ArrayRef<ClosureInfo> trailingClosures)>
                 MultiClosureCallback,
             std::function<bool(EditorPlaceholderExpr *)> NonClosureCallback) {
@@ -1797,15 +1833,10 @@ public:
     std::vector<ParamClosureInfo> params;
     Optional<unsigned> targetPlaceholderIndex;
     auto ECE = enclosingCallExprArg(SF, PlaceholderStartLoc);
-    Expr *Args = ECE.first;
+    ArgumentList *Args = ECE.first;
     if (Args && ECE.second) {
-      if (isa<ParenExpr>(Args)) {
-        params.emplace_back();
-        params.back().placeholderClosure = TargetClosureInfo;
-        targetPlaceholderIndex = 0;
-      } else if (auto *TE = dyn_cast<TupleExpr>(Args)) {
-        targetPlaceholderIndex = scanTupleExpr(TE, PlaceholderStartLoc, params);
-      }
+      targetPlaceholderIndex =
+          scanArgumentList(Args, PlaceholderStartLoc, params);
     }
 
     // If there was no appropriate parent call expression, it's non-trailing.
@@ -1849,8 +1880,7 @@ public:
          llvm::makeArrayRef(params).slice(firstTrailingIndex)) {
       trailingClosures.push_back(*param.placeholderClosure);
     }
-    MultiClosureCallback(cast<TupleExpr>(Args), firstTrailingIndex,
-                         trailingClosures);
+    MultiClosureCallback(Args, firstTrailingIndex, trailingClosures);
     return true;
   }
 };
@@ -1893,9 +1923,10 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 }
 
 static void updateSemaInfo(RefPtr<SwiftDocumentSemanticInfo> SemanticInfo,
-                           EditableTextBufferRef EditableBuffer) {
+                           EditableTextBufferRef EditableBuffer,
+                           SourceKitCancellationToken CancellationToken) {
   if (SemanticInfo) {
-    SemanticInfo->processLatestSnapshotAsync(EditableBuffer);
+    SemanticInfo->processLatestSnapshotAsync(EditableBuffer, CancellationToken);
   }
 }
 
@@ -1939,7 +1970,10 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
   if (ProvideSemanticInfo) {
     // If this is not a no-op, update semantic info.
     if (Length != 0 || Buf->getBufferSize() != 0) {
-      ::updateSemaInfo(SemanticInfo, EditableBuffer);
+      // We implicitly send the semantic info as a notification after the edit.
+      // The client thus doesn't have a handle to cancel it.
+      ::updateSemaInfo(SemanticInfo, EditableBuffer,
+                       /*CancellationToken=*/nullptr);
 
       // FIXME: we should also update any "interesting" ASTs that depend on this
       // document here, e.g. any ASTs for files visible in an editor. However,
@@ -1951,7 +1985,8 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
   return Snapshot;
 }
 
-void SwiftEditorDocument::updateSemaInfo() {
+void SwiftEditorDocument::updateSemaInfo(
+    SourceKitCancellationToken CancellationToken) {
   Impl.AccessMtx.lock();
   auto EditableBuffer = Impl.EditableBuffer;
   auto SemanticInfo = Impl.SemanticInfo;
@@ -1959,7 +1994,7 @@ void SwiftEditorDocument::updateSemaInfo() {
   // may call back to the editor for document state.
   Impl.AccessMtx.unlock();
 
-  ::updateSemaInfo(SemanticInfo, EditableBuffer);
+  ::updateSemaInfo(SemanticInfo, EditableBuffer, CancellationToken);
 }
 
 void SwiftEditorDocument::resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
@@ -1985,8 +2020,8 @@ void SwiftEditorDocument::resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
     Args.push_back("-");
     std::string Error;
     // Ignore possible error(s)
-    Lang.getASTManager()->
-      initCompilerInvocation(CompInv, Args, StringRef(), Error);
+    Lang.getASTManager()->initCompilerInvocation(
+        CompInv, Args, FrontendOptions::ActionType::Parse, StringRef(), Error);
   }
   CompInv.getLangOptions().BuildSyntaxTree = BuildSyntaxTree;
   CompInv.setMainFileSyntaxParsingCache(SyntaxCache);
@@ -2190,7 +2225,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
   SourceFile &SF = SyntaxInfo->getSourceFile();
 
   Scanner.scan(SF, BufID, Offset, Length,
-          [&](Expr *Args,
+          [&](ArgumentList *Args,
               bool UseTrailingClosure, bool isWrappedWithBraces,
               const PlaceholderExpansionScanner::ClosureInfo &closure) {
 
@@ -2202,7 +2237,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         if (UseTrailingClosure) {
           assert(Args);
 
-          if (isa<ParenExpr>(Args)) {
+          if (Args->isUnary()) {
             // There appears to be no other parameters in this call, so we'll
             // expand replacement for trailing closure and cover call parens.
             // For example:
@@ -2210,25 +2245,16 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
             EffectiveOffset = SM.getLocOffsetInBuffer(Args->getStartLoc(), BufID);
             OS << " ";
           } else {
-            auto *TupleE = cast<TupleExpr>(Args);
-            auto Elems = TupleE->getElements();
-            assert(!Elems.empty());
-            if (Elems.size() == 1) {
-              EffectiveOffset = SM.getLocOffsetInBuffer(Args->getStartLoc(), BufID);
-              OS << " ";
-            } else {
-              // Expand replacement range for trailing closure.
-              // For example:
-              // foo.bar(a, <#closure#>) turns into foo.bar(a) <#closure#>.
+            // Expand replacement range for trailing closure.
+            // For example:
+            // foo.bar(a, <#closure#>) turns into foo.bar(a) <#closure#>.
 
-              // If the preceding token in the call is the leading parameter
-              // separator, we'll expand replacement to cover that.
-              assert(Elems.size() > 1);
-              SourceLoc BeforeLoc = Lexer::getLocForEndOfToken(SM,
-                                              Elems[Elems.size()-2]->getEndLoc());
-              EffectiveOffset = SM.getLocOffsetInBuffer(BeforeLoc, BufID);
-              OS << ") ";
-            }
+            // If the preceding token in the call is the leading parameter
+            // separator, we'll expand replacement to cover that.
+            auto *Arg = Args->getExpr(Args->size() - 2);
+            auto BeforeLoc = Lexer::getLocForEndOfToken(SM, Arg->getEndLoc());
+            EffectiveOffset = SM.getLocOffsetInBuffer(BeforeLoc, BufID);
+            OS << ") ";
           }
 
           unsigned End = SM.getLocOffsetInBuffer(Args->getEndLoc(), BufID);
@@ -2246,7 +2272,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
       Consumer.handleSourceText(ExpansionStr);
       Consumer.recordAffectedRange(EffectiveOffset, EffectiveLength);
 
-    },[&](TupleExpr *args, unsigned firstTrailingIndex,
+    },[&](ArgumentList *args, unsigned firstTrailingIndex,
           ArrayRef<PlaceholderExpansionScanner::ClosureInfo> trailingClosures) {
       unsigned EffectiveOffset = Offset;
       unsigned EffectiveLength = Length;
@@ -2254,7 +2280,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
       {
         llvm::raw_svector_ostream OS(ExpansionStr);
 
-        assert(args->getNumElements() - firstTrailingIndex == trailingClosures.size());
+        assert(args->size() - firstTrailingIndex == trailingClosures.size());
         if (firstTrailingIndex == 0) {
           // foo(<....>) -> foo { <...> }
           EffectiveOffset = SM.getLocOffsetInBuffer(args->getStartLoc(), BufID);
@@ -2262,7 +2288,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         } else {
           // foo(blah, <....>) -> foo(blah) { <...> }
           SourceLoc beforeTrailingLoc = Lexer::getLocForEndOfToken(SM,
-              args->getElements()[firstTrailingIndex - 1]->getEndLoc());
+              args->getExpr(firstTrailingIndex - 1)->getEndLoc());
           EffectiveOffset = SM.getLocOffsetInBuffer(beforeTrailingLoc, BufID);
           OS << ") ";
         }
@@ -2271,12 +2297,12 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         EffectiveLength = (End + 1) - EffectiveOffset;
 
         unsigned argI = firstTrailingIndex;
-        for (unsigned i = 0; argI != args->getNumElements(); ++i, ++argI) {
+        for (unsigned i = 0; argI != args->size(); ++i, ++argI) {
           const auto &closure = trailingClosures[i];
           if (i == 0) {
             OS << "{ ";
           } else {
-            auto label = args->getElementName(argI);
+            auto label = args->getLabel(argI);
             OS << " " << (label.empty() ? "_" : label.str()) << ": { ";
           }
           printClosureBody(closure, OS, SM);
@@ -2355,7 +2381,9 @@ void SwiftLangSupport::editorOpen(
   }
 
   if (Consumer.needsSemanticInfo()) {
-    EditorDoc->updateSemaInfo();
+    // We implicitly send the semantic info as a notification after the
+    // document is opened. The client thus doesn't have a handle to cancel it.
+    EditorDoc->updateSemaInfo(/*CancellationToken=*/nullptr);
   }
 
   if (!Consumer.documentStructureEnabled() &&

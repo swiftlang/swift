@@ -76,6 +76,11 @@ func test5() -> Int {
 // CHECK: <comment-line>// <comment-url>http://whatever.com/what-ever</comment-url></comment-line>
 // http://whatever.com/what-ever
 
+// service://example.com
+// sip://example.com
+// CHECK: <comment-line>// <comment-url>service://example.com</comment-url></comment-line>
+// CHECK: <comment-line>// <comment-url>sip://example.com</comment-url></comment-line>
+
 /// Brief.
 ///
 /// Simple case.

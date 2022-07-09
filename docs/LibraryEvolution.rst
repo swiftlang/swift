@@ -269,15 +269,16 @@ Always Emit Into Client
 A function, computed property or subscript annotated as ``@_alwaysEmitIntoClient``
 is similar to an ``@inlinable`` declaration, except the declaration is
 not part of the module's ABI, meaning that the client must always emit
-their own copy.
+their own copy. As a result:
 
-As a result, removing a declaration annotated as ``@_alwaysEmitIntoClient``
-is a binary-compatible source-breaking change.
-
-.. admonition:: TODO
-
-    The implementation of ``@_alwaysEmitIntoClient`` is incomplete and
-    should probably graduate to having its own evolution proposal.
+- Removing a declaration annotated as ``@_alwaysEmitIntoClient`` is a
+  `binary-compatible source-breaking change`.
+- Adding ``@_alwaysEmitIntoClient`` to a declaration breaks ABI but is a
+  source-compatible change.
+- Removing ``@_alwaysEmitIntoClient`` from a declaration is a
+  binary-compatible change. It also requires updating the availability
+  to at least the OS version where the attribute was removed. As a result,
+  it may be a source-breaking change.
 
 Default Argument Expressions
 ----------------------------
@@ -365,7 +366,7 @@ the following changes are permitted:
 - Adding or removing a conformance to a non-ABI-public protocol.
 - Adding ``@dynamicCallable`` to the struct.
 
-The important most aspect of a Swift struct is its value semantics, not its
+The most important aspect of a Swift struct is its value semantics, not its
 layout. Note that adding a stored property to a struct is *not* a breaking
 change even with Swift's synthesis of memberwise and no-argument initializers;
 these initializers are always ``internal`` and thus not exposed to clients
@@ -845,6 +846,14 @@ Additionally, non-protocol extensions allow a few additional changes:
     protocol extensions that do *not* satisfy protocol requirements are not
     overridable, even when the conforming type is a class.
 
+.. note::
+    
+    It is an ABI incompatible change to move a member to an extension with 
+    different constraints. Similarly, it is an ABI incompatible change to move a member
+    from a constrained extension back to its base type. Note that this is the case 
+    even if the constraints from the extension are restated as constraints in the 
+    where clause of e.g. a function or subscript member.
+     
 
 Operators and Precedence Groups
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

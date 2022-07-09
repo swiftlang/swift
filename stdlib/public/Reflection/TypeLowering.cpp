@@ -18,12 +18,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_ENABLE_REFLECTION
+
+#include "llvm/Support/MathExtras.h"
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
+#include <iostream>
+#include <sstream>
+#include <limits>
 
 #ifdef DEBUG_TYPE_LOWERING
   #define DEBUG_LOG(expr) expr;
@@ -35,36 +41,36 @@ namespace swift {
 namespace reflection {
 
 void TypeInfo::dump() const {
-  dump(stderr);
+  dump(std::cerr);
 }
 
 namespace {
 
 class PrintTypeInfo {
-  FILE *file;
+  std::ostream &stream;
   unsigned Indent;
 
-  FILE * &indent(unsigned Amount) {
+  std::ostream &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
-      fprintf(file, " ");
-    return file;
+      stream << " ";
+    return stream;
   }
 
-  FILE * &printHeader(const std::string &name) {
-    fprintf(indent(Indent), "(%s", name.c_str());
-    return file;
+  std::ostream &printHeader(const std::string &name) {
+    indent(Indent) << "(" << name;
+    return stream;
   }
 
-  FILE * &printField(const std::string &name, const std::string &value) {
+  std::ostream &printField(const std::string &name, const std::string &value) {
     if (!name.empty())
-      fprintf(file, " %s=%s", name.c_str(), value.c_str());
+      stream << " " << name << "=" << value;
     else
-      fprintf(file, " %s", value.c_str());
-    return file;
+      stream << " " << name;
+    return stream;
   }
 
   void printRec(const TypeInfo &TI) {
-    fprintf(file, "\n");
+    stream << "\n";
 
     Indent += 2;
     print(TI);
@@ -82,13 +88,13 @@ class PrintTypeInfo {
   void printFields(const RecordTypeInfo &TI) {
     Indent += 2;
     for (auto Field : TI.getFields()) {
-      fprintf(file, "\n");
+      stream << "\n";
       printHeader("field");
       if (!Field.Name.empty())
         printField("name", Field.Name);
       printField("offset", std::to_string(Field.Offset));
       printRec(Field.TI);
-      fprintf(file, ")");
+      stream << ")";
     }
     Indent -= 2;
   }
@@ -98,7 +104,7 @@ class PrintTypeInfo {
     int Index = -1;
     for (auto Case : TI.getCases()) {
       Index += 1;
-      fprintf(file, "\n");
+      stream << "\n";
       printHeader("case");
       if (!Case.Name.empty())
         printField("name", Case.Name);
@@ -107,26 +113,26 @@ class PrintTypeInfo {
         printField("offset", std::to_string(Case.Offset));
         printRec(Case.TI);
       }
-      fprintf(file, ")");
+      stream << ")";
     }
     Indent -= 2;
   }
 
 public:
-  PrintTypeInfo(FILE *file, unsigned Indent)
-    : file(file), Indent(Indent) {}
+  PrintTypeInfo(std::ostream &stream, unsigned Indent)
+      : stream(stream), Indent(Indent) {}
 
   void print(const TypeInfo &TI) {
     switch (TI.getKind()) {
     case TypeInfoKind::Invalid:
       printHeader("invalid");
-      fprintf(file, ")");
+      stream << ")";
       return;
 
     case TypeInfoKind::Builtin:
       printHeader("builtin");
       printBasic(TI);
-      fprintf(file, ")");
+      stream << ")";
       return;
 
     case TypeInfoKind::Record: {
@@ -165,7 +171,7 @@ public:
       }
       printBasic(TI);
       printFields(RecordTI);
-      fprintf(file, ")");
+      stream << ")";
       return;
     }
 
@@ -184,7 +190,7 @@ public:
       }
       printBasic(TI);
       printCases(EnumTI);
-      fprintf(file, ")");
+      stream << ")";
       return;
     }
 
@@ -207,7 +213,7 @@ public:
         break;
       }
 
-      fprintf(file, ")");
+      stream << ")";
       return;
     }
     }
@@ -218,9 +224,9 @@ public:
 
 } // end anonymous namespace
 
-void TypeInfo::dump(FILE *file, unsigned Indent) const {
-  PrintTypeInfo(file, Indent).print(*this);
-  fprintf(file, "\n");
+void TypeInfo::dump(std::ostream &stream, unsigned Indent) const {
+  PrintTypeInfo(stream, Indent).print(*this);
+  stream << "\n";
 }
 
 BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
@@ -258,13 +264,16 @@ BuiltinTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
 bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
                                               remote::RemoteAddress address,
                                               int *extraInhabitantIndex) const {
+  *extraInhabitantIndex = -1;
+
   switch (SubKind) {
   case RecordKind::Invalid:
   case RecordKind::ClosureContext:
     return false;
 
-  case RecordKind::OpaqueExistential: {
-    if (Fields.size() != 1) {
+  case RecordKind::OpaqueExistential:
+  case RecordKind::ExistentialMetatype: {
+    if (Fields.size() < 1) {
       return false;
     }
     auto metadata = Fields[0];
@@ -274,7 +283,7 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
   }
 
   case RecordKind::ThickFunction: {
-    if (Fields.size() != 2) {
+    if (Fields.size() < 2) {
       return false;
     }
     auto function = Fields[0];
@@ -288,16 +297,25 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
   }
 
   case RecordKind::ClassExistential:
-  case RecordKind::ExistentialMetatype:
-  case RecordKind::ErrorExistential:
-  case RecordKind::ClassInstance: {
-    return false; // XXX TODO XXX
+  case RecordKind::ErrorExistential: {
+    if (Fields.size() < 1) {
+      return true;
+    }
+    auto first = Fields[0];
+    auto firstFieldAddress = address + first.Offset;
+    return first.TI.readExtraInhabitantIndex(reader, firstFieldAddress,
+                                             extraInhabitantIndex);
   }
+
+  case RecordKind::ClassInstance:
+    // This case seems unlikely to ever happen; if we're using XIs with a
+    // class, it'll be with a reference, not with the instance itself (i.e.
+    // we'll be in the RecordKind::ClassExistential case).
+    return false;
 
   case RecordKind::Tuple:
   case RecordKind::Struct: {
     if (Fields.size() == 0) {
-      *extraInhabitantIndex = -1;
       return true;
     }
     // Tuples and Structs inherit XIs from their most capacious member
@@ -628,18 +646,87 @@ public:
 // A variable-length bitmap used to track "spare bits" for general multi-payload
 // enums.
 class BitMask {
-  unsigned size;
+  static constexpr unsigned maxSize = 128 * 1024 * 1024; // 128MB
+
+  unsigned size; // Size of mask in bytes
   uint8_t *mask;
 public:
-  BitMask(int sizeInBytes): size(sizeInBytes) {
-    mask = (uint8_t *)malloc(size);
-    memset(mask, 0xff, size);
-  }
   ~BitMask() {
     free(mask);
   }
+  // Construct a bitmask of the appropriate number of bytes
+  // initialized to all bits set
+  BitMask(unsigned sizeInBytes): size(sizeInBytes) {
+    // Gracefully fail by constructing an empty mask if we exceed the size
+    // limit.
+    if (size > maxSize) {
+      size = 0;
+      mask = nullptr;
+      return;
+    }
+
+    mask = (uint8_t *)malloc(size);
+
+    if (!mask) {
+      // Malloc might fail if size is large due to some bad data. Assert in
+      // asserts builds, and fail gracefully in non-asserts builds by
+      // constructing an empty BitMask.
+      assert(false && "Failed to allocate BitMask");
+      size = 0;
+      return;
+    }
+
+    memset(mask, 0xff, size);
+  }
+  // Construct a bitmask of the appropriate number of bytes
+  // initialized with bits from the specified buffer
+  BitMask(unsigned sizeInBytes, const uint8_t *initialValue,
+          unsigned initialValueBytes, unsigned offset)
+      : size(sizeInBytes) {
+    // Gracefully fail by constructing an empty mask if we exceed the size
+    // limit.
+    if (size > maxSize) {
+      size = 0;
+      mask = nullptr;
+      return;
+    }
+
+    // Bad data could cause the initial value location to be off the end of our
+    // size. If initialValueBytes + offset is beyond sizeInBytes (or overflows),
+    // assert in asserts builds, and fail gracefully in non-asserts builds by
+    // constructing an empty BitMask.
+    bool overflowed = false;
+    unsigned initialValueEnd =
+        llvm::SaturatingAdd(initialValueBytes, offset, &overflowed);
+    if (overflowed) {
+      assert(false && "initialValueBytes + offset overflowed");
+      size = 0;
+      mask = nullptr;
+      return;
+    }
+    assert(initialValueEnd <= sizeInBytes);
+    if (initialValueEnd > size) {
+      assert(false && "initialValueBytes + offset is greater than size");
+      size = 0;
+      mask = nullptr;
+      return;
+    }
+
+    mask = (uint8_t *)calloc(1, size);
+
+    if (!mask) {
+      // Malloc might fail if size is large due to some bad data. Assert in
+      // asserts builds, and fail gracefully in non-asserts builds by
+      // constructing an empty BitMask.
+      assert(false && "Failed to allocate BitMask");
+      size = 0;
+      return;
+    }
+
+    memcpy(mask + offset, initialValue, initialValueBytes);
+  }
   // Move constructor moves ownership and zeros the src
-  BitMask(BitMask&& src) noexcept: size(src.size), mask(src.mask) {
+  BitMask(BitMask&& src) noexcept: size(src.size), mask(std::move(src.mask)) {
     src.size = 0;
     src.mask = nullptr;
   }
@@ -649,7 +736,41 @@ public:
     memcpy(mask, src.mask, size);
   }
 
-  void makeZero() { memset(mask, 0, size); }
+  std::string str() const {
+    std::ostringstream buff;
+    buff << size << ":0x";
+    for (unsigned i = 0; i < size; i++) {
+      buff << std::hex << ((mask[i] >> 4) & 0x0f) << (mask[i] & 0x0f);
+    }
+    return buff.str();
+  }
+
+  bool operator==(const BitMask& rhs) const {
+    // The two masks may be of different sizes.
+    // The common prefix must be identical.
+    size_t common = std::min(size, rhs.size);
+    if (memcmp(mask, rhs.mask, common) != 0)
+      return false;
+    // The remainder of the longer mask must be
+    // all zero bits.
+    unsigned mustBeZeroSize = std::max(size, rhs.size) - common;
+    uint8_t *mustBeZero;
+    if (size < rhs.size) {
+      mustBeZero = rhs.mask + size;
+    } else if (size > rhs.size) {
+      mustBeZero = mask + rhs.size;
+    }
+    for (unsigned i = 0; i < mustBeZeroSize; ++i) {
+      if (mustBeZero[i] != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool operator!=(const BitMask& rhs) const {
+    return !(*this == rhs);
+  }
 
   bool isNonZero() const { return !isZero(); }
 
@@ -660,6 +781,10 @@ public:
       }
     }
     return true;
+  }
+
+  void makeZero() {
+    memset(mask, 0, size * sizeof(mask[0]));
   }
 
   void complement() {
@@ -688,23 +813,32 @@ public:
     return bits;
   }
 
+  // Treat the provided value as a mask, `and` it with
+  // the part of the mask at the provided byte offset.
+  // Bits outside the specified area are unchanged.
   template<typename IntegerType>
   void andMask(IntegerType value, unsigned byteOffset) {
     andMask((void *)&value, sizeof(value), byteOffset);
   }
 
+  // As above, but using the provided bitmask instead
+  // of an integer.
   void andMask(BitMask mask, unsigned offset) {
     andMask(mask.mask, mask.size, offset);
   }
 
+  // As above, but using the complement of the
+  // provided mask.
   void andNotMask(BitMask mask, unsigned offset) {
-    andNotMask(mask.mask, mask.size, offset);
+    if (offset < size) {
+      andNotMask(mask.mask, mask.size, offset);
+    }
   }
 
   // Zero all bits except for the `n` most significant ones.
   // XXX TODO: Big-endian support?
-  void keepOnlyMostSignificantBits(int n) {
-    int count = 0;
+  void keepOnlyMostSignificantBits(unsigned n) {
+    unsigned count = 0;
     if (size < 1) {
       return;
     }
@@ -725,15 +859,15 @@ public:
     }
   }
 
-  int numBits() const {
+  unsigned numBits() const {
     return size * 8;
   }
 
-  int numSetBits() const {
-    int count = 0;
+  unsigned numSetBits() const {
+    unsigned count = 0;
     for (unsigned i = 0; i < size; ++i) {
       if (mask[i] != 0) {
-        for (int b = 1; b < 256; b <<= 1) {
+        for (unsigned b = 1; b < 256; b <<= 1) {
           if ((mask[i] & b) != 0) {
             ++count;
           }
@@ -760,7 +894,7 @@ public:
     IntegerType resultBit = 1; // Start from least-significant bit
     auto bytes = static_cast<const uint8_t *>(data.get());
     for (unsigned i = 0; i < size; ++i) {
-      for (int b = 1; b < 256; b <<= 1) {
+      for (unsigned b = 1; b < 256; b <<= 1) {
         if ((mask[i] & b) != 0) {
           if ((bytes[i] & b) != 0) {
             result |= resultBit;
@@ -776,18 +910,23 @@ public:
 
 private:
   void andMask(void *maskData, unsigned len, unsigned offset) {
-    assert(offset + len <= size);
-    uint8_t *maskBytes = (uint8_t *)maskData;
-    for (unsigned i = 0; i < len; ++i) {
-      mask[i + offset] &= maskBytes[i];
+    if (offset < size) {
+      unsigned common = std::min(len, size - offset);
+      uint8_t *maskBytes = (uint8_t *)maskData;
+      for (unsigned i = 0; i < common; ++i) {
+        mask[i + offset] &= maskBytes[i];
+      }
     }
   }
 
   void andNotMask(void *maskData, unsigned len, unsigned offset) {
-    assert(offset + len <= size);
-    uint8_t *maskBytes = (uint8_t *)maskData;
-    for (unsigned i = 0; i < len; ++i) {
-      mask[i + offset] &= ~maskBytes[i];
+    assert(offset < size);
+    if (offset < size) {
+      unsigned common = std::min(len, size - offset);
+      uint8_t *maskBytes = (uint8_t *)maskData;
+      for (unsigned i = 0; i < common; ++i) {
+        mask[i + offset] &= ~maskBytes[i];
+      }
     }
   }
 };
@@ -973,6 +1112,63 @@ public:
     return payloadTagBitsMask;
   }
 };
+
+// Recursively populate the spare bit mask for this single type
+static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mpePointerSpareBits);
+
+// Recursively populate the spare bit mask for this collection of
+// record fields or enum cases.
+static bool populateSpareBitsMask(const std::vector<FieldInfo> &Fields, BitMask &mask, uint64_t mpePointerSpareBits) {
+  for (auto Field : Fields) {
+    if (Field.TR != 0) {
+      BitMask submask(Field.TI.getSize());
+      if (!populateSpareBitsMask(&Field.TI, submask, mpePointerSpareBits)) {
+        return false;
+      }
+      mask.andMask(submask, Field.Offset);
+    }
+  }
+  return true;
+}
+
+// General recursive type walk to combine spare bit info from nested structures.
+static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mpePointerSpareBits) {
+  switch (TI->getKind()) {
+  case TypeInfoKind::Reference: {
+    if (TI->getSize() == 8) {
+      mask.andMask(mpePointerSpareBits, 0);
+    } else /* TI->getSize() == 4 */ {
+      uint32_t pointerMask = (uint32_t)mpePointerSpareBits;
+      mask.andMask(pointerMask, 0);
+    }
+    break;
+  }
+  case TypeInfoKind::Enum: {
+    auto EnumTI = reinterpret_cast<const EnumTypeInfo *>(TI);
+    // Remove bits used by the payloads
+    if (!populateSpareBitsMask(EnumTI->getCases(), mask, mpePointerSpareBits)) {
+      return false;
+    }
+    // TODO: Remove bits needed to discriminate payloads.
+    // Until then, return false for any type with an enum in it so we
+    // won't claim to support something we don't.
+    return false;
+    break;
+  }
+  case TypeInfoKind::Record: {
+    auto RecordTI = dyn_cast<RecordTypeInfo>(TI);
+    if (!populateSpareBitsMask(RecordTI->getFields(), mask, mpePointerSpareBits)) {
+      return false;
+    }
+    break;
+  }
+  default: {
+    mask.makeZero();
+    break;
+  }
+  }
+  return true;
+}
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
@@ -1562,6 +1758,11 @@ public:
   }
 
   bool
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return true;
+  }
+
+  bool
   visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return true;
   }
@@ -1674,6 +1875,11 @@ public:
 
   MetatypeRepresentation
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -1864,6 +2070,9 @@ public:
     } else {
       // MultiPayloadEnumImplStrategy
 
+      // Uncomment the following line to dump the MPE section every time we come through here...
+      //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
+
       // Check if this is a dynamic or static multi-payload enum
 
       // If we have a fixed descriptor for this type, it is a fixed-size
@@ -1877,33 +2086,84 @@ public:
         unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
         if (Stride == 0)
           Stride = 1;
-
-/*
-        // TODO: Obtain spare bit mask data from the field descriptor
-        // TODO: Have the compiler emit spare bit mask data in the FD
         auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
-        BitMask spareBitsMask(PayloadSize);
-        if (readSpareBitsMask(XYZ, spareBitsMask)) {
-          if (spareBitsMask.isZero()) {
+
+        // If there's a multi-payload enum descriptor, then we
+        // have layout information from the compiler.
+        auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumInfo(TR);
+        if (MPEDescriptor) {
+          if (MPEDescriptor->usesPayloadSpareBits()) {
+            auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
+            auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
+            auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
+            BitMask spareBitsMask(PayloadSize, SpareBitMask,
+                                  PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
+
+            if (!spareBitsMask.isZero()) {
+
+#if 0  // TODO: This should be !defined(NDEBUG)
+              // DEBUG verification that compiler mask and locally-computed
+              // mask are the same (whenever both are available).
+              BitMask locallyComputedSpareBitsMask(PayloadSize);
+              auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+              auto locallyComputedSpareBitsMaskIsValid
+                = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask, mpePointerSpareBits);
+              // If the local computation were always correct, we could:
+              // assert(locallyComputedSpareBitsMaskIsValid);
+              if (locallyComputedSpareBitsMaskIsValid) {
+                // Whenever the compiler and local computation both produce
+                // data, they should agree.
+                // TODO: Make this true, then change `#if 0` above
+                assert(locallyComputedSpareBitsMask == spareBitsMask);
+              }
+#endif
+
+              // Use compiler-provided spare bit information
+              return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
+                Size, Alignment, Stride, NumExtraInhabitants,
+                BitwiseTakable, Cases, spareBitsMask);
+            } else {
+              // The MPE descriptor doesn't make sense: It has a spare bit mask,
+              // but that mask is empty?  If this ever happens, fall through to
+              // the local calculation.
+            }
+          } else {
             // If there are no spare bits, use the "simple" tag-only implementation.
             return TC.makeTypeInfo<SimpleMultiPayloadEnumTypeInfo>(
               Size, Alignment, Stride, NumExtraInhabitants,
               BitwiseTakable, Cases);
-          } else {
-            // General case using a mix of spare bits and extra tag
-            return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
-              Size, Alignment, Stride, NumExtraInhabitants,
-              BitwiseTakable, Cases, spareBitsMask);
           }
         }
-*/
 
-        // Without spare bit mask info, we have to leave this particular
-        // enum as "Unsupported", meaning we will not be able to project
-        // cases or evaluate XIs.
-        return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
-          Size, Alignment, Stride, NumExtraInhabitants,
-          BitwiseTakable, EnumKind::MultiPayloadEnum, Cases);
+        // If there was no compiler data, try computing the mask ourselves
+        // (This is less robust, but necessary to support images from older
+        // compilers.)
+        BitMask spareBitsMask(PayloadSize);
+        auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+        auto validSpareBitsMask = populateSpareBitsMask(Cases, spareBitsMask, mpePointerSpareBits);
+        // For DEBUGGING, disable fallback to local computation to
+        // make missing compiler data more obvious:
+        // validSpareBitsMask = false;
+        if (!validSpareBitsMask) {
+          // If we couldn't correctly determine the spare bits mask,
+          // return a TI that will always fail when asked for XIs or value.
+          return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
+            Size, Alignment, Stride, NumExtraInhabitants,
+            BitwiseTakable, EnumKind::MultiPayloadEnum, Cases);
+        } else if (spareBitsMask.isZero()) {
+          // Simple case that does not use spare bits
+          // This is correct as long as our local spare bits calculation
+          // above only returns an empty mask when the mask is really empty,
+          return TC.makeTypeInfo<SimpleMultiPayloadEnumTypeInfo>(
+            Size, Alignment, Stride, NumExtraInhabitants,
+            BitwiseTakable, Cases);
+        } else {
+          // General case can mix spare bits and extra discriminator
+          // It obviously relies on having an accurate spare bit mask.
+          return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
+            Size, Alignment, Stride, NumExtraInhabitants,
+            BitwiseTakable, Cases, spareBitsMask);
+        }
       } else {
         // Dynamic multi-payload enums cannot use spare bits, so they
         // always use a separate tag value:
@@ -2069,6 +2329,11 @@ public:
     return builder.build(ExternalTypeInfo);
   }
 
+  const TypeInfo *
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return visitProtocolCompositionTypeRef(CET->getBase());
+  }
+
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
@@ -2221,6 +2486,11 @@ public:
 const TypeInfo *
 TypeConverter::getTypeInfo(const TypeRef *TR,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
+  if (!TR) {
+    DEBUG_LOG(fprintf(stderr, "null TypeRef"));
+    return nullptr;
+  }
+
   // See if we already computed the result
   auto found = Cache.find({TR, ExternalTypeInfo});
   if (found != Cache.end())
@@ -2289,3 +2559,5 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(
 
 } // namespace reflection
 } // namespace swift
+
+#endif

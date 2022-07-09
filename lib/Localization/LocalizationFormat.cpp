@@ -76,7 +76,7 @@ void SerializedLocalizationWriter::insert(swift::DiagID id,
 bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
   assert(llvm::sys::path::extension(filePath) == ".db");
   std::error_code error;
-  llvm::raw_fd_ostream OS(filePath, error, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OS(filePath, error, llvm::sys::fs::OF_None);
   if (OS.has_error()) {
     return true;
   }
@@ -231,7 +231,7 @@ readYAML(llvm::yaml::IO &io, T &Seq, T &unknownIDs, bool, Context &Ctx) {
       io.beginMapping();
 
       // If the current diagnostic ID is available in YAML and in `.def`, add it
-      // to the diagnostics array. Otherwise, re-parse the current diagnnostic
+      // to the diagnostics array. Otherwise, re-parse the current diagnostic
       // id as a string and store it in `unknownIDs` array.
       if (auto id = LocalizationInput::readID(io)) {
         // YAML file isn't guaranteed to have diagnostics in order of their

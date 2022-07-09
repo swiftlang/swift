@@ -54,9 +54,9 @@ enum SingletonTypeSynthesizer {
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
   switch (kind) {
-  case _any: return SC.Context.TheAnyType;
+  case _any: return SC.Context.getAnyExistentialType();
   case _bridgeObject: return SC.Context.TheBridgeObjectType;
-  case _error: return SC.Context.getExceptionType();
+  case _error: return SC.Context.getErrorExistentialType();
   case _executor: return SC.Context.TheExecutorType;
   case _job: return SC.Context.TheJobType;
   case _nativeObject: return SC.Context.TheNativeObjectType;
@@ -128,6 +128,22 @@ template <class S>
 Type synthesizeType(SynthesisContext &SC,
                     const ExistentialMetatypeTypeSynthesizer<S> &M) {
   return ExistentialMetatypeType::get(synthesizeType(SC, M.Sub));
+}
+
+/// A synthesizer that generates a MoveOnly wrapper of a type.
+template <class S>
+struct MoveOnlyTypeSynthesizer {
+  S Sub;
+};
+template <class S>
+constexpr MoveOnlyTypeSynthesizer<S> _moveOnly(S sub) {
+  return {sub};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC, const MoveOnlyTypeSynthesizer<S> &M) {
+  // Until we get the actual move only type, we just return the synthesized
+  // type.
+  return synthesizeType(SC, M.Sub);
 }
 
 /// Helper types for variadic synthesis.

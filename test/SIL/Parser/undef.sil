@@ -33,23 +33,19 @@ bb0:
 
   // CHECK: alloc_ref_dynamic undef : $@thick C.Type, $C
   alloc_ref_dynamic undef : $@thick C.Type, $C
-  // CHECK: alloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
-  alloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
   // CHECK: dealloc_box undef : $<τ_0_0> { var τ_0_0 } <()>
   dealloc_box undef : $<τ_0_0> { var τ_0_0 } <()>
   // CHECK: dealloc_ref undef : $C
   dealloc_ref undef : $C
   // CHECK: dealloc_partial_ref undef : $D, undef : $@thick C.Type
   dealloc_partial_ref undef : $D, undef : $@thick C.Type
-  // CHECK: dealloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
-  dealloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
 
   // Debug information
 
   // CHECK: debug_value undef : $()
   debug_value undef : $()
-  // CHECK: debug_value_addr undef : $*()
-  debug_value_addr undef : $*()
+  // CHECK: debug_value undef : $*(), expr op_deref
+  debug_value undef : $*(), expr op_deref
 
   // Accessing memory
 
@@ -235,10 +231,6 @@ bb0:
   unmanaged_to_ref undef : $@sil_unmanaged C to $C
   // CHECK: convert_function undef : $(D) -> () to $(C) -> ()
   convert_function undef : $(D) -> () to $(C) -> ()
-  // CHECK: thin_function_to_pointer undef : $@convention(thin) () -> () to $Builtin.RawPointer
-  thin_function_to_pointer undef : $@convention(thin) () -> () to $Builtin.RawPointer
-  // CHECK: pointer_to_thin_function undef : $Builtin.RawPointer to $@convention(thin) () -> ()
-  pointer_to_thin_function undef : $Builtin.RawPointer to $@convention(thin) () -> ()
   // CHECK: ref_to_bridge_object undef : $C, undef : $Builtin.Word
   ref_to_bridge_object undef : $C, undef : $Builtin.Word
   // CHECK: bridge_object_to_ref undef : $Builtin.BridgeObject to $C

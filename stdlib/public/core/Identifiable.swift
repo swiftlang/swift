@@ -20,15 +20,15 @@
 /// data fields change, such as the user's name.
 ///
 /// `Identifiable` leaves the duration and scope of the identity unspecified.
-/// Identities could be any of the following:
+/// Identities can have any of the following characteristics:
 ///
-/// - Guaranteed always unique (e.g. UUIDs).
-/// - Persistently unique per environment (e.g. database record keys).
-/// - Unique for the lifetime of a process (e.g. global incrementing integers).
-/// - Unique for the lifetime of an object (e.g. object identifiers).
-/// - Unique within the current collection (e.g. collection index).
+/// - Guaranteed always unique, like UUIDs.
+/// - Persistently unique per environment, like database record keys.
+/// - Unique for the lifetime of a process, like global incrementing integers.
+/// - Unique for the lifetime of an object, like object identifiers.
+/// - Unique within the current collection, like collection indices.
 ///
-/// It is up to both the conformer and the receiver of the protocol to document
+/// It's up to both the conformer and the receiver of the protocol to document
 /// the nature of the identity.
 ///
 /// Conforming to the Identifiable Protocol
@@ -38,8 +38,8 @@
 /// `ObjectIdentifier`), which is only guaranteed to remain unique for the
 /// lifetime of an object. If an object has a stronger notion of identity, it
 /// may be appropriate to provide a custom implementation.
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-public protocol Identifiable {
+@available(SwiftStdlib 5.1, *)
+public protocol Identifiable<ID> {
 
   /// A type representing the stable identity of the entity associated with
   /// an instance.
@@ -49,7 +49,7 @@ public protocol Identifiable {
   var id: ID { get }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension Identifiable where Self: AnyObject {
   public var id: ObjectIdentifier {
     return ObjectIdentifier(self)

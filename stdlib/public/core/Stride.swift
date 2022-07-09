@@ -96,7 +96,7 @@
 ///   `Stride` type's implementations. If a type conforming to `Strideable` is
 ///   its own `Stride` type, it must provide concrete implementations of the
 ///   two operators to avoid infinite recursion.
-public protocol Strideable: Comparable {
+public protocol Strideable<Stride>: Comparable {
   /// A type that represents the distance between two values.
   associatedtype Stride: SignedNumeric, Comparable
 
@@ -379,18 +379,24 @@ extension StrideTo: Sequence {
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
-    if element < _start || _end <= element {
-      return false
+    if _stride < 0 {
+      if element <= _end || _start < element { return false }
+    } else {
+      if element < _start || _end <= element { return false }
     }
+    // TODO: Additional implementation work will avoid always falling back to the
+    // predicate version of `contains` when the sequence *does* contain `element`.
     return nil
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension StrideTo: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["from": _start, "to": _end, "by": _stride])
   }
 }
+#endif
 
 // FIXME(conditional-conformances): This does not yet compile (SR-6474).
 #if false
@@ -590,19 +596,25 @@ extension StrideThrough: Sequence {
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
-    if element < _start || _end < element {
-      return false
+    if _stride < 0 {
+      if element < _end || _start < element { return false }
+    } else {
+      if element < _start || _end < element { return false }
     }
+    // TODO: Additional implementation work will avoid always falling back to the
+    // predicate version of `contains` when the sequence *does* contain `element`.
     return nil
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension StrideThrough: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self,
       children: ["from": _start, "through": _end, "by": _stride])
   }
 }
+#endif
 
 // FIXME(conditional-conformances): This does not yet compile (SR-6474).
 #if false

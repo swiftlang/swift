@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,11 +21,33 @@ let numberMap = Dictionary(uniqueKeysWithValues: zip(1...size, 1...size))
 let boxedNums = (1...size).lazy.map { Box($0) }
 let boxedNumMap = Dictionary(uniqueKeysWithValues: zip(boxedNums, boxedNums))
 
-public let DictionaryRemove = [
-  BenchmarkInfo(name: "DictionaryRemove",
-    runFunction: remove, tags: t, legacyFactor: 10),
-  BenchmarkInfo(name: "DictionaryRemoveOfObjects",
-    runFunction: removeObjects, tags: t, legacyFactor: 100),
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "DictionaryRemove",
+    runFunction: remove,
+    tags: t,
+    setUpFunction: { blackHole(numberMap) },
+    legacyFactor: 10),
+  BenchmarkInfo(
+    name: "DictionaryRemoveOfObjects",
+    runFunction: removeObjects,
+    tags: t,
+    setUpFunction: { blackHole(boxedNumMap) },
+    legacyFactor: 100),
+
+  BenchmarkInfo(
+    name: "DictionaryFilter",
+    runFunction: filter,
+    tags: t,
+    setUpFunction: { blackHole(numberMap) },
+    legacyFactor: 1),
+
+  BenchmarkInfo(
+    name: "DictionaryFilterOfObjects",
+    runFunction: filterObjects,
+    tags: t,
+    setUpFunction: { blackHole(boxedNumMap) },
+    legacyFactor: 1),
 ]
 
 class Box<T : Hashable> : Hashable {
@@ -44,18 +66,34 @@ class Box<T : Hashable> : Hashable {
   }
 }
 
-func remove(N: Int) {
-  for _ in 1...100*N {
+func remove(n: Int) {
+  for _ in 1...100*n {
     var dict = numberMap
     for i in 1...size { dict.removeValue(forKey: i) }
-    CheckResults(dict.isEmpty)
+    check(dict.isEmpty)
   }
 }
 
-func removeObjects(N: Int) {
-  for _ in 1...10*N {
+func removeObjects(n: Int) {
+  for _ in 1...10*n {
     var dict = boxedNumMap
     for i in 1...size { dict.removeValue(forKey: Box(i)) }
-    CheckResults(dict.isEmpty)
+    check(dict.isEmpty)
+  }
+}
+
+func filter(n: Int) {
+  for _ in 1...1000*n {
+    let dict = numberMap
+    let result = dict.filter {key, value in value % 2 == 0}
+    check(result.count == size/2)
+  }
+}
+
+func filterObjects(n: Int) {
+  for _ in 1...1000*n {
+    let dict = boxedNumMap
+    let result = dict.filter {key, value in value.value % 2 == 0}
+    check(result.count == size/2)
   }
 }

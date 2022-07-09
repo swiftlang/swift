@@ -84,11 +84,11 @@ doSomethingDeprecatedOniOS() // okay
 struct TestStruct {}
 
 @available(macOS 10.10, *)
-extension TestStruct { // expected-note {{enclosing scope here}}
+extension TestStruct { // expected-note {{enclosing scope requires availability of macOS 10.10 or newer}}
   @available(swift 400)
   func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift 400}}
 
-  @available(macOS 10.9, *) // expected-error {{declaration cannot be more available than enclosing scope}}
+  @available(macOS 10.9, *) // expected-error {{instance method cannot be more available than enclosing scope}}
   @available(swift 400)
   func doAnotherThing() {} // expected-note {{'doAnotherThing()' was introduced in Swift 400}}
 

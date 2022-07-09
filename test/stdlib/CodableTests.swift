@@ -76,14 +76,23 @@ func expectRoundTripEquality<T : Codable>(of value: T, encode: (T) throws -> Dat
     expectEqual(value, decoded, "\(#file):\(lineNumber): Decoded \(T.self) <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
 }
 
-func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, lineNumber: Int) where T : Equatable {
+func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, expectedJSON: String? = nil, lineNumber: Int) where T : Equatable {
     let inf = "INF", negInf = "-INF", nan = "NaN"
     let encode = { (_ value: T) throws -> Data in
         let encoder = JSONEncoder()
         encoder.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: inf,
                                                                       negativeInfinity: negInf,
                                                                       nan: nan)
-        return try encoder.encode(value)
+        if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+            encoder.outputFormatting = .sortedKeys
+        }
+        let encoded = try encoder.encode(value)
+
+        if let expectedJSON = expectedJSON {
+            let actualJSON = String(decoding: encoded, as: UTF8.self)
+            expectEqual(expectedJSON, actualJSON, line: UInt(lineNumber))
+        }
+        return encoded
     }
 
     let decode = { (_ type: T.Type, _ data: Data) throws -> T in
@@ -111,11 +120,20 @@ func expectRoundTripEqualityThroughPlist<T : Codable>(for value: T, lineNumber: 
 
 // MARK: - Helper Types
 // A wrapper around a UUID that will allow it to be encoded at the top level of an encoder.
-struct UUIDCodingWrapper : Codable, Equatable {
+struct UUIDCodingWrapper : Codable, Equatable, Hashable, CodingKeyRepresentable {
     let value: UUID
 
     init(_ value: UUID) {
         self.value = value
+    }
+
+    init?<T: CodingKey>(codingKey: T) {
+        guard let uuid = UUID(uuidString: codingKey.stringValue) else { return nil }
+        self.value = uuid
+    }
+
+    var codingKey: CodingKey {
+        GenericCodingKey(stringValue: value.uuidString)
     }
 
     static func ==(_ lhs: UUIDCodingWrapper, _ rhs: UUIDCodingWrapper) -> Bool {
@@ -416,7 +434,7 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - DateInterval
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-    lazy var dateIntervalValues: [Int : DateInterval] = [
+    static let dateIntervalValues: [Int : DateInterval] = [
         #line : DateInterval(),
         #line : DateInterval(start: Date.distantPast, end: Date()),
         #line : DateInterval(start: Date(), end: Date.distantFuture),
@@ -425,14 +443,14 @@ class TestCodable : TestCodableSuper {
 
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_DateInterval_JSON() {
-        for (testLine, interval) in dateIntervalValues {
+        for (testLine, interval) in Self.dateIntervalValues {
             expectRoundTripEqualityThroughJSON(for: interval, lineNumber: testLine)
         }
     }
 
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_DateInterval_Plist() {
-        for (testLine, interval) in dateIntervalValues {
+        for (testLine, interval) in Self.dateIntervalValues {
             expectRoundTripEqualityThroughPlist(for: interval, lineNumber: testLine)
         }
     }
@@ -461,6 +479,91 @@ class TestCodable : TestCodableSuper {
             expectRoundTripEqualityThroughPlist(for: decimal, lineNumber: testLine)
         }
     }
+
+    @available(SwiftStdlib 5.6, *)
+    func test_Dictionary_JSON() {
+        enum X: String, Codable { case a, b }
+        enum Y: String, Codable, CodingKeyRepresentable { case a, b }
+        enum Z: Codable, CodingKeyRepresentable {
+            case a
+            case b
+            init?<T: CodingKey>(codingKey: T) {
+                switch codingKey.stringValue {
+                case "α":
+                    self = .a
+                case "β":
+                    self = .b
+                default:
+                    return nil
+                }
+            }
+
+            var codingKey: CodingKey {
+                GenericCodingKey(stringValue: encoded)
+            }
+
+            var encoded: String {
+                switch self {
+                case .a: return "α"
+                case .b: return "β"
+                }
+            }
+        }
+        enum S: Character, Codable, CodingKeyRepresentable {
+            case a = "a"
+            case b = "b"
+
+            init?<T: CodingKey>(codingKey: T) {
+                guard codingKey.stringValue.count == 1 else { return nil }
+                self.init(rawValue: codingKey.stringValue.first!)
+            }
+
+            var codingKey: CodingKey {
+                GenericCodingKey(stringValue: "\(self.rawValue)")
+            }
+        }
+
+        enum U: Int, Codable { case a = 0, b}
+        enum V: Int, Codable, CodingKeyRepresentable { case a = 0, b }
+        enum W: Codable, CodingKeyRepresentable {
+            case a
+            case b
+            init?<T: CodingKey>(codingKey: T) {
+                guard let intValue = codingKey.intValue else { return nil }
+                switch intValue {
+                case 42:
+                    self = .a
+                case 64:
+                    self = .b
+                default:
+                    return nil
+                }
+            }
+            var codingKey: CodingKey {
+                GenericCodingKey(intValue: self.encoded)
+            }
+            var encoded: Int {
+                switch self {
+                case .a: return 42
+                case .b: return 64
+                }
+            }
+        }
+
+        let uuid = UUID(uuidString: "E621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
+        let uuidWrapper = UUIDCodingWrapper(uuid)
+
+        expectRoundTripEqualityThroughJSON(for: [X.a: true],             expectedJSON: #"["a",true]"#,                                    lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [Y.a: true, Y.b: false], expectedJSON: #"{"a":true,"b":false}"#,                          lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [Z.a: true, Z.b: false], expectedJSON: #"{"α":true,"β":false}"#,                          lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [S.a: true, S.b: false], expectedJSON: #"{"a":true,"b":false}"#,                          lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [uuidWrapper: true],     expectedJSON: #"{"E621E1F8-C36C-495A-93FC-0C247A3E6E5F":true}"#, lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [uuid: true],            expectedJSON: #"["E621E1F8-C36C-495A-93FC-0C247A3E6E5F",true]"#, lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [U.a: true],             expectedJSON: #"[0,true]"#,                                      lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [V.a: true, V.b: false], expectedJSON: #"{"0":true,"1":false}"#,                          lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [W.a: true, W.b: false], expectedJSON: #"{"42":true,"64":false}"#,                        lineNumber: #line)
+    }
+
 
     // MARK: - IndexPath
     lazy var indexPathValues: [Int : IndexPath] = [
@@ -538,7 +641,7 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - Measurement
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-    lazy var unitValues: [Int : Dimension] = [
+    static let unitValues: [Int : Dimension] = [
         #line : UnitAcceleration.metersPerSecondSquared,
         #line : UnitMass.kilograms,
         #line : UnitLength.miles
@@ -546,7 +649,7 @@ class TestCodable : TestCodableSuper {
 
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_Measurement_JSON() {
-        for (testLine, unit) in unitValues {
+        for (testLine, unit) in Self.unitValues {
             // FIXME: <rdar://problem/49026133>
             // Terminating due to uncaught exception NSInvalidArgumentException:
             // *** You must override baseUnit in your class NSDimension to define its base unit.
@@ -557,7 +660,7 @@ class TestCodable : TestCodableSuper {
 
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_Measurement_Plist() {
-        for (testLine, unit) in unitValues {
+        for (testLine, unit) in Self.unitValues {
             // FIXME: <rdar://problem/49026133>
             // Terminating due to uncaught exception NSInvalidArgumentException:
             // *** You must override baseUnit in your class NSDimension to define its base unit.
@@ -638,7 +741,7 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - PersonNameComponents
     @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
-    lazy var personNameComponentsValues: [Int : PersonNameComponents] = [
+    static let personNameComponentsValues: [Int : PersonNameComponents] = [
         #line : makePersonNameComponents(givenName: "John", familyName: "Appleseed"),
         #line : makePersonNameComponents(givenName: "John", familyName: "Appleseed", nickname: "Johnny"),
         #line : makePersonNameComponents(namePrefix: "Dr.", givenName: "Jane", middleName: "A.", familyName: "Appleseed", nameSuffix: "Esq.", nickname: "Janie")
@@ -646,14 +749,14 @@ class TestCodable : TestCodableSuper {
 
     @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
     func test_PersonNameComponents_JSON() {
-        for (testLine, components) in personNameComponentsValues {
+        for (testLine, components) in Self.personNameComponentsValues {
             expectRoundTripEqualityThroughJSON(for: components, lineNumber: testLine)
         }
     }
 
     @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
     func test_PersonNameComponents_Plist() {
-        for (testLine, components) in personNameComponentsValues {
+        for (testLine, components) in Self.personNameComponentsValues {
             expectRoundTripEqualityThroughPlist(for: components, lineNumber: testLine)
         }
     }
@@ -853,6 +956,20 @@ class TestCodable : TestCodableSuper {
 
 // MARK: - Helper Types
 
+struct GenericCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+
+    init(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
+    }
+}
+
 struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
     let value: T
 
@@ -935,6 +1052,10 @@ if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     tests["test_URLComponents_JSON"] = TestCodable.test_URLComponents_JSON
     tests["test_URLComponents_Plist"] = TestCodable.test_URLComponents_Plist
+}
+
+if #available(SwiftStdlib 5.6, *) {
+    tests["test_Dictionary_JSON"] = TestCodable.test_Dictionary_JSON
 }
 
 var CodableTests = TestSuite("TestCodable")

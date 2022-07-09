@@ -18,7 +18,7 @@
 // CHECK-DUMP: IMPORTED_MODULE
 // CHECK-DUMP-SAME: 'Module'
 // CHECK-DUMP: IMPORTED_MODULE
-// CHECK-DUMP-SAME: 'Swift'
+// CHECK-DUMP: 'Swift'
 
 
 import Module

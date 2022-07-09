@@ -61,8 +61,8 @@
 /// `replaceSubrange(_:with:)` with an empty collection for the `newElements`
 /// parameter. You can override any of the protocol's required methods to
 /// provide your own custom implementation.
-public protocol RangeReplaceableCollection: Collection
-  where SubSequence: RangeReplaceableCollection {
+public protocol RangeReplaceableCollection<Element>: Collection
+where SubSequence: RangeReplaceableCollection {
   // FIXME: Associated type inference requires this.
   override associatedtype SubSequence
 
@@ -369,7 +369,7 @@ public protocol RangeReplaceableCollection: Collection
 
   // FIXME: Associated type inference requires these.
   @_borrowed
-  override subscript(bounds: Index) -> Element { get }
+  override subscript(position: Index) -> Element { get }
   override subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
@@ -755,6 +755,23 @@ extension RangeReplaceableCollection {
     with newElements: __owned C
   ) where C.Element == Element, R.Bound == Index {
     self.replaceSubrange(subrange.relative(to: self), with: newElements)
+  }
+
+  // This unavailable default implementation of
+  // `replaceSubrange<C: Collection>(_: Range<Index>, with: C)` prevents
+  // incomplete RangeReplaceableCollection implementations from satisfying
+  // the protocol through the use of the generic convenience implementation
+  // `replaceSubrange<C: Collection, R: RangeExpression>(_: R, with: C)`,
+  // If that were the case, at runtime the implementation generic over
+  // `RangeExpression` would call itself in an infinite recursion
+  // due to the absence of a better option.
+  @available(*, unavailable)
+  @_alwaysEmitIntoClient
+  public mutating func replaceSubrange<C>(
+    _ subrange: Range<Index>,
+    with newElements: C
+  ) where C: Collection, C.Element == Element {
+    fatalError()
   }
 
   /// Removes the elements in the specified subrange from the collection.

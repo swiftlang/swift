@@ -67,7 +67,7 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
   let _ = Adder#^TYPEEXPR_NO_DOT^#;
 // TYPEEXPR_NO_DOT: Begin completions, 4 items
 // TYPEEXPR_NO_DOT-NOT: {#x: Int#}, {#y: Int#}
-// TYPEEXPR_NO_DOT-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#base: Int#})[#Adder#]; name=(base: Int)
+// TYPEEXPR_NO_DOT-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#base: Int#})[#Adder#];
 // TYPEEXPR_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   .callAsFunction({#(self): Adder#})[#(x: Int, y: Int) -> Int#];
 // TYPEEXPR_NO_DOT-DAG: Keyword[self]/CurrNominal:          .self[#Adder.Type#];
 // TYPEEXPR_NO_DOT-DAG: Keyword/CurrNominal:                .Type[#Adder.Type#];
@@ -109,8 +109,8 @@ func testCallAsFunctionOverloaded(fn: Functor) {
 
   fn(h: .left, v: .#^OVERLOADED_ARG2_VALUE^#)
 //OVERLOADED_ARG2_VALUE: Begin completions, 3 items
-//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: up[#Functor.Vertical#];
-//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: down[#Functor.Vertical#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: up[#Functor.Vertical#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: down[#Functor.Vertical#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Functor.Vertical#})[#(into: inout Hasher) -> Void#];
 //OVERLOADED_ARG2_VALUE: End completions
 }

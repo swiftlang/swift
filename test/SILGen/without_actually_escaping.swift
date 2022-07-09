@@ -19,7 +19,7 @@ func letEscape(f: () -> ()) -> () -> () {
 
 // thunk for @callee_guaranteed () -> ()
 // The thunk must be [without_actually_escaping].
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
 
 // CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping14letEscapeThrow1fyycyycyKXE_tKF
 // CHECK: bb0([[ARG:%.*]] : $@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)):
@@ -49,7 +49,7 @@ func letEscapeThrow(f: () throws -> () -> ()) throws -> () -> () {
 
 // thunk for @callee_guaranteed () -> (@owned @escaping @callee_guaranteed () -> (), @error @owned Error)
 // The thunk must be [without_actually_escaping].
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)) -> (@owned @callee_guaranteed () -> (), @error Error) {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)) -> (@owned @callee_guaranteed () -> (), @error Error) {
 
 // We used to crash on this example because we would use the wrong substitution
 // map.
@@ -84,7 +84,7 @@ func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
 // CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping0A24ActuallyEscapingConflictyyF : $@convention(thin) () -> () {
 // CHECK: [[CLOSURE_1_FUN:%.*]] = function_ref @$s25without_actually_escaping0A24ActuallyEscapingConflictyyFyycfU_ :
 // CHECK: [[CLOSURE_1:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_1_FUN]](
-// CHECK: [[BORROWED_CLOSURE_1:%.*]] = begin_borrow [[CLOSURE_1]]
+// CHECK: [[BORROWED_CLOSURE_1:%.*]] = begin_borrow [lexical] [[CLOSURE_1]]
 // CHECK: [[COPY_BORROWED_CLOSURE_1:%.*]] = copy_value [[BORROWED_CLOSURE_1]]
 // CHECK: [[COPY_2_BORROWED_CLOSURE_1:%.*]] = copy_value [[COPY_BORROWED_CLOSURE_1]]
 // CHECK: [[THUNK_FUNC:%.*]] = function_ref @$sIeg_Ieg_TR :
@@ -102,8 +102,8 @@ func withoutActuallyEscapingConflict() {
 }
 
 // CHECK-LABEL: sil [ossa] @$s25without_actually_escaping0A25ActuallyEscapingCFunction8functionyyyXC_tF
-// CHECK: bb0([[ARG:%.*]] : $@convention(c) @noescape () -> ()):
-// CHECK:   [[E:%.*]] = convert_function [[ARG]] : $@convention(c) @noescape () -> () to [without_actually_escaping] $@convention(c) () -> ()
+// CHECK: bb0([[ARG:%.*]] : $@convention(c) () -> ()):
+// CHECK:   [[E:%.*]] = convert_function [[ARG]] : $@convention(c) () -> () to [without_actually_escaping] $@convention(c) () -> ()
 // CHECK:   [[F:%.*]] = function_ref @$s25without_actually_escaping0A25ActuallyEscapingCFunction8functionyyyXC_tFyyyXCXEfU_ : $@convention(thin) (@convention(c) () -> ()) -> ()
 // CHECK:   apply [[F]]([[E]]) : $@convention(thin) (@convention(c) () -> ()) -> ()
 public func withoutActuallyEscapingCFunction(function: (@convention(c) () -> Void)) {

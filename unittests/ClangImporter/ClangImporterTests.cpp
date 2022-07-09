@@ -70,14 +70,15 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   // Set up the importer and emit a bridging PCH.
   swift::LangOptions langOpts;
   langOpts.Target = llvm::Triple("x86_64", "apple", "darwin");
-  swift::TypeCheckerOptions typeckOpts;
+  swift::SILOptions silOpts;
+  swift::TypeCheckerOptions typecheckOpts;
   INITIALIZE_LLVM();
   swift::SearchPathOptions searchPathOpts;
   swift::symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
   swift::SourceManager sourceMgr;
   swift::DiagnosticEngine diags(sourceMgr);
   std::unique_ptr<ASTContext> context(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, options,
+      ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, options,
                       symbolGraphOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context);
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-requirement-machine -debug-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
 protocol P1 {
   associatedtype T : P1
@@ -17,10 +17,9 @@ struct G<T : P1 & P2> {}
 // Since G.T.T == G.T.T.T == G.T.T.T.T = ... = Int, we tie off the
 // recursion by introducing a same-type requirement G.T.T => G.T.
 
-// CHECK-LABEL: Adding generic signature <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> {
+// CHECK-LABEL: Requirement machine for fresh signature < T >
 // CHECK-LABEL: Rewrite system: {
-// CHECK: - τ_0_0.[P1&P2:T].[concrete: Int] => τ_0_0.[P1&P2:T]
-// CHECK: - [P1&P2:T].T => [P1&P2:T].[P1:T]
-// CHECK: - τ_0_0.[P1&P2:T].[P1:T] => τ_0_0.[P1&P2:T]
-// CHECK: }
+// CHECK: - [P1:T].T => [P1:T].[P1:T]
+// CHECK: - τ_0_0.[P1:T].[concrete: Int] => τ_0_0.[P1:T]
+// CHECK: - τ_0_0.[P1:T].[P1:T] => τ_0_0.[P1:T]
 // CHECK: }

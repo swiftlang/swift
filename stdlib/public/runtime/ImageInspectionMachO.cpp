@@ -19,7 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #if defined(__APPLE__) && defined(__MACH__) &&                                 \
-    !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+    !defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)
 
 #include "ImageInspection.h"
 #include "ImageInspectionCommon.h"
@@ -43,6 +43,8 @@ constexpr const char DynamicReplacementSection[] =
     MachODynamicReplacementSection;
 constexpr const char DynamicReplacementSomeSection[] =
     MachODynamicReplacementSomeSection;
+constexpr const char AccessibleFunctionsSection[] =
+    MachOAccessibleFunctionsSection;
 constexpr const char TextSegment[] = MachOTextSegment;
 
 #if __POINTER_WIDTH__ == 64
@@ -52,7 +54,8 @@ using mach_header_platform = mach_header;
 #endif
 
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
-         void CONSUME_BLOCK(const void *start, uintptr_t size)>
+         void CONSUME_BLOCK(const void *baseAddress,
+                            const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh) {
 #if __POINTER_WIDTH__ == 64
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
@@ -68,17 +71,19 @@ void addImageCallback(const mach_header *mh) {
   if (!section)
     return;
   
-  CONSUME_BLOCK(section, size);
+  CONSUME_BLOCK(mh, section, size);
 }
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
-         void CONSUME_BLOCK(const void *start, uintptr_t size)>
+         void CONSUME_BLOCK(const void *baseAddress,
+                            const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   addImageCallback<SEGMENT_NAME, SECTION_NAME, CONSUME_BLOCK>(mh);
 }
 
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
           const char *SEGMENT_NAME2, const char *SECTION_NAME2,
-          void CONSUME_BLOCK(const void *start, uintptr_t size,
+          void CONSUME_BLOCK(const void *baseAddress,
+                             const void *start, uintptr_t size,
                              const void *start2, uintptr_t size2)>
 void addImageCallback2Sections(const mach_header *mh) {
 #if __POINTER_WIDTH__ == 64
@@ -104,11 +109,12 @@ void addImageCallback2Sections(const mach_header *mh) {
   if (!section2)
     size2 = 0;
 
-  CONSUME_BLOCK(section, size, section2, size2);
+  CONSUME_BLOCK(mh, section, size, section2, size2);
 }
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
           const char *SEGMENT_NAME2, const char *SECTION_NAME2,
-          void CONSUME_BLOCK(const void *start, uintptr_t size,
+          void CONSUME_BLOCK(const void *baseAddress,
+                             const void *start, uintptr_t size,
                              const void *start2, uintptr_t size2)>
 void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
   addImageCallback2Sections<SEGMENT_NAME, SECTION_NAME,
@@ -159,6 +165,13 @@ void swift::initializeDynamicReplacementLookup() {
                                 addImageDynamicReplacementBlockCallback>);
 }
 
+void swift::initializeAccessibleFunctionsLookup() {
+  REGISTER_FUNC(
+      addImageCallback<TextSegment, AccessibleFunctionsSection,
+                       addImageAccessibleFunctionsBlockCallbackUnsafe>);
+}
+
+#if SWIFT_STDLIB_HAS_DLADDR
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
@@ -171,6 +184,7 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
 }
+#endif
 
 #endif // defined(__APPLE__) && defined(__MACH__) &&
-       // !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+       // !defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)

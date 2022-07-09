@@ -46,6 +46,35 @@ public func _autorelease(_ x: AnyObject) {
 }
 #endif
 
+
+@available(SwiftStdlib 5.7, *)
+@_silgen_name("swift_getFunctionFullNameFromMangledName")
+public // SPI (Distributed)
+func _getFunctionFullNameFromMangledNameImpl(
+  _ mangledName: UnsafePointer<UInt8>, _ mangledNameLength: UInt
+) -> (UnsafePointer<UInt8>, UInt)
+
+/// Given a function's mangled name, return a human readable name.
+/// Used e.g. by Distributed.RemoteCallTarget to hide mangled names.
+@available(SwiftStdlib 5.7, *)
+public // SPI (Distributed)
+func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
+  let mangledNameUTF8 = Array(mangledName.utf8)
+  let (stringPtr, count) =
+    mangledNameUTF8.withUnsafeBufferPointer { (mangledNameUTF8) in
+    return _getFunctionFullNameFromMangledNameImpl(
+      mangledNameUTF8.baseAddress!,
+      UInt(mangledNameUTF8.endIndex))
+  }
+
+  guard count > 0 else {
+    return nil
+  }
+
+  return String._fromUTF8Repairing(
+    UnsafeBufferPointer(start: stringPtr, count: Int(count))).0
+}
+
 // FIXME(ABI)#51 : this API should allow controlling different kinds of
 // qualification separately: qualification with module names and qualification
 // with type names that we are nested in.
@@ -64,13 +93,13 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
-@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
 public func _getMangledTypeName(_ type: Any.Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
-@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 public // SPI
 func _mangledTypeName(_ type: Any.Type) -> String? {
   let (stringPtr, count) = _getMangledTypeName(type)
@@ -81,7 +110,7 @@ func _mangledTypeName(_ type: Any.Type) -> String? {
   let (result, repairsMade) = String._fromUTF8Repairing(
       UnsafeBufferPointer(start: stringPtr, count: count))
 
-  precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should be valid UTF-8")
+  _precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should be valid UTF-8")
 
   return result
 }
@@ -119,16 +148,9 @@ public func _getTypeByMangledNameInContext(
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
 
-@_silgen_name("swift_getMetadataSection")
-public func _getMetadataSection(
-  _ index: UInt)
-  -> UnsafeRawPointer?
-
-@_silgen_name("swift_getMetadataSectionCount")
-public func _getMetadataSectionCount()
-  -> UInt
-
-@_silgen_name("swift_getMetadataSectionName")
-public func _getMetadataSectionName(
-  _ metadata_section: UnsafeRawPointer)
-  -> UnsafePointer<CChar>
+/// Prevents performance diagnostics in the passed closure.
+@_alwaysEmitIntoClient
+@_semantics("no_performance_analysis")
+public func _unsafePerformance<T>(_ c: () -> T) -> T {
+  return c()
+}

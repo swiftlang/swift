@@ -22,7 +22,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -67,23 +66,35 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
         Str += C.getText();
       break;
 
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentName:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentInternalName:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentColon:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentType:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureType:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentTypeBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentDefaultBegin:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclBegin:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclExternalName:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclLocalName:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclColon:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclTypeBegin:
+    case CodeCompletionString::Chunk::ChunkKind::DefaultArgumentClauseBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterClauseBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericRequirementClauseBegin:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamColon:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterTypeBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
+    case CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierClauseBegin:
+    case CodeCompletionString::Chunk::ChunkKind::DeclResultTypeClauseBegin:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin:
+    case CodeCompletionString::Chunk::ChunkKind::AttributeAndModifierListBegin:
       return Str;
 
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureExpr:
       Str += " {";
       Str += C.getText();
       break;
@@ -110,11 +121,12 @@ static void toDisplayString(CodeCompletionResult *Result,
     }
     if (C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) ||
         C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
-      if (Result->getKind() == CodeCompletionResult::Declaration) {
+      if (Result->getKind() == CodeCompletionResultKind::Declaration) {
         switch (Result->getAssociatedDeclKind()) {
         case CodeCompletionDeclKind::Module:
         case CodeCompletionDeclKind::PrecedenceGroup:
         case CodeCompletionDeclKind::Class:
+        case CodeCompletionDeclKind::Actor:
         case CodeCompletionDeclKind::Struct:
         case CodeCompletionDeclKind::Enum:
           continue;
@@ -165,9 +177,10 @@ public:
   REPLCodeCompletionConsumer(REPLCompletions &Completions)
       : Completions(Completions) {}
 
-  void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
-    CodeCompletionContext::sortCompletionResults(Results);
-    for (auto Result : Results) {
+  void handleResults(CodeCompletionContext &context) override {
+    auto SortedResults = CodeCompletionContext::sortCompletionResults(
+        context.getResultSink().Results);
+    for (auto Result : SortedResults) {
       std::string InsertableString = toInsertableString(Result);
       if (StringRef(InsertableString).startswith(Completions.Prefix)) {
         llvm::SmallString<128> PrintedResult;

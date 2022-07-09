@@ -43,7 +43,7 @@ enum Int8Key : Int8, CodingKey { // expected-error {{type 'Int8Key' does not con
 struct StructKey : CodingKey { // expected-error {{type 'StructKey' does not conform to protocol 'CodingKey'}}
 }
 
-// Classes conforming to CodingKey should not get implict derived conformance.
+// Classes conforming to CodingKey should not get implicit derived conformance.
 class ClassKey : CodingKey { //expected-error {{type 'ClassKey' does not conform to protocol 'CodingKey'}}
 }
 

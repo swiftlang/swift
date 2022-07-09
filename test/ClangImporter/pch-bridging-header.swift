@@ -42,7 +42,7 @@
 // RUN: llvm-objdump --raw-clang-ast %t/pch3/*.pch | llvm-bcanalyzer -dump | %FileCheck %s -check-prefix=PERSISTENT
 // PERSISTENT: ORIGINAL_FILE{{.*}}Inputs/sdk-bridging-header.h
 
-// Test that -pch-disable-validation works in that it won't implicitely create a PCH
+// Test that -pch-disable-validation works in that it won't implicitly create a PCH
 // RUN: not %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/sdk-bridging-header.h -pch-output-dir %t/no-pch -pch-disable-validation 2>&1 | %FileCheck %s -check-prefix=NO-VALIDATION
 // NO-VALIDATION: PCH file {{.*}} not found
 

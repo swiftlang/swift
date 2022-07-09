@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,10 +14,11 @@
 // array of letters.
 import TestsUtils
 
-public let SortLettersInPlace = BenchmarkInfo(
-  name: "SortLettersInPlace",
-  runFunction: run_SortLettersInPlace,
-  tags: [.validation, .api, .algorithm, .String])
+public let benchmarks =
+  BenchmarkInfo(
+    name: "SortLettersInPlace",
+    runFunction: run_SortLettersInPlace,
+    tags: [.validation, .api, .algorithm, .String])
 
 class Letter {
   let value: String
@@ -27,8 +28,8 @@ class Letter {
 }
 
 @inline(never)
-public func run_SortLettersInPlace(_ N: Int) {
-  for _ in 1...100*N {
+public func run_SortLettersInPlace(_ n: Int) {
+  for _ in 1...100*n {
     var letters = [
         Letter("k"), Letter("a"), Letter("x"), Letter("i"), Letter("f"), Letter("l"),
         Letter("o"), Letter("w"), Letter("h"), Letter("p"), Letter("b"), Letter("u"),
@@ -43,6 +44,6 @@ public func run_SortLettersInPlace(_ N: Int) {
     }
 
     // Check whether letters are sorted.
-    CheckResults(letters[0].value <= letters[letters.count/2].value)
+    check(letters[0].value <= letters[letters.count/2].value)
   }
 }

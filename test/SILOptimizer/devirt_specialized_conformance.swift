@@ -3,7 +3,7 @@
 // Make sure that we completely inline/devirtualize/substitute all the way down
 // to unknown1.
 
-// CHECK-LABEL: sil @main
+// CHECK-LABEL: sil {{.*}}@main
 // CHECK: bb0({{.*}}):
 // CHECK: function_ref @unknown1
 // CHECK: apply

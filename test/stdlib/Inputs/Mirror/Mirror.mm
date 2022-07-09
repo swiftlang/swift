@@ -31,3 +31,14 @@
 @implementation FooMoreDerivedObjCClass : FooDerivedObjCClass
 @end
 
+@implementation StringConvertibleInDebugAndOtherwise_ObjC : NSObject
+
+-(NSString *) description {
+  return @"description";
+}
+
+-(NSString *) debugDescription {
+  return @"debugDescription";
+}
+
+@end

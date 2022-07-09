@@ -77,12 +77,12 @@ TYPE_NODES = [
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
-    # some type -> some 'type'
-    Node('SomeType', kind='Type',
+    # constrained-sugar-type -> ('some'|'any') type
+    Node('ConstrainedSugarType', kind='Type',
          children=[
-             Child('SomeSpecifier', kind='IdentifierToken',
+             Child('SomeOrAnySpecifier', kind='IdentifierToken',
                    classification='Keyword',
-                   text_choices=['some']),
+                   text_choices=['some', 'any']),
              Child('BaseType', kind='Type'),
          ]),
 
@@ -167,8 +167,7 @@ TYPE_NODES = [
              Child('Arguments', kind='TupleTypeElementList',
                    collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
-             Child('AsyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncKeyword', kind='ContextualKeyworkToken',
                    text_choices=['async'], is_optional=True),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
@@ -182,7 +181,7 @@ TYPE_NODES = [
          ]),
 
     # attributed-type -> type-specifier? attribute-list? type
-    # type-specifiyer -> 'inout' | '__owned' | '__unowned'
+    # type-specifier -> 'inout' | '__owned' | '__unowned'
     Node('AttributedType', kind='Type',
          children=[
              Child('Specifier', kind='Token',

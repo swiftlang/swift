@@ -25,6 +25,7 @@ target_sources(swiftSILOptimizer PRIVATE
   Outliner.cpp
   ObjectOutliner.cpp
   AssemblyVisionRemarkGenerator.cpp
+  PartialApplySimplification.cpp
   PerformanceInliner.cpp
   PhiArgumentOptimizations.cpp
   PruneVTables.cpp
@@ -35,10 +36,10 @@ target_sources(swiftSILOptimizer PRIVATE
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp
   SILSROA.cpp
+  SSADestroyHoisting.cpp
   SimplifyCFG.cpp
   Sink.cpp
   SpeculativeDevirtualizer.cpp
-  StackPromotion.cpp
   StringOptimization.cpp
   TempLValueOpt.cpp
   TempRValueElimination.cpp

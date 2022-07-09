@@ -12,14 +12,10 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
-
-// See rdar://problem/65251059
-// UNSUPPORTED: windows
-// rdar://problem/65015626
-// XFAIL: asserts
 
 import StdlibUnittest
 #if canImport(Darwin)

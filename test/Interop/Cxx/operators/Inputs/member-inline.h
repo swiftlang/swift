@@ -16,6 +16,28 @@ struct LoadableIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
+
+  LoadableIntWrapper &operator++() {
+    value++;
+    return *this;
+  }
+
+  // Friend functions
+  friend bool operator==(const LoadableIntWrapper lhs,
+                         const LoadableIntWrapper &rhs) {
+    return lhs.value == rhs.value;
+  }
+
+  friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
+    return LoadableIntWrapper{.value = -obj.value};
+  }
+};
+
+struct LoadableBoolWrapper {
+  bool value;
+  LoadableBoolWrapper operator!() {
+    return LoadableBoolWrapper{.value = !value};
+  }
 };
 
 struct AddressOnlyIntWrapper {
@@ -33,6 +55,34 @@ struct AddressOnlyIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
+
+  AddressOnlyIntWrapper operator-(AddressOnlyIntWrapper rhs) const {
+    return AddressOnlyIntWrapper(value - rhs.value);
+  }
+  AddressOnlyIntWrapper &operator++() {
+    value++;
+    return *this;
+  }
+  AddressOnlyIntWrapper operator++(int) {
+    // This shouldn't be called, since we only support pre-increment operators.
+    return AddressOnlyIntWrapper(-777);
+  }
+};
+
+struct HasPostIncrementOperator {
+  HasPostIncrementOperator operator++(int) {
+    return HasPostIncrementOperator();
+  }
+};
+
+struct HasPreIncrementOperatorWithAnotherReturnType {
+  int value = 0;
+  const int &operator++() { return ++value; }
+};
+
+struct HasPreIncrementOperatorWithVoidReturnType {
+  int value = 0;
+  void operator++() { ++value; }
 };
 
 struct HasDeletedOperator {
@@ -176,11 +226,24 @@ template<class T> struct TemplatedArrayByVal {
   T ts[];
   T operator[](int i) { return ts[i]; }
 };
+
 typedef TemplatedArrayByVal<double> TemplatedDoubleArrayByVal;
 
-struct TemplatedSubscriptArrayByVal {
+template <class T>
+struct TemplatedByVal {
+  T val;
+  TemplatedByVal<T> operator+(TemplatedByVal other) {
+    return TemplatedByVal{.val = val + other.val};
+  }
+};
+
+struct TemplatedOperatorArrayByVal {
   int *ptr;
   template<class T> T operator[](T i) { return ptr[i]; }
+  template <class T>
+  T *operator+(T i) {
+    return ptr + i;
+  }
 };
 
 struct NonTrivial {
@@ -241,6 +304,35 @@ struct ConstPtrByVal {
   const int *operator[](int x) { return &a; }
 private:
   int a = 64;
+};
+
+struct DerivedFromAddressOnlyIntWrapper : AddressOnlyIntWrapper {
+  DerivedFromAddressOnlyIntWrapper(int value) : AddressOnlyIntWrapper(value) { }
+};
+
+struct DerivedFromReadWriteIntArray : ReadWriteIntArray {};
+
+struct DerivedFromNonTrivialArrayByVal : NonTrivialArrayByVal {};
+
+struct Iterator {
+private:
+  int value = 123;
+public:
+  int &operator*() { return value; }
+};
+
+struct ConstIterator {
+private:
+  int value = 234;
+public:
+  const int &operator*() const { return value; }
+};
+
+struct ConstIteratorByVal {
+private:
+  int value = 456;
+public:
+  int operator*() const { return value; }
 };
 
 #endif

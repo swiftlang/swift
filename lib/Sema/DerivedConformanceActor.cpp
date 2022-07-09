@@ -70,14 +70,15 @@ static Expr *constructUnownedSerialExecutor(ASTContext &ctx,
     //   (Builtin.Executor) -> UnownedSerialExecutor
     auto metatypeRef = TypeExpr::createImplicit(executorType, ctx);
     Type ctorAppliedType = ctorType->getAs<FunctionType>()->getResult();
-    auto selfApply = new (ctx) ConstructorRefCallExpr(initRef, metatypeRef,
-                                                      ctorAppliedType);
+    auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef,
+                                                    ctorAppliedType);
     selfApply->setImplicit(true);
     selfApply->setThrows(false);
 
     // Call the constructor, building an expression of type
     // UnownedSerialExecutor.
-    auto call = CallExpr::createImplicit(ctx, selfApply, arg, /*labels*/ {});
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
+    auto call = CallExpr::createImplicit(ctx, selfApply, argList);
     call->setType(executorType);
     call->setThrows(false);
     return call;
@@ -137,10 +138,10 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   }
   Type executorType = executorDecl->getDeclaredInterfaceType();
 
-  auto propertyPair =
-    derived.declareDerivedProperty(ctx.Id_unownedExecutor,
-                                   executorType, executorType,
-                                   /*static*/ false, /*final*/ false);
+  auto propertyPair = derived.declareDerivedProperty(
+      DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_unownedExecutor,
+      executorType, executorType,
+      /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
   property->setSynthesized(true);
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
@@ -153,11 +154,14 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   if (property->getFormalAccess() == AccessLevel::Open)
     property->overwriteAccess(AccessLevel::Public);
 
-  // Clone any @available attributes from UnownedSerialExecutor.
-  // Really, though, the whole actor probably needs to be marked as
-  // unavailable.
-  for (auto attr: executorDecl->getAttrs().getAttributes<AvailableAttr>())
-    property->getAttrs().add(attr->clone(ctx, /*implicit*/true));
+  // Infer availability.
+  SmallVector<const Decl *, 2> asAvailableAs;
+  asAvailableAs.push_back(executorDecl);
+  if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
+    asAvailableAs.push_back(enclosingDecl);
+
+  AvailabilityInference::applyInferredAvailableAttrs(
+      property, asAvailableAs, ctx);
 
   auto getter =
     derived.addGetterToReadOnlyDerivedProperty(property, executorType);

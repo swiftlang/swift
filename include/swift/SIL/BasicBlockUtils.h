@@ -13,8 +13,9 @@
 #ifndef SWIFT_SIL_BASICBLOCKUTILS_H
 #define SWIFT_SIL_BASICBLOCKUTILS_H
 
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -87,14 +88,24 @@ public:
   /// Used to determine if we need to verify a DeadEndBlocks.
   bool isComputed() const { return didComputeValue; }
 
+  /// Add any (new) blocks that are backward-reachable from \p reachableBB to
+  /// the set of reachable blocks.
+  void updateForReachableBlock(SILBasicBlock *reachableBB);
+
+  /// Add new blocks to the set of reachable blocks.
+  void updateForNewBlock(SILBasicBlock *newBB);
+
   const SILFunction *getFunction() const { return f; }
-  
+
   /// Performs a simple check if \p block (or its single successor) ends in an
   /// "unreachable".
   ///
   /// This handles the common case of failure-handling blocks, which e.g.
   /// contain a call to fatalError().
   static bool triviallyEndsInUnreachable(SILBasicBlock *block);
+
+protected:
+  void propagateNewlyReachableBlocks(unsigned startIdx);
 };
 
 /// Compute joint-postdominating set for \p dominatingBlock and \p
@@ -117,7 +128,7 @@ public:
 ///      loop-nest relative to \p dominatingBlock causing us to go around a
 ///      backedge and hit the block during our traversal. In this case, we
 ///      have already during the traversal passed the exiting blocks of the
-///      sub-loop as joint postdominace completion set blocks. This is useful
+///      sub-loop as joint postdominance completion set blocks. This is useful
 ///      if one is using this API for lifetime extension purposes of lifetime
 ///      ending uses and one needs to insert compensating copy_value at these
 ///      locations due to the lack of strong control-equivalence in between
@@ -141,6 +152,85 @@ void findJointPostDominatingSet(
     function_ref<void(SILBasicBlock *)> foundJointPostDomSetCompletionBlocks,
     function_ref<void(SILBasicBlock *)> inputBlocksInJointPostDomSet = {});
 
+#ifndef NDEBUG
+bool checkDominates(SILBasicBlock *sourceBlock, SILBasicBlock *destBlock);
+#endif
+
+/// Walk depth-first the region backwards reachable from the provided roots
+/// constrained by \p region's \p isInRegion member function.
+///
+/// interface Region {
+///   /// Whether the indicated basic block is within the region of the graph
+///   /// that should be traversed.
+///   bool isInRegion(SILBasicBlock *)
+/// }
+template <typename Region>
+struct SILCFGBackwardDFS {
+  Region &region;
+  ArrayRef<SILBasicBlock *> roots;
+  Optional<SmallVector<SILBasicBlock *, 16>> cachedPostOrder;
+  Optional<BasicBlockSet> cachedVisited;
+
+  SILCFGBackwardDFS(Region &region, ArrayRef<SILBasicBlock *> roots)
+      : region(region), roots(roots) {}
+
+  /// Visit the blocks of the region in post-order.
+  ///
+  /// interface Visitor {
+  ///     /// Visit each block in topological order.
+  ///     void visit(SILBasicBlock *)
+  /// }
+  template <typename Visitor>
+  void visitPostOrder(Visitor &visitor) {
+    if (roots.empty())
+      return;
+    auto *function = roots.front()->getParent();
+    cachedVisited.emplace(function);
+    for (auto *root : roots) {
+      SmallVector<std::pair<SILBasicBlock *, SILBasicBlock::pred_iterator>, 32>
+          stack;
+      if (!region.isInRegion(root))
+        continue;
+      stack.push_back({root, root->pred_begin()});
+      while (!stack.empty()) {
+        while (stack.back().second != stack.back().first->pred_end()) {
+          auto predecessor = *stack.back().second;
+          stack.back().second++;
+          if (!region.isInRegion(predecessor))
+            continue;
+          if (cachedVisited->insert(predecessor))
+            stack.push_back({predecessor, predecessor->pred_begin()});
+        }
+        visitor.visit(stack.back().first);
+        stack.pop_back();
+      }
+    }
+  }
+
+  /// Visit the region in post-order and cache the visited blocks.
+  void cachePostOrder() {
+    if (cachedPostOrder)
+      return;
+    struct Visitor {
+      SILCFGBackwardDFS<Region> &dfs;
+      void visit(SILBasicBlock *block) {
+        dfs.cachedPostOrder->push_back(block);
+      }
+    };
+    cachedPostOrder.emplace();
+    Visitor visitor{*this};
+    visitPostOrder(visitor);
+  }
+
+  /// The region in post-order.
+  ArrayRef<SILBasicBlock *> postOrder() {
+    cachePostOrder();
+    return *cachedPostOrder;
+  };
+
+  /// The region in reverse post-order.
+  auto reversePostOrder() { return llvm::reverse(postOrder()); }
+};
 } // namespace swift
 
 #endif

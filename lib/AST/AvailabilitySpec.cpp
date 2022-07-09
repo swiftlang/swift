@@ -35,14 +35,6 @@ SourceRange AvailabilitySpec::getSourceRange() const {
   llvm_unreachable("bad AvailabilitySpecKind");
 }
 
-// Only allow allocation of AvailabilitySpecs using the
-// allocator in ASTContext.
-void *AvailabilitySpec::operator new(size_t Bytes, ASTContext &C,
-                                     unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
-
 SourceRange PlatformVersionConstraintAvailabilitySpec::getSourceRange() const {
   return SourceRange(PlatformLoc, VersionSrcRange.End);
 }

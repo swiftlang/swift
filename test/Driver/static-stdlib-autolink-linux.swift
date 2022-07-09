@@ -18,8 +18,8 @@
 // RUN:   ldd %t/main | %FileCheck %s --check-prefix=LDD; \
 // RUN: fi
 
-// LDD-NOT: libswiftCore.so 
-// LDD-NOT: libswift_Concurrency.so 
+// LDD-NOT: libswiftCore.so
+// LDD-NOT: libswift_Concurrency.so
 
 import asyncModule
 

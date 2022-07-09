@@ -19,7 +19,7 @@ if #unavailable(OSX 10.51) && #unavailable(OSX 10.52) { // expected-error {{expe
 }
 
 
-if #unavailable { // expected-error {{expected availability condition}} expected-error {{closure expression is unused}} expected-error {{top-level statement cannot begin with a closure expression}} expected-note {{did you mean to use a 'do' statement?}} {{17-17=do }}
+if #unavailable { // expected-error {{expected availability condition}}
 }
 
 if #unavailable( { // expected-error {{expected platform name}} expected-error {{expected ')'}} expected-note {{to match this opening '('}}
@@ -112,7 +112,7 @@ if case 42 = 42, #available(macOS 10.51, *), #unavailable(macOS 10.52) { // expe
 if #available(macOS 10.51, *), case 42 = 42, #unavailable(macOS 10.52) { // expected-error {{#available and #unavailable cannot be in the same statement}}
 }
 
-// Allow availabiility and unavailability to mix if they are not in the same statement.
+// Allow availability and unavailability to mix if they are not in the same statement.
 if #unavailable(macOS 11) {
   if #available(macOS 10, *) { }
 }

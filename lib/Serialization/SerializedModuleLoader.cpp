@@ -46,7 +46,22 @@ namespace {
 void forEachTargetModuleBasename(const ASTContext &Ctx,
                                  llvm::function_ref<void(StringRef)> body) {
   auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
+
+  // An arm64 module can import an arm64e module.
+  Optional<llvm::Triple> normalizedAltTarget;
+  if ((normalizedTarget.getArch() == llvm::Triple::ArchType::aarch64) &&
+      (normalizedTarget.getSubArch() !=
+       llvm::Triple::SubArchType::AArch64SubArch_arm64e)) {
+    auto altTarget = normalizedTarget;
+    altTarget.setArchName("arm64e");
+    normalizedAltTarget = getTargetSpecificModuleTriple(altTarget);
+  }
+
   body(normalizedTarget.str());
+
+  if (normalizedAltTarget) {
+    body(normalizedAltTarget->str());
+  }
 
   // We used the un-normalized architecture as a target-specific
   // module name. Fall back to that behavior.
@@ -61,49 +76,42 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
   if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm) {
     body("arm");
   }
-}
 
-enum class SearchPathKind {
-  Import,
-  Framework,
-  RuntimeLibrary,
-};
+  if (normalizedAltTarget) {
+    body(normalizedAltTarget->getArchName());
+  }
+}
 
 /// Apply \p body for each module search path in \p Ctx until \p body returns
 /// non-None value. Returns the return value from \p body, or \c None.
 Optional<bool> forEachModuleSearchPath(
     const ASTContext &Ctx,
-    llvm::function_ref<Optional<bool>(StringRef, SearchPathKind, bool isSystem)>
+    llvm::function_ref<Optional<bool>(StringRef, ModuleSearchPathKind,
+                                      bool isSystem)>
         callback) {
-  for (const auto &path : Ctx.SearchPathOpts.ImportSearchPaths)
+  for (const auto &path : Ctx.SearchPathOpts.getImportSearchPaths())
     if (auto result =
-            callback(path, SearchPathKind::Import, /*isSystem=*/false))
+            callback(path, ModuleSearchPathKind::Import, /*isSystem=*/false))
       return result;
 
-  for (const auto &path : Ctx.SearchPathOpts.FrameworkSearchPaths)
+  for (const auto &path : Ctx.SearchPathOpts.getFrameworkSearchPaths())
     if (auto result =
-            callback(path.Path, SearchPathKind::Framework, path.IsSystem))
+            callback(path.Path, ModuleSearchPathKind::Framework, path.IsSystem))
       return result;
 
   // Apple platforms have extra implicit framework search paths:
   // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   if (Ctx.LangOpts.Target.isOSDarwin()) {
-    SmallString<128> scratch;
-    scratch = Ctx.SearchPathOpts.SDKPath;
-    llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
-    if (auto result =
-            callback(scratch, SearchPathKind::Framework, /*isSystem=*/true))
-      return result;
-
-    scratch = Ctx.SearchPathOpts.SDKPath;
-    llvm::sys::path::append(scratch, "Library", "Frameworks");
-    if (auto result =
-            callback(scratch, SearchPathKind::Framework, /*isSystem=*/true))
-      return result;
+    for (const auto &path : Ctx.getDarwinImplicitFrameworkSearchPaths())
+      if (auto result =
+              callback(path, ModuleSearchPathKind::DarwinImplicitFramework,
+                       /*isSystem=*/true))
+        return result;
   }
 
-  for (auto importPath : Ctx.SearchPathOpts.RuntimeLibraryImportPaths) {
-    if (auto result = callback(importPath, SearchPathKind::RuntimeLibrary,
+  for (const auto &importPath :
+       Ctx.SearchPathOpts.getRuntimeLibraryImportPaths()) {
+    if (auto result = callback(importPath, ModuleSearchPathKind::RuntimeLibrary,
                                /*isSystem=*/true))
       return result;
   }
@@ -168,10 +176,10 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
     return false;
   };
 
-  forEachModuleSearchPath(Ctx, [&](StringRef searchPath, SearchPathKind Kind,
-                                   bool isSystem) {
+  forEachModuleSearchPath(Ctx, [&](StringRef searchPath,
+                                   ModuleSearchPathKind Kind, bool isSystem) {
     switch (Kind) {
-    case SearchPathKind::Import: {
+    case ModuleSearchPathKind::Import: {
       // Look for:
       // $PATH/{name}.swiftmodule/{arch}.{extension} or
       // $PATH/{name}.{extension}
@@ -195,7 +203,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       });
       return None;
     }
-    case SearchPathKind::RuntimeLibrary: {
+    case ModuleSearchPathKind::RuntimeLibrary: {
       // Look for:
       // (Darwin OS) $PATH/{name}.swiftmodule/{arch}.{extension}
       // (Other OS)  $PATH/{name}.{extension}
@@ -222,7 +230,8 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       });
       return None;
     }
-    case SearchPathKind::Framework: {
+    case ModuleSearchPathKind::Framework:
+    case ModuleSearchPathKind::DarwinImplicitFramework: {
       // Look for:
       // $PATH/{name}.framework/Modules/{name}.swiftmodule/{arch}.{extension}
       forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
@@ -391,12 +400,11 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
-  serialization::ValidationInfo loadInfo =
-      ModuleFileSharedCore::load(modulePath.str(),
-                       std::move(moduleBuf.get()),
-                       nullptr,
-                       nullptr,
-                       isFramework, loadedModuleFile);
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      modulePath.str(), std::move(moduleBuf.get()), nullptr, nullptr,
+      isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      Ctx.SearchPathOpts.DeserializedPathRecoverer,
+      loadedModuleFile);
 
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
@@ -431,7 +439,7 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework) {
   assert(((ModuleBuffer && ModuleDocBuffer) ||
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
@@ -524,8 +532,15 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-           bool &isFramework, bool &isSystemModule) {
-  SmallString<32> moduleName(moduleID.Item.str());
+           bool skipBuildingInterface, bool &isFramework, bool &isSystemModule) {
+  // Find a module with an actual, physical name on disk, in case
+  // -module-alias is used (otherwise same).
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
+  // and a source file has 'import Foo', a module called Bar (real name)
+  // should be searched.
+  StringRef moduleNameRef = Ctx.getRealModuleName(moduleID.Item).str();
+  SmallString<32> moduleName(moduleNameRef);
   SerializedModuleBaseName genericBaseName(moduleName);
 
   auto genericModuleFileName =
@@ -544,10 +559,12 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
 
   llvm::SmallString<256> currPath;
 
+  enum class SearchResult { Found, NotFound, Error };
+
   /// Returns true if a target-specific module file was found, false if an error
   /// was diagnosed, or None if neither one happened and the search should
   /// continue.
-  auto findTargetSpecificModuleFiles = [&](bool IsFramework) -> Optional<bool> {
+  auto findTargetSpecificModuleFiles = [&](bool IsFramework) -> SearchResult {
     Optional<SerializedModuleBaseName> firstAbsoluteBaseName;
 
     for (const auto &targetSpecificBaseName : targetSpecificBaseNames) {
@@ -557,18 +574,16 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       if (!firstAbsoluteBaseName.hasValue())
         firstAbsoluteBaseName.emplace(absoluteBaseName);
 
-      auto result = findModuleFilesInDirectory(moduleID,
-                        absoluteBaseName,
-                        moduleInterfacePath,
-                        moduleBuffer, moduleDocBuffer,
-                        moduleSourceInfoBuffer,
-                        IsFramework);
+      auto result = findModuleFilesInDirectory(
+          moduleID, absoluteBaseName, moduleInterfacePath, moduleBuffer,
+          moduleDocBuffer, moduleSourceInfoBuffer, skipBuildingInterface,
+          IsFramework);
       if (!result) {
-        return true;
+        return SearchResult::Found;
       } else if (result == std::errc::not_supported) {
-        return false;
+        return SearchResult::Error;
       } else if (result != std::errc::no_such_file_or_directory) {
-        return None;
+        return SearchResult::NotFound;
       }
     }
 
@@ -577,73 +592,98 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
     if (firstAbsoluteBaseName
         && maybeDiagnoseTargetMismatch(moduleID.Loc, moduleName,
                                        *firstAbsoluteBaseName)) {
-      return false;
+      return SearchResult::Error;
     } else {
-      return None;
+      return SearchResult::NotFound;
     }
   };
 
-  auto result = forEachModuleSearchPath(
-      Ctx,
-      [&](StringRef path, SearchPathKind Kind,
-          bool isSystem) -> Optional<bool> {
-        currPath = path;
-        isSystemModule = isSystem;
+  SmallVector<std::string, 4> InterestingFilenames = {
+      (moduleName + ".framework").str(),
+      genericBaseName.getName(file_types::TY_SwiftModuleInterfaceFile),
+      genericBaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile),
+      genericBaseName.getName(file_types::TY_SwiftModuleFile)};
 
-        switch (Kind) {
-        case SearchPathKind::Import:
-        case SearchPathKind::RuntimeLibrary: {
-          isFramework = false;
+  auto searchPaths = Ctx.SearchPathOpts.moduleSearchPathsContainingFile(
+      InterestingFilenames, Ctx.SourceMgr.getFileSystem().get(),
+      Ctx.LangOpts.Target.isOSDarwin());
+  for (const auto &searchPath : searchPaths) {
+    currPath = searchPath->getPath();
+    isSystemModule = searchPath->isSystem();
 
-          // On Apple platforms, we can assume that the runtime libraries use
-          // target-specifi module files wihtin a `.swiftmodule` directory.
-          // This was not always true on non-Apple platforms, and in order to
-          // ease the transition, check both layouts.
-          bool checkTargetSpecificModule = true;
-          if (Kind != SearchPathKind::RuntimeLibrary ||
-              !Ctx.LangOpts.Target.isOSDarwin()) {
-            auto modulePath = currPath;
-            llvm::sys::path::append(modulePath, genericModuleFileName);
-            llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(modulePath);
+    switch (searchPath->getKind()) {
+    case ModuleSearchPathKind::Import:
+    case ModuleSearchPathKind::RuntimeLibrary: {
+      isFramework = false;
 
-            // Even if stat fails, we can't just return the error; the path
-            // we're looking for might not be "Foo.swiftmodule".
-            checkTargetSpecificModule = statResult && statResult->isDirectory();
-          }
+      // On Apple platforms, we can assume that the runtime libraries use
+      // target-specific module files within a `.swiftmodule` directory.
+      // This was not always true on non-Apple platforms, and in order to
+      // ease the transition, check both layouts.
+      bool checkTargetSpecificModule = true;
+      if (searchPath->getKind() != ModuleSearchPathKind::RuntimeLibrary ||
+          !Ctx.LangOpts.Target.isOSDarwin()) {
+        auto modulePath = currPath;
+        llvm::sys::path::append(modulePath, genericModuleFileName);
+        llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(modulePath);
 
-          if (checkTargetSpecificModule)
-            // A .swiftmodule directory contains architecture-specific files.
-            return findTargetSpecificModuleFiles(isFramework);
+        // Even if stat fails, we can't just return the error; the path
+        // we're looking for might not be "Foo.swiftmodule".
+        checkTargetSpecificModule = statResult && statResult->isDirectory();
+      }
 
-          SerializedModuleBaseName absoluteBaseName{currPath, genericBaseName};
-
-          auto result = findModuleFilesInDirectory(
-              moduleID, absoluteBaseName, moduleInterfacePath,
-              moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer, isFramework);
-          if (!result)
-            return true;
-          else if (result == std::errc::not_supported)
-            return false;
-          else
-            return None;
+      if (checkTargetSpecificModule) {
+        // A .swiftmodule directory contains architecture-specific files.
+        switch (findTargetSpecificModuleFiles(isFramework)) {
+        case SearchResult::Found:
+          return true;
+        case SearchResult::NotFound:
+          continue;
+        case SearchResult::Error:
+          return false;
         }
-        case SearchPathKind::Framework: {
-          isFramework = true;
-          llvm::sys::path::append(currPath, moduleName + ".framework");
+      }
 
-          // Check if the framework directory exists.
-          if (!fs.exists(currPath))
-            return None;
+      SerializedModuleBaseName absoluteBaseName{currPath, genericBaseName};
 
-          // Frameworks always use architecture-specific files within a
-          // .swiftmodule directory.
-          llvm::sys::path::append(currPath, "Modules");
-          return findTargetSpecificModuleFiles(isFramework);
-        }
-        }
-        llvm_unreachable("covered switch");
-      });
-  return result.getValueOr(false);
+      auto result = findModuleFilesInDirectory(
+          moduleID, absoluteBaseName, moduleInterfacePath, moduleBuffer,
+          moduleDocBuffer, moduleSourceInfoBuffer, skipBuildingInterface,
+          isFramework);
+      if (!result) {
+        return true;
+      } else if (result == std::errc::not_supported) {
+        return false;
+      } else {
+        continue;
+      }
+    }
+    case ModuleSearchPathKind::Framework:
+    case ModuleSearchPathKind::DarwinImplicitFramework: {
+      isFramework = true;
+      llvm::sys::path::append(currPath, moduleName + ".framework");
+
+      // Check if the framework directory exists.
+      if (!fs.exists(currPath)) {
+        continue;
+      }
+
+      // Frameworks always use architecture-specific files within a
+      // .swiftmodule directory.
+      llvm::sys::path::append(currPath, "Modules");
+      switch (findTargetSpecificModuleFiles(isFramework)) {
+      case SearchResult::Found:
+        return true;
+      case SearchResult::NotFound:
+        continue;
+      case SearchResult::Error:
+        return false;
+      }
+    }
+    }
+    llvm_unreachable("covered switch");
+  }
+  return false;
 }
 
 static std::pair<StringRef, clang::VersionTuple>
@@ -710,12 +750,12 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
 
   std::unique_ptr<ModuleFile> loadedModuleFile;
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFileCore;
-  serialization::ValidationInfo loadInfo =
-      ModuleFileSharedCore::load(moduleInterfacePath,
-                       std::move(moduleInputBuffer),
-                       std::move(moduleDocInputBuffer),
-                       std::move(moduleSourceInfoInputBuffer),
-                       isFramework, loadedModuleFileCore);
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      moduleInterfacePath, std::move(moduleInputBuffer),
+      std::move(moduleDocInputBuffer), std::move(moduleSourceInfoInputBuffer),
+      isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      Ctx.SearchPathOpts.DeserializedPathRecoverer,
+      loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
   if (loadInfo.status == serialization::Status::Valid) {
@@ -726,6 +766,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     // We've loaded the file. Now try to bring it into the AST.
     fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
     M.setStaticLibrary(loadedModuleFile->isStaticLibrary());
+    M.setHasHermeticSealAtLink(loadedModuleFile->hasHermeticSealAtLink());
     if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
     if (loadedModuleFile->arePrivateImportsEnabled())
@@ -736,6 +777,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setHasIncrementalInfo();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
+    if (loadedModuleFile->isConcurrencyChecked())
+      M.setIsConcurrencyChecked();
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status = loadedModuleFile->associateWithFileContext(
@@ -784,7 +827,20 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
   }
 
+  // The -experimental-hermetic-seal-at-link flag turns on dead-stripping
+  // optimizations assuming library code can be optimized against client code.
+  // If the imported module was built with -experimental-hermetic-seal-at-link
+  // but the current module isn't, error out.
+  if (M.hasHermeticSealAtLink() && !Ctx.LangOpts.HermeticSealAtLink) {
+    Ctx.Diags.diagnose(diagLoc.getValueOr(SourceLoc()),
+                       diag::need_hermetic_seal_to_import_module, M.getName());
+  }
+
   return fileUnit;
+}
+
+bool SerializedModuleLoaderBase::isRequiredOSSAModules() const {
+  return Ctx.SILOpts.EnableOSSAModules;
 }
 
 void swift::serialization::diagnoseSerializedASTLoadFailure(
@@ -823,6 +879,13 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
       break;
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
+    break;
+  case serialization::Status::NotInOSSA:
+    // soft reject, silently ignore.
+    break;
+  case serialization::Status::RevisionIncompatible:
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
+                       ModuleName, moduleBufferID);
     break;
   case serialization::Status::Malformed:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_malformed_module,
@@ -872,7 +935,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                          missingNames);
     }
 
-    if (Ctx.SearchPathOpts.SDKPath.empty() &&
+    if (Ctx.SearchPathOpts.getSDKPath().empty() &&
         llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
@@ -905,7 +968,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   case serialization::Status::MissingUnderlyingModule: {
     Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_underlying_module,
                        ModuleName);
-    if (Ctx.SearchPathOpts.SDKPath.empty() &&
+    if (Ctx.SearchPathOpts.getSDKPath().empty() &&
         llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
@@ -961,6 +1024,13 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleOSInfo.second, moduleBufferID);
     break;
   }
+
+  case serialization::Status::SDKMismatch:
+    auto currentSDK = Ctx.LangOpts.SDKName;
+    auto moduleSDK = loadInfo.sdkName;
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
+                       ModuleName, moduleSDK, currentSDK, moduleBufferID);
+    break;
   }
 }
 
@@ -1016,12 +1086,19 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
     // options and input-like options.
     if (!parse->getOption().hasFlag(options::FrontendOption))
       continue;
-    // Push the supported option and its value to the list.
-    // We shouldn't need to worry about cases like -tbd-install_name=Foo because
-    // the parsing function should have droped alias options already.
-    SubArgs.push_back(ArgSaver.save(parse->getSpelling()).data());
-    for (auto value: parse->getValues())
-      SubArgs.push_back(value);
+    auto spelling = ArgSaver.save(parse->getSpelling());
+    auto &values = parse->getValues();
+    if (spelling.endswith("=")) {
+      // Handle the case like -tbd-install_name=Foo. This should be rare because
+      // most equal-separated arguments are alias to the separate form.
+      assert(values.size() == 1);
+      SubArgs.push_back(ArgSaver.save((llvm::Twine(spelling) + values[0]).str()).data());
+    } else {
+      // Push the supported option and its value to the list.
+      SubArgs.push_back(spelling.data());
+      for (auto value: values)
+        SubArgs.push_back(value);
+    }
   }
 
   return false;
@@ -1030,7 +1107,7 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
 llvm::VersionTuple
 swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   llvm::VersionTuple result;
-  // Read the inteface file and extract its compiler arguments line
+  // Read the interface file and extract its compiler arguments line
   if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
     llvm::BumpPtrAllocator alloc;
     llvm::StringSaver argSaver(alloc);
@@ -1041,6 +1118,10 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
       // Check the version number specified via -user-module-version.
       StringRef current(args[I]), next(args[I + 1]);
       if (current == "-user-module-version") {
+        // Sanitize versions that are too long
+        while(next.count('.') > 3) {
+          next = next.rsplit('.').first;
+        }
         result.tryParse(next);
         break;
       }
@@ -1049,8 +1130,12 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   return result;
 }
 
-bool SerializedModuleLoaderBase::canImportModule(
-    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
+bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
+                                                 llvm::VersionTuple version,
+                                                 bool underlyingVersion) {
+  // FIXME: Swift submodules?
+  if (path.hasSubmodule())
+    return false;
   // If underlying version is specified, this should be handled by Clang importer.
   if (!version.empty() && underlyingVersion)
     return false;
@@ -1071,9 +1156,11 @@ bool SerializedModuleLoaderBase::canImportModule(
     unusedModuleDocBuffer = &moduleDocBuffer;
   }
 
+  auto mID = path[0];
   auto found = findModule(mID, unusedModuleInterfacePath, unusedModuleBuffer,
                           unusedModuleDocBuffer, unusedModuleSourceInfoBuffer,
-                          isFramework, isSystemModule);
+                          /* skipBuildingInterface */ true, isFramework,
+                          isSystemModule);
   // If we cannot find the module, don't continue.
   if (!found)
     return false;
@@ -1089,9 +1176,10 @@ bool SerializedModuleLoaderBase::canImportModule(
   }
   // If failing to extract the user version from the interface file, try the binary
   // format, if present.
-  if (currentVersion.empty() && unusedModuleBuffer) {
-    auto metaData =
-      serialization::validateSerializedAST((*unusedModuleBuffer)->getBuffer());
+  if (currentVersion.empty() && *unusedModuleBuffer) {
+    auto metaData = serialization::validateSerializedAST(
+        (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+        Ctx.LangOpts.SDKName);
     currentVersion = metaData.userModuleVersion;
   }
 
@@ -1105,10 +1193,15 @@ bool SerializedModuleLoaderBase::canImportModule(
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
-    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
+    ImportPath::Module path, llvm::VersionTuple version,
+    bool underlyingVersion) {
+  // FIXME: Swift submodules?
+  if (path.hasSubmodule())
+    return false;
   // If underlying version is specified, this should be handled by Clang importer.
   if (!version.empty() && underlyingVersion)
     return false;
+  auto mID = path[0];
   auto mIt = MemoryBuffers.find(mID.Item.str());
   if (mIt == MemoryBuffers.end())
     return false;
@@ -1123,7 +1216,6 @@ bool MemoryBufferSerializedModuleLoader::canImportModule(
   assert(!(mIt->second.userVersion.empty()));
   return mIt->second.userVersion >= version;
 }
-
 ModuleDecl *
 SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
                                        ImportPath::Module path) {
@@ -1143,7 +1235,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   // Look on disk.
   if (!findModule(moduleID, &moduleInterfacePath, &moduleInputBuffer,
                   &moduleDocInputBuffer, &moduleSourceInfoInputBuffer,
-                  isFramework, isSystemModule)) {
+                  /* skipBuildingInterface */ false, isFramework, isSystemModule)) {
     return nullptr;
   }
 
@@ -1154,6 +1246,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
+  llvm::sys::path::native(moduleInterfacePath);
   auto *file =
       loadAST(*M, moduleID.Loc, moduleInterfacePath,
               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
@@ -1211,6 +1304,11 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   if (!file)
     return nullptr;
 
+  // The MemoryBuffer loader is used by LLDB during debugging. Modules imported
+  // from .swift_ast sections are never produced from textual interfaces. By
+  // disabling resilience the debugger can directly access private members.
+  if (BypassResilience)
+    M->setBypassResilience();
   M->addFile(*file);
   Ctx.addLoadedModule(M);
   return M;
@@ -1226,7 +1324,7 @@ void SerializedModuleLoaderBase::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void SerializedModuleLoaderBase::loadObjCMethods(
-       ClassDecl *classDecl,
+       NominalTypeDecl *typeDecl,
        ObjCSelector selector,
        bool isInstanceMethod,
        unsigned previousGeneration,
@@ -1234,7 +1332,7 @@ void SerializedModuleLoaderBase::loadObjCMethods(
   for (auto &modulePair : LoadedModuleFiles) {
     if (modulePair.second <= previousGeneration)
       continue;
-    modulePair.first->loadObjCMethods(classDecl, selector, isInstanceMethod,
+    modulePair.first->loadObjCMethods(typeDecl, selector, isInstanceMethod,
                                       methods);
   }
 }
@@ -1257,7 +1355,7 @@ std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework) {
   // This is a soft error instead of an llvm_unreachable because this API is
   // primarily used by LLDB which makes it more likely that unwitting changes to
   // the Swift compiler accidentally break the contract.
@@ -1424,7 +1522,7 @@ SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
 void SerializedASTFile::collectAllGroups(
     SmallVectorImpl<StringRef> &Names) const {
   File.collectAllGroups(Names);
-};
+}
 
 Optional<StringRef>
 SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
@@ -1468,8 +1566,8 @@ SerializedASTFile::getOpaqueReturnTypeDecls(
 }
 
 void
-SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
-  File.getDisplayDecls(results);
+SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive) const {
+  File.getDisplayDecls(results, recursive);
 }
 
 StringRef SerializedASTFile::getFilename() const {
@@ -1500,4 +1598,9 @@ SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 void SerializedASTFile::collectBasicSourceFileInfo(
     llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   File.collectBasicSourceFileInfo(callback);
+}
+
+void SerializedASTFile::collectSerializedSearchPath(
+    llvm::function_ref<void(StringRef)> callback) const {
+  File.collectSerializedSearchPath(callback);
 }

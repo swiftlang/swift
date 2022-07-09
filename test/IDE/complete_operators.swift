@@ -155,7 +155,7 @@ func testInfix7(x: S2?) {
 // S2_INFIX_OPTIONAL: Begin completions
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#{{.*}}#}[#Bool#]
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#{{.*}}#}[#Bool#]
-// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  ?? {#S2#}[#S2#]; name=?? S2
+// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  ?? {#S2#}[#S2#]; name=??
 // S2_INFIX_OPTIONAL: End completions
 // The equality operators don't come from equatable.
 // NEGATIVE_S2_INFIX_OPTIONAL-NOT: == {#S2
@@ -220,7 +220,7 @@ func testInfix15<T: P where T.T == S2>() {
 }
 // INFIX_15: Begin completions, 4 items
 // INFIX_15-NEXT: Decl[AssociatedType]/CurrNominal:   .T; name=T
-// INFIX_15-NEXT: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): P#})[#() -> S2#]; name=foo(self: P)
+// INFIX_15-NEXT: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): P#})[#() -> S2#]; name=foo(:)
 // INFIX_15-NEXT: Keyword[self]/CurrNominal:          .self[#T.Type#]; name=self
 // INFIX_15-NEXT: Keyword/CurrNominal:                .Type[#T.Type#]; name=Type
 // INFIX_15: End completions
@@ -230,7 +230,7 @@ func testInfix16<T: P where T.T == S2>() {
 }
 
 // INFIX_16: Begin completions, 2 items
-// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(self): P#})[#() -> S2#]; name=(self: P)
+// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(self): P#})[#() -> S2#]; name=(:)
 // INFIX_16-NEXT: Keyword[self]/CurrNominal:        .self[#(T) -> () -> S2#]; name=self
 // INFIX_16: End completions
 
@@ -239,12 +239,12 @@ func testInfix17(x: Void) {
 }
 
 // VOID_OPERATORS: Begin completions
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#()#}[#Bool#]; name=!= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#()#}[#Bool#]; name=== ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  <= {#()#}[#Bool#]; name=<= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  >= {#()#}[#Bool#]; name=>= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  < {#()#}[#Bool#]; name=< ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  > {#()#}[#Bool#]; name=> ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#()#}[#Bool#]; name=!=
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#()#}[#Bool#]; name===
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  <= {#()#}[#Bool#]; name=<=
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  >= {#()#}[#Bool#]; name=>=
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  < {#()#}[#Bool#]; name=<
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  > {#()#}[#Bool#]; name=>
 // VOID_OPERATORS: End completions
 
 func testInfix18(x: (S2, S2) {
@@ -274,7 +274,7 @@ func testInfix22() {
   E.B#^INFIX_22^#
 }
 // INFIX_22: Begin completions, 2 items
-// INFIX_22-NEXT: Pattern/CurrModule/Flair[ArgLabels]:               ({#S2#})[#E#]; name=(S2)
+// INFIX_22-NEXT: Pattern/CurrModule/Flair[ArgLabels]:               ({#S2#})[#E#]; name=()
 // INFIX_22: End completions
 
 func testSpace(x: S2) {

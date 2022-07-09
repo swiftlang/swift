@@ -865,32 +865,6 @@ bb0(%0 : $B):
   return %3 : $()
 }
 
-// CHECK-LABEL:   sil @cse_thin_function_to_pointer
-// CHECK:           [[REF:%[0-9]+]] = thin_function_to_pointer
-// CHECK-NOT:       thin_function_to_pointer
-// CHECK:           tuple ([[REF]] : $Builtin.RawPointer, [[REF]] : $Builtin.RawPointer)
-// CHECK-NEXT:      return
-sil @cse_thin_function_to_pointer : $@convention(thin) (@convention(thin) () -> ()) -> (Builtin.RawPointer, Builtin.RawPointer) {
-bb0(%0 : $@convention(thin) () -> ()):
-  %1 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
-  %2 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
-  %3 = tuple (%1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer)
-  return %3 : $(Builtin.RawPointer, Builtin.RawPointer)
-}
-
-// CHECK-LABEL:   sil @cse_pointer_to_thin_function
-// CHECK:           [[REF:%[0-9]+]] = pointer_to_thin_function
-// CHECK-NOT:       pointer_to_thin_function
-// CHECK:           tuple ([[REF]] : $@convention(thin) () -> (), [[REF]] : $@convention(thin) () -> ())
-// CHECK-NEXT:      return
-sil @cse_pointer_to_thin_function : $@convention(thin) (Builtin.RawPointer) -> (@convention(thin) () -> (), @convention(thin) () -> ()) {
-bb0(%0 : $Builtin.RawPointer):
-  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
-  %2 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
-  %3 = tuple(%1 : $@convention(thin) () -> (), %2 : $@convention(thin) () -> ())
-  return %3 : $(@convention(thin) () -> (), @convention(thin) () -> ())
-}
-
 sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 
 // CHECK-LABEL:   sil @dont_cse_get_count_on_low_level_sil
@@ -1125,7 +1099,7 @@ protocol Pingable { func ping() }
 // CHECK: return
 sil hidden @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
 bb0(%0 : $*Pingable):
-  debug_value_addr %0 : $*Pingable  // let x      // id: %1
+  debug_value %0 : $*Pingable, expr op_deref // let x      // id: %1
   %2 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable // users: %3, %4
   %3 = witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping, %2 : $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %4
   %4 = apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
@@ -1140,7 +1114,7 @@ bb0(%0 : $*Pingable):
 // CHECK-LABEL: CSE_Existential_Calls_With_Control_Flow
 sil hidden @CSE_Existential_Calls_With_Control_Flow : $@convention(thin) (@in Pingable, Int) -> () {
 bb0(%0 : $*Pingable, %1 : $Int):
-  debug_value_addr %0 : $*Pingable  // let x      // id: %2
+  debug_value %0 : $*Pingable, expr op_deref // let x      // id: %2
   debug_value %1 : $Int  // let y                 // id: %3
   %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable // users: %5, %6
   %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %6

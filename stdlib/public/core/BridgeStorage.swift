@@ -72,7 +72,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   @inline(__always)
   internal mutating func isUniquelyReferencedNative() -> Bool {
-    return _isUnique(&rawValue)
+    return isNative && _isUnique(&rawValue)
   }
 
   @_alwaysEmitIntoClient

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -lower-hop-to-actor -enable-experimental-concurrency | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -lower-hop-to-actor  | %FileCheck %s
 
 // REQUIRES: concurrency
 
@@ -218,6 +218,25 @@ bb0(%0 : @guaranteed $CustomActor):
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
 // CHECK-NEXT:   return [[RET]] : $()
   hop_to_executor %0 : $CustomActor
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @get_raw_executor : $@convention(thin) () -> Builtin.Executor
+
+// CHECK-LABEL: sil [ossa] @non_optional_executor :
+sil [ossa] @non_optional_executor : $@async () -> () {
+bb0:
+// CHECK: bb0:
+// CHECK:      [[GET_RAW_EXECUTOR:%.*]] = function_ref @get_raw_executor
+// CHECK-NEXT: [[EXECUTOR:%.*]] = apply [[GET_RAW_EXECUTOR]]()
+// CHECK-NEXT: [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[EXECUTOR]] : $Builtin.Executor
+// CHECK-NEXT: hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
+// CHECK-NEXT: [[RET:%.*]] = tuple ()
+// CHECK-NEXT: return [[RET]] : $()
+  %0 = function_ref @get_raw_executor : $@convention(thin) () -> Builtin.Executor
+  %1 = apply %0() : $@convention(thin) () -> Builtin.Executor
+  hop_to_executor %1 : $Builtin.Executor
   %r = tuple ()
   return %r : $()
 }

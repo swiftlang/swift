@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -549,8 +550,9 @@ bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
 ReabstractionInfo::ReabstractionInfo(
     ModuleDecl *targetModule, bool isWholeModule, ApplySite Apply,
     SILFunction *Callee, SubstitutionMap ParamSubs, IsSerialized_t Serialized,
-    bool ConvertIndirectToDirect, OptRemark::Emitter *ORE)
+    bool ConvertIndirectToDirect, bool dropMetatypeArgs, OptRemark::Emitter *ORE)
     : ConvertIndirectToDirect(ConvertIndirectToDirect),
+      dropMetatypeArgs(dropMetatypeArgs),
       TargetModule(targetModule), isWholeModule(isWholeModule),
       Serialized(Serialized) {
   if (!prepareAndCheck(Apply, Callee, ParamSubs, ORE))
@@ -682,6 +684,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     SubstitutedType->getParameters().size();
   Conversions.resize(NumArgs);
   TrivialArgs.resize(NumArgs);
+  droppedMetatypeArgs.resize(NumArgs);
 
   SILFunctionConventions substConv(SubstitutedType, M);
   TypeExpansionContext resilienceExp = getResilienceExpansion();
@@ -736,10 +739,16 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+      break;
+      
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
-    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Guaranteed: {
+      CanType ty = PI.getInterfaceType();
+      if (dropMetatypeArgs && isa<MetatypeType>(ty) && !ty->hasArchetype())
+        droppedMetatypeArgs.set(IdxToInsert);
       break;
+    }
     }
   }
 
@@ -802,23 +811,14 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   auto CanSpecializedGenericSig = SpecializedGenericSig.getCanonicalSignature();
 
   // First substitute concrete types into the existing function type.
-  CanSILFunctionType FnTy;
-  {
-    FnTy = OrigF->getLoweredFunctionType()
-                ->substGenericArgs(M, SubstMap, getResilienceExpansion())
-                ->getUnsubstitutedType(M);
-    // FIXME: Some of the added new requirements may not have been taken into
-    // account by the substGenericArgs. So, canonicalize in the context of the
-    // specialized signature.
-    if (CanSpecializedGenericSig)
-      FnTy = cast<SILFunctionType>(
-          CanSpecializedGenericSig->getCanonicalTypeInContext(FnTy));
-    else {
-      FnTy = cast<SILFunctionType>(FnTy->getCanonicalType());
-      assert(!FnTy->hasTypeParameter() && "Type parameters outside generic context?");
-    }
-  }
+  CanSILFunctionType FnTy =
+      cast<SILFunctionType>(CanSpecializedGenericSig.getCanonicalTypeInContext(
+          OrigF->getLoweredFunctionType()
+              ->substGenericArgs(M, SubstMap, getResilienceExpansion())
+              ->getUnsubstitutedType(M)));
   assert(FnTy);
+  assert((CanSpecializedGenericSig || !FnTy->hasTypeParameter()) &&
+         "Type parameters outside generic context?");
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
@@ -860,11 +860,16 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     // No conversion: re-use the original, substituted result info.
     SpecializedResults.push_back(RI);
   }
-  unsigned ParamIdx = 0;
+  unsigned idx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
+    unsigned paramIdx = idx++;
     PI = PI.getUnsubstituted(M, SubstFTy, context);
-    bool isTrivial = TrivialArgs.test(param2ArgIndex(ParamIdx));
-    if (!isParamConverted(ParamIdx++)) {
+
+    if (isDroppedMetatypeArg(param2ArgIndex(paramIdx)))
+      continue;
+
+    bool isTrivial = TrivialArgs.test(param2ArgIndex(paramIdx));
+    if (!isParamConverted(paramIdx)) {
       // No conversion: re-use the original, substituted parameter info.
       SpecializedParams.push_back(PI);
       continue;
@@ -909,13 +914,10 @@ getGenericEnvironmentAndSignatureWithRequirements(
   SmallVector<Requirement, 2> RequirementsCopy(Requirements.begin(),
                                                Requirements.end());
 
-  auto NewGenSig = evaluateOrDefault(
-      M.getASTContext().evaluator,
-      AbstractGenericSignatureRequest{
-        OrigGenSig.getPointer(), { }, std::move(RequirementsCopy)},
-      GenericSignature());
-
-  auto NewGenEnv = NewGenSig->getGenericEnvironment();
+  auto NewGenSig = buildGenericSignature(M.getASTContext(),
+                                         OrigGenSig, { },
+                                         std::move(RequirementsCopy));
+  auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
 
@@ -946,7 +948,7 @@ void ReabstractionInfo::performFullSpecializationPreparation(
 static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
                                             GenericSignature Sig,
                                             GenericEnvironment *Env) {
-  auto Reqs = Sig->getRequirements();
+  auto Reqs = Sig.getRequirements();
   auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
@@ -989,7 +991,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
 static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
                                 GenericEnvironment *Env,
                                 SmallVectorImpl<Requirement> &CollectedReqs) {
-  auto Reqs = Sig->getRequirements();
+  auto Reqs = Sig.getRequirements();
   auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
@@ -1103,8 +1105,12 @@ shouldBePartiallySpecialized(Type Replacement,
   llvm::SmallSetVector<ArchetypeType *, 2> UsedArchetypes;
   Replacement.visit([&](Type Ty) {
     if (auto Archetype = Ty->getAs<ArchetypeType>()) {
-      if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
+      if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype)) {
         UsedArchetypes.insert(Primary);
+      }
+
+      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
+        UsedArchetypes.insert(Seq);
       }
     }
   });
@@ -1261,14 +1267,14 @@ public:
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()) {
 
     // Create the new generic signature using provided requirements.
-    SpecializedGenericEnv = SpecializedGenericSig->getGenericEnvironment();
+    SpecializedGenericEnv = SpecializedGenericSig.getGenericEnvironment();
 
     // Compute SubstitutionMaps required for re-mapping.
 
     // Callee's generic signature and specialized generic signature
     // use the same set of generic parameters, i.e. each generic
     // parameter should be mapped to itself.
-    for (auto GP : CalleeGenericSig->getGenericParams()) {
+    for (auto GP : CalleeGenericSig.getGenericParams()) {
       CalleeInterfaceToSpecializedInterfaceMapping[GP] = Type(GP);
     }
     computeCalleeInterfaceToSpecializedInterfaceMap();
@@ -1307,7 +1313,7 @@ public:
 
 GenericTypeParamType *
 FunctionSignaturePartialSpecializer::createGenericParam() {
-  auto GP = GenericTypeParamType::get(0, GPIdx++, Ctx);
+  auto GP = GenericTypeParamType::get(/*type sequence*/ false, 0, GPIdx++, Ctx);
   AllGenericParams.push_back(GP);
   return GP;
 }
@@ -1329,8 +1335,12 @@ void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
     // Add used generic parameters/archetypes.
     Replacement.visit([&](Type Ty) {
       if (auto Archetype = Ty->getAs<ArchetypeType>()) {
-        if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
+        if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype)) {
           UsedCallerArchetypes.insert(Primary);
+        }
+
+        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
+          UsedCallerArchetypes.insert(Seq);
         }
       }
     });
@@ -1437,10 +1447,9 @@ void FunctionSignaturePartialSpecializer::
 /// which requires a substitution.
 void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams() {
-  for (auto GP : CalleeGenericSig->getGenericParams()) {
+  for (auto GP : CalleeGenericSig.getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
-    auto CanTyInContext =
-        CalleeGenericSig->getCanonicalTypeInContext(CanTy);
+    auto CanTyInContext = CalleeGenericSig.getCanonicalTypeInContext(CanTy);
     auto Replacement = CanTyInContext.subst(CalleeInterfaceToCallerArchetypeMap);
     LLVM_DEBUG(llvm::dbgs() << "\n\nChecking callee generic parameter:\n";
                CanTy->dump(llvm::dbgs()));
@@ -1570,9 +1579,8 @@ void FunctionSignaturePartialSpecializer::addCallerRequirements() {
 
 /// Add requirements from the callee's signature.
 void FunctionSignaturePartialSpecializer::addCalleeRequirements() {
-  if (CalleeGenericSig)
-    addRequirements(CalleeGenericSig->getRequirements(),
-                    CalleeInterfaceToSpecializedInterfaceMap);
+  addRequirements(CalleeGenericSig.getRequirements(),
+                  CalleeInterfaceToSpecializedInterfaceMap);
 }
 
 std::pair<GenericEnvironment *, GenericSignature>
@@ -1582,11 +1590,9 @@ FunctionSignaturePartialSpecializer::
     return { nullptr, nullptr };
 
   // Finalize the archetype builder.
-  auto GenSig = evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{nullptr, AllGenericParams, AllRequirements},
-      GenericSignature());
-  auto GenEnv = GenSig ? GenSig->getGenericEnvironment() : nullptr;
+  auto GenSig = buildGenericSignature(Ctx, GenericSignature(),
+                                      AllGenericParams, AllRequirements);
+  auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }
 
@@ -1657,7 +1663,7 @@ void FunctionSignaturePartialSpecializer::
     SpecializedGenericEnv = GenPair.first;
   }
 
-  for (auto GP : CalleeGenericSig->getGenericParams()) {
+  for (auto GP : CalleeGenericSig.getGenericParams()) {
     CalleeInterfaceToSpecializedInterfaceMapping[GP] = Type(GP);
   }
   computeCalleeInterfaceToSpecializedInterfaceMap();
@@ -1839,11 +1845,12 @@ ReabstractionInfo::ReabstractionInfo(ModuleDecl *targetModule,
 GenericFuncSpecializer::GenericFuncSpecializer(
     SILOptFunctionBuilder &FuncBuilder, SILFunction *GenericFunc,
     SubstitutionMap ParamSubs,
-    const ReabstractionInfo &ReInfo)
+    const ReabstractionInfo &ReInfo,
+    bool isMandatory)
     : FuncBuilder(FuncBuilder), M(GenericFunc->getModule()),
       GenericFunc(GenericFunc),
       ParamSubs(ParamSubs),
-      ReInfo(ReInfo) {
+      ReInfo(ReInfo), isMandatory(isMandatory) {
 
   assert((GenericFunc->isDefinition() || ReInfo.isPrespecialized()) &&
          "Expected definition or pre-specialized entry-point to specialize!");
@@ -1860,7 +1867,8 @@ GenericFuncSpecializer::GenericFuncSpecializer(
       ClonedName = Mangler.manglePrespecialized(ParamSubs);
     } else {
       ClonedName = Mangler.mangleReabstracted(ParamSubs,
-                                              ReInfo.needAlternativeMangling());
+                                              ReInfo.needAlternativeMangling(),
+                                              ReInfo.hasDroppedMetatypeArgs());
     }
   }
   LLVM_DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
@@ -1868,7 +1876,18 @@ GenericFuncSpecializer::GenericFuncSpecializer(
 
 /// Return an existing specialization if one exists.
 SILFunction *GenericFuncSpecializer::lookupSpecialization() {
-  if (SILFunction *SpecializedF = M.lookUpFunction(ClonedName)) {
+  SILFunction *SpecializedF = M.lookUpFunction(ClonedName);
+  if (!SpecializedF) {
+    // In case the specialized function is already serialized in an imported
+    // module, we need to take that. This can happen in case of cross-module-
+    // optimization.
+    // Otherwise we could end up that another de-serialized function from the
+    // same module would reference the new (non-external) specialization we
+    // would create here.
+    SpecializedF = M.loadFunction(ClonedName, SILModule::LinkingMode::LinkAll,
+                                  SILLinkage::Shared);
+  }
+  if (SpecializedF) {
     if (ReInfo.getSpecializedType() != SpecializedF->getLoweredFunctionType()) {
       llvm::dbgs() << "Looking for a function: " << ClonedName << "\n"
                    << "Expected type: " << ReInfo.getSpecializedType() << "\n"
@@ -1898,7 +1917,7 @@ void ReabstractionInfo::verify() const {
 SILFunction *
 GenericFuncSpecializer::tryCreateSpecialization(bool forcePrespecialization) {
   // Do not create any new specializations at Onone.
-  if (!GenericFunc->shouldOptimize() && !forcePrespecialization)
+  if (!GenericFunc->shouldOptimize() && !forcePrespecialization && !isMandatory)
     return nullptr;
 
   LLVM_DEBUG(llvm::dbgs() << "Creating a specialization: "
@@ -1989,6 +2008,9 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
       StoreResultTo = InputValue;
       return true;
     }
+
+    if (ReInfo.isDroppedMetatypeArg(ArgIdx))
+      return true;
 
     // Handle arguments for formal parameters.
     unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
@@ -2207,7 +2229,8 @@ protected:
 SILFunction *ReabstractionThunkGenerator::createThunk() {
   SILFunction *Thunk = FunctionBuilder.getOrCreateSharedFunction(
       Loc, ThunkName, ReInfo.getSubstitutedType(), IsBare, IsTransparent,
-      ReInfo.isSerialized(), ProfileCounter(), IsThunk, IsNotDynamic);
+      ReInfo.isSerialized(), ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
@@ -2236,8 +2259,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
       Arguments.push_back(NewArg);
     }
     FullApplySite ApplySite = createReabstractionThunkApply(Builder);
-    SILValue ReturnValue = ApplySite.getSingleDirectResult();
-    assert(ReturnValue && "getSingleDirectResult out of sync with ApplySite?!");
+    SILValue ReturnValue = ApplySite.getResult();
+    assert(ReturnValue && "getPseudoResult out of sync with ApplySite?!");
     Builder.createReturn(Loc, ReturnValue);
 
     return Thunk;
@@ -2249,8 +2272,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   FullApplySite ApplySite = createReabstractionThunkApply(Builder);
 
-  SILValue ReturnValue = ApplySite.getSingleDirectResult();
-  assert(ReturnValue && "getSingleDirectResult out of sync with ApplySite?!");
+  SILValue ReturnValue = ApplySite.getResult();
+  assert(ReturnValue && "getPseudoResult out of sync with ApplySite?!");
 
   if (ReturnValueAddr) {
     // Need to store the direct results to the original indirect address.
@@ -2400,10 +2423,10 @@ static bool createPrespecialized(StringRef UnspecializedName,
   SILFunction *UnspecFunc = M.lookUpFunction(UnspecializedName);
   if (UnspecFunc) {
     if (!UnspecFunc->isDefinition())
-      M.loadFunction(UnspecFunc);
+      M.loadFunction(UnspecFunc, SILModule::LinkingMode::LinkAll);
   } else {
-    UnspecFunc = M.getSILLoader()->lookupSILFunction(UnspecializedName,
-                                                     /*declarationOnly*/ false);
+    UnspecFunc = M.loadFunction(UnspecializedName,
+                                SILModule::LinkingMode::LinkAll);
   }
 
   if (!UnspecFunc || !UnspecFunc->isDefinition())
@@ -2412,7 +2435,7 @@ static bool createPrespecialized(StringRef UnspecializedName,
   ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), ApplySite(),
                            UnspecFunc, Apply.getSubstitutionMap(),
                            IsNotSerialized,
-                           /*ConvertIndirectToDirect=*/true, nullptr);
+                           /*ConvertIndirectToDirect=*/true);
 
   if (!ReInfo.canBeSpecialized())
     return false;
@@ -2475,6 +2498,8 @@ lookupOrCreatePrespecialization(SILOptFunctionBuilder &funcBuilder,
       GenericCloner::createDeclaration(funcBuilder, origF, reInfo, clonedName);
   declaration->setLinkage(SILLinkage::PublicExternal);
 
+  ScopeCloner scopeCloner(*declaration);
+
   return declaration;
 }
 
@@ -2496,6 +2521,32 @@ usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
           !currentModule->isImportedAsSPI(spiGroup, funcModule))
         continue;
     }
+    // Check whether the availability of the specialization allows for using
+    // it. We check the  deployment target or the current functions availability
+    // target depending which one is more recent.
+    auto specializationAvail = SA->getAvailability();
+    auto &ctxt = funcBuilder.getModule().getSwiftModule()->getASTContext();
+    auto deploymentAvail = AvailabilityContext::forDeploymentTarget(ctxt);
+    auto currentFn = apply.getFunction();
+    auto isInlinableCtxt = (currentFn->getResilienceExpansion()
+                             == ResilienceExpansion::Minimal);
+    auto currentFnAvailability = currentFn->getAvailabilityForLinkage();
+
+    // If we are in an inlineable function we can't use the specialization except
+    // the inlinable function itself has availability we can use.
+    if (currentFnAvailability.isAlwaysAvailable() && isInlinableCtxt) {
+      continue;
+    }
+    else if (isInlinableCtxt) {
+      deploymentAvail = currentFnAvailability;
+    }
+
+    if (!currentFnAvailability.isAlwaysAvailable() &&
+        !deploymentAvail.isContainedIn(currentFnAvailability))
+      deploymentAvail = currentFnAvailability;
+    if (!deploymentAvail.isContainedIn(specializationAvail))
+      continue;
+
     ReabstractionInfo reInfo(funcBuilder.getModule().getSwiftModule(),
                              funcBuilder.getModule().isWholeModule(), refF,
                              SA->getSpecializedSignature(),
@@ -2510,7 +2561,10 @@ usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
         mangler.mangleReabstracted(subs, reInfo.needAlternativeMangling());
 
     prespecializedReInfo = reInfo;
-    return lookupOrCreatePrespecialization(funcBuilder, refF, name, reInfo);
+    auto fn = lookupOrCreatePrespecialization(funcBuilder, refF, name, reInfo);
+    if (!specializationAvail.isAlwaysAvailable())
+      fn->setAvailabilityForLinkage(specializationAvail);
+    return fn;
   }
   return nullptr;
 }
@@ -2519,7 +2573,8 @@ void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
     SmallVectorImpl<SILFunction *> &NewFunctions,
-    OptRemark::Emitter &ORE) {
+    OptRemark::Emitter &ORE,
+    bool isMandatory) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
   auto *F = Apply.getFunction();
   auto *RefF =
@@ -2544,8 +2599,8 @@ void swift::trySpecializeApplyOfGeneric(
   // cloning the callee. Otherwise, strip it off so that we can optimize
   // the body more.
   IsSerialized_t Serialized = IsNotSerialized;
-  if (F->isSerialized() && RefF->isSerialized())
-    Serialized = IsSerializable;
+  if (F->isSerialized())
+    Serialized = IsSerialized;
 
   // If it is OnoneSupport consider all specializations as non-serialized
   // as we do not SIL serialize their bodies.
@@ -2561,13 +2616,16 @@ void swift::trySpecializeApplyOfGeneric(
   ReabstractionInfo ReInfo(FuncBuilder.getModule().getSwiftModule(),
                            FuncBuilder.getModule().isWholeModule(), Apply, RefF,
                            Apply.getSubstitutionMap(), Serialized,
-                           /*ConvertIndirectToDirect=*/true, &ORE);
+                           /*ConvertIndirectToDirect=*/ true,
+                           /*dropMetatypeArgs=*/ isMandatory,
+                           &ORE);
   if (!ReInfo.canBeSpecialized())
     return;
 
   // Check if there is a pre-specialization available in a library.
   SILFunction *prespecializedF = nullptr;
   ReabstractionInfo prespecializedReInfo;
+
   if ((prespecializedF = usePrespecialized(FuncBuilder, Apply, RefF, ReInfo,
                                            prespecializedReInfo))) {
     ReInfo = prespecializedReInfo;
@@ -2631,7 +2689,7 @@ void swift::trySpecializeApplyOfGeneric(
 
   GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                          RefF, Apply.getSubstitutionMap(),
-                                         ReInfo);
+                                         ReInfo, isMandatory);
   SILFunction *SpecializedF = prespecializedF
                                   ? prespecializedF
                                   : FuncSpecializer.lookupSpecialization();
@@ -2644,6 +2702,17 @@ void swift::trySpecializeApplyOfGeneric(
                             << "Specialized function type: "
                             << SpecializedF->getLoweredFunctionType() << "\n");
     NewFunctions.push_back(SpecializedF);
+  }
+  if (F->isSerialized() && !SpecializedF->hasValidLinkageForFragileInline()) {
+    // If the specialized function already exists as a "IsNotSerialized" function,
+    // but now it's called from a "IsSerialized" function, we need to mark it as
+    // IsSerialized.
+    SpecializedF->setSerialized(IsSerialized);
+    assert(SpecializedF->hasValidLinkageForFragileInline());
+    
+    // ... including all referenced shared functions.
+    FuncBuilder.getModule().linkFunction(SpecializedF,
+                                         SILModule::LinkingMode::LinkAll);
   }
 
   ORE.emit([&]() {
@@ -2787,9 +2856,10 @@ static SILFunction *lookupExistingSpecialization(SILModule &M,
   // TODO: Cache optimized specializations and perform lookup here?
   // Only check that this function exists, but don't read
   // its body. It can save some compile-time.
-  if (isKnownPrespecialization(FunctionName))
-    return M.findFunction(FunctionName, SILLinkage::PublicExternal);
-
+  if (isKnownPrespecialization(FunctionName)){
+    return M.loadFunction(FunctionName, SILModule::LinkingMode::LinkAll,
+                          SILLinkage::PublicExternal);
+  }
   return nullptr;
 }
 

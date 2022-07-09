@@ -23,6 +23,9 @@
 //  ↑                             ↑
 //  first (leftmost) code unit    discriminator (incl. count)
 //
+// On Android AArch64, there is one less byte available because the discriminator
+// is stored in the penultimate code unit instead, to match where it's stored
+// for large strings.
 @frozen @usableFromInline
 internal struct _SmallString {
   @usableFromInline
@@ -78,6 +81,8 @@ extension _SmallString {
   internal static var capacity: Int {
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     return 10
+#elseif os(Android) && arch(arm64)
+    return 14
 #else
     return 15
 #endif
@@ -111,7 +116,11 @@ extension _SmallString {
   // usage: it always clears the discriminator and count (in case it's full)
   @inlinable @inline(__always)
   internal var zeroTerminatedRawCodeUnits: RawBitPattern {
+#if os(Android) && arch(arm64)
+    let smallStringCodeUnitMask = ~UInt64(0xFFFF).bigEndian // zero last two bytes
+#else
     let smallStringCodeUnitMask = ~UInt64(0xFF).bigEndian // zero last byte
+#endif
     return (self._storage.0, self._storage.1 & smallStringCodeUnitMask)
   }
 
@@ -191,11 +200,17 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
 
   @inlinable  @inline(__always)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
-    // TODO(String performance): In-vector-register operation
-    return self.withUTF8 { utf8 in
-      let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
-      return _SmallString(rebased)._unsafelyUnwrappedUnchecked
+    get {
+      // TODO(String performance): In-vector-register operation
+      return self.withUTF8 { utf8 in
+        let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
+        return _SmallString(rebased)._unsafelyUnwrappedUnchecked
+      }
     }
+    // This setter is required for _SmallString to be a valid MutableCollection.
+    // Since _SmallString is internal and this setter unused, we cheat.
+    @_alwaysEmitIntoClient set { fatalError() }
+    @_alwaysEmitIntoClient _modify { fatalError() }
   }
 }
 

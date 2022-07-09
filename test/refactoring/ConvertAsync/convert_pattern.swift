@@ -1,20 +1,22 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
 enum E : Error { case e }
 
-func anyCompletion(_ completion: (Any?, Error?) -> Void) {}
-func anyResultCompletion(_ completion: (Result<Any?, Error>) -> Void) {}
+func anyCompletion(_ completion: @escaping (Any?, Error?) -> Void) {}
+func anyResultCompletion(_ completion: @escaping (Result<Any?, Error>) -> Void) {}
 
-func stringTupleParam(_ completion: ((String, String)?, Error?) -> Void) {}
+func stringTupleParam(_ completion: @escaping ((String, String)?, Error?) -> Void) {}
 func stringTupleParam() async throws -> (String, String) {}
 
-func stringTupleResult(_ completion: (Result<(String, String), Error>) -> Void) {}
+func stringTupleResult(_ completion: @escaping (Result<(String, String), Error>) -> Void) {}
 func stringTupleResult() async throws -> (String, String) {}
 
-func mixedTupleResult(_ completion: (Result<((Int, Float), String), Error>) -> Void) {}
+func mixedTupleResult(_ completion: @escaping (Result<((Int, Float), String), Error>) -> Void) {}
 func mixedTupleResult() async throws -> ((Int, Float), String) {}
 
-func multipleTupleParam(_ completion: ((String, String)?, (Int, Int)?, Error?) -> Void) {}
+func multipleTupleParam(_ completion: @escaping ((String, String)?, (Int, Int)?, Error?) -> Void) {}
 func multipleTupleParam() async throws -> ((String, String), (Int, Int)) {}
 
 func testPatterns() async throws {
@@ -121,7 +123,7 @@ func testPatterns() async throws {
   // FALLBACK-NEXT: guard let (str1, str2) = strs, str1 == "hi" else { fatalError() }
   // FALLBACK-NEXT: print(str1, str2, err)
 
-  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=GUARD-AND-UNHANDLED %s
+  // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=GUARD-AND-UNHANDLED %s
   stringTupleParam { strs, err in
     guard let (str1, str2) = strs else { fatalError() }
     print(str1, str2)
@@ -385,7 +387,7 @@ func testPatterns() async throws {
 }
 
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NAME-COLLISION %s
-func testNameCollision(_ completion: () -> Void) {
+func testNameCollision(_ completion: @escaping () -> Void) {
   let a = ""
   stringTupleParam { strs, err in
     guard let (a, b) = strs else { return }
@@ -414,7 +416,7 @@ func testNameCollision(_ completion: () -> Void) {
 // NAME-COLLISION-NEXT: }
 
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NAME-COLLISION2 %s
-func testNameCollision2(_ completion: () -> Void) {
+func testNameCollision2(_ completion: @escaping () -> Void) {
   mixedTupleResult { res in
     guard case let .success((x, y), z) = res else { return }
     stringTupleParam { strs, err in
@@ -434,6 +436,7 @@ func testNameCollision2(_ completion: () -> Void) {
 // NAME-COLLISION2-NEXT:   print("b", x, y, z)
 // NAME-COLLISION2-NEXT: }
 
+// Cannot use refactor-check-compiles, as cannot pattern match with placeholders.
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=TEST-UNHANDLED %s
 anyCompletion { val, err in
   if let x = val {
@@ -550,7 +553,7 @@ anyResultCompletion { res in
 
 // Make sure we handle a capture list okay.
 class C {
-  // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=CAPTURE %s
+  // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=CAPTURE %s
   func foo() {
     let _ = { [weak self] in
       print(self!)

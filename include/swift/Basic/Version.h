@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
+#include <array>
 #include <string>
 
 namespace swift {
@@ -128,7 +129,12 @@ public:
   /// Return this Version struct as the appropriate version string for APINotes.
   std::string asAPINotesVersionString() const;
 
-  /// Parse a version in the form used by the _compiler_version \#if condition.
+  /// Parse a version in the form used by the _compiler_version(string-literal)
+  /// \#if condition.
+  ///
+  /// \note This is \em only used for the string literal version, so it includes
+  /// backwards-compatibility logic to convert it to something that can be
+  /// compared with a modern SWIFT_COMPILER_VERSION.
   static Optional<Version> parseCompilerVersionString(StringRef VersionString,
                                                       SourceLoc Loc,
                                                       DiagnosticEngine *Diags);
@@ -181,7 +187,12 @@ std::string getSwiftFullVersion(Version effectiveLanguageVersion =
 
 /// Retrieves the repository revision number (or identifier) from which
 /// this Swift was built.
-std::string getSwiftRevision();
+StringRef getSwiftRevision();
+
+/// Is the running compiler built with a version tag for distribution?
+/// When true, \c Version::getCurrentCompilerVersion returns a valid version
+/// and \c getSwiftRevision returns the version tuple in string format.
+bool isCurrentCompilerTagged();
 
 } // end namespace version
 } // end namespace swift

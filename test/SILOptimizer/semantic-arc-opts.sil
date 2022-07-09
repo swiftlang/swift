@@ -9,11 +9,18 @@ import Builtin
 //////////////////
 
 typealias AnyObject = Builtin.AnyObject
+protocol Error {}
 
 enum MyNever {}
 enum FakeOptional<T> {
 case none
 case some(T)
+}
+
+enum MultiPayload {
+case none
+case some(Builtin.NativeObject)
+case another(Builtin.NativeObject)
 }
 
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
@@ -387,8 +394,7 @@ bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+bb2:
   br bb3
 
 bb3:
@@ -658,8 +664,7 @@ bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+bb2:
   br bb3
 
 bb3:
@@ -667,21 +672,21 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_with_default_and_extract : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_with_default_and_extract : $@convention(thin) (@guaranteed MultiPayload) -> () {
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'switch_enum_test_copyvalue_with_default_and_extract'
-sil [ossa] @switch_enum_test_copyvalue_with_default_and_extract : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
-bb0(%0 : @guaranteed $FakeOptional<Builtin.NativeObject>):
+sil [ossa] @switch_enum_test_copyvalue_with_default_and_extract : $@convention(thin) (@guaranteed MultiPayload) -> () {
+bb0(%0 : @guaranteed $MultiPayload):
   %f = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %1 = copy_value %0 : $FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, default bb2
+  %1 = copy_value %0 : $MultiPayload
+  switch_enum %1 : $MultiPayload, case #MultiPayload.some!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  %3a = unchecked_enum_data %3 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+bb2(%3 : @owned $MultiPayload):
+  %3a = unchecked_enum_data %3 : $MultiPayload, #MultiPayload.another!enumelt
   apply %f(%3a) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %3a : $Builtin.NativeObject
   br bb3
@@ -693,29 +698,29 @@ bb3:
 
 // TODO: We currently are unable to get rid of the begin_borrow. We should be
 // able to with appropriate analysis.
-// CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_with_borrow : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_with_borrow : $@convention(thin) (@owned MultiPayload) -> () {
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'switch_enum_test_copyvalue_with_borrow'
-sil [ossa] @switch_enum_test_copyvalue_with_borrow : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
-bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
+sil [ossa] @switch_enum_test_copyvalue_with_borrow : $@convention(thin) (@owned MultiPayload) -> () {
+bb0(%0 : @owned $MultiPayload):
   %f = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %0a = begin_borrow %0 : $FakeOptional<Builtin.NativeObject>
-  %1 = copy_value %0a : $FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, default bb2
+  %0a = begin_borrow %0 : $MultiPayload
+  %1 = copy_value %0a : $MultiPayload
+  switch_enum %1 : $MultiPayload, case #MultiPayload.some!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  %3a = unchecked_enum_data %3 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+bb2(%3 : @owned $MultiPayload):
+  %3a = unchecked_enum_data %3 : $MultiPayload, #MultiPayload.another!enumelt
   apply %f(%3a) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %3a : $Builtin.NativeObject
   br bb3
 
 bb3:
-  end_borrow %0a : $FakeOptional<Builtin.NativeObject>
-  destroy_value %0 : $FakeOptional<Builtin.NativeObject>
+  end_borrow %0a : $MultiPayload
+  destroy_value %0 : $MultiPayload
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1493,3 +1498,135 @@ bb3:
   return %9999 : $()
 }
 
+// Make sure we do not convert checked_cast_br from owned to guaranteed if we
+// are casting from AnyObject. This is because we may need to unwrap boxed
+// AnyObject + bridging.
+//
+// CHECK-LABEL: sil [ossa] @cast_anyobject_donot_opt : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
+// CHECK: [[COPIED_ARG:%.*]] = copy_value [[ARG]]
+// CHECK: checked_cast_br [[COPIED_ARG]] :
+// CHECK: } // end sil function 'cast_anyobject_donot_opt'
+sil [ossa] @cast_anyobject_donot_opt : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %2 = copy_value %0 : $AnyObject
+  checked_cast_br %2 : $AnyObject to Builtin.NativeObject, bb1, bb2
+
+bb1(%3 : @owned $Builtin.NativeObject):
+  %4 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %3 : $Builtin.NativeObject
+  br bb3(%4 : $FakeOptional<Builtin.NativeObject>)
+
+bb2(%5 : @owned $AnyObject):
+  destroy_value %5 : $AnyObject
+  %6 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.none!enumelt
+  br bb3(%6 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%7 : @owned $FakeOptional<Builtin.NativeObject>):
+  destroy_value %7 : $FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// SemanticARCOptVisitor::performGuaranteedCopyValueOptimization should not optimize this case.
+//
+// CHECK-LABEL: sil [ossa] @testDeadInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
+// CHECK: [[B:%.*]] = begin_borrow [lexical] %0 : $FakeOptional<AnyObject>
+// CHECK: copy_value
+// CHECK: switch_enum
+// CHECK: bb{{.*}}([[COPY:%.*]] : @owned $AnyObject):
+// CHECK: begin_borrow [lexical] [[COPY]] : $AnyObject
+// CHECK: end_borrow [[B]] : $FakeOptional<AnyObject>
+// CHECK: end_borrow
+// CHECK: destroy_value [[COPY]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testDeadInterleavedBorrow'
+sil [ossa] @testDeadInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
+bb0(%opt : @owned $FakeOptional<AnyObject>):
+    %opt_borrow = begin_borrow [lexical] %opt : $FakeOptional<AnyObject>
+    %opt_borrow_copy = copy_value %opt_borrow : $FakeOptional<AnyObject>
+    switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: some, case #FakeOptional.none!enumelt: none
+
+some(%obj : @owned $AnyObject):
+    %_borrow = begin_borrow [lexical] %obj : $AnyObject
+    end_borrow %opt_borrow : $FakeOptional<AnyObject>
+    end_borrow %_borrow : $AnyObject
+    destroy_value %obj : $AnyObject
+    br die
+
+die:
+    unreachable
+
+none:
+    end_borrow %opt_borrow : $FakeOptional<AnyObject>
+    br exit
+
+exit:
+    destroy_value %opt : $FakeOptional<AnyObject>
+    %res = tuple ()
+    return %res : $()
+}
+
+// SemanticARCOptVisitor::performGuaranteedCopyValueOptimization should not optimize this case.
+//
+// CHECK-LABEL: sil [ossa] @testDeadAndAliveInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
+// CHECK: [[B:%.*]] = begin_borrow [lexical] %0 : $FakeOptional<AnyObject>
+// CHECK: copy_value
+// CHECK: switch_enum
+//
+// CHECK: bb{{.*}}([[COPY:%.*]] : @owned $AnyObject):
+// CHECK: [[BB:%.*]] = begin_borrow [lexical] [[COPY]] : $AnyObject
+//
+// CHECK: try_apply undef
+//
+// CHECK: [[RESULT:%.*]] = apply undef(%{{.*}}) : $@convention(method) (@guaranteed AnyObject) -> @owned FakeOptional<AnyObject>
+// CHECK: switch_enum [[RESULT]] : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: {{.*}}, case #FakeOptional.none!enumelt: [[NONEBB:bb[0-9]?]]
+//
+// CHECK: [[NONEBB]]:
+// CHECK: end_borrow [[B]] : $FakeOptional<AnyObject>
+// CHECK: end_borrow [[BB]] : $AnyObject
+// CHECK: destroy_value [[COPY]] : $AnyObject
+// CHECK: destroy_value %0 : $FakeOptional<AnyObject>
+// CHECK-LABEL: } // end sil function 'testDeadAndAliveInterleavedBorrow'
+sil [ossa] @testDeadAndAliveInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
+bb0(%opt : @owned $FakeOptional<AnyObject>):
+    %opt_borrow = begin_borrow [lexical] %opt : $FakeOptional<AnyObject>
+    %opt_borrow_copy = copy_value %opt_borrow : $FakeOptional<AnyObject>
+    switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: some, case #FakeOptional.none!enumelt: none
+
+some(%obj : @owned $AnyObject):
+    %obj_borrow = begin_borrow [lexical] %obj : $AnyObject
+    %obj_borrow_copy = copy_value %obj_borrow : $AnyObject
+    try_apply undef(%obj_borrow_copy) : $@convention(method) (@owned AnyObject) -> (@owned AnyObject, @error Error), normal good, error bad
+
+good(%obj2 : @owned $AnyObject):
+    %obj3 = apply undef(%obj2) : $@convention(method) (@guaranteed AnyObject) -> @owned FakeOptional<AnyObject>
+    destroy_value %obj2 : $AnyObject
+    switch_enum %obj3 : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: good_some, case #FakeOptional.none!enumelt: good_none
+
+good_some(%obj4 : @owned $AnyObject):
+    destroy_value %obj4 : $AnyObject
+    end_borrow %obj_borrow : $AnyObject
+    destroy_value %obj : $AnyObject
+    br exit
+
+good_none:
+    end_borrow %opt_borrow : $FakeOptional<AnyObject>
+    end_borrow %obj_borrow : $AnyObject
+    destroy_value %obj : $AnyObject
+    destroy_value %opt : $FakeOptional<AnyObject>
+    br die
+
+bad(%error1 : @owned $Error):
+    br die
+
+die:
+    unreachable
+
+none:
+    br exit
+
+exit:
+    end_borrow %opt_borrow : $FakeOptional<AnyObject>
+    destroy_value %opt : $FakeOptional<AnyObject>
+    %res = tuple ()
+    return %res : $()
+}

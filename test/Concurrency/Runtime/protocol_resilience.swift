@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_protocol)) -Xfrontend -enable-experimental-concurrency -enable-library-evolution %S/Inputs/resilient_protocol.swift -emit-module -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_protocol))  -Xfrontend -disable-availability-checking -enable-library-evolution %S/Inputs/resilient_protocol.swift -emit-module -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol
 // RUN: %target-codesign %t/%target-library-name(resilient_protocol)
 
-// RUN: %target-build-swift -parse-as-library -Xfrontend -enable-experimental-concurrency %s -lresilient_protocol -I %t -L %t -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift -parse-as-library  -Xfrontend -disable-availability-checking %s -lresilient_protocol -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_protocol)
@@ -12,12 +12,8 @@
 // REQUIRES: concurrency
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-
-// XFAIL: windows
-// UNSUPPORTED: linux
-// UNSUPPORTED: openbsd
 
 import StdlibUnittest
 import resilient_protocol
@@ -62,19 +58,23 @@ func genericWait<T : Awaitable>(orThrow: Bool, _ t: T) async throws {
 
 @main struct Main {
   static func main() async {
-    var AsyncProtocolRequirementSuite = TestSuite("ResilientProtocol")
+    let task = Task.detached {
+      var AsyncProtocolRequirementSuite = TestSuite("ResilientProtocol")
 
-    AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
-      let x = IntAwaitable()
+      AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
+        let x = IntAwaitable()
 
-      await genericWaitForNothing(x)
+        await genericWaitForNothing(x)
 
-      expectEqual(123, await genericWait(x))
-      expectEqual(321, await genericWaitForInt(x))
+        expectEqual(123, await genericWait(x))
+        expectEqual(321, await genericWaitForInt(x))
 
-      expectNil(try? await genericWait(orThrow: true, x))
-      try! await genericWait(orThrow: false, x)
+        expectNil(try? await genericWait(orThrow: true, x))
+        try! await genericWait(orThrow: false, x)
+      }
+      await runAllTestsAsync()
     }
-    await runAllTestsAsync()
+
+    await task.value
   }
 }

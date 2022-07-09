@@ -15,7 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/ToolChain.h"
-#include "clang/Driver/DarwinSDKInfo.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Compiler.h"
 
@@ -73,7 +73,8 @@ protected:
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
   bool shouldStoreInvocationInDebugInfo() const override;
-
+  std::string getGlobalDebugPathRemapping() const override;
+  
   /// Retrieve the target SDK version for the given target triple.
   Optional<llvm::VersionTuple>
   getTargetSDKVersion(const llvm::Triple &triple) const ;
@@ -81,7 +82,7 @@ protected:
   /// Information about the SDK that the application is being built against.
   /// This information is only used by the linker, so it is only populated
   /// when there will be a linker job.
-  mutable Optional<clang::driver::DarwinSDKInfo> SDKInfo;
+  mutable Optional<clang::DarwinSDKInfo> SDKInfo;
 
   const Optional<llvm::Triple> TargetVariant;
 
@@ -112,6 +113,26 @@ public:
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
 };
+
+class LLVM_LIBRARY_VISIBILITY WebAssembly : public ToolChain {
+protected:
+  InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
+                                     const JobContext &context) const override;
+  void validateArguments(DiagnosticEngine &diags,
+                         const llvm::opt::ArgList &args,
+                         StringRef defaultTarget) const override;
+
+public:
+  WebAssembly(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  ~WebAssembly() = default;
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
+};
+
 
 class LLVM_LIBRARY_VISIBILITY GenericUnix : public ToolChain {
 protected:

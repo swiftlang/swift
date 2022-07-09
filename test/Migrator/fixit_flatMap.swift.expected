@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck %s -swift-version 4
-// RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -swift-version 4
+// RUN: %target-swift-frontend -typecheck %s -swift-version 4 %api_diff_data_dir
+// RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -swift-version 4 %api_diff_data_dir
 // RUN: diff -u %s.expected %t.result
 
 // REQUIRES: VENDOR=apple

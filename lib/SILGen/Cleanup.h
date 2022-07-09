@@ -133,6 +133,14 @@ protected:
   }
 };
 
+struct EndBorrowCleanup final : Cleanup {
+  SILValue borrowedValue;
+  EndBorrowCleanup(SILValue borrowedValue);
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override;
+  void dump(SILGenFunction &) const override;
+};
+
 /// A cleanup depth is generally used to denote the set of cleanups
 /// between the given cleanup (and not including it) and the top of
 /// the stack.
@@ -272,7 +280,8 @@ public:
   bool hasAnyActiveCleanups(CleanupsDepth from);
 
   /// Dump the output of each cleanup on this stack.
-  void dump() const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 
   /// Dump the given cleanup handle if it is on the current stack.
   void dump(CleanupHandle handle) const;

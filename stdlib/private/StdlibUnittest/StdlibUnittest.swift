@@ -31,6 +31,10 @@ import WinSDK
 import ObjectiveC
 #endif
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+import _Concurrency
+#endif
+
 extension String {
   /// Returns the lines in `self`.
   public var _lines : [String] {
@@ -177,106 +181,133 @@ public func identityComp(_ element: MinimalComparableValue)
   return element
 }
 
-public func expectEqual<T : Equatable>(_ expected: T, _ actual: T,
+public func expectEqual<T : Equatable>(
+  _ first: T,
+  _ second: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  expectEqualTest(expected, actual, message(),
+  file: String = #file, line: UInt = #line
+) {
+  expectEqualTest(first, second, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T : Equatable, U : Equatable>(
-  _ expected: (T, U), _ actual: (T, U),
+  _ first: (T, U),
+  _ second: (T, U),
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  expectEqualTest(expected.0, actual.0, message(),
+  file: String = #file, line: UInt = #line
+) {
+  expectEqualTest(first.0, second.0, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
-  expectEqualTest(expected.1, actual.1, message(),
+  expectEqualTest(first.1, second.1, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T : Equatable, U : Equatable, V : Equatable>(
-  _ expected: (T, U, V), _ actual: (T, U, V),
+  _ first: (T, U, V),
+  _ second: (T, U, V),
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  expectEqualTest(expected.0, actual.0, message(),
+  file: String = #file, line: UInt = #line
+) {
+  expectEqualTest(first.0, second.0, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
-  expectEqualTest(expected.1, actual.1, message(),
+  expectEqualTest(first.1, second.1, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
-  expectEqualTest(expected.2, actual.2, message(),
+  expectEqualTest(first.2, second.2, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T : Equatable, U : Equatable, V : Equatable, W : Equatable>(
-  _ expected: (T, U, V, W), _ actual: (T, U, V, W),
+  _ first: (T, U, V, W),
+  _ second: (T, U, V, W),
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  expectEqualTest(expected.0, actual.0, message(),
+  file: String = #file, line: UInt = #line
+) {
+  expectEqualTest(first.0, second.0, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
-  expectEqualTest(expected.1, actual.1, message(),
+  expectEqualTest(first.1, second.1, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
-  expectEqualTest(expected.2, actual.2, message(),
+  expectEqualTest(first.2, second.2, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
-  expectEqualTest(expected.3, actual.3, message(),
+  expectEqualTest(first.3, second.3, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
 }
 
-public func expectEqual(_ expected: String, _ actual: Substring,
+public func expectEqual(
+  _ first: String,
+  _ second: Substring,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if !(expected == actual) {
+  file: String = #file, line: UInt = #line
+) {
+  if !(first == second) {
     expectationFailure(
-      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
+      """
+      first:  \(String(reflecting: first)) (of type \(String(reflecting: type(of: first))))
+      second: \(String(reflecting: second)) (of type \(String(reflecting: type(of: second))))
+      """,
       trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
     )
   }
 }
-public func expectEqual(_ expected: Substring, _ actual: String,
+public func expectEqual(
+  _ first: Substring,
+  _ second: String,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if !(expected == actual) {
+  file: String = #file, line: UInt = #line
+) {
+  if !(first == second) {
     expectationFailure(
-      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
+      """
+      first:  \(String(reflecting: first)) (of type \(String(reflecting: type(of: first))))
+      second: \(String(reflecting: second)) (of type \(String(reflecting: type(of: second))))
+      """,
       trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
     )
   }
 }
-public func expectEqual(_ expected: String, _ actual: String,
+public func expectEqual(
+  _ first: String,
+  _ second: String,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if !(expected == actual) {
+  file: String = #file, line: UInt = #line
+) {
+  if !(first == second) {
     expectationFailure(
-      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
+      """
+      first:  \(String(reflecting: first)) (of type \(String(reflecting: type(of: first))))
+      second: \(String(reflecting: second)) (of type \(String(reflecting: type(of: second))))
+      """,
       trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
     )
   }
 }
 
-public func expectEqualReference(_ expected: AnyObject?, _ actual: AnyObject?,
+public func expectEqualReference(
+  _ first: AnyObject?,
+  _ second: AnyObject?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  expectEqualTest(expected, actual, message(),
+  file: String = #file, line: UInt = #line
+) {
+  expectEqualTest(first, second, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 === $1}
 }
 
@@ -294,30 +325,37 @@ public func expectationFailure(
 // See <rdar://26058520> Generic type constraints incorrectly applied to
 // functions with the same name
 public func expectEqualTest<T>(
-  _ expected: T, _ actual: T,
+  _ first: T,
+  _ second: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line, sameValue equal: (T, T) -> Bool
+  file: String = #file, line: UInt = #line,
+  sameValue equal: (T, T) -> Bool
 ) {
-  if !equal(expected, actual) {
+  if !equal(first, second) {
     expectationFailure(
-      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
+      """
+      first:  \(String(reflecting: first)) (of type \(String(reflecting: type(of: first))))
+      second: \(String(reflecting: second)) (of type \(String(reflecting: type(of: second))))
+      """,
       trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
     )
   }
 }
 
-public func expectNotEqual<T : Equatable>(_ expected: T, _ actual: T,
+public func expectNotEqual<T : Equatable>(
+  _ first: T,
+  _ second: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if expected == actual {
+  file: String = #file, line: UInt = #line
+) {
+  if first == second {
     expectationFailure(
-      "unexpected value: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
+      "unexpected value: \"\(second)\" (of type \(String(reflecting: type(of: second))))",
       trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
     )
@@ -325,30 +363,36 @@ public func expectNotEqual<T : Equatable>(_ expected: T, _ actual: T,
 }
 
 public func expectOptionalEqual<T>(
-  _ expected: T, _ actual: T?,
+  _ first: T,
+  _ second: T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line, sameValue equal: (T, T) -> Bool
+  file: String = #file, line: UInt = #line,
+  sameValue equal: (T, T) -> Bool
 ) {
-  if (actual == nil) || !equal(expected, actual!) {
+  if (second == nil) || !equal(first, second!) {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
+      """
+      first:  \"\(first)\" (of type \(String(reflecting: type(of: first))))
+      second: \"\(second.debugDescription)\" (of type \(String(reflecting: type(of: second))))
+      """,
       trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 
 public func expectEqual(
-  _ expected: Any.Type, _ actual: Any.Type,
+  _ first: Any.Type, _ second: Any.Type,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
+  expectEqualTest(
+    first, second, message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false
+  ) { $0 == $1 }
 }
 
 public func expectLT<T : Comparable>(_ lhs: T, _ rhs: T,
@@ -876,6 +920,7 @@ func _childProcess() {
 }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+@available(SwiftStdlib 5.1, *)
 @inline(never)
 func _childProcessAsync() async {
   _installTrapInterceptor()
@@ -1370,6 +1415,7 @@ class _ParentProcess {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.1, *)
   internal func runOneTestAsync(
     fullTestName: String,
     testSuite: TestSuite,
@@ -1536,6 +1582,7 @@ class _ParentProcess {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.1, *)
   func runAsync() async {
     if let filter = _filter {
       print("StdlibUnittest: using filter: \(filter)")
@@ -1720,6 +1767,7 @@ public func runAllTests() {
 }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+@available(SwiftStdlib 5.1, *)
 public func runAllTestsAsync() async {
   if PersistentState.runNoTestsWasCalled {
     print("runAllTests() called after runNoTests(). Aborting.")
@@ -1907,6 +1955,7 @@ public final class TestSuite {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.1, *)
   func _runTestAsync(name testName: String, parameter: Int?) async {
     PersistentState.ranSomething = true
     for r in _allResettables {
@@ -2133,9 +2182,10 @@ func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
   var count = 0
   sysctlbyname("kern.osproductversion", nil, &count, nil, 0)
-  var s = [CChar](repeating: 0, count: count)
-  sysctlbyname("kern.osproductversion", &s, &count, nil, 0)
-  return String(cString: &s)
+  return withUnsafeTemporaryAllocation(of: CChar.self, capacity: count) {
+    sysctlbyname("kern.osproductversion", $0.baseAddress, &count, nil, 0)
+    return String(cString: $0.baseAddress!)
+  }
 }
 #endif
 #endif

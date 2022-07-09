@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
@@ -118,7 +119,25 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    if (!IGM.getOptions().ForceStructTypeLayouts || !areFieldsABIAccessible()) {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
+
+    if (getFields().empty()) {
+      return IGM.typeLayoutCache.getEmptyEntry();
+    }
+
+    std::vector<TypeLayoutEntry *> fields;
+    for (auto &field : getFields()) {
+      auto fieldTy = field.getType(IGM, T);
+      fields.push_back(field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+    }
+
+    if (fields.size() == 1) {
+      return fields[0];
+    }
+
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
   }
 
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
@@ -272,7 +291,25 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    if (!IGM.getOptions().ForceStructTypeLayouts || !areFieldsABIAccessible()) {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
+
+    if (getFields().empty()) {
+      return IGM.typeLayoutCache.getEmptyEntry();
+    }
+
+    std::vector<TypeLayoutEntry *> fields;
+    for (auto &field : getFields()) {
+      auto fieldTy = field.getType(IGM, T);
+      fields.push_back(field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+    }
+
+    if (fields.size() == 1) {
+      return fields[0];
+    }
+
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
   }
 
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }

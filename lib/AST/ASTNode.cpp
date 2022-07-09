@@ -35,6 +35,11 @@ SourceRange ASTNode::getSourceRange() const {
     return P->getSourceRange();
   if (const auto *T = this->dyn_cast<TypeRepr *>())
     return T->getSourceRange();
+  if (const auto *C = this->dyn_cast<StmtConditionElement *>())
+    return C->getSourceRange();
+  if (const auto *I = this->dyn_cast<CaseLabelItem *>()) {
+    return I->getSourceRange();
+  }
   llvm_unreachable("unsupported AST node");
 }
 
@@ -73,6 +78,10 @@ bool ASTNode::isImplicit() const {
     return P->isImplicit();
   if (const auto *T = this->dyn_cast<TypeRepr*>())
     return false;
+  if (const auto *C = this->dyn_cast<StmtConditionElement *>())
+    return false;
+  if (const auto *I = this->dyn_cast<CaseLabelItem *>())
+    return false;
   llvm_unreachable("unsupported AST node");
 }
 
@@ -87,7 +96,15 @@ void ASTNode::walk(ASTWalker &Walker) {
     P->walk(Walker);
   else if (auto *T = this->dyn_cast<TypeRepr*>())
     T->walk(Walker);
-  else
+  else if (auto *C = this->dyn_cast<StmtConditionElement *>())
+    C->walk(Walker);
+  else if (auto *I = this->dyn_cast<CaseLabelItem *>()) {
+    if (auto *P = I->getPattern())
+      P->walk(Walker);
+
+    if (auto *G = I->getGuardExpr())
+      G->walk(Walker);
+  } else
     llvm_unreachable("unsupported AST node");
 }
 
@@ -102,7 +119,11 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
     P->dump(OS, Indent);
   else if (auto T = dyn_cast<TypeRepr*>())
     T->print(OS);
-  else
+  else if (auto *C = dyn_cast<StmtConditionElement *>())
+    OS.indent(Indent) << "(statement condition)";
+  else if (auto *I = dyn_cast<CaseLabelItem *>()) {
+    OS.indent(Indent) << "(case label item)";
+  } else
     llvm_unreachable("unsupported AST node");
 }
 

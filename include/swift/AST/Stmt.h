@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
@@ -53,7 +54,7 @@ enum : unsigned { NumStmtKindBits =
   countBitsUsed(static_cast<unsigned>(StmtKind::Last_Stmt)) };
 
 /// Stmt - Base class for all statements in swift.
-class alignas(8) Stmt {
+class alignas(8) Stmt : public ASTAllocated<Stmt> {
   Stmt(const Stmt&) = delete;
   Stmt& operator=(const Stmt&) = delete;
 
@@ -138,16 +139,6 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
-
-  // Only allow allocation of Exprs using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(Stmt));
-  
-  // Make vanilla new/delete illegal for Stmts.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 };
 
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
@@ -170,7 +161,7 @@ public:
 
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
-  
+
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
   bool empty() const { return getNumElements() == 0; }
@@ -191,7 +182,9 @@ public:
   ArrayRef<ASTNode> getElements() const {
     return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
   }
-  
+
+  ASTNode findAsyncNode();
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
 
@@ -402,7 +395,7 @@ public:
 /// the "x" binding, one for the "y" binding, one for the where clause, one for
 /// "z"'s binding.  A simple "if" statement is represented as a single binding.
 ///
-class StmtConditionElement {
+class alignas(1 << PatternAlignInBits) StmtConditionElement {
   /// If this is a pattern binding, it may be the first one in a declaration, in
   /// which case this is the location of the var/let/case keyword.  If this is
   /// the second pattern (e.g. for 'y' in "var x = ..., y = ...") then this
@@ -588,6 +581,10 @@ public:
   StmtCondition getCond() const { return Cond; }
   void setCond(StmtCondition e);
 
+  /// FIXME: Find a better way to implement this. Allows conditions to be
+  ///        stored in \c ASTNode.
+  StmtCondition *getCondPointer() { return &Cond; }
+
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&
            S->getKind() <= StmtKind::Last_LabeledConditionalStmt;
@@ -746,8 +743,8 @@ class ForEachStmt : public LabeledStmt {
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  VarDecl *iteratorVar = nullptr;
-  Expr *iteratorVarRef = nullptr;
+  PatternBindingDecl *iteratorVar = nullptr;
+  Expr *nextCall = nullptr;
   OpaqueValueExpr *elementExpr = nullptr;
   Expr *convertElementExpr = nullptr;
 
@@ -762,11 +759,11 @@ public:
     setPattern(Pat);
   }
 
-  void setIteratorVar(VarDecl *var) { iteratorVar = var; }
-  VarDecl *getIteratorVar() const { return iteratorVar; }
+  void setIteratorVar(PatternBindingDecl *var) { iteratorVar = var; }
+  PatternBindingDecl *getIteratorVar() const { return iteratorVar; }
 
-  void setIteratorVarRef(Expr *var) { iteratorVarRef = var; }
-  Expr *getIteratorVarRef() const { return iteratorVarRef; }
+  void setNextCall(Expr *next) { nextCall = next; }
+  Expr *getNextCall() const { return nextCall; }
 
   void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
   OpaqueValueExpr *getElementExpr() const { return elementExpr; }
@@ -805,8 +802,12 @@ public:
   /// by this foreach loop, as it was written in the source code and
   /// subsequently type-checked. To determine the semantic behavior of this
   /// expression to extract a range, use \c getRangeInit().
-  Expr *getSequence() const { return Sequence; }
-  void setSequence(Expr *S) { Sequence = S; }
+  Expr *getParsedSequence() const { return Sequence; }
+  void setParsedSequence(Expr *S) { Sequence = S; }
+
+  /// Type-checked version of the sequence or nullptr if this statement
+  /// yet to be type-checked.
+  Expr *getTypeCheckedSequence() const;
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
@@ -821,7 +822,7 @@ public:
 };
 
 /// A pattern and an optional guard expression used in a 'case' statement.
-class CaseLabelItem {
+class alignas(1 << PatternAlignInBits) CaseLabelItem {
   enum class Kind {
     /// A normal pattern
     Normal = 0,
@@ -1401,7 +1402,7 @@ inline void simple_display(llvm::raw_ostream &out, Stmt *S) {
     out << Stmt::getKindName(S->getKind());
   else
     out << "(null)";
-};
+}
 
 } // end namespace swift
 

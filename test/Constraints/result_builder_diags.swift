@@ -6,7 +6,7 @@ enum Either<T,U> {
 }
 
 @resultBuilder
-struct TupleBuilder { // expected-note 2 {{struct 'TupleBuilder' declared here}}
+struct TupleBuilder { // expected-note 3 {{struct 'TupleBuilder' declared here}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -78,7 +78,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note {{in call to function 'tuplify(_:body:)'}}
   print(body(cond))
 }
 
@@ -99,8 +99,23 @@ func testDiags() {
   tuplify(true) { _ in
     17
     let x = 17
-    let y: Int // expected-error{{closure containing a declaration cannot be used with result builder 'TupleBuilder'}}
+    let y: Int // expected-error{{local variable 'y' requires explicit initializer to be used with result builder 'TupleBuilder'}} {{15-15= = <#value#>}}
     x + 25
+  }
+
+  tuplify(true) { _ in
+    17
+    let y: Int, z: String
+    // expected-error@-1 {{local variable 'y' requires explicit initializer to be used with result builder 'TupleBuilder'}} {{15-15= = <#value#>}}
+    // expected-error@-2 {{local variable 'z' requires explicit initializer to be used with result builder 'TupleBuilder'}} {{26-26= = <#value#>}}
+    y + 25
+  }
+
+  tuplify(true) { _ in
+    0
+    let x: Int = 0, y: String = "" // Multiple initialized pattern bindings are okay
+    x + 1
+    y
   }
 
   // Statements unsupported by the particular builder.
@@ -292,21 +307,6 @@ struct MyTuplifiedStruct {
   }
 }
 
-func test_invalid_return_type_in_body() {
-  tuplify(true) { _ -> (Void, Int) in
-    tuplify(false) { condition in
-      if condition {
-        return 42 // expected-error {{cannot use explicit 'return' statement in the body of result builder 'TupleBuilder'}}
-        // expected-note@-1 {{remove 'return' statements to apply the result builder}} {{9-16=}}
-      } else {
-        1
-      }
-    }
-
-    42
-  }
-}
-
 // Check that we're performing syntactic use diagnostics.
 func acceptMetatype<T>(_: T.Type) -> Bool { true }
 
@@ -427,9 +427,8 @@ func getSomeEnumOverloaded(_: Int) -> E2 { return .b(0, nil) }
 
 func testOverloadedSwitch() {
   tuplify(true) { c in
-    // FIXME: Bad source location.
-    switch getSomeEnumOverloaded(17) { // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
-    case .a:
+    switch getSomeEnumOverloaded(17) {
+    case .a: // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
       "a"
     default:
       "default"
@@ -467,7 +466,7 @@ struct TestConstraintGenerationErrors {
   func buildTupleClosure() {
     tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
-      String(nothing)
+      String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
   }
 }
@@ -508,7 +507,7 @@ enum E3 {
 }
 
 func testCaseMutabilityMismatches(e: E3) {
-    tuplify(true) { c in
+   tuplify(true) { c in // expected-error {{generic parameter 'T' could not be inferred}}
     "testSwitch"
     switch e {
     case .a(let x, var y),
@@ -652,7 +651,7 @@ struct MyView {
 
   @TupleBuilder var invalidSwitchMultiple: some P {
     switch Optional.some(1) {
-    case .none: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+    case .none: // expected-error {{'case' label in a 'switch' must have at least one executable statement}}
     case . // expected-error {{expected ':' after 'case'}}
     } // expected-error {{expected identifier after '.' expression}}
   }
@@ -760,9 +759,99 @@ func test_rdar65667992() {
     @Builder var body: S {
       switch entry { // expected-error {{type 'E' has no member 'unset'}}
       case .set(_, _): S()
-      case .unset(_): S()
+      case .unset(_): S() // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
       default: S()
       }
     }
+  }
+}
+
+
+func test_weak_with_nonoptional_type() {
+  class X {
+    func test() -> Int { 0 }
+  }
+
+  tuplify(true) { c in
+    weak var x: X = X() // expected-error {{'weak' variable should have optional type 'X?'}}
+
+    if let x = x {
+      x.test()
+    }
+
+    42
+  }
+}
+
+// rdar://80941497 - compiler fails to produce diagnostic when referencing missing member in optional context
+func test_missing_member_in_optional_context() {
+  struct Test {
+  }
+
+  var test: Test? = nil
+
+  tuplify(true) { c in
+    if let prop = test?.prop { // expected-error {{value of type 'Test' has no member 'prop'}}
+      0
+    }
+
+    if let method = test?.method() { // expected-error {{value of type 'Test' has no member 'method'}}
+      1
+    }
+  }
+}
+
+func test_redeclarations() {
+  tuplify(true) { c in
+    let foo = 0 // expected-note {{'foo' previously declared here}}
+    let foo = foo // expected-error {{invalid redeclaration of 'foo'}}
+  }
+
+  tuplify(true) { c in
+    let (foo, foo) = (5, 6) // expected-error {{invalid redeclaration of 'foo'}} expected-note {{'foo' previously declared here}}
+  }
+}
+
+func test_rdar89742267() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ t: T) -> T { t }
+    static func buildEither<T>(first: T) -> T { first }
+    static func buildEither<T>(second: T) -> T { second }
+  }
+
+  struct S {}
+
+  enum Hey {
+    case listen
+  }
+
+  struct MyView {
+    var entry: Hey
+
+    @Builder var body: S {
+      switch entry {
+      case .listen: S()
+      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in Swift 6}}
+      default: S()
+      }
+    }
+  }
+}
+
+// https://github.com/apple/swift/issues/59390
+func test_invalid_result_is_diagnosed() {
+  @resultBuilder
+  struct MyBuilder {
+    static func buildBlock<T1>(_ t1: T1) -> T1 {
+      return t1
+    }
+  }
+
+  struct S<T> {} // expected-note {{arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
+
+  @MyBuilder
+  func test() -> S<String> { // expected-error {{cannot convert result builder result type 'S<Int>' to return type 'S<String>}}
+    S<Int>()
   }
 }

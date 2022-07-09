@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -dump-ast %s -enable-experimental-concurrency | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s  -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 
 func acceptClosure<T>(_: () -> T) { }

@@ -229,3 +229,27 @@ let _: Int = r
 // SR-11998 / rdar://problem/58455441
 class C<T> {}
 var sub: C! = C<Int>()
+
+// SR-15219 (rdar://83352038): Make sure we don't crash if an IUO param becomes
+// a placeholder.
+func rdar83352038() {
+  func foo(_: UnsafeRawPointer) -> Undefined {} // expected-error {{cannot find type 'Undefined' in scope}}
+  let _ = { (cnode: AlsoUndefined!) -> UnsafeMutableRawPointer in // expected-error {{cannot find type 'AlsoUndefined' in scope}}
+    return foo(cnode)
+  }
+}
+
+// Make sure we reject an attempt at a function conversion.
+func returnsIUO() -> Int! { 0 }
+let _ = (returnsIUO as () -> Int)() // expected-error {{cannot convert value of type '() -> Int?' to type '() -> Int' in coercion}}
+
+// Make sure we only permit an IUO unwrap on the first application.
+func returnsIUOFn() -> (() -> Int?)! { nil }
+let _: (() -> Int?)? = returnsIUOFn()
+let _: (() -> Int)? = returnsIUOFn() // expected-error {{cannot convert value of type '(() -> Int?)?' to specified type '(() -> Int)?'}}
+let _: () -> Int? = returnsIUOFn()
+let _: () -> Int = returnsIUOFn() // expected-error {{cannot convert value of type '(() -> Int?)?' to specified type '() -> Int'}}
+let _: Int? = returnsIUOFn()()
+let _: Int = returnsIUOFn()() // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+// expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+// expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}

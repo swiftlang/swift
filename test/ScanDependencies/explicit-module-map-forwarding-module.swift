@@ -37,7 +37,12 @@
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}," >> %/t/inputs/map.json
 // RUN: echo "{" >> %/t/inputs/map.json
-// RUN: echo "\"moduleName\": \"_Distributed\"," >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"_StringProcessing\"," >> %/t/inputs/map.json
+// RUN: echo "\"modulePath\": \"%/string_processing_module\"," >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
+// RUN: echo "}," >> %/t/inputs/map.json
+// RUN: echo "{" >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"Distributed\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%/distributed_module\"," >> %/t/inputs/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json

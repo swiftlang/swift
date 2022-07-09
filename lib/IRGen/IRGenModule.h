@@ -33,6 +33,7 @@
 #include "swift/Basic/SuccessorMap.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/RuntimeEffect.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -85,7 +86,6 @@ namespace clang {
 
 namespace swift {
   class GenericSignature;
-  class GenericSignatureBuilder;
   class AssociatedConformance;
   class AssociatedType;
   class ASTContext;
@@ -135,6 +135,7 @@ namespace irgen {
   class ForeignClassMetadataLayout;
   class ForeignFunctionInfo;
   class FormalType;
+  class FunctionPointerKind;
   class HeapLayout;
   class StructLayout;
   class IRGenDebugInfo;
@@ -220,7 +221,7 @@ private:
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
 
-  // The IGMs where sepecializations of functions are emitted. The key is the
+  // The IGMs where specializations of functions are emitted. The key is the
   // non-specialized function.
   // Storing all specializations of a function in the same IGM increases the
   // chances of function merging.
@@ -319,16 +320,18 @@ private:
 
   llvm::SmallVector<ClassDecl *, 4> ClassesForEagerInitialization;
 
+  llvm::SmallVector<ClassDecl *, 4> ObjCActorsNeedingSuperclassSwizzle;
+
   /// The order in which all the SIL function definitions should
   /// appear in the translation unit.
   llvm::DenseMap<SILFunction*, unsigned> FunctionOrder;
 
   /// The queue of IRGenModules for multi-threaded compilation.
   SmallVector<IRGenModule *, 8> Queue;
-
+  
   std::atomic<int> QueueIndex;
   
-  friend class CurrentIGMPtr;  
+  friend class CurrentIGMPtr;
 public:
   explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
 
@@ -399,6 +402,10 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
+  /// Emit type metadata records for functions that can be looked up by name at
+  /// runtime.
+  void emitAccessibleFunctions();
+
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
   void emitBuiltinReflectionMetadata();
@@ -407,6 +414,7 @@ public:
   void emitReflectionMetadataVersion();
 
   void emitEagerClassInitialization();
+  void emitObjCActorsNeedingSuperclassSwizzle();
 
   // Emit the code to replace dynamicReplacement(for:) functions.
   void emitDynamicReplacements();
@@ -499,6 +507,7 @@ public:
 
 
   void addClassForEagerInitialization(ClassDecl *ClassDecl);
+  void addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl);
 
   unsigned getFunctionOrder(SILFunction *F) {
     auto it = FunctionOrder.find(F);
@@ -519,7 +528,7 @@ public:
   /// Return the effective triple used by clang.
   llvm::Triple getEffectiveClangTriple();
 
-  const llvm::DataLayout &getClangDataLayout();
+  const llvm::StringRef getClangDataLayoutString();
 };
 
 class ConstantReference {
@@ -566,6 +575,9 @@ enum class MangledTypeRefRole {
   /// The mangled type reference is used for a default associated type
   /// witness.
   DefaultAssociatedTypeWitness,
+  /// The mangled type reference must be a flat string (i.e. no
+  /// symbolic references) and unique for the target type.
+  FlatUnique,
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -616,8 +628,8 @@ public:
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
-  // Is swifterror returned in a register by the target ABI.
-  bool IsSwiftErrorInRegister;
+  // Should `swifterror` attribute be explicitly added for the target ABI.
+  bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
@@ -724,6 +736,8 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
+  llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
+
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
   llvm::StructType *SwiftContextTy;
   llvm::StructType *SwiftTaskTy;
@@ -749,6 +763,9 @@ public:
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
+  llvm::GlobalVariable *swiftImmortalRefCount = nullptr;
+  llvm::GlobalVariable *swiftStaticArrayMetadata = nullptr;
+
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
   unsigned TailElemTypeID = 0;
@@ -756,7 +773,15 @@ public:
   unsigned InvariantMetadataID; /// !invariant.load
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
-  
+
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+  RuntimeEffect effectOfRuntimeFuncs = RuntimeEffect::NoEffect;
+  llvm::SmallVector<const char *> emittedRuntimeFuncs;
+
+  void registerRuntimeEffect(ArrayRef<RuntimeEffect> realtime,
+                             const char *funcName);
+#endif
+
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
@@ -811,6 +836,7 @@ public:
     case ReferenceCounting::Unknown:
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
+    case ReferenceCounting::None:
       return true;
 
     case ReferenceCounting::Bridge:
@@ -851,14 +877,19 @@ public:
   llvm::PointerType *getValueWitnessTablePtrTy();
   llvm::PointerType *getEnumValueWitnessTablePtrTy();
 
+  llvm::IntegerType *getTypeMetadataRequestParamTy();
+  llvm::StructType *getTypeMetadataResponseTy();
+
   void unimplemented(SourceLoc, StringRef Message);
-  LLVM_ATTRIBUTE_NORETURN
+  [[noreturn]]
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
 
   bool useDllStorage();
 
   bool shouldPrespecializeGenericMetadata();
+  
+  bool canMakeStaticObjectsReadOnly();
   
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
@@ -873,6 +904,18 @@ public:
   std::string GetObjCSectionName(StringRef Section, StringRef MachOAttributes);
   void SetCStringLiteralSection(llvm::GlobalVariable *GV, ObjCLabelType Type);
 
+  void addAsyncCoroIDMapping(llvm::GlobalVariable *asyncFunctionPointer,
+                             llvm::CallInst *coro_id_builtin);
+  
+  llvm::CallInst *getAsyncCoroIDMapping(
+                                    llvm::GlobalVariable *asyncFunctionPointer);
+  
+  void markAsyncFunctionPointerForPadding(
+                                    llvm::GlobalVariable *asyncFunctionPointer);
+  
+  bool isAsyncFunctionPointerMarkedForPadding(
+                                    llvm::GlobalVariable *asyncFunctionPointer);
+  
 private:
   Size PtrSize;
   Size AtomicBoolSize;
@@ -887,7 +930,18 @@ private:
   llvm::PointerType *EnumValueWitnessTablePtrTy = nullptr;
 
   llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
-  
+
+  // Mapping of AsyncFunctionPointer records to their corresponding
+  // `@llvm.coro.id.async` intrinsic tag in the function implementation.
+  // This is used for a runtime bug workaround where we need to pad the initial
+  // context size for tasks used as `async let` entry points.
+  //
+  // An entry in the map may have a null value, to indicate that a not-yet-
+  // emitted async function pointer should get the padding applied when it is
+  // emitted.
+  llvm::DenseMap<llvm::GlobalVariable*, llvm::CallInst*> AsyncCoroIDsForPadding;
+
+
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D, ProtocolInfoKind kind);
@@ -953,8 +1007,10 @@ public:
   substOpaqueTypesWithUnderlyingTypes(CanType type,
                                       ProtocolConformanceRef conformance);
 
-  bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
-  bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
+  bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion,
+                   ClassDecl *asViewedFromRootClass = nullptr);
+  bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion,
+                            ClassDecl *asViewedFromRootClass = nullptr);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
@@ -995,9 +1051,9 @@ private:
   
 //--- Globals ---------------------------------------------------------------
 public:
-  std::pair<llvm::GlobalVariable *, llvm::Constant *>
-  createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
-                       StringRef sectionName = "");
+  std::pair<llvm::GlobalVariable *, llvm::Constant *> createStringConstant(
+      StringRef Str, bool willBeRelativelyAddressed = false,
+      StringRef sectionName = "", StringRef name = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
                                         bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
@@ -1017,16 +1073,22 @@ public:
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
 
+  llvm::Constant *getOrCreateLazyGlobalVariable(LinkEntity entity,
+      llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> build,
+      llvm::function_ref<void(llvm::GlobalVariable *)> finish);
+
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
+  void addAccessibleFunction(SILFunction *func);
 
-  llvm::Constant *emitSwiftProtocols();
-  llvm::Constant *emitProtocolConformances();
-  llvm::Constant *emitTypeMetadataRecords();
-  llvm::Constant *emitFieldDescriptors();
+  llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
+  llvm::Constant *emitProtocolConformances(bool asContiguousArray);
+  llvm::Constant *emitTypeMetadataRecords(bool asContiguousArray);
+
+  void emitAccessibleFunctions();
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
@@ -1093,6 +1155,7 @@ private:
                                            LinkEntity entity);
                                            
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
+  llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
@@ -1154,6 +1217,9 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
+  /// List of all of the functions, which can be lookup by name
+  /// up at runtime.
+  SmallVector<SILFunction *, 4> AccessibleFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
@@ -1192,6 +1258,9 @@ private:
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
+  llvm::SmallVector<llvm::MDNode *> UsedConditionals;
+  void emitUsedConditionals();
+
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
@@ -1205,6 +1274,7 @@ public:
   std::string CaptureDescriptorSection;
   std::string ReflectionStringsSection;
   std::string ReflectionTypeRefSection;
+  std::string MultiPayloadEnumDescriptorSection;
 
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
@@ -1284,6 +1354,7 @@ public:
   const char *getCaptureDescriptorMetadataSectionName();
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
+  const char *getMultiPayloadEnumDescriptorSectionName();
 
 //--- Runtime ---------------------------------------------------------------
 public:
@@ -1330,6 +1401,7 @@ public:
   llvm::Constant *getFixLifetimeFn();
   
   llvm::Constant *getFixedClassInitializationFn();
+  llvm::Function *getAwaitAsyncContinuationFn();
 
   /// The constructor used when generating code.
   ///
@@ -1392,8 +1464,9 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
+  Signature getSignature(CanSILFunctionType fnType);
   Signature getSignature(CanSILFunctionType fnType,
-                         bool useSpecialConvention = false);
+                         FunctionPointerKind kind);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
@@ -1447,13 +1520,26 @@ public:
                                                      bool isDestroyer,
                                                      bool isForeign,
                                                      ForDefinition_t forDefinition);
-  llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
-                                        bool isPattern,
-                                        bool isConstant,
-                                        ConstantInitFuture init,
-                                        llvm::StringRef section = {});
+
+  void setVCallVisibility(llvm::GlobalVariable *var,
+                          llvm::GlobalObject::VCallVisibility visibility,
+                          std::pair<uint64_t, uint64_t> range);
+
+  void addVTableTypeMetadata(
+      ClassDecl *decl, llvm::GlobalVariable *var,
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries);
+
+  llvm::GlobalValue *defineTypeMetadata(
+      CanType concreteType, bool isPattern, bool isConstant,
+      ConstantInitFuture init, llvm::StringRef section = {},
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
+
+  void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
+                                      llvm::Constant *dependsOn);
+  void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
+                                      const ProtocolConformance *conformance);
 
   llvm::Constant *
   getAddrOfTypeMetadata(CanType concreteType,
@@ -1603,6 +1689,12 @@ public:
 
   Address getAddrOfObjCISAMask();
 
+  llvm::Function *
+  getAddrOfDistributedTargetAccessor(SILFunction *F,
+                                     ForDefinition_t forDefinition);
+
+  void emitDistributedTargetAccessor(SILFunction *method);
+
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.
   CanGenericSignature getCurGenericContext();
@@ -1687,7 +1779,17 @@ private:
   void addLazyConformances(const IterableDeclContext *idc);
 
 //--- Global context emission --------------------------------------------------
+  bool hasSwiftAsyncFunctionDef = false;
+  llvm::Value *extendedFramePointerFlagsWeakRef = nullptr;
+
+  /// Emit a weak reference to the `swift_async_extendedFramePointerFlags`
+  /// symbol needed by Swift async functions.
+  void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
+  bool isConcurrencyAvailable();
+  void noteSwiftAsyncFunctionDef() {
+    hasSwiftAsyncFunctionDef = true;
+  }
   void emitRuntimeRegistration();
   void emitVTableStubs();
   void emitTypeVerifier();

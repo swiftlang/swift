@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/ParameterPassing.swift
 // RUN: %line-directive %t/ParameterPassing.swift -- %target-build-swift %t/ParameterPassing.swift -o %t/a.out_Release -O

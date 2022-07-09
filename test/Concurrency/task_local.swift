@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
 // REQUIRES: concurrency
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct TL {
   @TaskLocal
   static var number: Int = 0
@@ -22,7 +22,7 @@ var global: Int = 0
 
 class NotSendable {}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test () async {
   TL.number = 10 // expected-error{{cannot assign to property: 'number' is a get-only property}}
   TL.$number = 10 // expected-error{{cannot assign value of type 'Int' to type 'TaskLocal<Int>'}}

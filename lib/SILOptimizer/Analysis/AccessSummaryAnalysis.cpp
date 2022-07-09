@@ -116,7 +116,6 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       worklist.append(inst->use_begin(), inst->use_end());
       break;
     }
-    case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::AddressToPointerInst:
       // Ignore these uses, they don't affect formal accesses.
       break;
@@ -124,6 +123,10 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       processPartialApply(info, argumentIndex, cast<PartialApplyInst>(user),
                           operand, order);
       break;
+    case SILInstructionKind::DebugValueInst:
+      if (DebugValueInst::hasAddrVal(user))
+        break;
+      LLVM_FALLTHROUGH;
     default:
       // FIXME: These likely represent scenarios in which we're not generating
       // begin access markers. Ignore these for now. But we really should
@@ -157,6 +160,9 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   // Bypass this verification when a diagnostic error is present. See comments
   // on DiagnoseInvalidEscapingCaptures above.
   if (user->getModule().getASTContext().hadError())
+    return true;
+
+  if (isIncidentalUse(user))
     return true;
 
   // It is fine to call the partial apply
@@ -202,10 +208,6 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   case SILInstructionKind::CopyValueInst:
     return llvm::all_of(cast<CopyValueInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
-
-  // End borrow is always ok.
-  case SILInstructionKind::EndBorrowInst:
-    return true;
 
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::StoreInst:

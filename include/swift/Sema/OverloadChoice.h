@@ -60,6 +60,16 @@ enum class OverloadChoiceKind : int {
   TupleIndex,
 };
 
+/// The kind of implicitly unwrapped optional for an overload reference.
+enum class IUOReferenceKind : uint8_t {
+  /// This overload references an IUO value which may be directly unwrapped.
+  Value,
+
+  /// This overload references a function, the return value of which may be
+  /// unwrapped.
+  ReturnValue,
+};
+
 /// Describes a particular choice within an overload set.
 ///
 class OverloadChoice {
@@ -258,11 +268,11 @@ public:
     return isDecl() ? getDecl() : nullptr;
   }
 
-  /// Returns true if this is either a decl for an optional that was
-  /// declared as one that can be implicitly unwrapped, or is a
-  /// function-typed decl that has a return value that is implicitly
-  /// unwrapped.
-  bool isImplicitlyUnwrappedValueOrReturnValue() const;
+  /// Retrieve the type of implicitly unwrapped optional for a reference to this
+  /// overload choice, or \c None if the choice is not for an IUO decl.
+  Optional<IUOReferenceKind>
+  getIUOReferenceKind(ConstraintSystem &cs,
+                      bool forSecondApplication = false) const;
 
   bool isKeyPathDynamicMemberLookup() const {
     return getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup;
@@ -272,6 +282,12 @@ public:
   /// members found directly on `Optional` didn't match.
   bool isFallbackMemberOnUnwrappedBase() const {
     return BaseAndDeclKind.getInt() == IsFallbackDeclViaUnwrappedOptional;
+  }
+
+  /// Whether this choice is for any kind of dynamic member lookup.
+  bool isAnyDynamicMemberLookup() const {
+    return getKind() == OverloadChoiceKind::DynamicMemberLookup ||
+           isKeyPathDynamicMemberLookup();
   }
 
   /// Get the name of the overload choice.

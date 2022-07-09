@@ -6,7 +6,7 @@
 
 // The following tests check different types of constants that are accepted
 // by the constantness Sema check. It creates helper functions with the
-// semnatics annotation: "oslog.requires_constant_arguments" which requires that
+// semantics annotation: "oslog.requires_constant_arguments" which requires that
 // all arguments passed to the function are constants. The annotation is meant
 // to be used only by the os log overlay. The test helpers use it here only for
 // the purpose of testing the functionality.
@@ -269,7 +269,7 @@ func testProtocolMethods<T: Proto>(b: Bool, p: T, p2:  Proto, s: SConf) {
   s.method(arg1: 6, arg2: b)
 }
 
-// Check requiers annotation on a class method.
+// Check requires annotation on a class method.
 class ClassD {
   @_semantics("oslog.requires_constant_arguments")
   func method(_ arg1: Int, _ arg2: Bool)
@@ -423,4 +423,33 @@ func testCallsWithinClosures(s: String, x: Int) {
     constantArgumentFunction("string literal")
     constantArgumentFunction("string with a single interpolation \(x)")
   }
+}
+
+@resultBuilder
+struct MyArrayBuilder {
+    typealias Component = [Int]
+    typealias Expression = Int
+    static func buildExpression(_ element: Expression) -> Component {
+        return [element]
+    }
+    static func buildBlock(_ components: Component...) -> Component {
+        return Array(components.joined())
+    }
+}
+
+struct MyArray {
+    public init(@MyArrayBuilder arr: () -> [Int]) {}
+}
+
+func testResultBuilder(x: Int, y: Int) -> MyArray {
+    let _: MyArray = MyArray {
+        constantArgumentFunctionReturningInt(x)
+          // expected-error@-1 {{argument must be an integer literal}}
+        constantArgumentFunctionReturningInt(y)
+          // expected-error@-1 {{argument must be an integer literal}}
+    }
+    let _: MyArray = MyArray {
+        constantArgumentFunctionReturningInt(x)
+          // expected-error@-1 {{argument must be an integer literal}}
+    }
 }

@@ -1,10 +1,11 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
+
 
 actor Simple {
   var count = 0
@@ -18,7 +19,7 @@ actor Custom {
   var count = 0
   let simple = Simple()
 
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.1, *)
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     print("custom unownedExecutor")
     return simple.unownedExecutor
@@ -32,7 +33,7 @@ actor Custom {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     print("begin")

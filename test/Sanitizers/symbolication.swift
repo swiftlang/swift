@@ -5,13 +5,6 @@
 // REQUIRES: asan_runtime
 // REQUIRES: VENDOR=apple
 
-// rdar://80274830 ([Swift CI] Sanitizer report symbolication fails because we fail to start atos, sanbox issue?)
-// REQUIRES: 80274830
-// Might be related/same issue as below
-
-// rdar://75365575 (Failing to start atos external symbolizer)
-// UNSUPPORTED: OS=watchos
-
 // We copy the binary but not the corresponding .dSYM for remote runs (e.g.,
 // on-device testing), and hence online symbolication fails.
 // UNSUPPORTED: remote_run

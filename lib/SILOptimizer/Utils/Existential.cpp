@@ -86,10 +86,11 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
 
     // Ignore instructions which don't write to the stack location.
     // Also ignore ASIUser (only kicks in if ASIUser is the original apply).
-    if (isa<DeallocStackInst>(User) || isa<DebugValueAddrInst>(User) ||
+    if (isa<DeallocStackInst>(User) ||
+        DebugValueInst::hasAddrVal(User) ||
         isa<DestroyAddrInst>(User) || isa<WitnessMethodInst>(User) ||
         isa<DeinitExistentialAddrInst>(User) ||
-        isa<OpenExistentialAddrInst>(User) || User == ASIUser) {
+        OpenExistentialAddrInst::isRead(User) || User == ASIUser) {
       continue;
     }
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
@@ -219,13 +220,13 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
@@ -234,7 +235,7 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     auto Ty = Open->getType().getASTType();
     while (auto Metatype = dyn_cast<MetatypeType>(Ty))
       Ty = Metatype.getInstanceType();
-    OpenedArchetype = cast<ArchetypeType>(Ty);
+    OpenedArchetype = cast<OpenedArchetypeType>(Ty);
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
   }
@@ -255,7 +256,8 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
   // than their corresponding existential, ExistentialConformances needs to be
   // filtered when using it with this (phony) generic signature.
   CanGenericSignature ExistentialSig =
-      M->getASTContext().getOpenedArchetypeSignature(ExistentialType);
+      M->getASTContext().getOpenedArchetypeSignature(ExistentialType,
+                                                     GenericSignature());
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
       [&](CanType /*depType*/, Type /*replaceType*/,

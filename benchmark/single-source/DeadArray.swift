@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,20 +13,21 @@
 // rdar://problem/20980377
 import TestsUtils
 
-public let DeadArray = BenchmarkInfo(
-  name: "DeadArray",
-  runFunction: run_DeadArray,
-  tags: [.regression, .unstable],
-  legacyFactor: 200
-)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "DeadArray",
+    runFunction: run_DeadArray,
+    tags: [.regression, .unstable],
+    legacyFactor: 200
+  )
 
 @inline(__always)
 func debug(_ m:String) {}
 
-private var Count = 0
+private var count = 0
 
 @inline(never)
-func bar() { Count += 1 }
+func bar() { count += 1 }
 
 @inline(never)
 func runLoop(_ var1: Int, var2: Int) {
@@ -37,10 +38,10 @@ func runLoop(_ var1: Int, var2: Int) {
 }
 
 @inline(never)
-public func run_DeadArray(_ N: Int) {
-  for _ in 1...N {
-    Count = 0
+public func run_DeadArray(_ n: Int) {
+  for _ in 1...n {
+    count = 0
     runLoop(0, var2: 0)
   }
-  CheckResults(Count == 500)
+  check(count == 500)
 }

@@ -20,7 +20,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Debug.h"
 #include <TargetConditionals.h>
-#include "../SwiftShims/FoundationShims.h"
+#include "SwiftShims/FoundationShims.h"
 
 struct os_system_version_s {
     unsigned int major;

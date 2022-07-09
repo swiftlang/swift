@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifdef SWIFT_ENABLE_REFLECTION
+
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Casting.h"
@@ -41,27 +43,6 @@
 #include <stdarg.h>
 
 namespace {
-int asprintf(char **strp, const char *fmt, ...) {
-  va_list argp0, argp1;
-
-  va_start(argp0, fmt);
-  va_copy(argp1, argp0);
-
-  int length = _vscprintf(fmt, argp0);
-
-  *strp = reinterpret_cast<char *>(malloc(length + 1));
-  if (*strp == nullptr)
-    return -1;
-
-  length = _vsnprintf(*strp, length, fmt, argp1);
-  (*strp)[length] = '\0';
-
-  va_end(argp0);
-  va_end(argp1);
-
-  return length;
-}
-
 char *strndup(const char *s, size_t n) {
   size_t length = std::min(strlen(s), n);
 
@@ -287,7 +268,7 @@ struct TupleImpl : ReflectionMirrorImpl {
     if (!hasLabel) {
       // The name is the stringized element number '.0'.
       char *str;
-      asprintf(&str, ".%" PRIdPTR, i);
+      swift_asprintf(&str, ".%" PRIdPTR, i);
       *outName = str;
     }
     
@@ -358,6 +339,7 @@ static bool _shouldReportMissingReflectionMetadataWarnings() {
 /// at runtime. This is usually mostly harmless, but it's good to alert
 /// users that it happens.
 static void
+SWIFT_FORMAT(1, 2)
 missing_reflection_metadata_warning(const char *fmt, ...) {
   bool shouldWarn =
     SWIFT_LAZY_CONSTANT(_shouldReportMissingReflectionMetadataWarnings());
@@ -498,6 +480,34 @@ struct StructImpl : ReflectionMirrorImpl {
   }
 };
 
+struct ForeignReferenceTypeImpl : ReflectionMirrorImpl {
+  bool isReflectable() {
+    return false;
+  }
+
+  char displayStyle() override {
+    return 'f';
+  }
+
+  intptr_t count() override {
+    return 0;
+  }
+
+  intptr_t childOffset(intptr_t i) override {
+    swift::crash("Cannot find offset of FRT.");
+  }
+
+  const FieldType childMetadata(intptr_t i, const char **outName,
+                                void (**outFreeFunc)(const char *)) override {
+    swift::crash("FRT has no children.");
+  }
+
+  AnyReturn subscript(intptr_t i, const char **outName,
+                      void (**outFreeFunc)(const char *)) override {
+    swift::crash("FRT has no subscript.");
+  }
+};
+
 
 // Implementation for enums.
 struct EnumImpl : ReflectionMirrorImpl {
@@ -625,20 +635,20 @@ struct ClassImpl : ReflectionMirrorImpl {
   }
   
   bool hasSuperclassMirror() {
-    auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto description = Clas->getDescription();
+    auto *Clazz = static_cast<const ClassMetadata*>(type);
+    auto description = Clazz->getDescription();
 
     return ((description->SuperclassType)
-            && (Clas->Superclass)
-            && (Clas->Superclass->isTypeMetadata()));
+            && (Clazz->Superclass)
+            && (Clazz->Superclass->isTypeMetadata()));
   }
 
   ClassImpl superclassMirror() {
-    auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto description = Clas->getDescription();
+    auto *Clazz = static_cast<const ClassMetadata*>(type);
+    auto description = Clazz->getDescription();
 
     if (description->SuperclassType) {
-      if (auto theSuperclass = Clas->Superclass) {
+      if (auto theSuperclass = Clazz->Superclass) {
         auto impl = ClassImpl();
         impl.type = (Metadata *)theSuperclass;
         impl.value = nullptr;
@@ -652,8 +662,8 @@ struct ClassImpl : ReflectionMirrorImpl {
     if (!isReflectable())
       return 0;
 
-    auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto description = Clas->getDescription();
+    auto *Clazz = static_cast<const ClassMetadata*>(type);
+    auto description = Clazz->getDescription();
     auto count = description->NumFields;
 
     return count;
@@ -668,8 +678,8 @@ struct ClassImpl : ReflectionMirrorImpl {
   }
 
   intptr_t childOffset(intptr_t i) override {
-    auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto description = Clas->getDescription();
+    auto *Clazz = static_cast<const ClassMetadata*>(type);
+    auto description = Clazz->getDescription();
 
     if (i < 0 || (size_t)i > description->NumFields)
       swift::crash("Swift mirror subscript bounds check failure");
@@ -678,12 +688,12 @@ struct ClassImpl : ReflectionMirrorImpl {
     // metadata, because we don't update the field offsets in the face of
     // resilient base classes.
     uintptr_t fieldOffset;
-    if (usesNativeSwiftReferenceCounting(Clas)) {
-      fieldOffset = Clas->getFieldOffsets()[i];
+    if (usesNativeSwiftReferenceCounting(Clazz)) {
+      fieldOffset = Clazz->getFieldOffsets()[i];
     } else {
   #if SWIFT_OBJC_INTEROP
       Ivar *ivars = class_copyIvarList(
-          reinterpret_cast<Class>(const_cast<ClassMetadata *>(Clas)), nullptr);
+          reinterpret_cast<Class>(const_cast<ClassMetadata *>(Clazz)), nullptr);
       fieldOffset = ivar_getOffset(ivars[i]);
       free(ivars);
   #else
@@ -900,6 +910,11 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
       return call(&impl);
     }
 
+    case MetadataKind::ForeignReferenceType: {
+      ForeignReferenceTypeImpl impl;
+      return call(&impl);
+    }
+
     case MetadataKind::Struct: {
       StructImpl impl;
       return call(&impl);
@@ -1088,12 +1103,16 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(Existential Metatype)";
     case MetadataKind::ForeignClass:
       return "(Foreign Class)";
+    case MetadataKind::ForeignReferenceType:
+      return "(Foreign Reference Type)";
     case MetadataKind::HeapLocalVariable:
       return "(Heap Local Variable)";
     case MetadataKind::HeapGenericLocalVariable:
       return "(Heap Generic Local Variable)";
     case MetadataKind::ErrorObject:
       return "(ErrorType Object)";
+    case MetadataKind::ExtendedExistential:
+      return "(Extended Existential)";
     default:
       return "(Unknown)";
   }
@@ -1106,3 +1125,5 @@ id swift_reflectionMirror_quickLookObject(OpaqueValue *value, const Metadata *T)
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->quickLookObject(); });
 }
 #endif
+
+#endif  // SWIFT_ENABLE_REFLECTION

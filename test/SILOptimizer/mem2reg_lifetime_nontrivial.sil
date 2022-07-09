@@ -1,0 +1,1196 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
+
+import Builtin
+import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+struct SmallCodesizeStruct {
+  var cls1 : Klass
+  var cls2 : Klass
+}
+
+struct WrapperStruct {
+  var cls : Klass
+}
+
+struct LargeCodesizeStruct {
+  var s1: SmallCodesizeStruct
+  var s2: SmallCodesizeStruct
+  var s3: SmallCodesizeStruct
+  var s4: SmallCodesizeStruct
+  var s5: SmallCodesizeStruct
+}
+
+public enum NonTrivialEnum {
+  case some1(Klass)
+  case some2(NonTrivialStruct)
+}
+
+struct NonTrivialStruct {
+  var val:Klass
+}
+
+public enum FakeOptional<T> {
+  case some(T)
+  case none
+}
+
+sil [ossa] @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+sil [ossa] @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
+sil [ossa] @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+sil [ossa] @take_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+
+///////////
+// Tests //
+///////////
+
+sil [noinline] [ossa] @blackhole : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  debug_value %0 : $*T, let, name "t", argno 1, expr op_deref
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil shared [noinline] @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @store_only_allocas :
+// CHECK-NOT: alloc_stack
+// CHECK: return
+sil [ossa] @store_only_allocas : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = load [take] %1 : $*Klass
+  %4 = apply %2(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  dealloc_stack %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals : {{.*}} {
+// CHECK-NOT:   alloc_stack
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $Klass, [[INSTANCE_2:%[^,]+]] : @owned $Klass):
+// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         cond_fail
+// CHECK:         destroy_value [[LIFETIME_OWNED_1]]
+// CHECK:         end_borrow [[LIFETIME_1]]
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         end_borrow [[LIFETIME_2]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         apply
+// CHECK:         destroy_value [[LIFETIME_OWNED_2]]
+// CHECK-LABEL: } // end sil function 'multiple_store_vals'
+sil [ossa] @multiple_store_vals : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack [lexical] $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  store %1 to [assign] %2 : $*Klass
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals2 : {{.*}} {
+// CHECK-NOT:   alloc_stack
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $Klass, [[INSTANCE_2:%[^,]+]] : @owned $Klass):
+// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         cond_fail
+// CHECK:         destroy_value [[LIFETIME_OWNED_1]]
+// CHECK:         end_borrow [[LIFETIME_1]]
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         end_borrow [[LIFETIME_2]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         apply
+// CHECK:         destroy_value [[LIFETIME_OWNED_2]]
+// CHECK-LABEL: } // end sil function 'multiple_store_vals2'
+sil [ossa] @multiple_store_vals2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack [lexical] $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  destroy_addr %2 : $*Klass
+  store %1 to [init] %2 : $*Klass
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals3 : {{.*}} {
+// CHECK-NOT:   alloc_stack
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @guaranteed $Klass, [[INSTANCE_2:%[^,]+]] : @guaranteed $Klass):
+// CHECK:         [[COPY_1:%[^,]+]] = copy_value [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[COPY_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         cond_fail
+// CHECK:         [[COPY_2:%[^,]+]] = copy_value [[INSTANCE_2]]
+// CHECK:         destroy_value [[LIFETIME_OWNED_1]]
+// CHECK:         end_borrow [[LIFETIME_1]]
+// CHECK:         destroy_value [[COPY_1]]
+// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[COPY_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         end_borrow [[LIFETIME_2]]
+// CHECK:         destroy_value [[COPY_2]]
+// CHECK:         apply
+// CHECK:         destroy_value [[LIFETIME_OWNED_2]]
+// CHECK-LABEL: } // end sil function 'multiple_store_vals3'
+sil [ossa] @multiple_store_vals3 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %2 = alloc_stack [lexical] $Klass
+  %copy0 = copy_value %0 : $Klass
+  store %copy0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  %copy1 = copy_value %1 : $Klass
+  store %copy1 to [assign] %2 : $*Klass
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals4 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals4'
+sil [ossa] @multiple_store_vals4 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack [lexical] $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Klass>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  store %1 to [assign] %2 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb2:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb3:
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals5 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals5'
+sil [ossa] @multiple_store_vals5 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  store %0 to [init] %stk : $*Klass
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Klass>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  store %1 to [assign] %stk : $*Klass
+  store %2 to [assign] %stk : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb2:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb3:
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals6 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals6'
+sil [ossa] @multiple_store_vals6 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  br bb1
+
+bb1:
+  %2 = alloc_stack [lexical] $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  store %1 to [assign] %2 : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals7 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals7'
+sil [ossa] @multiple_store_vals7 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  store %0 to [init] %stk : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  br bb1
+
+bb1:
+  store %1 to [assign] %stk : $*Klass
+  store %2 to [assign] %stk : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %stk : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %stk : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals8 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals8'
+sil [ossa] @multiple_store_vals8 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  store %0 to [init] %stk : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  br bb1
+
+bb1:
+  store %1 to [assign] %stk : $*Klass
+  destroy_addr %stk : $*Klass
+  store %2 to [init] %stk : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %stk : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %stk : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @with_loads :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'with_loads'
+sil [ossa] @with_loads : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack [lexical] $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Klass>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  store %1 to [assign] %2 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb2:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb3:
+  %ret = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %ret : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @basic_block_with_loads_and_stores :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'basic_block_with_loads_and_stores'
+sil [ossa] @basic_block_with_loads_and_stores : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack [lexical] $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = alloc_stack [lexical] $Klass
+  store %1 to [init] %3 : $*Klass
+  %local = alloc_ref $Klass
+  store %local to [assign] %3 : $*Klass
+  %func = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %arg = load [take] %3 : $*Klass
+  %applyres = apply %func(%arg) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %arg : $Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %3 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @basic_block_with_loads_copy_and_take : {{.*}} {
+// CHECK-NOT:   alloc_stack
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $Klass):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE:%[^,]+]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME:%[^,]+]]
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED:%[^,]+]]
+// CHECK:         end_borrow [[LIFETIME:%[^,]+]]
+// CHECK:         destroy_value [[INSTANCE:%[^,]+]]
+// CHECK:         destroy_value [[COPY:%[^,]+]]
+// CHECK:         destroy_value [[LIFETIME_OWNED:%[^,]+]]
+// CHECK-LABEL: } // end sil function 'basic_block_with_loads_copy_and_take'
+sil [ossa] @basic_block_with_loads_copy_and_take : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %1 : $*Klass
+  %copy = load [copy] %1 : $*Klass
+  %take = load [take] %1 : $*Klass
+  destroy_value %copy : $Klass
+  destroy_value %take : $Klass
+  dealloc_stack %1 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// load [copy] is not used as RunningVal
+// StackAllocationPromoter::fixBranchesAndUses will delete the loads and replace with %0
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_loads_copy_and_take_1 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_loads_copy_and_take_1'
+sil [ossa] @multi_basic_block_with_loads_copy_and_take_1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %1 : $*Klass
+  br bb1
+bb1:
+  %copy = load [copy] %1 : $*Klass
+  %take = load [take] %1 : $*Klass
+  destroy_value %copy : $Klass
+  destroy_value %take : $Klass
+  dealloc_stack %1 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// load [copy] is not used as RunningVal
+// StackAllocationPromoter::fixBranchesAndUses will delete the loads and replace with %0
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_loads_copy_and_take_2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_loads_copy_and_take_2'
+sil [ossa] @multi_basic_block_with_loads_copy_and_take_2 : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %1 : $*Klass
+  br bb1
+bb1:
+  %copy = load [copy] %1 : $*Klass
+  %take = load [take] %1 : $*Klass
+  destroy_value %take : $Klass
+  dealloc_stack %1 : $*Klass
+  return %copy : $Klass
+}
+
+// load [take] is used as RunningVal in bb1
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_loads_copy_and_take_3 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_loads_copy_and_take_3'
+sil [ossa] @multi_basic_block_with_loads_copy_and_take_3 : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %1 : $*Klass
+  br bb1
+bb1:
+  %take = load [take] %1 : $*Klass
+  %copy = copy_value %take : $Klass
+  destroy_value %take : $Klass
+  dealloc_stack %1 : $*Klass
+  return %copy : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_store_assign :
+// CHECK-NOT: alloc_stack
+// CHECK: destroy_value %0 : $Klass
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_store_assign'
+sil [ossa] @multi_basic_block_with_store_assign : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1: @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  store %0 to [init] %stk : $*Klass
+  br bb1
+bb1:
+  store %1 to [assign] %stk : $*Klass
+  %res = load [take] %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  return %res : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_phiarg :
+// CHECK-NOT:   alloc_stack
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $Klass, [[INSTANCE_2:%[^,]+]] : @owned $Klass):
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         br [[EXIT:bb[0-9]+]]([[INSTANCE_2]] : $Klass, [[LIFETIME_2]] : $Klass, [[LIFETIME_OWNED_2]] : $Klass)
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         br [[EXIT]]([[INSTANCE_1]] : $Klass, [[LIFETIME_1]] : $Klass, [[LIFETIME_OWNED_1]] : $Klass)
+// CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] : @owned $Klass, [[LIFETIME:%[^,]+]] : @guaranteed $Klass, [[LIFETIME_OWNED:%[^,]+]] : @owned $Klass):
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         destroy_value [[LIFETIME_OWNED]]
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_phiarg'
+sil [ossa] @multi_basic_block_with_phiarg : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  store %1 to [init] %stk : $*Klass
+  destroy_value %0 : $Klass
+  br bb3
+bb2:
+  store %0 to [init] %stk : $*Klass
+  destroy_value %1 : $Klass
+  br bb3
+bb3:
+  %val = load [take] %stk : $*Klass
+  destroy_value %val : $Klass
+  dealloc_stack %stk : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multi_asi_basic_block_with_phiarg : {{.*}} {
+// CHECK-NOT:   alloc_stack
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $Klass, [[INSTANCE_2:%[^,]+]] : @owned $Klass):
+// CHECK:         cond_br undef, [[BASIC_BLOCK1:bb[0-9]+]], [[BASIC_BLOCK2:bb[0-9]+]]
+// CHECK:       [[BASIC_BLOCK1]]:
+// CHECK:         [[LIFETIME_2_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_2_1:%[^,]+]] = copy_value [[LIFETIME_2_1]]
+// CHECK:         [[LIFETIME_1_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_1_1:%[^,]+]] = copy_value [[LIFETIME_1_1]]
+// CHECK:         br [[EXIT:bb[0-9]+]]([[INSTANCE_1]] : $Klass, [[LIFETIME_1_1]] : $Klass, [[LIFETIME_OWNED_1_1]] : $Klass, [[INSTANCE_2]] : $Klass, [[LIFETIME_2_1]] : $Klass, [[LIFETIME_OWNED_2_1]] : $Klass)
+// CHECK:       [[BASIC_BLOCK2]]:
+// CHECK:         [[LIFETIME_2_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_2_1_2:%[^,]+]] = copy_value [[LIFETIME_2_2]]
+// CHECK:         [[LIFETIME_1_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_1_1_2:%[^,]+]] = copy_value [[LIFETIME_1_2]]
+// CHECK:         br [[EXIT]]([[INSTANCE_2]] : $Klass, [[LIFETIME_2_2]] : $Klass, [[LIFETIME_OWNED_2_1_2]] : $Klass, [[INSTANCE_1]] : $Klass, [[LIFETIME_1_2]] : $Klass, [[LIFETIME_OWNED_1_1_2]] : $Klass)
+// CHECK:       [[EXIT]]([[INSTANCE_EXIT_1:%[^,]+]] : @owned $Klass, [[LIFETIME_EXIT_1:%[^,]+]] : @guaranteed $Klass, [[LIFETIME_OWNED_EXIT_1:%[^,]+]] : @owned $Klass, [[INSTANCE_EXIT_2:%[^,]+]] : @owned $Klass, [[LIFETIME_EXIT_2:%[^,]+]] : @guaranteed $Klass, [[LIFETIME_OWNED_EXIT_2:%[^,]+]] : @owned $Klass):
+// CHECK:         end_borrow [[LIFETIME_EXIT_2]]
+// CHECK:         destroy_value [[INSTANCE_EXIT_2]]
+// CHECK:         destroy_value [[LIFETIME_OWNED_EXIT_2]]
+// CHECK:         end_borrow [[LIFETIME_EXIT_1]]
+// CHECK:         destroy_value [[INSTANCE_EXIT_1]]
+// CHECK:         destroy_value [[LIFETIME_OWNED_EXIT_1]]
+// CHECK-LABEL: } // end sil function 'multi_asi_basic_block_with_phiarg'
+sil [ossa] @multi_asi_basic_block_with_phiarg : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk1 = alloc_stack [lexical] $Klass
+  %stk2 = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  store %1 to [init] %stk1 : $*Klass
+  store %0 to [init] %stk2 : $*Klass
+  br bb3
+bb2:
+  store %1 to [init] %stk2 : $*Klass
+  store %0 to [init] %stk1 : $*Klass
+  br bb3
+bb3:
+  %val1 = load [take] %stk1 : $*Klass
+  destroy_value %val1 : $Klass
+  %val2 = load [take] %stk2 : $*Klass
+  destroy_value %val2 : $Klass
+  dealloc_stack %stk2 : $*Klass
+  dealloc_stack %stk1 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// Test to check no dead args are passed to bb3 as phi arg
+// CHECK-LABEL: sil [ossa] @multi_basic_block_stack_deallocated_phiarg :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: bb2:
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK-LABEL: } // end sil function 'multi_basic_block_stack_deallocated_phiarg'
+sil [ossa] @multi_basic_block_stack_deallocated_phiarg : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  dealloc_stack %stk : $*Klass
+  destroy_value %0 : $Klass
+  br bb3
+bb2:
+  store %0 to [init] %stk : $*Klass
+  %val = load [take] %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  destroy_value %val : $Klass
+  br bb3
+bb3:
+  %res = tuple ()
+  return %res : $()
+}
+
+// Test to check no dead args are passed to bb3 as phi arg
+// CHECK-LABEL: sil [ossa] @multi_asi_basic_block_stack_deallocated_phiarg :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: bb2:
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK-LABEL: } // end sil function 'multi_asi_basic_block_stack_deallocated_phiarg'
+sil [ossa] @multi_asi_basic_block_stack_deallocated_phiarg : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk1 = alloc_stack [lexical] $Klass
+  %stk2 = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  dealloc_stack %stk2 : $*Klass
+  dealloc_stack %stk1 : $*Klass
+  destroy_value %0 : $Klass
+  destroy_value %1 : $Klass
+  br bb3
+bb2:
+  store %0 to [init] %stk1 : $*Klass
+  %val1 = load [take] %stk1 : $*Klass
+  store %1 to [init] %stk2 : $*Klass
+  %val2 = load [take] %stk2 : $*Klass
+  destroy_value %val1 : $Klass
+  destroy_value %val2 : $Klass
+  dealloc_stack %stk2 : $*Klass
+  dealloc_stack %stk1 : $*Klass
+  br bb3
+bb3:
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_destroyed_last_stored_val_phiarg :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: bb3:
+// CHECK-LABEL: } // end sil function 'multi_basic_block_destroyed_last_stored_val_phiarg'
+sil [ossa] @multi_basic_block_destroyed_last_stored_val_phiarg : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %0 : $Klass
+  br bb3
+bb2:
+  store %0 to [init] %stk : $*Klass
+  %val = load [take] %stk : $*Klass
+  destroy_value %val : $Klass
+  br bb3
+bb3:
+  dealloc_stack %stk : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_debug_value : {{.*}} {
+// CHECK-NOT:   alloc_stack
+// CHECK-NOT:   debug_value {{.*}} expr op_deref
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $Klass):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         debug_value [[LIFETIME_OWNED]]
+// CHECK-LABEL: } // end sil function 'mem2reg_debug_value'
+sil [ossa] @mem2reg_debug_value : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %1 : $*Klass
+  debug_value %1 : $*Klass, expr op_deref
+  %2 = load [take] %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  return %2 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_struct_addr : {{.*}} {
+// CHECK-NOT:   alloc_stack
+// CHECK:       {{bb[0-9]+}}([[INSTANCSE:%[^,]+]] : @owned $SmallCodesizeStruct):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCSE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LIFETIME_OWNED]]
+// CHECK:         [[ELEMENT:%[^,]+]] = struct_extract [[BORROW]]
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[ELEMENT]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         ([[FIELD_1:%[^,]+]], [[FIELD_2:%[^,]+]]) = destructure_struct [[LIFETIME_OWNED]]
+// CHECK:         destroy_value [[FIELD_1]]
+// CHECK:         destroy_value [[FIELD_2]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCSE]]
+// CHECK:         return [[COPY]]
+// CHECK-LABEL: } // end sil function 'mem2reg_struct_addr'
+sil [ossa] @mem2reg_struct_addr : $@convention(thin) (@owned SmallCodesizeStruct) -> @owned Klass {
+bb0(%0 : @owned $SmallCodesizeStruct):
+  %1 = alloc_stack [lexical] $SmallCodesizeStruct
+  store %0 to [init] %1 : $*SmallCodesizeStruct
+  %2 = struct_element_addr %1 : $*SmallCodesizeStruct, #SmallCodesizeStruct.cls1
+  %3 = load [copy] %2 : $*Klass
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  return %3 : $Klass
+}
+
+// SILMem2Reg is disabled when there is a load [take] with struct_elemenet_addr/tuple_element_addr
+// CHECK-LABEL: sil [ossa] @mem2reg_struct_addr_load_take :
+// CHECK: alloc_stack
+// CHECK-LABEL: } // end sil function 'mem2reg_struct_addr_load_take'
+sil [ossa] @mem2reg_struct_addr_load_take : $@convention(thin) (@owned WrapperStruct) -> () {
+bb0(%0 : @owned $WrapperStruct):
+  %1 = alloc_stack [lexical] $WrapperStruct
+  store %0 to [init] %1 : $*WrapperStruct
+  %2 = struct_element_addr %1 : $*WrapperStruct, #WrapperStruct.cls
+  %3 = load [take] %2 : $*Klass
+  destroy_value %3 : $Klass
+  dealloc_stack %1 : $*WrapperStruct
+  %tup = tuple ()
+  return %tup : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_tuple_addr :
+// CHECK-NOT: alloc_stack
+// CHECK: [[TUP:%.*]] = tuple (%0 : $Klass, %1 : $Klass)
+// CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[TUP]]
+// CHECK:  [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK: [[BORROW:%.*]] = begin_borrow [[LIFETIME_OWNED]] : $(Klass, Klass)
+// CHECK: [[ELE:%.*]] = tuple_extract [[BORROW]]
+// CHECK: [[COPY:%.*]] = copy_value [[ELE]] : $Klass
+// CHECK: end_borrow [[BORROW]] :  $(Klass, Klass)
+// CHECK: return [[COPY]]
+// CHECK-LABEL: } // end sil function 'mem2reg_tuple_addr'
+sil [ossa] @mem2reg_tuple_addr : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack [lexical] $(Klass, Klass)
+  %2 = tuple (%0 : $Klass, %1 : $Klass)
+  store %2 to [init] %stk : $*(Klass, Klass)
+  %4 = tuple_element_addr %stk : $*(Klass, Klass), 0
+  %5 = load [copy] %4 : $*Klass
+  destroy_addr %stk : $*(Klass, Klass)
+  dealloc_stack %stk : $*(Klass, Klass)
+  return %5 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @struct_extract_if_then_else :
+// CHECK-NOT: alloc_stack
+sil [ossa] @struct_extract_if_then_else : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack [lexical] $Int64
+  store %0 to [trivial] %1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 2
+  %4 = struct_extract %0 : $Int64, #Int64._value
+  %5 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  %6 = struct_element_addr %1 : $*Int64, #Int64._value
+  cond_br %5, bb1, bb2
+
+// CHECK: bb1:
+// CHECK: struct_extract %0
+bb1:
+  %8 = load [trivial] %6 : $*Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 1
+  %10 = integer_literal $Builtin.Int1, 0
+  %11 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int64, %9 : $Builtin.Int64, %10 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%12 : $Builtin.Int64)
+
+// CHECK: bb2:
+// CHECK: struct_extract %0
+bb2:
+  %14 = load [trivial] %6 : $*Builtin.Int64
+  %15 = integer_literal $Builtin.Int64, 2
+  %16 = integer_literal $Builtin.Int1, 0
+  %17 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%18 : $Builtin.Int64)
+
+// CHECK-NOT: dealloc_stack
+bb3(%20 : $Builtin.Int64):
+  dealloc_stack %1 : $*Int64
+  %22 = struct $Int64 (%20 : $Builtin.Int64)
+  return %22 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'struct_extract_if_then_else'
+
+// Test cases where the only use is a debug_value_addr
+// CHECK-LABEL: sil [ossa] @no_real_uses :
+sil [ossa] @no_real_uses : $@convention(thin) () -> () {
+// CHECK: bb0
+bb0:
+  // CHECK-NOT: alloc_stack
+  %0 = alloc_stack [lexical] $Klass
+  %local = alloc_ref $Klass
+  store %local to [init] %0 : $*Klass
+  // CHECK-NOT: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*Klass, expr op_deref
+  destroy_addr %0 : $*Klass
+  // CHECK-NOT: dealloc_stack
+  dealloc_stack %0 : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+// CHECK-LABEL: } // end sil function 'no_real_uses'
+
+// CHECK-LABEL: sil [ossa] @half_trivial
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $(Builtin.BridgeObject, Builtin.Int32)):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED]]
+// CHECK: destructure_tuple [[LIFETIME_OWNED]]
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple
+// CHECK-LABEL: } // end sil function 'half_trivial'
+sil [ossa] @half_trivial : $@convention(thin) (@owned (Builtin.BridgeObject, Builtin.Int32)) -> () {
+bb0(%0 : @owned $(Builtin.BridgeObject, Builtin.Int32)):
+  %1 = alloc_stack [lexical] $(Builtin.BridgeObject, Builtin.Int32)
+  store %0 to [init] %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  %3 = load [copy] %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  destroy_value %3 : $(Builtin.BridgeObject, Builtin.Int32)
+  destroy_addr %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  dealloc_stack %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_debug_value :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_debug_value'
+sil [ossa] @multiple_debug_value : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  debug_value %0 : $Klass
+  %2 = alloc_stack [lexical] $Klass
+  store %0 to [init] %2 : $*Klass
+  debug_value %2 : $*Klass, expr op_deref
+  %5 = load [take] %2 : $*Klass
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_bug1 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_bug1'
+sil [ossa] @multi_basic_block_bug1 : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %stk1 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %new1 = load [take] %stk1 : $*Klass
+  destroy_value %1 : $Klass
+  dealloc_stack %stk1 : $*Klass
+  br bbret(%new1 : $Klass)
+
+bb2:
+  store %1 to [assign] %stk1 : $*Klass
+  %new2 = load [take] %stk1 : $*Klass
+  dealloc_stack %stk1 : $*Klass
+  br bbret(%new2 : $Klass)
+
+bbret(%new : @owned $Klass):
+  return %new : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_bug2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_bug2'
+sil [ossa] @multi_basic_block_bug2 : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %stk1 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %new1 = load [take] %stk1 : $*Klass
+  destroy_value %1 : $Klass
+  br bbret(%new1 : $Klass)
+
+bb2:
+  store %1 to [assign] %stk1 : $*Klass
+  %new2 = load [take] %stk1 : $*Klass
+  br bbret(%new2 : $Klass)
+
+bbret(%new : @owned $Klass):
+  dealloc_stack %stk1 : $*Klass
+  return %new : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @test_dynamiclifetime1 :
+// CHECK: alloc_stack [dynamic_lifetime]
+// CHECK-LABEL: } // end sil function 'test_dynamiclifetime1'
+sil [ossa] @test_dynamiclifetime1 : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack [lexical] $Builtin.Int1
+  %3 = alloc_stack [lexical] [dynamic_lifetime] $NonTrivialStruct
+  %4 = integer_literal $Builtin.Int1, 0
+  store %4 to [trivial] %2 : $*Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %func = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val = apply %func() : $@convention(thin) () -> @owned NonTrivialStruct
+  %27 = integer_literal $Builtin.Int1, -1
+  store %27 to [trivial] %2 : $*Builtin.Int1
+  store %val to [init] %3 : $*NonTrivialStruct
+  br bb3
+
+bb3:
+  %32 = load [trivial] %2 : $*Builtin.Int1
+  cond_br %32, bb4, bb5
+
+bb4:
+  %34 = load [take] %3 : $*NonTrivialStruct
+  destroy_value %34 : $NonTrivialStruct
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  dealloc_stack %3 : $*NonTrivialStruct
+  dealloc_stack %2 : $*Builtin.Int1
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_dynamiclifetime2 :
+// CHECK: alloc_stack [dynamic_lifetime]
+// CHECK-LABEL: } // end sil function 'test_dynamiclifetime2'
+sil [ossa] @test_dynamiclifetime2 : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack [lexical] $Builtin.Int1
+  %3 = alloc_stack [lexical] [dynamic_lifetime] $NonTrivialStruct
+  %4 = integer_literal $Builtin.Int1, 0
+  store %4 to [trivial] %2 : $*Builtin.Int1
+  %func1 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val1 = apply %func1() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %val1 to [init] %3 : $*NonTrivialStruct
+  %ld1 = load [take] %3 : $*NonTrivialStruct
+  %func2 = function_ref @take_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  apply %func2(%ld1) : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %val = apply %func1() : $@convention(thin) () -> @owned NonTrivialStruct
+  %27 = integer_literal $Builtin.Int1, -1
+  store %27 to [trivial] %2 : $*Builtin.Int1
+  store %val to [init] %3 : $*NonTrivialStruct
+  br bb3
+
+bb3:
+  %32 = load [trivial] %2 : $*Builtin.Int1
+  cond_br %32, bb4, bb5
+
+bb4:
+  %ld2 = load [take] %3 : $*NonTrivialStruct
+  destroy_value %ld2 : $NonTrivialStruct
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  dealloc_stack %3 : $*NonTrivialStruct
+  dealloc_stack %2 : $*Builtin.Int1
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_deadphi1 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi1'
+sil [ossa] @test_deadphi1 : $@convention(thin)  () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb1a, bb6
+
+bb1a:
+  br bb2
+
+bb2:
+  %stk = alloc_stack [lexical] $NonTrivialStruct
+  cond_br undef, bb3, bb4
+
+bb3:
+  %func = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val = apply %func() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %val to [init] %stk : $*NonTrivialStruct
+  %lval1 = load [copy] %stk : $*NonTrivialStruct
+  destroy_value %lval1 : $NonTrivialStruct
+  %lval2 = load [take] %stk : $*NonTrivialStruct
+  destroy_value %lval2 : $NonTrivialStruct
+  dealloc_stack %stk : $*NonTrivialStruct
+  cond_br undef, bb3a, bb3b
+
+bb3a:
+  br bb1
+
+bb3b:
+  br bb5
+
+bb4:
+  dealloc_stack %stk : $*NonTrivialStruct
+  unreachable
+
+bb5:
+  br bb2
+
+bb6:
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_deadphi2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi2'
+sil [ossa] @test_deadphi2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] $NonTrivialStruct
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %4 = apply %3() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %4 to [init] %0 : $*NonTrivialStruct
+  cond_br undef, bb4, bb5
+
+bb3:
+  dealloc_stack %0 : $*NonTrivialStruct
+  br bb7
+
+bb4:
+  %lval1 = load [take] %0 : $*NonTrivialStruct
+  destroy_value %lval1 : $NonTrivialStruct
+  dealloc_stack %0 : $*NonTrivialStruct
+  br bb7
+
+bb5:
+  %lval2 = load [take] %0 : $*NonTrivialStruct
+  destroy_value %lval2 : $NonTrivialStruct
+  dealloc_stack %0 : $*NonTrivialStruct
+  br bb7
+
+bb6:
+  %17 = tuple ()
+  return %17 : $()
+
+bb7:
+  br bb6
+}
+
+// CHECK-LABEL: sil [ossa] @test_deadphi3 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi3'
+sil [ossa] @test_deadphi3 : $@convention(thin) (@owned NonTrivialEnum) -> () {
+bb0(%0 : @owned $NonTrivialEnum):
+  %1 = alloc_stack [lexical] $NonTrivialStruct
+  switch_enum %0 : $NonTrivialEnum, case #NonTrivialEnum.some1!enumelt: bb1, case #NonTrivialEnum.some2!enumelt: bb5
+
+bb1(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  %5 = function_ref @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+  %6 = apply %5() : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+  switch_enum %6 : $FakeOptional<NonTrivialStruct>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb3:
+  unreachable
+
+bb4(%10 : @owned $NonTrivialStruct):
+  store %10 to [init] %1 : $*NonTrivialStruct
+  br bb9
+
+bb5(%13 : @owned $NonTrivialStruct):
+  destroy_value %13 : $NonTrivialStruct
+  %15 = function_ref @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+  %16 = apply %15() : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+  switch_enum %16 : $FakeOptional<NonTrivialStruct>, case #FakeOptional.some!enumelt: bb8, case #FakeOptional.none!enumelt: bb6
+
+bb6:
+  br bb7
+
+bb7:
+  unreachable
+
+bb8(%20 : @owned $NonTrivialStruct):
+  store %20 to [init] %1 : $*NonTrivialStruct
+  br bb9
+
+bb9:
+  %23 = function_ref @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
+  %24 = apply %23() : $@convention(thin) () -> @owned NonTrivialEnum
+  switch_enum %24 : $NonTrivialEnum, case #NonTrivialEnum.some1!enumelt: bb10, case #NonTrivialEnum.some2!enumelt: bb11
+
+bb10(%26 : @owned $Klass):
+  %27 = load [copy] %1 : $*NonTrivialStruct
+  destroy_value %27 : $NonTrivialStruct
+  destroy_value %26 : $Klass
+  br bb12
+
+bb11(%31 : @owned $NonTrivialStruct):
+  %32 = load [copy] %1 : $*NonTrivialStruct
+  destroy_value %32 : $NonTrivialStruct
+  destroy_value %31 : $NonTrivialStruct
+  br bb12
+
+bb12:
+  %36 = load [take] %1 : $*NonTrivialStruct
+  destroy_value %36 : $NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  %39 = tuple ()
+  return %39 : $()
+}
+
+enum KlassOptional {
+  case some(Klass)
+  case none
+}
+
+sil @return_optional_or_error : $@convention(thin) () -> (@owned KlassOptional, @error Error)
+
+// CHECK-LABEL: sil [ossa] @test_deadphi4 :
+// mem2reg cannot optimize an enum location which spans over multiple blocks.
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi4'
+sil [ossa] @test_deadphi4 : $@convention(thin) (@owned KlassOptional) -> () {
+bb0(%0 : @owned $KlassOptional):
+  %stk = alloc_stack [lexical] $KlassOptional
+  switch_enum %0 : $KlassOptional, case #KlassOptional.some!enumelt: bb2, case #KlassOptional.none!enumelt: bb1
+
+bb1:
+  dealloc_stack %stk : $*KlassOptional
+  br bb7
+
+bb2(%some : @owned $Klass):
+  destroy_value %some : $Klass
+  %19 = function_ref @return_optional_or_error : $@convention(thin) () -> (@owned KlassOptional, @error Error)
+  try_apply %19() : $@convention(thin) () -> (@owned KlassOptional, @error Error), normal bb3, error bb8
+
+bb3(%callresult : @owned $KlassOptional):
+  store %callresult to [init] %stk : $*KlassOptional
+  %29 = load [take] %stk : $*KlassOptional
+  switch_enum %29 : $KlassOptional, case #KlassOptional.some!enumelt: bb5, case #KlassOptional.none!enumelt: bb4
+
+bb4:
+  dealloc_stack %stk : $*KlassOptional
+  br bb7
+
+bb5(%33 : @owned $Klass):
+  destroy_value %33 : $Klass
+  dealloc_stack %stk : $*KlassOptional
+  br bb6
+
+bb6:
+  %39 = tuple ()
+  return %39 : $()
+
+bb7:
+  br bb6
+
+bb8(%err : @owned $Error):
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_deadphi5 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi5'
+sil [ossa] @test_deadphi5 : $@convention(thin) () -> () {
+bb0:
+  %stk = alloc_stack [lexical] $NonTrivialStruct
+  cond_br undef, bb2, bb1
+
+bb1:
+  %func1 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val1 = apply %func1() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %val1 to [init] %stk : $*NonTrivialStruct
+  br bb5
+
+bb2:
+  %func2 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val2 = apply %func2() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %val2 to [init] %stk : $*NonTrivialStruct
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb5
+
+bb4:
+  %lval1 = load [take] %stk : $*NonTrivialStruct
+  destroy_value %lval1 : $NonTrivialStruct
+  dealloc_stack %stk : $*NonTrivialStruct
+  br bb9
+
+bb5:
+  cond_br undef, bb6, bb7
+
+bb6:
+  %lval2 = load [take] %stk : $*NonTrivialStruct
+  destroy_value %lval2 : $NonTrivialStruct
+  br bb8
+
+bb7:
+  %lval3 = load [take] %stk : $*NonTrivialStruct
+  destroy_value %lval3 : $NonTrivialStruct
+  br bb8
+
+bb8:
+  dealloc_stack %stk : $*NonTrivialStruct
+  br bb9
+
+bb9:
+  %res = tuple ()
+  return %res : $()
+}
+

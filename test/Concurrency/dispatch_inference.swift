@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency %import-libdispatch -warn-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking %import-libdispatch -warn-concurrency
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
@@ -14,9 +14,17 @@ func testMe() {
   }
 }
 
-func testUnsafeSendableInAsync() async {
+func testUnsafeSendableInMainAsync() async {
   var x = 5
   DispatchQueue.main.async {
+    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+  }
+  print(x)
+}
+
+func testUnsafeSendableInAsync(queue: DispatchQueue) async {
+  var x = 5
+  queue.async {
     x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)

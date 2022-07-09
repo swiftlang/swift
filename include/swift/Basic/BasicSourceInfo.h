@@ -50,7 +50,7 @@ struct ExternalSourceLocs {
 
   unsigned BufferID = 0;
   SourceLoc Loc;
-  SmallVector<CharSourceRange, 4> DocRanges;
+  ArrayRef<CharSourceRange> DocRanges;
 };
 
 class BasicSourceFileInfo {
@@ -83,7 +83,7 @@ public:
 
   ///  Construct with a `SourceFile`. `getInterfaceHashIncludingTypeMembers()`,
   ///  `getInterfaceHashExcludingTypeMembers()`, `getLastModified()` and
-  /// `getFileSize()` are laizily populated when accessed.
+  /// `getFileSize()` are lazily populated when accessed.
   BasicSourceFileInfo(const SourceFile *SF);
 
   bool isFromSourceFile() const;

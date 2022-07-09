@@ -3,7 +3,8 @@
 // RUN: %target-swift-frontend -merge-modules -emit-module -o %t/Test.swiftmodule %t/Test~partial.swiftmodule
 // RUN: %target-swift-ide-test -print-module -module-to-print=Test -source-filename=x -I %t -prefer-type-repr=false -fully-qualified-types=true | %FileCheck %s
 
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface -enable-library-evolution %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface)
 // RUN: %FileCheck %s < %t.swiftinterface
 
 // CHECK: func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Swift.Void = {

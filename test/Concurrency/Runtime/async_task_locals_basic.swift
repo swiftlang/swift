@@ -1,11 +1,11 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 final class StringLike: Sendable, CustomStringConvertible {
@@ -17,7 +17,7 @@ final class StringLike: Sendable, CustomStringConvertible {
   var description: String { value }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 enum TL {
 
   @TaskLocal
@@ -33,7 +33,7 @@ enum TL {
   static var clazz: ClassTaskLocal?
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 final class ClassTaskLocal: Sendable {
   init() {
     print("clazz init \(ObjectIdentifier(self))")
@@ -44,7 +44,7 @@ final class ClassTaskLocal: Sendable {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @discardableResult
 func printTaskLocalAsync<V>(
     _ key: TaskLocal<V>,
@@ -54,7 +54,7 @@ func printTaskLocalAsync<V>(
   printTaskLocal(key, expected, file: file, line: line)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -72,7 +72,7 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func simple() async {
   printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
   TL.$number.withValue(1) {
@@ -80,7 +80,7 @@ func simple() async {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func simple_deinit() async {
   TL.$clazz.withValue(ClassTaskLocal()) {
     // CHECK: clazz init [[C:.*]]
@@ -93,7 +93,7 @@ func simple_deinit() async {
 struct Boom: Error {
   let value: String
 }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func simple_throw() async {
   do {
     try TL.$clazz.withValue(ClassTaskLocal()) {
@@ -105,7 +105,7 @@ func simple_throw() async {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func nested() async {
   printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   TL.$string.withValue("hello") {
@@ -122,7 +122,7 @@ func nested() async {
   printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func nested_allContribute() async {
   printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   TL.$string.withValue("one") {
@@ -139,7 +139,7 @@ func nested_allContribute() async {
   printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func nested_3_onlyTopContributes() async {
   printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   TL.$string.withValue("one") {
@@ -156,7 +156,7 @@ func nested_3_onlyTopContributes() async {
   printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func nested_3_onlyTopContributesAsync() async {
   await printTaskLocalAsync(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   await TL.$string.withValue("one") {
@@ -173,7 +173,7 @@ func nested_3_onlyTopContributesAsync() async {
   await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func nested_3_onlyTopContributesMixed() async {
   await printTaskLocalAsync(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   await TL.$string.withValue("one") {
@@ -190,7 +190,7 @@ func nested_3_onlyTopContributesMixed() async {
   await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func withLocal_body_mustNotEscape() async {
   var something = "Nice"
   TL.$string.withValue("xxx") {
@@ -199,7 +199,7 @@ func withLocal_body_mustNotEscape() async {
   _ = something // silence not used warning
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await simple()

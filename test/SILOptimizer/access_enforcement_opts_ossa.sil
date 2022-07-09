@@ -18,6 +18,10 @@ class Klass {
 
 }
 
+class NonTrivial {
+  @_hasStorage var object: Klass { get set }
+}
+
 var globalX: X
 
 var globalOtherX: X
@@ -25,6 +29,8 @@ var globalOtherX: X
 sil_global hidden @globalX : $X
 
 sil_global hidden @globalOtherX : $X
+
+sil [ossa] @hasIndirectArg : $@convention(thin) (@inout Klass) -> ()
 
 sil hidden [ossa] @Xinit : $@convention(method) (@thin X.Type) -> X {
 bb0(%0 : $@thin X.Type):
@@ -56,8 +62,8 @@ bb0(%0 : $@thin X.Type):
 //
 // CHECK-LABEL: sil hidden [ossa] @testNestedAccess1 : $@convention(thin) () -> () {
 // CHECK: [[F1:%.*]] = function_ref @testNestedAccessClosure1 : $@convention(thin) () -> ()
-// CHECK: [[C1:%.*]] = convert_function [[F1]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF1:%.*]] = thin_to_thick_function [[C1]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed ()
+// CHECK: [[C1:%.*]] = convert_function [[F1]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF1:%.*]] = thin_to_thick_function [[C1]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed ()
 // CHECK: [[A1:%.*]] = begin_access [read] [dynamic] %0 : $*X
 // CHECK: apply [[TF1]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A1]] : $*X
@@ -76,8 +82,8 @@ bb0:
 }
 // CHECK-LABEL: sil hidden [ossa] @testNestedAccess2 : $@convention(thin) () -> () {
 // CHECK: [[F2:%.*]] = function_ref @testNestedAccessClosure2 : $@convention(thin) () -> ()
-// CHECK: [[C2:%.*]] = convert_function [[F2]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF2:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[C2:%.*]] = convert_function [[F2]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF2:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[A2:%.*]] = begin_access [modify] [dynamic] %0 : $*X
 // CHECK: apply [[TF2]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A2]] : $*X
@@ -96,8 +102,8 @@ bb0:
 }
 // CHECK-LABEL: sil hidden [ossa] @testNestedAccess3 : $@convention(thin) () -> () {
 // CHECK: [[F3:%.*]] = function_ref @testNestedAccessClosure3 : $@convention(thin) () -> ()
-// CHECK: [[C3:%.*]] = convert_function [[F3]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF3:%.*]] = thin_to_thick_function [[C3]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[C3:%.*]] = convert_function [[F3]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF3:%.*]] = thin_to_thick_function [[C3]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[A3:%.*]] = begin_access [modify] [dynamic] %0 : $*X
 // CHECK: apply [[TF3]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A3]] : $*X
@@ -569,7 +575,7 @@ sil private [ossa] @$s17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $
 // %0
 bb0(%0 : @guaranteed ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load [trivial] %3 : $*Int64
   end_access %3 : $*Int64
@@ -646,7 +652,7 @@ sil private [ossa] @$s17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@
 // %0
 bb0(%0 : @guaranteed ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 42
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -701,7 +707,7 @@ sil private [ossa] @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycf
 // %0
 bb0(%0 : @guaranteed ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load [trivial] %3 : $*Int64
   end_access %3 : $*Int64
@@ -721,7 +727,7 @@ sil private [ossa] @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXE
 // %0
 // %1
 bb0(%0 : $*Int64, %1 : @guaranteed $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [read] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -777,7 +783,7 @@ sil private [ossa] @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyy
 // %0
 bb0(%0 : @guaranteed ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 7
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -793,7 +799,7 @@ bb0(%0 : @guaranteed ${ var Int64 }):
 // CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_'
 sil private [ossa] @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : $*Int64, %1 : @guaranteed $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [read] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -849,7 +855,7 @@ sil private [ossa] @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosu
 // %0
 bb0(%0 : @guaranteed ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load [trivial] %3 : $*Int64
   end_access %3 : $*Int64
@@ -869,7 +875,7 @@ sil private [ossa] @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosu
 // %0
 // %1
 bb0(%0 : $*Int64, %1 : @guaranteed $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [modify] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -923,7 +929,7 @@ sil private [ossa] @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7Closur
 // %0
 bb0(%0 : @guaranteed ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 7
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -939,7 +945,7 @@ bb0(%0 : @guaranteed ${ var Int64 }):
 // CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_'
 sil private [ossa] @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : $*Int64, %1 : @guaranteed $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [modify] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -1817,3 +1823,54 @@ bb0(%0 : @guaranteed $Klass, %1 : $*Int64):
   return %14 : $Builtin.NativeObject
 }
 
+class Bar {
+  func foo()
+}
+
+// Nothing happens here. I guess we check that the analysis does not crash.
+//
+// CHECK-LABEL: sil [ossa] @$testEndLifetime : $@convention(method) (@owned Bar, @in Bar) -> () {
+// CHECK-LABEL: } // end sil function '$testEndLifetime'
+sil [ossa] @$testEndLifetime : $@convention(method) (@owned Bar, @in Bar) -> () {
+bb0(%0 : @owned $Bar, %1 : $*Bar):
+  %b = begin_access [modify] [dynamic] %1 : $*Bar
+  end_access %b : $*Bar
+  %f = objc_method %0 : $Bar, #Bar.foo!foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
+  %c = apply %f(%0) : $@convention(objc_method) (Bar) -> ()
+  end_lifetime %0 : $Bar
+  destroy_addr %1 : $*Bar
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testBorrowedAccess : $@convention(thin) (@owned NonTrivial) -> () {
+// CHECK: bb0(%0 : @owned $NonTrivial):
+// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $NonTrivial
+// CHECK:   [[ADR:%.*]] = ref_element_addr [[BORROW]] : $NonTrivial, #NonTrivial.object
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Klass
+// CHECK-NOT: access
+// CHECK-NOT: borrow
+// CHECK:   apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@inout Klass) -> ()
+// CHECK:   apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@inout Klass) -> ()
+// CHECK:   end_access [[ACCESS]] : $*Klass
+// CHECK:   end_borrow [[BORROW]] : $NonTrivial
+// CHECK:   destroy_value %0 : $NonTrivial
+// CHECK-LABEL: } // end sil function 'testBorrowedAccess'
+sil [ossa] @testBorrowedAccess : $@convention(thin) (@owned NonTrivial) -> () {
+bb0(%0 : @owned $NonTrivial):
+  %f = function_ref @hasIndirectArg : $@convention(thin) (@inout Klass) -> ()
+  %b1 = begin_borrow %0 : $NonTrivial
+  %e1 = ref_element_addr %b1 : $NonTrivial, #NonTrivial.object
+  %a1 = begin_access [modify] [dynamic] %e1 : $*Klass
+  %c1 = apply %f(%a1) : $@convention(thin) (@inout Klass) -> ()
+  end_access %a1 : $*Klass
+  end_borrow %b1 : $NonTrivial
+  %b2 = begin_borrow %0 : $NonTrivial
+  %e2 = ref_element_addr %b2 : $NonTrivial, #NonTrivial.object
+  %a2 = begin_access [modify] [dynamic] %e2 : $*Klass
+  %c2 = apply %f(%a2) : $@convention(thin) (@inout Klass) -> ()
+  end_access %a2 : $*Klass
+  end_borrow %b2 : $NonTrivial
+  destroy_value %0 : $NonTrivial
+  return undef : $()
+}

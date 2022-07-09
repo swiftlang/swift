@@ -32,68 +32,53 @@ using namespace swift;
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
-static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
-                                             Type &resultSugarTy,
-                                             bool &uniqueSugarTy) {
-  // If we already failed finding a unique sugar, bail out.
-  if (!uniqueSugarTy)
-    return;
-    
-  if (TupleType *argTupleTy = argTy->getAs<TupleType>()) {
-    // Recursively walk tuple arguments.
-    for (auto &field : argTupleTy->getElements()) {
-      substituteInputSugarArgumentType(field.getType(), resultTy,
-                                       resultSugarTy, uniqueSugarTy);
-      if (!uniqueSugarTy)
-        return;
+static Type getArgListUniqueSugarType(ArgumentList *args, CanType resultTy) {
+  Type uniqueSugarTy;
+  for (auto arg : *args) {
+    auto argTy = arg.getExpr()->getType();
+    if (!argTy)
+      return Type();
+
+    if (argTy->getCanonicalType() != resultTy) {
+      // If the argument is a metatype of what we're looking for, propagate
+      // that.
+      if (auto MTT = argTy->getAs<MetatypeType>())
+        argTy = MTT->getInstanceType();
+
+      if (argTy->getCanonicalType() != resultTy)
+        return Type();
     }
-    return;
-  }
-  
-  if (argTy->getCanonicalType() != resultTy) {
-    // If the argument is a metatype of what we're looking for, propagate that.
-    if (auto MTT = argTy->getAs<MetatypeType>())
-      argTy = MTT->getInstanceType();
 
-    if (argTy->getCanonicalType() != resultTy)
-      return;
-  }
+    // If this type is parenthesized, remove the parens.  We don't want to
+    // propagate parens from arguments to the result type.
+    argTy = argTy->getWithoutParens();
 
-  // If this type is parenthesized, remove the parens.  We don't want to
-  // propagate parens from arguments to the result type.
-  argTy = argTy->getWithoutParens();
-  
-  // If this is the first match against the sugar type we found, use it.
-  if (!resultSugarTy) {
-    resultSugarTy = argTy;
-    return;
+    // If this is the first match against the sugar type we found, use it.
+    if (!uniqueSugarTy) {
+      uniqueSugarTy = argTy;
+      continue;
+    }
+
+    // Make sure this argument's sugar is consistent with the sugar we
+    // already found.
+    if (argTy.getPointer() != uniqueSugarTy.getPointer())
+      return Type();
   }
-  
-  // Make sure this argument's sugar is consistent with the sugar we
-  // already found.
-  if (argTy.getPointer() == resultSugarTy.getPointer())
-    return;
-  uniqueSugarTy = false;
+  return uniqueSugarTy;
 }
 
 /// If we can propagate type sugar from input arguments types to the result of
 /// an apply, do so.
-///
 Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   if (!E->getType() || E->getType()->hasError())
     return E;
-  
-  Type resultTy = E->getFn()->getType()->castTo<FunctionType>()->getResult();
 
   /// Check to see if you have "x+y" (where x and y are type aliases) that match
   // the canonical result type.  If so, propagate the sugar.
-  Type resultSugarTy; // null if no sugar found, set when sugar found
-  bool uniqueSugarTy = true; // true if a unique sugar mapping found
-  substituteInputSugarArgumentType(E->getArg()->getType(),
-                                   resultTy->getCanonicalType(),
-                                   resultSugarTy, uniqueSugarTy);
-  
-  if (resultSugarTy && uniqueSugarTy && E->getType()->isCanonical()) {
+  auto resultTy = E->getType();
+  auto resultSugarTy = getArgListUniqueSugarType(E->getArgs(),
+                                                 resultTy->getCanonicalType());
+  if (resultSugarTy && resultTy->isCanonical()) {
     E->setType(resultSugarTy);
     return E;
   }
@@ -101,8 +86,9 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   // Otherwise check to see if this is a ConstructorRefExpr on a TypeExpr with
   // sugar on it.  If so, propagate the sugar to the curried result function
   // type.
-  if (isa<ConstructorRefCallExpr>(E) && isa<TypeExpr>(E->getArg())) {
-    auto resultSugar = cast<TypeExpr>(E->getArg())->getInstanceType();
+  if (auto *CRCE = dyn_cast<ConstructorRefCallExpr>(E)) {
+    if (auto *TE = dyn_cast<TypeExpr>(CRCE->getBase())) {
+      auto resultSugar = TE->getInstanceType();
 
     // The result of this apply is "(args) -> T" where T is the type being
     // constructed.  Apply the sugar onto it.
@@ -113,17 +99,8 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
         E->setType(NFT);
         return E;
       }
+    }
   }
-
-  // Otherwise, if the callee function had sugar on the result type, but it got
-  // dropped, make sure to propagate it along.
-  if (!resultTy->isCanonical() && E->getType()->isCanonical() &&
-      resultTy->isEqual(E->getType())) {
-    E->setType(resultTy);
-    return E;
-  }
-
-
   return E;
 }
 
@@ -202,7 +179,7 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   return nullptr;
 }
 
-/// Find LHS as if we append binary operator to existing pre-folded expresion.
+/// Find LHS as if we append binary operator to existing pre-folded expression.
 /// Returns found expression, or \c nullptr if the operator is not applicable.
 ///
 /// For example, given '(== R (* A B))':
@@ -244,10 +221,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
     } else if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
       E = ifExpr->getElseExpr();
     } else if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
-      auto *Args = dyn_cast<TupleExpr>(binaryExpr->getArg());
-      if (!Args || Args->getNumElements() != 2)
-        return nullptr;
-      E = Args->getElement(1);
+      E = binaryExpr->getRHS();
     } else {
       // E.g. 'fn() as Int << 2'.
       // In this case '<<' has higher precedence than 'as', but the LHS should
@@ -355,7 +329,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
     // Resolve the ternary expression.
-    assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
+    if (!Ctx.CompletionCallback) {
+      // In code completion we might call preCheckExpression twice - once for
+      // the first pass and once for the second pass. This is fine since
+      // preCheckExpression idempotent.
+      assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
+    }
     ifExpr->setCondExpr(LHS);
     ifExpr->setElseExpr(RHS);
     return ifExpr;
@@ -363,7 +342,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
     // Resolve the assignment expression.
-    assert(!assign->isFolded() && "already folded assign expr in sequence?!");
+    if (!Ctx.CompletionCallback) {
+      // In code completion we might call preCheckExpression twice - once for
+      // the first pass and once for the second pass. This is fine since
+      // preCheckExpression idempotent.
+      assert(!assign->isFolded() && "already folded assign expr in sequence?!");
+    }
     assign->setDest(LHS);
     assign->setSrc(RHS);
     return assign;
@@ -371,7 +355,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
     // Resolve the 'as' or 'is' expression.
-    assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
+    if (!Ctx.CompletionCallback) {
+      // In code completion we might call preCheckExpression twice - once for
+      // the first pass and once for the second pass. This is fine since
+      // preCheckExpression idempotent.
+      assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
+    }
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);    
     return as;
@@ -379,7 +368,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
     // Resolve the '->' expression.
-    assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
+    if (!Ctx.CompletionCallback) {
+      // In code completion we might call preCheckExpression twice - once for
+      // the first pass and once for the second pass. This is fine since
+      // preCheckExpression idempotent.
+      assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
+    }
     arrow->setArgsExpr(LHS);
     arrow->setResultExpr(RHS);
     return arrow;

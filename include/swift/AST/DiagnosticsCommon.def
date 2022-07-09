@@ -38,9 +38,6 @@ ERROR(cannot_parse_group_info_file,none,
 ERROR(error_no_group_info,none,
       "no group info found for file: '%0'", (StringRef))
 
-NOTE(previous_decldef,none,
-     "previous definition of %0 is here", (DeclBaseName))
-
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
@@ -71,6 +68,15 @@ ERROR(class_subscript_not_in_class,none,
       "class subscripts are only allowed within classes; "
       "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 subscript", (bool))
 
+ERROR(require_static_for_const,none,
+      "'static' is required for _const variable declaration", ())
+
+ERROR(require_let_for_const,none,
+      "let is required for a _const variable declaration", ())
+
+ERROR(require_const_initializer_for_const,none,
+      "_const let should be initialized with a compile-time literal", ())
+
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())
@@ -83,10 +89,6 @@ NOTE(note_typo_candidate,none,
 
 NOTE(profile_read_error,none,
      "failed to load profile data '%0': '%1'", (StringRef, StringRef))
-
-WARNING(protocol_extension_redundant_requirement,none,
-      "requirement of '%1' to '%2' is redundant in an extension of '%0'",
-      (StringRef, StringRef, StringRef))
 
 ERROR(attr_only_on_parameters, none,
       "'%0' may only be used on parameters", (StringRef))
@@ -196,7 +198,7 @@ ERROR(scanner_find_cycle, none,
 ERROR(scanner_arguments_invalid, none,
       "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
 
-WARNING(warn_scaner_deserialize_failed, none,
+WARNING(warn_scanner_deserialize_failed, none,
         "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
 
 REMARK(remark_reuse_cache, none,
@@ -209,13 +211,6 @@ REMARK(remark_save_cache, none,
 // MARK: custom attribute diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(ambiguous_custom_attribute_ref,none,
-      "ambiguous use of attribute %0", (Identifier))
-NOTE(ambiguous_custom_attribute_ref_fix,none,
-     "use '%0.' to reference the attribute %1 in module %2",
-     (StringRef, Identifier, Identifier))
-NOTE(found_attribute_candidate,none,
-     "found this attribute", ())
 ERROR(unknown_attribute,none,
       "unknown attribute '%0'", (StringRef))
 

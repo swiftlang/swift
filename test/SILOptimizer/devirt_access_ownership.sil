@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -devirtualizer | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer | %FileCheck %s
 
 sil_stage canonical
 
@@ -9,7 +9,7 @@ import SwiftShims
 class K {
   func ping() -> Int
   private func pong() -> Int
-  @objc deinit
+  deinit
   init()
 }
 
@@ -41,27 +41,27 @@ sil_vtable K {
 class X
 {
   private func ping() -> Int
-  @objc deinit
+  deinit
   init()
 }
 
 class Y : X
 {
-  @objc deinit
+  deinit
   override init()
 }
 
 class A
 {
   private func ping() -> Int
-  @objc deinit
+  deinit
   init()
 }
 
 class B : A
 {
   override func ping() -> Int
-  @objc deinit
+  deinit
   override init()
 }
 

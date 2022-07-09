@@ -649,6 +649,8 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                               dest, destType, flags);
 
   // Not a class.
+  // Foreign reference types don't suppport casting.
+  case MetadataKind::ForeignReferenceType:
   default:
     return false;
   }

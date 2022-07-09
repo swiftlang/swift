@@ -273,32 +273,6 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
   return result;
 }
 
-// An unfortunate hack to kick the decl checker into adding semantic members to
-// the current type before we attempt a semantic lookup. The places this method
-// looks needs to be in sync with \c extractDirectlyReferencedNominalTypes.
-// See the note in \c synthesizeSemanticMembersIfNeeded about a better, more
-// just, and peaceful world.
-static void installSemanticMembersIfNeeded(Type type, DeclNameRef name) {
-  // Look-through class-bound archetypes to ensure we synthesize e.g.
-  // inherited constructors.
-  if (auto archetypeTy = type->getAs<ArchetypeType>()) {
-    if (auto super = archetypeTy->getSuperclass()) {
-      type = super;
-    }
-  }
-
-  if (type->isExistentialType()) {
-    auto layout = type->getExistentialLayout();
-    if (auto super = layout.explicitSuperclass) {
-      type = super;
-    }
-  }
-
-  if (auto *current = type->getAnyNominal()) {
-    current->synthesizeSemanticMembersIfNeeded(name.getFullName());
-  }
-}
-
 LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
                                    SourceLoc loc,
@@ -346,7 +320,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   subOptions &= ~NL_RemoveNonVisible;
 
   // Make sure we've resolved implicit members, if we need them.
-  installSemanticMembersIfNeeded(type, name);
+  namelookup::installSemanticMembersIfNeeded(type, name);
 
   LookupResultBuilder builder(result, dc, options);
   SmallVector<ValueDecl *, 4> lookupResults;
@@ -366,7 +340,7 @@ static bool doesTypeAliasFullyConstrainAllOuterGenericParams(
   if (!parentSig || !genericSig)
     return false;
 
-  for (auto *paramType : parentSig->getGenericParams()) {
+  for (auto *paramType : parentSig.getGenericParams()) {
     if (!genericSig->isConcreteType(paramType))
       return false;
   }
@@ -438,7 +412,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     subOptions |= NL_IncludeUsableFromInline;
 
   // Make sure we've resolved implicit members, if we need them.
-  installSemanticMembersIfNeeded(type, name);
+  namelookup::installSemanticMembersIfNeeded(type, name);
 
   if (!dc->lookupQualified(type, name, subOptions, decls))
     return result;

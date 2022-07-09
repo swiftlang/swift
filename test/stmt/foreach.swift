@@ -60,8 +60,8 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   var sumf : Float
   for i : Int in gir { sum = sum + i }
   for i in gir { sum = sum + i }
-  for f : Float in gir { sum = sum + f } // expected-error{{cannot convert sequence element type 'GoodRange<Int>.Element' (aka 'Int') to expected type 'Float'}}
-  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'GoodRange<Int>.Element' (aka 'Int') does not conform to expected protocol 'ElementProtocol'}}
+  for f : Float in gir { sum = sum + f } // expected-error{{cannot convert sequence element type 'Int' to expected type 'Float'}}
+  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'Int' does not conform to expected protocol 'ElementProtocol'}}
 
   for (i, f) : (Int, Float) in gtr { sum = sum + i }
 
@@ -73,7 +73,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
 
-  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{cannot convert sequence element type 'GoodTupleIterator.Element' (aka '(Int, Float)') to expected type '(Int, Int)'}}
+  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{cannot convert sequence element type '(Int, Float)' to expected type '(Int, Int)'}}
 
   for (i, f) in gtr {}
 }
@@ -175,10 +175,16 @@ func testOptionalSequence() {
   }
 }
 
-// Crash with (invalid) for each over an existential
-func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
-  for x in s { // expected-error {{protocol 'Sequence' as a type cannot conform to the protocol itself}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+func testExistentialSequence(s: any Sequence) {
+  for x in s {
     _ = x
+  }
+}
+
+// rdar://92177656 - implicit existential opening should work with for-in loops
+func testForEachWithAnyCollection(c: any Collection) {
+  for v in c {
+    print(v)
   }
 }
 
@@ -237,4 +243,10 @@ func testForEachWhereWithClosure(_ x: [Int]) {
   for i in x where foo({ i }) {}
   for i in x where foo({ i.byteSwapped == 5 }) {}
   for i in x where x.contains(where: { $0.byteSwapped == i }) {}
+}
+
+// https://github.com/apple/swift/issues/59522 - use of `prefix` with generic base causes ambiguity in for-in statement
+func test_no_ambiguity_with_prefix_iterator<C: Collection>(c: C) {
+  for _ in c.prefix(1) { // Ok
+  }
 }

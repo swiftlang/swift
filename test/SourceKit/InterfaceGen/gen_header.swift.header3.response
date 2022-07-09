@@ -202,8 +202,6 @@ extension SKFuelKind {
         key.kind: source.lang.swift.decl.enumcase,
         key.offset: 45,
         key.length: 11,
-        key.nameoffset: 0,
-        key.namelength: 0,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
@@ -227,8 +225,6 @@ extension SKFuelKind {
         key.kind: source.lang.swift.decl.enumcase,
         key.offset: 62,
         key.length: 12,
-        key.nameoffset: 0,
-        key.namelength: 0,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
@@ -252,8 +248,6 @@ extension SKFuelKind {
         key.kind: source.lang.swift.decl.enumcase,
         key.offset: 80,
         key.length: 15,
-        key.nameoffset: 0,
-        key.namelength: 0,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,

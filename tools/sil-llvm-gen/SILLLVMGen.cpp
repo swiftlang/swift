@@ -175,11 +175,14 @@ int main(int argc, char **argv) {
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
 
   std::error_code EC;
-  llvm::raw_fd_ostream outStream(OutputFilename, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream outStream(OutputFilename, EC, llvm::sys::fs::OF_None);
   if (outStream.has_error() || EC) {
     CI.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
                            OutputFilename, EC.message());

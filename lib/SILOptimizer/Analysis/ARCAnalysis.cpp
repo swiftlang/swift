@@ -104,7 +104,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   auto &II = BInst->getIntrinsicInfo();
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
     auto attrs = II.getOrCreateAttributes(F->getASTContext());
-    if (attrs.hasFnAttribute(llvm::Attribute::ReadNone)) {
+    if (attrs.hasFnAttr(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
         if (!Op.get()->getType().isTrivial(*F)) {
           return true;
@@ -157,7 +157,6 @@ bool swift::canUseObject(SILInstruction *Inst) {
   // Debug values do not use referenced counted values in a manner we care
   // about.
   case SILInstructionKind::DebugValueInst:
-  case SILInstructionKind::DebugValueAddrInst:
     return false;
 
   // Casts do not use pointers in a manner that we care about since we strip
@@ -1159,8 +1158,7 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
       continue;
     }
 
-    if (CurInst.mayHaveSideEffects() && !isa<DebugValueInst>(CurInst) &&
-        !isa<DebugValueAddrInst>(CurInst))
+    if (CurInst.mayHaveSideEffects() && !DebugValueInst::hasAddrVal(&CurInst))
       break;
   }
 
@@ -1178,8 +1176,7 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
       continue;
     }
 
-    if (CurInst.mayHaveSideEffects() && !isa<DebugValueInst>(CurInst) &&
-        !isa<DebugValueAddrInst>(CurInst))
+    if (CurInst.mayHaveSideEffects() && !DebugValueInst::hasAddrVal(&CurInst))
       break;
   }
 

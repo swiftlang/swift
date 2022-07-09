@@ -5,6 +5,7 @@
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 import Swift
 import StdlibUnittest
@@ -14,6 +15,8 @@ import SwiftShims
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif os(WASI)
+  import WASILibc
 #elseif os(Windows)
   import CRT
   import WinSDK
@@ -518,7 +521,7 @@ Runtime.test("abstraction barrier on casting generic param bound to existential"
        dynamicWithErasedType,
        dynamicExistentialWithErasedType,
        dynamicDoubleWrappedExistentialWithErasedType)
-    = castWithAbstractionBarrier(x)
+    = castWithAbstractionBarrier(x as SomeProtocol)
 
   expectTrue(staticWithConcreteType == SomeProtocol.self)
   expectTrue(dynamicWithConcreteType == SomeProtocol.self)
@@ -683,7 +686,7 @@ Reflection.test("multiprotocolTypes") {
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 BitTwiddlingTestSuite.test("_pointerSize") {
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(8, MemoryLayout<Optional<AnyObject>>.size)
@@ -707,7 +710,7 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
   expectTrue(_isPowerOf2(asInt(2)))
   expectFalse(_isPowerOf2(asInt(3)))
   expectTrue(_isPowerOf2(asInt(1024)))
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
   // Not applicable to 32-bit architectures.
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectTrue(_isPowerOf2(asInt(0x8000_0000)))
@@ -746,9 +749,12 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
   // This test assumes that no version component on an OS we test upon
   // will ever be greater than 1066 and that every major version will always
   // be greater than 1.
+
+#if !targetEnvironment(macCatalyst)
   expectFalse(isAtLeastOS(1066, 0, 0))
   expectTrue(isAtLeastOS(0, 1066, 0))
   expectTrue(isAtLeastOS(0, 0, 1066))
+#endif
   
   // When using a runtime that's not part of the OS, 9999 is a special version
   // that's always available. The _swift_classIsSwiftMask symbol is absent in OS

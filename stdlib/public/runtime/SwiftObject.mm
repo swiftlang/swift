@@ -56,6 +56,7 @@
 #endif
 
 using namespace swift;
+using namespace hashable_support;
 
 #if SWIFT_HAS_ISA_MASKING
 OBJC_EXPORT __attribute__((__weak_import__))
@@ -76,7 +77,6 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 }
 
 #if SWIFT_OBJC_INTEROP
-
 /// Replacement for ObjC object_isClass(), which is unavailable on
 /// deployment targets macOS 10.9 and iOS 7.
 static bool objcObjectIsClass(id object) {
@@ -98,7 +98,7 @@ static Class _swift_getObjCClassOfAllocated(const void *object) {
 const ClassMetadata *swift::swift_getObjCClassFromObject(HeapObject *object) {
   auto classAsMetadata = _swift_getClass(object);
 
-  // Walk up the superclass chain skipping over artifical Swift classes.
+  // Walk up the superclass chain skipping over artificial Swift classes.
   // If we find a non-Swift class use the result of [object class] instead.
 
   while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
@@ -129,7 +129,7 @@ const Metadata *swift::swift_getObjectType(HeapObject *object) {
   auto classAsMetadata = _swift_getClass(object);
 
 #if SWIFT_OBJC_INTEROP
-  // Walk up the superclass chain skipping over artifical Swift classes.
+  // Walk up the superclass chain skipping over artificial Swift classes.
   // If we find a non-Swift class use the result of [object class] instead.
 
   while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
@@ -661,13 +661,12 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
   auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_retain_n(static_cast<HeapObject *>(objectRef), n);
     return object;
   }
   for (int i = 0;i < n; ++i)
-    objc_ret = objc_retain(static_cast<id>(objectRef));
+    objc_retain(static_cast<id>(objectRef));
   return object;
 #else
   swift_retain_n(static_cast<HeapObject *>(objectRef), n);
@@ -702,13 +701,12 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
   auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
     return object;
   }
   for (int i = 0;i < n; ++i)
-    objc_ret = objc_retain(static_cast<id>(objectRef));
+    objc_retain(static_cast<id>(objectRef));
   return object;
 #else
   swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
@@ -852,7 +850,7 @@ UnownedReference *swift::swift_unknownObjectUnownedInit(UnownedReference *dest,
                                                         void *value) {
   // Note that LLDB also needs to know about the memory layout of unowned
   // references. The implementation here needs to be kept in sync with
-  // lldb_private::SwiftLanguagueRuntime.
+  // lldb_private::SwiftLanguageRuntime.
   if (!value) {
     dest->Value = nullptr;
   } else if (isObjCForUnownedReference(value)) {
@@ -1352,6 +1350,36 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
     swift_isUniquelyReferenced_nonNull_native((const HeapObject*)object);
 }
 
+#if SWIFT_OBJC_INTEROP
+// It would be nice to weak link instead of doing this, but we can't do that
+// until the new API is in the versions of libobjc that we're linking against.
+static bool isUniquelyReferenced(id object) {
+#if OBJC_ISUNIQUELYREFERENCED_DEFINED
+  return objc_isUniquelyReferenced(object);
+#else
+  auto objcIsUniquelyRefd = SWIFT_LAZY_CONSTANT(reinterpret_cast<bool (*)(id)>(
+      dlsym(RTLD_NEXT, "objc_isUniquelyReferenced")));
+
+  return objcIsUniquelyRefd && objcIsUniquelyRefd(object);
+#endif /* OBJC_ISUNIQUELYREFERENCED_DEFINED */
+}
+#endif
+
+bool swift::swift_isUniquelyReferenced_nonNull(const void *object) {
+  assert(object != nullptr);
+
+#if SWIFT_OBJC_INTEROP
+  if (isObjCTaggedPointer(object))
+    return false;
+
+  if (!usesNativeSwiftReferenceCounting_nonNull(object)) {
+    return isUniquelyReferenced(id_const_cast(object));
+  }
+#endif
+  return swift_isUniquelyReferenced_nonNull_native(
+      static_cast<const HeapObject *>(object));
+}
+
 // Given an object reference, return true iff it is non-nil and refers
 // to a native swift object with strong reference count of 1.
 bool swift::swift_isUniquelyReferencedNonObjC(
@@ -1359,6 +1387,12 @@ bool swift::swift_isUniquelyReferencedNonObjC(
 ) {
   return object != nullptr
     && swift_isUniquelyReferencedNonObjC_nonNull(object);
+}
+
+// Given an object reference, return true if it is non-nil and refers
+// to an ObjC or native swift object with a strong reference count of 1.
+bool swift::swift_isUniquelyReferenced(const void *object) {
+  return object != nullptr && swift_isUniquelyReferenced_nonNull(object);
 }
 
 /// Return true if the given bits of a Builtin.BridgeObject refer to a
@@ -1386,22 +1420,42 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
 #endif
 }
 
+/// Return true if the given bits of a Builtin.BridgeObject refer to
+/// an object whose strong reference count is 1.
+bool swift::swift_isUniquelyReferenced_nonNull_bridgeObject(uintptr_t bits) {
+  auto bridgeObject = reinterpret_cast<void *>(bits);
+
+  if (isObjCTaggedPointer(bridgeObject))
+    return false;
+
+  const auto object = toPlainObject_unTagged_bridgeObject(bridgeObject);
+
+#if SWIFT_OBJC_INTEROP
+  return !isNonNative_unTagged_bridgeObject(bridgeObject)
+             ? swift_isUniquelyReferenced_nonNull_native(
+                   (const HeapObject *)object)
+             : swift_isUniquelyReferenced_nonNull(object);
+#else
+  return swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object);
+#endif
+}
+
 // Given a non-@objc object reference, return true iff the
-// object is non-nil and has a strong reference count greather than 1
+// object is non-nil and has a strong reference count greater than 1
 bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   const unsigned char *filename,
                                                   int32_t filenameLength,
                                                   int32_t line, int32_t column,
-                                                  unsigned verifcationType) {
-  assert((verifcationType == 0 || verifcationType == 1) &&
-         "Unknown verifcation type");
+                                                  unsigned verificationType) {
+  assert((verificationType == 0 || verificationType == 1) &&
+         "Unknown verification type");
 
   bool isEscaping =
       object != nullptr && !object->refCounts.isUniquelyReferenced();
 
   // Print a message if the closure escaped.
   if (isEscaping) {
-    auto *message = (verifcationType == 0)
+    auto *message = (verificationType == 0)
                         ? "closure argument was escaped in "
                           "withoutActuallyEscaping block"
                         : "closure argument passed as @noescape "
@@ -1498,13 +1552,13 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
     filenameLength = INT_MAX;
 
   char *message, *nullTerminatedFilename;
-  asprintf(&message,
+  swift_asprintf(&message,
            "implicit Objective-C entrypoint %c[%s %s] is deprecated and will "
            "be removed in Swift 4",
            isInstanceMethod ? '-' : '+',
            class_getName([self class]),
            sel_getName(selector));
-  asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
+  swift_asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
 
   RuntimeErrorDetails::FixIt fixit = {
     .filename = nullTerminatedFilename,
@@ -1543,6 +1597,24 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
 const Metadata *swift::getNSObjectMetadata() {
   return SWIFT_LAZY_CONSTANT(
       swift_getObjCClassMetadata((const ClassMetadata *)[NSObject class]));
+}
+
+const Metadata *swift::getNSStringMetadata() {
+  return SWIFT_LAZY_CONSTANT(swift_getObjCClassMetadata(
+    (const ClassMetadata *)objc_lookUpClass("NSString")
+  ));
+}
+
+const HashableWitnessTable *
+swift::hashable_support::getNSStringHashableConformance() {
+  return SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(
+        getNSStringMetadata(),
+        &HashableProtocolDescriptor
+      )
+    )
+  );
 }
 
 #endif

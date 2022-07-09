@@ -14,26 +14,51 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/Runtime/Concurrency.h"
+#include "Debug.h"
+#include "Error.h"
+#include "TaskGroupPrivate.h"
+#include "TaskPrivate.h"
+#include "Tracing.h"
+#include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/TaskOptions.h"
-#include "swift/ABI/Metadata.h"
-#include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/HeapObject.h"
-#include "TaskGroupPrivate.h"
-#include "TaskPrivate.h"
-#include "AsyncCall.h"
-#include "Debug.h"
-#include "Error.h"
+#include "swift/Threading/Mutex.h"
+#include <atomic>
+#include <new>
 
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
+#endif
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 #endif
 
+#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+#include <Availability.h>
+#include <TargetConditionals.h>
+#if TARGET_OS_WATCH
+// Bitcode compilation for the watch device precludes defining the following asm
+// symbols, so we don't use them... but simulators are okay.
+#if TARGET_OS_SIMULATOR
+asm("\n .globl _swift_async_extendedFramePointerFlags" \
+    "\n _swift_async_extendedFramePointerFlags = 0x0");
+#endif
+#else
+asm("\n .globl _swift_async_extendedFramePointerFlags" \
+    "\n _swift_async_extendedFramePointerFlags = 0x0");
+#endif
+#else
 #ifdef __APPLE__
 #if __POINTER_WIDTH__ == 64
 asm("\n .globl _swift_async_extendedFramePointerFlags" \
@@ -46,10 +71,18 @@ asm("\n .globl _swift_async_extendedFramePointerFlags" \
     "\n _swift_async_extendedFramePointerFlags = 0x0");
 #endif
 #endif // __APPLE__
+#endif // !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
 
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using TaskGroup = swift::TaskGroup;
+
+Metadata swift::TaskAllocatorSlabMetadata;
+const void *const swift::_swift_concurrency_debug_asyncTaskSlabMetadata =
+    &TaskAllocatorSlabMetadata;
+
+bool swift::_swift_concurrency_debug_supportsPriorityEscalation =
+    SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -62,7 +95,7 @@ void FutureFragment::destroy() {
     break;
 
   case Status::Error:
-    swift_unknownObjectRelease(reinterpret_cast<OpaqueValue *>(getError()));
+    swift_errorRelease(getError());
     break;
   }
 }
@@ -79,37 +112,79 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
   auto fragment = futureFragment();
 
   auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
-  bool contextIntialized = false;
+  bool contextInitialized = false;
+  auto escalatedPriority = JobPriority::Unspecified;
   while (true) {
     switch (queueHead.getStatus()) {
     case Status::Error:
     case Status::Success:
-#if SWIFT_TASK_PRINTF_DEBUG
-      fprintf(stderr, "[%lu] task %p waiting on task %p, completed immediately\n",
-              _swift_get_thread_id(), waitingTask, this);
-#endif
+      SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, completed immediately",
+                           waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
+      if (contextInitialized) waitingTask->flagAsRunning();
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
     case Status::Executing:
-#if SWIFT_TASK_PRINTF_DEBUG
-      fprintf(stderr, "[%lu] task %p waiting on task %p, going to sleep\n",
-              _swift_get_thread_id(), waitingTask, this);
-#endif
+      SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, going to sleep",
+                           waitingTask, this);
       _swift_tsan_release(static_cast<Job *>(waitingTask));
-      // Task is now complete. We'll need to add ourselves to the queue.
+      concurrency::trace::task_wait(
+          waitingTask, this, static_cast<uintptr_t>(queueHead.getStatus()));
+      // Task is not complete. We'll need to add ourselves to the queue.
       break;
     }
 
-    if (!contextIntialized) {
-      contextIntialized = true;
+    if (!contextInitialized) {
+      contextInitialized = true;
       auto context =
           reinterpret_cast<TaskFutureWaitAsyncContext *>(waitingTaskContext);
       context->errorResult = nullptr;
       context->successResultPointer = result;
       context->ResumeParent = resumeFn;
       context->Parent = callerContext;
+      waitingTask->flagAsSuspended();
+    }
+
+    // Escalate the blocking task to the priority of the waiting task.
+    // FIXME: Also record that the waiting task is now waiting on the
+    // blocking task so that escalators of the waiting task can propagate
+    // the escalation to the blocking task.
+    //
+    // Recording this dependency is tricky because we need escalators
+    // to be able to escalate without worrying about the blocking task
+    // concurrently finishing, resuming the escalated task, and being
+    // invalidated.  So we're not doing that yet.  In the meantime, we
+    // do the best-effort alternative of escalating the blocking task
+    // as a one-time deal to the current priority of the waiting task.
+    // If the waiting task is escalated after this point, the priority
+    // will not be escalated, but that's inevitable in the absence of
+    // propagation during escalation.
+    //
+    // We have to do the escalation before we successfully enqueue the
+    // waiting task on the blocking task's wait queue, because as soon as
+    // we do, this thread is no longer blocking the resumption of the
+    // waiting task, and so both the blocking task (which is retained
+    // during the wait only from the waiting task's perspective) and the
+    // waiting task (which can simply terminate) must be treat as
+    // invalidated from this thread's perspective.
+    //
+    // When we do fix this bug to record the dependency, we will have to
+    // do it before this escalation of the blocking task so that there
+    // isn't a race where an escalation of the waiting task can fail
+    // to propagate to the blocking task.  The correct priority to
+    // escalate to is the priority we observe when we successfully record
+    // the dependency; any later escalations will automatically propagate.
+    //
+    // If the blocking task finishes while we're doing this escalation,
+    // the escalation will be innocuous.  The wasted effort is acceptable;
+    // programmers should be encouraged to give tasks that will block
+    // other tasks the correct priority to begin with.
+    auto waitingStatus =
+      waitingTask->_private()._status().load(std::memory_order_relaxed);
+    if (waitingStatus.getStoredPriority() > escalatedPriority) {
+      swift_task_escalate(this, waitingStatus.getStoredPriority());
+      escalatedPriority = waitingStatus.getStoredPriority();
     }
 
     // Put the waiting task at the beginning of the wait queue.
@@ -119,9 +194,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
             queueHead, newQueueHead,
             /*success*/ std::memory_order_release,
             /*failure*/ std::memory_order_acquire)) {
-      // Escalate the priority of this task based on the priority
-      // of the waiting task.
-      swift_task_escalate(this, waitingTask->Flags.getPriority());
+
+      _swift_task_clearCurrent();
       return FutureFragment::Status::Executing;
     }
   }
@@ -135,7 +209,8 @@ void NullaryContinuationJob::process(Job *_job) {
 
   _swift_task_dealloc_specific(task, job);
 
-  auto *context = cast<ContinuationAsyncContext>(continuation->ResumeContext);
+  auto *context =
+    static_cast<ContinuationAsyncContext*>(continuation->ResumeContext);
 
   context->setErrorResult(nullptr);
   swift_continuation_resume(continuation);
@@ -144,7 +219,7 @@ void NullaryContinuationJob::process(Job *_job) {
 void AsyncTask::completeFuture(AsyncContext *context) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
-
+  SWIFT_TASK_DEBUG_LOG("complete future = %p", this);
   assert(isFuture());
   auto fragment = futureFragment();
 
@@ -180,21 +255,16 @@ void AsyncTask::completeFuture(AsyncContext *context) {
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
 
-#if SWIFT_TASK_PRINTF_DEBUG
   if (!waitingTask)
-    fprintf(stderr, "[%lu] task %p had no waiting tasks\n",
-            _swift_get_thread_id(), this);
-#endif
+    SWIFT_TASK_DEBUG_LOG("task %p had no waiting tasks", this);
 
   while (waitingTask) {
     // Find the next waiting task before we invalidate it by resuming
     // the task.
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
-#if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%lu] waking task %p from future of task %p\n",
-            _swift_get_thread_id(), waitingTask, this);
-#endif
+    SWIFT_TASK_DEBUG_LOG("waking task %p from future of task %p", waitingTask,
+                         this);
 
     // Fill in the return context.
     auto waitingContext =
@@ -207,9 +277,11 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
     _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
+    concurrency::trace::task_resume(waitingTask);
+
     // Enqueue the waiter on the global executor.
     // TODO: allow waiters to fill in a suggested executor
-    swift_task_enqueueGlobal(waitingTask);
+    waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
 
     // Move to the next task.
     waitingTask = nextWaitingTask;
@@ -222,18 +294,40 @@ static void destroyJob(SWIFT_CONTEXT HeapObject *obj) {
 }
 
 AsyncTask::~AsyncTask() {
+  flagAsCompleted();
+
   // For a future, destroy the result.
   if (isFuture()) {
     futureFragment()->destroy();
   }
 
   Private.destroy();
+
+  concurrency::trace::task_destroy(this);
+}
+
+void AsyncTask::setTaskId() {
+  static std::atomic<uint64_t> NextId(1);
+
+  // We want the 32-bit Job::Id to be non-zero, so loop if we happen upon zero.
+  uint64_t Fetched;
+  do {
+    Fetched = NextId.fetch_add(1, std::memory_order_relaxed);
+    Id = Fetched & 0xffffffff;
+  } while (Id == 0);
+
+  _private().Id = (Fetched >> 32) & 0xffffffff;
+}
+
+uint64_t AsyncTask::getTaskId() {
+  // Reconstitute a full 64-bit task ID from the 32-bit job ID and the upper
+  // 32 bits held in _private().
+  return (uint64_t)Id << _private().Id;
 }
 
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
-
   task->~AsyncTask();
 
   // The task execution itself should always hold a reference to it, so
@@ -242,19 +336,21 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // the task-local allocator.  There's actually nothing else to clean up
   // here.
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] destroy task %p\n", _swift_get_thread_id(), task);
-#endif
+  SWIFT_TASK_DEBUG_LOG("destroy task %p", task);
   free(task);
 }
 
 static ExecutorRef executorForEnqueuedJob(Job *job) {
+#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
+  return ExecutorRef::generic();
+#else
   void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
   if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
     return ExecutorRef::generic();
   else
     return ExecutorRef::forOrdinary(reinterpret_cast<HeapObject*>(jobQueue),
                     _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+#endif
 }
 
 static void jobInvoke(void *obj, void *unused, uint32_t flags) {
@@ -317,9 +413,7 @@ static void completeTaskImpl(AsyncTask *task,
 
   task->Private.complete(task);
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] task %p completed\n", _swift_get_thread_id(), task);
-#endif
+  SWIFT_TASK_DEBUG_LOG("task %p completed", task);
 
   // Complete the future.
   // Warning: This deallocates the task in case it's an async let task.
@@ -373,7 +467,7 @@ static void completeTaskWithClosure(SWIFT_ASYNC_CONTEXT AsyncContext *context,
       reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
 
   swift_release((HeapObject *)asyncContextPrefix->closureContext);
-  
+
   // Clean up the rest of the task.
   return completeTaskAndRelease(context, error);
 }
@@ -410,18 +504,80 @@ task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   return _context->ResumeParent(_context->Parent);
 }
 
+const void *const swift::_swift_concurrency_debug_non_future_adapter =
+    reinterpret_cast<void *>(non_future_adapter);
+const void *const swift::_swift_concurrency_debug_future_adapter =
+    reinterpret_cast<void *>(future_adapter);
+const void
+    *const swift::_swift_concurrency_debug_task_wait_throwing_resume_adapter =
+        reinterpret_cast<void *>(task_wait_throwing_resume_adapter);
+const void
+    *const swift::_swift_concurrency_debug_task_future_wait_resume_adapter =
+        reinterpret_cast<void *>(task_future_wait_resume_adapter);
+
+const void *AsyncTask::getResumeFunctionForLogging() {
+  const void *result = reinterpret_cast<const void *>(ResumeTask);
+
+  if (ResumeTask == non_future_adapter) {
+    auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
+        reinterpret_cast<char *>(ResumeContext) - sizeof(AsyncContextPrefix));
+    result =
+        reinterpret_cast<const void *>(asyncContextPrefix->asyncEntryPoint);
+  } else if (ResumeTask == future_adapter) {
+    auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
+        reinterpret_cast<char *>(ResumeContext) -
+        sizeof(FutureAsyncContextPrefix));
+    result =
+        reinterpret_cast<const void *>(asyncContextPrefix->asyncEntryPoint);
+  } else if (ResumeTask == task_wait_throwing_resume_adapter) {
+    auto context = static_cast<TaskFutureWaitAsyncContext *>(ResumeContext);
+    result = reinterpret_cast<const void *>(context->ResumeParent);
+  } else if (ResumeTask == task_future_wait_resume_adapter) {
+    result = reinterpret_cast<const void *>(ResumeContext->ResumeParent);
+  }
+
+  return __ptrauth_swift_runtime_function_entry_strip(result);
+}
+
+JobPriority swift::swift_task_currentPriority(AsyncTask *task)
+{
+  // This is racey but this is to be used in an API is inherently racey anyways.
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  return oldStatus.getStoredPriority();
+}
+
+JobPriority swift::swift_task_basePriority(AsyncTask *task)
+{
+  JobPriority pri = task->_private().BasePriority;
+  SWIFT_TASK_DEBUG_LOG("Task %p has base priority = %zu", task, pri);
+  return pri;
+}
+
+static inline bool isUnspecified(JobPriority priority) {
+  return priority == JobPriority::Unspecified;
+}
+
+static inline bool taskIsUnstructured(JobFlags jobFlags) {
+  return !jobFlags.task_isAsyncLetTask() && !jobFlags.task_isGroupChildTask();
+}
+
+static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags) {
+  return taskIsUnstructured(jobFlags) && !createFlags.copyTaskLocals();
+}
+
 /// Implementation of task creation.
 SWIFT_CC(swift)
 static AsyncTaskAndContext swift_task_create_commonImpl(
     size_t rawTaskCreateFlags,
     TaskOptionRecord *options,
     const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, void *closureContext,
+    TaskContinuationFunction *function, void *closureContext,
     size_t initialContextSize) {
+
   TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
+  JobFlags jobFlags(JobKind::Task, JobPriority::Unspecified);
 
   // Propagate task-creation flags to job flags as appropriate.
-  JobFlags jobFlags(JobKind::Task, taskCreateFlags.getPriority());
   jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
   if (futureResultType) {
     jobFlags.task_setIsFuture(true);
@@ -432,6 +588,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   ExecutorRef executor = ExecutorRef::generic();
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
+  bool hasAsyncLetResultBuffer = false;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
     case TaskOptionRecordKind::Executor:
@@ -450,6 +607,19 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       jobFlags.task_setIsAsyncLetTask(true);
       jobFlags.task_setIsChildTask(true);
       break;
+
+    case TaskOptionRecordKind::AsyncLetWithBuffer:
+      auto *aletRecord = cast<AsyncLetWithBufferTaskOptionRecord>(option);
+      asyncLet = aletRecord->getAsyncLet();
+      // TODO: Actually digest the result buffer into the async let task
+      // context, so that we can emplace the eventual result there instead
+      // of in a FutureFragment.
+      hasAsyncLetResultBuffer = true;
+      assert(asyncLet && "Missing async let storage");
+
+      jobFlags.task_setIsAsyncLetTask(true);
+      jobFlags.task_setIsChildTask(true);
+      break;
     }
   }
 
@@ -460,24 +630,80 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   }
 
   AsyncTask *parent = nullptr;
+  AsyncTask *currentTask = swift_task_getCurrent();
   if (jobFlags.task_isChildTask()) {
-    parent = swift_task_getCurrent();
+    parent = currentTask;
     assert(parent != nullptr && "creating a child task with no active task");
   }
 
-  // Inherit the priority of the currently-executing task if unspecified and
-  // we want to inherit.
-  if (jobFlags.getPriority() == JobPriority::Unspecified &&
-      (jobFlags.task_isChildTask() || taskCreateFlags.inheritContext())) {
-    AsyncTask *currentTask = parent;
-    if (!currentTask)
-      currentTask = swift_task_getCurrent();
+  // Start with user specified priority at creation time (if any)
+  JobPriority basePriority = (taskCreateFlags.getRequestedPriority());
 
-    if (currentTask)
-      jobFlags.setPriority(currentTask->getPriority());
-    else
-      jobFlags.setPriority(swift_task_getCurrentThreadPriority());
+  if (taskIsDetached(taskCreateFlags, jobFlags)) {
+     SWIFT_TASK_DEBUG_LOG("Creating a detached task from %p", currentTask);
+    // Case 1: No priority specified
+    //    Base priority = UN
+    //    Escalated priority = UN
+    // Case 2: Priority specified
+    //    Base priority = user specified priority
+    //    Escalated priority = UN
+    //
+    // Task will be created with max priority = max(base priority, UN) = base
+    // priority. We shouldn't need to do any additional manipulations here since
+    // basePriority should already be the right value
+
+  } else if (taskIsUnstructured(jobFlags)) {
+     SWIFT_TASK_DEBUG_LOG("Creating an unstructured task from %p", currentTask);
+
+    if (isUnspecified(basePriority)) {
+      // Case 1: No priority specified
+      //    Base priority = Base priority of parent with a UI -> IN downgrade
+      //    Escalated priority = UN
+      if (currentTask) {
+        basePriority = currentTask->_private().BasePriority;
+      } else {
+        basePriority = swift_task_getCurrentThreadPriority();
+      }
+      basePriority = withUserInteractivePriorityDowngrade(basePriority);
+    } else {
+      // Case 2: User specified a priority
+      //    Base priority = user specified priority
+      //    Escalated priority = UN
+    }
+
+    // Task will be created with max priority = max(base priority, UN) = base
+    // priority
+  } else {
+    // Is a structured concurrency child task. Must have a parent.
+    assert((asyncLet || group) && parent);
+    SWIFT_TASK_DEBUG_LOG("Creating an structured concurrency task from %p", currentTask);
+
+    if (isUnspecified(basePriority)) {
+      // Case 1: No priority specified
+      //    Base priority = Base priority of parent with a UI -> IN downgrade
+      //    Escalated priority = Escalated priority of parent with a UI -> IN
+      //    downgrade
+      JobPriority parentBasePri = parent->_private().BasePriority;
+      basePriority = withUserInteractivePriorityDowngrade(parentBasePri);
+    } else {
+      // Case 2: User priority specified
+      //    Base priority = User specified priority
+      //    Escalated priority = Escalated priority of parent with a UI -> IN
+      //    downgrade
+    }
+
+    // Task will be created with escalated priority = base priority. We will
+    // update the escalated priority with the right rules in
+    // updateNewChildWithParentAndGroupState when we link the child into
+    // the parent task/task group since we'll have the right
+    // synchronization then.
   }
+
+  if (isUnspecified(basePriority)) {
+     basePriority = JobPriority::Default;
+  }
+
+  SWIFT_TASK_DEBUG_LOG("Task's base priority = %#zx", basePriority);
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -488,7 +714,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
   if (futureResultType) {
-    headerSize += FutureFragment::fragmentSize(futureResultType);
+    headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
     // Add the future async context prefix.
     headerSize += sizeof(FutureAsyncContextPrefix);
   } else {
@@ -504,20 +730,37 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   assert(amountToAllocate % MaximumAlignment == 0);
 
-  constexpr unsigned initialSlabSize = 512;
+  unsigned initialSlabSize = 512;
 
   void *allocation = nullptr;
   if (asyncLet) {
     assert(parent);
-    allocation = _swift_task_alloc_specific(parent,
-                                        amountToAllocate + initialSlabSize);
+
+    // If there isn't enough room in the fixed async let allocation to
+    // set up the initial context, then we'll have to allocate more space
+    // from the parent.
+    if (asyncLet->getSizeOfPreallocatedSpace() < amountToAllocate) {
+      hasAsyncLetResultBuffer = false;
+    }
+
+    // DEPRECATED. This is separated from the above condition because we
+    // also have to handle an older async let ABI that did not provide
+    // space for the initial slab in the compiler-generated preallocation.
+    if (!hasAsyncLetResultBuffer) {
+      allocation = _swift_task_alloc_specific(parent,
+                                          amountToAllocate + initialSlabSize);
+    } else {
+      allocation = asyncLet->getPreallocatedSpace();
+      assert(asyncLet->getSizeOfPreallocatedSpace() >= amountToAllocate
+             && "async let does not preallocate enough space for child task");
+      initialSlabSize = asyncLet->getSizeOfPreallocatedSpace()
+                          - amountToAllocate;
+    }
   } else {
     allocation = malloc(amountToAllocate);
   }
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] allocate task %p, parent = %p\n",
-          _swift_get_thread_id(), allocation, parent);
-#endif
+  SWIFT_TASK_DEBUG_LOG("allocate task %p, parent = %p, slab %u", allocation,
+                       parent, initialSlabSize);
 
   AsyncContext *initialContext =
     reinterpret_cast<AsyncContext*>(
@@ -554,34 +797,37 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
   AsyncTask *task = nullptr;
+  bool captureCurrentVoucher = !taskIsDetached(taskCreateFlags, jobFlags);
   if (asyncLet) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
     task = new(allocation) AsyncTask(&taskHeapMetadata,
                              InlineRefCounts::Immortal, jobFlags,
-                             function, initialContext);
+                             function, initialContext,
+                             captureCurrentVoucher);
   } else {
     task = new(allocation) AsyncTask(&taskHeapMetadata, jobFlags,
-                                    function, initialContext);
+                                    function, initialContext,
+                                    captureCurrentVoucher);
   }
 
   // Initialize the child fragment if applicable.
   if (parent) {
     auto childFragment = task->childFragment();
-    new (childFragment) AsyncTask::ChildFragment(parent);
+    ::new (childFragment) AsyncTask::ChildFragment(parent);
   }
 
   // Initialize the group child fragment if applicable.
   if (group) {
     auto groupChildFragment = task->groupChildFragment();
-    new (groupChildFragment) AsyncTask::GroupChildFragment(group);
+    ::new (groupChildFragment) AsyncTask::GroupChildFragment(group);
   }
-  
+
   // Initialize the future fragment if applicable.
   if (futureResultType) {
     assert(task->isFuture());
     auto futureFragment = task->futureFragment();
-    new (futureFragment) FutureFragment(futureResultType);
+    ::new (futureFragment) FutureFragment(futureResultType);
 
     // Set up the context for the future so there is no error, and a successful
     // result will be written into the future fragment's storage.
@@ -592,22 +838,22 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     futureAsyncContextPrefix->indirectResult = futureFragment->getStoragePtr();
   }
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] creating task %p with parent %p\n",
-          _swift_get_thread_id(), task, parent);
-#endif
+  SWIFT_TASK_DEBUG_LOG("creating task %p ID %" PRIu64
+                       " with parent %p at base pri %zu",
+                       task, task->getTaskId(), parent, basePriority);
 
   // Initialize the task-local allocator.
-  if (asyncLet) {
-    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-                                                   &completeTask);
+  initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+                            asyncLet       ? &completeTask
+                          : closureContext ? &completeTaskWithClosure
+                                           : &completeTaskAndRelease);
+  if (asyncLet && initialSlabSize > 0) {
     assert(parent);
     void *initialSlab = (char*)allocation + amountToAllocate;
-    task->Private.initializeWithSlab(task, initialSlab, initialSlabSize);
+    task->Private.initializeWithSlab(basePriority, initialSlab,
+                                     initialSlabSize);
   } else {
-    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-        closureContext ? &completeTaskWithClosure : &completeTaskAndRelease);
-    task->Private.initialize(task);
+    task->Private.initialize(basePriority);
   }
 
   // Perform additional linking between parent and child task.
@@ -632,8 +878,12 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // as if they might be null, even though the only time they ever might
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
-  initialContext->Flags = AsyncContextKind::Ordinary;
-  initialContext->Flags.setShouldNotDeallocateInCallee(true);
+
+  concurrency::trace::task_create(
+      task, parent, group, asyncLet,
+      static_cast<uint8_t>(task->Flags.getPriority()),
+      task->Flags.task_isChildTask(), task->Flags.task_isFuture(),
+      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask());
 
   // Attach to the group, if needed.
   if (group) {
@@ -647,13 +897,13 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // Push the async let task status record.
   if (asyncLet) {
-    asyncLet_addImpl(task, asyncLet);
+    asyncLet_addImpl(task, asyncLet, !hasAsyncLetResultBuffer);
   }
 
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
     swift_retain(task);
-    swift_task_enqueue(task, executor);
+    task->flagAsAndEnqueueOnExecutor(executor);
   }
 
   return {task, initialContext};
@@ -691,7 +941,8 @@ AsyncTaskAndContext swift::swift_task_create(
     >(closureEntry, closureContext);
 
   return swift_task_create_common(
-      taskCreateFlags, options, futureResultType, taskEntry, closureContext,
+      taskCreateFlags, options, futureResultType,
+      reinterpret_cast<TaskContinuationFunction *>(taskEntry), closureContext,
       initialContextSize);
 }
 
@@ -810,154 +1061,123 @@ void swift_task_future_wait_throwingImpl(
   }
 }
 
-namespace {
-
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-
-class RunAndBlockSemaphore {
-  bool Finished = false;
-public:
-  void wait() {
-    donateThreadToGlobalExecutorUntil([](void *context) {
-      return *reinterpret_cast<bool*>(context);
-    }, &Finished);
-
-    assert(Finished && "ran out of tasks before we were signalled");
-  }
-
-  void signal() {
-    Finished = true;
-  }
-};
-
-#else
-
-class RunAndBlockSemaphore {
-  ConditionVariable Queue;
-  ConditionVariable::Mutex Lock;
-  bool Finished = false;
-public:
-  /// Wait for a signal.
-  void wait() {
-    Lock.withLockOrWait(Queue, [&] {
-      return Finished;
-    });
-  }
-
-  void signal() {
-    Lock.withLockThenNotifyAll(Queue, [&]{
-      Finished = true;
-    });
-  }
-};
-
-#endif
-
-using RunAndBlockSignature =
-  AsyncSignature<void(HeapObject*), /*throws*/ false>;
-struct RunAndBlockContext: AsyncContext {
-  const void *Function;
-  HeapObject *FunctionContext;
-  RunAndBlockSemaphore *Semaphore;
-};
-using RunAndBlockCalleeContext =
-  AsyncCalleeContext<RunAndBlockContext, RunAndBlockSignature>;
-
-} // end anonymous namespace
-
-/// Second half of the runAndBlock async function.
-SWIFT_CC(swiftasync)
-static void runAndBlock_finish(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
-  auto calleeContext = static_cast<RunAndBlockCalleeContext*>(_context);
-
-  auto context = popAsyncContext(calleeContext);
-
-  context->Semaphore->signal();
-
-  return context->ResumeParent(context);
-}
-
-/// First half of the runAndBlock async function.
-SWIFT_CC(swiftasync)
-static void runAndBlock_start(SWIFT_ASYNC_CONTEXT AsyncContext *_context,
-                              SWIFT_CONTEXT HeapObject *closureContext) {
-  auto callerContext = static_cast<RunAndBlockContext*>(_context);
-
-  RunAndBlockSignature::FunctionType *function;
-  size_t calleeContextSize;
-  auto functionContext = callerContext->FunctionContext;
-  assert(closureContext == functionContext);
-  std::tie(function, calleeContextSize)
-    = getAsyncClosureEntryPointAndContextSize<
-      RunAndBlockSignature,
-      SpecialPointerAuthDiscriminators::AsyncRunAndBlockFunction
-    >(const_cast<void*>(callerContext->Function), functionContext);
-
-  auto calleeContext =
-    pushAsyncContext<RunAndBlockSignature>(callerContext,
-                                           calleeContextSize,
-                                           &runAndBlock_finish,
-                                           functionContext);
-  return reinterpret_cast<AsyncVoidClosureEntryPoint *>(function)(
-      calleeContext, functionContext);
-}
-
-// TODO: Remove this hack.
-void swift::swift_task_runAndBlockThread(const void *function,
-                                         HeapObject *functionContext) {
-  RunAndBlockSemaphore semaphore;
-
-  // Set up a task that runs the runAndBlock async function above.
-  auto flags = TaskCreateFlags();
-  flags.setPriority(JobPriority::Default);
-  auto pair = swift_task_create_common(
-      flags.getOpaqueValue(),
-      /*options=*/nullptr,
-      /*futureResultType=*/nullptr,
-      reinterpret_cast<ThinNullaryAsyncSignature::FunctionType *>(
-          &runAndBlock_start),
-      nullptr,
-      sizeof(RunAndBlockContext));
-  auto context = static_cast<RunAndBlockContext*>(pair.InitialContext);
-  context->Function = function;
-  context->FunctionContext = functionContext;
-  context->Semaphore = &semaphore;
-
-  // Enqueue the task.
-  swift_task_enqueueGlobal(pair.Task);
-
-  // Wait until the task completes.
-  semaphore.wait();
-}
-
 size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
 }
 
-AsyncTask *swift::swift_continuation_init(ContinuationAsyncContext *context,
-                                          AsyncContinuationFlags flags) {
-  context->Flags = AsyncContextKind::Continuation;
+SWIFT_CC(swift)
+static AsyncTask *swift_task_suspendImpl() {
+  auto task = _swift_task_clearCurrent();
+  task->flagAsSuspended();
+  return task;
+}
+
+SWIFT_CC(swift)
+static void
+swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task, ExecutorRef executor)
+{
+  task->flagAsAndEnqueueOnExecutor(executor);
+}
+
+SWIFT_CC(swift)
+static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
+                                              AsyncContinuationFlags flags) {
+  context->Flags = ContinuationAsyncContext::FlagsType();
   if (flags.canThrow()) context->Flags.setCanThrow(true);
+  if (flags.isExecutorSwitchForced())
+    context->Flags.setIsExecutorSwitchForced(true);
   context->ErrorResult = nullptr;
 
-  // Set the current executor as the target executor unless there's
+  // Set the generic executor as the target executor unless there's
   // an executor override.
   if (!flags.hasExecutorOverride())
-    context->ResumeToExecutor = swift_task_getCurrentExecutor();
+    context->ResumeToExecutor = ExecutorRef::generic();
 
   // We can initialize this with a relaxed store because resumption
   // must happen-after this call.
   context->AwaitSynchronization.store(flags.isPreawaited()
                                         ? ContinuationStatus::Awaited
-                                        : ContinuationStatus::Pending, 
+                                        : ContinuationStatus::Pending,
                                       std::memory_order_relaxed);
 
-  auto task = swift_task_getCurrent();
-  assert(task && "initializing a continuation with no current task");
+  AsyncTask *task;
+
+  // A preawait immediately suspends the task.
+  if (flags.isPreawaited()) {
+    task = _swift_task_clearCurrent();
+    assert(task && "initializing a continuation with no current task");
+    task->flagAsSuspended();
+  } else {
+    task = swift_task_getCurrent();
+    assert(task && "initializing a continuation with no current task");
+  }
+
   task->ResumeContext = context;
   task->ResumeTask = context->ResumeParent;
 
+  concurrency::trace::task_continuation_init(task, context);
+
   return task;
+}
+
+SWIFT_CC(swiftasync)
+static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
+#ifndef NDEBUG
+  auto task = swift_task_getCurrent();
+  assert(task && "awaiting continuation without a task");
+  assert(task->ResumeContext == context);
+  assert(task->ResumeTask == context->ResumeParent);
+#endif
+
+  concurrency::trace::task_continuation_await(context);
+
+  auto &sync = context->AwaitSynchronization;
+
+  auto oldStatus = sync.load(std::memory_order_acquire);
+  assert((oldStatus == ContinuationStatus::Pending ||
+          oldStatus == ContinuationStatus::Resumed) &&
+         "awaiting a corrupt or already-awaited continuation");
+
+  // If the status is already Resumed, we can resume immediately.
+  // Comparing against Pending may be very slightly more compact.
+  if (oldStatus != ContinuationStatus::Pending) {
+    if (context->isExecutorSwitchForced())
+      return swift_task_switch(context, context->ResumeParent,
+                               context->ResumeToExecutor);
+    return context->ResumeParent(context);
+  }
+
+  // Load the current task (we already did this in assertions builds).
+#ifdef NDEBUG
+  auto task = swift_task_getCurrent();
+#endif
+
+  // Flag the task as suspended.
+  task->flagAsSuspended();
+
+  // Try to transition to Awaited.
+  bool success =
+    sync.compare_exchange_strong(oldStatus, ContinuationStatus::Awaited,
+                                 /*success*/ std::memory_order_release,
+                                 /*failure*/ std::memory_order_acquire);
+
+  // If that succeeded, we have nothing to do.
+  if (success) {
+    _swift_task_clearCurrent();
+    return;
+  }
+
+  // If it failed, it should be because someone concurrently resumed
+  // (note that the compare-exchange above is strong).
+  assert(oldStatus == ContinuationStatus::Resumed &&
+         "continuation was concurrently corrupted or awaited");
+
+  // Restore the running state of the task and resume it.
+  task->flagAsRunning();
+  if (context->isExecutorSwitchForced())
+    return swift_task_switch(context, context->ResumeParent,
+                             context->ResumeToExecutor);
+  return context->ResumeParent(context);
 }
 
 static void resumeTaskAfterContinuation(AsyncTask *task,
@@ -991,18 +1211,20 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
   // to make a stronger best-effort attempt to catch racing attempts to
   // resume the continuation?
 
-  swift_task_enqueue(task, context->ResumeToExecutor);
+  task->flagAsAndEnqueueOnExecutor(context->ResumeToExecutor);
 }
 
 SWIFT_CC(swift)
 static void swift_continuation_resumeImpl(AsyncTask *task) {
-  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
+  auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
+  concurrency::trace::task_continuation_resume(context, false);
   resumeTaskAfterContinuation(task, context);
 }
 
 SWIFT_CC(swift)
 static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
-  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
+  auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
+  concurrency::trace::task_continuation_resume(context, false);
   resumeTaskAfterContinuation(task, context);
 }
 
@@ -1010,7 +1232,8 @@ static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
 SWIFT_CC(swift)
 static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
                                                 /* +1 */ SwiftError *error) {
-  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
+  auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
+  concurrency::trace::task_continuation_resume(context, true);
   context->ErrorResult = error;
   resumeTaskAfterContinuation(task, context);
 }
@@ -1027,17 +1250,30 @@ swift_task_addCancellationHandlerImpl(
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
   auto unsigned_handler = swift_auth_code(handler, 3848);
-  auto *record = new (allocation)
+  auto *record = ::new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
-  swift_task_addStatusRecord(record);
+  bool fireHandlerNow = false;
+
+  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+    if (parentStatus.isCancelled()) {
+      fireHandlerNow = true;
+      // We don't fire the cancellation handler here since this function needs
+      // to be idempotent
+    }
+    return true;
+  });
+
+  if (fireHandlerNow) {
+    record->run();
+  }
   return record;
 }
 
 SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
-  swift_task_removeStatusRecord(record);
+  removeStatusRecord(record);
   swift_task_dealloc(record);
 }
 
@@ -1049,7 +1285,7 @@ swift_task_createNullaryContinuationJobImpl(
   void *allocation =
       swift_task_alloc(sizeof(NullaryContinuationJob));
   auto *job =
-      new (allocation) NullaryContinuationJob(
+      ::new (allocation) NullaryContinuationJob(
         swift_task_getCurrent(), static_cast<JobPriority>(priority),
         continuation);
 
@@ -1061,32 +1297,36 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }
 
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 SWIFT_CC(swift)
 static void swift_task_asyncMainDrainQueueImpl() {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   bool Finished = false;
-  donateThreadToGlobalExecutorUntil([](void *context) {
+  swift_task_donateThreadToGlobalExecutorUntil([](void *context) {
     return *reinterpret_cast<bool*>(context);
   }, &Finished);
+#elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
+  // FIXME: consider implementing a concurrent global main queue for
+  // these environments?
+  swift_reportError(0, "operation unsupported without libdispatch: "
+                       "swift_task_asyncMainDrainQueue");
 #else
 #if defined(_WIN32)
-  static void(FAR *pfndispatch_main)(void) = NULL;
-
-  if (pfndispatch_main)
-    return pfndispatch_main();
-
   HMODULE hModule = LoadLibraryW(L"dispatch.dll");
-  if (hModule == NULL)
-    abort();
+  if (hModule == NULL) {
+    swift_Concurrency_fatalError(0,
+      "unable to load dispatch.dll: %lu", GetLastError());
+  }
 
-  pfndispatch_main =
-      reinterpret_cast<void (FAR *)(void)>(GetProcAddress(hModule,
-                                                          "dispatch_main"));
-  if (pfndispatch_main == NULL)
-    abort();
+  auto pfndispatch_main = reinterpret_cast<void (FAR *)(void)>(
+    GetProcAddress(hModule, "dispatch_main"));
+  if (pfndispatch_main == NULL) {
+    swift_Concurrency_fatalError(0,
+      "unable to locate dispatch_main in dispatch.dll: %lu", GetLastError());
+  }
 
   pfndispatch_main();
-  exit(0);
+  swift_unreachable("Returned from dispatch_main()");
 #else
   // CFRunLoop is not available on non-Darwin targets.  Foundation has an
   // implementation, but CoreFoundation is not meant to be exposed.  We can only

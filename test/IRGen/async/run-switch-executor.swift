@@ -1,15 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -g -parse-as-library -module-name main -o %t/main
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking %s -g -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // FIXME: both of these should work, need to figure out why
 // UNSUPPORTED: CPU=arm64e
-// UNSUPPORTED: OS=windows-msvc
 
 // REQUIRES: rdar72893124
 

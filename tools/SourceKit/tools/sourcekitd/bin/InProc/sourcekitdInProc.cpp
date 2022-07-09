@@ -80,6 +80,13 @@ static std::string getRuntimeLibPath() {
   return libPath.str().str();
 }
 
+static std::string getSwiftExecutablePath() {
+  llvm::SmallString<128> path;
+  getToolchainPrefixPath(path);
+  llvm::sys::path::append(path, "bin", "swift-frontend");
+  return path.str().str();
+}
+
 static std::string getDiagnosticDocumentationPath() {
   llvm::SmallString<128> docPath;
   getToolchainPrefixPath(docPath);
@@ -90,7 +97,7 @@ static std::string getDiagnosticDocumentationPath() {
 void sourcekitd_initialize(void) {
   if (sourcekitd::initializeClient()) {
     LOG_INFO_FUNC(High, "initializing");
-    sourcekitd::initializeService(getRuntimeLibPath(),
+    sourcekitd::initializeService(getSwiftExecutablePath(), getRuntimeLibPath(),
                                   getDiagnosticDocumentationPath(),
                                   postNotification);
   }
@@ -111,14 +118,25 @@ void sourcekitd::set_interrupted_connection_handler(
 // sourcekitd_request_sync
 //===----------------------------------------------------------------------===//
 
+/// Create a new SourceKit request handle. Each call of this method is
+/// guaranteed to return a new, unique handle.
+static sourcekitd_request_handle_t create_request_handle(void) {
+  static std::atomic<size_t> handle(1);
+  return reinterpret_cast<sourcekitd_request_handle_t>(
+      handle.fetch_add(1, std::memory_order_relaxed));
+}
+
 sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
   Semaphore sema(0);
 
   sourcekitd_response_t ReturnedResp;
-  sourcekitd::handleRequest(req, [&](sourcekitd_response_t resp) {
-    ReturnedResp = resp;
-    sema.signal();
-  });
+  // If the request runs sequentially, the client doesn't have a chance to
+  // cancel it.
+  sourcekitd::handleRequest(req, /*CancellationToken=*/nullptr,
+                            [&](sourcekitd_response_t resp) {
+                              ReturnedResp = resp;
+                              sema.signal();
+                            });
 
   sema.wait();
   return ReturnedResp;
@@ -127,22 +145,32 @@ sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
 void sourcekitd_send_request(sourcekitd_object_t req,
                              sourcekitd_request_handle_t *out_handle,
                              sourcekitd_response_receiver_t receiver) {
-  // FIXME: Implement request handle.
+  sourcekitd_request_handle_t request_handle = nullptr;
+  if (out_handle) {
+    request_handle = create_request_handle();
+    *out_handle = request_handle;
+  }
 
   sourcekitd_request_retain(req);
   receiver = Block_copy(receiver);
-  WorkQueue::dispatchConcurrent([=]{
-    sourcekitd::handleRequest(req, [=](sourcekitd_response_t resp) {
-      // The receiver accepts ownership of the response.
-      receiver(resp);
-      Block_release(receiver);
-    });
+  WorkQueue::dispatchConcurrent([=] {
+    sourcekitd::handleRequest(req, /*CancellationToken=*/request_handle,
+                              [=](sourcekitd_response_t resp) {
+                                // The receiver accepts ownership of the
+                                // response.
+                                receiver(resp);
+                                Block_release(receiver);
+                              });
     sourcekitd_request_release(req);
   });
 }
 
 void sourcekitd_cancel_request(sourcekitd_request_handle_t handle) {
-  // FIXME: Implement cancelling.
+  sourcekitd::cancelRequest(/*CancellationToken=*/handle);
+}
+
+void sourcekitd_request_handle_dispose(sourcekitd_request_handle_t handle) {
+  sourcekitd::disposeCancellationToken(/*CancellationToken=*/handle);
 }
 
 void

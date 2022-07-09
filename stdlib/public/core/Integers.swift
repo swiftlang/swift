@@ -258,7 +258,7 @@ public protocol Numeric: AdditiveArithmetic, ExpressibleByIntegerLiteral {
   static func *=(lhs: inout Self, rhs: Self)
 }
 
-/// A type that can represent both positive and negative values.
+/// A numeric type with a negation operation.
 ///
 /// The `SignedNumeric` protocol extends the operations defined by the
 /// `Numeric` protocol to include a value's additive inverse.
@@ -2036,7 +2036,7 @@ where Magnitude: FixedWidthInteger & UnsignedInteger,
   ///     // result.low  == 128
   ///
   /// The product of `x` and `y` is `-1920`, which is too large to represent in
-  /// an `Int8` instance. The `high` and `low` compnents of the `result` value
+  /// an `Int8` instance. The `high` and `low` components of the `result` value
   /// represent `-1920` when concatenated to form a double-width integer; that
   /// is, using `result.high` as the high byte and `result.low` as the low byte
   /// of an `Int16` instance.
@@ -3502,8 +3502,19 @@ extension UnsignedInteger where Self: FixedWidthInteger {
 
 /// An integer type that can represent both positive and negative values.
 public protocol SignedInteger: BinaryInteger, SignedNumeric {
-  // These requirements are for the source code compatibility with Swift 3
+  // These requirements are needed for binary compatibility; the following:
+  //
+  // func foo<T>(_ a: T) -> T
+  // where T: SignedInteger & FixedWidthInteger {
+  //   a &+ 1
+  // }
+  //
+  // generated a call to `static Swift.SignedInteger._maskingAdd(A, A) -> A`
+  // when compiled with Swift 5.5 and earlier.
+  @available(*, deprecated, message: "Use &+ instead.")
   static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
+  
+  @available(*, deprecated, message: "Use &- instead.")
   static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
 }
 
@@ -3629,49 +3640,48 @@ public func numericCast<T: BinaryInteger, U: BinaryInteger>(_ x: T) -> U {
   return U(x)
 }
 
-// FIXME(integers): Absence of &+ causes ambiguity in the code like the
-// following:
-//    func f<T: SignedInteger>(_ x: T, _ y: T) {
-//      var _  = (x &+ (y - 1)) < x
-//    }
-//  Compiler output:
-//  error: ambiguous reference to member '-'
-//    var _  = (x &+ (y - 1)) < x
-//                      ^
+// Needed to support user-defined types conformance to SignedInteger.
+// We need these defaults to exist, but they are not called.
 extension SignedInteger {
-  @_transparent
+  @available(*, deprecated, message: "Use &+ instead.")
   public static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self {
     fatalError("Should be overridden in a more specific type")
   }
-
-  @_transparent
+  
+  @available(*, deprecated, message: "Use &- instead.")
   public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
     fatalError("Should be overridden in a more specific type")
   }
 }
 
+// These symbols have to exist for ABI compatibility, but should not be used
+// any longer; we want to find the FixedWidthInteger definitions instead.
 extension SignedInteger where Self: FixedWidthInteger {
-  // This overload is supposed to break the ambiguity between the
-  // implementations on SignedInteger and FixedWidthInteger
-  @_transparent
-  public static func &+ (lhs: Self, rhs: Self) -> Self {
-    return _maskingAdd(lhs, rhs)
+  @available(*, unavailable)
+  public static func &+(lhs: Self, rhs: Self) -> Self {
+    lhs.addingReportingOverflow(rhs).partialValue
   }
-
-  @_transparent
+  
+  // This may be called in rare situations by binaries compiled with
+  // Swift 5.5 and earlier, so we need to keep it around for compatibility.
+  // We can't mark it unavailable, because then the concrete signed integer
+  // types in the standard library would not satisfy the protocol requirements.
+  @available(*, deprecated, message: "Use &+ instead.")
   public static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self {
-    return lhs.addingReportingOverflow(rhs).partialValue
+    lhs.addingReportingOverflow(rhs).partialValue
   }
 
-  // This overload is supposed to break the ambiguity between the
-  // implementations on SignedInteger and FixedWidthInteger
-  @_transparent
-  public static func &- (lhs: Self, rhs: Self) -> Self {
-    return _maskingSubtract(lhs, rhs)
+  @available(*, unavailable)
+  public static func &-(lhs: Self, rhs: Self) -> Self {
+    lhs.subtractingReportingOverflow(rhs).partialValue
   }
-
-  @_transparent
+  
+  // This may be called in rare situations by binaries compiled with
+  // Swift 5.5 and earlier, so we need to keep it around for compatibility.
+  // We can't mark it unavailable, because then the concrete signed integer
+  // types in the standard library would not satisfy the protocol requirements.
+  @available(*, deprecated, message: "Use &- instead.")
   public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
-    return lhs.subtractingReportingOverflow(rhs).partialValue
+    lhs.subtractingReportingOverflow(rhs).partialValue
   }
 }

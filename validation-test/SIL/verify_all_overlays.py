@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # RUN: ${python} %s %target-swiftmodule-name %platform-sdk-overlay-dir \
 # RUN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
 # RUN:       -F %sdk/System/Library/PrivateFrameworks \
@@ -7,8 +7,6 @@
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
-
-from __future__ import print_function
 
 import os
 import subprocess
@@ -25,6 +23,10 @@ for module_file in os.listdir(sdk_overlay_dir):
     # Skip the standard library because it's tested elsewhere.
     if module_name == "Swift":
         continue
+    # Skip the C++ standard library overlay because it's not yet shipped
+    # in any released SDK.
+    if module_name == "std":
+        continue
     # TODO(TF-1229): Fix the "_Differentiation" module.
     if module_name == "_Differentiation":
         continue
@@ -39,7 +41,7 @@ for module_file in os.listdir(sdk_overlay_dir):
 
     # llvm-bcanalyzer | not grep Unknown
     bcanalyzer_output = subprocess.check_output(["llvm-bcanalyzer",
-                                                 module_path])
+                                                 module_path]).decode("utf-8")
     if "Unknown" in bcanalyzer_output:
         print(bcanalyzer_output)
         sys.exit(1)

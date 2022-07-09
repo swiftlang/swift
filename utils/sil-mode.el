@@ -58,10 +58,9 @@
 
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
-                    "alloc_value_buffer" "alloc_global"
+                    "alloc_global"
                     "dealloc_stack" "dealloc_box" "project_box" "dealloc_ref"
-                    "dealloc_partial_ref" "dealloc_value_buffer"
-                    "project_value_buffer")
+                    "dealloc_partial_ref")
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Debug Information.
@@ -124,7 +123,8 @@
                     "unmanaged_retain_value" "unmanaged_release_value"
                     "unmanaged_autorelease_value"
                     "strong_copy_unowned_value" "strong_copy_unmanaged_value"
-                    "destructure_struct" "destructure_tuple")
+                    "destructure_struct" "destructure_tuple" "move_value"
+                    "explicit_copy_value")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
    ;; swift declaration as well handled at the top.
@@ -155,7 +155,6 @@
                     "unowned_to_ref" "ref_to_unowned"
                     "convert_function" "convert_escape_to_noescape"
                     "ref_to_unmanaged" "unmanaged_to_ref"
-                    "thin_function_to_pointer" "pointer_to_thin_function"
                     "ref_to_bridge_object"
                     "bridge_object_to_word" "bridge_object_to_ref"
                     "thin_to_thick_function"

@@ -29,8 +29,11 @@ In contrast to LLVM IR, SIL is a generally target-independent format
 representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
-For more information on developing the implementation of SIL and SIL passes, see
-`SILProgrammersManual.md <SILProgrammersManual.md>`_.
+For more information on developing the implementation of SIL and SIL passes, see:
+
+- `SILProgrammersManual.md <SILProgrammersManual.md>`_.
+- `SILFunctionConventions.md <SILFunctionConventions.md>`_.
+- `SILMemoryAccess.md <SILMemoryAccess.md>`_.
 
 SIL in the Swift Compiler
 -------------------------
@@ -1087,6 +1090,30 @@ from the command line.
 The specified memory effects of the function.
 ::
 
+  sil-function-attribute ::= '[' 'escapes' escape-list ']'
+  sil-function-attribute ::= '[' 'defined_escapes' escape-list ']'
+  escape-list ::= (escape-list ',')? escape
+  escape ::= '!' arg-selection                 // not-escaping
+  escape ::= arg-selection '=>' arg-selection  // exclusive escaping
+  escape ::= arg-selection '->' arg-selection  // not-exclusive escaping
+  arg-selection ::= arg-or-return ('.' projection-path)?
+  arg-or-return ::= '%' [0-9]+
+  arg-or-return ::= '%r'
+  projection-path ::= (projection-path '.')? path-component
+  path-component ::= 's' [0-9]+        // struct field
+  path-component ::= 'c' [0-9]+        // class field
+  path-component ::= 'ct'              // class tail element
+  path-component ::= 'e' [0-9]+        // enum case
+  path-component ::= [0-9]+            // tuple element
+  path-component ::= 'v**'             // any value fields
+  path-component ::= 'c*'              // any class field
+  path-component ::= '**'              // anything
+
+The escaping effects for function arguments. For details see the documentation
+in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
+
+::
+
   sil-function-attribute ::= '[_semantics "' [A-Za-z._0-9]+ '"]'
 
 The specified high-level semantics of the function. The optimizer can use this
@@ -1104,6 +1131,15 @@ Specifies for which types specialized code should be generated.
   sil-function-attribute ::= '[clang "' identifier '"]'
 
 The clang node owner.
+::
+
+  sil-function-attribute ::= '[' performance-constraint ']'
+  performance-constraint :: 'no_locks'
+  performance-constraint :: 'no_allocation'
+
+Specifies the performance constraints for the function, which defines which type
+of runtime functions are allowed to be called from the function.
+
 
 Basic Blocks
 ~~~~~~~~~~~~
@@ -1712,7 +1748,7 @@ with partitioned defs/uses annotated inline::
     return %kls1Casted : $SuperKlass
   }
 
-Notice how every value in the SIL above has a partionable set of uses with
+Notice how every value in the SIL above has a partitionable set of uses with
 normal uses always before consuming uses. Any such violations of ownership
 semantics would trigger a SILVerifier error allowing us to know that we
 do not have any leaks or use-after-frees in the above code.
@@ -1766,7 +1802,7 @@ This lattice is applied to SIL by requiring well formed SIL to:
    the same for all instances of an instruction) or dynamic (e.x.: forwarding
    instructions set their ownership upon construction). We call this subset of
    OwnershipKind to be the set of `Value Ownership Kind`_: `None`_, `Unowned`_,
-   `Guaranteed`_, `Owned`_ (note conspiciously missing `Any`). This is because
+   `Guaranteed`_, `Owned`_ (note conspicuously missing `Any`). This is because
    in our model `Any` represents an unknown ownership semantics and since our
    model is strict, we do not allow for values to have unknown ownership.
 
@@ -2029,7 +2065,7 @@ called a "forwarding instruction" and any use with such a user instruction a
 "forwarding use". This inference generally occurs upon instruction construction
 and as a result:
 
-* When manipulating forwarding instructions programatically, one must manually
+* When manipulating forwarding instructions programmatically, one must manually
   update their forwarded ownership since most of the time the ownership is
   stored in the instruction itself. Don't worry though because the SIL verifier
   will catch this error for you if you forget to do so!
@@ -2039,7 +2075,7 @@ and as a result:
   parsed operand.
   In some cases the forwarding ownership kind is different from the ownership kind
   of its operand. In such cases, textual SIL represents the forwarding ownership kind
-  explicity.
+  explicitly.
   Eg: ::
 
     %cast = unchecked_ref_cast %val : $Klass to $Optional<Klass>, forwarding: @unowned
@@ -2132,7 +2168,7 @@ payload from an enum, can consume the entire enum+payload.
 
 To handle cases where we want to use `struct_extract`_ in a consuming way, we
 instead are able to use the `destructure_struct`_ instruction that consumes the
-entire struct at once and gives one back the structs individual constituant
+entire struct at once and gives one back the structs individual constituent
 parts::
 
      struct KlassPair {
@@ -2156,6 +2192,26 @@ parts::
        // Then return %1 to our caller
        return %1 : $Klass
      }
+
+Forwarding Address-Only Values
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Address-only values are potentially unmovable when borrowed. This
+means that they cannot be forwarded with guaranteed ownership unless
+the forwarded value has the same representation as in the original
+value and can reuse the same storage. Non-destructive projection is
+allowed, such as `struct_extract`. Aggregation, such as `struct`, and
+destructive disaggregation, such as `switch_enum` is not allowed. This
+is an invariant for OSSA with opaque SIL values for these reasons:
+
+1. To avoid implicit semantic copies. For move-only values, this allows
+complete diagnostics. And in general, it makes it impossible for SIL
+passes to "accidentally" create copies.
+
+2. To reuse borrowed storage. This allows the optimizer to share the same
+storage for multiple exclusive reads of the same variable, avoiding
+copies. It may also be necessary to support native Swift atomics, which
+will be unmovable-when-borrowed.
 
 Borrowed Object based Safe Interior Pointers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2226,7 +2282,7 @@ classify uses directly. Instead the verifier:
 Note that typically instructions in category (1) are instructions whose uses do
 not propagate the pointer value, so they are safe. In contrast, some other
 instructions in category (1) are escaping uses of the address such as
-`pointer_to_address`_. Those uses are unsafe--the user is reponsible for
+`pointer_to_address`_. Those uses are unsafe--the user is responsible for
 managing unsafe pointer lifetimes and the compiler must not extend those pointer
 lifetimes.
 
@@ -2328,6 +2384,69 @@ The current list of interior pointer SIL instructions are:
 (*) We still need to finish adding support for project_box, but all other
 interior pointers are guarded already.
 
+Variable Lifetimes
+~~~~~~~~~~~~~~~~~~
+
+In order for programmer intended lifetimes to be maintained under optimization,
+the lifetimes of SIL values which correspond to named source-level values can
+only be modified in limited ways.  Generally, the behavior is that the lifetime
+of a named source-level value cannot _observably_ end before the end of the
+lexical scope in which that value is defined.  Specifically, code motion may
+not move the ends of these lifetimes across a **deinit barrier**.
+
+A few sorts of SIL value have lifetimes that are constrained that way:
+
+1: `begin_borrow [lexical]`
+2: `move_value [lexical]`
+3: @owned function arguments
+4: `alloc_stack [lexical]`
+
+That these three have constrained lifetimes is encoded in ValueBase::isLexical,
+which should be checked before changing the lifetime of a value.
+
+The reason that only @owned function arguments are constrained is that a
+@guaranteed function argument is guaranteed by the function's caller to live for
+the full duration of the function already.  Optimization of the function alone
+can't shorten it.  When such a function is inlined into its caller, though, a
+lexical borrow scope is added for each of its @guaranteed arguments, ensuring
+that the lifetime of the corresponding source-level value is not shortened in a
+way that doesn't respect deinit barriers.
+
+Unlike the other sorts, `alloc_stack [lexical]` isn't a SILValue.  Instead, it
+constrains the lifetime of an addressable variable.  Since the constraint is
+applied to the in-memory representation, no additional lexical SILValue is
+required.
+
+Deinit Barriers
+```````````````
+
+Deinit barriers (see swift::isDeinitBarrier) are instructions which would be
+affected by the side effects of deinitializers.  To maintain the order of
+effects that is visible to the programmer, destroys of lexical values cannot be
+reordered with respect to them.  There are three kinds:
+
+1. synchronization points (locks, memory barriers, syscalls, etc.)
+2. loads of weak or unowned values
+3. accesses of pointers
+
+Examples:
+
+1. Given an instance of a class which owns a file handle and closes the file
+   handle on deinit, writing to the file handle and then deallocating the
+   instance would result in changes being written.  If the destroy of the
+   instance were hoisted above the call to write to the file handle, an error
+   would be raised instead.
+2. Given an instance `c` of a class `C` which weakly references an instance `d`
+   of a second class `D`, if `d` is referenced via a local variable `v`, then
+   loading that weak reference from `c` within the variable scope should return
+   a non-nil reference to `d`.  Hoisting the destroy of `v` above the weak load
+   from `c`, however, would result in the destruction of `d` before that load
+   and a nil weak reference to `D`.
+3. Given an instance of a class which owns a buffer and deallocates it on
+   deinitialization, accessing the pointer and then deallocating the instance
+   is defined behavior.  Hoisting the destroy of the instance above the access
+   to the memory would result in accessing a freed pointer.
+
 Memory Lifetime
 ~~~~~~~~~~~~~~~
 
@@ -2396,7 +2515,7 @@ blocks. Operationally, this implies that:
   terminate in a `return`_ or `throw`_. In contrast, a SIL value does not need to
   have a lifetime ending use along paths that end in an `unreachable`_.
 
-* `end_borrow`_ and `destroy_value`_ are redundent, albeit legal, in blocks
+* `end_borrow`_ and `destroy_value`_ are redundant, albeit legal, in blocks
   where all paths through the block end in an `unreachable`_.
 
 Consider the following legal SIL where we leak ``%0`` in blocks prefixed with
@@ -2444,7 +2563,7 @@ Consider the following legal SIL where we leak ``%0`` in blocks prefixed with
     // This block is also live, but since we do not return %0, we must insert a
     // destroy_value to cleanup %0.
     //
-    // NOTE: The copy_value/destroy_value here is redundent and can be removed by
+    // NOTE: The copy_value/destroy_value here is redundant and can be removed by
     // the optimizer. The author left it in for illustrative purposes.
     %1 = copy_value %0 : $Klass
     destroy_value %0 : $Klass
@@ -3079,7 +3198,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? '[lexical]'? '[moved]'? sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -3101,6 +3220,15 @@ deallocated in last-in, first-out stack order.
 The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
+
+The optional ``lexical`` attribute specifies that the storage corresponds to a
+local variable in the Swift source.
+
+The optional ``moved`` attribute specifies that at the source level, the
+variable associated with this alloc_stack was moved and furthermore that at the
+SIL level it passed move operator checking. This means that one can not assume
+that the value in the alloc_stack can be semantically valid over the entire
+function frame when emitting debug info.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
@@ -3128,8 +3256,8 @@ optional ``objc`` attribute indicates that the object should be
 allocated using Objective-C's allocation methods (``+allocWithZone:``).
 
 The optional ``stack`` attribute indicates that the object can be allocated
-on the stack instead on the heap. In this case the instruction must have
-balanced with a ``dealloc_ref [stack]`` instruction to mark the end of the
+on the stack instead on the heap. In this case the instruction must be
+balanced with a ``dealloc_stack_ref`` instruction to mark the end of the
 object's lifetime.
 Note that the ``stack`` attribute only specifies that stack allocation is
 possible. The final decision on stack allocation is done during llvm IR
@@ -3191,23 +3319,6 @@ count of zero destroys the contained value as if by ``destroy_addr``.
 Releasing a box is undefined behavior if the box's value is uninitialized.
 To deallocate a box whose value has not been initialized, ``dealloc_box``
 should be used.
-
-alloc_value_buffer
-``````````````````
-
-::
-
-   sil-instruction ::= 'alloc_value_buffer' sil-type 'in' sil-operand
-
-   %1 = alloc_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-   // The result has type $*(Int, T).
-
-Given the address of an unallocated value buffer, allocate space in it
-for a value of the given type.  This instruction has undefined
-behavior if the value buffer is currently allocated.
-
-The type operand must be a lowered object type.
 
 alloc_global
 ````````````
@@ -3383,13 +3494,25 @@ project_box
 
 Given a ``@box T`` reference, produces the address of the value inside the box.
 
+dealloc_stack_ref
+`````````````````
+::
+
+  sil-instruction ::= 'dealloc_stack_ref' sil-operand
+
+  dealloc_stack_ref %0 : $T
+  // $T must be a class type
+  // %0 must be an 'alloc_ref [stack]' instruction
+
+Marks the deallocation of the stack space for an ``alloc_ref [stack]``.
+
 dealloc_ref
 ```````````
 ::
 
-  sil-instruction ::= 'dealloc_ref' ('[' 'stack' ']')? sil-operand
+  sil-instruction ::= 'dealloc_ref' sil-operand
 
-  dealloc_ref [stack] %0 : $T
+  dealloc_ref %0 : $T
   // $T must be a class type
 
 Deallocates an uninitialized class type instance, bypassing the reference
@@ -3436,44 +3559,6 @@ This does not destroy the reference type instance. The contents of the
 heap object must have been fully uninitialized or destroyed before
 ``dealloc_ref`` is applied.
 
-dealloc_value_buffer
-````````````````````
-
-::
-
-   sil-instruction ::= 'dealloc_value_buffer' sil-type 'in' sil-operand
-
-   dealloc_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-
-Given the address of a value buffer, deallocate the storage in it.
-This instruction has undefined behavior if the value buffer is not
-currently allocated, or if it was allocated with a type other than the
-type operand.
-
-The type operand must be a lowered object type.
-
-project_value_buffer
-````````````````````
-
-::
-
-   sil-instruction ::= 'project_value_buffer' sil-type 'in' sil-operand
-
-   %1 = project_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-   // The result has type $*(Int, T).
-
-Given the address of a value buffer, return the address of the value
-storage in it.  This instruction has undefined behavior if the value
-buffer is not currently allocated, or if it was allocated with a type
-other than the type operand.
-
-The result is the same value as was originally returned by
-``alloc_value_buffer``.
-
-The type operand must be a lowered object type.
-
 Debug Information
 ~~~~~~~~~~~~~~~~~
 
@@ -3489,15 +3574,19 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value '[poison]'? sil-operand (',' debug-var-attr)*
+  sil-instruction ::= debug_value '[poison]'? '[moved]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
 
   debug_value %1 : $Int
 
-This indicates that the value of a declaration with loadable type has changed
-value to the specified operand.  The declaration in question is identified by
-the SILLocation attached to the debug_value instruction.
+This indicates that the value of a declaration has changed value to the
+specified operand.  The declaration in question is identified by either the
+SILLocation attached to the debug_value instruction or the SILLocation specified
+in the advanced debug variable attributes.
 
-The operand must have loadable type.
+If the '[moved]' flag is set, then one knows that the debug_value's operand is
+moved at some point of the program, so one can not model the debug_value using
+constructs that assume that the value is live for the entire function (e.x.:
+llvm.dbg.declare).
 
 ::
 
@@ -3505,35 +3594,91 @@ The operand must have loadable type.
    debug-var-attr ::= 'let'
    debug-var-attr ::= 'name' string-literal
    debug-var-attr ::= 'argno' integer-literal
+   debug-var-attr ::= 'implicit'
 
 There are a number of attributes that provide details about the source
 variable that is being described, including the name of the
 variable. For function and closure arguments ``argno`` is the number
-of the function argument starting with 1.
+of the function argument starting with 1. A compiler-generated source
+variable will be marked ``implicit`` and optimizers are free to remove
+it even in -Onone.
 
 If the '[poison]' flag is set, then all references within this debug
 value will be overwritten with a sentinel at this point in the
 program. This is used in debug builds when shortening non-trivial
 value lifetimes to ensure the debugger cannot inspect invalid
-memory. `debug_value` instructions with the poison flag are not
-generated until OSSA islowered. They are not expected to be serialized
+memory. ``debug_value`` instructions with the poison flag are not
+generated until OSSA is lowered. They are not expected to be serialized
 within the module, and the pipeline is not expected to do any
 significant code motion after lowering.
 
-debug_value_addr
-````````````````
+::
+
+  advanced-debug-var-attr ::= '(' 'name' string-literal (',' sil-instruction-source-info)? ')'
+  advanced-debug-var-attr ::= 'type' sil-type
+
+Advanced debug variable attributes represent source locations and the type of
+the source variable when it was originally declared. It is useful when
+we're indirectly associating the SSA value with the source variable
+(via SIL DIExpression, for example) in which case SSA value's type is different
+from that of source variable.
 
 ::
 
-  sil-instruction ::= debug_value_addr sil-operand (',' debug-var-attr)*
+  debug-info-expr   ::= di-expr-operand (':' di-expr-operand)*
+  di-expr-operand   ::= di-expr-operator (':' sil-operand)*
+  di-expr-operator  ::= 'op_fragment'
+  di-expr-operator  ::= 'op_deref'
 
-  debug_value_addr %7 : $*SomeProtocol
+SIL debug info expression (SIL DIExpression) is a powerful method to connect SSA
+value with the source variable in an indirect fashion. Di-expression in SIL
+uses a stack based execution model to evaluate the expression and apply on
+the associated (SIL) SSA value before connecting it with the debug variable.
+For instance, given the following SIL code::
 
-This indicates that the value of a declaration with address-only type
-has changed value to the specified operand.  The declaration in
-question is identified by the SILLocation attached to the
-debug_value_addr instruction.
+  debug_value %a : $*Int, name "x", expr op_deref
 
+It means: "You can get the value of source variable 'x' by *dereferencing*
+SSA value ``%a``". The ``op_deref`` is a SIL DIExpression operator that represents
+"dereference". If there are multiple SIL DIExpression operators (or arguments), they
+are evaluated from left to right::
+
+  debug_value %b : $**Int, name "y", expr op_deref:op_deref
+
+In the snippet above, two ``op_deref`` operators will be applied on SSA value
+``%b`` sequentially.
+
+Note that normally when the SSA value has an address type, there will be a ``op_deref``
+in the SIL DIExpression. Because there is no pointer in Swift so you always need to
+dereference an address-type SSA value to get the value of a source variable.
+However, if the SSA value is a ``alloc_stack``, the ``debug_value`` is used to indicate
+the *declaration* of a source variable. Or, you can say, used to specify the location
+(memory address) of the source variable. Therefore, we don't need to add a ``op_deref``
+in this case::
+
+  %a = alloc_stack $Int, ...
+  debug_value %a : $*Int, name "my_var"
+
+
+The ``op_fragment`` operator is used to specify the SSA value of a specific
+field in an aggregate-type source variable. This SIL DIExpression operator takes
+a field declaration -- which references the desired sub-field in source variable
+-- as its argument. Here is an example::
+
+  struct MyStruct {
+    var x: Int
+    var y: Int
+  }
+  ...
+  debug_value %1 : $Int, var, (name "the_struct", loc "file.swift":8:7), type $MyStruct, expr op_fragment:#MyStruct.y, loc "file.swift":9:4
+
+In the snippet above, source variable "the_struct" has an aggregate type ``$MyStruct`` and we use a SIL DIExpression with ``op_fragment`` operator to associate ``%1`` to the ``y`` member variable (via the ``#MyStruct.y`` directive) inside "the_struct".
+Note that the extra source location directive follows right after ``name "the_struct"`` indicate that "the_struct" was originally declared in line 8, but not until line 9 -- the current ``debug_value`` instruction's source location -- does member ``y`` got updated with SSA value ``%1``.
+
+It is worth noting that a SIL DIExpression is similar to
+`!DIExpression <https://www.llvm.org/docs/LangRef.html#diexpression>`_ in LLVM debug
+info metadata. While LLVM represents ``!DIExpression`` are a list of 64-bit integers,
+SIL DIExpression can have elements with various types, like AST nodes or strings.
 
 Accessing Memory
 ~~~~~~~~~~~~~~~~
@@ -3600,6 +3745,8 @@ store_borrow
 
 Stores the value ``%0`` to a stack location ``%1``, which must be an
 ``alloc_stack $T``.
+The stack location must not be modified by other instructions than
+``store_borrow``.
 The stored value is alive until the ``dealloc_stack`` or until another
 ``store_borrow`` overwrites the value. During the its lifetime, the stored
 value must not be modified or destroyed.
@@ -3613,7 +3760,7 @@ begin_borrow
 
 ::
 
-   sil-instruction ::= 'begin_borrow' sil-operand
+   sil-instruction ::= 'begin_borrow' '[lexical]'? sil-operand
 
    %1 = begin_borrow %0 : $T
 
@@ -3625,6 +3772,10 @@ in `Dead End Blocks`_. This `begin_borrow`_ and the lifetime ending uses of
 region in between this borrow and its lifetime ending use, ``%0`` must be
 live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
+
+The optional ``lexical`` attribute specifies that the operand corresponds to a
+local variable in the Swift source, so special care must be taken when moving
+the end_borrow.
 
 This instruction is only valid in functions in Ownership SSA form.
 
@@ -3777,7 +3928,7 @@ mark_function_escape
 
   sil-instruction ::= 'mark_function_escape' sil-operand (',' sil-operand)
 
-  %2 = mark_function_escape %1 : $*T
+  mark_function_escape %1 : $*T
 
 Indicates that a function definition closes over a symbolic memory location.
 This instruction is variadic, and all of its operands must be addresses.
@@ -3966,12 +4117,40 @@ bind_memory
 
   sil-instruction ::= 'bind_memory' sil-operand ',' sil-operand 'to' sil-type
 
-  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T
+  %token = bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T
   // %0 must be of $Builtin.RawPointer type
   // %1 must be of $Builtin.Word type
+  // %token is an opaque $Builtin.Word representing the previously bound types
+  // for this memory region.
 
 Binds memory at ``Builtin.RawPointer`` value ``%0`` to type ``$T`` with enough
 capacity to hold ``%1`` values. See SE-0107: UnsafeRawPointer.
+
+Produces a opaque token representing the previous memory state. For
+memory binding semantics, this state includes the type that the memory
+was previously bound to. The token cannot, however, be used to
+retrieve a metatype. It's value is only meaningful to the Swift
+runtime for typed pointer verification.
+
+rebind_memory
+`````````````
+
+::
+
+  sil-instruction ::= 'rebind_memory' sil-operand ' 'to' sil-value
+
+  %out_token = rebind_memory %0 : $Builtin.RawPointer to %in_token
+  // %0 must be of $Builtin.RawPointer type
+  // %in_token represents a cached set of bound types from a prior memory state.
+  // %out_token is an opaque $Builtin.Word representing the previously bound
+  // types for this memory region.
+
+This instruction's semantics are identical to ``bind_memory``, except
+that the types to which memory will be bound, and the extent of the
+memory region is unknown at compile time. Instead, the bound-types are
+represented by a token that was produced by a prior memory binding
+operation. ``%in_token`` must be the result of bind_memory or
+rebind_memory.
 
 begin_access
 ````````````
@@ -5186,6 +5365,67 @@ independent of the operand. In terms of specific types:
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
 
+explicit_copy_value
+```````````````````
+
+::
+
+   sil-instruction ::= 'explicit_copy_value' sil-operand
+
+   %1 = explicit_copy_value %0 : $A
+
+Performs a copy of a loadable value as if by the value's type lowering and
+returns the copy. The returned copy semantically is a value that is completely
+independent of the operand. In terms of specific types:
+
+1. For trivial types, this is equivalent to just propagating through the trivial
+   value.
+2. For reference types, this is equivalent to performing a ``strong_retain``
+   operation and returning the reference.
+3. For ``@unowned`` types, this is equivalent to performing an
+   ``unowned_retain`` and returning the operand.
+4. For aggregate types, this is equivalent to recursively performing a
+   ``copy_value`` on its components, forming a new aggregate from the copied
+   components, and then returning the new aggregate.
+
+In ownership qualified functions, a ``explicit_copy_value`` produces a +1 value
+that must be consumed at most once along any path through the program.
+
+When move only variable checking is performed, ``explicit_copy_value`` is
+treated as an explicit copy asked for by the user that should not be rewritten
+and should be treated as a non-consuming use.
+
+move_value
+``````````
+
+::
+
+   sil-instruction ::= 'move_value' '[lexical]'? sil-operand
+
+   %1 = move_value %0 : $@_moveOnly A
+
+Performs a move of the operand, ending its lifetime. When ownership is enabled,
+it always takes in an `@owned T` and produces a new `@owned @_moveOnly T`. 
+
+1. For trivial types, this is equivalent to just propagating through the trivial
+   value.
+2. For reference types, this is equivalent to ending the lifetime of the
+   operand, beginning a new lifetime for the result and setting the result to
+   the value of the operand.
+3. For aggregates, the operation is equivalent to performing a move_value on
+   each of its fields recursively.
+
+After ownership is lowered, we leave in the move_value to provide a place for
+IRGenSIL to know to store a potentially new variable (in case the move was
+associated with a let binding).
+
+NOTE: This instruction is used in an experimental feature called 'move only
+values'. A move_value instruction is an instruction that introduces (or injects)
+a type `T` into the move only value space.
+
+The ``lexical`` attribute specifies that the value corresponds to a local
+variable in the Swift source.
+
 release_value
 `````````````
 
@@ -6107,7 +6347,8 @@ pointer_to_address
 ``````````````````
 ::
 
-  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? sil-type
+  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? ('[' 'invariant' ']')? ('[' 'alignment' '=' alignment ']')? sil-type
+  alignment ::= [0-9]+
 
   %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
   // %1 will be of type $*T
@@ -6127,6 +6368,12 @@ type. A memory access from an address that is not strict cannot have
 its address substituted with a strict address, even if other nearby
 memory accesses at the same location are strict.
 
+The ``invariant`` flag is set if loading from the returned address
+always produces the same value.
+
+The ``alignment`` integer value specifies the byte alignment of the
+address. ``alignment=0`` is the default, indicating the natural
+alignment of ``T``.
 
 unchecked_ref_cast
 ``````````````````
@@ -6387,16 +6634,6 @@ passed to a function (materializeForSet) which escapes the closure in a way not
 expressed by the convert's users. The mandatory pass must ensure the lifetime
 in a conservative way.
 
-thin_function_to_pointer
-````````````````````````
-
-TODO
-
-pointer_to_thin_function
-````````````````````````
-
-TODO
-
 classify_bridge_object
 ``````````````````````
 ::
@@ -6542,9 +6779,9 @@ Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime checking.
 
-The `unconditional_checked_cast_addr`_, `unconditional_checked_cast_value`_ and `unconditional_checked_cast`_
+The `unconditional_checked_cast_addr` and `unconditional_checked_cast`_
 instructions performs an unconditional checked cast; it is a runtime failure
-if the cast fails. The `checked_cast_addr_br`_, `checked_cast_value_br`_ and `checked_cast_br`_
+if the cast fails. The `checked_cast_addr_br`_ and `checked_cast_br`_
 terminator instruction performs a conditional checked cast; it branches to one
 of two destinations based on whether the cast succeeds or not.
 
@@ -6578,25 +6815,6 @@ unconditional_checked_cast_addr
 
 Performs a checked indirect conversion, causing a runtime failure if the
 conversion fails.
-
-unconditional_checked_cast_value
-````````````````````````````````
-::
-
-  sil-instruction ::= 'unconditional_checked_cast_value'
-                       sil-operand 'to' sil-type
-
-  %1 = unconditional_checked_cast_value %0 : $A to $B
-  // $A must not be an address
-  // $B must not be an address
-  // %1 will be of type $B
-  // $A is destroyed during the conversion. There is no implicit copy.
-
-Performs a checked conversion, causing a runtime failure if the conversion
-fails. Unlike `unconditional_checked_cast`, this destroys its operand and
-creates a new value. Consequently, this supports bridging objects to values, as
-well as casting to a different ownership classification such as `$AnyObject` to
-`$T.Type`.
 
 Runtime Failures
 ~~~~~~~~~~~~~~~~
@@ -6978,26 +7196,6 @@ An exact cast checks whether the dynamic type is exactly the target
 type, not any possible subtype of it.  The source and target types
 must be class types.
 
-checked_cast_value_br
-`````````````````````
-::
-
-  sil-terminator ::= 'checked_cast_value_br'
-                      sil-operand 'to' sil-type ','
-                      sil-identifier ',' sil-identifier
-  sil-checked-cast-exact ::= '[' 'exact' ']'
-
-  checked_cast_value_br %0 : $A to $B, bb1, bb2
-  // $A must be not be an address
-  // $B must be an opaque value
-  // bb1 must take a single argument of type $B
-  // bb2 must take no arguments
-
-Performs a checked opaque conversion from ``$A`` to ``$B``. If the conversion
-succeeds, control is transferred to ``bb1``, and the result of the cast is
-passed into ``bb1`` as an argument. If the conversion fails, control is
-transferred to ``bb2``.
-
 checked_cast_addr_br
 ````````````````````
 ::
@@ -7246,6 +7444,68 @@ The remaining components identify the SIL differentiability witness:
 - Witness generic parameter clause (optional). When parsing SIL, the parsed
   witness generic parameter clause is combined with the original function's
   generic signature to form the full witness generic signature.
+
+Optimizer Dataflow Marker Instructions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+mark_must_check
+```````````````
+::
+
+  sil-instruction ::= 'mark_must_check'
+                      '[' sil-optimizer-analysis-marker ']'
+
+  sil-optimizer-analysis-marker ::= 'no_implicit_copy'
+
+A canary value inserted by a SIL generating frontend to signal to the move
+checker to check a specific value.  Valid only in Raw SIL. The relevant checkers
+should remove the `mark_must_check`_ instruction after successfully running the
+relevant diagnostic. The idea here is that instead of needing to introduce
+multiple "flaging" instructions for the optimizer, we can just reuse this one
+instruction by varying the kind.
+
+No Implicit Copy and No Escape Value Instructions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+copyable_to_moveonlywrapper
+```````````````````````````
+::
+
+  sil-instruction ::= 'copyable_to_moveonlywrapper'
+
+`copyable_to_moveonlywrapper`_ takes in a 'T' and maps it to a move only wrapped
+'@moveOnly T'. This is semantically used by a code generator initializing a new
+moveOnly binding from a copyable value. It semantically destroys its input
+@owned value and returns a brand new independent @owned @moveOnly value. It also
+is used to convert a trivial copyable value with type 'Trivial' into an owned
+non-trivial value of type '@moveOnly Trivial'. If one thinks of '@moveOnly' as a
+monad, this is how one injects a copyable value into the move only space.
+
+moveonlywrapper_to_copyable
+```````````````````````````
+::
+
+  sil-instruction ::= 'moveonlywrapper_to_copyable [owned]'
+  sil-instruction ::= 'moveonlywrapper_to_copyable [guaranteed]'
+
+`moveonlywrapper_to_copyable`_ takes in a '@moveOnly T' and produces a new 'T'
+value. This is a 'forwarding' instruction where at parse time, we only allow for
+one to choose it to be [owned] or [guaranteed]. With time, we may eliminate the
+need for the guaranteed form in the future.
+
+* `moveonlywrapper_to_copyable [owned]` is used to signal the end of lifetime of
+  the '@moveOnly' wrapper. SILGen inserts these when ever a move only value has
+  its ownership passed to a situation where a copyable value is needed. Since it
+  is consuming, we know that the no implicit copy or no-escape checker will ensure
+  that if we need a copy for it, the program will emit a diagnostic.
+
+* `moveonlywrapper_to_copyable [guaranteed]` is used to pass a @moveOnly T value
+  as a copyable guaranteed parameter with type 'T' to a function. In the case of
+  using no-implicit-copy checking this is always fine since no-implicit-copy is a
+  local pattern. This would be an error when performing no escape
+  checking. Importantly, this instruction also is where in the case of an
+  @moveOnly trivial type, we convert from the non-trivial representation to the
+  trivial representation.
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

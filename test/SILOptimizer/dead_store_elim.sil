@@ -188,7 +188,7 @@ bb0:
   %3 = ref_element_addr %0 : $foo, #foo.a
   store %2 to %3 : $*Int
   %4 = tuple ()
-  dealloc_ref [stack] %0 : $foo
+  dealloc_stack_ref %0 : $foo
   return %4 : $()
 }
 
@@ -198,7 +198,7 @@ bb0:
 // CHECK: bb0
 // CHECK: alloc_ref
 // CHECK: store
-// CHECK: dealloc_ref
+// CHECK: dealloc_stack_ref
 // CHECK: return
 sil hidden @blocking_read_on_local_store_into_alloc_ref_stack : $@convention(thin) () -> () {
 bb0:
@@ -209,7 +209,7 @@ bb0:
   store %2 to %3 : $*Int
   %4 = tuple ()
   strong_release %0 : $foo
-  dealloc_ref [stack] %0 : $foo
+  dealloc_stack_ref %0 : $foo
   return %4 : $()
 }
 
@@ -366,21 +366,20 @@ bb2:
   return %9999 : $()
 }
 
-// We cannot remove the local store as the debug_value_addr could
-// be turned to a debug_value and thus act as a read on the memory
-// location..
+// We cannot remove the local store as the debug_value w/ address value
+// could be promoted and thus act as a read on the memory location..
 //
 // CHECK-LABEL: blocking_debug_value_addr_on_dead_store
 // CHECK: bb0
 // CHECK: {{ store}}
-// CHECK: debug_value_addr
+// CHECK: debug_value %{{.*}} : $*Int
 sil hidden @blocking_debug_value_addr_on_dead_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"
   %1 = integer_literal $Builtin.Int64, 1
   %2 = struct $Int (%1 : $Builtin.Int64)
   store %2 to %0 : $*Int
-  debug_value_addr %0 : $*Int
+  debug_value %0 : $*Int
   %4 = tuple ()
   dealloc_stack %0 : $*Int
   return %4 : $()
@@ -1538,6 +1537,6 @@ bb0:
   store %3 to %4 : $*Int
   set_deallocating %1 : $foo
   dealloc_ref %1 : $foo
-  dealloc_ref [stack] %1 : $foo
+  dealloc_stack_ref %1 : $foo
   return %3 : $Int
 }

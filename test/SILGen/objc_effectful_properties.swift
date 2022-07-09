@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules %s -verify | %FileCheck --enable-var-scope --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -disable-availability-checking -I %S/Inputs/custom-modules %s -verify | %FileCheck --enable-var-scope --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -50,14 +50,18 @@ func testAsyncThrows(eff : EffProps) async {
 
 // CHECK-LABEL: sil {{.*}}@${{.*}}17testMainActorProp
 func testMainActorProp(eff : EffProps) async {
-  // CHECK-NOT: hop_to_executor
+  // CHECK:         [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]] :
+  // CHECK:         hop_to_executor [[GENERIC_EXEC]] :
   // CHECK: } // end sil function '${{.*}}17testMainActorProp
   let _ = await eff.mainDogProp
 }
 
 // CHECK-LABEL: sil {{.*}}@${{.*}}19testMainActorMethod
 func testMainActorMethod(eff : EffProps) async {
-  // CHECK-NOT: hop_to_executor
+  // CHECK:         [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]] :
+  // CHECK:         hop_to_executor [[GENERIC_EXEC]] :
   // CHECK: } // end sil function '${{.*}}19testMainActorMethod
   let _ = await eff.regularMainDog()
 }

@@ -20,7 +20,7 @@
 namespace swift {
 
 /// A data structure responsible for efficiently allocating closure contexts for
-/// linear maps such as pullbacks, including rescursive branching trace enum
+/// linear maps such as pullbacks, including recursive branching trace enum
 /// case payloads.
 class AutoDiffLinearMapContext : public HeapObject {
 private:
@@ -39,16 +39,16 @@ public:
 };
 
 /// Creates a linear map context with a tail-allocated top-level subcontext.
-SWIFT_EXPORT_FROM(swift_Differentiation) SWIFT_CC(swift)
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(
     size_t topLevelSubcontextSize);
 
 /// Returns the address of the tail-allocated top-level subcontext.
-SWIFT_EXPORT_FROM(swift_Differentiation) SWIFT_CC(swift)
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 void *swift_autoDiffProjectTopLevelSubcontext(AutoDiffLinearMapContext *);
 
 /// Allocates memory for a new subcontext.
-SWIFT_EXPORT_FROM(swift_Differentiation) SWIFT_CC(swift)
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 void *swift_autoDiffAllocateSubcontext(AutoDiffLinearMapContext *, size_t size);
 
 }

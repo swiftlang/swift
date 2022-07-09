@@ -10,14 +10,17 @@
 #
 # ----------------------------------------------------------------------------
 
+from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
+from .curl import LibCurl
 from .earlyswiftdriver import EarlySwiftDriver
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
 from .libdispatch import LibDispatch
 from .libicu import LibICU
+from .libxml2 import LibXML2
 from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
@@ -26,6 +29,8 @@ from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
+from .swiftdocc import SwiftDocC
+from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
 from .swiftevolve import SwiftEvolve
 from .swiftformat import SwiftFormat
@@ -34,14 +39,19 @@ from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
+from .zlib import Zlib
 
 __all__ = [
+    'BackDeployConcurrency',
     'CMark',
     'Ninja',
     'Foundation',
     'LibCXX',
     'LibDispatch',
     'LibICU',
+    'LibXML2',
+    'Zlib',
+    'LibCurl',
     'LLBuild',
     'LLDB',
     'LLVM',
@@ -61,4 +71,6 @@ __all__ = [
     'SourceKitLSP',
     'Benchmarks',
     'TSanLibDispatch',
+    'SwiftDocC',
+    'SwiftDocCRender'
 ]

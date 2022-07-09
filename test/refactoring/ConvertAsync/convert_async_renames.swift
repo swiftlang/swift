@@ -1,12 +1,14 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
-func simple(_ completion: (String) -> Void) { }
+func simple(_ completion: @escaping (String) -> Void) { }
 func simple() async -> String { }
 
-func simpleArg(arg: String, _ completion: (String) -> Void) { }
+func simpleArg(arg: String, _ completion: @escaping (String) -> Void) { }
 func simpleArg(arg: String) async -> String { }
 
-func simpleErr(arg: String, _ completion: (String?, Error?) -> Void) { }
+func simpleErr(arg: String, _ completion: @escaping (String?, Error?) -> Void) { }
 func simpleErr(arg: String) async throws -> String { }
 
 func whatever() -> Bool { return true }

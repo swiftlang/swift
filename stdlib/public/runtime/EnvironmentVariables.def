@@ -62,4 +62,14 @@ VARIABLE(SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, true,
 
 #endif
 
+#ifndef NDEBUG
+
+VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,
+         "Enable the an asserts runtime to emit logging as it works.")
+
+#endif
+
+VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32_t, 0,
+        "Set the binary compatibility level of the Swift Standard Library")
+
 #undef VARIABLE

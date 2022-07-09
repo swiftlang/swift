@@ -58,13 +58,13 @@ struct WrapperAcceptingAutoclosure<T> {
 
 @propertyWrapper
 struct MissingValue<T> { }
-// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}
+// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}{{25-25=var wrappedValue: <#Value#>}}
 
 @propertyWrapper
 struct StaticValue {
   static var wrappedValue: Int = 17
 }
-// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}
+// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}{{21-21=var wrappedValue: <#Value#>}}
 
 
 // expected-error@+1{{'@propertyWrapper' attribute cannot be applied to this declaration}}
@@ -1009,6 +1009,17 @@ struct SR_10899_Wrapper {
 
 struct SR_10899_Usage {
   @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match 'wrappedValue' type 'String'}}
+}
+
+// https://bugs.swift.org/browse/SR-14730
+@propertyWrapper
+struct StringWrappedValue {
+  var wrappedValue: String
+}
+
+struct SR_14730 {
+  // expected-error@+1 {{property type '() -> String' does not match 'wrappedValue' type 'String'}}
+  @StringWrappedValue var value: () -> String
 }
 
 // SR-11061 / rdar://problem/52593304 assertion with DeclContext mismatches

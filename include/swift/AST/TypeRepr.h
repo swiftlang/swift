@@ -47,8 +47,12 @@ enum class TypeReprKind : uint8_t {
 enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
+class OpaqueReturnTypeRepr;
+using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
+
 /// Representation of a type as written in source.
-class alignas(1 << TypeReprAlignInBits) TypeRepr {
+class alignas(1 << TypeReprAlignInBits) TypeRepr
+    : public ASTAllocated<TypeRepr> {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
@@ -150,19 +154,33 @@ public:
     return walk(walker);
   }
 
+  /// Look through the given type and its children to find a type for
+  /// which the given predicate returns true.
+  ///
+  /// \param pred A predicate function object. It should return true if the
+  /// given type node satisfies the criteria.
+  ///
+  /// \returns true if the predicate returns true for the given type or any of
+  /// its children.
+  bool findIf(llvm::function_ref<bool(TypeRepr *)> pred);
+
+  /// Check recursively whether this type repr or any of its descendants are
+  /// opaque return type reprs.
+  bool hasOpaque();
+
+  /// Walk the type representation recursively, collecting any
+  /// `OpaqueReturnTypeRepr`s.
+  CollectedOpaqueReprs collectOpaqueReturnTypeReprs();
+
+  /// Retrieve the type repr without any parentheses around it.
+  ///
+  /// The use of this function must be restricted to contexts where
+  /// user-written types are provided, and a syntactic analysis is appropriate.
+  /// Most use cases should analyze the resolved \c Type instead and use
+  /// \c Type::getCanonicalType() or \c Type::getWithoutParens().
+  TypeRepr *getWithoutParens() const;
+
   //*** Allocation Routines ************************************************/
-
-  void *operator new(size_t bytes, const ASTContext &C,
-                     unsigned Alignment = alignof(TypeRepr));
-
-  void *operator new(size_t bytes, void *data) {
-    assert(data);
-    return data;
-  }
-
-  // Make placement new and vanilla new/delete illegal for TypeReprs.
-  void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) = delete;
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
@@ -1015,6 +1033,21 @@ public:
   static bool classof(const IsolatedTypeRepr *T) { return true; }
 };
 
+/// An '_const' type.
+/// \code
+///   x : _const Int
+/// \endcode
+class CompileTimeConstTypeRepr : public SpecifierTypeRepr {
+public:
+  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::CompileTimeConst;
+  }
+  static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+};
+
 /// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
@@ -1108,9 +1141,9 @@ private:
 /// A TypeRepr for a type with a generic parameter list of named opaque return
 /// types.
 ///
-/// This can occur only as the return type of a function declaration, to specify
-/// subtypes which should be abstracted from callers, given a set of generic
-/// constraints that the concrete types satisfy:
+/// This can occur only as the return type of a function declaration, or the
+/// type of a property, to specify types which should be abstracted from
+/// callers, given a set of generic constraints that the concrete types satisfy:
 ///
 /// func foo() -> <T: Collection> T { return [1] }
 class NamedOpaqueReturnTypeRepr : public TypeRepr {
@@ -1136,6 +1169,35 @@ private:
   SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const;
   SourceLoc getLocImpl() const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// A TypeRepr for an existential type spelled with \c any
+///
+/// Can appear anywhere a normal existential type would. This is
+/// purely a more explicit spelling for existential types.
+class ExistentialTypeRepr: public TypeRepr {
+  TypeRepr *Constraint;
+  SourceLoc AnyLoc;
+
+public:
+  ExistentialTypeRepr(SourceLoc anyLoc, TypeRepr *constraint)
+    : TypeRepr(TypeReprKind::Existential), Constraint(constraint),
+      AnyLoc(anyLoc) {}
+
+  TypeRepr *getConstraint() const { return Constraint; }
+  SourceLoc getAnyLoc() const { return AnyLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Existential;
+  }
+  static bool classof(const ExistentialTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return AnyLoc; }
+  SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
+  SourceLoc getLocImpl() const { return AnyLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -1267,6 +1329,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
+  case TypeReprKind::Existential:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -1284,6 +1347,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Owned:
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
+  case TypeReprKind::CompileTimeConst:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

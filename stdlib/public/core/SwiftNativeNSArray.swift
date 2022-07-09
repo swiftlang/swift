@@ -21,15 +21,15 @@
 #if _runtime(_ObjC)
 import SwiftShims
 
-/// Returns `true` iff the given `index` is valid as a position, i.e. `0
-/// ≤ index ≤ count`.
+/// Returns `true` if the given `index` is valid as a position (`0
+/// ≤ index ≤ count`); otherwise, returns `false`.
 @usableFromInline @_transparent
 internal func _isValidArrayIndex(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
-/// Returns `true` iff the given `index` is valid for subscripting, i.e.
-/// `0 ≤ index < count`.
+/// Returns `true` if the given `index` is valid for subscripting 
+/// (`0 ≤ index < count`); otherwise, returns `false`.
 @usableFromInline @_transparent
 internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index < count)

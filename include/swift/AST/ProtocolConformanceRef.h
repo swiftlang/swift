@@ -19,6 +19,8 @@
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Type.h"
@@ -29,6 +31,7 @@ namespace llvm {
 
 namespace swift {
 
+class BuiltinProtocolConformance;
 class ConcreteDeclRef;
 class ProtocolConformance;
 enum class EffectKind : uint8_t;
@@ -72,6 +75,11 @@ public:
     return ProtocolConformanceRef();
   }
 
+  /// Retrieve an invalid or missing conformance, as appropriate, when a
+  /// legitimate conformance doesn't exist.
+  static ProtocolConformanceRef forMissingOrInvalid(
+      Type type, ProtocolDecl *proto);
+
   bool isInvalid() const {
     return !Union;
   }
@@ -97,6 +105,28 @@ public:
   ProtocolDecl *getAbstract() const {
     return Union.get<ProtocolDecl*>();
   }
+
+  /// Determine whether this conformance (or a conformance it depends on)
+  /// involves an always-unavailable conformance.
+  bool hasUnavailableConformance() const;
+
+  /// Determine whether this conformance (or a conformance it depends on)
+  /// involves a "missing" conformance anywhere. Such conformances
+  /// cannot be depended on to always exist.
+  bool hasMissingConformance(ModuleDecl *module) const;
+
+  /// Enumerate the missing conformances in this conformance.
+  ///
+  /// Calls \c fn with each missing conformance found within this conformance,
+  /// including this conformance or any conditional conformances it depends on.
+  /// If the invocation of \c fn returns \c true, the traversal exits early
+  /// and the overall function returns \c true.
+  ///
+  /// \returns \c true if any invocation of \c fn returned true,
+  /// \c false otherwise.
+  bool forEachMissingConformance(
+      ModuleDecl *module,
+      llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const;
 
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }

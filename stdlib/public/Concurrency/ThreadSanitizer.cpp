@@ -16,8 +16,8 @@
 
 #include "TaskPrivate.h"
 
-// Thread Sanitizer is not supported on Windows.
-#if defined(_WIN32)
+// Thread Sanitizer is not supported on Windows or WASI.
+#if defined(_WIN32) || defined(__wasi__) || !__has_include(<dlfcn.h>)
 void swift::_swift_tsan_acquire(void *addr) {}
 void swift::_swift_tsan_release(void *addr) {}
 #else
@@ -31,18 +31,14 @@ TSanFunc *tsan_acquire, *tsan_release;
 void swift::_swift_tsan_acquire(void *addr) {
   if (tsan_acquire) {
     tsan_acquire(addr);
-#if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%lu] tsan_acquire on %p\n", _swift_get_thread_id(), addr);
-#endif
+    SWIFT_TASK_DEBUG_LOG("tsan_acquire on %p", addr);
   }
 }
 
 void swift::_swift_tsan_release(void *addr) {
   if (tsan_release) {
     tsan_release(addr);
-#if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%lu] tsan_release on %p\n", _swift_get_thread_id(), addr);
-#endif
+    SWIFT_TASK_DEBUG_LOG("tsan_release on %p", addr);
   }
 }
 

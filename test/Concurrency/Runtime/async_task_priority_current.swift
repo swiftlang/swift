@@ -1,19 +1,35 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck --dump-input=always %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck --dump-input=always %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+// Work around the inability of older Swift runtimes to print a task priority.
+extension TaskPriority: CustomStringConvertible {
+  public var description: String {
+    "TaskPriority(rawValue: \(rawValue))"
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@main struct Main {
+  static func main() async {
+    print("main priority: \(Task.currentPriority)") // CHECK: main priority: TaskPriority(rawValue: [[#MAIN_PRIORITY:]])
+    await test_detach()
+    await test_multiple_lo_indirectly_escalated()
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
 func test_detach() async {
   let a1 = Task.currentPriority
-  print("a1: \(a1)") // CHECK: TaskPriority(rawValue: 0)
+  print("a1: \(a1)") // CHECK: a1: TaskPriority(rawValue: [[#MAIN_PRIORITY]])
 
   // Note: remember to detach using a higher priority, otherwise a lower one
   // might be escalated by the get() and we could see `default` in the detached
@@ -24,10 +40,10 @@ func test_detach() async {
   }.get()
 
   let a3 = Task.currentPriority
-  print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: 0)
+  print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: [[#MAIN_PRIORITY]])
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_multiple_lo_indirectly_escalated() async {
   @Sendable
   func loopUntil(priority: TaskPriority) async {
@@ -59,10 +75,4 @@ func test_multiple_lo_indirectly_escalated() async {
   print("default done") // CHECK: default done
 }
 
-@available(SwiftStdlib 5.5, *)
-@main struct Main {
-  static func main() async {
-    await test_detach()
-    await test_multiple_lo_indirectly_escalated()
-  }
-}
+

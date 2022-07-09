@@ -484,7 +484,7 @@ static_assert(sizeof(Projection) == sizeof(uintptr_t),
 /// The main purpose of this class is to enable one to reason about iterated
 /// chains of projections. Some example usages are:
 ///
-/// 1. Converting value projections to aggregate projections or vis-a-versa.
+/// 1. Converting value projections to aggregate projections or vice versa.
 /// 2. Performing tuple operations on two paths (using the mathematical
 ///    definition of tuples as ordered sets).
 class ProjectionPath {
@@ -859,7 +859,7 @@ public:
   ProjectionTree &operator=(ProjectionTree &&) = default;
 
   /// Compute liveness and use information in this projection tree using Base.
-  /// All debug instructions (debug_value, debug_value_addr) are ignored.
+  /// All debug_value instructions are ignored.
   void computeUsesAndLiveness(SILValue Base);
 
   /// Create a root SILValue iout of the given leaf node values by walking on

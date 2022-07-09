@@ -44,6 +44,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/BasicBlockData.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -70,6 +71,13 @@ static bool isRecursiveCall(FullApplySite applySite) {
 
   if (auto *CMI = dyn_cast<ClassMethodInst>(callee)) {
 
+    SILModule &module = parentFunc->getModule();
+    CanType classType = CMI->getOperand()->getType().getASTType();
+    if (auto mt = dyn_cast<MetatypeType>(classType)) {
+      classType = mt.getInstanceType();
+    }
+    ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+
     // FIXME: If we're not inside the module context of the method,
     // we may have to deserialize vtables.  If the serialized tables
     // are damaged, the pass will crash.
@@ -77,29 +85,41 @@ static bool isRecursiveCall(FullApplySite applySite) {
     // Though, this has the added bonus of not looking into vtables
     // outside the current module.  Because we're not doing IPA, let
     // alone cross-module IPA, this is all well and good.
-    SILModule &module = parentFunc->getModule();
-    CanType classType = CMI->getOperand()->getType().getASTType();
-    ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
     if (classDecl && classDecl->getModuleContext() != module.getSwiftModule())
       return false;
 
-    if (!calleesAreStaticallyKnowable(module, CMI->getMember()))
-      return false;
-
-    // The "statically knowable" check just means that we have all the
-    // callee candidates available for analysis. We still need to check
-    // if the current function has a known override point.
-    auto *methodDecl = CMI->getMember().getAbstractFunctionDecl();
-    if (methodDecl->isOverridden())
-      return false;
-
     SILFunction *method = getTargetClassMethod(module, classDecl, CMI);
-    return method == parentFunc;
+    if (method != parentFunc)
+      return false;
+
+    SILDeclRef member = CMI->getMember();
+    if (calleesAreStaticallyKnowable(module, member) &&
+        // The "statically knowable" check just means that we have all the
+        // callee candidates available for analysis. We still need to check
+        // if the current function has a known override point.
+        !member.getAbstractFunctionDecl()->isOverridden()) {
+      return true;
+    }
+
+    // Even if the method is (or could be) overridden, it's a recursive call if
+    // it's called on the self argument:
+    // ```
+    // class X {
+    //   // Even if foo() is overridden in a derived class, it'll end up in an
+    //   // infinite recursion if initially called on an instance of `X`.
+    //   func foo() { foo() }
+    // }
+    // ```
+    if (parentFunc->hasSelfParam() &&
+        CMI->getOperand() == SILValue(parentFunc->getSelfArgument())) {
+      return true;
+    }
+    return false;
   }
 
   if (auto *WMI = dyn_cast<WitnessMethodInst>(callee)) {
     auto funcAndTable = parentFunc->getModule().lookUpFunctionInWitnessTable(
-        WMI->getConformance(), WMI->getMember());
+        WMI->getConformance(), WMI->getMember(), SILModule::LinkingMode::LinkNormal);
     return funcAndTable.first == parentFunc;
   }
   return false;
@@ -224,8 +244,7 @@ public:
     case TermKind::CondBranchInst:
     case TermKind::SwitchValueInst:
     case TermKind::SwitchEnumInst:
-    case TermKind::CheckedCastBranchInst:
-    case TermKind::CheckedCastValueBranchInst: {
+    case TermKind::CheckedCastBranchInst: {
       SmallPtrSet<SILInstruction *, 16> visited;
       return isInvariantValue(term->getOperand(0), visited);
     }
@@ -275,8 +294,10 @@ struct BlockInfo {
   /// non-null if this block contains a recursive call.
   SILInstruction *recursiveCall;
 
-  /// The number of successors which reach a `return`.
-  unsigned numSuccsNotReachingReturn;
+  /// The number of successors which reach a recursive call, but not the
+  /// function exit, i.e. successors for which
+  ///   reachesRecursiveCall && !reachesFunctionExit
+  unsigned numSuccsReachingRecursiveCall;
 
   /// True if the block has a terminator with an invariant condition.
   ///
@@ -284,29 +305,22 @@ struct BlockInfo {
   ///       which are passed to the constructor.
   bool hasInvariantCondition;
 
-  /// Is there any path from the this block to a function return, without going
+  /// Is there any path from the this block to a function exit, without going
   /// through a recursive call?
   ///
-  /// This flag is propagated up the control flow, starting at returns.
-  ///
   /// Note that if memory is expected to be invariant, all memory-writing
-  /// instructions are also considered as a "return".
-  bool reachesReturn;
+  /// instructions are also considered as a "function exit".
+  bool reachesFunctionExit;
 
-  /// Is there any path from the entry to this block without going through a
-  /// `reachesReturn` block.
-  ///
-  /// This flag is propagated down the control flow, starting at entry. If this
-  /// flag reaches a block with a recursiveCall, it means that it's an infinite
-  /// recursive call.
-  bool reachableFromEntry;
-
+  /// Is there any path from the this block to a recursive call?
+  bool reachesRecursiveCall;
+  
   /// Get block information with expected \p invariants.
   BlockInfo(SILBasicBlock *block, Invariants invariants) :
       recursiveCall(nullptr),
-      numSuccsNotReachingReturn(block->getNumSuccessors()),
+      numSuccsReachingRecursiveCall(0),
       hasInvariantCondition(invariants.isInvariant(block->getTerminator())),
-      reachesReturn(false), reachableFromEntry(false) {
+      reachesFunctionExit(false), reachesRecursiveCall(false) {
     for (SILInstruction &inst : *block) {
       if (auto applySite = FullApplySite::isa(&inst)) {
         // Ignore blocks which call a @_semantics("programtermination_point").
@@ -319,14 +333,15 @@ struct BlockInfo {
         if (isRecursiveCall(applySite) &&
             invariants.hasInvariantArguments(applySite)) {
           recursiveCall = &inst;
+          reachesRecursiveCall = true;
           return;
         }
       }
       if (invariants.isMemoryInvariant() && mayWriteToMemory(&inst)) {
         // If we are assuming that all memory is invariant, a memory-writing
         // instruction potentially breaks the infinite recursion loop. For the
-        // sake of the anlaysis, it's like a function return.
-        reachesReturn = true;
+        // sake of the anlaysis, it's like a function exit.
+        reachesFunctionExit = true;
         return;
       }
     }
@@ -334,7 +349,7 @@ struct BlockInfo {
     if (term->isFunctionExiting() ||
         // Also treat non-assert-like unreachables as returns, like "exit()".
         term->isProgramTerminating()) {
-      reachesReturn = true;
+      reachesFunctionExit = true;
     }
   }
 };
@@ -383,76 +398,102 @@ class InfiniteRecursionAnalysis {
         return BlockInfo(block, invariants);
       }) { }
 
-  /// Propagates the `reachesReturn` flags up the control flow and returns true
-  /// if the flag reaches the entry block.
-  bool isEntryReachableFromReturn() {
-    // Contains blocks for which the `reachesReturn` flag is set.
-    SmallVector<SILBasicBlock *, 32> workList;
+  /// Propagates the `reachesRecursiveCall` flags up the control flow.
+  void propagateRecursiveCalls() {
+    StackList<SILBasicBlock *> workList(blockInfos.getFunction());
 
-    // Initialize the workList with all function-return blocks.
+    // Initialize the workList with all blocks which contain recursive calls.
     for (auto bd : blockInfos) {
-      if (bd.data.reachesReturn)
+      if (bd.data.reachesRecursiveCall)
         workList.push_back(&bd.block);
     }
 
     while (!workList.empty()) {
       SILBasicBlock *block = workList.pop_back_val();
+      assert(blockInfos[block].reachesRecursiveCall);
       for (auto *pred : block->getPredecessorBlocks()) {
         BlockInfo &predInfo = blockInfos[pred];
-        if (predInfo.reachesReturn ||
+        predInfo.numSuccsReachingRecursiveCall += 1;
+        if (!predInfo.reachesRecursiveCall) {
+          predInfo.reachesRecursiveCall = true;
+          workList.push_back(pred);
+        }
+      }
+    }
+  }
+  
+  /// Propagates the `reachesFunctionExit` flags up the control flow.
+  void propagateFunctionExits() {
+    StackList<SILBasicBlock *> workList(blockInfos.getFunction());
+
+    // Initialize the workList with all function-exiting blocks.
+    for (auto bd : blockInfos) {
+      if (bd.data.reachesFunctionExit)
+        workList.push_back(&bd.block);
+    }
+
+    while (!workList.empty()) {
+      SILBasicBlock *block = workList.pop_back_val();
+      BlockInfo &info = blockInfos[block];
+      assert(info.reachesFunctionExit);
+      for (auto *pred : block->getPredecessorBlocks()) {
+        BlockInfo &predInfo = blockInfos[pred];
+
+        if (info.reachesRecursiveCall) {
+          // Update `numSuccsReachingRecursiveCall`, because this counter
+          // excludes successors which reach a function exit.
+          assert(predInfo.numSuccsReachingRecursiveCall > 0);
+          predInfo.numSuccsReachingRecursiveCall -= 1;
+        }
+
+        if (predInfo.reachesFunctionExit ||
             // Recursive calls block the flag propagation.
             predInfo.recursiveCall != nullptr)
           continue;
 
-        assert(predInfo.numSuccsNotReachingReturn > 0);
-        predInfo.numSuccsNotReachingReturn -= 1;
-
         // This is the trick for handling invariant conditions: usually the
-        // `reachesReturn` flag is propagated if _any_ of the successors has it
-        // set.
+        // `reachesFunctionExit` flag is propagated if _any_ of the successors
+        // has it set.
         // For invariant conditions, it's only propagated if _all_ successors
-        // have it set. If at least one of the successors reaches a recursive
-        // call and this successor is taken once, it will be taken forever
-        // (because the condition is invariant).
+        // which reach recursive calls also reach a function exit.
+        // If at least one of the successors reaches a recursive call (but not
+        // a function exit) and this successor is taken once, it will be taken
+        // forever (because the condition is invariant).
         if (predInfo.hasInvariantCondition &&
-            predInfo.numSuccsNotReachingReturn > 0)
+            predInfo.numSuccsReachingRecursiveCall > 0)
           continue;
 
-        predInfo.reachesReturn = true;
+        predInfo.reachesFunctionExit = true;
         workList.push_back(pred);
       }
     }
-    return blockInfos.entry().data.reachesReturn;
   }
+  
+  /// Finds all infinite recursive calls reachable from the entry and issues
+  /// warnings.
+  /// Returns true if the function contains infinite recursive calls.
+  bool issueWarningsForInfiniteRecursiveCalls() {
+    const BlockInfo &entryInfo = blockInfos.entry().data;
+    if (!entryInfo.reachesRecursiveCall || entryInfo.reachesFunctionExit)
+      return false;
 
-  /// Propagates the `reachableFromEntry` flags down the control flow and
-  /// issues a warning if it reaches a recursive call.
-  /// Returns true, if at least one recursive call is found.
-  bool findRecursiveCallsAndDiagnose() {
-    SmallVector<SILBasicBlock *, 32> workList;
-    auto entry = blockInfos.entry();
-    entry.data.reachableFromEntry = true;
-    workList.push_back(&entry.block);
+    BasicBlockWorklist workList(blockInfos.getFunction());
+    workList.push(&blockInfos.entry().block);
 
-    bool foundInfiniteRecursion = false;
-    while (!workList.empty()) {
-      SILBasicBlock *block = workList.pop_back_val();
+    while (SILBasicBlock *block = workList.pop()) {
       if (auto *recursiveCall = blockInfos[block].recursiveCall) {
         blockInfos.getFunction()->getModule().getASTContext().Diags.diagnose(
                  recursiveCall->getLoc().getSourceLoc(),
                  diag::warn_infinite_recursive_call);
-        foundInfiniteRecursion = true;
         continue;
       }
       for (auto *succ : block->getSuccessorBlocks()) {
         BlockInfo &succInfo = blockInfos[succ];
-        if (!succInfo.reachesReturn && !succInfo.reachableFromEntry) {
-          succInfo.reachableFromEntry = true;
-          workList.push_back(succ);
-        }
+        if (succInfo.reachesRecursiveCall && !succInfo.reachesFunctionExit)
+          workList.pushIfNotVisited(succ);
       }
     }
-    return foundInfiniteRecursion;
+    return true;
   }
 
 public:
@@ -460,14 +501,14 @@ public:
   LLVM_ATTRIBUTE_USED void dump() {
     for (auto bd : blockInfos) {
       llvm::dbgs() << "bb" << bd.block.getDebugID()
-                   << ": numSuccs= " << bd.data.numSuccsNotReachingReturn;
+                   << ": numSuccs= " << bd.data.numSuccsReachingRecursiveCall;
       if (bd.data.recursiveCall)
         llvm::dbgs() << " hasRecursiveCall";
       if (bd.data.hasInvariantCondition)
         llvm::dbgs() << " hasInvariantCondition";
-      if (bd.data.reachesReturn)
-        llvm::dbgs() << " reachesReturn";
-      if (bd.data.reachableFromEntry)
+      if (bd.data.reachesFunctionExit)
+        llvm::dbgs() << " reachesFunctionExit";
+      if (bd.data.reachesRecursiveCall)
         llvm::dbgs() << " reachesRecursiveCall";
       llvm::dbgs() << '\n';
     }
@@ -477,20 +518,9 @@ public:
   /// Returns true, if at least one recursive call is found.
   static bool analyzeAndDiagnose(SILFunction *function, Invariants invariants) {
     InfiniteRecursionAnalysis analysis(function, invariants);
-    if (analysis.isEntryReachableFromReturn())
-      return false;
-
-    // Now we know that the function never returns.
-    // There can be three cases:
-    // 1. All paths end up in an abnormal program termination, like fatalError().
-    //    We don't want to warn about this. It's probably intention.
-    // 2. There is an infinite loop.
-    //    We don't want to warn about this either. Maybe it's intention. Anyway,
-    //    this case is handled by the DiagnoseUnreachable pass.
-    // 3. There is an infinite recursion.
-    //    That's what we are interested in. We do a forward propagation to find
-    //    the actual infinite recursive call(s) - if any.
-    return analysis.findRecursiveCallsAndDiagnose();
+    analysis.propagateRecursiveCalls();
+    analysis.propagateFunctionExits();
+    return analysis.issueWarningsForInfiniteRecursiveCalls();
   }
 };
 

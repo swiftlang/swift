@@ -86,8 +86,6 @@ using namespace swift;
 // Temporary debugging flag until this pass is better tested.
 static llvm::cl::opt<bool> EnableCopyForwarding("enable-copyforwarding",
                                                 llvm::cl::init(true));
-static llvm::cl::opt<bool> EnableDestroyHoisting("enable-destroyhoisting",
-                                                llvm::cl::init(true));
 
 /// \return true if the given copy source value can only be accessed via the
 /// given def (this def uniquely identifies the object).
@@ -194,7 +192,7 @@ public:
   virtual bool visitNormalUse(SILInstruction *user) = 0;
   virtual bool visitTake(CopyAddrInst *copy) = 0;
   virtual bool visitDestroy(DestroyAddrInst *destroy) = 0;
-  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) = 0;
+  virtual bool visitDebugValue(DebugValueInst *debugValue) = 0;
 };
 } // namespace
 
@@ -265,12 +263,16 @@ static bool visitAddressUsers(SILValue address, SILInstruction *ignoredUser,
     case SILInstructionKind::StoreInst:
       if (!visitor.visitNormalUse(UserInst))
         return false;
-
       break;
-    case SILInstructionKind::DebugValueAddrInst:
-      if (!visitor.visitDebugValue(cast<DebugValueAddrInst>(UserInst)))
+    case SILInstructionKind::DebugValueInst:
+      if (auto *DV = DebugValueInst::hasAddrVal(UserInst)) {
+        if (!visitor.visitDebugValue(DV))
+          return false;
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "  Skipping copy: use exposes def"
+                                << *UserInst);
         return false;
-
+      }
       break;
     case SILInstructionKind::DeallocStackInst:
       break;
@@ -385,9 +387,12 @@ public:
     Oper = &UserInst->getOperandRef();
     return false;
   }
-  bool visitDebugValueAddrInst(DebugValueAddrInst *UserInst) {
-    Oper = &UserInst->getOperandRef();
-    return false;
+  bool visitDebugValueInst(DebugValueInst *UserInst) {
+    if (UserInst->hasAddrVal()) {
+      Oper = &UserInst->getOperandRef();
+      return false;
+    }
+    return true;
   }
   bool visitInitEnumDataAddrInst(InitEnumDataAddrInst *UserInst) {
     llvm_unreachable("illegal reinitialization");
@@ -489,9 +494,12 @@ public:
     }
     return true;
   }
-  bool visitDebugValueAddrInst(DebugValueAddrInst *UserInst) {
-    Oper = &UserInst->getOperandRef();
-    return false;
+  bool visitDebugValueInst(DebugValueInst *UserInst) {
+    if (UserInst->hasAddrVal()) {
+      Oper = &UserInst->getOperandRef();
+      return false;
+    }
+    return true;
   }
   bool visitSILInstruction(SILInstruction *UserInst) {
     return false;
@@ -503,7 +511,6 @@ class CopyForwarding {
   PostOrderAnalysis *PostOrder;
   DominanceAnalysis *DomAnalysis;
   RCIdentityAnalysis *RCIAnalysis;
-  bool DoGlobalHoisting;
   bool HasChanged;
   bool HasChangedCFG;
 
@@ -523,9 +530,8 @@ class CopyForwarding {
 
   bool HasForwardedToCopy;
   SmallPtrSet<SILInstruction*, 16> SrcUserInsts;
-  SmallPtrSet<DebugValueAddrInst*, 4> SrcDebugValueInsts;
+  SmallPtrSet<SILInstruction*, 4> SrcDebugValueInsts;
   SmallVector<CopyAddrInst*, 4> TakePoints;
-  SmallPtrSet<SILInstruction *, 16> StoredValueUserInsts;
   SmallVector<DestroyAddrInst*, 4> DestroyPoints;
   SmallPtrSet<SILBasicBlock*, 32> DeadInBlocks;
 
@@ -560,7 +566,7 @@ class CopyForwarding {
       CPF.DestroyPoints.push_back(destroy);
       return true;
     }
-    virtual bool visitDebugValue(DebugValueAddrInst *debugValue) override {
+    virtual bool visitDebugValue(DebugValueInst *debugValue) override {
       return CPF.SrcDebugValueInsts.insert(debugValue).second;
     }
   };
@@ -569,7 +575,7 @@ public:
   CopyForwarding(PostOrderAnalysis *PO, DominanceAnalysis *DA,
                  RCIdentityAnalysis *RCIAnalysis)
     : PostOrder(PO), DomAnalysis(DA), RCIAnalysis(RCIAnalysis),
-      DoGlobalHoisting(false), HasChanged(false), HasChangedCFG(false),
+      HasChanged(false), HasChangedCFG(false),
       IsSrcLoadedFrom(false), HasUnknownStoredValue(false),
       HasForwardedToCopy(false), CurrentCopy(nullptr) {}
 
@@ -580,7 +586,6 @@ public:
     // some alloc_stack cases after global destroy hoisting. CopyForwarding will
     // be reapplied after the transparent function is inlined at which point
     // global hoisting will be done.
-    DoGlobalHoisting = !F->isTransparent();
     if (HasChangedCFG) {
       // We are only invalidating the analysis that we use internally.
       // We'll invalidate the analysis that are used by other passes at the end.
@@ -595,7 +600,6 @@ public:
     SrcUserInsts.clear();
     SrcDebugValueInsts.clear();
     TakePoints.clear();
-    StoredValueUserInsts.clear();
     DestroyPoints.clear();
     DeadInBlocks.clear();
     CurrentCopy = nullptr;
@@ -611,14 +615,13 @@ public:
   void forwardCopiesOf(SILValue Def, SILFunction *F);
 
 protected:
-  bool propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy);
+  bool propagateCopy(CopyAddrInst *CopyInst);
   CopyAddrInst *findCopyIntoDeadTemp(
       CopyAddrInst *destCopy,
-      SmallVectorImpl<DebugValueAddrInst *> &debugInstsToDelete);
+      SmallVectorImpl<SILInstruction *> &debugInstsToDelete);
   bool forwardDeadTempCopy(CopyAddrInst *destCopy);
   bool forwardPropagateCopy();
   bool backwardPropagateCopy();
-  bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc);
 
   bool isSourceDeadAtCopy();
 
@@ -645,7 +648,7 @@ public:
   virtual bool visitDestroy(DestroyAddrInst *destroy) override {
     return DestUsers.insert(destroy).second;
   }
-  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) override {
+  virtual bool visitDebugValue(DebugValueInst *debugValue) override {
     return DestUsers.insert(debugValue).second;
   }
 };
@@ -660,7 +663,7 @@ public:
 /// If the forwarded copy is not an [init], then insert a destroy of the copy's
 /// dest.
 bool CopyForwarding::
-propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
+propagateCopy(CopyAddrInst *CopyInst) {
   if (!EnableCopyForwarding)
     return false;
 
@@ -682,7 +685,7 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
 
   // Handle copy-of-copy without analyzing uses.
   // Assumes that CurrentCopy->getSrc() is dead after CurrentCopy.
-  assert(CurrentCopy->isTakeOfSrc() || hoistingDestroy);
+  assert(CurrentCopy->isTakeOfSrc());
   if (forwardDeadTempCopy(CurrentCopy)) {
     HasChanged = true;
     ++NumDeadTemp;
@@ -692,8 +695,7 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
   if (forwardPropagateCopy()) {
     LLVM_DEBUG(llvm::dbgs() << "  Forwarding Copy:" << *CurrentCopy);
     if (!CurrentCopy->isInitializationOfDest()) {
-      // Replace the original copy with a destroy. We may be able to hoist it
-      // more in another pass but don't currently iterate.
+      // Replace the original copy with a destroy.
       SILBuilderWithScope(CurrentCopy)
           .createDestroyAddr(CurrentCopy->getLoc(), CurrentCopy->getDest());
     }
@@ -739,7 +741,7 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
 /// intervening instructions, it avoids the need to analyze projection paths.
 CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(
     CopyAddrInst *destCopy,
-    SmallVectorImpl<DebugValueAddrInst *> &debugInstsToDelete) {
+    SmallVectorImpl<SILInstruction *> &debugInstsToDelete) {
   auto tmpVal = destCopy->getSrc();
   assert(tmpVal == CurrentDef);
   assert(isIdentifiedSourceValue(tmpVal));
@@ -756,13 +758,13 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(
     if (SrcUserInsts.count(UserInst))
       return nullptr;
 
-    // Collect all debug_value_addr instructions between temp to dest copy and
-    // src to temp copy. On success, these debug_value_addr instructions should
-    // be deleted.
-    if (auto *debugUser = dyn_cast<DebugValueAddrInst>(UserInst)) {
+    // Collect all debug_value w/ address value instructions between temp to
+    // dest copy and src to temp copy.
+    // On success, these debug_value instructions should be deleted.
+    if (isa<DebugValueInst>(UserInst)) {
       // 'SrcDebugValueInsts' consists of all the debug users of 'temp'
-      if (SrcDebugValueInsts.count(debugUser))
-        debugInstsToDelete.push_back(debugUser);
+      if (SrcDebugValueInsts.count(UserInst))
+        debugInstsToDelete.push_back(UserInst);
       continue;
     }
 
@@ -795,7 +797,7 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(
 ///   attempts to destroy this uninitialized value.
 bool CopyForwarding::
 forwardDeadTempCopy(CopyAddrInst *destCopy) {
-  SmallVector<DebugValueAddrInst*, 2> debugInstsToDelete;
+  SmallVector<SILInstruction*, 2> debugInstsToDelete;
   auto *srcCopy = findCopyIntoDeadTemp(CurrentCopy, debugInstsToDelete);
   if (!srcCopy)
     return false;
@@ -816,21 +818,12 @@ forwardDeadTempCopy(CopyAddrInst *destCopy) {
       .createDestroyAddr(srcCopy->getLoc(), srcCopy->getDest());
   }
 
-  // Delete all dead debug_value_addr instructions
+  // Delete all dead debug_value instructions
   for (auto *deadDebugUser : debugInstsToDelete) {
     deadDebugUser->eraseFromParent();
   }
 
-  // Either `destCopy` is a take, or the caller is hoisting a destroy:
-  // copy_addr %temp, %dest
-  // ...
-  // destroy %temp
-  //
-  // If the caller is hoisting a destroy, and we return `true` then it will
-  // erase the destroy for us. Either way, it's safe to simply rewrite destCopy.
-  // For now, don't bother finding the subsequent destroy, because this isn't
-  // the common case.
-
+  // `destCopy` is a take.  It's safe to simply rewrite destCopy.
   destCopy->setSrc(srcCopy->getSrc());
   destCopy->setIsTakeOfSrc(srcCopy->isTakeOfSrc());
   srcCopy->eraseFromParent();
@@ -867,8 +860,7 @@ bool CopyForwarding::doesCopyDominateDestUsers(
   return true;
 }
 
-// Add all recognized users of storedValue to StoredValueUserInsts. Return true
-// if all users were recgonized.
+// Return true if all users were recgonized.
 //
 // To find all SSA users of storedValue, we first find the RC root, then search
 // past any instructions that may propagate the reference.
@@ -889,19 +881,16 @@ bool CopyForwarding::markStoredValueUsers(SILValue storedValue) {
     // Recognize any uses that have no results as normal uses. They cannot
     // transitively propagate a reference.
     if (user->getResults().empty()) {
-      StoredValueUserInsts.insert(user);
       continue;
     }
     // Recognize full applies as normal uses. They may transitively retain, but
     // the caller cannot rely on that.
     if (FullApplySite::isa(user)) {
-      StoredValueUserInsts.insert(user);
       continue;
     }
     // A single-valued use is nontransitive if its result is trivial.
     if (auto *SVI = dyn_cast<SingleValueInstruction>(user)) {
       if (SVI->getType().isTrivial(*F)) {
-        StoredValueUserInsts.insert(user);
         continue;
       }
     }
@@ -946,8 +935,7 @@ static DeallocStackInst *getSingleDealloc(AllocStackInst *ASI) {
 /// If the last use (deinit) is a copy, replace it with a destroy+copy[init].
 ///
 /// The caller has already guaranteed that the lifetime of the copy's source
-/// ends at this copy. Either the copy is a [take] or a destroy can be hoisted
-/// to the copy.
+/// ends at this copy. The copy is a [take].
 bool CopyForwarding::forwardPropagateCopy() {
 
   SILValue CopyDest = CurrentCopy->getDest();
@@ -1142,7 +1130,7 @@ bool CopyForwarding::backwardPropagateCopy() {
   bool seenCopyDestDef = false;
   // ValueUses records the uses of CopySrc in reverse order.
   SmallVector<Operand*, 16> ValueUses;
-  SmallVector<DebugValueAddrInst*, 4> DebugValueInstsToDelete;
+  SmallVector<SILInstruction*, 4> DebugValueInstsToDelete;
   auto SI = CurrentCopy->getIterator(), SE = CurrentCopy->getParent()->begin();
   while (SI != SE) {
     --SI;
@@ -1155,8 +1143,8 @@ bool CopyForwarding::backwardPropagateCopy() {
     if (UserInst == CopyDestRoot->getDefiningInstruction()
         || DestUserInsts.count(UserInst)
         || RootUserInsts.count(UserInst)) {
-      if (auto *DVAI = dyn_cast<DebugValueAddrInst>(UserInst)) {
-        DebugValueInstsToDelete.push_back(DVAI);
+      if (DebugValueInst::hasAddrVal(UserInst)) {
+        DebugValueInstsToDelete.push_back(UserInst);
         continue;
       }
       LLVM_DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
@@ -1165,8 +1153,8 @@ bool CopyForwarding::backwardPropagateCopy() {
     }
     // Early check to avoid scanning unrelated instructions.
     if (!SrcUserInsts.count(UserInst)
-        && !(isa<DebugValueAddrInst>(UserInst)
-             && SrcDebugValueInsts.count(cast<DebugValueAddrInst>(UserInst))))
+        && !(isa<DebugValueInst>(UserInst)
+             && SrcDebugValueInsts.count(UserInst)))
       continue;
 
     AnalyzeBackwardUse AnalyzeUse(CopySrc);
@@ -1210,87 +1198,6 @@ bool CopyForwarding::backwardPropagateCopy() {
   return true;
 }
 
-/// Attempt to hoist a destroy point up to the last use. If the last use is a
-/// copy, eliminate both the copy and the destroy.
-///
-/// The copy will be eliminated if the original is not accessed between the
-/// point of copy and the original's destruction.
-///
-/// CurrentDef = <uniquely identified> // no aliases
-/// ...
-/// Copy = copy_addr [init] Def
-/// ...                    // no access to CurrentDef
-/// destroy_addr Def
-///
-/// Return true if a destroy was inserted, forwarded from a copy, or the
-/// block was marked dead-in.
-bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
-                                  SILLocation DestroyLoc) {
-  if (!EnableDestroyHoisting)
-    return false;
-
-  assert(!SrcUserInsts.count(DestroyPoint) && "caller should check terminator");
-  SILBasicBlock *BB = DestroyPoint->getParent();
-
-  // If DestroyPoint is a block terminator, we must hoist.
-  bool MustHoist = (DestroyPoint == BB->getTerminator());
-  // If we haven't seen anything significant, avoid useless hoisting.
-  bool ShouldHoist = MustHoist;
-
-  auto tryToInsertHoistedDestroyAfter = [&](SILInstruction *afterInst) {
-    if (!ShouldHoist)
-      return false;
-    LLVM_DEBUG(llvm::dbgs() << "  Hoisting to Use:" << *afterInst);
-    SILBuilderWithScope(std::next(afterInst->getIterator()), afterInst)
-        .createDestroyAddr(DestroyLoc, CurrentDef);
-    HasChanged = true;
-    return true;
-  };
-
-  auto SI = DestroyPoint->getIterator(), SE = BB->begin();
-  while (SI != SE) {
-    --SI;
-    SILInstruction *Inst = &*SI;
-    if (!SrcUserInsts.count(Inst)) {
-      if (StoredValueUserInsts.count(Inst)) {
-        // The current definition may take ownership of a value stored into its
-        // address. Its lifetime cannot end before the last use of that stored
-        // value.
-        // CurrentDef = ...
-        // Copy = copy_addr CurrentDef to ...
-        // store StoredValue to CurrentDef
-        // ...                    // no access to CurrentDef
-        // retain StoredValue
-        // destroy_addr CurrentDef
-        LLVM_DEBUG(llvm::dbgs() << "  Cannot hoist above stored value use:"
-                                << *Inst);
-        return tryToInsertHoistedDestroyAfter(Inst);
-      }
-      if (!ShouldHoist && isa<ApplyInst>(Inst))
-        ShouldHoist = true;
-      continue;
-    }
-    if (auto *CopyInst = dyn_cast<CopyAddrInst>(Inst)) {
-      if (!CopyInst->isTakeOfSrc() && CopyInst->getSrc() == CurrentDef) {
-        // This use is a copy of CurrentDef. Attempt to forward CurrentDef to
-        // all uses of the copy's value.
-        if (propagateCopy(CopyInst, /*hoistingDestroy=*/true))
-          return true;
-      }
-    }
-    return tryToInsertHoistedDestroyAfter(Inst);
-  }
-  if (!DoGlobalHoisting) {
-    // If DoGlobalHoisting is set, then we should never mark a DeadInBlock, so
-    // MustHoist should be false.
-    assert(!MustHoist &&
-           "Cannot hoist above a terminator with global hoisting disabled.");
-    return false;
-  }
-  DeadInBlocks.insert(BB);
-  return true;
-}
-
 /// Perform CopyForwarding on the current Def.
 void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   reset(F);
@@ -1300,86 +1207,9 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   if (!visitAddressUsers(Def, nullptr, visitor))
     return;
 
-  // First forward any copies that implicitly destroy CurrentDef. There is no
-  // need to hoist Destroy for these.
+  // Forward any copies that implicitly destroy CurrentDef.
   for (auto *CopyInst : TakePoints) {
-    propagateCopy(CopyInst, /*hoistingDestroy=*/false);
-  }
-  // If the copied address is also loaded from, then destroy hoisting is unsafe.
-  //
-  // TODO: Record all loads during collectUsers. Implement findRetainPoints to
-  // peek though projections of the load, like unchecked_enum_data to find the
-  // true extent of the lifetime including transitively referenced objects.
-  if (IsSrcLoadedFrom || HasUnknownStoredValue)
-    return;
-
-  bool HoistedDestroyFound = false;
-  SILLocation HoistedDestroyLoc = F->getLocation();
-  const SILDebugScope *HoistedDebugScope = nullptr;
-
-  for (auto *Destroy : DestroyPoints) {
-    // If hoistDestroy returns false, it was not worth hoisting.
-    if (hoistDestroy(Destroy, Destroy->getLoc())) {
-      // Propagate DestroyLoc for any destroy hoisted above a block.
-      if (DeadInBlocks.count(Destroy->getParent())) {
-        HoistedDestroyLoc = Destroy->getLoc();
-        HoistedDebugScope = Destroy->getDebugScope();
-        HoistedDestroyFound = true;
-      }
-      // We either just created a new destroy, forwarded a copy, or will
-      // continue propagating from this dead-in block. In any case, erase the
-      // original Destroy.
-      Destroy->eraseFromParent();
-      assert(HasChanged || !DeadInBlocks.empty() && "HasChanged should be set");
-    }
-  }
-  // Any blocks containing a DestroyPoints where hoistDestroy did not find a use
-  // are now marked in DeadInBlocks.
-  if (DeadInBlocks.empty())
-    return;
-
-  assert(HoistedDestroyFound && "Hoisted destroy should have been found");
-
-  DestroyPoints.clear();
-
-  // Propagate dead-in blocks upward via PostOrder traversal.
-  // TODO: We could easily handle hoisting above loops if LoopInfo is available.
-  //
-  for (auto *BB : PostOrder->get(F)->getPostOrder()) {
-    SmallVector<unsigned, 4> DeadInSuccs;
-    ArrayRef<SILSuccessor> Succs = BB->getSuccessors();
-    if (Succs.empty())
-      continue;
-
-    for (unsigned EdgeIdx = 0, End = Succs.size(); EdgeIdx != End; ++EdgeIdx) {
-      if (DeadInBlocks.count(Succs[EdgeIdx].getBB()))
-        DeadInSuccs.push_back(EdgeIdx);
-    }
-    if (DeadInSuccs.size() == Succs.size() &&
-        !SrcUserInsts.count(BB->getTerminator())) {
-      // All successors are dead, so continue hoisting.
-      bool WasHoisted = hoistDestroy(BB->getTerminator(), HoistedDestroyLoc);
-      (void)WasHoisted;
-      assert(WasHoisted && "should always hoist above a terminator");
-      continue;
-    }
-    // Emit a destroy on each CFG edge leading to a dead-in block. This requires
-    // splitting critical edges and will naturally handle redundant branch
-    // targets.
-    for (unsigned EdgeIdx : DeadInSuccs) {
-      SILBasicBlock *SuccBB = splitCriticalEdge(BB->getTerminator(), EdgeIdx);
-      if (SuccBB)
-        HasChangedCFG = true;
-      else
-        SuccBB = BB->getSuccessors()[EdgeIdx];
-
-      // We make no attempt to use the best DebugLoc, because in all known
-      // cases, we only have one.
-      SILBuilder B(SuccBB->begin());
-      B.setCurrentDebugScope(HoistedDebugScope);
-      B.createDestroyAddr(HoistedDestroyLoc, CurrentDef);
-      HasChanged = true;
-    }
+    propagateCopy(CopyInst);
   }
 }
 
@@ -1438,7 +1268,8 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   if (!CopyInst->isTakeOfSrc())
     return false;
 
-  if (!isa<AllocStackInst>(CopyInst->getSrc()))
+  auto *asi = dyn_cast<AllocStackInst>(CopyInst->getSrc());
+  if (!asi || asi->hasDynamicLifetime())
     return false;
 
   // The copy's dest must be an indirect SIL argument. Otherwise, it may not
@@ -1505,7 +1336,7 @@ static llvm::cl::opt<int> ForwardStop("copy-forward-stop",
 class CopyForwardingPass : public SILFunctionTransform
 {
   void run() override {
-    if (!EnableCopyForwarding && !EnableDestroyHoisting)
+    if (!EnableCopyForwarding)
       return;
 
     // This pass assumes that the ownership lifetime of a value in a memory
@@ -1536,7 +1367,7 @@ class CopyForwardingPass : public SILFunctionTransform
     for (auto &BB : *getFunction())
       for (auto II = BB.begin(), IE = BB.end(); II != IE; ++II) {
         if (auto *CopyInst = dyn_cast<CopyAddrInst>(&*II)) {
-          if (EnableDestroyHoisting && canNRVO(CopyInst)) {
+          if (canNRVO(CopyInst)) {
             NRVOCopies.push_back(CopyInst);
             continue;
           }

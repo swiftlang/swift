@@ -51,6 +51,18 @@ void DerivedConformance::addMembersToConformanceContext(
     IDC->addMember(child);
 }
 
+void DerivedConformance::addMemberToConformanceContext(
+    Decl *member, Decl *hint) {
+  auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  IDC->addMember(member, hint, /*insertAtHead=*/false);
+}
+
+void DerivedConformance::addMemberToConformanceContext(
+    Decl *member, bool insertAtHead) {
+  auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  IDC->addMember(member, /*hint=*/nullptr, insertAtHead);
+}
+
 Type DerivedConformance::getProtocolType() const {
   return Protocol->getDeclaredInterfaceType();
 }
@@ -77,8 +89,13 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
+
+  if (*derivableKind == KnownDerivableProtocolKind::Identifiable)
+    return canDeriveIdentifiable(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
     return canDeriveDistributedActor(Nominal, DC);
+  if (*derivableKind == KnownDerivableProtocolKind::DistributedActorSystem)
+    return canDeriveDistributedActorSystem(Nominal, DC);
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
@@ -192,6 +209,14 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
 
   if (*knownProtocol == KnownProtocolKind::Comparable) {
     tryDiagnoseFailedComparableDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::DistributedActor) {
+    tryDiagnoseFailedDistributedActorDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::DistributedActorSystem) {
+    tryDiagnoseFailedDistributedActorSystemDerivation(DC, nominal);
   }
 }
 
@@ -312,6 +337,14 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_unownedExecutor))
       return getRequirement(KnownProtocolKind::Actor);
 
+    // DistributedActor.id
+    if (name.isSimpleName(ctx.Id_id))
+      return getRequirement(KnownProtocolKind::DistributedActor);
+
+    // DistributedActor.actorSystem
+    if (name.isSimpleName(ctx.Id_actorSystem))
+      return getRequirement(KnownProtocolKind::DistributedActor);
+
     return nullptr;
   }
 
@@ -350,6 +383,22 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_into)
         return getRequirement(KnownProtocolKind::Hashable);
     }
+
+    // static DistributedActor.resolve(id:using:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_resolve &&
+        func->isStatic()) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2 &&
+          argumentNames[0] == ctx.Id_id &&
+          argumentNames[1] == ctx.Id_using) {
+        return getRequirement(KnownProtocolKind::DistributedActor);
+      }
+    }
+
+    // DistributedActor.actorSystem
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_invokeHandlerOnReturn)
+      return getRequirement(KnownProtocolKind::DistributedActorSystem);
 
     return nullptr;
   }
@@ -431,8 +480,8 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   Expr *ref = new (ctx) DeclRefExpr(declRef, DeclNameLoc(),
                                     /*Implicit=*/true,
                                     AccessSemantics::Ordinary, fnType);
-  CallExpr *call =
-    CallExpr::createImplicit(ctx, ref, args, /*labels*/ {});
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, args);
+  auto *call = CallExpr::createImplicit(ctx, ref, argList);
   call->setType(resultType);
   call->setThrows(false);
 
@@ -468,23 +517,33 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     property->getInterfaceType(), parentDC);
   getterDecl->setImplicit();
   getterDecl->setIsTransparent(false);
-
   getterDecl->copyFormalAccessFrom(property);
 
 
   return getterDecl;
 }
 
+static VarDecl::Introducer
+mapIntroducer(DerivedConformance::SynthesizedIntroducer intro) {
+  switch (intro) {
+  case DerivedConformance::SynthesizedIntroducer::Let:
+    return VarDecl::Introducer::Let;
+  case DerivedConformance::SynthesizedIntroducer::Var:
+    return VarDecl::Introducer::Var;
+  }
+  llvm_unreachable("Invalid synthesized introducer!");
+}
+
 std::pair<VarDecl *, PatternBindingDecl *>
-DerivedConformance::declareDerivedProperty(Identifier name,
+DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
+                                           Identifier name,
                                            Type propertyInterfaceType,
                                            Type propertyContextType,
                                            bool isStatic, bool isFinal) {
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (Context)
-      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
-              SourceLoc(), name, parentDC);
+  VarDecl *propDecl = new (Context) VarDecl(
+      /*IsStatic*/ isStatic, mapIntroducer(intro), SourceLoc(), name, parentDC);
   propDecl->setImplicit();
   propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
@@ -542,7 +601,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
     return true;
   }
 
-  // A non-final class can't have an protocol-witnesss initializer in an
+  // A non-final class can't have a protocol-witnesses initializer in an
   // extension.
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
     if (!CD->isSemanticallyFinal() && isa<ConstructorDecl>(synthesizing) &&
@@ -551,6 +610,16 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
           diag::cannot_synthesize_init_in_extension_of_nonfinal,
           getProtocolType(), synthesizing->getName());
       return true;
+    }
+  }
+
+  if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
+    if (ED->getAllCases().empty() &&
+        (Protocol->isSpecificProtocol(KnownProtocolKind::Encodable) ||
+         Protocol->isSpecificProtocol(KnownProtocolKind::Decodable))) {
+      ED->diagnose(diag::codable_synthesis_empty_enum_not_supported,
+                   getProtocolType(), Nominal->getBaseIdentifier());
+      return false;
     }
   }
 
@@ -831,4 +900,19 @@ VarDecl *DerivedConformance::indexedVarDecl(char prefixChar, int index, Type typ
                                  varContext);
   varDecl->setInterfaceType(type);
   return varDecl;
+}
+
+bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
+  if (!getActorIsolation(nominal).isActorIsolated())
+    return false;
+
+  for (auto property : nominal->getStoredProperties()) {
+    if (!property->isUserAccessible())
+      continue;
+
+    if (!property->isLet())
+      return true;
+  }
+
+  return false;
 }

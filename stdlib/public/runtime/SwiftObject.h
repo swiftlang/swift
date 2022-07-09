@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <utility>
 #include "swift/Runtime/HeapObject.h"
+#include "../runtime/SwiftHashableSupport.h"
 #if SWIFT_OBJC_INTEROP
 #include <objc/NSObject.h>
 #endif
@@ -89,7 +90,11 @@ namespace swift {
 
 /// Get the NSObject metadata.
 const Metadata *getNSObjectMetadata();
+const Metadata *getNSStringMetadata();
 
+namespace hashable_support {
+const HashableWitnessTable *getNSStringHashableConformance();
+}
 }
 
 #endif

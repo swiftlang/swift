@@ -37,10 +37,11 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
                                                 DeclContext *dc,
                                                 CanGenericSignature sig) {
   SmallVector<GenericTypeParamDecl *, 2> clonedParams;
-  for (auto paramType : sig->getGenericParams()) {
-    auto clonedParam = new (ctx)
-        GenericTypeParamDecl(dc, paramType->getName(), SourceLoc(),
-                             paramType->getDepth(), paramType->getIndex());
+  for (auto paramType : sig.getGenericParams()) {
+    auto clonedParam = GenericTypeParamDecl::create(
+        dc, paramType->getName(), SourceLoc(), paramType->isTypeSequence(),
+        paramType->getDepth(), paramType->getIndex(),
+        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
     clonedParam->setDeclContext(dc);
     clonedParam->setImplicit(true);
     clonedParams.push_back(clonedParam);
@@ -374,7 +375,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   CanGenericSignature derivativeFnGenSig = nullptr;
   if (auto *derivativeFnGenEnv = derivativeFn->getGenericEnvironment())
     derivativeFnGenSig =
-        derivativeFnGenEnv->getGenericSignature()->getCanonicalSignature();
+        derivativeFnGenEnv->getGenericSignature().getCanonicalSignature();
 
   // Create linear map struct for each original block.
   for (auto &origBB : *original) {

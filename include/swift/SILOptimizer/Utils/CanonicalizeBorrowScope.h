@@ -16,25 +16,22 @@
 /// deleted, which in turn allows canonicalization of the outer owned values
 /// (via CanonicalizeOSSALifetime).
 ///
-/// This does not shrink borrow scopes; it does not rewrite end_borrows.
-///
-/// TODO: A separate utility to shrink borrow scopes should eventually run
-/// before this utility. It should hoist end_borrow up to the latest "destroy
-/// barrier" whenever the scope does not contain a PointerEscape.
+/// This does not shrink borrow scopes; it does not rewrite end_borrows.  For
+/// that, see ShrinkBorrowScope.
 ///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEBORROWSCOPES_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEBORROWSCOPES_H
 
-#include "swift/Basic/DAGNodeWorklist.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/PrunedLiveness.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -69,10 +66,10 @@ private:
   InstructionDeleter &deleter;
 
   /// Visited set for general def-use traversal that prevents revisiting values.
-  DAGNodeWorklist<SILValue, 8> defUseWorklist;
+  GraphNodeWorklist<SILValue, 8> defUseWorklist;
 
   /// Visited set general CFG traversal that prevents revisiting blocks.
-  DAGNodeWorklist<SILBasicBlock *, 8> blockWorklist;
+  GraphNodeWorklist<SILBasicBlock *, 8> blockWorklist;
 
   /// Record any copies outside the borrow scope that were updated. This
   /// includes the outer copy that us used by outer uses and copies for any
@@ -136,7 +133,7 @@ public:
 
 protected:
   void initBorrow(BorrowedValue borrow) {
-    assert(liveness.empty() && persistentCopies.empty());
+    assert(borrow && liveness.empty() && persistentCopies.empty());
 
     updatedCopies.clear();
     borrowedValue = borrow;
@@ -149,6 +146,18 @@ protected:
 
   bool consolidateBorrowScope();
 };
+
+bool shrinkBorrowScope(
+    BeginBorrowInst const &bbi, InstructionDeleter &deleter,
+    SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts);
+
+MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
+                                                 DominanceInfo &dominanceTree,
+                                                 InstructionDeleter &deleter);
+
+bool hoistDestroysOfOwnedLexicalValue(SILValue const value,
+                                      SILFunction &function,
+                                      InstructionDeleter &deleter);
 
 } // namespace swift
 

@@ -293,10 +293,10 @@ func triggerUseLazyTestAutoclosure() {
 
   // Rather, an implicit closure is referenced
   // CHECK: // function_ref implicit closure #1 in triggerUseLazyTestAutoclosure()
-  // CHECK: function_ref @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ : $@convention(thin) () -> Int
+  // CHECK: function_ref @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ :
 
   // And the implicit closure calls computeInt()
-  // CHECK: sil private [transparent] [ossa] @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ : $@convention(thin) () -> Int
+  // CHECK: sil private [transparent] [ossa] @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ :
   // CHECK: // function_ref computeInt()
   // CHECK: function_ref @$s17property_wrappers10computeIntSiyF : $@convention(thin) () -> Int
 }
@@ -956,6 +956,34 @@ class Model {}
 struct TestAutoclosureComposition {
   @Once @ObservedObject var model = Model()
 }
+
+@propertyWrapper
+struct SR_15940Foo {
+  var wrappedValue: Int { 0 }
+}
+
+struct SR_15940_C {
+  func a() {
+    @SR_15940Foo var b: Int
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers10SR_15940_CV1ayyF : $@convention(method) (SR_15940_C) -> () {
+// CHECK: bb0(%0 : $SR_15940_C):
+// CHECK-NEXT:  debug_value %0 : $SR_15940_C, let, name "self", argno 1, implicit
+// CHECK-NEXT:  [[BOX:%.*]] = alloc_box ${ var SR_15940Foo }, var, name "_b"
+// CHECK-NEXT:  [[LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]] : ${ var SR_15940Foo }
+// CHECK-NEXT:  [[BOXADDR:%.*]] = project_box [[LIFETIME]] : ${ var SR_15940Foo }, 0
+// CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin SR_15940Foo.Type
+// CHECK-NEXT:  // function_ref SR_15940Foo.init()
+// CHECK-NEXT:  [[DEFAULTVALUE_FN:%.*]] = function_ref @$s17property_wrappers11SR_15940FooVACycfC : $@convention(method) (@thin SR_15940Foo.Type) -> SR_15940Foo
+// CHECK-NEXT:  [[DEFAULTRESULT:%.*]] = apply [[DEFAULTVALUE_FN]]([[METATYPE]]) : $@convention(method) (@thin SR_15940Foo.Type) -> SR_15940Foo
+// CHECK-NEXT:  store [[DEFAULTRESULT]] to [trivial] [[BOXADDR]] : $*SR_15940Foo
+// CHECK-NEXT:  end_borrow [[LIFETIME]] : ${ var SR_15940Foo }
+// CHECK-NEXT:  destroy_value [[BOX]] : ${ var SR_15940Foo }
+// CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:  return [[TUPLE]] : $()
+// CHECK-NEXT:  } // end sil function '$s17property_wrappers10SR_15940_CV1ayyF
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter

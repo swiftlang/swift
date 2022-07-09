@@ -157,6 +157,7 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::SetDeallocatingInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::EndBorrowInst:
@@ -430,8 +431,7 @@ private:
   /// Function currently processing.
   SILFunction *Fn;
 
-  /// The passmanager we are using.
-  SILPassManager *PM;
+  SILFunctionTransform *parentTransform;
 
   /// The alias analysis that we will use during all computations.
   AliasAnalysis *AA;
@@ -486,14 +486,21 @@ private:
   /// If set, RLE ignores loads from that array type.
   NominalTypeDecl *ArrayType;
 
+  /// Se to true if loads with a `ref_element_addr [immutable]` or
+  /// `ref_tail_addr [immutable]` base address are found.
+  bool immutableLoadsFound = false;
+
+  /// Only optimize loads with a base address of  `ref_element_addr [immutable]`
+  /// `ref_tail_addr [immutable]`.
+  bool onlyImmutableLoads;
+
 #ifndef NDEBUG
   SILPrintContext printCtx;
 #endif
 
 public:
-  RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
-             TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-             EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads);
+  RLEContext(SILFunction *F, SILFunctionTransform *parentTransform,
+             bool disableArrayLoads, bool onlyImmutableLoads);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = delete;
@@ -503,6 +510,8 @@ public:
 
   /// Entry point to redundant load elimination.
   bool run();
+
+  bool shouldOptimizeImmutableLoads() const { return immutableLoadsFound; }
 
   SILFunction *getFunction() const { return Fn; }
 
@@ -569,6 +578,11 @@ public:
       if (!ArrayType ||
           LI->getType().getNominalOrBoundGenericNominal() != ArrayType) {
         return LI;
+      }
+      if (onlyImmutableLoads &&
+          !LSLocation::getBaseAddressOrObject(LI->getOperand(),
+                                             /*stopAtImmutable*/ true).second) {
+        return nullptr;
       }
     }
     return nullptr;
@@ -1134,7 +1148,8 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
   // the basic blocks in the functions are iterated in post order.
   // Then this function can be processed in one iteration, i.e. no
   // need to generate the genset and killset.
-  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(Fn);
+  auto *PO = parentTransform->getPassManager()->
+              getAnalysis<PostOrderAnalysis>()->get(Fn);
   BasicBlockSet HandledBBs(Fn);
   for (SILBasicBlock *B : PO->getReversePostOrder()) {
     ++BBCount;
@@ -1200,14 +1215,18 @@ void BlockState::dump(RLEContext &Ctx) {
 //                          RLEContext Implementation
 //===----------------------------------------------------------------------===//
 
-RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
-                       TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-                       EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads)
-    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI), BBToLocState(F),
-      BBWithLoads(F),
+RLEContext::RLEContext(SILFunction *F, SILFunctionTransform *parentTransform,
+                       bool disableArrayLoads, bool onlyImmutableLoads)
+    : Fn(F), parentTransform(parentTransform),
+      AA(parentTransform->getPassManager()->getAnalysis<AliasAnalysis>(F)),
+      TE(parentTransform->getPassManager()->getAnalysis<TypeExpansionAnalysis>()),
+      PO(parentTransform->getPassManager()->getAnalysis<PostOrderAnalysis>()->get(F)),
+      EAFI(parentTransform->getPassManager()->getAnalysis<EpilogueARCAnalysis>()->get(F)),
+      BBToLocState(F), BBWithLoads(F),
       ArrayType(disableArrayLoads
                     ? F->getModule().getASTContext().getArrayDecl()
-                    : nullptr)
+                    : nullptr),
+      onlyImmutableLoads(onlyImmutableLoads)
 #ifndef NDEBUG
       ,
       printCtx(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true)
@@ -1363,7 +1382,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     }
     endLifetimeAtLeakingBlocks(phi, userBBs);
   }
-  return makeNewValueAvailable(Val, BB);
+  return makeValueAvailable(Val, BB);
 }
 
 bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
@@ -1567,14 +1586,15 @@ bool RLEContext::run() {
   // Phase 4. we perform the redundant load elimination.
   // Walk over the function and find all the locations accessed by
   // this function.
-  std::pair<int, int> LSCount = std::make_pair(0, 0); 
+  int numLoads = 0, numStores = 0;
   LSLocation::enumerateLSLocations(*Fn, LocationVault,
                                    LocToBitIndex,
                                    BaseToLocIndex, TE,
-                                   LSCount);
+                                   /*stopAtImmutable*/ onlyImmutableLoads,
+                                   numLoads, numStores, immutableLoadsFound);
 
   // Check how to optimize this function.
-  ProcessKind Kind = getProcessFunctionKind(LSCount.first, LSCount.second);
+  ProcessKind Kind = getProcessFunctionKind(numLoads, numStores);
   
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)
@@ -1609,6 +1629,9 @@ bool RLEContext::run() {
   // Set up the load forwarding.
   processBasicBlocksForRLE(Optimistic);
 
+  if (!parentTransform->continueWithNextSubpassRun(nullptr))
+    return false;
+
   // Finally, perform the redundant load replacements.
   llvm::SmallVector<SILInstruction *, 16> InstsToDelete;
   bool SILChanged = false;
@@ -1629,6 +1652,10 @@ bool RLEContext::run() {
       auto Iter = Loads.find(V);
       if (Iter == Loads.end())
         continue;
+
+      if (!parentTransform->continueWithNextSubpassRun(V))
+        return SILChanged;
+
       LLVM_DEBUG(llvm::dbgs() << "Replacing  " << SILValue(Iter->first)
                               << "With " << Iter->second);
       auto *origLoad = cast<LoadInst>(Iter->first);
@@ -1647,6 +1674,10 @@ bool RLEContext::run() {
   // Erase the instructions recursively, this way, we get rid of pass
   // dependence on DCE.
   for (auto &X : InstsToDelete) {
+
+    if (!parentTransform->continueWithNextSubpassRun(X))
+      return SILChanged;
+
     // It is possible that the instruction still has uses, because it could be
     // used as the replacement Value, i.e. F.second, for some other RLE pairs.
     //
@@ -1681,14 +1712,23 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "*** RLE on function: " << F->getName()
                             << " ***\n");
 
-    auto *AA = PM->getAnalysis<AliasAnalysis>(F);
-    auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
-    auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-    auto *EAFI = PM->getAnalysis<EpilogueARCAnalysis>()->get(F);
-
-    RLEContext RLE(F, PM, AA, TE, PO, EAFI, disableArrayLoads);
+    RLEContext RLE(F, this, disableArrayLoads,
+                   /*onlyImmutableLoads*/ false);
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
+    if (!continueWithNextSubpassRun(nullptr))
+      return;
+
+    if (RLE.shouldOptimizeImmutableLoads()) {
+      /// Re-running RLE with cutting base addresses off at
+      /// `ref_element_addr [immutable]` or `ref_tail_addr [immutable]` can
+      /// expose additional opportunities.
+      RLEContext RLE2(F, this, disableArrayLoads,
+                      /*onlyImmutableLoads*/ true);
+      if (RLE2.run()) {
+        invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      }
     }
   }
 };

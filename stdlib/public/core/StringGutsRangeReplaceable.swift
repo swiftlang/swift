@@ -299,21 +299,31 @@ extension _StringGuts {
     self = result._guts
   }
 
+  // - Returns: The encoded offset range of the replaced contents in the result.
+  @discardableResult
   internal mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C: Collection, C.Iterator.Element == Character {
+  ) -> Range<Int>
+  where C: Collection, C.Iterator.Element == Character {
     if isUniqueNative {
-      if let replStr = newElements as? String, replStr._guts.isFastUTF8 {
-        replStr._guts.withFastUTF8 {
-          uniqueNativeReplaceSubrange(
-            bounds, with: $0, isASCII: replStr._guts.isASCII)
+      if let repl = newElements as? String {
+        if repl._guts.isFastUTF8 {
+          return repl._guts.withFastUTF8 {
+            uniqueNativeReplaceSubrange(
+              bounds, with: $0, isASCII: repl._guts.isASCII)
+          }
         }
-        return
+      } else if let repl = newElements as? Substring {
+        if repl._wholeGuts.isFastUTF8 {
+          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+            uniqueNativeReplaceSubrange(
+              bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
+          }
+        }
       }
-      uniqueNativeReplaceSubrange(
+      return uniqueNativeReplaceSubrange(
         bounds, with: newElements.lazy.flatMap { $0.utf8 })
-      return
     }
 
     var result = String()
@@ -324,16 +334,74 @@ extension _StringGuts {
     }
     let selfStr = String(self)
     result.append(contentsOf: selfStr[..<bounds.lowerBound])
+    let i = result._guts.count
     result.append(contentsOf: newElements)
+    let j = result._guts.count
     result.append(contentsOf: selfStr[bounds.upperBound...])
     self = result._guts
+    return Range(_uncheckedBounds: (i, j))
   }
 
+  // - Returns: The encoded offset range of the replaced contents in the result.
+  @discardableResult
+  internal mutating func replaceSubrange<C>(
+    _ bounds: Range<Index>,
+    with newElements: C
+  ) -> Range<Int>
+  where C: Collection, C.Iterator.Element == UnicodeScalar {
+    if isUniqueNative {
+      if let repl = newElements as? String.UnicodeScalarView {
+        if repl._guts.isFastUTF8 {
+          return repl._guts.withFastUTF8 {
+            uniqueNativeReplaceSubrange(
+              bounds, with: $0, isASCII: repl._guts.isASCII)
+          }
+        }
+      } else if let repl = newElements as? Substring.UnicodeScalarView {
+        if repl._wholeGuts.isFastUTF8 {
+          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+            uniqueNativeReplaceSubrange(
+              bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
+          }
+        }
+      }
+      if #available(SwiftStdlib 5.1, *) {
+        return uniqueNativeReplaceSubrange(
+          bounds, with: newElements.lazy.flatMap { $0.utf8 })
+      } else {
+        // FIXME: The stdlib should not have a deployment target this ancient.
+        let c = newElements.reduce(0) { $0 + UTF8.width($1) }
+        var utf8: [UInt8] = []
+        utf8.reserveCapacity(c)
+        utf8 = newElements.reduce(into: utf8) { utf8, next in
+          next.withUTF8CodeUnits { utf8.append(contentsOf: $0) }
+        }
+        return uniqueNativeReplaceSubrange(bounds, with: utf8)
+      }
+    }
+
+    var result = String.UnicodeScalarView()
+    // FIXME: It should be okay to get rid of excess capacity
+    // here. rdar://problem/45635432
+    if let capacity = self.nativeCapacity {
+      result.reserveCapacity(capacity)
+    }
+    let selfStr = String.UnicodeScalarView(self)
+    result.append(contentsOf: selfStr[..<bounds.lowerBound])
+    let i = result._guts.count
+    result.append(contentsOf: newElements)
+    let j = result._guts.count
+    result.append(contentsOf: selfStr[bounds.upperBound...])
+    self = result._guts
+    return Range(_uncheckedBounds: (i, j))
+  }
+
+  // - Returns: The encoded offset range of the replaced contents in the result.
   internal mutating func uniqueNativeReplaceSubrange(
     _ bounds: Range<Index>,
     with codeUnits: UnsafeBufferPointer<UInt8>,
     isASCII: Bool
-  ) {
+  ) -> Range<Int> {
     let neededCapacity =
       bounds.lowerBound._encodedOffset
       + codeUnits.count + (self.count - bounds.upperBound._encodedOffset)
@@ -342,17 +410,19 @@ extension _StringGuts {
     _internalInvariant(bounds.lowerBound.transcodedOffset == 0)
     _internalInvariant(bounds.upperBound.transcodedOffset == 0)
 
-    _object.nativeStorage.replace(
-      from: bounds.lowerBound._encodedOffset,
-      to: bounds.upperBound._encodedOffset,
-      with: codeUnits)
+    let start = bounds.lowerBound._encodedOffset
+    let end = bounds.upperBound._encodedOffset
+    _object.nativeStorage.replace(from: start, to: end, with: codeUnits)
     self = _StringGuts(_object.nativeStorage)
+    return Range(_uncheckedBounds: (start, start + codeUnits.count))
   }
 
+  // - Returns: The encoded offset range of the replaced contents in the result.
   internal mutating func uniqueNativeReplaceSubrange<C: Collection>(
     _ bounds: Range<Index>,
     with codeUnits: C
-  ) where C.Element == UInt8 {
+  ) -> Range<Int>
+  where C.Element == UInt8 {
     let replCount = codeUnits.count
 
     let neededCapacity =
@@ -363,12 +433,119 @@ extension _StringGuts {
     _internalInvariant(bounds.lowerBound.transcodedOffset == 0)
     _internalInvariant(bounds.upperBound.transcodedOffset == 0)
 
+    let start = bounds.lowerBound._encodedOffset
+    let end = bounds.upperBound._encodedOffset
     _object.nativeStorage.replace(
-      from: bounds.lowerBound._encodedOffset,
-      to: bounds.upperBound._encodedOffset,
-      with: codeUnits,
-      replacementCount: replCount)
+      from: start, to: end, with: codeUnits, replacementCount: replCount)
     self = _StringGuts(_object.nativeStorage)
+    return Range(_uncheckedBounds: (start, start + replCount))
+  }
+
+  /// Run `body` to mutate the given `subrange` of this string within
+  /// `startIndex ..< endIndex`, then update `startIndex` and `endIndex` to be
+  /// valid positions in the resulting string, addressing the same (logical)
+  /// locations as in the original string.
+  ///
+  /// This is used by both `Substring` and `Substring.UnicodeScalarView` to
+  /// implement their `replaceSubrange` methods.
+  ///
+  /// - Parameter subrange: A scalar-aligned offset range in this string.
+  /// - Parameter startIndex: The start index of the substring that performs
+  ///   this operation.
+  /// - Parameter endIndex: The end index of the substring that performs this
+  ///   operations.
+  /// - Parameter body: The mutation operation to execute on `self`. The
+  ///   returned offset range must correspond to `subrange` in the resulting
+  ///   string.
+  internal mutating func mutateSubrangeInSubstring(
+    subrange: Range<Index>,
+    startIndex: inout Index,
+    endIndex: inout Index,
+    with body: (inout _StringGuts) -> Range<Int>
+  ) {
+    _internalInvariant(
+      subrange.lowerBound >= startIndex && subrange.upperBound <= endIndex)
+
+    guard _fastPath(isUTF8) else {
+      // UTF-16 string. The mutation will convert this to the native UTF-8
+      // encoding, so we need to do some extra work to preserve our bounds.
+      let utf8StartOffset = String(self).utf8.distance(
+        from: self.startIndex, to: startIndex)
+      let oldUTF8Count = String(self).utf8.distance(
+        from: startIndex, to: endIndex)
+
+      let oldUTF8SubrangeCount = String(self).utf8.distance(
+        from: subrange.lowerBound, to: subrange.upperBound)
+
+      let newUTF8Subrange = body(&self)
+      _internalInvariant(isUTF8)
+
+      let newUTF8Count =
+        oldUTF8Count + newUTF8Subrange.count - oldUTF8SubrangeCount
+
+      // Get the character stride in the entire string, not just the substring.
+      // (Characters in a substring may end beyond the bounds of it.)
+      let newStride = _opaqueCharacterStride(startingAt: utf8StartOffset)
+
+      startIndex = String.Index(
+        encodedOffset: utf8StartOffset,
+        transcodedOffset: 0,
+        characterStride: newStride)._scalarAligned._knownUTF8
+      if isOnGraphemeClusterBoundary(startIndex) {
+        startIndex = startIndex._characterAligned
+      }
+
+      endIndex = String.Index(
+        encodedOffset: utf8StartOffset + newUTF8Count,
+        transcodedOffset: 0)._scalarAligned._knownUTF8
+      return
+    }
+
+    // UTF-8 string.
+
+    let oldRange = subrange._encodedOffsetRange
+    let newRange = body(&self)
+
+    let oldBounds = Range(
+      _uncheckedBounds: (startIndex._encodedOffset, endIndex._encodedOffset))
+    let newBounds = Range(_uncheckedBounds: (
+        oldBounds.lowerBound,
+        oldBounds.upperBound &+ newRange.count &- oldRange.count))
+
+    // Update `startIndex` if necessary. The replacement may have invalidated
+    // its cached character stride and character alignment flag, but not its
+    // stored offset, encoding, or scalar alignment.
+    //
+    // We are exploiting the fact that mutating the string _after_ the scalar
+    // following the end of the character at `startIndex` cannot possibly change
+    // the length of that character. (This is true because `index(after:)` never
+    // needs to look ahead by more than one Unicode scalar.)
+    let oldStride = startIndex.characterStride ?? 0
+    if oldRange.lowerBound <= oldBounds.lowerBound &+ oldStride {
+      // Get the character stride in the entire string, not just the substring.
+      // (Characters in a substring may end beyond the bounds of it.)
+      let newStride = _opaqueCharacterStride(startingAt: newBounds.lowerBound)
+      var newStart = String.Index(
+        encodedOffset: newBounds.lowerBound,
+        characterStride: newStride
+      )._scalarAligned._knownUTF8
+
+      // Preserve character alignment flag if possible
+      if startIndex._isCharacterAligned,
+        (oldRange.lowerBound > oldBounds.lowerBound ||
+         isOnGraphemeClusterBoundary(newStart)) {
+        newStart = newStart._characterAligned
+      }
+
+      startIndex = newStart
+    }
+
+    // Update `endIndex`.
+    if newBounds.upperBound != endIndex._encodedOffset {
+      endIndex = Index(
+        _encodedOffset: newBounds.upperBound
+      )._scalarAligned._knownUTF8
+    }
   }
 }
 

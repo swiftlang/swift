@@ -12,28 +12,29 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
-  /// Suspends the current task for _at least_ the given duration
+  @available(*, deprecated, renamed: "Task.sleep(nanoseconds:)")
+  /// Suspends the current task for at least the given duration
   /// in nanoseconds.
   ///
-  /// This function does _not_ block the underlying thread.
+  /// This function doesn't block the underlying thread.
   public static func sleep(_ duration: UInt64) async {
-    let currentTask = Builtin.getCurrentAsyncTask()
-    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
-
-    return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
-      let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
+    return await Builtin.withUnsafeContinuation {
+      (continuation: Builtin.RawUnsafeContinuation) -> Void in
+      let job = _taskCreateNullaryContinuationJob(
+          priority: Int(Task.currentPriority.rawValue),
+          continuation: continuation)
       _enqueueJobGlobalWithDelay(duration, job)
     }
   }
 
   /// The type of continuation used in the implementation of
   /// sleep(nanoseconds:).
-  private typealias SleepContinuation = UnsafeContinuation<(), Error>
+  typealias SleepContinuation = UnsafeContinuation<(), Error>
 
   /// Describes the state of a sleep() operation.
-  private enum SleepState {
+  enum SleepState {
     /// The sleep continuation has not yet begun.
     case notStarted
 
@@ -43,10 +44,10 @@ extension Task where Success == Never, Failure == Never {
     /// The sleep has finished.
     case finished
 
-    /// The sleep was cancelled.
+    /// The sleep was canceled.
     case cancelled
 
-    /// The sleep was cancelled before it even got started.
+    /// The sleep was canceled before it even got started.
     case cancelledBeforeStarted
 
     /// Decode sleep state from the word of storage.
@@ -104,8 +105,8 @@ extension Task where Success == Never, Failure == Never {
   }
 
   /// Called when the sleep(nanoseconds:) operation woke up without being
-  /// cancelled.
-  private static func onSleepWake(
+  /// canceled.
+  static func onSleepWake(
       _ wordPtr: UnsafeMutablePointer<Builtin.Word>
   ) {
     while true {
@@ -147,9 +148,9 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
-  /// Called when the sleep(nanoseconds:) operation has been cancelled before
+  /// Called when the sleep(nanoseconds:) operation has been canceled before
   /// the sleep completed.
-  private static func onSleepCancel(
+  static func onSleepCancel(
       _ wordPtr: UnsafeMutablePointer<Builtin.Word>
   ) {
     while true {
@@ -193,11 +194,13 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
-  /// Suspends the current task for _at least_ the given duration
-  /// in nanoseconds, unless the task is cancelled. If the task is cancelled,
-  /// throws \c CancellationError without waiting for the duration.
+  /// Suspends the current task for at least the given duration
+  /// in nanoseconds.
   ///
-  /// This function does _not_ block the underlying thread.
+  /// If the task is canceled before the time ends,
+  /// this function throws `CancellationError`.
+  ///
+  /// This function doesn't block the underlying thread.
   public static func sleep(nanoseconds duration: UInt64) async throws {
     // Allocate storage for the storage word.
     let wordPtr = UnsafeMutablePointer<Builtin.Word>.allocate(capacity: 1)

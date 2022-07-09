@@ -11,20 +11,11 @@ final class Buffer {
   init()
 }
 
-sil @unknown : $@convention(thin) (@guaranteed Buffer) -> ()
-
-// CHECK-LABEL: sil @test_complete_removal
-// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// CHECK:   [[T:%[0-9]+]] = tuple ([[I]] : $Builtin.Int1, %0 : $Buffer)
-// CHECK:   return [[T]]
-// CHECK: } // end sil function 'test_complete_removal'
-sil @test_complete_removal : $@convention(thin) (@owned Buffer) -> (Builtin.Int1, @owned Buffer) {
-bb0(%0 : $Buffer):
-  %e = end_cow_mutation %0 : $Buffer
-  (%u, %b) = begin_cow_mutation %e : $Buffer
-  %t = tuple (%u : $Builtin.Int1, %b : $Buffer)
-  return %t : $(Builtin.Int1, Buffer)
+struct Str {
+  @_hasStorage var b: Buffer { get set }
 }
+
+sil @unknown : $@convention(thin) (@guaranteed Buffer) -> ()
 
 // CHECK-LABEL: sil @test_simple
 // CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
@@ -36,6 +27,7 @@ sil @test_simple : $@convention(thin) (@owned Buffer) -> (Int, Builtin.Int1, @ow
 bb0(%0 : $Buffer):
   %e = end_cow_mutation %0 : $Buffer
   %addr = ref_element_addr [immutable] %e : $Buffer, #Buffer.i
+  debug_value %e : $Buffer, var, name "x"
   %i = load %addr : $*Int
   (%u, %b) = begin_cow_mutation %e : $Buffer
   %t = tuple (%i : $Int, %u : $Builtin.Int1, %b : $Buffer)
@@ -104,11 +96,35 @@ bb0(%0 : $*Buffer):
 sil @test_loop : $@convention(thin) (@owned Buffer) -> (Builtin.Int1, @owned Buffer) {
 bb0(%0 : $Buffer):
   %e = end_cow_mutation %0 : $Buffer
-  br bb1(%e : $Buffer)
-bb1(%a : $Buffer):
-  (%u, %b) = begin_cow_mutation %a : $Buffer
+  %s1 = struct $Str (%e: $Buffer)
+  br bb1(%s1 : $Str)
+bb1(%a : $Str):
+  %as = struct_extract %a : $Str, #Str.b
+  (%u, %b) = begin_cow_mutation %as : $Buffer
   %e2 = end_cow_mutation %b : $Buffer
-  cond_br undef, bb1(%e2 : $Buffer), bb2
+  %s2 = struct $Str (%e2: $Buffer)
+  cond_br undef, bb1(%s2 : $Str), bb2
+bb2:
+  %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
+  return %t : $(Builtin.Int1, Buffer)
+}
+
+// CHECK-LABEL: sil @not_all_incoming_values_are_end_cow_mutation
+// CHECK:   ([[U:%[0-9]+]], {{.*}}) = begin_cow_mutation
+// CHECK:   [[B:%[0-9]+]] = end_cow_mutation
+// CHECK:   [[T:%[0-9]+]] = tuple ([[U]] : $Builtin.Int1, [[B]] : $Buffer)
+// CHECK:   return [[T]]
+// CHECK: } // end sil function 'not_all_incoming_values_are_end_cow_mutation'
+sil @not_all_incoming_values_are_end_cow_mutation : $@convention(thin) (@owned Buffer) -> (Builtin.Int1, @owned Buffer) {
+bb0(%0 : $Buffer):
+  %s1 = struct $Str (%0: $Buffer)
+  br bb1(%s1 : $Str)
+bb1(%a : $Str):
+  %as = struct_extract %a : $Str, #Str.b
+  (%u, %b) = begin_cow_mutation %as : $Buffer
+  %e2 = end_cow_mutation %b : $Buffer
+  %s2 = struct $Str (%e2: $Buffer)
+  cond_br undef, bb1(%s2 : $Str), bb2
 bb2:
   %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
   return %t : $(Builtin.Int1, Buffer)

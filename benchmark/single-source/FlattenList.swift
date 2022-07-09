@@ -12,17 +12,19 @@
 
 import TestsUtils
 
-public let FlattenListLoop = BenchmarkInfo(
-  name: "FlattenListLoop",
-  runFunction: run_FlattenListLoop,
-  tags: [.api, .validation],
-  setUpFunction: { blackHole(inputArray) })
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "FlattenListLoop",
+    runFunction: run_FlattenListLoop,
+    tags: [.api, .validation],
+    setUpFunction: { blackHole(inputArray) }),
 
-public let FlattenListFlatMap = BenchmarkInfo(
-  name: "FlattenListFlatMap",
-  runFunction: run_FlattenListFlatMap,
-  tags: [.api, .validation],
-  setUpFunction: { blackHole(inputArray) })
+  BenchmarkInfo(
+    name: "FlattenListFlatMap",
+    runFunction: run_FlattenListFlatMap,
+    tags: [.api, .validation],
+    setUpFunction: { blackHole(inputArray) }),
+]
 
 let inputArray: [(Int, Int, Int, Int)] = (0..<(1<<16)).map { _ in
   (5, 6, 7, 8)
@@ -47,15 +49,15 @@ func flattenLoop(_ input: [(Int, Int, Int, Int)]) -> [Int] {
 }
 
 @inline(never)
-public func run_FlattenListLoop(_ N: Int) {
-  for _ in 0..<5*N {
+public func run_FlattenListLoop(_ n: Int) {
+  for _ in 0..<5*n {
     blackHole(flattenLoop(inputArray))
   }
 }
 
 @inline(never)
-public func run_FlattenListFlatMap(_ N: Int) {
-  for _ in 1...5*N {
+public func run_FlattenListFlatMap(_ n: Int) {
+  for _ in 1...5*n {
     blackHole(flattenFlatMap(inputArray))
   }
 }

@@ -392,7 +392,8 @@ func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(_ x: (Int, Float)) {
   var x = x
   // CHECK: [[XADDR:%.*]] = alloc_box ${ var (Int, Float) }
-  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
+  // CHECK: [[XLIFETIME:%.*]] = begin_borrow [lexical] [[XADDR]]
+  // CHECK: [[PB:%.*]] = project_box [[XLIFETIME]]
 
   int(x.0)
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
@@ -427,15 +428,20 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var z = z
   // CHECK: bb0({{.*}}):
   // CHECK: [[AB:%[0-9]+]] = alloc_box ${ var Bool }
-  // CHECK: [[PBA:%.*]] = project_box [[AB]]
+  // CHECK: [[AL:%[0-9]+]] = begin_borrow [lexical] [[AB]]
+  // CHECK: [[PBA:%.*]] = project_box [[AL]]
   // CHECK: [[BB:%[0-9]+]] = alloc_box ${ var Bool }
-  // CHECK: [[PBB:%.*]] = project_box [[BB]]
+  // CHECK: [[BL:%[0-9]+]] = begin_borrow [lexical] [[BB]]
+  // CHECK: [[PBB:%.*]] = project_box [[BL]]
   // CHECK: [[XB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBX:%.*]] = project_box [[XB]]
+  // CHECK: [[XL:%[0-9]+]] = begin_borrow [lexical] [[XB]]
+  // CHECK: [[PBX:%.*]] = project_box [[XL]]
   // CHECK: [[YB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBY:%.*]] = project_box [[YB]]
+  // CHECK: [[YL:%[0-9]+]] = begin_borrow [lexical] [[YB]]
+  // CHECK: [[PBY:%.*]] = project_box [[YL]]
   // CHECK: [[ZB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBZ:%.*]] = project_box [[ZB]]
+  // CHECK: [[ZL:%[0-9]+]] = begin_borrow [lexical] [[ZB]]
+  // CHECK: [[PBZ:%.*]] = project_box [[ZL]]
 
   return a
     ? x
@@ -545,7 +551,7 @@ func dontLoadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivia
 }
 // CHECK-LABEL: dontLoadIgnoredLValueForceUnwrap
 // CHECK: bb0(%0 : $*Optional<NonTrivialStruct>):
-// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: debug_value %0{{.*}} expr op_deref
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
@@ -561,7 +567,7 @@ func dontLoadIgnoredLValueDoubleForceUnwrap(_ a: inout NonTrivialStruct??) -> No
 }
 // CHECK-LABEL: dontLoadIgnoredLValueDoubleForceUnwrap
 // CHECK: bb0(%0 : $*Optional<Optional<NonTrivialStruct>>):
-// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: debug_value %0{{.*}} expr op_deref
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
@@ -582,7 +588,7 @@ func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStru
 }
 // CHECK-LABEL: loadIgnoredLValueForceUnwrap
 // CHECK: bb0(%0 : $*NonTrivialStruct):
-// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: debug_value %0{{.*}} expr op_deref
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: [[BORROW:%[0-9]+]] = load_borrow [[READ]]
 // CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
@@ -603,7 +609,7 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
 }
 // CHECK-LABEL: loadIgnoredLValueThroughForceUnwrap
 // CHECK: bb0(%0 : $*Optional<NonTrivialStruct>):
-// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: debug_value %0{{.*}} expr op_deref
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
@@ -629,7 +635,7 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 }
 // CHECK-LABEL: evaluateIgnoredKeyPathExpr
 // CHECK: bb0(%0 : $*NonTrivialStruct, %1 : @guaranteed $WritableKeyPath<NonTrivialStruct, Int>):
-// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: debug_value %0{{.*}} expr op_deref
 // CHECK-NEXT: debug_value %1
 // CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value %1
 // CHECK-NEXT: [[S_READ:%[0-9]+]] = begin_access [read] [unknown] %0

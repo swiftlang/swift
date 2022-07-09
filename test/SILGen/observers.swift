@@ -1,5 +1,7 @@
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 5 -disable-availability-checking -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+
+// REQUIRES: concurrency
 
 var zero: Int = 0
 
@@ -9,20 +11,32 @@ func takeInt(_ a : Int) {}
 
 public struct DidSetWillSetTests {
   // CHECK-LABEL: sil [ossa] @$s9observers010DidSetWillC5TestsV{{[_0-9a-zA-Z]*}}fC
-  public init(x : Int) {
+  @MainActor public init(x : Int) {
     // Accesses to didset/willset variables are direct in init methods and dtors.
     a = x
     a = x
 
     // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
     // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
-    // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF]]
+    // CHECK:        [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[SELF]]
+    // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
     // CHECK:        [[P1:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
     // CHECK-NEXT:   assign %0 to [[P1]]
     // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
     // CHECK:        [[P2:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
     // CHECK-NEXT:   assign %0 to [[P2]]
+
+    // In Swift 5 and earlier, the accesses are _not_ direct within a defer that
+    // appears in an init/deinit for non-actor types.
+    defer { a = x }
+
+    // CHECK-LABEL: sil private [ossa] @$s9observers010DidSetWillC5TestsV1xACSi_tcfc6$deferL_yyF
+    // CHECK-NOT:   assign
+    // CHECK:       [[SETTER:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1aSivs
+    // CHECK-NEXT:  apply [[SETTER]]
+    // CHECK-NOT:   assign
+    // CHECK: } // end sil function
   }
 
   public var a: Int {
@@ -30,7 +44,7 @@ public struct DidSetWillSetTests {
     willSet(newA) {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
-      // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
+      // CHECK-NEXT: debug_value %1 : $*DidSetWillSetTests, {{.*}} expr op_deref
 
       takeInt(a)
 
@@ -64,7 +78,7 @@ public struct DidSetWillSetTests {
     // CHECK-LABEL: sil private [ossa] @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
     didSet {
       // CHECK: bb0(%0 : $*DidSetWillSetTests):
-      // CHECK-NEXT: debug_value_addr %0 : $*DidSetWillSetTests
+      // CHECK-NEXT: debug_value %0 : $*DidSetWillSetTests, {{.*}} expr op_deref
 
       takeInt(a)
 
@@ -102,7 +116,7 @@ public struct DidSetWillSetTests {
     // CHECK-LABEL: sil [ossa] @$s9observers010DidSetWillC5TestsV1aSivs : $@convention(method) (Int, @inout DidSetWillSetTests) -> () {
     // CHECK: bb0([[NEWVALUE:%.*]] : $Int, %1 : $*DidSetWillSetTests):
     // CHECK-NEXT: debug_value [[NEWVALUE]] : $Int, let, name "value", argno 1
-    // CHECK-NEXT: debug_value_addr %1
+    // CHECK-NEXT: debug_value %1{{.*}} expr op_deref
 
     // CHECK-NEXT: [[MODIFY_ONE:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
     // CHECK-NEXT: // function_ref observers.DidSetWillSetTests.a.willset : Swift.Int
@@ -166,15 +180,81 @@ public struct DidSetWillSetTests {
   }
 }
 
+actor Pop {
+  var a: Int = 0 {
+    didSet {}
+  }
+
+  init(input: Int) {
+    defer { a = input }
+  }
+  // In Swift 5, a defer in an actor init or deinit matches its enclosing context,
+  // which is direct-to-storage.
+  // CHECK-LABEL: sil private [ossa] @$s9observers3PopC5inputACSi_tcfc6$deferL_yyF
+  // CHECK-NOT:     apply
+  // CHECK:         assign {{%.*}} to {{%.*}} : $*Int
+  // CHECK-NOT:     apply
+  // CHECK:       } // end sil function
+
+  deinit {
+    defer { a = 0 }
+  }
+
+  // CHECK-LABEL: sil private [ossa] @$s9observers3PopCfd6$deferL_yyF
+  // CHECK:         [[INT:%.*]] = apply {{.*}} : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  // CHECK-NOT:     apply
+  // CHECK:         assign [[INT]] to {{.*}} : $*Int
+  // CHECK-NOT:     apply
+  // CHECK:       } // end sil function
+}
+
+@MainActor
+class SaltNVinegar {
+  var a: Int = 0 {
+    didSet {}
+  }
+
+  init(regular val: Int) {
+    defer { a = val }
+
+    // In Swift 5, an actor-isolated type has its defers match-up. So, we're
+    // direct-to-storage here...
+    // CHECK-LABEL: sil private [ossa] @$s9observers12SaltNVinegarC7regularACSi_tcfc6$deferL_yyF
+    // CHECK-NOT:     apply
+    // CHECK:         assign {{%.*}} to {{%.*}} : $*Int
+    // CHECK-NOT:     apply
+    // CHECK:       } // end sil function
+  }
+}
+
+@MainActor(unsafe)
+class BBQ {
+  var a: Int = 0 {
+    didSet {}
+  }
+
+  init(regular val: Int) {
+    defer { a = val }
+
+    // ... but if the type is using unsafe global-actor isolation, then we preserve
+    // the non-direct access in the defer.
+    // CHECK-LABEL: sil private [ossa] @$s9observers3BBQC7regularACSi_tcfc6$deferL_yyF
+    // CHECK-NOT:     assign
+    // CHECK:         [[SETTER:%.*]] = class_method {{%.*}} : $BBQ, #BBQ.a!setter
+    // CHECK-NEXT:    apply [[SETTER]]
+    // CHECK-NOT:     assign
+    // CHECK:       } // end sil function
+  }
+}
 
 // Test global observing properties.
 
 var global_observing_property : Int = zero {
   // The variable is initialized with "zero".
-  // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) () -> () {
-  // CHECK: bb0:
+  // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
+  // CHECK: bb0(%0 : $Builtin.RawPointer):
   // CHECK-NEXT: alloc_global @$s9observers25global_observing_propertySiv
-  // CHECK-NEXT: %1 = global_addr @$s9observers25global_observing_propertySivp : $*Int
+  // CHECK-NEXT: %2 = global_addr @$s9observers25global_observing_propertySivp : $*Int
   // CHECK: observers.zero.unsafeMutableAddressor
   // CHECK: return
 
@@ -238,7 +318,8 @@ func local_observing_property(_ arg: Int) {
   // Alloc and initialize the property to the argument value.
   // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PB:%.*]] = project_box [[BOX]]
+  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+  // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
   // CHECK: store [[ARG]] to [trivial] [[PB]]
 }
 
@@ -313,7 +394,7 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "value", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
-// CHECK-NEXT:  debug_value_addr [[ARG2_PB]] : $*Int, var, name "p", argno 2
+// CHECK-NEXT:  debug_value [[ARG2_PB]] : $*Int, var, name "p", argno 2, expr op_deref
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [trivial] [[READ]] : $*Int
 // CHECK-NEXT:  end_access [[READ]]

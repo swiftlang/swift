@@ -56,7 +56,7 @@ struct Entry {
 // through the IAT.
 
 // CHECK-SHARED:       @"$s6module1EO4main1QADWP" = hidden constant [2 x i8*] [
-// CHECK-SHARED-SAME:      i8* bitcast (%swift.protocol_conformance_descriptor* @"$s6module1EO4main1QADMc" to i8*),
+// CHECK-SHARED-SAME:      i8* bitcast ({ i32, i32, i32, i32, i16, i16, i32, i32 }* @"$s6module1EO4main1QADMc" to i8*),
 // CHECK-SHARED-SAME:      i8* null
 // CHECK-SHARED-SAME:  ]
 

@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let SIMDReduceInteger = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "SIMDReduce.Int32",
     runFunction: run_SIMDReduceInt32x1,
@@ -85,7 +85,7 @@ let int32Data: UnsafeBufferPointer<Int32> = {
   let untyped = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int32>.size * count, alignment: 16
   )
-  // Intialize the memory as Int32 and fill with random values.
+  // Initialize the memory as Int32 and fill with random values.
   let typed = untyped.initializeMemory(as: Int32.self, repeating: 0)
   var g = SplitMix64(seed: 0)
   for i in 0 ..< typed.count {
@@ -95,8 +95,8 @@ let int32Data: UnsafeBufferPointer<Int32> = {
 }()
 
 @inline(never)
-public func run_SIMDReduceInt32x1(_ N: Int) {
-  for _ in 0 ..< scale*N {
+public func run_SIMDReduceInt32x1(_ n: Int) {
+  for _ in 0 ..< scale*n {
     var accum: Int32 = 0
     for v in int32Data {
       accum &+= v &* v
@@ -106,8 +106,8 @@ public func run_SIMDReduceInt32x1(_ N: Int) {
 }
 
 @inline(never)
-public func run_SIMDReduceInt32x4_init(_ N: Int) {
-  for _ in 0 ..< scale*N {
+public func run_SIMDReduceInt32x4_init(_ n: Int) {
+  for _ in 0 ..< scale*n {
     var accum = SIMD4<Int32>()
     for i in stride(from: 0, to: int32Data.count, by: 4) {
       let v = SIMD4(int32Data[i ..< i+4])
@@ -118,9 +118,9 @@ public func run_SIMDReduceInt32x4_init(_ N: Int) {
 }
 
 @inline(never)
-public func run_SIMDReduceInt32x4_cast(_ N: Int) {
+public func run_SIMDReduceInt32x4_cast(_ n: Int) {
   // Morally it seems like we "should" be able to use withMemoryRebound
-  // to SIMD4<Int32>, but that function requries that the sizes match in
+  // to SIMD4<Int32>, but that function requires that the sizes match in
   // debug builds, so this is pretty ugly. The following "works" for now,
   // but is probably in violation of the formal model (the exact rules
   // for "assumingMemoryBound" are not clearly documented). We need a
@@ -129,7 +129,7 @@ public func run_SIMDReduceInt32x4_cast(_ N: Int) {
     start: UnsafeRawPointer(int32Data.baseAddress!).assumingMemoryBound(to: SIMD4<Int32>.self),
     count: int32Data.count / 4
   )
-  for _ in 0 ..< scale*N {
+  for _ in 0 ..< scale*n {
     var accum = SIMD4<Int32>()
     for v in vecs {
       accum &+= v &* v
@@ -139,8 +139,8 @@ public func run_SIMDReduceInt32x4_cast(_ N: Int) {
 }
 
 @inline(never)
-public func run_SIMDReduceInt32x16_init(_ N: Int) {
-  for _ in 0 ..< scale*N {
+public func run_SIMDReduceInt32x16_init(_ n: Int) {
+  for _ in 0 ..< scale*n {
     var accum = SIMD16<Int32>()
     for i in stride(from: 0, to: int32Data.count, by: 16) {
       let v = SIMD16(int32Data[i ..< i+16])
@@ -151,12 +151,12 @@ public func run_SIMDReduceInt32x16_init(_ N: Int) {
 }
 
 @inline(never)
-public func run_SIMDReduceInt32x16_cast(_ N: Int) {
+public func run_SIMDReduceInt32x16_cast(_ n: Int) {
   let vecs = UnsafeBufferPointer<SIMD16<Int32>>(
     start: UnsafeRawPointer(int32Data.baseAddress!).assumingMemoryBound(to: SIMD16<Int32>.self),
     count: int32Data.count / 16
   )
-  for _ in 0 ..< scale*N {
+  for _ in 0 ..< scale*n {
     var accum = SIMD16<Int32>()
     for v in vecs {
       accum &+= v &* v
@@ -172,7 +172,7 @@ let int8Data: UnsafeBufferPointer<Int8> = {
   let untyped = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int8>.size * count, alignment: 16
   )
-  // Intialize the memory as Int8 and fill with random values.
+  // Initialize the memory as Int8 and fill with random values.
   let typed = untyped.initializeMemory(as: Int8.self, repeating: 0)
   var g = SplitMix64(seed: 0)
   for i in 0 ..< typed.count {
@@ -182,8 +182,8 @@ let int8Data: UnsafeBufferPointer<Int8> = {
 }()
 
 @inline(never)
-public func run_SIMDReduceInt8x1(_ N: Int) {
-  for _ in 0 ..< scale*N {
+public func run_SIMDReduceInt8x1(_ n: Int) {
+  for _ in 0 ..< scale*n {
     var accum: Int8 = 0
     for v in int8Data {
       accum &+= v &* v
@@ -193,8 +193,8 @@ public func run_SIMDReduceInt8x1(_ N: Int) {
 }
 
 @inline(never)
-public func run_SIMDReduceInt8x16_init(_ N: Int) {
-  for _ in 0 ..< scale*N {
+public func run_SIMDReduceInt8x16_init(_ n: Int) {
+  for _ in 0 ..< scale*n {
     var accum = SIMD16<Int8>()
     for i in stride(from: 0, to: int8Data.count, by: 16) {
       let v = SIMD16(int8Data[i ..< i+16])
@@ -205,12 +205,12 @@ public func run_SIMDReduceInt8x16_init(_ N: Int) {
 }
 
 @inline(never)
-public func run_SIMDReduceInt8x16_cast(_ N: Int) {
+public func run_SIMDReduceInt8x16_cast(_ n: Int) {
   let vecs = UnsafeBufferPointer<SIMD16<Int8>>(
     start: UnsafeRawPointer(int8Data.baseAddress!).assumingMemoryBound(to: SIMD16<Int8>.self),
     count: int8Data.count / 16
   )
-  for _ in 0 ..< scale*N {
+  for _ in 0 ..< scale*n {
     var accum = SIMD16<Int8>()
     for v in vecs {
       accum &+= v &* v
@@ -220,8 +220,8 @@ public func run_SIMDReduceInt8x16_cast(_ N: Int) {
 }
 
 @inline(never)
-public func run_SIMDReduceInt8x64_init(_ N: Int) {
-  for _ in 0 ..< scale*N {
+public func run_SIMDReduceInt8x64_init(_ n: Int) {
+  for _ in 0 ..< scale*n {
     var accum = SIMD64<Int8>()
     for i in stride(from: 0, to: int8Data.count, by: 64) {
       let v = SIMD64(int8Data[i ..< i+64])
@@ -232,12 +232,12 @@ public func run_SIMDReduceInt8x64_init(_ N: Int) {
 }
 
 @inline(never)
-public func run_SIMDReduceInt8x64_cast(_ N: Int) {
+public func run_SIMDReduceInt8x64_cast(_ n: Int) {
   let vecs = UnsafeBufferPointer<SIMD64<Int8>>(
     start: UnsafeRawPointer(int8Data.baseAddress!).assumingMemoryBound(to: SIMD64<Int8>.self),
     count: int8Data.count / 64
   )
-  for _ in 0 ..< scale*N {
+  for _ in 0 ..< scale*n {
     var accum = SIMD64<Int8>()
     for v in vecs {
       accum &+= v &* v

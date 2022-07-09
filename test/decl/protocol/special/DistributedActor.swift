@@ -1,29 +1,86 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-ignore-unknown
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
-// Synthesis of distributed actors.
+/// Use the existential wrapper as the default actor system.
+typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
 
-@available(SwiftStdlib 5.5, *)
+distributed actor D0 {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+  var x: Int = 17
+}
+
 distributed actor D1 {
   var x: Int = 17
 }
 
-@available(SwiftStdlib 5.5, *)
+class X: Identifiable {
+  // should work as expected, synthesis not triggering
+  func test() {
+    let _: ObjectIdentifier = self.id
+  }
+}
+
+protocol DAP: DistributedActor {
+  // should work as expected, synthesis not triggering
+  func test()
+}
+
+extension DAP where ActorSystem.ActorID == String {
+  func test() {
+    _ = self.id == ""
+  }
+}
+
 distributed actor D2 {
-  let actorTransport: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'actorTransport'}}
-  let actorAddress: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'actorAddress'}}
+  // expected-error@-1{{actor 'D2' has no initializers}}
+  let actorSystem: String
+  // expected-error@-1{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'actorSystem'}}
+  // expected-note@-3{{stored property 'actorSystem' without initial value prevents synthesized initializers}}
+}
+
+distributed actor D3 {
+  var id: Int { 0 }
+  // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'id'}}
+}
+
+struct OtherActorIdentity: Sendable, Hashable, Codable {}
+
+distributed actor D4 {
+  // expected-error@-1{{actor 'D4' has no initializers}}
+
+  let actorSystem: String
+  // expected-error@-1{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'actorSystem'}}
+  // expected-note@-3{{stored property 'actorSystem' without initial value prevents synthesized initializers}}
+  let id: OtherActorIdentity
+  // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'id'}}
+  // expected-note@-3{{stored property 'id' without initial value prevents synthesized initializers}}
+}
+
+protocol P1: DistributedActor {
+  distributed func dist() -> String
+  // expected-note@-1{{'dist()' declared here}}
+}
+
+distributed actor D5: P1 {
+  func dist() -> String { "" }
+  // expected-error@-1{{distributed actor-isolated instance method 'dist()' cannot be used to satisfy actor-isolated protocol requirement}}
+  // expected-note@-2{{add 'distributed' to 'dist()' to make this instance method satisfy the protocol requirement}}{{3-3=distributed }}
 }
 
 // ==== Tests ------------------------------------------------------------------
 
-// Make sure the conformances actually happen.
-@available(SwiftStdlib 5.5, *)
-func acceptActor<Act: DistributedActor>(_: Act.Type) { }
+// Make sure the conformances have been added implicitly.
+func acceptDistributedActor<Act: DistributedActor>(_: Act.Type) { }
+func acceptAnyActor<Act: AnyActor>(_: Act.Type) { }
 
-@available(SwiftStdlib 5.5, *)
 func testConformance() {
-  acceptActor(D1.self)
+  acceptDistributedActor(D1.self)
+  acceptAnyActor(D1.self)
 }

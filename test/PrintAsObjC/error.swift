@@ -1,18 +1,23 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module-path %t/error.swiftmodule -emit-objc-header-path %t/error.h -experimental-allow-module-with-compiler-errors %s
-// RUN: %FileCheck %s < %t/error.h
+// RUN: %FileCheck --input-file %t/error.h %s
 // RUN: %check-in-clang %t/error.h
 
 // REQUIRES: objc_interop
 
 import Foundation
 
+// TODO: Ideally we'd output invalid decls regardless (so that they could eg. be used in code
+// completion), but we avoid doing so for now to prevent crashes. Revisit later to handle a possibly
+// invalid AST while printing the ObjectiveC header - see SR-15088.
+
 @objc class ErrorClass: NSObject {
 // CHECK: @interface ErrorClass
   @objc let member: Int
   // CHECK: @property {{.*}} NSInteger member;
+
   @objc let invalidMember: undefined
-  // TODO: Not output on invalid type
+  // TODO: Missing
 
   @objc func method() {}
   // CHECK: - (void)method;
@@ -33,10 +38,10 @@ import Foundation
   }
 
   @objc func invalidRet() -> undefined {}
-  // CHECK: - (/* error */id)invalidRet
+  // TODO: Missing
 
   @objc func invalidParams(a: undefined) {}
-  // TODO: Not output with invalid parameters
+  // TODO: Missing
 
   @objc(invalid::)
   func invalidRenamedMethod() {}
@@ -55,3 +60,6 @@ import Foundation
 
 @objc class InvalidParent: undefined {}
 // CHECK: @interface InvalidParent
+
+// Used to crash during sorting due to assumptions regarding the Decl kind
+@objc class ErrorClass: NSObject {}

@@ -59,6 +59,13 @@ public:
   using BuiltType = swift::Type;
   using BuiltTypeDecl = swift::GenericTypeDecl *; // nominal or type alias
   using BuiltProtocolDecl = swift::ProtocolDecl *;
+  using BuiltGenericSignature = swift::GenericSignature;
+  using BuiltGenericTypeParam = swift::GenericTypeParamType *;
+  using BuiltRequirement = swift::Requirement;
+  using BuiltSubstitutionMap = swift::SubstitutionMap;
+
+  static constexpr bool needsToPrecomputeParentGenericContextShapes = false;
+
   explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   ASTContext &getASTContext() { return Ctx; }
@@ -66,7 +73,7 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
 
-  Type decodeMangledType(NodePointer node);
+  Type decodeMangledType(NodePointer node, bool forRequirement = true);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
 
   TypeDecl *createTypeDecl(NodePointer node);
@@ -109,7 +116,16 @@ public:
 
   Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
                                      Type superclass,
-                                     bool isClassBound);
+                                     bool isClassBound,
+                                     bool forRequirement = true);
+
+  Type createProtocolTypeFromDecl(ProtocolDecl *protocol);
+
+  Type createConstrainedExistentialType(Type base,
+                                        ArrayRef<BuiltRequirement> constraints);
+
+  Type createSymbolicExtendedExistentialType(NodePointer shapeNode,
+                                             ArrayRef<Type> genArgs);
 
   Type createExistentialMetatypeType(Type instance,
                      Optional<Demangle::ImplMetatypeRepresentation> repr=None);
@@ -131,7 +147,6 @@ public:
   Type createSILBoxType(Type base);
   using BuiltSILBoxField = llvm::PointerIntPair<Type, 1>;
   using BuiltSubstitution = std::pair<Type, Type>;
-  using BuiltRequirement = swift::Requirement;
   using BuiltLayoutConstraint = swift::LayoutConstraint;
   Type createSILBoxTypeWithLayout(ArrayRef<BuiltSILBoxField> Fields,
                                   ArrayRef<BuiltSubstitution> Substitutions,
@@ -163,6 +178,15 @@ public:
   Type createDictionaryType(Type key, Type value);
 
   Type createParenType(Type base);
+
+  BuiltGenericSignature
+  createGenericSignature(ArrayRef<BuiltType> params,
+                         ArrayRef<BuiltRequirement> requirements);
+
+  BuiltSubstitutionMap createSubstitutionMap(BuiltGenericSignature sig,
+                                             ArrayRef<BuiltType> replacements);
+
+  Type subst(Type subject, const BuiltSubstitutionMap &Subs) const;
 
   LayoutConstraint getLayoutConstraint(LayoutConstraintKind kind);
   LayoutConstraint getLayoutConstraintWithSizeAlign(LayoutConstraintKind kind,

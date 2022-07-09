@@ -95,7 +95,6 @@ public:
     static_assert(DAK_Count < UINT_MAX, "DeclAttrKind is > 31 bits");
   }
   AnyAttrKind() : kind(TAK_Count), isType(1) {}
-  AnyAttrKind(const AnyAttrKind &) = default;
 
   /// Returns the TypeAttrKind, or TAK_Count if this is not a type attribute.
   TypeAttrKind type() const {
@@ -129,6 +128,9 @@ struct PrintOptions {
   /// Whether to print function definitions.
   bool FunctionDefinitions = false;
 
+  /// Whether to print expressions.
+  bool PrintExprs = false;
+  
   /// Whether to print '{ get set }' on readwrite computed properties.
   bool PrintGetSetOnRWProperties = true;
 
@@ -198,11 +200,17 @@ struct PrintOptions {
   /// Print fully qualified extended types if ambiguous.
   bool FullyQualifiedExtendedTypesIfAmbiguous = false;
 
+  /// Whether to protocol-qualify DependentMemberTypes.
+  bool ProtocolQualifiedDependentMemberTypes = false;
+
   /// If true, printed module names will use the "exported" name, which may be
   /// different from the regular name.
   ///
   /// \see FileUnit::getExportedModuleName
   bool UseExportedModuleNames = false;
+
+  /// Use the original module name to qualify a symbol.
+  bool UseOriginallyDefinedInModuleNames = false;
 
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
@@ -234,6 +242,10 @@ struct PrintOptions {
 
   /// Whether to print unavailable parts of the AST.
   bool SkipUnavailable = false;
+
+  /// Whether to print synthesized extensions created by '@_nonSendable', even
+  /// if SkipImplicit or SkipUnavailable is set.
+  bool AlwaysPrintNonSendableExtensions = true;
 
   bool SkipSwiftPrivateClangDecls = false;
 
@@ -272,6 +284,13 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
+  /// Whether to print the \c any keyword for existential
+  /// types.
+  bool PrintExplicitAny = false;
+
+  /// Whether to desugar the constraint for an existential type.
+  bool DesugarExistentialConstraint = false;
+
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
@@ -287,6 +306,9 @@ struct PrintOptions {
 
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
+
+  /// Suppress emitting @available(*, noasync)
+  bool SuppressNoAsyncAvailabilityAttr = false;
 
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
@@ -346,6 +368,10 @@ struct PrintOptions {
   /// Whether to print 'static' or 'class' on static decls.
   bool PrintStaticKeyword = true;
 
+  /// Whether to print 'mutating', 'nonmutating', or '__consuming' keyword on
+  /// specified decls.
+  bool PrintSelfAccessKindKeyword = true;
+
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
@@ -370,6 +396,12 @@ struct PrintOptions {
 
   /// Whether to use an empty line to separate two members in a single decl.
   bool EmptyLineBetweenMembers = false;
+
+  /// Whether to print empty members of a declaration on a single line, e.g.:
+  /// ```
+  /// extension Foo: Bar {}
+  /// ```
+  bool PrintEmptyMembersOnSameLine = false;
 
   /// Whether to print the extensions from conforming protocols.
   bool PrintExtensionFromConformingProtocols = false;
@@ -469,9 +501,17 @@ struct PrintOptions {
   /// Whether to print inheritance lists for types.
   bool PrintInherited = true;
 
+  /// Whether to print a space before the `:` of an inheritance list in a type
+  /// decl.
+  bool PrintSpaceBeforeInheritance = true;
+
   /// Whether to print feature checks for compatibility with older Swift
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
+
+  /// Whether to print @_specialize attributes that have an availability
+  /// parameter.
+  bool PrintSpecializeAttributeWithAvailability = true;
 
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {
@@ -485,6 +525,12 @@ struct PrintOptions {
   /// part of the context).
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
+
+  /// If true, we print a protocol's primary associated types using the
+  /// primary associated type syntax: protocol Foo<Type1, ...>.
+  ///
+  /// If false, we print them as ordinary associated types.
+  bool PrintPrimaryAssociatedTypes = true;
 
   /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
@@ -514,6 +560,13 @@ struct PrintOptions {
     result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
+    return result;
+  }
+
+  /// The print options used for formatting diagnostic arguments.
+  static PrintOptions forDiagnosticArguments() {
+    PrintOptions result;
+    result.PrintExplicitAny = true;
     return result;
   }
 
@@ -633,6 +686,13 @@ struct PrintOptions {
   ///
   /// This is only intended for debug output.
   static PrintOptions printEverything() {
+    PrintOptions result = printDeclarations();
+    result.FunctionDefinitions = true;
+    result.PrintExprs = true;
+    return result;
+  }
+
+  static PrintOptions printDeclarations() {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
     result.ExcludeAttrList.push_back(DAK_FixedLayout);
@@ -659,6 +719,7 @@ struct PrintOptions {
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     PO.PrintParameterSpecifiers = true;
     PO.SkipImplicit = true;
+    PO.AlwaysPrintNonSendableExtensions = false;
     PO.AlwaysTryPrintParameterLabels = true;
     return PO;
   }

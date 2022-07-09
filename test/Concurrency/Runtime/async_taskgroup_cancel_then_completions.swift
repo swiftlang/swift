@@ -1,23 +1,23 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input always
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
 // FIXME: this is a workaround since (A, B) today isn't inferred to be Sendable
 //        and causes an error, but should be a warning (this year at least)
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
   let first: A
   let second: B
@@ -28,7 +28,7 @@ struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_cancel_then_completions() async {
   // CHECK: test_taskGroup_cancel_then_completions
   print("before \(#function)")
@@ -73,7 +73,7 @@ func test_taskGroup_cancel_then_completions() async {
   print("result: \(result)") // CHECK: result: 3
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_then_completions()

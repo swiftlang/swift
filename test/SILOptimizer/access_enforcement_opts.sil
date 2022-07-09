@@ -52,8 +52,8 @@ bb0(%0 : $@thin X.Type):
 //
 // CHECK-LABEL: sil hidden @testNestedAccess1 : $@convention(thin) () -> () {
 // CHECK: [[F1:%.*]] = function_ref @testNestedAccessClosure1 : $@convention(thin) () -> ()
-// CHECK: [[C1:%.*]] = convert_function [[F1]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF1:%.*]] = thin_to_thick_function [[C1]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed ()
+// CHECK: [[C1:%.*]] = convert_function [[F1]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF1:%.*]] = thin_to_thick_function [[C1]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed ()
 // CHECK: [[A1:%.*]] = begin_access [read] [dynamic] %0 : $*X
 // CHECK: apply [[TF1]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A1]] : $*X
@@ -62,8 +62,8 @@ sil hidden @testNestedAccess1 : $@convention(thin) () -> () {
 bb0:
   %2 = global_addr @globalX: $*X
   %3 = function_ref @testNestedAccessClosure1 : $@convention(thin) () -> ()
-  %4 = convert_function %3 : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-  %5 = thin_to_thick_function %4 : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = convert_function %3 : $@convention(thin) () -> () to $@convention(thin) () -> ()
+  %5 = thin_to_thick_function %4 : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
   %6 = begin_access [read] [dynamic] %2 : $*X
   %9 = apply %5() : $@noescape @callee_guaranteed () -> ()
   end_access %6 : $*X
@@ -72,8 +72,8 @@ bb0:
 }
 // CHECK-LABEL: sil hidden @testNestedAccess2 : $@convention(thin) () -> () {
 // CHECK: [[F2:%.*]] = function_ref @testNestedAccessClosure2 : $@convention(thin) () -> ()
-// CHECK: [[C2:%.*]] = convert_function [[F2]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF2:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[C2:%.*]] = convert_function [[F2]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF2:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[A2:%.*]] = begin_access [modify] [dynamic] %0 : $*X
 // CHECK: apply [[TF2]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A2]] : $*X
@@ -92,8 +92,8 @@ bb0:
 }
 // CHECK-LABEL: sil hidden @testNestedAccess3 : $@convention(thin) () -> () {
 // CHECK: [[F3:%.*]] = function_ref @testNestedAccessClosure3 : $@convention(thin) () -> ()
-// CHECK: [[C3:%.*]] = convert_function [[F3]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF3:%.*]] = thin_to_thick_function [[C3]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[C3:%.*]] = convert_function [[F3]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF3:%.*]] = thin_to_thick_function [[C3]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[A3:%.*]] = begin_access [modify] [dynamic] %0 : $*X
 // CHECK: apply [[TF3]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A3]] : $*X
@@ -564,7 +564,7 @@ sil private @$s17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $@conven
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load %3 : $*Int64
   end_access %3 : $*Int64
@@ -641,7 +641,7 @@ sil private @$s17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@convent
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 42
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -696,7 +696,7 @@ sil private @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_ : $@
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load %3 : $*Int64
   end_access %3 : $*Int64
@@ -716,7 +716,7 @@ sil private @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_ : 
 // %0
 // %1
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [read] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -772,7 +772,7 @@ sil private @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_ : 
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 7
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -788,7 +788,7 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_'
 sil private @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [read] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -844,7 +844,7 @@ sil private @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyy
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load %3 : $*Int64
   end_access %3 : $*Int64
@@ -864,7 +864,7 @@ sil private @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyy
 // %0
 // %1
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [modify] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -918,7 +918,7 @@ sil private @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyc
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 7
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -934,7 +934,7 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_'
 sil private @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [modify] [dynamic] %0 : $*Int64
   %5 = tuple ()

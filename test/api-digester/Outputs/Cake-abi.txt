@@ -1,7 +1,17 @@
 
 /* Generic Signature Changes */
+cake: Constructor S1.init(_:) has mangled name changing from 'cake.S1.init(Swift.Int) -> cake.S1' to 'cake.S1.init(Swift.Double) -> cake.S1'
+cake: Func C1.foo1() has mangled name changing from 'static cake.C1.foo1() -> ()' to 'cake.C1.foo1() -> ()'
+cake: Func C1.foo2(_:) has mangled name changing from 'cake.C1.foo2(Swift.Int) -> ()' to 'cake.C1.foo2(() -> ()) -> ()'
 cake: Func P1.P1Constraint() has generic signature change from <Self where Self : cake.P1, Self : cake.P2> to <Self where Self : cake.P1>
+cake: Func P1.P1Constraint() has mangled name changing from '(extension in cake):cake.P1< where A: cake.P2>.P1Constraint() -> ()' to '(extension in cake):cake.P1.P1Constraint() -> ()'
+cake: Func S1.foo3() has mangled name changing from 'cake.S1.foo3() -> ()' to 'static cake.S1.foo3() -> ()'
+cake: Func S1.foo5(x:y:) has mangled name changing from 'cake.S1.foo5(x: Swift.Int, y: Swift.Int) -> ()' to 'cake.S1.foo5(x: Swift.Int, y: Swift.Int, z: Swift.Int) -> ()'
+cake: Func Somestruct2.foo1(_:) has mangled name changing from 'static cake.Somestruct2.foo1(cake.C3) -> ()' to 'static cake.NSSomestruct2.foo1(cake.C1) -> ()'
+cake: Func ownershipChange(_:_:) has mangled name changing from 'cake.ownershipChange(inout Swift.Int, __shared Swift.Int) -> ()' to 'cake.ownershipChange(Swift.Int, __owned Swift.Int) -> ()'
+cake: Func returnFunctionTypeOwnershipChange() has mangled name changing from 'cake.returnFunctionTypeOwnershipChange() -> (cake.C1) -> ()' to 'cake.returnFunctionTypeOwnershipChange() -> (__owned cake.C1) -> ()'
 cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
+cake: Struct Somestruct2 has mangled name changing from 'cake.Somestruct2' to 'cake.NSSomestruct2'
 
 /* RawRepresentable Changes */
 
@@ -12,13 +22,13 @@ cake: Accessor RemoveSetters.Value.Modify() has been removed
 cake: Accessor RemoveSetters.Value.Set() has been removed
 cake: Accessor RemoveSetters.subscript(_:).Modify() has been removed
 cake: Accessor RemoveSetters.subscript(_:).Set() has been removed
-cake: AssociatedType RequiementChanges.removedType has been removed
+cake: AssociatedType RequirementChanges.removedType has been removed
 cake: Class C3 has been removed
 cake: Constructor Somestruct2.init(_:) has been removed
 cake: Func C4.foo() has been removed
 cake: Func Int.IntEnhancer() has been removed
-cake: Func RequiementChanges.removedFunc() has been removed
-cake: Var RequiementChanges.removedVar has been removed
+cake: Func RequirementChanges.removedFunc() has been removed
+cake: Var RequirementChanges.removedVar has been removed
 
 /* Moved Decls */
 cake: Class ClassToStruct has been changed to a Struct
@@ -40,7 +50,7 @@ cake: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
 cake: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
 cake: Func Somestruct2.foo1(_:) has parameter 0 type change from cake.C3 to cake.C1
-cake: Func Zoo.getCurrentAnimalInlinable() has return type change from cake.Cat to cake.Dog
+cake: Func Zoo.getCurrentAnimalInlinable() has return type change from [cake.Cat] to [cake.Dog]
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 cake: Func returnFunctionTypeOwnershipChange() has return type change from (cake.C1) -> () to (__owned cake.C1) -> ()
@@ -53,17 +63,21 @@ cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API w
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
 cake: Class C0 is a new API without @available attribute
 cake: Class C8 is a new API without @available attribute
+cake: Constructor AddingNewDesignatedInit.init(_:) is a new API without @available attribute
 cake: Constructor C1.init(_:) is a new API without @available attribute
 cake: Constructor ClassWithMissingDesignatedInits.init() is a new API without @available attribute
 cake: Constructor SubclassWithMissingDesignatedInits.init() is a new API without @available attribute
 cake: Enum IceKind is now without @frozen
 cake: EnumElement FrozenKind.AddedCase is a new API without @available attribute
+cake: EnumElement FutureKind.FineToAdd is a new API without @available attribute
 cake: Func C1.foo1() is now not static
 cake: Func FinalFuncContainer.NewFinalFunc() is now with final
 cake: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
 cake: Func Float.floatHigher() is a new API without @available attribute
+cake: Func FutureKind.==(_:_:) is a new API without @available attribute
+cake: Func FutureKind.hash(into:) is a new API without @available attribute
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
-cake: Func RequiementChanges.addedFunc() is a new API without @available attribute
+cake: Func RequirementChanges.addedFunc() is a new API without @available attribute
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake: Func S1.foo3() is now static
 cake: Func _NoResilientClass.NoLongerFinalFunc() is now without final
@@ -72,7 +86,8 @@ cake: Protocol P4 is a new API without @available attribute
 cake: Struct C6 is now with @frozen
 cake: Var C1.CIIns1 changes from weak to strong
 cake: Var C1.CIIns2 changes from strong to weak
-cake: Var RequiementChanges.addedVar is a new API without @available attribute
+cake: Var FutureKind.hashValue is a new API without @available attribute
+cake: Var RequirementChanges.addedVar is a new API without @available attribute
 cake: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is a new API without @available attribute
 cake: Var fixedLayoutStruct.c is a new API without @available attribute
 
@@ -99,10 +114,10 @@ cake: Struct fixedLayoutStruct has removed conformance to P1
 /* Protocol Requirement Change */
 cake: Accessor HasMutatingMethodClone.bar.Get() now requires new witness table entry
 cake: AssociatedType AssociatedTypePro.T1 has removed default type Swift.Int
-cake: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
+cake: AssociatedType RequirementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake: Func HasMutatingMethodClone.foo() now requires new witness table entry
-cake: Func RequiementChanges.addedFunc() has been added as a protocol requirement
-cake: Var RequiementChanges.addedVar has been added as a protocol requirement
+cake: Func RequirementChanges.addedFunc() has been added as a protocol requirement
+cake: Var RequirementChanges.addedVar has been added as a protocol requirement
 
 /* Class Inheritance Change */
 cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>

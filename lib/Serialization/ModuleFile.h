@@ -55,8 +55,13 @@ class ModuleFile
   friend class DeclDeserializer;
   friend class TypeDeserializer;
   friend class SILDeserializer;
+  friend class ProtocolConformanceDeserializer;
+  template <serialization::decls_block::detail::TypeRecords TypeRecord>
+  friend class serialization::decls_block::detail::TypeRecordDispatch;
+  friend struct serialization::decls_block::detail::function_deserializer;
   using Status = serialization::Status;
   using TypeID = serialization::TypeID;
+  using ProtocolConformanceID = serialization::ProtocolConformanceID;
 
   /// The core data of a serialized module file. This is accessed as immutable
   /// and thread-safe.
@@ -239,8 +244,8 @@ private:
   /// Local DeclContexts referenced by this module.
   MutableArrayRef<Serialized<DeclContext*>> LocalDeclContexts;
 
-  /// Normal protocol conformances referenced by this module.
-  MutableArrayRef<Serialized<NormalProtocolConformance *>> NormalConformances;
+  /// Protocol conformances referenced by this module.
+  MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
   /// SILLayouts referenced by this module.
   MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
@@ -256,6 +261,11 @@ private:
 
   /// Substitution maps referenced by this module.
   MutableArrayRef<Serialized<SubstitutionMap>> SubstitutionMaps;
+
+  uint64_t
+  createLazyConformanceLoaderToken(ArrayRef<uint64_t> ids);
+  ArrayRef<ProtocolConformanceID>
+  claimLazyConformanceLoaderToken(uint64_t token);
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
@@ -333,7 +343,7 @@ public:
 
   /// Emits one last diagnostic, adds the current module details and errors to
   /// the pretty stack trace, and then aborts.
-  LLVM_ATTRIBUTE_NORETURN void fatal(llvm::Error error) const;
+  [[noreturn]] void fatal(llvm::Error error) const;
   void fatalIfNotSuccess(llvm::Error error) const {
     if (error)
       fatal(std::move(error));
@@ -344,9 +354,18 @@ public:
     fatal(expected.takeError());
   }
 
-  LLVM_ATTRIBUTE_NORETURN void fatal() const {
+  /// Report an unexpected format error that could happen only from a memory-level
+  /// inconsistency. Please prefer passing an error to `fatal(llvm::Error error)` when possible.
+  [[noreturn]] void fatal() const {
     fatal(llvm::make_error<llvm::StringError>(
-        "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
+        "Memory corruption or serialization format inconsistency.",
+        llvm::inconvertibleErrorCode()));
+  }
+
+  [[noreturn]] void fatal(StringRef msg) const {
+    fatal(llvm::make_error<llvm::StringError>(
+          msg,
+          llvm::inconvertibleErrorCode()));
   }
 
   /// Outputs information useful for diagnostics to \p out
@@ -380,14 +399,32 @@ private:
   GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
-  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
-                               llvm::BitstreamCursor &Cursor);
+  void deserializeGenericRequirements(ArrayRef<uint64_t> scratch,
+                                      unsigned &nextIndex,
+                                 SmallVectorImpl<Requirement> &requirements);
 
   /// Reads a set of requirements from \c DeclTypeCursor, returns the first
   /// error, if any.
   llvm::Error
-  readGenericRequirementsChecked(SmallVectorImpl<Requirement> &requirements,
-                                 llvm::BitstreamCursor &Cursor);
+  deserializeGenericRequirementsChecked(ArrayRef<uint64_t> scratch,
+                                        unsigned &nextIndex,
+                                   SmallVectorImpl<Requirement> &requirements);
+
+  /// Read the requirement signature of a protocol, which consists of a list of
+  /// generic requirements and a list of protocol typealias records.
+  void readRequirementSignature(SmallVectorImpl<Requirement> &requirements,
+                                SmallVectorImpl<ProtocolTypeAlias> &typeAliases,
+                                llvm::BitstreamCursor &Cursor);
+
+  /// Read a list of associated type declarations in a protocol.
+  void readAssociatedTypes(
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
+      llvm::BitstreamCursor &Cursor);
+
+  /// Read a list of primary associated type declarations in a protocol.
+  void readPrimaryAssociatedTypes(
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
+      llvm::BitstreamCursor &Cursor);
 
   /// Populates the protocol's default witness table.
   ///
@@ -467,6 +504,11 @@ public:
     return Core->Bits.IsStaticLibrary;
   }
 
+  /// Whether this module was built with -experimental-hermetic-seal-at-link.
+  bool hasHermeticSealAtLink() const {
+    return Core->Bits.HasHermeticSealAtLink;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
@@ -496,6 +538,9 @@ public:
   /// \c true if this module has information from a corresponding
   /// .swiftsourceinfo file (ie. the file exists and has been read).
   bool hasSourceInfo() const { return Core->hasSourceInfo(); }
+
+  /// \c true if this module was built with complete checking for concurrency.
+  bool isConcurrencyChecked() const { return Core->isConcurrencyChecked(); }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -575,11 +620,11 @@ public:
   /// Note that this may cause other decls to load as well.
   void loadExtensions(NominalTypeDecl *nominal);
 
-  /// Load the methods within the given class that produce
+  /// Load the methods within the given nominal type that produce
   /// Objective-C class or instance methods with the given selector.
   ///
-  /// \param classDecl The class in which we are searching for @objc methods.
-  /// The search only considers this class and its extensions; not any
+  /// \param typeDecl The nominal in which we are searching for @objc methods.
+  /// The search only considers this type and its extensions; not any
   /// superclasses.
   ///
   /// \param selector The selector to search for.
@@ -589,7 +634,7 @@ public:
   ///
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested.
-  void loadObjCMethods(ClassDecl *classDecl,
+  void loadObjCMethods(NominalTypeDecl *typeDecl,
                        ObjCSelector selector,
                        bool isInstanceMethod,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
@@ -657,7 +702,7 @@ public:
   /// This includes all decls that should be displayed to clients of the module.
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
-  void getDisplayDecls(SmallVectorImpl<Decl*> &results);
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false);
 
   StringRef getModuleFilename() const {
     if (!Core->ModuleInterfacePath.empty())
@@ -707,7 +752,18 @@ public:
 
   void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
-                           SmallVectorImpl<Requirement> &requirements) override;
+                           SmallVectorImpl<Requirement> &requirements,
+                           SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override;
+
+  void
+  loadAssociatedTypes(
+      const ProtocolDecl *proto, uint64_t contextData,
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
+
+  void
+  loadPrimaryAssociatedTypes(
+      const ProtocolDecl *proto, uint64_t contextData,
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;
@@ -724,7 +780,8 @@ public:
   Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
-
+  void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const;
 
   // MARK: Deserialization interface
 
@@ -814,24 +871,18 @@ public:
   llvm::Expected<SubstitutionMap>
   getSubstitutionMapChecked(serialization::SubstitutionMapID id);
 
-  /// Recursively reads a protocol conformance from the given cursor.
-  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
-                                         GenericEnvironment *genericEnv =
-                                           nullptr);
+  /// Returns the protocol conformance for the given ID.
+  ProtocolConformanceRef
+  getConformance(serialization::ProtocolConformanceID id,
+                 GenericEnvironment *genericEnv = nullptr);
 
-  /// Recursively reads a protocol conformance from the given cursor,
-  /// returns the conformance or the first error.
+  /// Returns the protocol conformance for the given ID.
   llvm::Expected<ProtocolConformanceRef>
-  readConformanceChecked(llvm::BitstreamCursor &Cursor,
-                         GenericEnvironment *genericEnv = nullptr);
+  getConformanceChecked(serialization::ProtocolConformanceID id,
+                        GenericEnvironment *genericEnv = nullptr);
 
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
-
-  /// Read the given normal conformance from the current module file,
-  /// returns the conformance or the first error.
-  llvm::Expected<NormalProtocolConformance *>
-  readNormalConformanceChecked(serialization::NormalConformanceID id);
 
   /// Reads a foreign error convention from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();

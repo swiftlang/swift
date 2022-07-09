@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend-typecheck -emit-module-interface-path %t.swiftinterface %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name conformances
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name conformances
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix CHECK-END %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.swiftinterface
@@ -236,6 +237,12 @@ public struct NestedAvailabilityOuter {
   @available(iOS 23, *)
   public struct Inner: PrivateSubProto {}
 }
+
+@_nonSendable public struct NonSendable {}
+// NEGATIVE-NOT: @_nonSendable
+// CHECK-LABEL: public struct NonSendable {
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension conformances.NonSendable : @unchecked Swift.Sendable {
 
 // CHECK-END: @available(macOS 10.97, iOS 23, *)
 // CHECK-END: @available(tvOS, unavailable)

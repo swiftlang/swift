@@ -96,6 +96,7 @@ void
 DeclarationFragmentPrinter::printNamePre(PrintNameContext Context) {
   switch (Context) {
   case PrintNameContext::Keyword:
+  case PrintNameContext::IntroducerKeyword:
     openFragment(FragmentKind::Keyword);
     break;
   case PrintNameContext::GenericParameter:

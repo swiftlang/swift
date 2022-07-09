@@ -16,7 +16,7 @@ import TestsUtils
 import Foundation
 
 #if _runtime(_ObjC)
-public let DictionaryKeysContains = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DictionaryKeysContainsNative",
     runFunction: run_DictionaryKeysContains,
@@ -32,7 +32,7 @@ public let DictionaryKeysContains = [
     tearDownFunction: teardownDictionary),
 ]
 #else
-public let DictionaryKeysContains = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DictionaryKeysContainsNative",
     runFunction: run_DictionaryKeysContains,
@@ -69,13 +69,13 @@ private func teardownDictionary() {
 }
 
 @inline(never)
-public func run_DictionaryKeysContains(_ N: Int) {
+public func run_DictionaryKeysContains(_ n: Int) {
 #if os(Linux)
   fatalError("Unsupported benchmark")
 #else
-  for _ in 0..<(N * 100) {
-    CheckResults(dictionary.keys.contains("42"))
-    CheckResults(!dictionary.keys.contains("-1"))
+  for _ in 0..<(n * 100) {
+    check(dictionary.keys.contains("42"))
+    check(!dictionary.keys.contains("-1"))
   }
 #endif
 }

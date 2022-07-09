@@ -165,7 +165,7 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-NEXT: call void @llvm.lifetime.start.p0i8({{(i32|i64)}} -1, i8* [[ALLOCA]])
 // CHECK-NEXT: [[ENUM_STORAGE:%.*]] = bitcast i8* [[ALLOCA]] to %swift.opaque*
 
-// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
+// CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithCopy]] = bitcast i8* [[WITNESS]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64

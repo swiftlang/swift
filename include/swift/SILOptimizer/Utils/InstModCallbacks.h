@@ -226,6 +226,39 @@ struct InstModCallbacks {
     }
   }
 
+  /// Replace all uses of the results of \p oldInst pairwise with new uses of
+  /// the results of \p newInst.
+  ///
+  /// If \p setUseValueFunc is not set to a value, we just call inline
+  /// SILInstruction::replaceAllUsesPairwiseWith(...) to ensure we only pay a
+  /// cost if we actually set setUseValueFunc.
+  void replaceAllInstUsesPairwiseWith(SILInstruction *oldInst, SILInstruction *newInst) {
+    wereAnyCallbacksInvoked = true;
+
+    // If setUseValueFunc is not set, just call RAUW directly. RAUW in this case
+    // is equivalent to what we do below. We just enable better
+    // performance. This ensures that the default InstModCallback is really
+    // fast.
+    if (!setUseValueFunc)
+      return oldInst->replaceAllUsesPairwiseWith(newInst);
+
+    auto results = oldInst->getResults();
+
+    // If we don't have any results, fast-path out without asking the other
+    // instruction for its results.
+    if (results.empty()) {
+      assert(newInst->getResults().empty());
+      return;
+    }
+
+    // Replace values with the corresponding values of the other instruction.
+    auto otherResults = newInst->getResults();
+    assert(results.size() == otherResults.size());
+    for (auto i : indices(results)) {
+      replaceValueUsesWith(results[i], otherResults[i]);
+    }
+  }
+
   void eraseAndRAUWSingleValueInst(SingleValueInstruction *oldInst,
                                    SILValue newValue) {
     wereAnyCallbacksInvoked = true;

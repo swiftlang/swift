@@ -18,6 +18,7 @@ add_swift_host_library(swiftParse STATIC
   ParseIfConfig.cpp
   ParsePattern.cpp
   Parser.cpp
+  ParseRegex.cpp
   ParseRequests.cpp
   ParseStmt.cpp
   ParseType.cpp
@@ -31,7 +32,8 @@ _swift_gyb_target_sources(swiftParse PRIVATE
 target_link_libraries(swiftParse PRIVATE
   swiftAST
   swiftSyntax
-  swiftSyntaxParse)
+  swiftSyntaxParse
+)
 
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)
 

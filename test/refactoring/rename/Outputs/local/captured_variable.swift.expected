@@ -47,7 +47,7 @@ func test5(_ x: Int) {
   print(x)
 }
 
-func testCaputreVariable() {
+func testCaptureVariable() {
   let capturedVariableRenamed = 0
 
   _ = { [capturedVariableRenamed] in

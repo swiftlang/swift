@@ -14,6 +14,7 @@
 #define SWIFT_SILGEN_RESULTPLAN_H
 
 #include "Callee.h"
+#include "ExecutorBreadcrumb.h"
 #include "ManagedValue.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
@@ -38,8 +39,14 @@ class CalleeTypeInfo;
 class ResultPlan {
 public:
   virtual RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                        ArrayRef<ManagedValue> &directResults) = 0;
+                        ArrayRef<ManagedValue> &directResults,
+                        SILValue bridgedForeignError) = 0;
   virtual ~ResultPlan() = default;
+
+  /// Defers the emission of the given breadcrumb until \p finish is invoked.
+  virtual void deferExecutorBreadcrumb(ExecutorBreadcrumb &&breadcrumb) {
+    llvm_unreachable("this ResultPlan does not handle deferred breadcrumbs!");
+  }
 
   virtual void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
@@ -49,9 +56,9 @@ public:
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) {
     return None;
   }
-  
-  virtual ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF, SILLocation loc) {
+
+  virtual ManagedValue emitForeignAsyncCompletionHandler(
+      SILGenFunction &SGF, AbstractionPattern origFormalType, SILLocation loc) {
     return {};
   }
 };

@@ -54,11 +54,17 @@ SIMPLE_LOCATOR_PATH_ELT(AutoclosureResult)
 /// The result of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 
+/// FIXME: Misleading name: this locator is used only for single-expression
+/// closure returns.
+///
 /// The type of a closure body.
 CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
 
 /// The lookup for a constructor member.
 SIMPLE_LOCATOR_PATH_ELT(ConstructorMember)
+
+/// The constructor member type in the lookup of a constructor.
+CUSTOM_LOCATOR_PATH_ELT(ConstructorMemberType)
 
 /// The desired contextual type passed in to the constraint system.
 CUSTOM_LOCATOR_PATH_ELT(ContextualType)
@@ -134,6 +140,10 @@ SIMPLE_LOCATOR_PATH_ELT(MemberRefBase)
 /// base of the locator.
 CUSTOM_LOCATOR_PATH_ELT(OpenedGeneric)
 
+/// This is referring to a type produced by opening an opaque type archetype
+/// type at the base of the locator.
+CUSTOM_LOCATOR_PATH_ELT(OpenedOpaqueArchetype)
+
 /// An optional payload.
 SIMPLE_LOCATOR_PATH_ELT(OptionalPayload)
 
@@ -176,6 +186,12 @@ ABSTRACT_LOCATOR_PATH_ELT(AnyTupleElement)
   /// A tuple element referenced by name.
   CUSTOM_LOCATOR_PATH_ELT(NamedTupleElement)
 
+/// Pack types <T, U, V, ...>
+CUSTOM_LOCATOR_PATH_ELT(PackType)
+
+/// An element of a pack type - the T in <T, U, V, ...>
+CUSTOM_LOCATOR_PATH_ELT(PackElement)
+
 /// An unresolved member.
 SIMPLE_LOCATOR_PATH_ELT(UnresolvedMember)
 
@@ -212,6 +228,16 @@ CUSTOM_LOCATOR_PATH_ELT(PlaceholderType)
 
 /// The implicit conversion applied at a given location.
 CUSTOM_LOCATOR_PATH_ELT(ImplicitConversion)
+
+/// An implicit call to a 'dynamicMember' subscript for a dynamic member lookup.
+SIMPLE_LOCATOR_PATH_ELT(ImplicitDynamicMemberSubscript)
+
+/// The element of the closure/function body e.g. statement, pattern,
+/// declaration, or expression.
+CUSTOM_LOCATOR_PATH_ELT(SyntacticElement)
+
+/// The element of the pattern binding declaration.
+CUSTOM_LOCATOR_PATH_ELT(PatternBindingElement)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

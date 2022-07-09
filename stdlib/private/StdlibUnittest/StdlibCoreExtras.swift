@@ -16,6 +16,8 @@ import SwiftPrivateLibcExtras
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif os(WASI)
+import WASILibc
 #elseif os(Windows)
 import CRT
 #endif
@@ -270,7 +272,7 @@ public func _isStdlibDebugConfiguration() -> Bool {
 
 // Return true if the Swift runtime available is at least 5.1
 public func _hasSwift_5_1() -> Bool {
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  if #available(SwiftStdlib 5.1, *) {
     return true
   }
   return false
@@ -294,3 +296,24 @@ public struct LinearCongruentialGenerator: RandomNumberGenerator {
     return _state
   }
 }
+
+#if !SWIFT_ENABLE_REFLECTION
+
+public func dump<T, TargetStream: TextOutputStream>(_ value: T, to target: inout TargetStream) {
+  target.write("(reflection not available)")
+}
+
+#endif
+
+#if SWIFT_STDLIB_STATIC_PRINT
+
+public func print(_ s: Any, terminator: String = "\n") {
+  let data = Array("\(s)\(terminator)".utf8)
+  write(STDOUT_FILENO, data, data.count)
+}
+
+public func print<Target>(_ s: Any, terminator: String = "\n", to output: inout Target) where Target : TextOutputStream {
+  output.write("\(s)\(terminator)")
+}
+
+#endif

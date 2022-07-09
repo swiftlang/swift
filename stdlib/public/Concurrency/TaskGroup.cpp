@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,28 +16,35 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 
-#include "swift/ABI/TaskGroup.h"
-#include "swift/ABI/Task.h"
-#include "swift/ABI/Metadata.h"
-#include "swift/ABI/HeapObject.h"
-#include "TaskPrivate.h"
+#include "Debug.h"
 #include "TaskGroupPrivate.h"
+#include "TaskPrivate.h"
+#include "bitset"
+#include "queue" // TODO: remove and replace with usage of our mpsc queue
+#include "string"
+#include "swift/ABI/HeapObject.h"
+#include "swift/ABI/Metadata.h"
+#include "swift/ABI/Task.h"
+#include "swift/ABI/TaskGroup.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
-#include "AsyncCall.h"
-#include "Debug.h"
-#include "bitset"
-#include "string"
-#include "queue" // TODO: remove and replace with usage of our mpsc queue
+#include "swift/Threading/Mutex.h"
 #include <atomic>
-#include <assert.h>
-#include <dispatch/dispatch.h>
+#include <new>
 
-#if !defined(_WIN32)
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+#include <mutex>
+#endif
+
+#include <assert.h>
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+#include <dispatch/dispatch.h>
+#endif
+
+#if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 #endif
 
@@ -277,9 +284,16 @@ public:
   };
 
 private:
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+  // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
+  mutable std::mutex mutex_;
 
-//    // TODO: move to lockless via the status atomic
-  mutable std::mutex mutex;
+  void lock() const { mutex_.lock(); }
+  void unlock() const { mutex_.unlock(); }
+#else
+  void lock() const {}
+  void unlock() const {}
+#endif
 
   /// Used for queue management, counting number of waiting and ready tasks
   std::atomic <uint64_t> status;
@@ -289,7 +303,6 @@ private:
   /// The low bits contain the status, the rest of the pointer is the
   /// AsyncTask.
   NaiveQueue<ReadyQueueItem> readyQueue;
-//     mpsc_queue_t<ReadyQueueItem> readyQueue; // TODO: can we get away with an MPSC queue here once actor executors land?
 
   /// Single waiting `AsyncTask` currently waiting on `group.next()`,
   /// or `nullptr` if no task is currently waiting.
@@ -304,9 +317,7 @@ public:
     : TaskGroupTaskStatusRecord(),
       status(GroupStatus::initial().status),
       readyQueue(),
-//          readyQueue(ReadyQueueItem::get(ReadyStatus::Empty, nullptr)),
       waitQueue(nullptr), successType(T) {}
-
 
   TaskGroupTaskStatusRecord *getTaskRecord() {
     return reinterpret_cast<TaskGroupTaskStatusRecord *>(this);
@@ -397,14 +408,14 @@ public:
   ///
   /// This is used to atomically perform a waiting task completion.
   bool statusCompletePendingReadyWaiting(GroupStatus &old) {
-    return status.compare_exchange_weak(
+    return status.compare_exchange_strong(
       old.status, old.completingPendingReadyWaiting().status,
       /*success*/ std::memory_order_relaxed,
       /*failure*/ std::memory_order_relaxed);
   }
 
   bool statusCompletePendingReady(GroupStatus &old) {
-    return status.compare_exchange_weak(
+    return status.compare_exchange_strong(
       old.status, old.completingPendingReady().status,
       /*success*/ std::memory_order_relaxed,
       /*failure*/ std::memory_order_relaxed);
@@ -451,31 +462,44 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
   return reinterpret_cast<TaskGroup*>(group);
 }
 
+TaskGroupTaskStatusRecord * TaskGroup::getTaskRecord() {
+    return asImpl(this)->getTaskRecord();
+}
+
 // =============================================================================
 // ==== initialize -------------------------------------------------------------
 
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
-  TaskGroupImpl *impl = new (group) TaskGroupImpl(T);
+  SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
+
+  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
-  bool notCancelled = swift_task_addStatusRecord(record);
-
-  // If the task has already been cancelled, reflect that immediately in
-  // the group status.
-  if (!notCancelled) impl->statusCancel();
+  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+    // If the task has already been cancelled, reflect that immediately in
+    // the group's status.
+    if (parentStatus.isCancelled()) {
+      impl->statusCancel();
+    }
+    return true;
+  });
 }
 
 // =============================================================================
 // ==== add / attachChild ------------------------------------------------------
-SWIFT_CC(swift)
-static void swift_taskGroup_attachChildImpl(TaskGroup *group,
-                                            AsyncTask *child) {
-  auto groupRecord = asImpl(group)->getTaskRecord();
-  return groupRecord->attachChild(child);
+
+void TaskGroup::addChildTask(AsyncTask *child) {
+  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, this);
+
+  // The counterpart of this (detachChild) is performed by the group itself,
+  // when it offers the completed (child) task's value to a waiting task -
+  // during the implementation of `await group.next()`.
+  auto groupRecord = asImpl(this)->getTaskRecord();
+  groupRecord->attachChild(child);
 }
 
 // =============================================================================
@@ -486,19 +510,17 @@ static void swift_taskGroup_destroyImpl(TaskGroup *group) {
 }
 
 void TaskGroupImpl::destroy() {
-  // First, remove the group from the task and deallocate the record
-  swift_task_removeStatusRecord(getTaskRecord());
+  SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
 
-  mutex.lock(); // TODO: remove lock, and use status for synchronization
-  // Release all ready tasks which are kept retained, the group destroyed,
-  // so no other task will ever await on them anymore;
-  ReadyQueueItem item;
-  bool taskDequeued = readyQueue.dequeue(item);
-  while (taskDequeued) {
-    swift_release(item.getTask());
-    taskDequeued = readyQueue.dequeue(item);
-  }
-  mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+  // First, remove the group from the task and deallocate the record
+  removeStatusRecord(getTaskRecord());
+
+  // No need to drain our queue here, as by the time we call destroy,
+  // all tasks inside the group must have been awaited on already.
+  // This is done in Swift's withTaskGroup function explicitly.
+
+  // destroy the group's storage
+  this->~TaskGroupImpl();
 }
 
 // =============================================================================
@@ -520,9 +542,10 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
     assert(false && "filling a waiting status?");
     return;
 
-  case PollStatus::Error:
-    context->fillWithError(reinterpret_cast<SwiftError*>(result.storage));
+  case PollStatus::Error: {
+    context->fillWithError(reinterpret_cast<SwiftError *>(result.storage));
     return;
+  }
 
   case PollStatus::Success: {
     // Initialize the result as an Optional<Success>.
@@ -552,18 +575,9 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask->hasChildFragment());
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
+  SWIFT_TASK_DEBUG_LOG("offer task %p to group %p", completedTask, this);
 
-  // We retain the completed task, because we will either:
-  // - (a) schedule the waiter to resume on the next() that it is waiting on, or
-  // - (b) will need to store this task until the group task enters next() and
-  //       picks up this task.
-  // either way, there is some time between us returning here, and the `completeTask`
-  // issuing a swift_release on this very task. We need to keep it alive until
-  // we have the chance to poll it from the queue (via the waiter task entering
-  // calling next()).
-  swift_retain(completedTask);
-
-  mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
+  lock(); // TODO: remove fragment lock, and use status for synchronization
 
   // Immediately increment ready count and acquire the status
   // Examples:
@@ -578,20 +592,22 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   bool hadErrorResult = false;
   auto errorObject = asyncContextPrefix->errorResult;
   if (errorObject) {
-    // instead we need to enqueue this result:
+    // instead, we need to enqueue this result:
     hadErrorResult = true;
   }
 
   // ==== a) has waiting task, so let us complete it right away
   if (assumed.hasWaitingTask()) {
     auto waitingTask = waitQueue.load(std::memory_order_acquire);
+    SWIFT_TASK_DEBUG_LOG("group has waiting task = %p, complete with = %p",
+                         waitingTask, completedTask);
     while (true) {
       // ==== a) run waiting task directly -------------------------------------
       assert(assumed.hasWaitingTask());
       assert(assumed.pendingTasks() && "offered to group with no pending tasks!");
       // We are the "first" completed task to arrive,
       // and since there is a task waiting we immediately claim and complete it.
-      if (waitQueue.compare_exchange_weak(
+      if (waitQueue.compare_exchange_strong(
           waitingTask, nullptr,
           /*success*/ std::memory_order_release,
           /*failure*/ std::memory_order_acquire) &&
@@ -599,21 +615,24 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         // Run the task.
         auto result = PollResult::get(completedTask, hadErrorResult);
 
-        mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+        unlock(); // TODO: remove fragment lock, and use status for synchronization
 
         auto waitingContext =
             static_cast<TaskFutureWaitAsyncContext *>(
                 waitingTask->ResumeContext);
 
         fillGroupNextResult(waitingContext, result);
+        detachChild(result.retainedTask);
 
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
         // TODO: allow the caller to suggest an executor
-        swift_task_enqueueGlobal(waitingTask);
+        waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
         return;
       } // else, try again
     }
+
+    llvm_unreachable("should have enqueued and returned.");
   }
 
   // ==== b) enqueue completion ------------------------------------------------
@@ -622,10 +641,12 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   // queue when a task polls during next() it will notice that we have a value
   // ready for it, and will process it immediately without suspending.
   assert(!waitQueue.load(std::memory_order_relaxed));
-
+  SWIFT_TASK_DEBUG_LOG("group has no waiting tasks, RETAIN and store ready task = %p",
+                       completedTask);
   // Retain the task while it is in the queue;
   // it must remain alive until the task group is alive.
   swift_retain(completedTask);
+
   auto readyItem = ReadyQueueItem::get(
       hadErrorResult ? ReadyStatus::Error : ReadyStatus::Success,
       completedTask
@@ -634,7 +655,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask == readyItem.getTask());
   assert(readyItem.getTask()->isFuture());
   readyQueue.enqueue(readyItem);
-  mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+  unlock(); // TODO: remove fragment lock, and use status for synchronization
   return;
 }
 
@@ -667,6 +688,7 @@ SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_wait_next_t
 
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
+
 SWIFT_CC(swiftasync)
 static void swift_taskGroup_wait_next_throwingImpl(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
@@ -690,6 +712,8 @@ static void swift_taskGroup_wait_next_throwingImpl(
   PollResult polled = group->poll(waitingTask);
   switch (polled.status) {
   case PollStatus::MustWait:
+    SWIFT_TASK_DEBUG_LOG("poll group = %p, no ready tasks, waiting task = %p",
+                         group, waitingTask);
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
 #ifdef __ARM_ARCH_7K__
@@ -702,13 +726,22 @@ static void swift_taskGroup_wait_next_throwingImpl(
   case PollStatus::Empty:
   case PollStatus::Error:
   case PollStatus::Success:
+    SWIFT_TASK_DEBUG_LOG("poll group = %p, task = %p, ready task available = %p",
+                         group, waitingTask, polled.retainedTask);
     fillGroupNextResult(context, polled);
+    if (auto completedTask = polled.retainedTask) {
+      // it would be null for PollStatus::Empty, then we don't need to release
+      group->detachChild(polled.retainedTask);
+      swift_release(polled.retainedTask);
+    }
+
     return waitingTask->runInFullyEstablishedContext();
   }
 }
 
 PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
-  mutex.lock(); // TODO: remove group lock, and use status for synchronization
+  lock(); // TODO: remove group lock, and use status for synchronization
+  SWIFT_TASK_DEBUG_LOG("poll group = %p", this);
   auto assumed = statusMarkWaitingAssumeAcquire();
 
   PollResult result;
@@ -718,23 +751,30 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
 
   // ==== 1) bail out early if no tasks are pending ----------------------------
   if (assumed.isEmpty()) {
+    SWIFT_TASK_DEBUG_LOG("poll group = %p, group is empty, no pending tasks", this);
     // No tasks in flight, we know no tasks were submitted before this poll
     // was issued, and if we parked here we'd potentially never be woken up.
     // Bail out and return `nil` from `group.next()`.
     statusRemoveWaiting();
     result.status = PollStatus::Empty;
     result.successType = this->successType;
-    mutex.unlock(); // TODO: remove group lock, and use status for synchronization
+    unlock(); // TODO: remove group lock, and use status for synchronization
     return result;
   }
+
+  // Have we suspended the task?
+  bool hasSuspended = false;
 
   auto waitHead = waitQueue.load(std::memory_order_acquire);
 
   // ==== 2) Ready task was polled, return with it immediately -----------------
   if (assumed.readyTasks()) {
+    SWIFT_TASK_DEBUG_LOG("poll group = %p, group has ready tasks = %d",
+                         this, assumed.readyTasks());
+
     auto assumedStatus = assumed.status;
     auto newStatus = TaskGroupImpl::GroupStatus{assumedStatus};
-    if (status.compare_exchange_weak(
+    if (status.compare_exchange_strong(
         assumedStatus, newStatus.completingPendingReadyWaiting().status,
         /*success*/ std::memory_order_relaxed,
         /*failure*/ std::memory_order_acquire)) {
@@ -742,19 +782,18 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
       // Success! We are allowed to poll.
       ReadyQueueItem item;
       bool taskDequeued = readyQueue.dequeue(item);
-      if (!taskDequeued) {
-        result.status = PollStatus::MustWait;
-        result.storage = nullptr;
-        result.successType = nullptr;
-        result.retainedTask = nullptr;
-        mutex.unlock(); // TODO: remove group lock, and use status for synchronization
-        return result;
+      assert(taskDequeued); (void) taskDequeued;
+
+      // We're going back to running the task, so if we suspended before,
+      // we need to flag it as running again.
+      if (hasSuspended) {
+        waitingTask->flagAsRunning();
       }
 
       assert(item.getTask()->isFuture());
       auto futureFragment = item.getTask()->futureFragment();
 
-      // Store the task in the result, so after we're done processing it it may
+      // Store the task in the result, so after we're done processing it may
       // be swift_release'd; we kept it alive while it was in the readyQueue by
       // an additional retain issued as we enqueued it there.
       result.retainedTask = item.getTask();
@@ -766,7 +805,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.successType = futureFragment->getResultType();
           assert(result.retainedTask && "polled a task, it must be not null");
           _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
-          mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+          unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
 
         case ReadyStatus::Error:
@@ -777,7 +816,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.successType = nullptr;
           assert(result.retainedTask && "polled a task, it must be not null");
           _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
-          mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+          unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
 
         case ReadyStatus::Empty:
@@ -785,7 +824,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.storage = nullptr;
           result.retainedTask = nullptr;
           result.successType = this->successType;
-          mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+          unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
       }
       assert(false && "must return result when status compare-and-swap was successful");
@@ -796,18 +835,22 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
   assert(assumed.readyTasks() == 0);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
   while (true) {
+    if (!hasSuspended) {
+      hasSuspended = true;
+      waitingTask->flagAsSuspended();
+    }
     // Put the waiting task at the beginning of the wait queue.
-    if (waitQueue.compare_exchange_weak(
+    if (waitQueue.compare_exchange_strong(
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
-      mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+      unlock(); // TODO: remove fragment lock, and use status for synchronization
       // no ready tasks, so we must wait.
       result.status = PollStatus::MustWait;
+      _swift_task_clearCurrent();
       return result;
     } // else, try again
   }
-  assert(false && "must successfully compare exchange the waiting task.");
 }
 
 // =============================================================================
@@ -832,6 +875,8 @@ static void swift_taskGroup_cancelAllImpl(TaskGroup *group) {
 }
 
 bool TaskGroupImpl::cancelAll() {
+  SWIFT_TASK_DEBUG_LOG("cancel all tasks in group = %p", this);
+
   // store the cancelled bit
   auto old = statusCancel();
   if (old.isCancelled()) {
@@ -839,6 +884,7 @@ bool TaskGroupImpl::cancelAll() {
     return false;
   }
 
+  // FIXME: must also remove the records!!!!
   // cancel all existing tasks within the group
   swift_task_cancel_group_child_tasks(asAbstract(this));
   return true;

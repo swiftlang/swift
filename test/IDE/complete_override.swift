@@ -260,12 +260,12 @@ extension TestProtocol_PA {
 }
 
 // PROTOCOL_PA_EXT: Begin completions
-// PROTOCOL_PA_EXT-DAG: Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int)
+// PROTOCOL_PA_EXT-DAG: Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA:)
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc()
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional()
-// PROTOCOL_PA_EXT-DAG: Decl[Subscript]/Super:              subscript(a: TagPA) -> Int {|}; name=subscript(a: TagPA) -> Int
-// PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRW: Int; name=protoAVarRW: Int
-// PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRO: Int; name=protoAVarRO: Int
+// PROTOCOL_PA_EXT-DAG: Decl[Subscript]/Super:              subscript(a: TagPA) -> Int {|}; name=subscript(:)
+// PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRW: Int; name=protoAVarRW
+// PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRO: Int; name=protoAVarRO
 // PROTOCOL_PA_EXT: End completions
 
 class OuterNominal : ProtocolA {
@@ -277,13 +277,13 @@ class OuterNominal : ProtocolA {
 class OuterNominal2: ProtocolA {
   var f = { #^NESTED_CLOSURE_1?keywords=false^# }()
 }
-// NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super: func
 // NESTED_CLOSURE_1-NOT: {|}
 
 class OuterNominal3: ProtocolA {
   var f = { static #^NESTED_CLOSURE_2?keywords=false^# }()
 }
-// NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super: func
 // NESTED_CLOSURE_2-NOT: {|}
 
 class OmitKW1 : ProtocolA {
@@ -294,7 +294,7 @@ class OmitKW1 : ProtocolA {
 // OMIT_KEYWORD1-NOT:    Decl[Constructor]
 // OMIT_KEYWORD1-DAG:    Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc(){{$}}
 // OMIT_KEYWORD1-DAG:    Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
-// OMIT_KEYWORD1-DAG:    Decl[Subscript]/Super:              subscript(a: TagPA) -> Int {|}; name=subscript(a: TagPA) -> Int
+// OMIT_KEYWORD1-DAG:    Decl[Subscript]/Super:              subscript(a: TagPA) -> Int {|}; name=subscript(:)
 // OMIT_KEYWORD1-DAG:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD1-NOT:    Decl[Constructor]
 // OMIT_KEYWORD1: End completions
@@ -411,10 +411,10 @@ class TestClassWithThrows : HasThrowing, HasThrowingProtocol {
   #^HAS_THROWING?keywords=false^#
 }
 // HAS_THROWING: Begin completions
-// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         func foo() throws {|}; name=foo() throws
-// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func bar() throws {|}; name=bar() throws
-// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: @escaping () throws -> ()) rethrows {|}; name=baz(x: {{(@escaping )?}}() throws -> ()) rethrows
-// HAS_THROWING-DAG: Decl[Constructor]/Super:            override init() throws {|}; name=init() throws
+// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         func foo() throws {|}; name=foo()
+// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func bar() throws {|}; name=bar()
+// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: @escaping () throws -> ()) rethrows {|}; name=baz(x:)
+// HAS_THROWING-DAG: Decl[Constructor]/Super:            override init() throws {|}; name=init()
 // HAS_THROWING: End completions
 
 protocol P0
@@ -428,8 +428,8 @@ class C1 : P1 {
 }
 
 // ASSOC_TYPE1: Begin completions, 2 items
-// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T2 = {#(Type)#}; name=T2 = Type
-// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T3 = {#(Type)#}; name=T3 = Type
+// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T2 = {#(Type)#}; name=T2 =
+// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T3 = {#(Type)#}; name=T3 =
 
 class Deprecated1 {
   @available(*, deprecated)
@@ -442,7 +442,7 @@ class Deprecated2 : Deprecated1 {
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
 
 class EscapingBase {
-  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> (@escaping (@escaping ()->() )->()) { }
+  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> ((@escaping ()->() )->()) { }
   func autoclosure(arg: @autoclosure () -> Bool) {}
 }
 class Escaping : EscapingBase {
@@ -576,52 +576,52 @@ class Override26 : OverrideBase, OverrideP {
 }
 
 // MODIFIER1: Begin completions, 10 items
-// MODIFIER1-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
+// MODIFIER1-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=init(p:)
 // MODIFIER1-DAG: Decl[StaticMethod]/Super:           override class func classMethod() {|}; name=classMethod()
-// MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar: Int
-// MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar
+// MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar
 // MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
-// MODIFIER1-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
-// MODIFIER1-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
-// MODIFIER1-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
-// MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc = Type
+// MODIFIER1-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl
+// MODIFIER1-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x:)
+// MODIFIER1-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=init(a:)
+// MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc =
 // MODIFIER1: End completions
 
 // MODIFIER2: Begin completions, 6 items
-// MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar: Int
-// MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar
+// MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar
 // MODIFIER2-DAG: Decl[StaticMethod]/Super:           override class func classMethod() {|}; name=classMethod()
 // MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
-// MODIFIER2-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
+// MODIFIER2-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl
 // MODIFIER2: End completions
 
 // MODIFIER4: Begin completions, 3 items
-// MODIFIER4-DAG: Decl[Constructor]/Super:            init(p: Int) {|}; name=init(p: Int)
-// MODIFIER4-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
-// MODIFIER4-DAG: Decl[Constructor]/Super:            init(a: Int) {|}; name=init(a: Int)
+// MODIFIER4-DAG: Decl[Constructor]/Super:            init(p: Int) {|}; name=init(p:)
+// MODIFIER4-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x:)
+// MODIFIER4-DAG: Decl[Constructor]/Super:            init(a: Int) {|}; name=init(a:)
 // MODIFIER4: End completions
 
 // MODIFIER5: Begin completions, 3 items
-// MODIFIER5-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
-// MODIFIER5-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
-// MODIFIER5-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
+// MODIFIER5-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=init(p:)
+// MODIFIER5-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x:)
+// MODIFIER5-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=init(a:)
 // MODIFIER5: End completions
 
 // MODIFIER6: Begin completions, 1 items
-// MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc = Type
+// MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc =
 // MODIFIER6: End completions
 
 // MODIFIER7: Begin completions, 8 items
-// MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classVar: Int; name=classVar: Int
-// MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classVar: Int; name=classVar
+// MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classGetOnlyVar: Int; name=classGetOnlyVar
 // MODIFIER7-DAG: Decl[StaticMethod]/Super:           class func classMethod() {|}; name=classMethod()
 // MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func defaultMethod() {|}; name=defaultMethod()
-// MODIFIER7-DAG: Decl[InstanceVar]/Super:            var varDecl: Int; name=varDecl: Int
+// MODIFIER7-DAG: Decl[InstanceVar]/Super:            var varDecl: Int; name=varDecl
 // MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func openMethod() {|}; name=openMethod()
-// MODIFIER7-DAG: Decl[Constructor]/Super:            init(x: Int) {|}; name=init(x: Int)
-// MODIFIER7-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
+// MODIFIER7-DAG: Decl[Constructor]/Super:            init(x: Int) {|}; name=init(x:)
+// MODIFIER7-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=init(a:)
 // MODIFIER7: End completions
 
 // MODIFIER8: Begin completions, 2 items
@@ -630,23 +630,23 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER8: End completions
 
 // MODIFIER9: Begin completions, 1 items
-// MODIFIER9-DAG: Decl[InstanceVar]/Super/Erase[4]:   override var varDecl: Int; name=varDecl: Int
+// MODIFIER9-DAG: Decl[InstanceVar]/Super/Erase[4]:   override var varDecl: Int; name=varDecl
 // MODIFIER9: End completions
 
 // MODIFIER12: Begin completions, 1 items
-// MODIFIER12-DAG: Decl[InstanceVar]/Super:           varDecl: Int; name=varDecl: Int
+// MODIFIER12-DAG: Decl[InstanceVar]/Super:           varDecl: Int; name=varDecl
 // MODIFIER12: End completions
 
 // MODIFIER13-NOT: Begin completions
 
 // MODIFIER15: Begin completions, 2 items
-// MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classVar: Int; name=classVar: Int
-// MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classVar: Int; name=classVar
+// MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classGetOnlyVar: Int; name=classGetOnlyVar
 // MODIFIER15: End completions
 
 // MODIFIER17: Begin completions, 2 items
-// MODIFIER17-DAG: Decl[StaticVar]/Super:             classVar: Int; name=classVar: Int
-// MODIFIER17-DAG: Decl[StaticVar]/Super:             classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER17-DAG: Decl[StaticVar]/Super:             classVar: Int; name=classVar
+// MODIFIER17-DAG: Decl[StaticVar]/Super:             classGetOnlyVar: Int; name=classGetOnlyVar
 // MODIFIER17: End completions
 
 // MODIFIER21: Begin completions, 1 items
@@ -659,14 +659,14 @@ class Override26 : OverrideBase, OverrideP {
 
 // MODIFIER23: Begin completions, 3 items
 // MODIFIER23-DAG: Decl[StaticMethod]/Super:          override func classMethod() {|}; name=classMethod()
-// MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classVar: Int; name=classVar: Int
-// MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classVar: Int; name=classVar
+// MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classGetOnlyVar: Int; name=classGetOnlyVar
 // MODIFIER23: End completions
 
 // MODIFIER24: Begin completions, 3 items
 // MODIFIER24-DAG: Decl[StaticMethod]/Super:          func classMethod() {|}; name=classMethod()
-// MODIFIER24-DAG: Decl[StaticVar]/Super:             var classVar: Int; name=classVar: Int
-// MODIFIER24-DAG: Decl[StaticVar]/Super:             var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER24-DAG: Decl[StaticVar]/Super:             var classVar: Int; name=classVar
+// MODIFIER24-DAG: Decl[StaticVar]/Super:             var classGetOnlyVar: Int; name=classGetOnlyVar
 // MODIFIER24: End completions
 
 protocol RequiredP {
@@ -683,15 +683,15 @@ struct RequiredS : RequiredP {
 }
 
 // PROTOINIT_NORM: Begin completions, 1 items
-// PROTOINIT_NORM-DAG: required init(p: Int) {|}; name=required init(p: Int)
+// PROTOINIT_NORM-DAG: required init(p: Int) {|}; name=init(p:)
 // PROTOINIT_NORM: End completions
 
 // PROTOINIT_FINAL: Begin completions, 1 items
-// PROTOINIT_FINAL-DAG: init(p: Int) {|}; name=init(p: Int)
+// PROTOINIT_FINAL-DAG: init(p: Int) {|}; name=init(p:)
 // PROTOINIT_FINAL: End completions
 
 // PROTOINIT_STRUCT: Begin completions, 1 items
-// PROTOINIT_STRUCT-DAG: init(p: Int) {|}; name=init(p: Int)
+// PROTOINIT_STRUCT-DAG: init(p: Int) {|}; name=init(p:)
 // PROTOINIT_STRUCT: End completions
 
 protocol AssocAndMethod {
@@ -736,7 +736,7 @@ struct SynthesizedConformance3: Hashable {
   #^OVERRIDE_SYNTHESIZED_3?keywords=false^#
 // FIXME: Where did Equatable.(==) go?
 // OVERRIDE_SYNTHESIZED_3: Begin completions, 2 items
-// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int; name=hashValue: Int
+// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int; name=hashValue
 // OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceMethod]/Super/IsSystem:    func hash(into hasher: inout Hasher) {|}
 }
 
@@ -756,4 +756,14 @@ class SynthesizedConformance5: SynthesizedConformance2 {
 // OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super/IsSystem:       required init(from decoder: Decoder) throws {|};
 // OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super:                required init(from decoder: Decoder) throws {|};
 // FIXME: 'required init(from decoder: Decoder)' is suggested twice
+}
+
+protocol ProtocolSr14687 {
+  var value: Int { get }
+}
+struct StructSr14687: ProtocolSr14687 {
+  let foo = val, #^MULTI_VAR_DECL_OVERRIDE^#
+// MULTI_VAR_DECL_OVERRIDE:     Begin completions, 1 items
+// MULTI_VAR_DECL_OVERRIDE-DAG: Decl[InstanceVar]/Super:            value: Int;
+// MULTI_VAR_DECL_OVERRIDE:     End completions
 }

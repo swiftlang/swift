@@ -23,7 +23,7 @@ class MemoryBuffer;
 namespace swift {
 
 class DiagnosticEngine;
-class ModuleDependenciesCache;
+class GlobalModuleDependenciesCache;
 
 namespace dependencies {
 namespace module_dependency_cache_serialization {
@@ -37,7 +37,7 @@ using llvm::BCVBR;
 /// Every .moddepcache file begins with these 4 bytes, for easy identification.
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D',
                                                                   'C'};
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 1;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 2;
 /// Increment this on every change.
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 0;
 
@@ -46,17 +46,17 @@ const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 0;
 using IdentifierIDField = BCVBR<13>;
 using FileIDField = IdentifierIDField;
 using ModuleIDField = IdentifierIDField;
-using CompilerFlagField = IdentifierIDField;
 using ContextHashField = IdentifierIDField;
 
 /// A bit that indicates whether or not a module is a framework
 using IsFrameworkField = BCFixed<1>;
 
-/// Arrays of various identifiers, distinguised for readability
+/// Arrays of various identifiers, distinguished for readability
 using IdentifierIDArryField = llvm::BCArray<IdentifierIDField>;
 
 /// Identifiers used to refer to the above arrays
 using FileIDArrayIDField = IdentifierIDField;
+using TripleIDField = IdentifierIDField;
 using DependencyIDArrayIDField = IdentifierIDField;
 using FlagIDArrayIDField = IdentifierIDField;
 
@@ -72,7 +72,8 @@ namespace graph_block {
 enum {
   METADATA = 1,
   MODULE_NODE,
-  SWIFT_TEXTUAL_MODULE_DETAILS_NODE,
+  SWIFT_INTERFACE_MODULE_DETAILS_NODE,
+  SWIFT_SOURCE_MODULE_DETAILS_NODE,
   SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE,
   SWIFT_BINARY_MODULE_DETAILS_NODE,
   CLANG_MODULE_DETAILS_NODE,
@@ -101,7 +102,7 @@ using IdentifierNodeLayout = BCRecordLayout<IDENTIFIER_NODE, BCBlob>;
 //
 // These arrays are also referenced by their sequence number,
 // starting from 1, similar to identifiers above. Value 0 indicates an
-// empty array. This record is used because individiual array fields must
+// empty array. This record is used because individual array fields must
 // appear as the last field of whatever record they belong to, and several of
 // the below record layouts contain multiple arrays.
 using IdentifierArrayLayout =
@@ -109,18 +110,20 @@ using IdentifierArrayLayout =
 
 // After the array records, we have a sequence of Module info
 // records, each of which is followed by one of:
-// - SwiftTextualModuleDetails
+// - SwiftInterfaceModuleDetails
+// - SwiftSourceModuleDetails
 // - SwiftBinaryModuleDetails
 // - SwiftPlaceholderModuleDetails
 // - ClangModuleDetails
 using ModuleInfoLayout =
     BCRecordLayout<MODULE_NODE,             // ID
                    IdentifierIDField,       // module name
+                   TripleIDField,           // target triple
                    DependencyIDArrayIDField // directDependencies
                    >;
 
-using SwiftTextualModuleDetailsLayout =
-    BCRecordLayout<SWIFT_TEXTUAL_MODULE_DETAILS_NODE, // ID
+using SwiftInterfaceModuleDetailsLayout =
+    BCRecordLayout<SWIFT_INTERFACE_MODULE_DETAILS_NODE, // ID
                    FileIDField,                       // swiftInterfaceFile
                    FileIDArrayIDField, // compiledModuleCandidates
                    FlagIDArrayIDField, // buildCommandLine
@@ -130,7 +133,16 @@ using SwiftTextualModuleDetailsLayout =
                    FileIDField,        // bridgingHeaderFile
                    FileIDArrayIDField, // sourceFiles
                    FileIDArrayIDField, // bridgingSourceFiles
-                   IdentifierIDField   // bridgingModuleDependencies
+                   FileIDArrayIDField   // bridgingModuleDependencies
+                   >;
+
+using SwiftSourceModuleDetailsLayout =
+    BCRecordLayout<SWIFT_SOURCE_MODULE_DETAILS_NODE, // ID
+                   FlagIDArrayIDField, // extraPCMArgs
+                   FileIDField,        // bridgingHeaderFile
+                   FileIDArrayIDField, // sourceFiles
+                   FileIDArrayIDField, // bridgingSourceFiles
+                   FileIDArrayIDField  // bridgingModuleDependencies
                    >;
 
 using SwiftBinaryModuleDetailsLayout =
@@ -153,30 +165,31 @@ using ClangModuleDetailsLayout =
                    FileIDField,               // moduleMapPath
                    ContextHashField,          // contextHash
                    FlagIDArrayIDField,        // commandLine
-                   FileIDArrayIDField         // fileDependencies
+                   FileIDArrayIDField,        // fileDependencies
+                   FlagIDArrayIDField         // capturedPCMArgs
                    >;
 } // namespace graph_block
 
 /// Tries to read the dependency graph from the given buffer.
 /// Returns \c true if there was an error.
 bool readInterModuleDependenciesCache(llvm::MemoryBuffer &buffer,
-                                      ModuleDependenciesCache &cache);
+                                      GlobalModuleDependenciesCache &cache);
 
 /// Tries to read the dependency graph from the given path name.
 /// Returns true if there was an error.
 bool readInterModuleDependenciesCache(llvm::StringRef path,
-                                      ModuleDependenciesCache &cache);
+                                      GlobalModuleDependenciesCache &cache);
 
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
 bool writeInterModuleDependenciesCache(DiagnosticEngine &diags,
                                        llvm::StringRef path,
-                                       const ModuleDependenciesCache &cache);
+                                       const GlobalModuleDependenciesCache &cache);
 
 /// Tries to write out the given dependency cache with the given
 /// bitstream writer.
 void writeInterModuleDependenciesCache(llvm::BitstreamWriter &Out,
-                                       const ModuleDependenciesCache &cache);
+                                       const GlobalModuleDependenciesCache &cache);
 
 } // end namespace module_dependency_cache_serialization
 } // end namespace dependencies

@@ -94,7 +94,7 @@ tests.test("set algebra") {
 
   p = P.boxOrBag
   let removed = p.remove(P.satchelOrBag)
-  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(SwiftStdlib 5.3, *) {
     // https://github.com/apple/swift/pull/28378
     expectEqual(P.bag, removed)
   }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
 
 // REQUIRES: concurrency
 
@@ -9,7 +9,6 @@ func test() async {
 
 struct X {
   async let x = 1 // expected-error{{'async let' can only be used on local declarations}}
-  // FIXME: expected-error@-1{{'async' call cannot occur in a property initializer}}
 }
 
 func testAsyncFunc() async {
@@ -40,9 +39,6 @@ func cook() async throws {
 }
 
 func testInterpolation() async {
-  spawn let x = "\(12345)"
-  _ = await x
-
   async let y = "\(12345)"
   _ = await y
 }

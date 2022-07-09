@@ -167,9 +167,8 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
-  // CHECK: [[NEXT:%[0-9]+]] = witness_method $IndexingIterator<Array<MyClass>>, #IteratorProtocol.next : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
-  // CHECK-NEXT: apply [[NEXT]]<IndexingIterator<Array<MyClass>>>
-  // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo :
+  // CHECK: [[NEXT:%[0-9]+]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
+  // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
   let objects = [MyClass(), MyClass() ]
   for obj in objects {
     obj.foo()
@@ -527,10 +526,12 @@ func defer_mutable(_ x: Int) {
   var x = x
   // expected-warning@-1 {{variable 'x' was never mutated; consider changing to 'let' constant}}
   // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
-  // CHECK-NEXT: project_box [[BOX]]
-  // CHECK-NOT: [[BOX]]
+  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+  // CHECK-NEXT: project_box [[LIFETIME]]
+  // CHECK-NOT: [[LIFETIME]]
   // CHECK: function_ref @$s10statements13defer_mutableyySiF6$deferL_yyF : $@convention(thin) (@inout_aliasable Int) -> ()
-  // CHECK-NOT: [[BOX]]
+  // CHECK-NOT: [[LIFETIME]]
+  // CHECK: end_borrow [[LIFETIME]]
   // CHECK: destroy_value [[BOX]]
   defer { _ = x } // expected-warning {{'defer' statement at end of scope always executes immediately}}{{3-8=do}}
 }
@@ -604,8 +605,8 @@ func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK:  [[SOME_BB]]([[STR:%.*]] : @owned $String):
-  // CHECK-NEXT:   debug_value [[STR]] : $String, let, name "t"
-  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
+  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [lexical] [[STR]]
+  // CHECK-NEXT:   debug_value [[BORROWED_STR]] : $String, let, name "t"
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]]
   // CHECK-NEXT:   destroy_value [[STR]] : $String
@@ -648,8 +649,8 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : @owned $DerivedClass):
-  // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
-  // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
+  // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [lexical] [[PTR]]
+  // CHECK-NEXT: debug_value [[BORROWED_PTR]] : $DerivedClass, let, name "result"
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
   // CHECK-NEXT: end_borrow [[BORROWED_PTR]]
   // CHECK-NEXT: destroy_value [[PTR]] : $DerivedClass

@@ -75,7 +75,7 @@ where T == T.TangentVector {
 }
 
 %for op in ['derivative', 'gradient']:
-%for T in ['Float', 'Float80']:
+%for T in ['Float', 'Double', 'Float80']:
 
 %if T == 'Float80':
 #if !(os(Windows) || os(Android) || os(FreeBSD)) && (arch(i386) || arch(x86_64))
@@ -205,7 +205,7 @@ DerivativeTests.test("${op}_${T}") {
 #endif
 %end
 
-%end # for T in ['Float', 'Float80']:
+%end # for T in ['Float', 'Double', 'Float80']:
 %end # for op in ['derivative', 'gradient']:
 
 runAllTests()

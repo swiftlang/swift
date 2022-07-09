@@ -88,7 +88,6 @@
               key.usr: "s:16forbid_typecheck6ClsSecC6memberSivg",
               key.line: 5,
               key.column: 20,
-              key.receiver_usr: "s:16forbid_typecheck6ClsSecC",
               key.is_implicit: 1
             }
           ]

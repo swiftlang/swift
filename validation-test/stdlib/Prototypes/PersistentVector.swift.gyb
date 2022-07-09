@@ -4,6 +4,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %line-directive %t/PersistentVector.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 /*
 

@@ -44,25 +44,6 @@ STATISTIC(NumDuplicateSolutionStates,
 
 using namespace swift;
 
-AbstractTypeWitness AbstractTypeWitness::forFixed(AssociatedTypeDecl *assocType,
-                                                  Type type) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::Fixed, assocType, type,
-                             nullptr);
-}
-
-AbstractTypeWitness
-AbstractTypeWitness::forDefault(AssociatedTypeDecl *assocType, Type type,
-                                AssociatedTypeDecl *defaultedAssocType) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::Default, assocType, type,
-                             defaultedAssocType);
-}
-
-AbstractTypeWitness
-AbstractTypeWitness::forGenericParam(AssociatedTypeDecl *assocType, Type type) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::GenericParam, assocType,
-                             type, nullptr);
-}
-
 void InferredAssociatedTypesByWitness::dump() const {
   dump(llvm::errs(), 0);
 }
@@ -215,13 +196,10 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (!proto) {
       // Retrieve the generic signature of the extension.
       const auto extensionSig = extension->getGenericSignature();
-
-      // Extensions of non-generic nominals are always viable for inference.
-      if (!extensionSig)
-        return true;
-
-      return extensionSig->requirementsNotSatisfiedBy(
-          conformanceCtx->getGenericSignatureOfContext()).empty();
+      return extensionSig
+          .requirementsNotSatisfiedBy(
+              conformanceCtx->getGenericSignatureOfContext())
+          .empty();
     }
 
     // The condition here is a bit more fickle than
@@ -233,17 +211,26 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // so won't be affected by whatever answer inference comes up with.
     auto *module = dc->getParentModule();
     auto checkConformance = [&](ProtocolDecl *proto) {
-      auto otherConf = module->lookupConformance(conformance->getType(),
-                                                 proto);
-      return (otherConf && otherConf.getConditionalRequirements().empty());
+      auto typeInContext = dc->mapTypeIntoContext(conformance->getType());
+      auto otherConf = TypeChecker::conformsToProtocol(
+          typeInContext, proto, module);
+      return !otherConf.isInvalid();
     };
 
     // First check the extended protocol itself.
     if (!checkConformance(proto))
       return false;
 
-    // Now check any additional bounds on 'Self' from the where clause.
-    auto bounds = getSelfBoundsFromWhereClause(extension);
+    // Source file and module file have different ways to get self bounds.
+    // Source file extension will have trailing where clause which can avoid
+    // computing a generic signature. Module file will not have
+    // trailing where clause, so it will compute generic signature to get
+    // self bounds which might result in slow performance.
+    SelfBounds bounds;
+    if (extension->getParentSourceFile() != nullptr)
+      bounds = getSelfBoundsFromWhereClause(extension);
+    else
+      bounds = getSelfBoundsFromGenericSignature(extension);
     for (auto *decl : bounds.decls) {
       if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
         if (!checkConformance(proto))
@@ -263,8 +250,10 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // type can't use it regardless of what associated types we end up
     // inferring, skip the witness.
     if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext()))
-      if (!isExtensionUsableForInference(extension))
+      if (!isExtensionUsableForInference(extension)) {
+        LLVM_DEBUG(llvm::dbgs() << "Extension not usable for inference\n");
         continue;
+      }
 
     // Try to resolve the type witness via this value witness.
     auto witnessResult = inferTypeWitnessesViaValueWitness(req, witness);
@@ -326,7 +315,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
             auto selfAssocTy = DependentMemberType::get(selfTy,
                                                         dmt->getAssocType());
             for (auto &reqt : witnessContext->getGenericSignatureOfContext()
-                                            ->getRequirements()) {
+                                            .getRequirements()) {
               switch (reqt.getKind()) {
               case RequirementKind::Conformance:
               case RequirementKind::Superclass:
@@ -636,24 +625,37 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   return result;
 }
 
-Type swift::adjustInferredAssociatedType(Type type, bool &noescapeToEscaping) {
+Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
+                                         bool &performed) {
   // If we have an optional type, adjust its wrapped type.
   if (auto optionalObjectType = type->getOptionalObjectType()) {
     auto newOptionalObjectType =
-      adjustInferredAssociatedType(optionalObjectType, noescapeToEscaping);
+      adjustInferredAssociatedType(adjustment, optionalObjectType, performed);
     if (newOptionalObjectType.getPointer() == optionalObjectType.getPointer())
       return type;
 
     return OptionalType::get(newOptionalObjectType);
   }
 
+  auto needsAdjustment = [=](FunctionType *funcType) -> bool {
+    if (adjustment == TypeAdjustment::NoescapeToEscaping)
+      return funcType->isNoEscape();
+    else
+      return !funcType->isSendable();
+  };
+  auto adjust = [=](const ASTExtInfo &info) -> ASTExtInfo {
+    if (adjustment == TypeAdjustment::NoescapeToEscaping)
+      return info.withNoEscape(false);
+    else
+      return info.withConcurrent(true);
+  };
+
   // If we have a noescape function type, make it escaping.
   if (auto funcType = type->getAs<FunctionType>()) {
-    if (funcType->isNoEscape()) {
-      noescapeToEscaping = true;
+    performed = needsAdjustment(funcType);
+    if (performed)
       return FunctionType::get(funcType->getParams(), funcType->getResult(),
-                               funcType->getExtInfo().withNoEscape(false));
-    }
+                               adjust(funcType->getExtInfo()));
   }
   return type;
 }
@@ -716,7 +718,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       // Adjust the type to a type that can be written explicitly.
       bool noescapeToEscaping = false;
       Type inferredType =
-        adjustInferredAssociatedType(secondType, noescapeToEscaping);
+        adjustInferredAssociatedType(TypeAdjustment::NoescapeToEscaping,
+                                     secondType, noescapeToEscaping);
       if (!inferredType->isMaterializable())
         return true;
 
@@ -770,8 +773,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   // Match the witness. If we don't succeed, throw away the inference
   // information.
   // FIXME: A renamed match might be useful to retain for the failure case.
-  if (matchWitness(dc, req, witness, setup, matchTypes, finalize)
-          .Kind != MatchKind::ExactMatch) {
+  if (!matchWitness(dc, req, witness, setup, matchTypes, finalize)
+          .isWellFormed()) {
     inferred.Inferred.clear();
   }
 
@@ -809,8 +812,6 @@ AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
 Type AssociatedTypeInference::computeFixedTypeWitness(
                                             AssociatedTypeDecl *assocType) {
   Type resultType;
-  auto *const structuralTy = DependentMemberType::get(
-      proto->getSelfInterfaceType(), assocType->getName());
 
   // Look at all of the inherited protocols to determine whether they
   // require a fixed type for this associated type.
@@ -819,16 +820,28 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
         !conformedProto->inheritsFrom(assocType->getProtocol()))
       continue;
 
-    const auto ty =
-        conformedProto->getGenericSignature()->getCanonicalTypeInContext(
-            structuralTy);
+    auto sig = conformedProto->getGenericSignature();
+
+    // FIXME: The RequirementMachine will assert on re-entrant construction.
+    // We should find a more principled way of breaking this cycle.
+    if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
+        ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
+        conformedProto->isComputingRequirementSignature())
+      continue;
+
+    auto selfTy = conformedProto->getSelfInterfaceType();
+    if (!sig->requiresProtocol(selfTy, assocType->getProtocol()))
+      continue;
+
+    auto structuralTy = DependentMemberType::get(selfTy, assocType->getName());
+    const auto ty = sig.getCanonicalTypeInContext(structuralTy);
 
     // A dependent member type with an identical base and name indicates that
     // the protocol does not same-type constrain it in any way; move on to
     // the next protocol.
     if (auto *const memberTy = ty->getAs<DependentMemberType>()) {
-      if (memberTy->getBase()->isEqual(structuralTy->getBase()) &&
-          memberTy->getName() == structuralTy->getName())
+      if (memberTy->getBase()->isEqual(selfTy) &&
+          memberTy->getName() == assocType->getName())
         continue;
     }
 
@@ -847,7 +860,7 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
 
 Optional<AbstractTypeWitness>
 AssociatedTypeInference::computeDefaultTypeWitness(
-    AssociatedTypeDecl *assocType) {
+    AssociatedTypeDecl *assocType) const {
   // Go find a default definition.
   auto *const defaultedAssocType = findDefaultedAssociatedType(assocType);
   if (!defaultedAssocType)
@@ -861,8 +874,7 @@ AssociatedTypeInference::computeDefaultTypeWitness(
   if (defaultType->hasError())
     return None;
 
-  return AbstractTypeWitness::forDefault(assocType, defaultType,
-                                         defaultedAssocType);
+  return AbstractTypeWitness(assocType, defaultType, defaultedAssocType);
 }
 
 std::pair<Type, TypeDecl *>
@@ -899,7 +911,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   // We don't have a type witness for this associated type, so go
   // looking for more options.
   if (Type concreteType = computeFixedTypeWitness(assocType))
-    return AbstractTypeWitness::forFixed(assocType, concreteType);
+    return AbstractTypeWitness(assocType, concreteType);
 
   // If we can form a default type, do so.
   if (const auto &typeWitness = computeDefaultTypeWitness(assocType))
@@ -907,13 +919,63 @@ AssociatedTypeInference::computeAbstractTypeWitness(
 
   // If there is a generic parameter of the named type, use that.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    for (auto gp : genericSig->getInnermostGenericParams()) {
+    for (auto gp : genericSig.getInnermostGenericParams()) {
       if (gp->getName() == assocType->getName())
-        return AbstractTypeWitness::forGenericParam(assocType, gp);
+        return AbstractTypeWitness(assocType, gp);
     }
   }
 
   return None;
+}
+
+void AssociatedTypeInference::collectAbstractTypeWitnesses(
+    TypeWitnessSystem &system,
+    ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const {
+  // First, look at all the protocols the adoptee conforms to and feed the
+  // same-type constraints in their requirement signatures to the system.
+  for (auto *const conformedProto :
+       adoptee->getAnyNominal()->getAllProtocols(/*sorted=*/true)) {
+    // FIXME: The RequirementMachine will assert on re-entrant construction.
+    // We should find a more principled way of breaking this cycle.
+    if (ctx.isRecursivelyConstructingRequirementMachine(
+            conformedProto->getGenericSignature().getCanonicalSignature()) ||
+        ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
+        conformedProto->isComputingRequirementSignature())
+      continue;
+
+    for (const auto &req :
+         conformedProto->getRequirementSignature().getRequirements()) {
+      if (req.getKind() != RequirementKind::SameType) {
+        continue;
+      }
+
+      system.addSameTypeRequirement(req);
+    }
+  }
+
+  // If the same-type constraints weren't enough to resolve an associated type,
+  // look for more options.
+  for (auto *const assocType : unresolvedAssocTypes) {
+    if (system.hasResolvedTypeWitness(assocType->getName())) {
+      continue;
+    }
+
+    // If we find a default type definition, feed it to the system.
+    if (const auto &typeWitness = computeDefaultTypeWitness(assocType)) {
+      system.addDefaultTypeWitness(typeWitness->getType(),
+                                   typeWitness->getDefaultedAssocType());
+    } else {
+      // As a last resort, look for a generic parameter that matches the name
+      // of the associated type.
+      if (auto genericSig = dc->getGenericSignatureOfContext()) {
+        for (auto *gp : genericSig.getInnermostGenericParams()) {
+          if (gp->getName() == assocType->getName()) {
+            system.addTypeWitness(assocType->getName(), gp);
+          }
+        }
+      }
+    }
+  }
 }
 
 Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
@@ -1077,22 +1139,19 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                     ProtocolConformanceRef(conformance));
 
   SmallVector<Requirement, 4> sanitizedRequirements;
-  sanitizeProtocolRequirements(proto, proto->getRequirementSignature(),
+  auto requirements = proto->getRequirementSignature().getRequirements();
+  sanitizeProtocolRequirements(proto, requirements,
                                sanitizedRequirements);
-  auto result =
-    TypeChecker::checkGenericArguments(dc, SourceLoc(), SourceLoc(),
-                                       typeInContext,
-                                       { proto->getSelfInterfaceType() },
-                                       sanitizedRequirements,
-                                       QuerySubstitutionMap{substitutions},
-                                       options);
-  switch (result) {
-  case RequirementCheckResult::Failure:
+
+  switch (TypeChecker::checkGenericArguments(
+      dc->getParentModule(), sanitizedRequirements,
+      QuerySubstitutionMap{substitutions}, options)) {
+  case CheckGenericArgumentsResult::RequirementFailure:
     ++NumSolutionStatesFailedCheck;
     return true;
 
-  case RequirementCheckResult::Success:
-  case RequirementCheckResult::SubstitutionFailure:
+  case CheckGenericArgumentsResult::Success:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
     break;
   }
 
@@ -1128,91 +1187,226 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
   switch (TypeChecker::checkGenericArguments(
-                       dc, SourceLoc(), SourceLoc(), adoptee,
-                       ext->getGenericSignature()->getGenericParams(),
-                       ext->getGenericSignature()->getRequirements(),
-                       QueryTypeSubstitutionMap{subs},
-                       options)) {
-  case RequirementCheckResult::Success:
-  case RequirementCheckResult::SubstitutionFailure:
+      dc->getParentModule(), ext->getGenericSignature().getRequirements(),
+      QueryTypeSubstitutionMap{subs}, options)) {
+  case CheckGenericArgumentsResult::Success:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
     return false;
 
-  case RequirementCheckResult::Failure:
+  case CheckGenericArgumentsResult::RequirementFailure:
     return true;
   }
   llvm_unreachable("unhandled result");
 }
 
-AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
+AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes, unsigned reqDepth) {
-  // Examine the solution for errors and attempt to compute abstract type
-  // witnesses for associated types that are still lacking an entry.
-  llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
-  for (auto *const assocType : unresolvedAssocTypes) {
-    const auto typeWitness = typeWitnesses.begin(assocType);
-    if (typeWitness != typeWitnesses.end()) {
-      // The solution contains an error.
-      if (typeWitness->first->hasError()) {
-        return assocType;
-      }
-
-      continue;
-    }
-
-    // Try to compute the type without the aid of a specific potential witness.
-    if (const auto &typeWitness = computeAbstractTypeWitness(assocType)) {
-      // Record the type witness immediately to make it available
-      // for substitutions into other tentative type witnesses.
-      typeWitnesses.insert(assocType, {typeWitness->getType(), reqDepth});
-
-      abstractTypeWitnesses.push_back(std::move(typeWitness.getValue()));
-      continue;
-    }
-
-    // The solution is incomplete.
-    return assocType;
+  if (unresolvedAssocTypes.empty()) {
+    return nullptr;
   }
 
-  // Check each abstract type witness we computed against the generic
-  // requirements on the corresponding associated type.
+  // Attempt to compute abstract type witnesses for associated types that could
+  // not resolve otherwise.
+  llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
+
+  if (ctx.LangOpts.hasFeature(Feature::TypeWitnessSystemInference)) {
+    TypeWitnessSystem system(unresolvedAssocTypes);
+    collectAbstractTypeWitnesses(system, unresolvedAssocTypes);
+
+    if (ctx.LangOpts.DumpTypeWitnessSystems) {
+      system.dump(llvm::dbgs(), conformance);
+    }
+
+    // If we couldn't resolve an associated type, bail out.
+    for (auto *assocType : unresolvedAssocTypes) {
+      if (!system.hasResolvedTypeWitness(assocType->getName())) {
+        return assocType;
+      }
+    }
+
+    // Record the tentative type witnesses to make them available during
+    // substitutions.
+    for (auto *assocType : unresolvedAssocTypes) {
+      auto resolvedTy = system.getResolvedTypeWitness(assocType->getName());
+
+      typeWitnesses.insert(assocType, {resolvedTy, reqDepth});
+
+      if (auto *defaultedAssocType =
+              system.getDefaultedAssocType(assocType->getName())) {
+        abstractTypeWitnesses.emplace_back(assocType, resolvedTy,
+                                           defaultedAssocType);
+      } else {
+        abstractTypeWitnesses.emplace_back(assocType, resolvedTy);
+      }
+    }
+  } else {
+    for (auto *const assocType : unresolvedAssocTypes) {
+      // Try to compute the type without the aid of a specific potential
+      // witness.
+      if (const auto &typeWitness = computeAbstractTypeWitness(assocType)) {
+        // Record the type witness immediately to make it available
+        // for substitutions into other tentative type witnesses.
+        typeWitnesses.insert(assocType, {typeWitness->getType(), reqDepth});
+
+        abstractTypeWitnesses.push_back(std::move(typeWitness.getValue()));
+        continue;
+      }
+
+      // The solution is incomplete.
+      return assocType;
+    }
+  }
+
+  // Check each abstract type witness against the generic requirements on the
+  // corresponding associated type.
+  //
+  // FIXME: Consider checking non-dependent type witnesses first. Checking in
+  // default order can lead to the creation and exposure of malformed types in
+  // diagnostics. For example, we would diagnose that 'G<Never>' (!) does not
+  // conform to 'Sequence' in the below.
+  //
+  // struct G<S: Sequence> {}
+  // protocol P {
+  //   associatedtype A: Sequence = G<B>
+  //   associatedtype B: Sequence = Never
+  // }
   const auto substOptions = getSubstOptionsWithCurrentTypeWitnesses();
   for (const auto &witness : abstractTypeWitnesses) {
+    auto *const assocType = witness.getAssocType();
     Type type = witness.getType();
+
+    // Replace type parameters with other known or tentative type witnesses.
     if (type->hasTypeParameter()) {
-      if (witness.getKind() != AbstractTypeWitnessKind::GenericParam) {
-        // Replace type parameters with other known or tentative type witnesses.
-        type = type.subst(
-            [&](SubstitutableType *type) {
-              if (type->isEqual(proto->getSelfInterfaceType()))
-                return adoptee;
+      // FIXME: We should find a better way to detect and reason about these
+      // cyclic solutions so that we can spot them earlier and express them in
+      // diagnostics.
+      llvm::SmallPtrSet<AssociatedTypeDecl *, 4> circularityCheck;
+      circularityCheck.insert(assocType);
 
-              return Type();
-            },
-            LookUpConformanceInModule(dc->getParentModule()), substOptions);
+      std::function<Type(Type)> substCurrentTypeWitnesses;
+      substCurrentTypeWitnesses = [&](Type ty) -> Type {
+        if (auto *gp = ty->getAs<GenericTypeParamType>()) {
+          // FIXME: 'computeFixedTypeWitness' uses 'getCanonicalTypeInContext',
+          // so if a generic parameter is canonical here, it's 'Self'.
+          if (gp->isCanonical() ||
+              isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
+            return adoptee;
+          }
 
-        // If the substitution produced an error, we're done.
-        if (type->hasError())
-          return witness.getAssocType();
-      }
+          return ty;
+        }
+
+        auto *const dmt = ty->getAs<DependentMemberType>();
+        if (!dmt) {
+          return ty;
+        }
+
+        const auto substBase =
+            dmt->getBase().transform(substCurrentTypeWitnesses);
+        if (!substBase) {
+          return nullptr;
+        }
+
+        // If the transformed base has the same nominal as the adoptee, we may
+        // need to look up a tentative type witness. Otherwise, just substitute
+        // the base.
+        if (substBase->getAnyNominal() != adoptee->getAnyNominal()) {
+          return dmt->substBaseType(dc->getParentModule(), substBase);
+        }
+
+        auto *assocTy = dmt->getAssocType();
+        assert(
+            assocTy &&
+            "found structural DependentMemberType in tentative type witness");
+
+        // Intercept recursive solutions.
+        if (!circularityCheck.insert(assocTy).second) {
+          return nullptr;
+        }
+        SWIFT_DEFER { circularityCheck.erase(dmt->getAssocType()); };
+
+        if (assocTy->getProtocol() == proto) {
+          // We have the associated type we need.
+        } else if (proto->inheritsFrom(assocTy->getProtocol())) {
+          // See if there is an associated type with the same name in our
+          // protocol. If there isn't, keep the original associated type:
+          // we'll be falling back to a base substitution.
+          if (auto *decl = proto->getAssociatedType(assocTy->getName())) {
+            assocTy = decl;
+          }
+        }
+
+        // Find the type witness for this associated type.
+        Type tyWitness;
+        if (assocTy->getProtocol() == proto && typeWitnesses.count(assocTy)) {
+          tyWitness = typeWitnesses.begin(assocTy)->first;
+
+          // A tentative type witness may contain a 'Self'-rooted type
+          // parameter,
+          // FIXME: or a weird concrete-type-rooted dependent member type
+          // coming from inference via a value witness. Make sure we sort these
+          // out so that we don't break any subst() invariants.
+          if (tyWitness->hasTypeParameter() ||
+              tyWitness->hasDependentMember()) {
+            tyWitness = tyWitness.transform(substCurrentTypeWitnesses);
+          }
+
+          if (tyWitness) {
+            // HACK: Those inferred via value witnesses are eagerly mapped into
+            // context. For now, do the same for abstract type witnesses and
+            // handle archetypes.
+            if (tyWitness->hasArchetype()) {
+              tyWitness = tyWitness->mapTypeOutOfContext();
+            }
+
+            // If the transformed base is specialized, apply substitutions.
+            if (tyWitness->hasTypeParameter()) {
+              const auto conf = dc->getParentModule()->lookupConformance(
+                  substBase, assocTy->getProtocol(), /*allowMissing=*/true);
+              if (auto *specialized = dyn_cast<SpecializedProtocolConformance>(
+                      conf.getConcrete())) {
+                tyWitness = tyWitness.subst(specialized->getSubstitutionMap());
+              }
+            }
+          }
+        } else {
+          // The associated type has a recorded type witness, or comes from a
+          // different, possibly unrelated protocol; fall back to a base
+          // substitution to find the type witness.
+          tyWitness =
+              DependentMemberType::get(proto->getSelfInterfaceType(), assocTy)
+                  ->substBaseType(dc->getParentModule(), substBase);
+        }
+
+        return tyWitness;
+      };
+
+      type = type.transform(substCurrentTypeWitnesses);
+
+      // If substitution failed, give up.
+      if (!type || type->hasError())
+        return assocType;
+
       type = dc->mapTypeIntoContext(type);
     }
 
-    if (const auto &failed = checkTypeWitness(type, witness.getAssocType(),
-                                              conformance, substOptions)) {
+    if (const auto failed =
+            checkTypeWitness(type, assocType, conformance, substOptions)) {
       // We failed to satisfy a requirement. If this is a default type
       // witness failure and we haven't seen one already, write it down.
-      if (witness.getKind() == AbstractTypeWitnessKind::Default &&
-          !failedDefaultedAssocType && !failed.isError()) {
-        failedDefaultedAssocType = witness.getDefaultedAssocType();
+      auto *defaultedAssocType = witness.getDefaultedAssocType();
+      if (defaultedAssocType && !failedDefaultedAssocType &&
+          !failed.isError()) {
+        failedDefaultedAssocType = defaultedAssocType;
         failedDefaultedWitness = type;
         failedDefaultedResult = std::move(failed);
       }
 
-      return witness.getAssocType();
+      return assocType;
     }
 
-    // Update the solution entry.
-    typeWitnesses.insert(witness.getAssocType(), {type, reqDepth});
+    // Update the entry for this associated type.
+    typeWitnesses.insert(assocType, {type, reqDepth});
   }
 
   return nullptr;
@@ -1242,9 +1436,28 @@ void AssociatedTypeInference::findSolutionsRec(
     // Introduce a hash table scope; we may add type witnesses here.
     TypeWitnessesScope typeWitnessesScope(typeWitnesses);
 
-    // Validate and complete the solution.
+    // Filter out the associated types that remain unresolved.
+    SmallVector<AssociatedTypeDecl *, 4> stillUnresolved;
+    for (auto *const assocType : unresolvedAssocTypes) {
+      const auto typeWitness = typeWitnesses.begin(assocType);
+      if (typeWitness == typeWitnesses.end()) {
+        stillUnresolved.push_back(assocType);
+      } else {
+        // If an erroneous type witness has already been recorded for one of
+        // the associated types, give up.
+        if (typeWitness->first->hasError()) {
+          if (!missingTypeWitness)
+            missingTypeWitness = assocType;
+
+          return;
+        }
+      }
+    }
+
+    // Attempt to infer abstract type witnesses for associated types that
+    // could not be resolved otherwise.
     if (auto *const assocType =
-            completeSolution(unresolvedAssocTypes, reqDepth)) {
+            inferAbstractTypeWitnesses(stillUnresolved, reqDepth)) {
       // The solution is decisively incomplete; record the associated type
       // we failed on and bail out.
       if (!missingTypeWitness)
@@ -1255,6 +1468,7 @@ void AssociatedTypeInference::findSolutionsRec(
 
     ++NumSolutionStates;
 
+    // Validate and complete the solution.
     // Fold the dependent member types within this type.
     for (auto assocType : proto->getAssociatedTypeMembers()) {
       if (conformance->hasTypeWitness(assocType))
@@ -1489,7 +1703,9 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
   if (!sig1 || !sig2)
     return TypeChecker::compareDeclarations(DC, decl1, decl2);
 
-  auto selfParam = GenericTypeParamType::get(0, 0, decl1->getASTContext());
+  auto selfParam = GenericTypeParamType::get(/*type sequence*/ false,
+                                             /*depth*/ 0, /*index*/ 0,
+                                             decl1->getASTContext());
 
   // Collect the protocols required by extension 1.
   Type class1;
@@ -1504,7 +1720,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       insertProtocol(parent);
   };
 
-  for (auto &reqt : sig1->getRequirements()) {
+  for (auto &reqt : sig1.getRequirements()) {
     if (!reqt.getFirstType()->isEqual(selfParam))
       continue;
     switch (reqt.getKind()) {
@@ -1536,7 +1752,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       removeProtocol(parent);
   };
 
-  for (auto &reqt : sig2->getRequirements()) {
+  for (auto &reqt : sig2.getRequirements()) {
     if (!reqt.getFirstType()->isEqual(selfParam))
       continue;
     switch (reqt.getKind()) {
@@ -1754,6 +1970,34 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
           if ((!failed.TypeWitness->getAnyNominal() ||
                failed.TypeWitness->isExistentialType()) &&
               failed.Result.isConformanceRequirement()) {
+            Type resultType;
+            SourceRange typeRange;
+            if (auto *var = dyn_cast<VarDecl>(failed.Witness)) {
+              resultType = var->getValueInterfaceType();
+              typeRange = var->getTypeSourceRangeForDiagnostics();
+            } else if (auto *func = dyn_cast<FuncDecl>(failed.Witness)) {
+              resultType = func->getResultInterfaceType();
+              typeRange = func->getResultTypeSourceRange();
+            } else if (auto *subscript = dyn_cast<SubscriptDecl>(failed.Witness)) {
+              resultType = subscript->getElementInterfaceType();
+              typeRange = subscript->getElementTypeSourceRange();
+            }
+
+            // If the type witness was inferred from an existential
+            // result type, suggest an opaque result type instead,
+            // which can conform to protocols.
+            if (failed.TypeWitness->isExistentialType() &&
+                resultType && resultType->isEqual(failed.TypeWitness) &&
+                typeRange.isValid()) {
+              diags.diagnose(typeRange.Start,
+                             diag::suggest_opaque_type_witness,
+                             assocType->getName(), failed.TypeWitness,
+                             failed.Result.getRequirement())
+                .highlight(typeRange)
+                .fixItInsert(typeRange.Start, "some ");
+              continue;
+            }
+
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_conform_impossible,
                            assocType->getName(), failed.TypeWitness,
@@ -1895,6 +2139,20 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
   return false;
 }
 
+bool AssociatedTypeInference::canAttemptEagerTypeWitnessDerivation(
+    ConformanceChecker &checker,
+    AssociatedTypeDecl *assocType) {
+
+  /// Rather than locating the TypeID via the default implementation of
+  /// Identifiable, we need to find the type based on the associated ActorSystem
+  if (checker.Adoptee->isDistributedActor() &&
+      assocType->getProtocol()->isSpecificProtocol(KnownProtocolKind::Identifiable)) {
+    return true;
+  }
+
+  return false;
+}
+
 auto AssociatedTypeInference::solve(ConformanceChecker &checker)
     -> Optional<InferredTypeWitnesses> {
   // Track when we are checking type witnesses.
@@ -1908,6 +2166,16 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
     // If we already have a type witness, do nothing.
     if (conformance->hasTypeWitness(assocType))
       continue;
+
+    if (canAttemptEagerTypeWitnessDerivation(checker, assocType)) {
+      auto derivedType = computeDerivedTypeWitness(assocType);
+      if (derivedType.first) {
+        checker.recordTypeWitness(assocType,
+                                  derivedType.first->mapTypeOutOfContext(),
+                                  derivedType.second);
+        continue;
+      }
+    }
 
     // Try to resolve this type witness via name lookup, which is the
     // most direct mechanism, overriding all others.
@@ -2018,6 +2286,291 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   }
 
   return None;
+}
+
+void TypeWitnessSystem::EquivalenceClass::setResolvedType(Type ty) {
+  assert(ty && "cannot resolve to a null type");
+  assert(!isAmbiguous() && "must not set resolved type when ambiguous");
+
+  ResolvedTyAndIsAmbiguous.setPointer(ty);
+}
+
+TypeWitnessSystem::TypeWitnessSystem(
+    ArrayRef<AssociatedTypeDecl *> assocTypes) {
+  for (auto *assocType : assocTypes) {
+    this->TypeWitnesses.try_emplace(assocType->getName());
+  }
+}
+
+TypeWitnessSystem::~TypeWitnessSystem() {
+  for (auto *equivClass : this->EquivalenceClasses) {
+    delete equivClass;
+  }
+}
+
+bool TypeWitnessSystem::hasResolvedTypeWitness(Identifier name) const {
+  return (bool)getResolvedTypeWitness(name);
+}
+
+Type TypeWitnessSystem::getResolvedTypeWitness(Identifier name) const {
+  assert(this->TypeWitnesses.count(name));
+
+  if (auto *equivClass = this->TypeWitnesses.lookup(name).EquivClass) {
+    return equivClass->getResolvedType();
+  }
+
+  return Type();
+}
+
+AssociatedTypeDecl *
+TypeWitnessSystem::getDefaultedAssocType(Identifier name) const {
+  assert(this->TypeWitnesses.count(name));
+
+  return this->TypeWitnesses.lookup(name).DefaultedAssocType;
+}
+
+void TypeWitnessSystem::addTypeWitness(Identifier name, Type type) {
+  assert(this->TypeWitnesses.count(name));
+
+  if (const auto *depTy = type->getAs<DependentMemberType>()) {
+    // If the type corresponds to a name variable in the system, form an
+    // equivalence between variables.
+    if (depTy->getBase()->is<GenericTypeParamType>()) {
+      if (this->TypeWitnesses.count(depTy->getName())) {
+        return addEquivalence(name, depTy->getName());
+      }
+    } else {
+      while (depTy->getBase()->is<DependentMemberType>()) {
+        depTy = depTy->getBase()->castTo<DependentMemberType>();
+      }
+
+      // Equivalences of the form 'Self.X == Self.X.*' do not contribute
+      // to solving the system, so just ignore them.
+      if (name == depTy->getName()) {
+        return;
+      }
+    }
+  }
+
+  auto &tyWitness = this->TypeWitnesses[name];
+
+  // Assume that the type resolves the equivalence class.
+  if (tyWitness.EquivClass) {
+    // Nothing else to do if the equivalence class had been marked as ambiguous.
+    if (tyWitness.EquivClass->isAmbiguous()) {
+      return;
+    }
+
+    // If we already have a resolved type, keep going only if the new one is
+    // a better choice.
+    const Type currResolvedTy = tyWitness.EquivClass->getResolvedType();
+    if (currResolvedTy) {
+      switch (compareResolvedTypes(type, currResolvedTy)) {
+      case ResolvedTypeComparisonResult::Better:
+        break;
+      case ResolvedTypeComparisonResult::EquivalentOrWorse:
+        return;
+      case ResolvedTypeComparisonResult::Ambiguity:
+        // Mark the equivalence class as ambiguous and give up.
+        tyWitness.EquivClass->setAmbiguous();
+        return;
+      }
+    }
+  }
+
+  // If we can find an existing equivalence class for this type, use it.
+  for (auto *const equivClass : this->EquivalenceClasses) {
+    if (equivClass->getResolvedType() &&
+        equivClass->getResolvedType()->isEqual(type)) {
+      if (tyWitness.EquivClass) {
+        mergeEquivalenceClasses(equivClass, tyWitness.EquivClass);
+      } else {
+        tyWitness.EquivClass = equivClass;
+      }
+
+      return;
+    }
+  }
+
+  if (tyWitness.EquivClass) {
+    tyWitness.EquivClass->setResolvedType(type);
+  } else {
+    auto *equivClass = new EquivalenceClass(type);
+    this->EquivalenceClasses.insert(equivClass);
+
+    tyWitness.EquivClass = equivClass;
+  }
+}
+
+void TypeWitnessSystem::addDefaultTypeWitness(
+    Type type, AssociatedTypeDecl *defaultedAssocType) {
+  const auto name = defaultedAssocType->getName();
+  assert(this->TypeWitnesses.count(name));
+
+  auto &tyWitness = this->TypeWitnesses[name];
+  assert(!hasResolvedTypeWitness(name) && "already resolved a type witness");
+  assert(!tyWitness.DefaultedAssocType &&
+         "already recorded a default type witness");
+
+  // Set the defaulted associated type.
+  tyWitness.DefaultedAssocType = defaultedAssocType;
+
+  // Record the type witness.
+  addTypeWitness(name, type);
+}
+
+void TypeWitnessSystem::addSameTypeRequirement(const Requirement &req) {
+  assert(req.getKind() == RequirementKind::SameType);
+
+  auto *const depTy1 = req.getFirstType()->getAs<DependentMemberType>();
+  auto *const depTy2 = req.getSecondType()->getAs<DependentMemberType>();
+
+  // Equivalences other than 'Self.X == ...' (or '... == Self.X'), where
+  // 'X' is a name variable in this system, do not contribute to solving
+  // the system.
+  if (depTy1 && depTy1->getBase()->is<GenericTypeParamType>() &&
+      this->TypeWitnesses.count(depTy1->getName())) {
+    addTypeWitness(depTy1->getName(), req.getSecondType());
+  } else if (depTy2 && depTy2->getBase()->is<GenericTypeParamType>() &&
+             this->TypeWitnesses.count(depTy2->getName())) {
+    addTypeWitness(depTy2->getName(), req.getFirstType());
+  }
+}
+
+void TypeWitnessSystem::dump(
+    llvm::raw_ostream &out,
+    const NormalProtocolConformance *conformance) const {
+  llvm::SmallVector<Identifier, 4> sortedNames;
+  sortedNames.reserve(this->TypeWitnesses.size());
+
+  for (const auto &pair : this->TypeWitnesses) {
+    sortedNames.push_back(pair.first);
+  }
+
+  // Deterministic ordering.
+  llvm::array_pod_sort(sortedNames.begin(), sortedNames.end(),
+                       [](const Identifier *lhs, const Identifier *rhs) -> int {
+                         return lhs->compare(*rhs);
+                       });
+
+  out << "Abstract type witness system for conformance"
+      << " of " << conformance->getType() << " to "
+      << conformance->getProtocol()->getName() << ": {\n";
+
+  for (const auto &name : sortedNames) {
+    out.indent(2) << name << " => ";
+
+    const auto *eqClass = this->TypeWitnesses.lookup(name).EquivClass;
+    if (eqClass) {
+      if (eqClass->getResolvedType()) {
+        out << eqClass->getResolvedType();
+      } else if (eqClass->isAmbiguous()) {
+        out << "(ambiguous)";
+      } else {
+        out << "(unresolved)";
+      }
+    } else {
+      out << "(unresolved)";
+    }
+
+    if (eqClass) {
+      out << ", " << eqClass;
+    }
+    out << "\n";
+  }
+  out << "}\n";
+}
+
+void TypeWitnessSystem::addEquivalence(Identifier name1, Identifier name2) {
+  assert(this->TypeWitnesses.count(name1));
+  assert(this->TypeWitnesses.count(name2));
+
+  if (name1 == name2) {
+    return;
+  }
+
+  auto &tyWitness1 = this->TypeWitnesses[name1];
+  auto &tyWitness2 = this->TypeWitnesses[name2];
+
+  // If both candidates are associated with existing equivalence classes,
+  // merge them.
+  if (tyWitness1.EquivClass && tyWitness2.EquivClass) {
+    mergeEquivalenceClasses(tyWitness1.EquivClass, tyWitness2.EquivClass);
+    return;
+  }
+
+  if (tyWitness1.EquivClass) {
+    tyWitness2.EquivClass = tyWitness1.EquivClass;
+  } else if (tyWitness2.EquivClass) {
+    tyWitness1.EquivClass = tyWitness2.EquivClass;
+  } else {
+    // Neither has an associated equivalence class.
+    auto *equivClass = new EquivalenceClass(nullptr);
+    this->EquivalenceClasses.insert(equivClass);
+
+    tyWitness1.EquivClass = equivClass;
+    tyWitness2.EquivClass = equivClass;
+  }
+}
+
+void TypeWitnessSystem::mergeEquivalenceClasses(
+    EquivalenceClass *equivClass1, const EquivalenceClass *equivClass2) {
+  assert(equivClass1 && equivClass2);
+  if (equivClass1 == equivClass2) {
+    return;
+  }
+
+  // Merge the second equivalence class into the first.
+  if (equivClass1->getResolvedType() && equivClass2->getResolvedType()) {
+    switch (compareResolvedTypes(equivClass2->getResolvedType(),
+                                 equivClass1->getResolvedType())) {
+    case ResolvedTypeComparisonResult::Better:
+      equivClass1->setResolvedType(equivClass2->getResolvedType());
+      break;
+    case ResolvedTypeComparisonResult::EquivalentOrWorse:
+      break;
+    case ResolvedTypeComparisonResult::Ambiguity:
+      equivClass1->setAmbiguous();
+      break;
+    }
+  } else if (equivClass1->isAmbiguous()) {
+    // Ambiguity is retained.
+  } else if (equivClass2->getResolvedType()) {
+    // Carry over the resolved type.
+    equivClass1->setResolvedType(equivClass2->getResolvedType());
+  } else if (equivClass2->isAmbiguous()) {
+    // Carry over ambiguity.
+    equivClass1->setAmbiguous();
+  }
+
+  // Migrate members of the second equivalence class to the first.
+  for (auto &pair : this->TypeWitnesses) {
+    if (pair.second.EquivClass == equivClass2) {
+      pair.second.EquivClass = equivClass1;
+    }
+  }
+
+  // Finally, dispose of the second equivalence class.
+  this->EquivalenceClasses.erase(const_cast<EquivalenceClass *>(equivClass2));
+  delete equivClass2;
+}
+
+TypeWitnessSystem::ResolvedTypeComparisonResult
+TypeWitnessSystem::compareResolvedTypes(Type ty1, Type ty2) {
+  assert(ty1 && ty2);
+  if (!ty1->isTypeParameter()) {
+    if (ty2->isTypeParameter()) {
+      // A concrete type is better than a type parameter.
+      return ResolvedTypeComparisonResult::Better;
+    } else if (!ty1->isEqual(ty2)) {
+      return ResolvedTypeComparisonResult::Ambiguity;
+    }
+  }
+
+  // Anything else is either equivalent (i.e. actually equal concrete types or
+  // type parameter vs. type parameter), or worse (i.e. type parameter vs.
+  // concrete type).
+  return ResolvedTypeComparisonResult::EquivalentOrWorse;
 }
 
 void ConformanceChecker::resolveTypeWitnesses() {

@@ -70,6 +70,8 @@ static inline int zeroRedeclared(void) { return innerZero(); }
 
 static int staticButNotInline(void) { return innerZero(); }
 
+static inline void ackbar(void) { __builtin_trap(); }
+
 @interface NSView : NSObject
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;
 @end
@@ -165,4 +167,7 @@ __attribute__((swift_name("OuterType.InnerType")))
 @end
 
 @interface ObjcGenericClass<__covariant SectionType>
+@end
+
+@interface FungingArray <Element: id<NSFunging>> : NSObject
 @end

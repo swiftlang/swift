@@ -154,9 +154,7 @@ static llvm::StringRef substrAfter(llvm::StringRef whole,
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
                      swift::Demangle::Context &DCtx,
                      const swift::Demangle::DemangleOptions &options) {
-  bool hadLeadingUnderscore = false;
   if (name.startswith("__")) {
-    hadLeadingUnderscore = true;
     name = name.substr(1);
   }
   swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);

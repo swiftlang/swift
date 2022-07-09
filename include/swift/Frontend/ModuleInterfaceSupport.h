@@ -55,6 +55,9 @@ struct ModuleInterfaceOptions {
 
   /// Intentionally print invalid syntax into the file.
   bool DebugPrintInvalidSyntax = false;
+
+  /// A list of modules we shouldn't import in the public interfaces.
+  std::vector<std::string> ModulesToSkipInPublicInterface;
 };
 
 extern version::Version InterfaceFormatVersion;

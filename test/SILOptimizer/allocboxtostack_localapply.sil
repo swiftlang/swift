@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -allocbox-to-stack -sil-deadfuncelim | %FileCheck %s
+// RUN: %target-sil-opt -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false %s -allocbox-to-stack -sil-deadfuncelim | %FileCheck %s
 
 sil_stage canonical
 

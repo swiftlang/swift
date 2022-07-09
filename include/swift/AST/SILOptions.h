@@ -30,6 +30,50 @@
 
 namespace swift {
 
+enum class LexicalLifetimesOption : uint8_t {
+  // Do not insert lexical markers.
+  Off = 0,
+
+  // Insert lexical markers via lexical borrow scopes and the lexical flag on
+  // alloc_stacks produced from alloc_boxes, but strip them when lowering out of
+  // Raw SIL.
+  DiagnosticMarkersOnly,
+
+  // Insert lexical markers and use them to lengthen object lifetime based on
+  // lexical scope.
+  On,
+};
+
+enum class CopyPropagationOption : uint8_t {
+  // Do not add any copy propagation passes.
+  Off = 0,
+
+  // Only add the copy propagation passes requested by other flags, currently
+  // just -enable-ossa-modules.
+  RequestedPassesOnly,
+
+  // Add all relevant copy propagation passes.  If a setting, e.g.
+  // -enable-ossa-modules, requests to add copy propagation to the pipeline, do
+  // so.
+  On
+};
+
+enum class DestroyHoistingOption : uint8_t {
+  // Do not run SSADestroyHoisting.
+  Off = 0,
+
+  // Run SSADestroyHoisting pass after AllocBoxToStack in the function passes.
+  On = 1
+};
+
+enum class CrossModuleOptimizationMode : uint8_t {
+  Off = 0,
+  Default = 1,
+  Aggressive = 2
+};
+
+class SILModule;
+
 class SILOptions {
 public:
   /// Controls the aggressiveness of the performance inliner.
@@ -44,15 +88,20 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
-  /// Force-run SIL copy propagation to shorten object lifetime in whatever
-  /// optimization pipeline is currently used.
-  /// When this is 'false' the pipeline has default behavior.
-  bool EnableCopyPropagation = false;
+  /// Both emit lexical markers and use them to extend object lifetime to the
+  /// observable end of lexical scope.
+  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::On;
 
-  /// Disable SIL copy propagation to preserve object lifetime in whatever
+  /// Whether to run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
-  /// When this is 'false' the pipeline has default behavior.
-  bool DisableCopyPropagation = false;
+  ///
+  /// When this is 'On' the pipeline has default behavior.
+  CopyPropagationOption CopyPropagation = CopyPropagationOption::On;
+
+  /// Whether to run the SSADestroyHoisting pass.
+  ///
+  /// When this 'On' the pipeline has the default behavior.
+  DestroyHoistingOption DestroyHoisting = DestroyHoistingOption::On;
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
@@ -74,8 +123,11 @@ public:
   bool DisableSILPerfOptimizations = false;
 
   /// Controls whether cross module optimization is enabled.
-  bool CrossModuleOptimization = false;
-  
+  CrossModuleOptimizationMode CMOMode = CrossModuleOptimizationMode::Off;
+
+  /// Enables experimental performance annotations.
+  bool EnablePerformanceAnnotations = false;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
@@ -106,6 +158,9 @@ public:
   ///
   /// If this is disabled we do not serialize in OSSA form when optimizing.
   bool EnableOSSAModules = false;
+
+  /// If set to true, compile with the SIL Opaque Values enabled.
+  bool EnableSILOpaqueValues = false;
 
   // The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
@@ -138,6 +193,8 @@ public:
 
   /// Emit a mapping of profile counters for use in coverage.
   bool EmitProfileCoverageMapping = false;
+
+  bool emitTBD = false;
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
@@ -172,7 +229,7 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = true;
 
-  /// Emit extra exclusvity markers for memory access and verify coverage.
+  /// Emit extra exclusivity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
   /// When building the stdlib with opts should we lower ownership after
@@ -188,6 +245,15 @@ public:
   ///     original() // calls original() implementation if true
   /// }
   bool EnableDynamicReplacementCanCallPreviousImplementation = true;
+
+  /// Are we parsing the stdlib, i.e. -parse-stdlib?
+  bool ParseStdlib = false;
+
+  /// If true, check for leaking instructions when the SILModule is destructed.
+  ///
+  /// Warning: this is not thread safe. It can only be enabled in case there
+  /// is a single SILModule in a single thread.
+  bool checkSILModuleLeaks = false;
 
   /// The name of the file to which the backend should save optimization
   /// records.
@@ -211,6 +277,12 @@ public:
   bool shouldOptimize() const {
     return OptMode > OptimizationMode::NoOptimization;
   }
+
+  /// Returns true if we support inserting lexical lifetimes given the current
+  /// SIL stage.
+  ///
+  /// Defined in SILModule.h.
+  bool supportsLexicalLifetimes(const SILModule &mod) const;
 };
 
 } // end namespace swift

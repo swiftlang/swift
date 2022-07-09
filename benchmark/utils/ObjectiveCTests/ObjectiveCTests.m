@@ -307,6 +307,14 @@
   };
 }
 
+- (void)testRangeOfStringSpecificWithNeedle:(NSString *)needle
+                                   haystack:(NSString *)haystack
+                                          n:(NSInteger)n {
+  for (int i = 0; i < n; i++) {
+    (void)[haystack rangeOfString:needle];
+  }
+}
+
 - (void) testHash {
   for (NSString *str1 in bridgedStrings) {
     @autoreleasepool {

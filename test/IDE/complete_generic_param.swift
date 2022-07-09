@@ -6,6 +6,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT6 | %FileCheck %s -check-prefix=INHERIT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPE_PARAM
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SECOND_GENERIC_TYPE_PARAM | %FileCheck %s -check-prefix=GENERIC_TYPE_PARAM
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_ON_NESTED_TYPE_GLOBAL_VAR | %FileCheck %s -check-prefix=GENERIC_PARAM_ON_NESTED_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_ON_NESTED_TYPE_LOCAL_VAR | %FileCheck %s -check-prefix=GENERIC_PARAM_ON_NESTED_TYPE
 
 class C1{}
 protocol P1{}
@@ -45,3 +47,19 @@ _ = Sr14432<SomeType, #^SECOND_GENERIC_TYPE_PARAM^# >()
 // GENERIC_TYPE_PARAM: Begin completions
 // GENERIC_TYPE_PARAM-DAG: Decl[Class]/CurrModule:             C1[#C1#];
 // GENERIC_TYPE_PARAM: End completions
+
+struct Sr14627 {
+  struct Nested<Elements> {
+    init() { fatalError() }
+  }
+}
+
+var sr14627_globalVar = Sr14627.Nested< #^GENERIC_PARAM_ON_NESTED_TYPE_GLOBAL_VAR^#>()
+
+func someFunction() {
+  var sr14627_localVar = Sr14627.Nested< #^GENERIC_PARAM_ON_NESTED_TYPE_LOCAL_VAR^#>()
+}
+
+// GENERIC_PARAM_ON_NESTED_TYPE: Begin completions
+// GENERIC_PARAM_ON_NESTED_TYPE-DAG: Decl[Struct]/CurrModule:            Sr14627[#Sr14627#];
+// GENERIC_PARAM_ON_NESTED_TYPE: End completions

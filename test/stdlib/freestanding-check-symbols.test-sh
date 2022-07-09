@@ -1,0 +1,10 @@
+// Ensure that we only depend on a small expected set of external symbols in the freestanding stdlib.
+
+// Important (!): This test is in test/stdlib/ to make sure it is actually run on the minimal/freestanding CI job, which
+// filters the set of tests to test/stdlib/ only (see build-preset.ini).
+
+// REQUIRES: freestanding
+// REQUIRES: executable_test
+// UNSUPPORTED: objc_interop
+
+// RUN: %{python} %utils/check_freestanding_dependencies.py --vendor %target-vendor --library %test-resource-dir/freestanding/libswiftCore.a --nm-path %llvm-nm

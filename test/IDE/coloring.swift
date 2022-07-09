@@ -174,6 +174,8 @@ protocol Prot {
   var protocolProperty1: Int { get }
   // CHECK: <kw>var</kw> protocolProperty2: <type>Int</type> { <kw>get</kw> <kw>set</kw> }
   var protocolProperty2: Int { get set }
+  // CHECK: <kw>var</kw> protoAsyncProp: <type>Int</type> { <kw>get</kw> <kw>async</kw> }
+  var protoAsyncProp: Int { get async }
 }
 
 // CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-* : FunnyPrecedence{{$}}

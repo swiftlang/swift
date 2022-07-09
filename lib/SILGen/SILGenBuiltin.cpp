@@ -101,7 +101,8 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &SGF,
                                           SGFContext C,
                                           IsTake_t isTake,
                                           bool isStrict,
-                                          bool isInvariant) {
+                                          bool isInvariant,
+                                          llvm::MaybeAlign align) {
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "load should have single substitution");
   assert(args.size() == 1 && "load should have a single argument");
@@ -113,9 +114,12 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &SGF,
   SILType loadedType = rvalueTL.getLoweredType();
 
   // Convert the pointer argument to a SIL address.
+  //
+  // Default to an unaligned pointer. This can be optimized in the presence of
+  // Builtin.assumeAlignment.
   SILValue addr = SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
                                                loadedType.getAddressType(),
-                                               isStrict, isInvariant);
+                                               isStrict, isInvariant, align);
   // Perform the load.
   return SGF.emitLoad(loc, addr, rvalueTL, C, isTake);
 }
@@ -125,9 +129,11 @@ static ManagedValue emitBuiltinLoad(SILGenFunction &SGF,
                                     SubstitutionMap substitutions,
                                     ArrayRef<ManagedValue> args,
                                     SGFContext C) {
+  // Regular loads assume natural alignment.
   return emitBuiltinLoadOrTake(SGF, loc, substitutions, args,
                                C, IsNotTake,
-                               /*isStrict*/ true, /*isInvariant*/ false);
+                               /*isStrict*/ true, /*isInvariant*/ false,
+                               llvm::MaybeAlign());
 }
 
 static ManagedValue emitBuiltinLoadRaw(SILGenFunction &SGF,
@@ -135,9 +141,11 @@ static ManagedValue emitBuiltinLoadRaw(SILGenFunction &SGF,
                                        SubstitutionMap substitutions,
                                        ArrayRef<ManagedValue> args,
                                        SGFContext C) {
+  // Raw loads cannot assume alignment.
   return emitBuiltinLoadOrTake(SGF, loc, substitutions, args,
                                C, IsNotTake,
-                               /*isStrict*/ false, /*isInvariant*/ false);
+                               /*isStrict*/ false, /*isInvariant*/ false,
+                               llvm::MaybeAlign(1));
 }
 
 static ManagedValue emitBuiltinLoadInvariant(SILGenFunction &SGF,
@@ -145,9 +153,11 @@ static ManagedValue emitBuiltinLoadInvariant(SILGenFunction &SGF,
                                              SubstitutionMap substitutions,
                                              ArrayRef<ManagedValue> args,
                                              SGFContext C) {
+  // Regular loads assume natural alignment.
   return emitBuiltinLoadOrTake(SGF, loc, substitutions, args,
                                C, IsNotTake,
-                               /*isStrict*/ false, /*isInvariant*/ true);
+                               /*isStrict*/ false, /*isInvariant*/ true,
+                               llvm::MaybeAlign());
 }
 
 static ManagedValue emitBuiltinTake(SILGenFunction &SGF,
@@ -155,9 +165,11 @@ static ManagedValue emitBuiltinTake(SILGenFunction &SGF,
                                     SubstitutionMap substitutions,
                                     ArrayRef<ManagedValue> args,
                                     SGFContext C) {
+  // Regular loads assume natural alignment.
   return emitBuiltinLoadOrTake(SGF, loc, substitutions, args,
                                C, IsTake,
-                               /*isStrict*/ true, /*isInvariant*/ false);
+                               /*isStrict*/ true, /*isInvariant*/ false,
+                               llvm::MaybeAlign());
 }
 
 /// Specialized emitter for Builtin.destroy.
@@ -285,7 +297,9 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
 
   // If the argument is existential, open it.
   if (argTy->isClassExistentialType()) {
-    auto openedTy = OpenedArchetypeType::get(argTy);
+    auto openedTy =
+        OpenedArchetypeType::get(argTy->getCanonicalType(),
+                                 SGF.F.getGenericSignature());
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     arg = SGF.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
   }
@@ -778,7 +792,8 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
   
   // If the argument is existential, open it.
   if (sourceType->isClassExistentialType()) {
-    auto openedTy = OpenedArchetypeType::get(sourceType);
+    auto openedTy = OpenedArchetypeType::get(sourceType->getCanonicalType(),
+                                             SGF.F.getGenericSignature());
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     ref = SGF.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
   }
@@ -961,16 +976,30 @@ static ManagedValue emitBuiltinBindMemory(SILGenFunction &SGF,
                                           ArrayRef<ManagedValue> args,
                                           SGFContext C) {
   assert(subs.getReplacementTypes().size() == 1 && "bindMemory should have a single substitution");
-  assert(args.size() == 3 && "bindMemory should have three argument");
+  assert(args.size() == 3 && "bindMemory should have three arguments");
 
   // The substitution determines the element type for bound memory.
   CanType boundFormalType = subs.getReplacementTypes()[0]->getCanonicalType();
   SILType boundType = SGF.getLoweredType(boundFormalType);
 
-  SGF.B.createBindMemory(loc, args[0].getValue(),
-                         args[1].getValue(), boundType);
+  auto *bindMemory = SGF.B.createBindMemory(loc, args[0].getValue(),
+                                            args[1].getValue(), boundType);
 
-  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+  return ManagedValue::forUnmanaged(bindMemory);
+}
+
+static ManagedValue emitBuiltinRebindMemory(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            SubstitutionMap subs,
+                                            ArrayRef<ManagedValue> args,
+                                            SGFContext C) {
+  assert(subs.empty() && "rebindMemory should have no substitutions");
+  assert(args.size() == 2 && "rebindMemory should have two arguments");
+
+  auto *rebindMemory = SGF.B.createRebindMemory(loc, args[0].getValue(),
+                                                args[1].getValue());
+
+  return ManagedValue::forUnmanaged(rebindMemory);
 }
 
 static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &SGF,
@@ -1402,17 +1431,19 @@ emitFunctionArgumentForAsyncTaskEntryPoint(SILGenFunction &SGF,
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
-static ManagedValue emitBuiltinCreateAsyncTask(
-    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
-    ArrayRef<ManagedValue> args, SGFContext C) {
+ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap subs,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
   auto flags = args[0].forward(SGF);
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(MetatypeType::get(
-               GenericTypeParamType::get(0, 0, SGF.getASTContext()),
-               MetatypeRepresentation::Thick))
+      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+                                                       /*depth*/ 0, /*index*/ 0,
+                                                       SGF.getASTContext()),
+                             MetatypeRepresentation::Thick))
           .subst(subs)
           ->getCanonicalType();
   CanType anyTypeType = ExistentialMetatypeType::get(
@@ -1434,7 +1465,9 @@ static ManagedValue emitBuiltinCreateAsyncTask(
           .withRepresentation(GenericFunctionType::Representation::Swift)
           .build();
   auto genericSig = subs.getGenericSignature().getCanonicalSignature();
-  auto genericResult = GenericTypeParamType::get(0, 0, ctx);
+  auto genericResult =
+      GenericTypeParamType::get(/*type sequence*/ false,
+                                /*depth*/ 0, /*index*/ 0, SGF.getASTContext());
   // <T> () async throws -> T
   CanType functionTy =
       GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
@@ -1465,9 +1498,12 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(
-        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext()), MetatypeRepresentation::Thick))
-          .subst(subs)->getCanonicalType();
+      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+                                                       /*depth*/ 0, /*index*/ 0,
+                                                       SGF.getASTContext()),
+                             MetatypeRepresentation::Thick))
+          .subst(subs)
+          ->getCanonicalType();
   CanType anyTypeType = ExistentialMetatypeType::get(
       ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
@@ -1531,10 +1567,9 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
 
     Scope errorScope(SGF, loc);
 
-    auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
-      ->getCanonicalType();
-    auto errorVal
-      = SGF.B.createOwnedPhiArgument(SILType::getPrimitiveObjectType(errorTy));
+    auto errorTy = SGF.getASTContext().getErrorExistentialType();
+    auto errorVal = SGF.B.createTermResult(
+        SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
 
     SGF.emitThrow(loc, errorVal, true);
   }

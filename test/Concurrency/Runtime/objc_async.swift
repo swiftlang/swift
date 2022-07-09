@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -fobjc-arc %S/Inputs/objc_async.m -c -o %t/objc_async_objc.o
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking -parse-as-library -module-name main -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -Xfrontend -disable-availability-checking -parse-as-library -module-name main -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async
 // RUN: %target-run %t/objc_async | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -8,7 +8,7 @@
 // REQUIRES: objc_interop
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 // Disable this test because it's flaky without a proper way to make the main

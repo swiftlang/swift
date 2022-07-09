@@ -63,6 +63,7 @@ SEMANTICS_ATTR(ARRAY_COUNT, "array.count")
 SEMANTICS_ATTR(ARRAY_DEALLOC_UNINITIALIZED, "array.dealloc_uninitialized")
 SEMANTICS_ATTR(ARRAY_UNINITIALIZED_INTRINSIC, "array.uninitialized_intrinsic")
 SEMANTICS_ATTR(ARRAY_FINALIZE_INTRINSIC, "array.finalize_intrinsic")
+SEMANTICS_ATTR(ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE, "array.getContiguousArrayStorageType")
 
 SEMANTICS_ATTR(SEQUENCE_FOR_EACH, "sequence.forEach")
 SEMANTICS_ATTR(TYPENAME, "typeName")
@@ -75,6 +76,7 @@ SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER,
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER,
           "optimize.sil.specialize.owned2guarantee.never")
 
+SEMANTICS_ATTR(OSLOG_MESSAGE_TYPE, "oslog.message.type")
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_INTERPOLATION, "oslog.message.init_interpolation")
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_STRING_LITERAL, "oslog.message.init_stringliteral")
 SEMANTICS_ATTR(OSLOG_REQUIRES_CONSTANT_ARGUMENTS, "oslog.requires_constant_arguments")
@@ -111,6 +113,11 @@ SEMANTICS_ATTR(FORCE_EMIT_OPT_REMARK_PREFIX, "optremark")
 /// be forbidden from having associated objects set upon them. This is only used
 /// for testing purposes.
 SEMANTICS_ATTR(OBJC_FORBID_ASSOCIATED_OBJECTS, "objc.forbidAssociatedObjects")
+
+SEMANTICS_ATTR(LIFETIMEMANAGEMENT_MOVE, "lifetimemanagement.move")
+SEMANTICS_ATTR(LIFETIMEMANAGEMENT_COPY, "lifetimemanagement.copy")
+
+SEMANTICS_ATTR(NO_PERFORMANCE_ANALYSIS, "no_performance_analysis")
 
 #undef SEMANTICS_ATTR
 

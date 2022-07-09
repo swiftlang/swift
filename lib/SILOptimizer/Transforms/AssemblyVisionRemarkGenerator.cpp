@@ -229,7 +229,7 @@ namespace {
 
 /// A helper struct that attempts to infer the decl associated with a value from
 /// one of its uses. It does this by searching the def-use graph locally for
-/// debug_value and debug_value_addr instructions.
+/// debug_value instructions.
 struct ValueUseToDeclInferrer {
   using Argument = ValueToDeclInferrer::Argument;
   using ArgumentKeyKind = ValueToDeclInferrer::ArgumentKeyKind;
@@ -420,7 +420,7 @@ bool ValueToDeclInferrer::infer(
       }
 
       // See if we have a single init alloc_stack and can infer a
-      // debug_value/debug_value_addr from that.
+      // debug_value from that.
       LLVM_DEBUG(llvm::dbgs() << "Checking for single init use!\n");
       if (auto *initUse = getSingleInitAllocStackUse(asi)) {
         LLVM_DEBUG(llvm::dbgs() << "Found one: " << *initUse->getUser());
@@ -511,7 +511,9 @@ struct AssemblyVisionRemarkGeneratorInstructionVisitor
   void visitStrongReleaseInst(StrongReleaseInst *sri);
   void visitRetainValueInst(RetainValueInst *rvi);
   void visitReleaseValueInst(ReleaseValueInst *rvi);
+  void visitAllocRefInstBase(AllocRefInstBase *ari);
   void visitAllocRefInst(AllocRefInst *ari);
+  void visitAllocRefDynamicInst(AllocRefDynamicInst *ari);
   void visitAllocBoxInst(AllocBoxInst *abi);
   void visitSILInstruction(SILInstruction *) {}
   void visitBeginAccessInst(BeginAccessInst *bai);
@@ -704,8 +706,8 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
   });
 }
 
-void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInst(
-    AllocRefInst *ari) {
+void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInstBase(
+    AllocRefInstBase *ari) {
   if (ari->canAllocOnStack()) {
     return ORE.emit([&]() {
       using namespace OptRemark;
@@ -738,6 +740,17 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInst(
       resultRemark << arg;
     return resultRemark;
   });
+}
+
+
+void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInst(
+  AllocRefInst *ari) {
+  visitAllocRefInstBase(ari);
+}
+
+void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefDynamicInst(
+  AllocRefDynamicInst *ari) {
+  visitAllocRefInstBase(ari);
 }
 
 void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocBoxInst(

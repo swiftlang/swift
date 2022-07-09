@@ -31,14 +31,14 @@ namespace {
 ///    %x = alloc_ref [stack] $X
 ///      ...
 ///    strong_release %x
-///    dealloc_ref [stack] %x
+///    dealloc_stack_ref %x
 /// with
 ///    %x = alloc_ref [stack] $X
 ///      ...
 ///    set_deallocating %x
 ///    %d = function_ref @dealloc_of_X
 ///    %a = apply %d(%x)
-///    dealloc_ref [stack] %x
+///    dealloc_stack_ref %x
 ///
 /// The optimization is only done for stack promoted objects because they are
 /// known to have no associated objects (which are not explicitly released
@@ -54,7 +54,7 @@ private:
 
   /// Devirtualize releases of array buffers.
   bool devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
-                                   DeallocRefInst *DeallocInst);
+                                   DeallocStackRefInst *deallocStackInst);
 
   /// Replace the release-instruction \p ReleaseInst with an explicit call to
   /// the deallocating destructor of \p AllocType for \p object.
@@ -79,8 +79,11 @@ void ReleaseDevirtualizer::run() {
 
     for (SILInstruction &I : BB) {
       if (LastRelease) {
-        if (auto *DRI = dyn_cast<DeallocRefInst>(&I)) {
-          Changed |= devirtualizeReleaseOfObject(LastRelease, DRI);
+        // We only do the optimization for stack promoted object, because for
+        // these we know that they don't have associated objects, which are
+        // _not_ released by the deinit method.
+        if (auto *elti = dyn_cast<DeallocStackRefInst>(&I)) {
+          Changed |= devirtualizeReleaseOfObject(LastRelease, elti);
           LastRelease = nullptr;
           continue;
         }
@@ -101,24 +104,12 @@ void ReleaseDevirtualizer::run() {
 
 bool ReleaseDevirtualizer::
 devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
-                            DeallocRefInst *DeallocInst) {
+                            DeallocStackRefInst *deallocStackInst) {
 
   LLVM_DEBUG(llvm::dbgs() << "  try to devirtualize " << *ReleaseInst);
 
-  // We only do the optimization for stack promoted object, because for these
-  // we know that they don't have associated objects, which are _not_ released
-  // by the deinit method.
-  // This restriction is no problem because only stack promotion result in this
-  // alloc-release-dealloc pattern.
-  if (!DeallocInst->canAllocOnStack())
-    return false;
-
-  // Is the dealloc_ref paired with an alloc_ref?
-  auto *ARI = dyn_cast<AllocRefInst>(DeallocInst->getOperand());
-  if (!ARI)
-    return false;
-
   // Does the last release really release the allocated object?
+  auto *ARI = deallocStackInst->getAllocRef();
   SILValue rcRoot = RCIA->getRCIdentityRoot(ReleaseInst->getOperand(0));
   if (rcRoot != ARI)
     return false;
@@ -142,14 +133,9 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   SILFunction *Dealloc = M.lookUpFunction(DeallocRef);
   if (!Dealloc)
     return false;
-  TypeExpansionContext context(*ReleaseInst->getFunction());
-  CanSILFunctionType DeallocType =
-      Dealloc->getLoweredFunctionTypeInContext(context);
   auto *NTD = AllocType.getASTType()->getAnyNominal();
   auto AllocSubMap = AllocType.getASTType()
     ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
-
-  DeallocType = DeallocType->substGenericArgs(M, AllocSubMap, context);
 
   SILBuilder B(ReleaseInst);
   if (object->getType() != AllocType)
@@ -173,6 +159,6 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
 
 } // end anonymous namespace
 
-SILTransform *swift::createReleaseDevirtualizer() {
+SILTransform *swift::createLegacyReleaseDevirtualizer() {
   return new ReleaseDevirtualizer();
 }

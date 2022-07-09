@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,11 +15,13 @@
 //         http://en.wikipedia.org/wiki/SHA-1
 import TestsUtils
 
-public let HashTest = BenchmarkInfo(
-  name: "HashTest",
-  runFunction: run_HashTest,
-  tags: [.validation, .algorithm],
-  legacyFactor: 10)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "HashTest",
+    runFunction: run_HashTest,
+    tags: [.validation, .algorithm],
+    legacyFactor: 10),
+]
 
 class Hash {
   /// C'tor.
@@ -75,7 +77,7 @@ class Hash {
   func hashState() -> String {
     fatalError("Pure virtual")
   }
-  func hashStateFast(_ Res: inout [UInt8]) {
+  func hashStateFast(_ res: inout [UInt8]) {
     fatalError("Pure virtual")
   }
 
@@ -84,30 +86,30 @@ class Hash {
     fatalError("Pure virtual")
   }
 
-  var HexTbl = ["0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f"]
+  var hexTable = ["0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f"]
   final
-  var HexTblFast : [UInt8] = [48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102]
+  var hexTableFast : [UInt8] = [48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102]
 
   /// Convert a 4-byte integer to a hex string.
   final
-  func toHex(_ In: UInt32) -> String {
-    var In = In
-    var Res = ""
+  func toHex(_ input: UInt32) -> String {
+    var input = input
+    var res = ""
     for _ in 0..<8 {
-      Res = HexTbl[Int(In & 0xF)] + Res
-      In = In >> 4
+      res = hexTable[Int(input & 0xF)] + res
+      input = input >> 4
     }
-    return Res
+    return res
   }
 
   final
-  func toHexFast(_ In: UInt32, _ Res: inout Array<UInt8>, _ Index : Int) {
-    var In = In
+  func toHexFast(_ input: UInt32, _ res: inout Array<UInt8>, _ index : Int) {
+    var input = input
     for i in 0..<4 {
       // Convert one byte each iteration.
-      Res[Index + 2*i] = HexTblFast[Int(In >> 4) & 0xF]
-      Res[Index + 2*i + 1] = HexTblFast[Int(In & 0xF)]
-      In = In >> 8
+      res[index + 2*i] = hexTableFast[Int(input >> 4) & 0xF]
+      res[index + 2*i + 1] = hexTableFast[Int(input & 0xF)]
+      input = input >> 8
     }
   }
 
@@ -171,11 +173,11 @@ class MD5 : Hash {
     dataLength = 0
   }
 
-  func appendBytes(_ Val: Int, _ Message: inout Array<UInt8>, _ Offset : Int) {
-    Message[Offset] = UInt8(truncatingIfNeeded: Val)
-    Message[Offset + 1] = UInt8(truncatingIfNeeded: Val >> 8)
-    Message[Offset + 2] = UInt8(truncatingIfNeeded: Val >> 16)
-    Message[Offset + 3] = UInt8(truncatingIfNeeded: Val >> 24)
+  func appendBytes(_ val: Int, _ message: inout Array<UInt8>, _ offset : Int) {
+    message[offset] = UInt8(truncatingIfNeeded: val)
+    message[offset + 1] = UInt8(truncatingIfNeeded: val >> 8)
+    message[offset + 2] = UInt8(truncatingIfNeeded: val >> 16)
+    message[offset + 3] = UInt8(truncatingIfNeeded: val >> 24)
   }
 
   override
@@ -208,11 +210,11 @@ class MD5 : Hash {
     dataLength += 8
   }
 
-  func toUInt32(_ Message: Array<UInt8>, _ Offset: Int) -> UInt32 {
-    let first = UInt32(Message[Offset + 0])
-    let second = UInt32(Message[Offset + 1]) << 8
-    let third = UInt32(Message[Offset + 2]) << 16
-    let fourth = UInt32(Message[Offset + 3]) << 24
+  func toUInt32(_ message: Array<UInt8>, _ offset: Int) -> UInt32 {
+    let first = UInt32(message[offset + 0])
+    let second = UInt32(message[offset + 1]) << 8
+    let third = UInt32(message[offset + 2]) << 16
+    let fourth = UInt32(message[offset + 3]) << 24
     return first | second | third | fourth
   }
 
@@ -265,36 +267,36 @@ class MD5 : Hash {
     h3 = d &+ h3
   }
 
-  func reverseBytes(_ In: UInt32) -> UInt32 {
-    let B0 = (In >> 0 ) & 0xFF
-    let B1 = (In >> 8 ) & 0xFF
-    let B2 = (In >> 16) & 0xFF
-    let B3 = (In >> 24) & 0xFF
-    return (B0 << 24) | (B1 << 16) | (B2 << 8) | B3
+  func reverseBytes(_ input: UInt32) -> UInt32 {
+    let b0 = (input >> 0 ) & 0xFF
+    let b1 = (input >> 8 ) & 0xFF
+    let b2 = (input >> 16) & 0xFF
+    let b3 = (input >> 24) & 0xFF
+    return (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
   }
 
   override
   func hashState() -> String {
-    var S = ""
+    var s = ""
     for h in [h0, h1, h2, h3] {
-      S += toHex(reverseBytes(h))
+      s += toHex(reverseBytes(h))
     }
-    return S
+    return s
   }
 
   override
-  func hashStateFast(_ Res: inout [UInt8]) {
+  func hashStateFast(_ res: inout [UInt8]) {
 #if !NO_RANGE
-    var Idx: Int = 0
+    var idx: Int = 0
     for h in [h0, h1, h2, h3] {
-      toHexFast(h, &Res, Idx)
-      Idx += 8
+      toHexFast(h, &res, idx)
+      idx += 8
     }
 #else
-    toHexFast(h0, &Res, 0)
-    toHexFast(h1, &Res, 8)
-    toHexFast(h2, &Res, 16)
-    toHexFast(h3, &Res, 24)
+    toHexFast(h0, &res, 0)
+    toHexFast(h1, &res, 8)
+    toHexFast(h2, &res, 16)
+    toHexFast(h3, &res, 24)
 #endif
   }
 
@@ -375,50 +377,50 @@ class SHA1 : Hash {
 
     dataLength = 0
 
-    var A = h0
-    var B = h1
-    var C = h2
-    var D = h3
-    var E = h4
-    var K: UInt32, F: UInt32
+    var a = h0
+    var b = h1
+    var c = h2
+    var d = h3
+    var e = h4
+    var k: UInt32, f: UInt32
 
     for t in 0..<80 {
       if t < 20 {
-        K = 0x5a827999
-        F = (B & C) | ((B ^ 0xFFFFFFFF) & D)
+        k = 0x5a827999
+        f = (b & c) | ((b ^ 0xFFFFFFFF) & d)
       } else if t < 40 {
-        K = 0x6ed9eba1
-        F = B ^ C ^ D
+        k = 0x6ed9eba1
+        f = b ^ c ^ d
       } else if t < 60 {
-        K = 0x8f1bbcdc
-        F = (B & C) | (B & D) | (C & D)
+        k = 0x8f1bbcdc
+        f = (b & c) | (b & d) | (c & d)
       } else {
-        K = 0xca62c1d6
-        F = B ^ C ^ D
+        k = 0xca62c1d6
+        f = b ^ c ^ d
       }
-      let Temp: UInt32 = rol(A,5) &+ F &+ E &+ w[t] &+ K
+      let temp: UInt32 = rol(a,5) &+ f &+ e &+ w[t] &+ k
 
-      E = D
-      D = C
-      C = rol(B,30)
-      B = A
-      A = Temp
+      e = d
+      d = c
+      c = rol(b,30)
+      b = a
+      a = temp
     }
 
-    h0 = h0 &+ A
-    h1 = h1 &+ B
-    h2 = h2 &+ C
-    h3 = h3 &+ D
-    h4 = h4 &+ E
+    h0 = h0 &+ a
+    h1 = h1 &+ b
+    h2 = h2 &+ c
+    h3 = h3 &+ d
+    h4 = h4 &+ e
   }
 
   override
   func hashState() -> String {
-    var Res: String = ""
+    var res: String = ""
     for state in [h0, h1, h2, h3, h4] {
-      Res += toHex(state)
+      res += toHex(state)
     }
-    return Res
+    return res
   }
 }
 
@@ -522,12 +524,12 @@ class SHA256 :  Hash {
     var h = h7
 
     for i in 0..<64 {
-      let S1 = ror(e, 6) ^ ror(e, 11) ^ ror(e, 25)
+      let s1 = ror(e, 6) ^ ror(e, 11) ^ ror(e, 25)
       let ch = (e & f) ^ ((~e) & g)
-      let temp1 = h &+ S1 &+ ch &+ k[i] &+ w[i]
-      let S0 = ror(a, 2) ^ ror(a, 13) ^ ror(a, 22)
+      let temp1 = h &+ s1 &+ ch &+ k[i] &+ w[i]
+      let s0 = ror(a, 2) ^ ror(a, 13) ^ ror(a, 22)
       let maj = (a & b) ^ (a & c) ^ (b & c)
-      let temp2 = S0 &+ maj
+      let temp2 = s0 &+ maj
 
       h = g
       g = f
@@ -551,11 +553,11 @@ class SHA256 :  Hash {
 
   override
   func hashState() -> String {
-    var Res: String = ""
+    var res: String = ""
     for state in [h0, h1, h2, h3, h4, h5, h6, h7] {
-      Res += toHex(state)
+      res += toHex(state)
     }
-    return Res
+    return res
   }
 }
 
@@ -568,104 +570,104 @@ func == (lhs: [UInt8], rhs: [UInt8]) -> Bool {
 }
 
 @inline(never)
-public func run_HashTest(_ N: Int) {
-  let TestMD5 = [""                                : "d41d8cd98f00b204e9800998ecf8427e",
+public func run_HashTest(_ n: Int) {
+  let testMD5 = [""                                : "d41d8cd98f00b204e9800998ecf8427e",
     "The quick brown fox jumps over the lazy dog." : "e4d909c290d0fb1ca068ffaddf22cbd0",
     "The quick brown fox jumps over the lazy cog." : "68aa5deab43e4df2b5e1f80190477fb0"]
 
-  let TestSHA1 = [""                              : "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+  let testSHA1 = [""                              : "da39a3ee5e6b4b0d3255bfef95601890afd80709",
     "The quick brown fox jumps over the lazy dog" : "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12",
     "The quick brown fox jumps over the lazy cog" : "de9f2c7fd25e1b3afad3e85a0bd17d9b100db4b3"]
 
-  let TestSHA256 = [""                             : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  let testSHA256 = [""                             : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "The quick brown fox jumps over the lazy dog"  : "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
     "The quick brown fox jumps over the lazy dog." : "ef537f25c895bfa782526529a9b63d97aa631564d5d789c2b765448c8635fb6c"]
   let size = 50
 
-  for _ in 1...N {
+  for _ in 1...n {
     // Check for precomputed values.
-    let MD = MD5()
-    for (K, V) in TestMD5 {
-      MD.update(K)
-      CheckResults(MD.digest() == V)
-      MD.reset()
+    let md = MD5()
+    for (k, v) in testMD5 {
+      md.update(k)
+      check(md.digest() == v)
+      md.reset()
     }
 
     // Check that we don't crash on large strings.
-    var S: String = ""
+    var s: String = ""
     for _ in 1...size {
-      S += "a"
-      MD.reset()
-      MD.update(S)
+      s += "a"
+      md.reset()
+      md.update(s)
     }
 
     // Check that the order in which we push values does not change the result.
-    MD.reset()
-    var L: String = ""
+    md.reset()
+    var l: String = ""
     for _ in 1...size {
-      L += "a"
-      MD.update("a")
+      l += "a"
+      md.update("a")
     }
-    let MD2 = MD5()
-    MD2.update(L)
-    CheckResults(MD.digest() == MD2.digest())
+    let md2 = MD5()
+    md2.update(l)
+    check(md.digest() == md2.digest())
 
-    // Test the famous MD5 collision from 2009: http://www.mscs.dal.ca/~selinger/md5collision/
-    let Src1 : [UInt8] =
+    // Test the famous md5 collision from 2009: http://www.mscs.dal.ca/~selinger/md5collision/
+    let src1 : [UInt8] =
     [0xd1, 0x31, 0xdd, 0x02, 0xc5, 0xe6, 0xee, 0xc4, 0x69, 0x3d, 0x9a, 0x06, 0x98, 0xaf, 0xf9, 0x5c, 0x2f, 0xca, 0xb5, 0x87, 0x12, 0x46, 0x7e, 0xab, 0x40, 0x04, 0x58, 0x3e, 0xb8, 0xfb, 0x7f, 0x89,
      0x55, 0xad, 0x34, 0x06, 0x09, 0xf4, 0xb3, 0x02, 0x83, 0xe4, 0x88, 0x83, 0x25, 0x71, 0x41, 0x5a, 0x08, 0x51, 0x25, 0xe8, 0xf7, 0xcd, 0xc9, 0x9f, 0xd9, 0x1d, 0xbd, 0xf2, 0x80, 0x37, 0x3c, 0x5b,
      0xd8, 0x82, 0x3e, 0x31, 0x56, 0x34, 0x8f, 0x5b, 0xae, 0x6d, 0xac, 0xd4, 0x36, 0xc9, 0x19, 0xc6, 0xdd, 0x53, 0xe2, 0xb4, 0x87, 0xda, 0x03, 0xfd, 0x02, 0x39, 0x63, 0x06, 0xd2, 0x48, 0xcd, 0xa0,
      0xe9, 0x9f, 0x33, 0x42, 0x0f, 0x57, 0x7e, 0xe8, 0xce, 0x54, 0xb6, 0x70, 0x80, 0xa8, 0x0d, 0x1e, 0xc6, 0x98, 0x21, 0xbc, 0xb6, 0xa8, 0x83, 0x93, 0x96, 0xf9, 0x65, 0x2b, 0x6f, 0xf7, 0x2a, 0x70]
 
-    let Src2 : [UInt8] =
+    let src2 : [UInt8] =
     [0xd1, 0x31, 0xdd, 0x02, 0xc5, 0xe6, 0xee, 0xc4, 0x69, 0x3d, 0x9a, 0x06, 0x98, 0xaf, 0xf9, 0x5c, 0x2f, 0xca, 0xb5, 0x07, 0x12, 0x46, 0x7e, 0xab, 0x40, 0x04, 0x58, 0x3e, 0xb8, 0xfb, 0x7f, 0x89,
      0x55, 0xad, 0x34, 0x06, 0x09, 0xf4, 0xb3, 0x02, 0x83, 0xe4, 0x88, 0x83, 0x25, 0xf1, 0x41, 0x5a, 0x08, 0x51, 0x25, 0xe8, 0xf7, 0xcd, 0xc9, 0x9f, 0xd9, 0x1d, 0xbd, 0x72, 0x80, 0x37, 0x3c, 0x5b,
      0xd8, 0x82, 0x3e, 0x31, 0x56, 0x34, 0x8f, 0x5b, 0xae, 0x6d, 0xac, 0xd4, 0x36, 0xc9, 0x19, 0xc6, 0xdd, 0x53, 0xe2, 0x34, 0x87, 0xda, 0x03, 0xfd, 0x02, 0x39, 0x63, 0x06, 0xd2, 0x48, 0xcd, 0xa0,
      0xe9, 0x9f, 0x33, 0x42, 0x0f, 0x57, 0x7e, 0xe8, 0xce, 0x54, 0xb6, 0x70, 0x80, 0x28, 0x0d, 0x1e, 0xc6, 0x98, 0x21, 0xbc, 0xb6, 0xa8, 0x83, 0x93, 0x96, 0xf9, 0x65, 0xab, 0x6f, 0xf7, 0x2a, 0x70]
 
-    let H1 = MD5()
-    let H2 = MD5()
+    let h1 = MD5()
+    let h2 = MD5()
 
-    H1.update(Src1)
-    H2.update(Src2)
-    let A1 = H1.digest()
-    let A2 = H2.digest()
-    CheckResults(A1 == A2)
-    CheckResults(A1 == "79054025255fb1a26e4bc422aef54eb4")
-    H1.reset()
-    H2.reset()
+    h1.update(src1)
+    h2.update(src2)
+    let a1 = h1.digest()
+    let a2 = h2.digest()
+    check(a1 == a2)
+    check(a1 == "79054025255fb1a26e4bc422aef54eb4")
+    h1.reset()
+    h2.reset()
 
-    let SH = SHA1()
-    let SH256 = SHA256()
-    for (K, V) in TestSHA1 {
-      SH.update(K)
-      CheckResults(SH.digest() == V)
-      SH.reset()
+    let sh = SHA1()
+    let sh256 = SHA256()
+    for (k, v) in testSHA1 {
+      sh.update(k)
+      check(sh.digest() == v)
+      sh.reset()
     }
 
-    for (K, V) in TestSHA256 {
-      SH256.update(K)
-      CheckResults(SH256.digest() == V)
-      SH256.reset()
+    for (k, v) in testSHA256 {
+      sh256.update(k)
+      check(sh256.digest() == v)
+      sh256.reset()
     }
 
     // Check that we don't crash on large strings.
-    S = ""
+    s = ""
     for _ in 1...size {
-      S += "a"
-      SH.reset()
-      SH.update(S)
+      s += "a"
+      sh.reset()
+      sh.update(s)
     }
 
     // Check that the order in which we push values does not change the result.
-    SH.reset()
-    L = ""
+    sh.reset()
+    l = ""
     for _ in 1...size {
-      L += "a"
-      SH.update("a")
+      l += "a"
+      sh.update("a")
     }
-    let SH2 = SHA1()
-    SH2.update(L)
-    CheckResults(SH.digest() == SH2.digest())
+    let sh2 = SHA1()
+    sh2.update(l)
+    check(sh.digest() == sh2.digest())
   }
 }

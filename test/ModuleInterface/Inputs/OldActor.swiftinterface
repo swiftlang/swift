@@ -1,10 +1,10 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -enable-library-evolution -module-name OldActor -enable-experimental-concurrency
+// swift-module-flags: -enable-library-evolution -module-name OldActor 
 import Swift
 import _Concurrency
 
 #if compiler(>=5.3) && $Actors
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public actor Monk {
   public init()
   deinit

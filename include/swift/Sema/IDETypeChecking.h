@@ -19,7 +19,9 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
 #include <tuple>
@@ -27,6 +29,7 @@
 namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
+  class CaptureListExpr;
   class ConcreteDeclRef;
   class Decl;
   class DeclContext;
@@ -35,6 +38,7 @@ namespace swift {
   class Expr;
   class ExtensionDecl;
   class FunctionType;
+  class LabeledConditionalStmt;
   class LookupResult;
   class NominalTypeDecl;
   class PatternBindingDecl;
@@ -46,8 +50,15 @@ namespace swift {
   class ValueDecl;
   struct PrintOptions;
 
+  namespace constraints {
+  class ConstraintSystem;
+  class Solution;
+  class SolutionApplicationTarget;
+  }
+
   /// Typecheck binding initializer at \p bindingIndex.
-  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
+  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex,
+                               bool leaveClosureBodiesUnchecked);
 
   /// Check if T1 is convertible to T2.
   ///
@@ -87,7 +98,7 @@ namespace swift {
   /// should be used when you want to look up declarations with the same name as
   /// one you already have.
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
-                                         DeclName Name);
+                                          DeclName Name);
 
   /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
@@ -133,11 +144,35 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Type check a function body element which is at \p TagetLoc .
-  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
+  /// Type check a function body element which is at \p TagetLoc.
+  bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                             SourceLoc TargetLoc);
+
+  /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
+  /// available to \c swift::ide.
+  /// Type check the given expression and provide results back to code
+  /// completion via specified callback.
+  ///
+  /// This method is designed to be used for code completion which means that
+  /// it doesn't mutate given expression, even if there is a single valid
+  /// solution, and constraint solver is allowed to produce partially correct
+  /// solutions. Such solutions can have any number of holes in them.
+  ///
+  /// \returns `true` if target was applicable and it was possible to infer
+  /// types for code completion, `false` otherwise.
+  bool typeCheckForCodeCompletion(
+      constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+      llvm::function_ref<void(const constraints::Solution &)> callback);
 
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
+
+  /// Get all of the top-level declarations that should be printed as part of
+  /// this module. This may force synthesis of top-level declarations that
+  /// \c ModuleDecl::getDisplayDecls() would only return if previous
+  /// work happened to have synthesized them.
+  void
+  getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results, bool Recursive = false);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
@@ -233,25 +268,6 @@ namespace swift {
                            std::vector<VariableTypeInfo> &VariableTypeInfos,
                            llvm::raw_ostream &OS);
 
-  /// FIXME: All of the below goes away once CallExpr directly stores its
-  /// arguments.
-
-  /// Return value for getOriginalArgumentList().
-  struct OriginalArgumentList {
-    SmallVector<Expr *, 4> args;
-    SmallVector<Identifier, 4> labels;
-    SmallVector<SourceLoc, 4> labelLocs;
-    SourceLoc lParenLoc;
-    SourceLoc rParenLoc;
-    bool hasTrailingClosure = false;
-  };
-
-  /// When applying a solution to a constraint system, the type checker rewrites
-  /// argument lists of calls to insert default arguments and collect varargs.
-  /// Sometimes for diagnostics we want to work on the original argument list as
-  /// written by the user; this performs the reverse transformation.
-  OriginalArgumentList getOriginalArgumentList(Expr *expr);
-
   /// Returns the root type and result type of the keypath type in a keypath
   /// dynamic member lookup subscript, or \c None if it cannot be determined.
   ///
@@ -305,6 +321,22 @@ namespace swift {
   /// for a Fix-It that adds a new build* function to a result builder.
   std::tuple<SourceLoc, std::string, Type>
   determineResultBuilderBuildFixItInfo(NominalTypeDecl *builder);
+
+  /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
+  bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
+
+  /// If the capture list shadows any declarations using shorthand syntax, i.e.
+  /// syntax that names both the newly declared variable and the referenced
+  /// variable by the same identifier in the source text, i.e. `[foo]`, return
+  /// these shorthand shadows.
+  /// The first element in the pair is the implicitly declared variable and the
+  /// second variable is the shadowed one.
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+  getShorthandShadows(CaptureListExpr *CaptureList);
+
+  /// Same as above but for shorthand `if let foo {` syntax.
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+  getShorthandShadows(LabeledConditionalStmt *CondStmt);
 }
 
 #endif

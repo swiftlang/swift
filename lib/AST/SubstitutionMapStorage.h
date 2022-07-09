@@ -55,7 +55,7 @@ class SubstitutionMap::Storage final
 
 private:
   unsigned getNumReplacementTypes() const {
-    return genericSig->getGenericParams().size();
+    return genericSig.getGenericParams().size();
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {

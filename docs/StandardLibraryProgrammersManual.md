@@ -12,9 +12,231 @@ In this document, "stdlib" refers to the core standard library (`stdlib/public/c
 
 ### Formatting Conventions
 
-The stdlib currently has a hard line length limit of 80 characters. To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe.)
+The Standard Library codebase has some uniformly applied formatting conventions. While these aren't currently automatically enforced, we still expect these conventions to be followed in every PR, including draft PRs. (PRs are first and foremost intended to be read/reviewed by people, and it's crucial that trivial formatting issues don't get in the way of understanding proposed changes.)
+
+Some of this code is very subtle, and its presentation matters greatly. Effort spent on getting formatting _just right_ is time very well spent: new code we add is going to be repeatedly read and re-read by many people, and it's important that code is presented in a way that helps understanding it.
+
+#### Line Breaking
+
+The stdlib currently has a hard line length limit of 80 characters. This allows code to be easily read in environments that don't gracefully handle long lines, including (especially!) code reviews on GitHub.
    
 We use two spaces as the unit of indentation. We don't use tabs.
+
+To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe in detail.)
+
+Our primary rule is that if we need to insert a line break anywhere in the middle of a list (such as arguments, tuple or array/dictionary literals, generic type parameters, etc.), then we must go all the way and put each item on its own line, indented by +1 unit, even if some of the items would fit on a single line together.
+
+The rationale for this is that line breaks tend to put strong visual emphasis on the item that follows them, risking subsequent items on the same line to be glanced over during review. For example, see how easy it is to accidentally miss `arg2` in the second example below.
+
+```swift
+// BAD (completely unreadable)
+@inlinable public func foobar<Result>(_ arg1: Result, arg2: Int, _ arg3: (Result, Element) throws -> Result) rethrows -> Result {
+  ...
+}
+
+// BAD (arg2 is easily missed)
+@inlinable 
+public func foobar<Result>(
+  _ arg1: Result, arg2: Int,             // ☹️
+  _ arg3: (Result, Element) throws -> Result
+) rethrows -> Result {
+
+// GOOD
+@inlinable
+public func foobar<Result>(
+  _ arg1: Result, 
+  arg2: Int, 
+  _ arg3: (Result, Element) throws -> Result
+) rethrows -> Result {
+  ...
+}
+```
+
+As a special case, function arguments that are very tightly coupled together are sometimes kept on the same line. The typical example for this is a pair of defaulted file/line arguments that track the caller's source position:
+
+```swift
+// OK
+internal func _preconditionFailure(
+  _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) -> Never {
+  ...
+}
+
+// Also OK
+internal func _preconditionFailure(
+  _ message: StaticString = StaticString(),
+  file: StaticString = #file, 
+  line: UInt = #line
+) -> Never {
+  ...
+}
+```
+
+(When in doubt, err on the side of adding more line breaks.)
+
+
+For lists that have delimiter characters (`(`/`)`, `[`/`]`, `<`/`>`, etc.), we prefer to put a line break both *after* the opening delimiter, and *before* the closing delimiter.
+However, within function bodies, it's okay to omit the line break before the closing delimiter.
+
+```swift
+// GOOD:
+func foo<S: Sequence, T>(
+  input: S,
+  transform: (S.Element) -> throws T
+) -> [S.Element] {     // Note: there *must* be a line break before the ')'
+  ...
+  someLongFunctionCall(
+    on: S,
+    startingAt: i,
+    stride: 32)        // Note: the break before the closing paren is optional
+}
+```
+
+If the entire contents of a list fit on a single line, it is okay to only break at the delimiters. That said, it is also acceptable to put breaks around each item:
+
+```swift
+// GOOD:
+@_alwaysEmitIntoClient
+internal func _parseIntegerDigits<Result: FixedWidthInteger>(
+  ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
+) -> Result? {
+  ...
+}
+
+// ALSO GOOD:
+@_alwaysEmitIntoClient
+internal func _parseIntegerDigits<Result: FixedWidthInteger>(
+  ascii codeUnits: UnsafeBufferPointer<UInt8>, 
+  radix: Int, 
+  isNegative: Bool
+) -> Result? {
+  ...
+}
+```
+
+The rules typically don't require breaking lines that don't exceed the length limit; but if you find it helps understanding, feel free to do so anyway.
+
+```swift
+// OK
+guard let foo = foo else { return false }
+
+// Also OK
+guard let foo = foo else {
+  return false
+}
+```
+
+Historically, we had a one (1) exception to the line limit, which is that we allowed string literals to go over the margin. Now that Swift has multi-line string literals, we could start breaking overlong ones. However, multiline literals can be a bit heavy visually, while in most cases the string is a precondition failure message, which doesn't necessarily need to be emphasized as much -- so the old exception still applies:
+
+```swift
+      // OK
+      _precondition(                                                           |
+        buffer.baseAddress == firstElementAddress,                             |
+        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
+      )                                                                        |
+                                                                               |
+      // Also OK, although spending 4 lines on the message is a bit much       |
+      _precondition(                                                           |
+        buffer.baseAddress == firstElementAddress,                             |
+        """"                                                                   |
+        Can't reassign buffer in \                                             |
+        Array(unsafeUninitializedCapacity:initializingWith:)                   |
+        """"                                                                   |
+      )                                                                        |
+```
+
+In every other case, long lines must be broken up. We expect this rule to be strictly observed.
+
+
+#### Presentation of Type Definitions
+
+To ease reading/understanding type declarations, we prefer to define members in the following order:
+
+1. Crucial type aliases and nested types, not exceeding a handful of lines in length
+2. Stored properties
+3. Initializers
+4. Any other instance members (methods, computed properties, etc)
+
+Please keep all stored properties together in a single uninterrupted list, followed immediately by the type's most crucial initializer(s). Put these as close to the top of the type declaration as possible -- we don't want to force readers to scroll around to find these core definitions.
+
+We also have some recommendations for defining other members. These aren't strict rules, as the best way to present definitions varies; but it usually makes sense to break up the implementation into easily digestible, logical chunks.
+
+- In general, it is a good idea to keep the main `struct`/`class` definition as short as possible: preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
+
+- Everything else should go in standalone extensions, arranged by logical theme. For example, it's often nice to define protocol conformances in dedicated extensions. If it makes sense, feel free to add a comment to title these sectioning extensions.
+
+- Think about what order you present these sections -- put related conformances together, follow some didactic progression, etc. E.g, conformance definitions for closely related protocols such as `Equatable`/`Hashable`/`Comparable` should be kept very close to each other, for easy referencing.
+
+- In some cases, it can also work well to declare the most essential protocol conformances directly on the type definition; feel free to do so if it helps understanding. (You can still implement requirements in separate extensions in this case, or you can do it within the main declaration.)
+
+- It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule. 
+
+Extensions are a nice way to break up the implementation into easily digestible chunks, but they aren't the only way. The goal is to make things easy to understand -- if a type is small enough, it may be best to list every member directly in the `struct`/`class` definition, while for huge types it often makes more sense to break them up into a handful of separate source files instead. 
+
+```swift
+// BAD (a jumbled mess)
+struct Foo: RandomAccessCollection, Hashable {
+  var count: Int { ... }
+  
+  struct Iterator: IteratorProtocol { /* hundreds of lines */ }
+ 
+  class _Storage { /* even more lines */ }
+  
+  static func _createStorage(_ foo: Int, _ bar: Double) -> _Storage { ... }
+  
+  func hash(into hasher: inout Hasher) { ... }
+  
+  func makeIterator() -> Iterator { ... }
+  
+  /* more stuff */
+  
+  init(foo: Int, bar: Double) { 
+    _storage = Self._createStorage(foo, bar) 
+  }
+
+  static func ==(left: Self, right: Self) -> Bool { ... }
+  
+  var _storage: _Storage
+}
+
+// GOOD
+struct Foo {
+  var _storage: _Storage
+  
+  init(foo: Int, bar: Double) { ... }
+}
+
+extension Foo {
+  class _Storage { /* even more lines */ }
+
+  static func _createStorage(_ foo: Int, _ bar: Double) -> _Storage { ... }
+}
+
+extension Foo: Equatable {
+  static func ==(left: Self, right: Self) -> Bool { ... }
+}
+
+extension Foo: Hashable {
+  func hash(into hasher: inout Hasher) { ... }
+}
+ 
+extension Foo: Sequence {
+  struct Iterator: IteratorProtocol { /* hundreds of lines */ }
+  
+  func makeIterator() -> Iterator { ... }
+  ...
+}
+
+extension Foo: RandomAccessCollection {
+  var count: Int { ... }
+  ...
+}
+
+extension Foo {
+  /* more stuff */
+}
+```
 
 ### Public APIs
 
@@ -72,27 +294,67 @@ For historical reasons, the existing codebase generally uses `internal` as the c
 
 Every entry point in the standard library that has an ABI impact must be applied an `@available` attribute that describes the earliest ABI-stable OS releases that it can be deployed on. (Currently this only applies to macOS, iOS, watchOS and tvOS, since Swift isn't ABI stable on other platforms yet.)
 
-Unlike access control modifiers, we prefer to put `@available` attributes on the extension context rather than duplicating them on every individual entry point. This is an effort to fight against information overload: the `@available` attribute is information dense and it's generally easier to review/maintain if applied to a group of entry points all at once.
+Just like access control modifiers, we prefer to put `@available` attributes on each individual access point, rather than just the extension in which they are defined. 
 
 ```swift
-// 👍
-@available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
+// 😢👎
+@available(SwiftStdlib 5.2, *)
 extension String {
   public func blanch() { ... }
   public func roast() { ... }
 }
+
+// 🥲👍
+extension String {
+  @available(SwiftStdlib 5.2, *)
+  public func blanch() { ... }
+
+  @available(SwiftStdlib 5.2, *)
+  public func roast() { ... }
+}
 ```
 
-Features under development that haven't been released yet must be marked with the placeholder version number `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release.
+This coding style is enforced by the ABI checker -- it will complain if an extension member declaration that needs an availability doesn't have it directly attached.
+
+This repository defines a set of availability macros (of the form `SwiftStdlib x.y`) that map Swift Stdlib releases to the OS versions that shipped them, for all ABI stable platforms. The following two definitions are equivalent, but the second one is less error-prone, so we prefer that:
 
 ```swift
+extension String {
+  // 😵‍💫👎
+  @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
+  public func fiddle() { ... }
+
+  // 😎👍
+  @available(SwiftStdlib 5.2, *)
+  public func fiddle() { ... }
+}
+```
+
+(Mistakes in the OS version number list are very easy to miss during review, but can have major ABI consequences.)
+
+This is especially important for newly introduced APIs, where the corresponding OS releases may not even be known yet. 
+
+Features under development that haven't shipped yet must be marked as available in the placeholder OS version `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release. 
+
+Never explicitly spell out such placeholder availability -- instead, use the `SwiftStdlib` macro corresponding to the Swift version we're currently working on:
+
+```swift
+// 😵‍💫👎
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public struct FutureFeature {
+  ...
+}
+
+// 😎👍
+@available(SwiftStdlib 6.3, *) // Or whatever
 public struct FutureFeature {
   ...
 }
 ```
 
-On these platforms, the Swift Standard Library ships as an integrated part of the operating system; as such, it is the platform owners' responsibility to update these placeholder version numbers to actual versions as part of their release process.
+This way, platform owners can easily update declarations to the correct set of version numbers by simply changing the definition of the macro, rather than having to update each individual declaration.
+
+If we haven't defined a version number for the "next" Swift release yet, please use the special placeholder version `SwiftStdlib 9999`, which always expands to 9999 versions. Declarations that use this version will need to be manually updated once we decide on the corresponding Swift version number.
 
 ## Internals
 

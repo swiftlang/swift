@@ -8,7 +8,7 @@ public struct ResilientStruct {
     var x: AnyObject
 }
 
-// CHECK-LABEL: sil @mem2reg_debug_value_addr :
+// CHECK-LABEL: sil @mem2reg_debug_value :
 // CHECK:       bb0(%0 : $*ResilientStruct):
 // CHECK-NEXT:    %1 = load %0
 // CHECK-NEXT:    retain_value %1
@@ -16,14 +16,14 @@ public struct ResilientStruct {
 // CHECK-NEXT:    release_value %1
 // CHECK-NEXT:    tuple ()
 // CHECK-NEXT:    return {{%.*}} : $()
-// CHECK: } // end sil function 'mem2reg_debug_value_addr'
-sil @mem2reg_debug_value_addr : $@convention(thin) (@in_guaranteed ResilientStruct) -> () {
+// CHECK: } // end sil function 'mem2reg_debug_value'
+sil @mem2reg_debug_value : $@convention(thin) (@in_guaranteed ResilientStruct) -> () {
 bb0(%0 : $*ResilientStruct):
   %1 = alloc_stack $ResilientStruct
   %2 = load %0 : $*ResilientStruct
   retain_value %2 : $ResilientStruct
   store %2 to %1 : $*ResilientStruct
-  debug_value_addr %1 : $*ResilientStruct
+  debug_value %1 : $*ResilientStruct, expr op_deref
   %3 = load %1 : $*ResilientStruct
   destroy_addr %1 : $*ResilientStruct
   dealloc_stack %1 : $*ResilientStruct

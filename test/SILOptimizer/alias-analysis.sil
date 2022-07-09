@@ -22,10 +22,10 @@ struct OuterStruct {
 
 // Test overlaping access on a different path; the user has misused an index offset
 // CHECK-LABEL: @testOffsetBehindProjection
-// CHECK: PAIR #28.
-// CHECK:   %4 = load %3 : $*Int64
-// CHECK:   %6 = load %5 : $*Int64
-// CHECK: MayAlias
+// CHECK: PAIR #23.
+// CHECK:   %3 = index_addr %1 : $*Int64, %2 : $Builtin.Word
+// CHECK:   %5 = struct_element_addr %0 : $*MyStruct, #MyStruct.j
+// CHECK: NoAlias
 sil shared @testOffsetBehindProjection : $@convention(thin) (@inout MyStruct) -> () {
 bb0(%0 : $*MyStruct):
   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
@@ -40,10 +40,10 @@ bb0(%0 : $*MyStruct):
 }
 
 // CHECK-LABEL: @testOffsetsBehindProjectionOverlap
-// CHECK: PAIR #28.
-// CHECK:   %3 = load %2 : $*Int64
-// CHECK:   %7 = load %6 : $*Int64
-// CHECK: MayAlias
+// CHECK: PAIR #21.
+// CHECK:   %2 = struct_element_addr %1 : $*MyStruct, #MyStruct.i
+// CHECK:   %6 = struct_element_addr %5 : $*MyStruct, #MyStruct.i
+// CHECK: NoAlias
 sil shared @testOffsetsBehindProjectionOverlap : $@convention(thin) (@inout OuterStruct) -> () {
 bb0(%0 : $*OuterStruct):
   %1 = struct_element_addr %0 : $*OuterStruct, #OuterStruct.s
@@ -55,6 +55,43 @@ bb0(%0 : $*OuterStruct):
   %5 = index_addr %1 : $*MyStruct, %4 : $Builtin.Word
   %6 = struct_element_addr %5 : $*MyStruct, #MyStruct.i
   %7 = load %6 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testIndexOf0
+// CHECK: PAIR #8.
+// CHECK:   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK:   %3 = index_addr %0 : $*MyStruct, %2 : $Builtin.Word
+// CHECK: MayAlias
+// CHECK: PAIR #9.
+// CHECK:   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK:   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+// CHECK: MustAlias
+sil @testIndexOf0 : $@convention(thin) (@inout MyStruct) -> () {
+bb0(%0 : $*MyStruct):
+  %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = index_addr %0 : $*MyStruct, %2 : $Builtin.Word
+  %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testUnknownIndex
+// CHECK: PAIR #12.
+// CHECK:   %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK:   %3 = index_addr %0 : $*MyStruct, %1 : $Builtin.Word
+// CHECK: MayAlias
+// CHECK: PAIR #13.
+// CHECK:   %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK:   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+// CHECK: MayAlias
+sil @testUnknownIndex : $@convention(thin) (@inout MyStruct, Builtin.Word) -> () {
+bb0(%0 : $*MyStruct, %1 : $Builtin.Word):
+  %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+  %3 = index_addr %0 : $*MyStruct, %1 : $Builtin.Word
+  %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
   %99 = tuple ()
   return %99 : $()
 }

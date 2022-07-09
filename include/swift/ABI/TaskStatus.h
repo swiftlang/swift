@@ -20,8 +20,8 @@
 #ifndef SWIFT_ABI_TASKSTATUS_H
 #define SWIFT_ABI_TASKSTATUS_H
 
-#include "swift/ABI/Task.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/ABI/Task.h"
 
 namespace swift {
 
@@ -30,12 +30,12 @@ namespace swift {
 /// TaskStatusRecords are typically allocated on the stack (possibly
 /// in the task context), partially initialized, and then atomically
 /// added to the task with `swift_task_addTaskStatusRecord`.  While
-/// registered with the task, a status record should only be 
+/// registered with the task, a status record should only be
 /// modified in ways that respect the possibility of asynchronous
 /// access by a cancelling thread.  In particular, the chain of
 /// status records must not be disturbed.  When the task leaves
 /// the scope that requires the status record, the record can
-/// be unregistered from the task with `swift_task_removeStatusRecord`,
+/// be unregistered from the task with `removeStatusRecord`,
 /// at which point the memory can be returned to the system.
 class TaskStatusRecord {
 public:
@@ -51,13 +51,9 @@ public:
   TaskStatusRecord(const TaskStatusRecord &) = delete;
   TaskStatusRecord &operator=(const TaskStatusRecord &) = delete;
 
-  TaskStatusRecordKind getKind() const {
-    return Flags.getKind();
-  }
+  TaskStatusRecordKind getKind() const { return Flags.getKind(); }
 
-  TaskStatusRecord *getParent() const {
-    return Parent;
-  }
+  TaskStatusRecord *getParent() const { return Parent; }
 
   /// Change the parent of this unregistered status record to the
   /// given record.
@@ -77,9 +73,7 @@ public:
   /// Unlike resetParent, this assumes that it's just removing one or
   /// more records from the chain and that there's no need to do any
   /// extra cache manipulation.
-  void spliceParent(TaskStatusRecord *newParent) {
-    Parent = newParent;
-  }
+  void spliceParent(TaskStatusRecord *newParent) { Parent = newParent; }
 };
 
 /// A deadline for the task.  If this is reached, the task will be
@@ -102,14 +96,12 @@ struct TaskDeadline {
 /// within the task.
 class DeadlineStatusRecord : public TaskStatusRecord {
   TaskDeadline Deadline;
+
 public:
   DeadlineStatusRecord(TaskDeadline deadline)
-    : TaskStatusRecord(TaskStatusRecordKind::Deadline),
-      Deadline(deadline) {}
+      : TaskStatusRecord(TaskStatusRecordKind::Deadline), Deadline(deadline) {}
 
-  TaskDeadline getDeadline() const {
-    return Deadline;
-  }
+  TaskDeadline getDeadline() const { return Deadline; }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::Deadline;
@@ -123,25 +115,22 @@ class ChildTaskStatusRecord : public TaskStatusRecord {
 
 public:
   ChildTaskStatusRecord(AsyncTask *child)
-    : TaskStatusRecord(TaskStatusRecordKind::ChildTask),
-      FirstChild(child) {}
+      : TaskStatusRecord(TaskStatusRecordKind::ChildTask), FirstChild(child) {}
 
   ChildTaskStatusRecord(AsyncTask *child, TaskStatusRecordKind kind)
-    : TaskStatusRecord(kind),
-      FirstChild(child) {
+      : TaskStatusRecord(kind), FirstChild(child) {
     assert(kind == TaskStatusRecordKind::ChildTask);
     assert(!child->hasGroupChildFragment() &&
-      "Group child tasks must be tracked in their respective "
-      "TaskGroupTaskStatusRecord, and not as independent ChildTaskStatusRecord "
-      "records.");
+           "Group child tasks must be tracked in their respective "
+           "TaskGroupTaskStatusRecord, and not as independent "
+           "ChildTaskStatusRecord "
+           "records.");
   }
 
   /// Return the first child linked by this record.  This may be null;
   /// if not, it (and all of its successors) are guaranteed to satisfy
   /// `isChildTask()`.
-  AsyncTask *getFirstChild() const {
-    return FirstChild;
-  }
+  AsyncTask *getFirstChild() const { return FirstChild; }
 
   static AsyncTask *getNextChildTask(AsyncTask *task) {
     return task->childFragment()->getNextChild();
@@ -175,54 +164,77 @@ public:
 /// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
 class TaskGroupTaskStatusRecord : public TaskStatusRecord {
   AsyncTask *FirstChild;
+  AsyncTask *LastChild;
+
 public:
   TaskGroupTaskStatusRecord()
-    : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
-      FirstChild(nullptr) {}
+      : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
+        FirstChild(nullptr),
+        LastChild(nullptr) {
+  }
 
   TaskGroupTaskStatusRecord(AsyncTask *child)
-    : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
-      FirstChild(child) {}
-
-  TaskGroup* getGroup() {
-    return reinterpret_cast<TaskGroup *>(this);
+      : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
+        FirstChild(child),
+        LastChild(child) {
+    assert(!LastChild || !LastChild->childFragment()->getNextChild());
   }
+
+  TaskGroup *getGroup() { return reinterpret_cast<TaskGroup *>(this); }
 
   /// Return the first child linked by this record.  This may be null;
   /// if not, it (and all of its successors) are guaranteed to satisfy
   /// `isChildTask()`.
-  AsyncTask *getFirstChild() const {
-    return FirstChild;
-  }
+  AsyncTask *getFirstChild() const { return FirstChild; }
 
   /// Attach the passed in `child` task to this group.
   void attachChild(AsyncTask *child) {
-    assert(child->groupChildFragment());
     assert(child->hasGroupChildFragment());
     assert(child->groupChildFragment()->getGroup() == getGroup());
 
+    auto oldLastChild = LastChild;
+    LastChild = child;
+    
     if (!FirstChild) {
       // This is the first child we ever attach, so store it as FirstChild.
       FirstChild = child;
       return;
     }
 
-    // We need to traverse the siblings to find the last one and add the child there.
-    // FIXME: just set prepend to the current head, no need to traverse.
+    oldLastChild->childFragment()->setNextChild(child);
+  }
 
-    auto cur = FirstChild;
-    while (cur) {
-      // no need to check hasChildFragment, all tasks we store here have them.
-      auto fragment = cur->childFragment();
-      if (auto next = fragment->getNextChild()) {
-        cur = next;
-      } else {
-        // we're done searching and `cur` is the last
-        break;
+  void detachChild(AsyncTask *child) {
+    assert(child && "cannot remove a null child from group");
+    if (FirstChild == child) {
+      FirstChild = getNextChildTask(child);
+      if (FirstChild == nullptr) {
+        LastChild = nullptr;
       }
+      return;
     }
+    
+    AsyncTask *prev = FirstChild;
+    // Remove the child from the linked list, i.e.:
+    //     prev -> afterPrev -> afterChild
+    //                 ==
+    //               child   -> afterChild
+    // Becomes:
+    //     prev --------------> afterChild
+    while (prev) {
+      auto afterPrev = getNextChildTask(prev);
 
-    cur->childFragment()->setNextChild(child);
+      if (afterPrev == child) {
+        auto afterChild = getNextChildTask(child);
+        prev->childFragment()->setNextChild(afterChild);
+        if (child == LastChild) {
+          LastChild = prev;
+        }
+        return;
+      }
+
+      prev = afterPrev;
+    }
   }
 
   static AsyncTask *getNextChildTask(AsyncTask *task) {
@@ -244,25 +256,23 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeStatusRecord` and freely
+/// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
 public:
-  using FunctionType = SWIFT_CC(swift) void (SWIFT_CONTEXT void *);
+  using FunctionType = SWIFT_CC(swift) void(SWIFT_CONTEXT void *);
 
 private:
-  FunctionType * __ptrauth_swift_cancellation_notification_function Function;
+  FunctionType *__ptrauth_swift_cancellation_notification_function Function;
   void *Argument;
 
 public:
   CancellationNotificationStatusRecord(FunctionType *fn, void *arg)
-    : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
-      Function(fn), Argument(arg) {}
+      : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
+        Function(fn), Argument(arg) {}
 
-  void run() {
-    Function(Argument);
-  }
+  void run() { Function(Argument); }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::CancellationNotification;
@@ -274,25 +284,23 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeStatusRecord` and freely
+/// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {
 public:
-  using FunctionType = void (void *, JobPriority);
+  using FunctionType = void(void *, JobPriority);
 
 private:
-  FunctionType * __ptrauth_swift_escalation_notification_function Function;
+  FunctionType *__ptrauth_swift_escalation_notification_function Function;
   void *Argument;
 
 public:
   EscalationNotificationStatusRecord(FunctionType *fn, void *arg)
-    : TaskStatusRecord(TaskStatusRecordKind::EscalationNotification),
-      Function(fn), Argument(arg) {}
+      : TaskStatusRecord(TaskStatusRecordKind::EscalationNotification),
+        Function(fn), Argument(arg) {}
 
-  void run(JobPriority newPriority) {
-    Function(Argument, newPriority);
-  }
+  void run(JobPriority newPriority) { Function(Argument, newPriority); }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::EscalationNotification;

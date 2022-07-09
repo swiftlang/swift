@@ -14,6 +14,14 @@
 #define SWIFT_IDE_COMPLETIONINSTANCE_H
 
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/CancellableResult.h"
+#include "swift/IDE/CodeCompletionContext.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionResultSink.h"
+#include "swift/IDE/ConformingMethodList.h"
+#include "swift/IDE/ImportDepth.h"
+#include "swift/IDE/SwiftCompletionInfo.h"
+#include "swift/IDE/TypeContextInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -34,6 +42,41 @@ std::unique_ptr<llvm::MemoryBuffer>
 makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
                                unsigned &Offset,
                                llvm::StringRef bufferIdentifier);
+
+/// The result returned via the callback from the perform*Operation methods.
+struct CompletionInstanceResult {
+  /// The compiler instance that is prepared for the second pass.
+  CompilerInstance &CI;
+  /// Whether an AST was reused.
+  bool DidReuseAST;
+  /// Whether the CompletionInstance found a code completion token in the source
+  /// file. If this is \c false, the user will most likely want to return empty
+  /// results.
+  bool DidFindCodeCompletionToken;
+};
+
+/// The results returned from \c CompletionInstance::codeComplete.
+struct CodeCompleteResult {
+  CodeCompletionResultSink &ResultSink;
+  SwiftCompletionInfo &Info;
+  ImportDepth ImportDep;
+};
+
+/// The results returned from \c CompletionInstance::typeContextInfo.
+struct TypeContextInfoResult {
+  /// The actual results. If empty, no results were found.
+  ArrayRef<TypeContextInfoItem> Results;
+  /// Whether an AST was reused to produce the results.
+  bool DidReuseAST;
+};
+
+/// The results returned from \c CompletionInstance::conformingMethodList.
+struct ConformingMethodListResults {
+  /// The actual results. If \c nullptr, no results were found.
+  const ConformingMethodListResult *Result;
+  /// Whether an AST was reused for the completion.
+  bool DidReuseAST;
+};
 
 /// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
@@ -58,27 +101,61 @@ class CompletionInstance {
 
   /// Calls \p Callback with cached \c CompilerInstance if it's usable for the
   /// specified completion request.
-  /// Returns \c if the callback was called. Returns \c false if the compiler
-  /// argument has changed, primary file is not the same, the \c Offset is not
-  /// in function bodies, or the interface hash of the file has changed.
+  /// Returns \c true if performing the cached operation was possible. Returns
+  /// \c false if the compiler argument has changed, primary file is not the
+  /// same, the \c Offset is not in function bodies, or the interface hash of
+  /// the file has changed.
+  /// \p Callback will be called if and only if this function returns \c true.
   bool performCachedOperationIfPossible(
       llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      const SearchPathOptions &SearchPathOpts,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+          Callback);
 
   /// Calls \p Callback with new \c CompilerInstance for the completion
   /// request. The \c CompilerInstace passed to the callback already performed
   /// the first pass.
   /// Returns \c false if it fails to setup the \c CompilerInstance.
-  bool performNewOperation(
+  void performNewOperation(
       llvm::Optional<llvm::hash_code> ArgsHash,
       swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      std::string &Error, DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
+      DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+          Callback);
+
+  /// Calls \p Callback with a \c CompilerInstance which is prepared for the
+  /// second pass. \p Callback is resposible to perform the second pass on it.
+  /// The \c CompilerInstance may be reused from the previous completions,
+  /// and may be cached for the next completion.
+  /// In case of failure or cancellation, the callback receives the
+  /// corresponding failed or cancelled result.
+  ///
+  /// If \p CancellationFlag is not \c nullptr, code completion can be cancelled
+  /// by setting the flag to \c true.
+  /// IMPORTANT: If \p CancellationFlag is not \c nullptr, then completion might
+  /// be cancelled in the secon pass that's invoked inside \p Callback.
+  /// Therefore, \p Callback MUST check whether completion was cancelled before
+  /// interpreting the results, since invalid results may be returned in case
+  /// of cancellation.
+  ///
+  /// NOTE: \p Args is only used for checking the equaity of the invocation.
+  /// Since this function assumes that it is already normalized, exact the same
+  /// arguments including their order is considered as the same invocation.
+  void performOperation(
+      swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+          Callback);
 
 public:
   CompletionInstance() : CachedCIShouldBeInvalidated(false) {}
@@ -90,22 +167,31 @@ public:
   // Update options with \c NewOpts. (Thread safe.)
   void setOptions(Options NewOpts);
 
-  /// Calls \p Callback with a \c CompilerInstance which is prepared for the
-  /// second pass. \p Callback is resposible to perform the second pass on it.
-  /// The \c CompilerInstance may be reused from the previous completions,
-  /// and may be cached for the next completion.
-  /// Return \c true if \p is successfully called, \c it fails. In failure
-  /// cases \p Error is populated with an error message.
-  ///
-  /// NOTE: \p Args is only used for checking the equaity of the invocation.
-  /// Since this function assumes that it is already normalized, exact the same
-  /// arguments including their order is considered as the same invocation.
-  bool performOperation(
+  void codeComplete(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      std::string &Error, DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
+      DiagnosticConsumer *DiagC, ide::CodeCompletionContext &CompletionContext,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback);
+
+  void typeContextInfo(
+      swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      llvm::function_ref<void(CancellableResult<TypeContextInfoResult>)>
+          Callback);
+
+  void conformingMethodList(
+      swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      DiagnosticConsumer *DiagC, ArrayRef<const char *> ExpectedTypeNames,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
+          Callback);
 };
 
 } // namespace ide

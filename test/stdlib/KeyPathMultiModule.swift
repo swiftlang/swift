@@ -15,6 +15,9 @@
 
 // REQUIRES: executable_test
 
+// Freestanding stdlib is built with -experimental-hermetic-seal-at-link which doesn't allow -enable-library-evolution
+// UNSUPPORTED: freestanding
+
 import KeyPathMultiModule_b
 import StdlibUnittest
 

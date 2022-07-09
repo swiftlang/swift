@@ -27,6 +27,7 @@ namespace swift {
   class ApplyExpr;
   class AvailableAttr;
   class Expr;
+  class ClosureExpr;
   class InFlightDiagnostic;
   class Decl;
   class ProtocolConformanceRef;
@@ -39,8 +40,10 @@ namespace swift {
 
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
-  /// Used when type-checking protocol conformances, since conforming to a
-  /// protocol that doesn't exist yet is allowed.
+  /// We allow a type to conform to a protocol that is less available than the
+  /// type itself. This enables a type to retroactively model or directly conform
+  /// to a protocol only available on newer OSes and yet still be used on older
+  /// OSes.
   AllowPotentiallyUnavailableProtocol = 1 << 0,
 
   /// Diagnose uses of declarations in versions before they were introduced, but
@@ -53,7 +56,13 @@ enum class DeclAvailabilityFlag : uint8_t {
 
   /// If an error diagnostic would normally be emitted, demote the error to a
   /// warning. Used for ObjC key path components.
-  ForObjCKeyPath = 1 << 3
+  ForObjCKeyPath = 1 << 3,
+  
+  /// Downgrade errors about decl availability to warnings when the fix would be
+  /// to constrain availability to a version that is more available than the
+  /// current deployment target. This is needed for source compatibility in when
+  /// checking public extensions in library modules.
+  WarnForPotentialUnavailabilityBeforeDeploymentTarget = 1 << 4,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
@@ -130,7 +139,7 @@ public:
   static ExportContext forFunctionBody(DeclContext *DC, SourceLoc loc);
 
   /// Create an instance describing associated conformances that can be
-  /// referenced from the the conformance defined by the given DeclContext,
+  /// referenced from the conformance defined by the given DeclContext,
   /// which must be a NominalTypeDecl or ExtensionDecl.
   static ExportContext forConformance(DeclContext *DC, ProtocolDecl *proto);
 
@@ -141,7 +150,7 @@ public:
   /// Produce a new context with the same properties as this one, except
   /// that if 'exported' is false, the resulting context can reference
   /// declarations that are not exported. If 'exported' is true, the
-  /// resulting context is indentical to this one.
+  /// resulting context is identical to this one.
   ///
   /// That is, this will perform a 'bitwise and' on the 'exported' bit.
   ExportContext withExported(bool exported) const;
@@ -182,9 +191,10 @@ public:
   Optional<ExportabilityReason> getExportabilityReason() const;
 };
 
-/// Check if a public declaration is part of a module's API; that is, this
-/// will return false if the declaration is @_spi or @_implementationOnly.
+/// Check if a declaration is exported as part of a module's external interface.
+/// This includes public and @usableFromInline decls.
 bool isExported(const ValueDecl *VD);
+bool isExported(const ExtensionDecl *ED);
 bool isExported(const Decl *D);
 
 /// Diagnose uses of unavailable declarations in expressions.
@@ -219,21 +229,22 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 ProtocolConformanceRef conformance,
                                 const ExportContext &context,
                                 Type depTy=Type(),
-                                Type replacementTy=Type());
+                                Type replacementTy=Type(),
+                                bool useConformanceAvailabilityErrorsOption = false);
 
-bool
-diagnoseSubstitutionMapAvailability(SourceLoc loc,
-                                    SubstitutionMap subs,
-                                    const ExportContext &context,
-                                    Type depTy=Type(),
-                                    Type replacementTy=Type());
+bool diagnoseSubstitutionMapAvailability(
+    SourceLoc loc,
+    SubstitutionMap subs, 
+    const ExportContext &context,
+    Type depTy = Type(),
+    Type replacementTy = Type(),
+    bool useConformanceAvailabilityErrorsOption = false,
+    bool suppressParameterizationCheckForOptional = false);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool diagnoseDeclAvailability(const ValueDecl *D,
-                              SourceRange R,
-                              const ApplyExpr *call,
-                              const ExportContext &where,
+bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
+                              const Expr *call, const ExportContext &where,
                               DeclAvailabilityFlags flags = None);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
@@ -242,10 +253,9 @@ void diagnoseUnavailableOverride(ValueDecl *override,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
-bool diagnoseExplicitUnavailability(const ValueDecl *D,
-                                    SourceRange R,
+bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                     const ExportContext &Where,
-                                    const ApplyExpr *call,
+                                    const Expr *call,
                                     DeclAvailabilityFlags Flags = None);
 
 /// Emit a diagnostic for references to declarations that have been
@@ -263,10 +273,20 @@ bool diagnoseExplicitUnavailability(
     SourceLoc loc,
     const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext,
-    const ExportContext &where);
+    const ExportContext &where,
+    bool useConformanceAvailabilityErrorsOption = false);
+
+/// Diagnose uses of the runtime features of parameterized protools. Returns
+/// \c true if a diagnostic was emitted.
+bool diagnoseParameterizedProtocolAvailability(SourceRange loc,
+                                               const DeclContext *DC);
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
+
+/// Check if \p D needs to be checked for correct availability depending on the
+/// flag -check-api-availability-only.
+bool shouldCheckAvailability(const Decl *D);
 
 } // namespace swift
 

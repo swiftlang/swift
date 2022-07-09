@@ -42,6 +42,7 @@ generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
 generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 
 add_swift_host_library(swiftBasic STATIC
+  BasicBridging.cpp
   BasicSourceInfo.cpp
   Cache.cpp
   ClusteredBitVector.cpp
@@ -68,6 +69,7 @@ add_swift_host_library(swiftBasic STATIC
   StableHasher.cpp
   Statistic.cpp
   StringExtras.cpp
+  TargetInfo.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
   Unicode.cpp

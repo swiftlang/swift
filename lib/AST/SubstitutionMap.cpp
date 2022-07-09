@@ -89,7 +89,7 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
 
   // Make sure we've filled in all of the replacement types.
   if (!storage->populatedAllReplacements) {
-    for (auto gp : getGenericSignature()->getGenericParams()) {
+    for (auto gp : getGenericSignature().getGenericParams()) {
       (void)lookupSubstitution(cast<SubstitutableType>(gp->getCanonicalType()));
     }
 
@@ -103,7 +103,7 @@ ArrayRef<Type> SubstitutionMap::getInnermostReplacementTypes() const {
   if (empty()) return { };
 
   return getReplacementTypes().take_back(
-      getGenericSignature()->getInnermostGenericParams().size());
+      getGenericSignature().getInnermostGenericParams().size());
 }
 
 GenericSignature SubstitutionMap::getGenericSignature() const {
@@ -213,7 +213,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 
   // Form the replacement types.
   SmallVector<Type, 4> replacementTypes;
-  replacementTypes.reserve(genericSig->getGenericParams().size());
+  replacementTypes.reserve(genericSig.getGenericParams().size());
 
   genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     // Don't eagerly form replacements for non-canonical generic parameters.
@@ -229,7 +229,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 
   // Form the stored conformances.
   SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (const auto &req : genericSig->getRequirements()) {
+  for (const auto &req : genericSig.getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance) continue;
 
     CanType depTy = req.getFirstType()->getCanonicalType();
@@ -249,7 +249,12 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    if (!isa<PrimaryArchetypeType>(archetype))
+    // Only consider root archetypes.
+    if (!archetype->isRoot())
+      return Type();
+
+    if (!isa<PrimaryArchetypeType>(archetype) &&
+        !isa<SequenceArchetypeType>(archetype))
       return Type();
 
     type = cast<GenericTypeParamType>(
@@ -263,7 +268,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   auto replacementTypes = mutableThis->getReplacementTypesBuffer();
   auto genericSig = getGenericSignature();
   assert(genericSig);
-  auto genericParams = genericSig->getGenericParams();
+  auto genericParams = genericSig.getGenericParams();
   auto replacementIndex =
     GenericParamKey(genericParam).findIndexIn(genericParams);
 
@@ -295,7 +300,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
   // The generic parameter may not be canonical. Retrieve the canonical
   // type, which will be dependent.
-  CanType canonicalType = genericSig->getCanonicalTypeInContext(genericParam);
+  CanType canonicalType = genericSig.getCanonicalTypeInContext(genericParam);
 
   // If nothing changed, we don't have a replacement.
   if (canonicalType == type) return Type();
@@ -321,7 +326,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    if (!isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
+    if (!isa<OpaqueTypeArchetypeType>(archetype)) {
       type = archetype->getInterfaceType()->getCanonicalType();
     }
   }
@@ -336,7 +341,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   auto getSignatureConformance =
       [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
     unsigned index = 0;
-    for (auto reqt : genericSig->getRequirements()) {
+    for (auto reqt : genericSig.getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance) {
         if (reqt.getFirstType()->isEqual(type) &&
             reqt.getProtocolDecl() == proto)
@@ -354,24 +359,16 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (auto directConformance = getSignatureConformance(type, proto))
     return *directConformance;
 
-  // Check whether the superclass conforms.
-  if (auto superclass = genericSig->getSuperclassBound(type)) {
-    LookUpConformanceInSignature lookup(getGenericSignature().getPointer());
-    auto substType = type.subst(*this);
-    if (auto conformance = lookup(type->getCanonicalType(), substType, proto)){
-      return conformance;
-    }
-  }
-
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
-  if (!genericSig->requiresProtocol(type, proto))
-    return ProtocolConformanceRef::forInvalid();
+  if (!genericSig->requiresProtocol(type, proto)) {
+    Type substType = type.subst(*this);
+    return ProtocolConformanceRef::forMissingOrInvalid(substType, proto);
+  }
 
   auto accessPath =
     genericSig->getConformanceAccessPath(type, proto);
 
-  // Fall through because we cannot yet evaluate an access path.
   ProtocolConformanceRef conformance;
   for (const auto &step : accessPath) {
     // For the first step, grab the initial conformance.
@@ -461,7 +458,7 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
   auto oldConformances = getConformances();
 
   auto genericSig = getGenericSignature();
-  for (const auto &req : genericSig->getRequirements()) {
+  for (const auto &req : genericSig.getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance) continue;
 
     auto conformance = oldConformances[0];
@@ -504,15 +501,9 @@ SubstitutionMap::getOverrideSubstitutions(
                                       Optional<SubstitutionMap> derivedSubs) {
   // For overrides within a protocol hierarchy, substitute the Self type.
   if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
-    if (auto derivedProtoSelf =
-          derivedDecl->getDeclContext()->getSelfInterfaceType()) {
-      return SubstitutionMap::getProtocolSubstitutions(
-                                             baseProto,
-                                             derivedProtoSelf,
-                                             ProtocolConformanceRef(baseProto));
-    }
-
-    return SubstitutionMap();
+    auto baseSig = baseDecl->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+    return baseSig->getIdentitySubstitutionMap();
   }
 
   auto *baseClass = baseDecl->getDeclContext()->getSelfClassDecl();
@@ -542,7 +533,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   unsigned baseDepth = 0;
   SubstitutionMap baseSubMap;
   if (auto baseClassSig = baseClass->getGenericSignature()) {
-    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+    baseDepth = baseClassSig.getGenericParams().back()->getDepth() + 1;
 
     auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
     if (derivedSubs)
@@ -556,7 +547,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
 
   unsigned origDepth = 0;
   if (auto derivedClassSig = derivedClass->getGenericSignature())
-    origDepth = derivedClassSig->getGenericParams().back()->getDepth() + 1;
+    origDepth = derivedClassSig.getGenericParams().back()->getDepth() + 1;
 
   SubstitutionMap origSubMap;
   if (derivedSubs)
@@ -584,19 +575,18 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (how == CombineSubstitutionMaps::AtDepth) {
         if (gp->getDepth() < firstDepthOrIndex)
           return Type();
-        return GenericTypeParamType::get(
-          gp->getDepth() + secondDepthOrIndex - firstDepthOrIndex,
-          gp->getIndex(),
-          ctx);
+        return GenericTypeParamType::get(gp->isTypeSequence(),
+                                         gp->getDepth() + secondDepthOrIndex -
+                                             firstDepthOrIndex,
+                                         gp->getIndex(), ctx);
       }
 
       assert(how == CombineSubstitutionMaps::AtIndex);
       if (gp->getIndex() < firstDepthOrIndex)
         return Type();
       return GenericTypeParamType::get(
-        gp->getDepth(),
-        gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex,
-        ctx);
+          gp->isTypeSequence(), gp->getDepth(),
+          gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex, ctx);
     }
 
     return type;
@@ -659,7 +649,7 @@ void SubstitutionMap::verify() const {
 
   unsigned conformanceIndex = 0;
 
-  for (const auto &req : getGenericSignature()->getRequirements()) {
+  for (const auto &req : getGenericSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 

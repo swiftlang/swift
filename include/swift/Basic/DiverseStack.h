@@ -395,8 +395,7 @@ class DiverseValueBuffer {
 public:
   DiverseValueBuffer(const T &value) {
     size_t size = value.allocated_size();
-    data.reserve(size);
-    data.set_size(size);
+    data.resize_for_overwrite(size);
     memcpy(data.data(), reinterpret_cast<const void *>(&value), size);
   }
 

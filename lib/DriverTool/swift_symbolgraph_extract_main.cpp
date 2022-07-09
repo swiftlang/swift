@@ -23,6 +23,7 @@
 #include "swift/Option/Options.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -62,7 +63,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   if (ParsedArgs.getLastArg(OPT_help) || Args.empty()) {
     std::string ExecutableName =
         llvm::sys::path::stem(MainExecutablePath).str();
-    Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
+    Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                      "Swift Symbol Graph Extractor",
                      SwiftSymbolGraphExtractOption, 0,
                      /*ShowAllAliases*/ false);
@@ -169,6 +170,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       ParsedArgs.hasArg(OPT_v),
       ParsedArgs.hasArg(OPT_skip_inherited_docs),
       ParsedArgs.hasArg(OPT_include_spi_symbols),
+      /*IncludeClangDocs=*/false,
   };
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
@@ -182,8 +184,9 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
             .Default(AccessLevel::Public);
   }
 
-  if (CI.setup(Invocation)) {
-    llvm::outs() << "Failed to setup compiler instance\n";
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::outs() << InstanceSetupError << '\n';
     return EXIT_FAILURE;
   }
 
@@ -220,7 +223,10 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     return EXIT_FAILURE;
   }
 
-  const auto &MainFile = M->getMainFile(FileUnitKind::SerializedAST);
+  FileUnitKind expectedKind = FileUnitKind::SerializedAST;
+  if (M->isNonSwiftModule())
+    expectedKind = FileUnitKind::ClangModule;
+  const auto &MainFile = M->getMainFile(expectedKind);
   
   if (Options.PrintMessages)
     llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';
@@ -235,7 +241,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   // don't need to print these errors.
   CI.removeDiagnosticConsumer(&DiagPrinter);
   
-  SmallVector<ModuleDecl *> Overlays;
+  SmallVector<ModuleDecl *, 8> Overlays;
   M->findDeclaredCrossImportOverlaysTransitive(Overlays);
   for (const auto *OM : Overlays) {
     auto CIM = CI.getASTContext().getModuleByName(OM->getNameStr());

@@ -92,9 +92,8 @@ func classifyPoint2(_ p: (Double, Double)) {
 // CHECK-SCOPES: ![[X1]] = {{.*}}name: "x", scope: ![[SCOPE1:[0-9]+]], {{.*}}line: 37
 // CHECK-SCOPES: ![[SCOPE1]] = distinct !DILexicalBlock(scope: ![[SWITCH1:[0-9]+]], {{.*}}line: 37
 // CHECK-SCOPES: ![[SWITCH1]] = distinct !DILexicalBlock({{.*}}, line: 20
-// CHECK-SCOPES: ![[X1LOC]] = {{.*}}line: 37
-
 // CHECK-SCOPES: ![[Y1]] = {{.*}}name: "y", scope: ![[SCOPE1]], {{.*}}line: 37
+// CHECK-SCOPES: ![[X1LOC]] = {{.*}}line: 37
 // CHECK-SCOPES: ![[Y1LOC]] = {{.*}}line: 37
 
 // CHECK: !DILocation(line: [[@LINE+1]],

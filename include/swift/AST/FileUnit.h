@@ -16,9 +16,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/Debug.h"
+
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
-static inline unsigned alignOfFileUnit();
+class SynthesizedFileUnit;
 
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
@@ -28,25 +31,33 @@ static inline unsigned alignOfFileUnit();
 /// file. A module can contain several file-units.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnon-virtual-dtor"
-class FileUnit : public DeclContext {
+class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
 #pragma clang diagnostic pop
   virtual void anchor();
 
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
-  // FIXME: Stick this in a PointerIntPair.
-  const FileUnitKind Kind;
+  // The pointer is FileUnit insted of SynthesizedFileUnit to break circularity.
+  llvm::PointerIntPair<FileUnit *, 3, FileUnitKind> SynthesizedFileAndKind;
 
 protected:
   FileUnit(FileUnitKind kind, ModuleDecl &M)
-    : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
+    : DeclContext(DeclContextKind::FileUnit, &M),
+      SynthesizedFileAndKind(nullptr, kind) {
   }
 
 public:
   FileUnitKind getKind() const {
-    return Kind;
+    return SynthesizedFileAndKind.getInt();
   }
+
+  /// Returns the synthesized file for this source file, if it exists.
+  SynthesizedFileUnit *getSynthesizedFile() const;
+
+  /// Returns the synthesized file for this source file, creating one and
+  /// inserting it into the module if it does not exist.
+  SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
@@ -180,6 +191,8 @@ public:
   virtual Identifier
   getDiscriminatorForPrivateValue(const ValueDecl *D) const = 0;
 
+  virtual bool shouldCollectDisplayDecls() const { return true; }
+
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -235,7 +248,7 @@ public:
   ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
-  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const {
     getTopLevelDecls(results);
   }
 
@@ -290,13 +303,18 @@ public:
     return nullptr;
   }
 
-  /// Returns the name to use when referencing entities in this file.
+  /// Returns the real name of the enclosing module to use when referencing entities in this file.
+  /// The 'real name' is the actual binary name of the module, which can be different from the 'name'
+  /// if module aliasing was used (via -module-alias flag).
   ///
-  /// Usually this is the module name itself, but certain Clang features allow
+  /// Usually this is the module real name itself, but certain Clang features allow
   /// substituting another name instead.
   virtual StringRef getExportedModuleName() const {
-    return getParentModule()->getName().str();
+    return getParentModule()->getRealName().str();
   }
+
+  SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
+  SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 
   /// Traverse the decls within this file.
   ///
@@ -313,22 +331,9 @@ public:
     return DC->getContextKind() == DeclContextKind::FileUnit;
   }
 
-private:
-  // Make placement new and vanilla new/delete illegal for FileUnits.
-  void *operator new(size_t Bytes) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-
-public:
-  // Only allow allocation of FileUnits using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignOfFileUnit());
+  using ASTAllocated<FileUnit>::operator new;
+  using ASTAllocated<FileUnit>::operator delete;
 };
-
-static inline unsigned alignOfFileUnit() {
-  return alignof(FileUnit&);
-}
 
 /// This represents the compiler's implicitly generated declarations in the
 /// Builtin module.
@@ -408,6 +413,8 @@ public:
   virtual void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {}
 
+  virtual void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const {}
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||
            file->getKind() == FileUnitKind::ClangModule ||

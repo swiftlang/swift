@@ -1,0 +1,4 @@
+module ExternC {
+  header "extern-c.h"
+  requires cplusplus
+}

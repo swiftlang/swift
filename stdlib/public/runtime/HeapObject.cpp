@@ -31,6 +31,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <new>
 #include <thread>
 #include "../SwiftShims/GlobalObjects.h"
 #include "../SwiftShims/RuntimeShims.h"
@@ -40,7 +41,6 @@
 # include <objc/message.h>
 # include <objc/objc.h>
 # include "swift/Runtime/ObjCBridge.h"
-# include "swift/Runtime/Once.h"
 # include <dlfcn.h>
 #endif
 #include "Leaks.h"
@@ -50,8 +50,8 @@ using namespace swift;
 // Check to make sure the runtime is being built with a compiler that
 // supports the Swift calling convention.
 //
-// If the Swift calling convention is not in use, functions such as 
-// swift_allocBox and swift_makeBoxUnique that rely on their return value 
+// If the Swift calling convention is not in use, functions such as
+// swift_allocBox and swift_makeBoxUnique that rely on their return value
 // being passed in a register to be compatible with Swift may miscompile on
 // some platforms and silently fail.
 #if !__has_attribute(swiftcall)
@@ -66,6 +66,10 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
   // arm64_32 is special since it has 32-bit pointers but __arm64__ is true.
   // Catch it early since __POINTER_WIDTH__ is generally non-portable.
   return p != nullptr;
+#elif defined(__ANDROID__) && defined(__aarch64__)
+  // Check the top of the second byte instead, since Android AArch64 reserves
+  // the top byte for its own pointer tagging since Android 11.
+  return (intptr_t)((uintptr_t)p << 8) > 0;
 #elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
   // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
@@ -88,6 +92,7 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
 // not to emit a bunch of ptrauth instructions just to perform the comparison.
 // We only want to authenticate the function pointer if we actually call it. We
 // can revert to a straight comparison once rdar://problem/55267009 is fixed.
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask)
@@ -120,7 +125,7 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
   // check on the placement new allocator which we have observed on Windows,
   // Linux, and macOS.
-  new (object) HeapObject(metadata);
+  ::new (object) HeapObject(metadata);
 
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);
@@ -156,13 +161,6 @@ struct InitStaticObjectContext {
   HeapMetadata const *metadata;
 };
 
-// Callback for swift_once.
-static void initStaticObjectWithContext(void *OpaqueCtx) {
-  InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
-  Ctx->object->metadata = Ctx->metadata;
-  Ctx->object->refCounts.initImmortal();
-}
-
 // TODO: We could generate inline code for the fast-path, i.e. the metadata
 // pointer is already set. That would be a performance/codesize tradeoff.
 HeapObject *
@@ -176,7 +174,14 @@ swift::swift_initStaticObject(HeapMetadata const *metadata,
   // refcount to 1 while another thread already incremented it - and would
   // decrement it to 0 afterwards.
   InitStaticObjectContext Ctx = { object, metadata };
-  swift_once(token, initStaticObjectWithContext, &Ctx);
+  swift::once(
+      *token,
+      [](void *OpaqueCtx) {
+        InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
+        Ctx->object->metadata = Ctx->metadata;
+        Ctx->object->refCounts.initImmortal();
+      },
+      &Ctx);
 
   return object;
 }
@@ -186,11 +191,11 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
   if (object->refCounts.getCount() != 0)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Stack object escaped\n");
-  
+
   if (object->refCounts.getUnownedCount() != 1)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Unowned reference to stack object\n");
-  
+
   if (object->refCounts.getWeakCount() != 0)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Weak reference to stack object\n");
@@ -344,7 +349,7 @@ static HeapObject *_swift_retain_(HeapObject *object) {
 }
 
 HeapObject *swift::swift_retain(HeapObject *object) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain(object);
 #else
   CALL_IMPL(swift_retain, (object));
@@ -371,7 +376,7 @@ static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
 }
 
 HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain_n(object, n);
 #else
   CALL_IMPL(swift_retain_n, (object, n));
@@ -397,7 +402,7 @@ static void _swift_release_(HeapObject *object) {
 }
 
 void swift::swift_release(HeapObject *object) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_release(object);
 #else
   CALL_IMPL(swift_release, (object));
@@ -422,7 +427,7 @@ static void _swift_release_n_(HeapObject *object, uint32_t n) {
 }
 
 void swift::swift_release_n(HeapObject *object, uint32_t n) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_release_n(object, n);
 #else
   CALL_IMPL(swift_release_n, (object, n));
@@ -454,7 +459,7 @@ size_t swift::swift_weakRetainCount(HeapObject *object) {
 }
 
 HeapObject *swift::swift_unownedRetain(HeapObject *object) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   return static_cast<HeapObject *>(swift_nonatomic_unownedRetain(object));
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetain);
@@ -467,7 +472,7 @@ HeapObject *swift::swift_unownedRetain(HeapObject *object) {
 }
 
 void swift::swift_unownedRelease(HeapObject *object) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_unownedRelease(object);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRelease);
@@ -477,10 +482,10 @@ void swift::swift_unownedRelease(HeapObject *object) {
   // Only class objects can be unowned-retained and unowned-released.
   assert(object->metadata->isClassObject());
   assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
-  
+
   if (object->refCounts.decrementUnownedShouldFree(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    
+
     swift_slowDealloc(object, classMetadata->getInstanceSize(),
                       classMetadata->getInstanceAlignMask());
   }
@@ -514,7 +519,7 @@ void swift::swift_nonatomic_unownedRelease(HeapObject *object) {
 }
 
 HeapObject *swift::swift_unownedRetain_n(HeapObject *object, int n) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_unownedRetain_n(object, n);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetain_n);
@@ -527,7 +532,7 @@ HeapObject *swift::swift_unownedRetain_n(HeapObject *object, int n) {
 }
 
 void swift::swift_unownedRelease_n(HeapObject *object, int n) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_unownedRelease_n(object, n);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRelease_n);
@@ -537,7 +542,7 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n) {
   // Only class objects can be unowned-retained and unowned-released.
   assert(object->metadata->isClassObject());
   assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
-  
+
   if (object->refCounts.decrementUnownedShouldFree(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
     swift_slowDealloc(object, classMetadata->getInstanceSize(),
@@ -577,7 +582,7 @@ static HeapObject *_swift_tryRetain_(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
     return nullptr;
 
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   if (object->refCounts.tryIncrementNonAtomic()) return object;
   else return nullptr;
 #else
@@ -606,7 +611,7 @@ void swift::swift_setDeallocating(HeapObject *object) {
 }
 
 HeapObject *swift::swift_unownedRetainStrong(HeapObject *object) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_unownedRetainStrong(object);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetainStrong);
@@ -634,7 +639,7 @@ HeapObject *swift::swift_nonatomic_unownedRetainStrong(HeapObject *object) {
 }
 
 void swift::swift_unownedRetainStrongAndRelease(HeapObject *object) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_unownedRetainStrongAndRelease(object);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetainStrongAndRelease);

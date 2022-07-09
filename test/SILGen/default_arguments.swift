@@ -434,6 +434,23 @@ func testCallableWithDefault(_ x: CallableWithDefault) {
   x(y: 5)
 }
 
+enum E {
+  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments1EO6ResultV4name9platformsAESS_SaySiGtcfcfA0_ : $@convention(thin) () -> @owned Array<Int>
+  struct Result {
+    var name: String
+    var platforms: [Int] = []
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments1EO4testyyFZ : $@convention(method) (@thin E.Type) -> ()
+  static func test() {
+    // CHECK: function_ref @$s17default_arguments1EO6ResultV4name9platformsAESS_SaySiGtcfcfA0_ : $@convention(thin) () -> @owned Array<Int>
+    // CHECK: function_ref @$s17default_arguments1EO4testyyFZAC6ResultVSS_SaySiGtcfu_ : $@convention(thin) (@guaranteed String, @guaranteed Array<Int>) -> @owned E.Result
+
+    // CHECK-LABEL: sil private [ossa] @$s17default_arguments1EO4testyyFZAC6ResultVSS_SaySiGtcfu_ : $@convention(thin) (@guaranteed String, @guaranteed Array<Int>) -> @owned E.Result
+    var result = Self.Result(name: "")
+  }
+}
+
 // FIXME: Arguably we shouldn't allow calling a constructor like this, as
 // we usually require the user write an explicit '.init'.
 struct WeirdUMEInitCase {

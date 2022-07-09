@@ -13,7 +13,7 @@ func unsafePointerInitEphemeralConversions() {
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  _ = UnsafePointer(&foo + 1) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to '+'}}
+  _ = UnsafePointer(&foo + 1) // expected-warning {{argument #1 must be a pointer that outlives the call to '+'}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to '+'}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
@@ -57,7 +57,7 @@ func unsafePointerInitEphemeralConversions() {
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutablePointer<Int>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
   // expected-note@-2 {{use the 'withUnsafeMutableBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = UnsafeMutablePointer(&arr + 2) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to '+'}}
+  _ = UnsafeMutablePointer(&arr + 2) // expected-warning {{argument #1 must be a pointer that outlives the call to '+'}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutablePointer<Int>' produces a pointer valid only for the duration of the call to '+'}}
   // expected-note@-2 {{use the 'withUnsafeMutableBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 

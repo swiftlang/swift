@@ -97,3 +97,24 @@ bb2:
   abort_apply %4
   unwind
 }
+
+// CHECK-LABEL: sil @test_yield_and_retain
+// CHECK:   [[S:%[0-9]+]] = alloc_stack $BigStruct
+// CHECK:   copy_addr [take] %0 to [initialization] [[S]]
+// CHECK:   retain_value_addr [[S]]
+// CHECK:   yield [[S]] : $*BigStruct
+// CHECK: // end sil function 'test_yield_and_retain'
+sil @test_yield_and_retain : $@convention(thin) @yield_once (@in_guaranteed BigStruct) -> @yields BigStruct {
+entry(%0 : $*BigStruct):
+  %big = load %0 : $*BigStruct
+  retain_value %big : $BigStruct
+  yield %big : $BigStruct, resume resume, unwind unwind
+
+resume:
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  unwind
+}
+

@@ -20,9 +20,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -82,7 +83,9 @@ namespace {
       IGF.IGM.getSize(Size(index)),               //     [index]
       llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //       .Offset
     };
-    auto slot = IGF.Builder.CreateInBoundsGEP(asTuple, indices);
+    auto slot = IGF.Builder.CreateInBoundsGEP(
+        asTuple->getType()->getScalarType()->getPointerElementType(), asTuple,
+        indices);
 
     return IGF.Builder.CreateLoad(slot, IGF.IGM.getPointerAlignment(),
                                   metadata->getName()
@@ -231,7 +234,23 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+      }
+      if (getFields().empty()) {
+        return IGM.typeLayoutCache.getEmptyEntry();
+      }
+
+      std::vector<TypeLayoutEntry *> fields;
+      for (auto &field : getFields()) {
+        auto fieldTy = field.getType(IGM, T);
+        fields.push_back(
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+      }
+      if (fields.size() == 1) {
+        return fields[0];
+      }
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -260,7 +279,24 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+      }
+      if (getFields().empty()) {
+        return IGM.typeLayoutCache.getEmptyEntry();
+      }
+
+      std::vector<TypeLayoutEntry *> fields;
+      for (auto &field : getFields()) {
+        auto fieldTy = field.getType(IGM, T);
+        fields.push_back(
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+      }
+      if (fields.size() == 1) {
+        return fields[0];
+      }
+
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -329,9 +365,8 @@ namespace {
         return fields[0];
       }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1, false);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
     }
-
 
     llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                          llvm::Value *numEmptyCases,

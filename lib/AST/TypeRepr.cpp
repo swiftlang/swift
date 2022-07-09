@@ -14,10 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
@@ -74,10 +75,60 @@ SourceRange TypeRepr::getSourceRange() const {
   llvm_unreachable("unknown kind!");
 }
 
-/// Standard allocator for TypeReprs.
-void *TypeRepr::operator new(size_t Bytes, const ASTContext &C,
-                             unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
+bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
+  struct Walker : ASTWalker {
+    llvm::function_ref<bool(TypeRepr *)> Pred;
+    bool FoundIt;
+
+    explicit Walker(llvm::function_ref<bool(TypeRepr *)> pred)
+        : Pred(pred), FoundIt(false) {}
+
+    bool walkToTypeReprPre(TypeRepr *ty) override {
+      // Returning false skips any child nodes. If we "found it", we can bail by
+      // returning false repeatedly back up the type tree.
+      return !(FoundIt || (FoundIt = Pred(ty)));
+    }
+  };
+
+  Walker walker(pred);
+  walk(walker);
+  return walker.FoundIt;
+}
+
+// TODO [OPAQUE SUPPORT]: We should probably use something like `Type`'s
+// `RecursiveProperties` to track this instead of computing it.
+bool TypeRepr::hasOpaque() {
+  return isa<NamedOpaqueReturnTypeRepr>(this) ||
+    findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
+}
+
+TypeRepr *TypeRepr::getWithoutParens() const {
+  auto *repr = const_cast<TypeRepr *>(this);
+  while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(repr)) {
+    if (!tupleRepr->isParenType())
+      break;
+    repr = tupleRepr->getElementType(0);
+  }
+  return repr;
+}
+
+CollectedOpaqueReprs TypeRepr::collectOpaqueReturnTypeReprs() {
+  class Walker : public ASTWalker {
+    CollectedOpaqueReprs &Reprs;
+
+  public:
+    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
+
+    bool walkToTypeReprPre(TypeRepr *repr) override {
+      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
+        Reprs.push_back(opaqueRepr);
+      return true;
+    }
+  };
+
+  CollectedOpaqueReprs reprs;
+  walk(Walker(reprs));
+  return reprs;
 }
 
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {
@@ -160,6 +211,8 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@autoclosure") << " ";
   if (hasAttr(TAK_escaping))
     Printer.printSimpleAttr("@escaping") << " ";
+  if (hasAttr(TAK_Sendable))
+    Printer.printSimpleAttr("@Sendable") << " ";
   if (hasAttr(TAK_noDerivative))
     Printer.printSimpleAttr("@noDerivative") << " ";
 
@@ -202,6 +255,8 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
 
   if (hasAttr(TAK_async))
     Printer.printSimpleAttr("@async") << " ";
+  if (hasAttr(TAK_opened))
+    Printer.printSimpleAttr("@opened") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
@@ -454,6 +509,12 @@ void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Constraint, Printer, Opts);
 }
 
+void ExistentialTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
+  Printer.printKeyword("any", Opts, /*Suffix=*/" ");
+  printTypeRepr(Constraint, Printer, Opts);
+}
+
 SourceLoc NamedOpaqueReturnTypeRepr::getStartLocImpl() const {
   return GenericParams->getLAngleLoc();
 }
@@ -476,6 +537,11 @@ void NamedOpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {
   switch (getKind()) {
+#define TYPEREPR(CLASS, PARENT) case TypeReprKind::CLASS:
+#define SPECIFIER_TYPEREPR(CLASS, PARENT)
+#include "swift/AST/TypeReprNodes.def"
+    llvm_unreachable("invalid repr kind");
+    break;
   case TypeReprKind::InOut:
     Printer.printKeyword("inout", Opts, " ");
     break;
@@ -485,8 +551,11 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::Owned:
     Printer.printKeyword("__owned", Opts, " ");
     break;
-  default:
-    llvm_unreachable("unknown specifier type repr");
+  case TypeReprKind::Isolated:
+    Printer.printKeyword("isolated", Opts, " ");
+    break;
+  case TypeReprKind::CompileTimeConst:
+    Printer.printKeyword("_const", Opts, " ");
     break;
   }
   printTypeRepr(Base, Printer, Opts);

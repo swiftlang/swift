@@ -54,16 +54,26 @@ private:
   bool shouldWalkIntoGenericParams() override {
     return SEWalker.shouldWalkIntoGenericParams();
   }
+
+  bool shouldWalkSerializedTopLevelInternalDecls() override {
+    return false;
+  }
+
   bool walkToDeclPre(Decl *D) override;
+  bool walkToDeclPreProper(Decl *D);
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
 
   bool walkToDeclPost(Decl *D) override;
+  bool walkToDeclPostProper(Decl *D);
   Expr *walkToExprPost(Expr *E) override;
   bool walkToTypeReprPost(TypeRepr *T) override;
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override;
   Stmt *walkToStmtPost(Stmt *S) override;
+
+  std::pair<bool, ArgumentList *>
+  walkToArgumentListPre(ArgumentList *ArgList) override;
 
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
   Pattern *walkToPatternPost(Pattern *P) override;
@@ -83,7 +93,7 @@ private:
   bool passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
                                    ReferenceMetaData Data);
 
-  bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
+  bool passCallArgNames(Expr *Fn, ArgumentList *ArgList);
 
   bool shouldIgnore(Decl *D);
 
@@ -115,6 +125,21 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     return isa<PatternBindingDecl>(D);
   }
 
+  SEWalker.beginBalancedASTOrderDeclVisit(D);
+  bool Continue = walkToDeclPreProper(D);
+
+  if (!Continue) {
+    // To satisfy the contract of balanced calls to
+    // begin/endBalancedASTOrderDeclVisit, we must call
+    // endBalancedASTOrderDeclVisit here if walkToDeclPost isn't going to be
+    // called.
+    SEWalker.endBalancedASTOrderDeclVisit(D);
+  }
+
+  return Continue;
+}
+
+bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
   if (!handleCustomAttributes(D)) {
     Cancelled = true;
     return false;
@@ -154,6 +179,21 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
       auto ParamList = getParameterList(VD);
       if (!ReportParamList(ParamList))
         return false;
+    }
+
+    if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
+      // Report a primary associated type as a references to the associated type
+      // declaration.
+      for (auto parsedName : proto->getPrimaryAssociatedTypeNames()) {
+        Identifier name = parsedName.first;
+        SourceLoc loc = parsedName.second;
+        if (auto assocTypeDecl = proto->getAssociatedType(name)) {
+          passReference(assocTypeDecl,
+                        assocTypeDecl->getDeclaredInterfaceType(),
+                        DeclNameLoc(loc),
+                        ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+        }
+      }
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = SourceRange();
@@ -200,6 +240,12 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
 }
 
 bool SemaAnnotator::walkToDeclPost(Decl *D) {
+  bool Continue = walkToDeclPostProper(D);
+  SEWalker.endBalancedASTOrderDeclVisit(D);
+  return Continue;
+}
+
+bool SemaAnnotator::walkToDeclPostProper(Decl *D) {
   if (isDone())
     return false;
 
@@ -262,6 +308,25 @@ static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
   return SemaReferenceKind::DeclRef;
 }
 
+std::pair<bool, ArgumentList *>
+SemaAnnotator::walkToArgumentListPre(ArgumentList *ArgList) {
+  auto doStopTraversal = [&]() -> std::pair<bool, ArgumentList *> {
+    Cancelled = true;
+    return {false, nullptr};
+  };
+
+  // Don't consider the argument labels for an implicit ArgumentList.
+  if (ArgList->isImplicit())
+    return {true, ArgList};
+
+  // FIXME: What about SubscriptExpr and KeyPathExpr arg labels? (SR-15063)
+  if (auto CallE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
+    if (!passCallArgNames(CallE->getFn(), ArgList))
+      return doStopTraversal();
+  }
+  return {true, ArgList};
+}
+
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   assert(E);
 
@@ -273,6 +338,21 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // We are skipping the expression. Call neither walkToExprPr nor
     // walkToExprPost on it
     return { false, E };
+  }
+
+  auto doStopTraversal = [&]() -> std::pair<bool, Expr *> {
+    Cancelled = true;
+    return { false, nullptr };
+  };
+
+  // Skip the synthesized curry thunks and just walk over the unwrapped
+  // expression
+  if (auto *ACE = dyn_cast<AutoClosureExpr>(E)) {
+    if (auto *SubExpr = ACE->getUnwrappedCurryThunkExpr()) {
+      if (!SubExpr->walk(*this))
+        return doStopTraversal();
+      return { false, E };
+    }
   }
 
   if (!SEWalker.walkToExprPre(E)) {
@@ -291,29 +371,8 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return { false, E };
   };
 
-  auto doStopTraversal = [&]() -> std::pair<bool, Expr *> {
-    Cancelled = true;
-    return { false, nullptr };
-  };
-
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
-
-  if (auto *ACE = dyn_cast<AutoClosureExpr>(E)) {
-    if (auto *SubExpr = ACE->getUnwrappedCurryThunkExpr()) {
-      if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
-        if (!passReference(DRE->getDecl(), DRE->getType(),
-                           DRE->getNameLoc(),
-                           ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
-                                             OpAccess)))
-          return doStopTraversal();
-
-        return doSkipChildren();
-      }
-    }
-
-    return { true, E };
-  }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     auto *FD = dyn_cast<FuncDecl>(DRE->getDecl());
@@ -402,7 +461,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         return doStopTraversal();
     }
 
-    if (!SE->getIndex()->walk(*this))
+    if (!SE->getArgs()->walk(*this))
       return doStopTraversal();
 
     if (SubscrD) {
@@ -454,12 +513,6 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
     // We already visited the children.
     return doSkipChildren();
-
-  } else if (auto TupleE = dyn_cast<TupleExpr>(E)) {
-    if (auto CallE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
-      if (!passCallArgNames(CallE->getFn(), TupleE))
-        return doStopTraversal();
-    }
   } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
     llvm::SaveAndRestore<Optional<AccessKind>>
       C(this->OpAccess, AccessKind::ReadWrite);
@@ -570,6 +623,12 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   if (isDone())
     return false;
 
+  bool Continue = SEWalker.walkToTypeReprPre(T);
+  if (!Continue) {
+    Cancelled = true;
+    return false;
+  }
+
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
       if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
@@ -581,11 +640,19 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
                            ReferenceMetaData(SemaReferenceKind::TypeRef, None));
     }
   }
+
   return true;
 }
 
 bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
-  return !isDone();
+  if (isDone()) {
+    return false;
+  }
+
+  bool Continue = SEWalker.walkToTypeReprPost(T);
+  if (!Continue)
+    Cancelled = true;
+  return Continue;
 }
 
 std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
@@ -648,15 +715,15 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
     }
     if (auto *SemaInit = customAttr->getSemanticInit()) {
       if (!SemaInit->isImplicit()) {
-        assert(customAttr->getArg());
+        assert(customAttr->hasArgs());
         if (!SemaInit->walk(*this))
           return false;
         // Don't walk this again via the associated PatternBindingDecl's
         // initializer
         ExprsToSkip.insert(SemaInit);
       }
-    } else if (auto *Arg = customAttr->getArg()) {
-      if (!Arg->walk(*this))
+    } else if (auto *Args = customAttr->getArgs()) {
+      if (!Args->walk(*this))
         return false;
     }
   }
@@ -790,19 +857,17 @@ bool SemaAnnotator::passReference(ModuleEntity Mod,
   return Continue;
 }
 
-bool SemaAnnotator::passCallArgNames(Expr *Fn, TupleExpr *TupleE) {
+bool SemaAnnotator::passCallArgNames(Expr *Fn, ArgumentList *ArgList) {
   ValueDecl *D = extractDecl(Fn);
   if (!D)
     return true; // continue.
 
-  ArrayRef<Identifier> ArgNames = TupleE->getElementNames();
-  ArrayRef<SourceLoc> ArgLocs = TupleE->getElementNameLocs();
-  for (auto i : indices(ArgNames)) {
-    Identifier Name = ArgNames[i];
+  for (auto Arg : *ArgList) {
+    Identifier Name = Arg.getLabel();
     if (Name.empty())
       continue;
 
-    SourceLoc Loc = ArgLocs[i];
+    SourceLoc Loc = Arg.getLabelLoc();
     if (Loc.isInvalid())
       continue;
 

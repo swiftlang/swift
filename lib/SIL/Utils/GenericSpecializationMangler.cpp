@@ -65,7 +65,9 @@ std::string SpecializationMangler::finalize() {
   for (NodePointer FuncChild : *FuncTopLevel) {
     TopLevel->addChild(FuncChild, D);
   }
-  std::string mangledName = Demangle::mangleNode(TopLevel);
+  auto mangling = Demangle::mangleNode(TopLevel);
+  assert(mangling.isSuccess());
+  std::string mangledName = mangling.result();
   verify(mangledName);
   return mangledName;
 }
@@ -79,7 +81,7 @@ appendSubstitutions(GenericSignature sig, SubstitutionMap subs) {
   bool First = true;
   sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
     if (Canonical) {
-      appendType(Type(ParamType).subst(subs)->getCanonicalType());
+      appendType(Type(ParamType).subst(subs)->getCanonicalType(), nullptr);
       appendListSeparator(First);
     }
   });
@@ -103,13 +105,18 @@ mangleNotReabstracted(SubstitutionMap subs) {
 }
                                   
 std::string GenericSpecializationMangler::
-mangleReabstracted(SubstitutionMap subs, bool alternativeMangling) {
+mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
+                   bool metatyeParamsRemoved) {
   beginMangling();
   appendSubstitutions(getGenericSignature(), subs);
   
   // See ReabstractionInfo::hasConvertedResilientParams for why and when to use
   // the alternative mangling.
-  appendSpecializationOperator(alternativeMangling ? "TB" : "Tg");
+  if (metatyeParamsRemoved) {
+    appendSpecializationOperator(alternativeMangling ? "TBm" : "Tgm");
+  } else {
+    appendSpecializationOperator(alternativeMangling ? "TB" : "Tg");
+  }
   return finalize();
 }
 
@@ -127,7 +134,7 @@ getSubstitutionMapForPrespecialization(GenericSignature genericSig,
                                        GenericSignature specSig) {
   auto CalleeGenericSig = genericSig;
   auto SpecializedGenericSig = specSig;
-  auto SpecializedGenericEnv = specSig->getGenericEnvironment();
+  auto SpecializedGenericEnv = specSig.getGenericEnvironment();
 
   auto CalleeInterfaceToSpecializedInterfaceMap = SubstitutionMap::get(
       CalleeGenericSig,

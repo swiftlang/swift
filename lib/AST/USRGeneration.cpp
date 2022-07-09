@@ -19,6 +19,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Demangling/Demangler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -255,6 +256,18 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
 }
 
+std::string ide::demangleUSR(StringRef mangled) {
+  if (mangled.startswith(getUSRSpacePrefix())) {
+    mangled = mangled.substr(getUSRSpacePrefix().size());
+  }
+  SmallString<128> buffer;
+  buffer += "$s";
+  buffer += mangled;
+  mangled = buffer.str();
+  Demangler Dem;
+  return nodeToString(Dem.demangleSymbol(mangled));
+}
+
 std::string
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
@@ -267,7 +280,7 @@ swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
 
 bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {
   if (auto *D = Mod.getAsSwiftModule()) {
-    StringRef moduleName = D->getName().str();
+    StringRef moduleName = D->getRealName().str();
     return clang::index::generateFullUSRForTopLevelModuleName(moduleName, OS);
   } else if (auto ClangM = Mod.getAsClangModule()) {
     return clang::index::generateFullUSRForModule(ClangM, OS);

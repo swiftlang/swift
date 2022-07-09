@@ -14,10 +14,10 @@
 /// information.
 ///
 /// This maps each access of identified storage onto a disjoint access
-/// location. Local accesses (Box and Stack) already have unique AccessedStorage
+/// location. Local accesses (Box and Stack) already have unique AccessStorage
 /// and should be removed by an earlier function pass if possible. This pass
 /// handles Class and Global access by partitioning their non-unique
-/// AccessedStorage objects into unique DisjointAccessLocations. These disjoint
+/// AccessStorage objects into unique DisjointAccessLocations. These disjoint
 /// access locations may be accessed across multiple functions, so a module pass
 /// is required to identify and optimize them.
 ///
@@ -26,9 +26,9 @@
 /// accesses are ignored because they are considered an access in the caller,
 /// while Class and Global access always occurs in the callee. Note that a SIL
 /// function argument value may be the source of a either a Class-kind
-/// AccessedStorage or an Argument-kind AccessedStorage. When the argument is
+/// AccessStorage or an Argument-kind AccessStorage. When the argument is
 /// used to access a class, it will always be identified as a Class-kind
-/// AccessedStorage even though its source is an argument.
+/// AccessStorage even though its source is an argument.
 ///
 /// For each function, discover the disjointly accessed locations. Each location
 /// is optimistically mapped to a `noNestedConflict` flag (if a location has not
@@ -49,7 +49,7 @@
 /// Note: This optimization must be aware of all possible access to a Class or
 /// Global address. This includes unpaired access instructions and keypath
 /// instructions. Ignoring any access pattern would weaken enforcement. For
-/// example, AccessedStorageAnalysis cannot be used here because that analysis
+/// example, AccessStorageAnalysis cannot be used here because that analysis
 /// may conservatively summarize some functions.
 //===----------------------------------------------------------------------===//
 
@@ -66,6 +66,9 @@ using namespace swift;
 using llvm::DenseMap;
 using llvm::SmallDenseSet;
 
+using DisjointAccessLocationKey =
+    llvm::PointerUnion<const VarDecl *, const SILGlobalVariable *>;
+
 // Get the VarDecl that represents the DisjointAccessLocation for the given
 // storage and access base. Returns nullptr for any storage that can't be
 // partitioned into a disjoint location.
@@ -73,26 +76,44 @@ using llvm::SmallDenseSet;
 // Global storage is expected to be disjoint because identifyFormalAccess may
 // only return Unidentified storage for a global variable access if the global
 // is defined in a different module.
-const VarDecl *
-getDisjointAccessLocation(AccessedStorageWithBase storageAndBase) {
+static DisjointAccessLocationKey
+getDisjointAccessLocation(AccessStorageWithBase storageAndBase) {
   auto storage = storageAndBase.storage;
   switch (storage.getKind()) {
-  case AccessedStorage::Global:
-  case AccessedStorage::Class:
-    // Class and Globals are always a VarDecl, but the global decl may have a
-    // null value for global_addr -> phi.
-    return cast_or_null<VarDecl>(storage.getDecl(storageAndBase.base));
-  case AccessedStorage::Box:
-  case AccessedStorage::Stack:
-  case AccessedStorage::Tail:
-  case AccessedStorage::Argument:
-  case AccessedStorage::Yield:
-  case AccessedStorage::Unidentified:
+  case AccessStorage::Class: {
+    auto *varDecl = cast<VarDecl>(storageAndBase.getDecl());
+    // For class properties, a VarDecl can always be derived from AccessBase.
+    assert(varDecl && "no VarDecl for class property");
+    return varDecl;
+  }
+  case AccessStorage::Global:
+    return storageAndBase.getAccessBase().getGlobal();
+  case AccessStorage::Box:
+  case AccessStorage::Stack:
+  case AccessStorage::Tail:
+  case AccessStorage::Argument:
+  case AccessStorage::Yield:
+  case AccessStorage::Unidentified:
     return nullptr;
-  case AccessedStorage::Nested:
+  case AccessStorage::Nested:
     llvm_unreachable("Unexpected Nested access.");
   }
   llvm_unreachable("unhandled kind");
+}
+
+static bool isVisibleExternally(DisjointAccessLocationKey key, SILModule *mod) {
+  if (auto *decl = key.dyn_cast<const VarDecl *>())
+    return mod->isVisibleExternally(decl);
+
+  auto *global = key.get<const SILGlobalVariable *>();
+  return isPossiblyUsedExternally(global->getLinkage(), mod->isWholeModule());
+}
+
+static StringRef getName(DisjointAccessLocationKey key) {
+  if (auto *decl = key.dyn_cast<const VarDecl *>())
+    return decl->getNameStr();
+
+  return key.get<const SILGlobalVariable *>()->getName();
 }
 
 namespace {
@@ -128,13 +149,14 @@ class GlobalAccessRemoval {
   /// Information for an access location that, if it is valid, must be disjoint
   /// from all other access locations.
   struct DisjointAccessLocationInfo {
-    AccessedStorage::Kind accessKind = AccessedStorage::Unidentified;
+    AccessStorage::Kind accessKind = AccessStorage::Unidentified;
     // False if any nested conflict has been seen at this location.
     bool noNestedConflict = true;
     BeginAccessSet beginAccessSet;
   };
 
-  DenseMap<const VarDecl *, DisjointAccessLocationInfo> disjointAccessMap;
+  DenseMap<DisjointAccessLocationKey, DisjointAccessLocationInfo>
+      disjointAccessMap;
 
 public:
   GlobalAccessRemoval(SILModule &module) : module(module) {}
@@ -142,10 +164,9 @@ public:
   void perform();
 
 protected:
-  void visitInstruction(SILInstruction *I);
-  void recordAccess(SILInstruction *beginAccess, const VarDecl *decl,
-                    AccessedStorage::Kind storageKind,
-                    bool hasNoNestedConflict);
+  bool visitInstruction(SILInstruction *I);
+  void recordAccess(SILInstruction *beginAccess, DisjointAccessLocationKey key,
+                    AccessStorage::Kind storageKind, bool hasNoNestedConflict);
   void removeNonreentrantAccess();
 };
 } // namespace
@@ -159,27 +180,33 @@ void GlobalAccessRemoval::perform() {
       continue;
 
     for (auto &BB : F) {
-      for (auto &I : BB)
-        visitInstruction(&I);
+      for (auto &I : BB) {
+        if (!visitInstruction(&I))
+          return;
+      }
     }
   }
   removeNonreentrantAccess();
 }
 
-void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
+bool GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(I)) {
-    auto storageAndBase = AccessedStorageWithBase::compute(BAI->getSource());
-    const VarDecl *decl = getDisjointAccessLocation(storageAndBase);
-    recordAccess(BAI, decl, storageAndBase.storage.getKind(),
+    auto storageAndBase = AccessStorageWithBase::compute(BAI->getSource());
+    if (!storageAndBase.base)
+      return false;
+    auto key = getDisjointAccessLocation(storageAndBase);
+    recordAccess(BAI, key, storageAndBase.storage.getKind(),
                  BAI->hasNoNestedConflict());
-    return;
+    return true;
   }
   if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I)) {
-    auto storageAndBase = AccessedStorageWithBase::compute(BUAI->getSource());
-    const VarDecl *decl = getDisjointAccessLocation(storageAndBase);
-    recordAccess(BUAI, decl, storageAndBase.storage.getKind(),
+    auto storageAndBase = AccessStorageWithBase::compute(BUAI->getSource());
+    if (!storageAndBase.base)
+      return false;
+    auto key = getDisjointAccessLocation(storageAndBase);
+    recordAccess(BUAI, key, storageAndBase.storage.getKind(),
                  BUAI->hasNoNestedConflict());
-    return;
+    return true;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(I)) {
     for (const KeyPathPatternComponent &component :
@@ -187,7 +214,7 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
       switch (component.getKind()) {
       case KeyPathPatternComponent::Kind::StoredProperty:
         recordAccess(KPI, component.getStoredPropertyDecl(),
-                     AccessedStorage::Class, /*hasNoNestedConflict=*/false);
+                     AccessStorage::Class, /*hasNoNestedConflict=*/false);
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
       case KeyPathPatternComponent::Kind::SettableProperty:
@@ -198,8 +225,8 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
         break;
       }
     }
-    return;
   }
+  return true;
 }
 
 // Record an access in the disjointAccessMap.
@@ -213,21 +240,21 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
 // key_path instruction somewhere else in the same module (or it must be dead
 // code, or only access public properties).
 //
-// `decl` may be nullptr if the declaration can't be determined from the
+// `key` may be nullptr if the variable's identity cannot be determined from the
 // access. This is only legal when the access is known to be a local access, not
 // a class property or global.
 void GlobalAccessRemoval::recordAccess(SILInstruction *beginAccess,
-                                       const VarDecl *decl,
-                                       AccessedStorage::Kind storageKind,
+                                       DisjointAccessLocationKey key,
+                                       AccessStorage::Kind storageKind,
                                        bool hasNoNestedConflict) {
-  if (!decl || module.isVisibleExternally(decl))
+  if (key.isNull() || isVisibleExternally(key, &module))
     return;
 
   LLVM_DEBUG(if (!hasNoNestedConflict) llvm::dbgs()
-             << "Nested conflict on " << decl->getName() << " at"
-             << *beginAccess << "\n");
+             << "Nested conflict on " << getName(key) << " at" << *beginAccess
+             << "\n");
 
-  auto accessLocIter = disjointAccessMap.find(decl);
+  auto accessLocIter = disjointAccessMap.find(key);
   if (accessLocIter != disjointAccessMap.end()) {
     // Add this begin_access to an existing DisjointAccessLocationInfo.
     DisjointAccessLocationInfo &info = accessLocIter->second;
@@ -245,22 +272,21 @@ void GlobalAccessRemoval::recordAccess(SILInstruction *beginAccess,
   info.noNestedConflict = hasNoNestedConflict;
   if (auto *BA = dyn_cast<BeginAccessInst>(beginAccess))
     info.beginAccessSet.insert(BA);
-  disjointAccessMap.insert(std::make_pair(decl, info));
+  disjointAccessMap.insert(std::make_pair(key, info));
 }
 
 // For each unique storage within this function that is never reentrantly
 // accessed, promote all access checks for that storage to static enforcement.
 void GlobalAccessRemoval::removeNonreentrantAccess() {
-  for (auto &declAndInfo : disjointAccessMap) {
-    const DisjointAccessLocationInfo &info = declAndInfo.second;
+  for (auto &keyAndInfo : disjointAccessMap) {
+    const DisjointAccessLocationInfo &info = keyAndInfo.second;
     if (!info.noNestedConflict)
       continue;
 
-    const VarDecl *decl = declAndInfo.first;
-    LLVM_DEBUG(llvm::dbgs() << "Eliminating all formal access on "
-                            << decl->getName() << "\n");
-    assert(!module.isVisibleExternally(decl));
-    (void)decl;
+    auto key = keyAndInfo.first;
+    LLVM_DEBUG(llvm::dbgs()
+               << "Eliminating all formal access on " << getName(key) << "\n");
+    assert(!isVisibleExternally(key, &module));
 
     // Non-deterministic iteration, only used to set a flag.
     for (BeginAccessInst *beginAccess : info.beginAccessSet) {

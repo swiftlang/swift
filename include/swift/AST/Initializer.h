@@ -209,15 +209,16 @@ public:
   };
 
 private:
-  ParamDecl *param;
+  VarDecl *wrappedVar;
   Kind kind;
 
 public:
-  explicit PropertyWrapperInitializer(DeclContext *parent, ParamDecl *param, Kind kind)
+  explicit PropertyWrapperInitializer(DeclContext *parent, VarDecl *wrappedVar,
+                                      Kind kind)
       : Initializer(InitializerKind::PropertyWrapper, parent),
-        param(param), kind(kind) {}
+        wrappedVar(wrappedVar), kind(kind) {}
 
-  ParamDecl *getParam() const { return param; }
+  VarDecl *getWrappedVar() const { return wrappedVar; }
 
   Kind getKind() const { return kind; }
 

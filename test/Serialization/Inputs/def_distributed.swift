@@ -1,8 +1,10 @@
-import _Distributed
+import Distributed
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-distributed actor DA {
-    public distributed func doSomethingDistributed() async -> Int {
-        return 0
-    }
+typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
+
+@available(SwiftStdlib 5.6, *)
+public distributed actor DA {
+  public distributed func doSomethingDistributed(param: String) async -> Int {
+    return 0
+  }
 }

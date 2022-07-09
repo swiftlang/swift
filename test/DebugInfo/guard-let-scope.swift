@@ -3,9 +3,11 @@
 func f(c: AnyObject?) {
   let x = c
   // CHECK: sil_scope [[S1:[0-9]+]] { {{.*}} parent @{{.*}}1f
-  // CHECK: sil_scope [[S2:[0-9]+]] { loc "{{.*}}":[[@LINE+3]]:3 parent [[S1]] }
-  // CHECK: debug_value %{{.*}} : $Optional<AnyObject>, let, name "x"{{.*}} scope [[S1]]
-  // CHECK: debug_value %{{.*}} : $AnyObject, let, name "x", {{.*}} scope [[S2]]
+  // CHECK: sil_scope [[S2:[0-9]+]] { {{.*}} parent [[S1]] }
+  // CHECK: sil_scope [[S3:[0-9]+]] { {{.*}} parent [[S2]] }
+  // CHECK: sil_scope [[S4:[0-9]+]] { loc "{{.*}}":[[@LINE+3]]:17 parent [[S3]] }
+  // CHECK: debug_value %{{.*}} : $Optional<AnyObject>, let, name "x"{{.*}} scope [[S2]]
+  // CHECK: debug_value %{{.*}} : $AnyObject, let, name "x", {{.*}} scope [[S4]]
   guard let x = x else {
     fatalError(".")
   }

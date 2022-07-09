@@ -21,7 +21,7 @@
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/SwiftObjectHeader.h"
+#include "swift/Basic/SwiftObjectHeader.h"
 #include <type_traits>
 
 namespace swift {
@@ -116,8 +116,8 @@ public:
 ///   ValueBase subobject, the cast will yield a corrupted value.
 ///   Always use the LLVM casts (cast<>, dyn_cast<>, etc.) instead.
 class alignas(8) SILNode :
-  // SILNode contains a swift object header for bridging with libswift.
-  // For details see libswift/README.md.
+  // SILNode contains a swift object header for bridging with Swift.
+  // For details see SwiftCompilerSources/README.md.
   public SwiftObjectHeader {
 public:
   enum { NumVOKindBits = 3 };
@@ -218,10 +218,6 @@ protected:
     Length : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeallocRefInst, DeallocationInst, 1,
-    OnStack : 1
-  );
-
   // Ensure that AllocBoxInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(AllocBoxInst, AllocationInst);
   // Ensure that AllocExistentialBoxInst bitfield does not overflow.
@@ -237,8 +233,6 @@ protected:
     NumTailTypes : 32-1-1-NumAllocationInstBits
   );
   static_assert(32-1-1-NumAllocationInstBits >= 14, "Reconsider bitfield use?");
-
-  UIWTDOB_BITFIELD_EMPTY(AllocValueBufferInst, AllocationInst);
 
   // TODO: Sort the following in SILNodes.def order
 
@@ -362,20 +356,47 @@ protected:
     FieldIndex : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(EnumInst,
+                                      SingleValueInstruction, 32,
+    : NumPadBits,
+    CaseIndex : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(UncheckedEnumDataInst,
+                                      SingleValueInstruction, 32,
+    : NumPadBits,
+    CaseIndex : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(InjectEnumAddrInst,
+                                      SILInstruction, 32,
+    : NumPadBits,
+    CaseIndex : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(InitEnumDataAddrInst,
+                                      SingleValueInstruction, 32,
+    : NumPadBits,
+    CaseIndex : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(UncheckedTakeEnumDataAddrInst,
+                                      SingleValueInstruction, 32,
+    : NumPadBits,
+    CaseIndex : 32
+  );
+
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
   // Ensure that WitnessMethodInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(WitnessMethodInst, MethodInst);
   UIWTDOB_BITFIELD_EMPTY(ObjCMethodInst, MethodInst);
 
   SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
-  SWIFT_INLINE_BITFIELD(PointerToAddressInst, ConversionInst, 1+1,
-    IsStrict : 1,
-    IsInvariant : 1
-  );
+  SWIFT_INLINE_BITFIELD(PointerToAddressInst, ConversionInst, 8 + 1 + 1,
+                        Alignment : 8, IsStrict : 1, IsInvariant : 1);
 
   UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
                    WithoutActuallyEscaping : 1);
-  UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UncheckedRefCastInst, ConversionInst);
@@ -383,7 +404,6 @@ protected:
   UIWTDOB_BITFIELD_EMPTY(UncheckedTrivialBitCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UncheckedBitwiseCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(ThinToThickFunctionInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastValueInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(InitExistentialAddrInst, SingleValueInstruction);
   UIWTDOB_BITFIELD_EMPTY(InitExistentialValueInst, SingleValueInstruction);
   UIWTDOB_BITFIELD_EMPTY(InitExistentialRefInst, SingleValueInstruction);
@@ -391,7 +411,6 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(TermInst, SILInstruction);
   UIWTDOB_BITFIELD_EMPTY(CheckedCastBranchInst, SingleValueInstruction);
-  UIWTDOB_BITFIELD_EMPTY(CheckedCastValueBranchInst, SingleValueInstruction);
 
   // Ensure that BranchInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(BranchInst, TermInst);

@@ -184,9 +184,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   if (auto existingThunk = M.lookUpFunction(name))
     return SILVTable::Entry(base, existingThunk, implKind, false);
 
-  GenericEnvironment *genericEnv = nullptr;
-  if (auto genericSig = overrideInfo.FormalType.getOptGenericSignature())
-    genericEnv = genericSig->getGenericEnvironment();
+  auto *genericEnv = overrideInfo.FormalType.getOptGenericSignature().getGenericEnvironment();
 
   // Emit the thunk.
   SILLocation loc(derivedDecl);
@@ -195,7 +193,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       SILLinkage::Private, name, overrideInfo.SILFnType,
       genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      ProfileCounter(), IsThunk);
+      IsNotDistributed, ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
@@ -417,8 +415,19 @@ public:
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(reqDecl)) {
+        auto newDecl = requirementRef.withDecl(witness.getDecl());
+        // Only import C++ methods as foreign. If the following
+        // Objective-C function is imported as foreign:
+        //   () -> String
+        // It will be imported as the following type:
+        //   () -> NSString
+        // But the first is correct, so make sure we don't mark this witness
+        // as foreign.
+        if (dyn_cast_or_null<clang::CXXMethodDecl>(
+                witness.getDecl()->getClangDecl()))
+          newDecl = newDecl.asForeign();
         return addMethodImplementation(
-            requirementRef, requirementRef.withDecl(witness.getDecl()),
+            requirementRef, getWitnessRef(newDecl, witness),
             witness);
       }
 
@@ -446,7 +455,8 @@ public:
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
 
     return addMethodImplementation(
-        requirementRef, requirementRef.withDecl(witnessAccessor), witness);
+        requirementRef, getWitnessRef(requirementRef, witnessAccessor),
+        witness);
   }
 
 private:
@@ -459,6 +469,22 @@ private:
       isFreeFunctionWitness(requirementRef.getDecl(), witnessRef.getDecl());
     asDerived().addMethodImplementation(requirementRef, witnessRef,
                                         isFree, witness);
+  }
+
+  SILDeclRef getWitnessRef(SILDeclRef requirementRef, Witness witness) {
+    auto witnessRef = requirementRef.withDecl(witness.getDecl());
+    // If the requirement/witness is a derivative function, we need to
+    // substitute the witness's derivative generic signature in its derivative
+    // function identifier.
+    if (requirementRef.isAutoDiffDerivativeFunction()) {
+      auto *reqrRerivativeId = requirementRef.getDerivativeFunctionIdentifier();
+      auto *witnessDerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+          reqrRerivativeId->getKind(), reqrRerivativeId->getParameterIndices(),
+          witness.getDerivativeGenericSignature(), witnessRef.getASTContext());
+      witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
+    }
+
+    return witnessRef;
   }
 };
 
@@ -508,7 +534,7 @@ public:
 
     // Check if we already have a declaration or definition for this witness
     // table.
-    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false)) {
+    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance)) {
       // If we have a definition already, just return it.
       //
       // FIXME: I am not sure if this is possible, if it is not change this to an
@@ -669,6 +695,29 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto requirementInfo =
       Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
+  auto shouldUseDistributedThunkWitness =
+      // always use a distributed thunk for distributed requirements:
+      requirement.isDistributedThunk() ||
+      // for non-distributed requirements, which are however async/throws,
+      // and have a proper witness (passed typechecking), we can still invoke
+      // them on the distributed actor; but must do so through the distributed
+      // thunk as the call "through an existential" we never statically know
+      // if the actor is local or not.
+      (requirement.hasDecl() && requirement.getFuncDecl() && requirement.hasAsync() &&
+       !requirement.getFuncDecl()->isDistributed() &&
+       witnessRef.hasDecl() && witnessRef.getFuncDecl() &&
+       witnessRef.getFuncDecl()->isDistributed());
+  // We only need to use thunks when we go cross-actor:
+  shouldUseDistributedThunkWitness = shouldUseDistributedThunkWitness &&
+                                     getActorIsolation(requirement.getDecl()) !=
+                                         getActorIsolation(witness.getDecl());
+  if (shouldUseDistributedThunkWitness) {
+    auto thunkDeclRef = SILDeclRef(
+        witnessRef.getFuncDecl()->getDistributedThunk(),
+        SILDeclRef::Kind::Func);
+    witnessRef = thunkDeclRef.asDistributed();
+  }
+
   // Work out the lowered function type of the SIL witness thunk.
   auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
 
@@ -756,6 +805,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
                  derivativeId->getParameterIndices()->getString();
   }
 
+  if (requirement.isDistributedThunk()) {
+    nameBuffer = nameBuffer + "TE";
+  }
+
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
   // calls removed if possible, e.g. when we're able to devirtualize
@@ -770,8 +823,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
       SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent, isSerialized,
-      IsNotDynamic, ProfileCounter(), IsThunk, SubclassScope::NotApplicable,
-      InlineStrategy);
+      IsNotDynamic, IsNotDistributed, ProfileCounter(), IsThunk,
+      SubclassScope::NotApplicable, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -787,7 +840,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubMap, witnessRef,
-                          witnessSubs, isFree, /*isSelfConformance*/ false);
+                          witnessSubs, isFree, /*isSelfConformance*/ false,
+                          witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
   return f;
@@ -817,7 +871,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                           ProtocolConformanceRef(conformance));
 
   // Open the protocol type.
-  auto openedType = OpenedArchetypeType::get(protocolType);
+  auto openedType = OpenedArchetypeType::get(
+      protocol->getExistentialType()->getCanonicalType(), GenericSignature());
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
@@ -842,7 +897,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   auto *f = builder.createFunction(
       linkage, name, witnessSILFnType, genericEnv,
       SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
-      IsSerialized, IsNotDynamic, ProfileCounter(), IsThunk,
+      IsSerialized, IsNotDynamic, IsNotDistributed, ProfileCounter(), IsThunk,
       SubclassScope::NotApplicable, InlineDefault);
 
   f->setDebugScope(new (SGM.M)
@@ -858,7 +913,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement,
-                          witnessSubs, isFree, /*isSelfConformance*/ true);
+                          witnessSubs, isFree, /*isSelfConformance*/ true,
+                          None);
 
   SGM.emitLazyConformancesForFunction(f);
 
@@ -1102,7 +1158,7 @@ public:
       return;
 
     // Emit any default argument generators.
-    SGM.emitDefaultArgGenerators(EED, EED->getParameterList());
+    SGM.emitArgumentGenerators(EED, EED->getParameterList());
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
@@ -1133,11 +1189,17 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
+    if (auto *thunk = vd->getDistributedThunk()) {
+      auto thunkRef = SILDeclRef(thunk).asDistributed();
+      SGM.emitFunctionDefinition(thunkRef,
+                                 SGM.getFunction(thunkRef, ForDefinition));
+    }
+
     visitAbstractStorageDecl(vd);
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    SGM.emitArgumentGenerators(sd, sd->getIndices());
     visitAbstractStorageDecl(sd);
   }
 
@@ -1259,11 +1321,18 @@ public:
         return;
       }
     }
+
+    if (auto *thunk = vd->getDistributedThunk()) {
+      auto thunkRef = SILDeclRef(thunk).asDistributed();
+      SGM.emitFunctionDefinition(thunkRef,
+                                 SGM.getFunction(thunkRef, ForDefinition));
+    }
+
     visitAbstractStorageDecl(vd);
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    SGM.emitArgumentGenerators(sd, sd->getIndices());
     visitAbstractStorageDecl(sd);
   }
 

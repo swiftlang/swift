@@ -12,6 +12,7 @@ func test() {
   _ = swiftFunc()
 }
 
+// REQUIRES: radar82364901
 // UNSUPPORTED: OS=windows-msvc
 
 // -----------------------------------------------------------------------------
@@ -60,7 +61,7 @@ func test() {
 // CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperExplicitFunc' in scope",
 
 // -----------------------------------------------------------------------------
-// Test that modifications for frameworks in '-F' are immidiately propagated
+// Test that modifications for frameworks in '-F' are immediately propagated
 // while modifications for frameworks in '-Fsystem' are not.
 
 // RUN: %empty-directory(%t/ModuleCache)

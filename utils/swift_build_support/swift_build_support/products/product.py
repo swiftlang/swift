@@ -65,7 +65,7 @@ class Product(object):
     def is_before_build_script_impl_product(cls):
         """is_before_build_script_impl_product -> bool
 
-        Whether this product is build before any build-script-impl products.
+        Whether this product is built before any build-script-impl products.
         Such products must be non-build_script_impl products.
         Because such products are built ahead of the compiler, they are
         built using the host toolchain.
@@ -195,17 +195,22 @@ class Product(object):
         """toolchain_path() -> string
 
         Returns the path to the toolchain that is being created as part of this
-        build, or to a native prebuilt toolchain that was passed in.
+        build
         """
-        if self.args.native_swift_tools_path is not None:
-            return os.path.split(self.args.native_swift_tools_path)[0]
-
         install_destdir = self.args.install_destdir
         if self.args.cross_compile_hosts:
-            build_root = os.path.dirname(self.build_dir)
-            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
+            if self.is_darwin_host(host_target):
+                install_destdir = self.host_install_destdir(host_target)
+            else:
+                install_destdir = os.path.join(install_destdir, self.args.host_target)
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
+
+    def native_toolchain_path(self, host_target):
+        if self.args.native_swift_tools_path is not None:
+            return os.path.split(self.args.native_swift_tools_path)[0]
+        else:
+            return self.install_toolchain_path(host_target)
 
     def is_darwin_host(self, host_target):
         return host_target.startswith("macosx") or \
@@ -224,9 +229,11 @@ class Product(object):
                 # If this is one of the hosts we should lipo,
                 # install in to a temporary subdirectory.
                 return '%s/intermediate-install/%s' % \
-                    (self.args.install_destdir, host_target)
-            elif host_target == "merged-hosts":
-                # This assumes that all hosts are merged to the lipo.
+                    (os.path.dirname(self.build_dir), host_target)
+            elif host_target == "merged-hosts" or \
+                    not self.args.cross_compile_append_host_target_to_destdir:
+                # This assumes that all hosts are merged to the lipo, or the build
+                # was told not to append anything.
                 return self.args.install_destdir
             else:
                 return '%s/%s' % (self.args.install_destdir, host_target)
@@ -236,6 +243,9 @@ class Product(object):
     def is_cross_compile_target(self, host_target):
         return self.args.cross_compile_hosts and \
             host_target in self.args.cross_compile_hosts
+
+    def has_cross_compile_hosts(self):
+        return self.args.cross_compile_hosts
 
     def generate_darwin_toolchain_file(self, platform, arch):
         shell.makedirs(self.build_dir)
@@ -280,6 +290,71 @@ class Product(object):
             toolchain_args['CMAKE_CXX_COMPILER_TARGET'] = target
         # Swift always supports cross compiling.
         toolchain_args['CMAKE_Swift_COMPILER_TARGET'] = target
+
+        # Sort by the key so that we always produce the same toolchain file
+        data = sorted(toolchain_args.items(), key=lambda x: x[0])
+        if not self.args.dry_run:
+            with open(toolchain_file, 'w') as f:
+                f.writelines("set({} {})\n".format(k, v) for k, v in data)
+        else:
+            print("DRY_RUN! Writing Toolchain file to path: {}".format(toolchain_file))
+
+        return toolchain_file
+
+    def get_linux_abi(self, arch):
+        # Map tuples of (platform, arch) to ABI
+        #
+        # E.x.: Hard ABI or Soft ABI for Linux map to gnueabihf
+        arch_platform_to_abi = {
+            # For now always map to hard float ABI.
+            'armv7': ('arm', 'gnueabihf')
+        }
+
+        # Default is just arch, gnu
+        sysroot_arch, abi = arch_platform_to_abi.get(arch, (arch, 'gnu'))
+        return sysroot_arch, abi
+
+    def get_linux_sysroot(self, platform, arch):
+        if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
+            return None
+        sysroot_arch, abi = self.get_linux_abi(arch)
+        # $ARCH-$PLATFORM-$ABI
+        # E.x.: aarch64-linux-gnu
+        sysroot_dirname = '{}-{}-{}'.format(sysroot_arch, platform, abi)
+        return os.path.join(os.sep, 'usr', sysroot_dirname)
+
+    def get_linux_target(self, platform, arch):
+        sysroot_arch, abi = self.get_linux_abi(arch)
+        return '{}-unknown-linux-{}'.format(sysroot_arch, abi)
+
+    def generate_linux_toolchain_file(self, platform, arch):
+        shell.makedirs(self.build_dir)
+        toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
+
+        toolchain_args = {}
+
+        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
+        toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
+
+        # We only set the actual sysroot if we are actually cross
+        # compiling. This is important since otherwise cmake seems to change the
+        # RUNPATH to be a relative rather than an absolute path, breaking
+        # certain cmark tests (and maybe others).
+        maybe_sysroot = self.get_linux_sysroot(platform, arch)
+        if maybe_sysroot is not None:
+            toolchain_args['CMAKE_SYSROOT'] = maybe_sysroot
+
+        target = self.get_linux_target(platform, arch)
+        if self.toolchain.cc.endswith('clang'):
+            toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
+        if self.toolchain.cxx.endswith('clang++'):
+            toolchain_args['CMAKE_CXX_COMPILER_TARGET'] = target
+        # Swift always supports cross compiling.
+        toolchain_args['CMAKE_Swift_COMPILER_TARGET'] = target
+        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_PROGRAM'] = 'NEVER'
+        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_LIBRARY'] = 'ONLY'
+        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_INCLUDE'] = 'ONLY'
+        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_PACKAGE'] = 'ONLY'
 
         # Sort by the key so that we always produce the same toolchain file
         data = sorted(toolchain_args.items(), key=lambda x: x[0])

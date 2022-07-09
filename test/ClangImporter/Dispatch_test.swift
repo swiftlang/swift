@@ -17,7 +17,7 @@ func test2(_ queue: DispatchQueue) {
 
   // Make sure the dispatch types are actually distinct types!
   let _ = queue as DispatchSource // expected-error {{cannot convert value of type 'DispatchQueue' to type 'DispatchSource' in coercion}}
-  let _ = base as DispatchSource // expected-error {{'NSObjectProtocol' is not convertible to 'DispatchSource'}}
+  let _ = base as DispatchSource // expected-error {{'any NSObjectProtocol' is not convertible to 'DispatchSource'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
 }
 

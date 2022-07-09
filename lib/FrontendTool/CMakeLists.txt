@@ -21,11 +21,12 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftIndex
     swiftIRGen
     swiftOption
-    swiftPrintAsObjC
+    swiftPrintAsClang
     swiftSerialization
     swiftSIL
     swiftSILGen
     swiftSILOptimizer
-    swiftTBDGen)
+    swiftTBDGen
+    swiftThreading)
 
 set_swift_llvm_is_available(swiftFrontendTool)

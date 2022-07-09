@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct _Deque<Element> {
   internal struct _UnsafeHandle {
     let _header: UnsafeMutablePointer<_Storage._Header>
@@ -41,7 +41,7 @@ struct _Deque<Element> {
     }
     
     internal func slot(after slot: Int) -> Int {
-      assert(slot < capacity)
+      _internalInvariant(slot < capacity)
       let position = slot + 1
       if position >= capacity {
         return 0
@@ -51,7 +51,7 @@ struct _Deque<Element> {
 
     
     internal func slot(_ slot: Int, offsetBy delta: Int) -> Int {
-      assert(slot <= capacity)
+      _internalInvariant(slot <= capacity)
       let position = slot + delta
       if delta >= 0 {
         if position >= capacity { return position - capacity }
@@ -66,13 +66,13 @@ struct _Deque<Element> {
     }
     
     internal func uncheckedAppend(_ element: Element) {
-      assert(count < capacity)
+      _internalInvariant(count < capacity)
       ptr(at: endSlot).initialize(to: element)
       count += 1
     }
     
     internal func uncheckedRemoveFirst() -> Element {
-      assert(count > 0)
+      _internalInvariant(count > 0)
       let result = ptr(at: startSlot).move()
       startSlot = slot(after: startSlot)
       count -= 1
@@ -101,7 +101,7 @@ struct _Deque<Element> {
       ) {
         self.first = first
         self.second = second
-        assert(first.count > 0 || second == nil)
+        _internalInvariant(first.count > 0 || second == nil)
       }
 
       internal init(
@@ -135,7 +135,7 @@ struct _Deque<Element> {
       ) {
         self.first = first
         self.second = second?.count == 0 ? nil : second
-        assert(first.count > 0 || second == nil)
+        _internalInvariant(first.count > 0 || second == nil)
       }
 
       internal init(
@@ -180,7 +180,7 @@ struct _Deque<Element> {
     }
     
     func ptr(at slot: Int) -> UnsafeMutablePointer<Element> {
-      assert(slot >= 0 && slot <= capacity)
+      _internalInvariant(slot >= 0 && slot <= capacity)
       return _elements! + slot
     }
 
@@ -189,7 +189,7 @@ struct _Deque<Element> {
       at start: Int,
       from source: UnsafeBufferPointer<Element>
     ) -> Int {
-      assert(start + source.count <= capacity)
+      _internalInvariant(start + source.count <= capacity)
       guard source.count > 0 else { return start }
       ptr(at: start).initialize(from: source.baseAddress!, count: source.count)
       return start + source.count
@@ -200,7 +200,7 @@ struct _Deque<Element> {
       at start: Int,
       from source: UnsafeMutableBufferPointer<Element>
     ) -> Int {
-      assert(start + source.count <= capacity)
+      _internalInvariant(start + source.count <= capacity)
       guard source.count > 0 else { return start }
       ptr(at: start).moveInitialize(from: source.baseAddress!, count: source.count)
       return start + source.count
@@ -224,7 +224,7 @@ struct _Deque<Element> {
     
     internal func moveElements(minimumCapacity: Int) -> _Storage {
       let count = self.count
-      assert(minimumCapacity >= count)
+      _internalInvariant(minimumCapacity >= count)
       let object = _Storage._DequeBuffer.create(
         minimumCapacity: minimumCapacity,
         makingHeaderWith: {
@@ -413,3 +413,13 @@ struct _Deque<Element> {
   }
 }
 
+@_alwaysEmitIntoClient @_transparent
+internal func _internalInvariant(
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String = String(),
+  file: StaticString = #fileID, line: UInt = #line
+) {
+  #if INTERNAL_CHECKS_ENABLED
+  assert(condition(), message(), file: file, line: line)
+  #endif
+}

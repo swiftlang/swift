@@ -33,6 +33,26 @@
 
 using namespace swift;
 
+void
+swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
+                                  SmallVectorImpl<Decl*> &Results,
+                                  bool Recursive) {
+  auto startingSize = Results.size();
+  M->getDisplayDecls(Results, Recursive);
+
+  // Force Sendable on all types, which might synthesize some extensions.
+  // FIXME: We can remove this if @_nonSendable stops creating extensions.
+  for (auto result : Results) {
+    if (auto NTD = dyn_cast<NominalTypeDecl>(result))
+      (void)swift::isSendableType(M, NTD->getDeclaredInterfaceType());
+  }
+
+  // Remove what we fetched and fetch again, possibly now with additional
+  // extensions.
+  Results.resize(startingSize);
+  M->getDisplayDecls(Results, Recursive);
+}
+
 static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
   if (!Options.TransformContext ||
       !isa<ExtensionDecl>(D->getDeclContext()) ||
@@ -242,7 +262,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   bool IncludeUnconditional;
   PrintOptions Options;
   MergeGroupVector AllGroups;
-  std::unique_ptr<ExtensionInfoMap> InfoMap;
+  ExtensionInfoMap InfoMap;
 
   Implementation(NominalTypeDecl *Target,
                  bool IncludeUnconditional,
@@ -354,7 +374,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
       assert(Ext->getGenericSignature() && "No generic signature.");
       auto GenericSig = Ext->getGenericSignature();
-      if (handleRequirements(subMap, Ext, GenericSig->getRequirements()))
+      if (handleRequirements(subMap, Ext, GenericSig.getRequirements()))
         return {Result, MergeInfo};
     }
 
@@ -397,9 +417,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
   }
 
-  std::unique_ptr<ExtensionInfoMap>
+  ExtensionInfoMap
   collectSynthesizedExtensionInfoForProtocol(MergeGroupVector &AllGroups) {
-    std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
+    ExtensionInfoMap InfoMap;
     ExtensionMergeInfoMap MergeInfoMap;
     for (auto *E : Target->getExtensions()) {
       if (!Options.shouldPrint(E))
@@ -408,12 +428,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                                /*EnablingExt*/ nullptr,
                                /*Conf*/ nullptr);
       if (Pair.first) {
-        InfoMap->insert({E, Pair.first});
+        InfoMap.insert({E, Pair.first});
         MergeInfoMap.insert({E, Pair.second});
       }
     }
-    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups,
-                       /*AllowMergeWithDefBody*/false);
+    populateMergeGroup(InfoMap, MergeInfoMap, AllGroups,
+                       /*AllowMergeWithDefBody=*/false);
     std::sort(AllGroups.begin(), AllGroups.end());
     for (auto &Group : AllGroups) {
       Group.sortMembers();
@@ -429,12 +449,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     return false;
   }
 
-  std::unique_ptr<ExtensionInfoMap>
+  ExtensionInfoMap
   collectSynthesizedExtensionInfo(MergeGroupVector &AllGroups) {
     if (isa<ProtocolDecl>(Target)) {
       return collectSynthesizedExtensionInfoForProtocol(AllGroups);
     }
-    std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
+
+    ExtensionInfoMap InfoMap;
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
 
@@ -451,7 +472,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       if (AdjustedOpts.shouldPrint(E)) {
         auto Pair = isApplicable(E, Synthesized, EnablingE, Conf);
         if (Pair.first) {
-          InfoMap->insert({E, Pair.first});
+          InfoMap.insert({E, Pair.first});
           MergeInfoMap.insert({E, Pair.second});
         }
       }
@@ -496,8 +517,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     }
 
-    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups,
-                       /*AllowMergeWithDefBody*/true);
+    populateMergeGroup(InfoMap, MergeInfoMap, AllGroups,
+                       /*AllowMergeWithDefBody=*/true);
 
     std::sort(AllGroups.begin(), AllGroups.end());
     for (auto &Group : AllGroups) {
@@ -512,20 +533,22 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   }
 };
 
-SynthesizedExtensionAnalyzer::
-SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
-                             PrintOptions Options,
-                             bool IncludeUnconditional):
-Impl(*(new Implementation(Target, IncludeUnconditional, Options))) {}
+SynthesizedExtensionAnalyzer::SynthesizedExtensionAnalyzer(
+    NominalTypeDecl *Target, PrintOptions Options, bool IncludeUnconditional)
+    : Impl(*(new Implementation(Target, IncludeUnconditional, Options))) {}
 
 SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 
-bool SynthesizedExtensionAnalyzer::
-isInSynthesizedExtension(const ValueDecl *VD) {
+bool SynthesizedExtensionAnalyzer::isInSynthesizedExtension(
+    const ValueDecl *VD) {
   if (auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
                                                  getInnermostTypeContext())) {
-    return Impl.InfoMap->count(Ext) != 0 &&
-    Impl.InfoMap->find(Ext)->second.IsSynthesized;
+    auto It = Impl.InfoMap.find(Ext);
+    if (It != Impl.InfoMap.end() && It->second.IsSynthesized) {
+      // A synthesized extension will only be created if the underlying type
+      // is in the same module
+      return VD->getModuleContext() == Impl.Target->getModuleContext();
+    }
   }
   return false;
 }
@@ -546,8 +569,7 @@ forEachExtensionMergeGroup(MergeGroupKind Kind, ExtensionGroupOperation Fn) {
   }
 }
 
-bool SynthesizedExtensionAnalyzer::
-hasMergeGroup(MergeGroupKind Kind) {
+bool SynthesizedExtensionAnalyzer::hasMergeGroup(MergeGroupKind Kind) {
   for (auto &Group : Impl.AllGroups) {
     if (Kind == MergeGroupKind::All)
       return true;
@@ -883,4 +905,62 @@ Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
   return evaluateOrDefault(SD->getASTContext().evaluator,
     RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
       SecondTy;
+}
+
+SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+swift::getShorthandShadows(CaptureListExpr *CaptureList) {
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
+  for (auto Capture : CaptureList->getCaptureList()) {
+    if (Capture.PBD->getPatternList().size() != 1) {
+      continue;
+    }
+    auto *DRE = dyn_cast_or_null<DeclRefExpr>(Capture.PBD->getInit(0));
+    if (!DRE) {
+      continue;
+    }
+
+    auto DeclaredVar = Capture.getVar();
+    if (DeclaredVar->getLoc() != DRE->getLoc()) {
+      // We have a capture like `[foo]` if the declared var and the
+      // reference share the same location.
+      continue;
+    }
+
+    auto *ReferencedVar = dyn_cast_or_null<VarDecl>(DRE->getDecl());
+    if (!ReferencedVar) {
+      continue;
+    }
+
+    assert(DeclaredVar->getName() == ReferencedVar->getName());
+
+    Result.emplace_back(std::make_pair(DeclaredVar, ReferencedVar));
+  }
+  return Result;
+}
+
+SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+swift::getShorthandShadows(LabeledConditionalStmt *CondStmt) {
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
+  for (const StmtConditionElement &Cond : CondStmt->getCond()) {
+    if (Cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+      continue;
+    }
+    auto Init = dyn_cast<DeclRefExpr>(Cond.getInitializer());
+    if (!Init) {
+      continue;
+    }
+    auto ReferencedVar = dyn_cast_or_null<VarDecl>(Init->getDecl());
+    if (!ReferencedVar) {
+      continue;
+    }
+
+    Cond.getPattern()->forEachVariable([&](VarDecl *DeclaredVar) {
+      if (DeclaredVar->getLoc() != Init->getLoc()) {
+        return;
+      }
+      assert(DeclaredVar->getName() == ReferencedVar->getName());
+      Result.emplace_back(std::make_pair(DeclaredVar, ReferencedVar));
+    });
+  }
+  return Result;
 }

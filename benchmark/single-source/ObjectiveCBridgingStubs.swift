@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,8 +18,9 @@ import ObjectiveCTests
 
 let t: [BenchmarkCategory] = [.validation, .bridging]
 let ts: [BenchmarkCategory] = [.validation, .String, .bridging]
+let bs: [BenchmarkCategory] = [.String, .bridging]
 
-public let ObjectiveCBridgingStubs = [
+public let benchmarks = [
   BenchmarkInfo(name: "ObjectiveCBridgeStubDataAppend",
     runFunction: run_ObjectiveCBridgeStubDataAppend, tags: t,
     legacyFactor: 20),
@@ -68,9 +69,24 @@ public let ObjectiveCBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStringGetUTF8Contents",
     runFunction: run_ObjectiveCBridgeStringGetUTF8Contents, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
-  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString",
+  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString", //should be BridgeString.find.mixed
     runFunction: run_ObjectiveCBridgeStringRangeOfString, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "BridgeString.find.native",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwift, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
+  BenchmarkInfo(name: "BridgeString.find.native.nonASCII",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftNonASCII, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
+  BenchmarkInfo(name: "BridgeString.find.native.long",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystack, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
+  BenchmarkInfo(name: "BridgeString.find.native.longBoth",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackLongNeedle, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
+  BenchmarkInfo(name: "BridgeString.find.native.longNonASCII",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackNonASCII, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
   BenchmarkInfo(name: "ObjectiveCBridgeStringHash",
     runFunction: run_ObjectiveCBridgeStringHash, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
@@ -92,14 +108,14 @@ func testObjectiveCBridgeStubFromNSString() {
    for _ in 0 ..< 10_000 {
      str = b.testToString()
    }
-   CheckResults(str != "" && str == "Default string value no tagged pointer")
+   check(str != "" && str == "Default string value no tagged pointer")
 }
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubFromNSString(_ N: Int) {
+public func run_ObjectiveCBridgeStubFromNSString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubFromNSString()
     }
@@ -120,9 +136,9 @@ func testObjectiveCBridgeStubToNSString() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubToNSString(_ N: Int) {
+public func run_ObjectiveCBridgeStubToNSString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubToNSString()
     }
@@ -139,14 +155,14 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
      arr = b.testToArrayOfStrings()
      str = arr[0]
    }
-   CheckResults(str != "" && str == "Default string value no tagged pointer")
+   check(str != "" && str == "Default string value no tagged pointer")
 }
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubFromArrayOfNSString(_ N: Int) {
+public func run_ObjectiveCBridgeStubFromArrayOfNSString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubFromArrayOfNSString()
     }
@@ -166,9 +182,9 @@ func testObjectiveCBridgeStubToArrayOfNSString() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubToArrayOfNSString(_ N: Int) {
+public func run_ObjectiveCBridgeStubToArrayOfNSString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubToArrayOfNSString()
     }
@@ -190,9 +206,9 @@ func testObjectiveCBridgeStubFromNSDate() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubFromNSDate(N: Int) {
+public func run_ObjectiveCBridgeStubFromNSDate(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubFromNSDate()
     }
@@ -212,9 +228,9 @@ public func testObjectiveCBridgeStubToNSDate() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubToNSDate(N: Int) {
+public func run_ObjectiveCBridgeStubToNSDate(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubToNSDate()
     }
@@ -234,9 +250,9 @@ func testObjectiveCBridgeStubDateAccess() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubDateAccess(N: Int) {
+public func run_ObjectiveCBridgeStubDateAccess(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubDateAccess()
     }
@@ -255,9 +271,9 @@ func testObjectiveCBridgeStubDateMutation() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubDateMutation(N: Int) {
+public func run_ObjectiveCBridgeStubDateMutation(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubDateMutation()
     }
@@ -279,9 +295,9 @@ func testObjectiveCBridgeStubURLAppendPath() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubURLAppendPath(N: Int) {
+public func run_ObjectiveCBridgeStubURLAppendPath(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubURLAppendPath()
     }
@@ -304,9 +320,9 @@ func testObjectiveCBridgeStubDataAppend() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubDataAppend(N: Int) {
+public func run_ObjectiveCBridgeStubDataAppend(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubDataAppend()
     }
@@ -321,9 +337,9 @@ internal func getStringsToBridge() -> [String] {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringIsEqual(N: Int) {
+public func run_ObjectiveCBridgeStringIsEqual(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testIsEqualToString()
     }
@@ -332,9 +348,9 @@ public func run_ObjectiveCBridgeStringIsEqual(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringIsEqual2(N: Int) {
+public func run_ObjectiveCBridgeStringIsEqual2(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testIsEqualToString2()
     }
@@ -343,9 +359,9 @@ public func run_ObjectiveCBridgeStringIsEqual2(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringIsEqualAllSwift(N: Int) {
+public func run_ObjectiveCBridgeStringIsEqualAllSwift(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testIsEqualToStringAllSwift()
     }
@@ -354,9 +370,9 @@ public func run_ObjectiveCBridgeStringIsEqualAllSwift(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringCompare(N: Int) {
+public func run_ObjectiveCBridgeStringCompare(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testCompare()
     }
@@ -365,9 +381,9 @@ public func run_ObjectiveCBridgeStringCompare(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringCompare2(N: Int) {
+public func run_ObjectiveCBridgeStringCompare2(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testCompare2()
     }
@@ -376,9 +392,9 @@ public func run_ObjectiveCBridgeStringCompare2(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringGetASCIIContents(N: Int) {
+public func run_ObjectiveCBridgeStringGetASCIIContents(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testGetASCIIContents()
     }
@@ -387,9 +403,9 @@ public func run_ObjectiveCBridgeStringGetASCIIContents(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringGetUTF8Contents(N: Int) {
+public func run_ObjectiveCBridgeStringGetUTF8Contents(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testGetUTF8Contents()
     }
@@ -398,9 +414,9 @@ public func run_ObjectiveCBridgeStringGetUTF8Contents(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringRangeOfString(N: Int) {
+public func run_ObjectiveCBridgeStringRangeOfString(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testRangeOfString()
     }
@@ -408,10 +424,51 @@ public func run_ObjectiveCBridgeStringRangeOfString(N: Int) {
   #endif
 }
 
+@inline(__always)
+func run_rangeOfStringSpecific(needle: String, haystack: String, n: Int) {
+#if _runtime(_ObjC)
+  b.testRangeOfStringSpecific(withNeedle: needle, haystack: haystack, n: n)
+#endif
+}
+
 @inline(never)
-public func run_ObjectiveCBridgeStringHash(N: Int) {
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwift(n: Int) {
+  run_rangeOfStringSpecific(needle: "y", haystack: "The quick brown fox jumps over the lazy dog", n: 100 * n)
+}
+
+var longNativeASCII: String! = nil
+var longNativeNonASCII: String! = nil
+public func setup_SpecificRangeOfStringBridging() {
+  setup_StringBridgeBenchmark()
+  longNativeASCII = Array(repeating: "The quick brown fox jump over the lazy dog", count: 1000).joined() + "s"
+  longNativeNonASCII = "ü" + longNativeASCII + "ö"
+  
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystack(n: Int) {
+  run_rangeOfStringSpecific(needle: "s", haystack: longNativeASCII, n: n)
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackNonASCII(n: Int) {
+  run_rangeOfStringSpecific(needle: "s", haystack: longNativeNonASCII, n: n)
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftNonASCII(n: Int) {
+  run_rangeOfStringSpecific(needle: "ü", haystack: "The quick brown fox jump over the lazy dogü", n: 100 * n)
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackLongNeedle(n: Int) {
+  run_rangeOfStringSpecific(needle: "The quick brown fox jump over the lazy dogs", haystack: longNativeASCII, n: n)
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringHash(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testHash()
     }
@@ -420,9 +477,9 @@ public func run_ObjectiveCBridgeStringHash(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringUTF8String(N: Int) {
+public func run_ObjectiveCBridgeStringUTF8String(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testUTF8String()
     }
@@ -431,9 +488,9 @@ public func run_ObjectiveCBridgeStringUTF8String(N: Int) {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStringCStringUsingEncoding(N: Int) {
+public func run_ObjectiveCBridgeStringCStringUsingEncoding(n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       b.testCStringUsingEncoding()
     }

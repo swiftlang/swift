@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # ===--- generate_harness.py ---------------------------------------------===//
 #
@@ -13,8 +13,6 @@
 # ===---------------------------------------------------------------------===//
 
 # Generate boilerplate, CMakeLists.txt and utils/main.swift from templates.
-
-from __future__ import print_function
 
 import argparse
 import os

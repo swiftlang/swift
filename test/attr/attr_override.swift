@@ -391,7 +391,7 @@ class MismatchOptional : MismatchOptionalBase {
 
   override func functionParam(x: @escaping (Int) -> Int) {} // expected-error {{cannot override instance method parameter of type '((Int) -> Int)?' with non-optional type '(Int) -> Int'}} {{34-34=(}} {{56-56=)?}}
   override func tupleParam(x: (Int, Int)) {} // expected-error {{cannot override instance method parameter of type '(Int, Int)?' with non-optional type '(Int, Int)'}} {{41-41=?}}
-  override func compositionParam(x: P1 & P2) {} // expected-error {{cannot override instance method parameter of type '(P1 & P2)?' with non-optional type 'P1 & P2'}} {{37-37=(}} {{44-44=)?}}
+  override func compositionParam(x: P1 & P2) {} // expected-error {{cannot override instance method parameter of type '(any P1 & P2)?' with non-optional type 'any P1 & P2'}} {{37-37=(}} {{44-44=)?}}
 
   override func nameAndTypeMismatch(_: Int) {}
   // expected-error@-1 {{argument labels for method 'nameAndTypeMismatch' do not match those of overridden method 'nameAndTypeMismatch(label:)'}} {{37-37=label }}
@@ -545,21 +545,21 @@ class SR_4206_DerivedConcrete_2<T>: SR_4206_BaseGeneric_2<T> {
 // Base class generic w/ method generic, derived class generic w/ method generic but different requirement
 
 class SR_4206_BaseGeneric_3<T> {
-  func foo<T>(arg: T) {} // expected-note {{overridden declaration is here}}
+  func foo<T>(arg: T) {}
 }
 
 class SR_4206_DerivedGeneric_3<T>: SR_4206_BaseGeneric_3<T> {
-  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T, T>; expected generic signature to be <T, T>}}
+  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Base class not generic w/ method generic, derived class not generic w/ method generic but different requirement
 
 class SR_4206_BaseConcrete_4 {
-  func foo<T>(arg: T) {} // expected-note {{overridden declaration is here}}
+  func foo<T>(arg: T) {}
 }
 
 class SR_4206_DerivedConcrete_4: SR_4206_BaseConcrete_4 {
-  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T>; expected generic signature to be <T>}}
+  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Base class not generic w/ method generic, derived class not generic w/ method generic but removed requirement
@@ -575,22 +575,22 @@ class SR_4206_DerivedConcrete_5: SR_4206_BaseConcrete_5 {
 // Base class not generic w/ method generic, derived class generic w/ method generic but different requirement
 
 class SR_4206_BaseConcrete_6 {
-  func foo<T: SR_4206_Protocol_2>(arg: T) {} // expected-note {{overridden declaration is here}}
+  func foo<T: SR_4206_Protocol_2>(arg: T) {}
 }
 
 class SR_4206_DerivedGeneric_6<T>: SR_4206_BaseConcrete_6 {
-  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_2>; expected generic signature to be <T, T where T : SR_4206_Protocol_2>}}
+  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Contextual where clauses on non-generic members
 
 class SR_4206_Base_7<T> {
-  func foo1() where T: SR_4206_Protocol_1 {} // expected-note {{overridden declaration is here}}
+  func foo1() where T: SR_4206_Protocol_1 {}
   func foo2() where T: SR_4206_Protocol_1 {}
 }
 
 class SR_4206_Derived_7<T>: SR_4206_Base_7<T> {
-  override func foo1() where T: SR_4206_Protocol_2 {} // expected-error {{overridden method 'foo1' has generic signature <T where T : SR_4206_Protocol_2> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T where T : SR_4206_Protocol_1>}}
+  override func foo1() where T: SR_4206_Protocol_2 {} // expected-error {{method does not override any method from its superclass}}
 
   override func foo2() {} // OK
 }
@@ -624,10 +624,10 @@ class SR_4206_Derived_9<T>: SR_4206_Base_9<T> {
 // Override with constraint on a non-inherited generic param
 
 class SR_4206_Base_10<T> {
-  func foo() where T: SR_4206_Protocol_1 {} // expected-note {{overridden declaration is here}}
+  func foo() where T: SR_4206_Protocol_1 {}
 }
 class SR_4206_Derived_10<T, U>: SR_4206_Base_10<T> {
-  override func foo() where U: SR_4206_Protocol_1 {} // expected-error {{overridden method 'foo' has generic signature <T, U where U : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T, U where T : SR_4206_Protocol_1>}}
+  override func foo() where U: SR_4206_Protocol_1 {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Override with return type specialization
@@ -709,4 +709,20 @@ public extension SR_11740_Base where F: SR_11740_Q {
 
 extension SR_11740_Derived where F: SR_11740_P {
     public static func foo(_: A) {}
+}
+
+// Make sure we don't crash on generic requirement mismatch
+protocol P3 {}
+
+protocol P4 {
+  associatedtype T
+}
+
+class Base {
+  func method<T: P3>(_: T) {}
+  func method<T: P4>(_: T) where T.T : P3 {}
+}
+
+class Derived: Base {
+  override func method<T: P3>(_: T) {}
 }

@@ -18,6 +18,31 @@
 
 using namespace swift;
 
+void ValueLifetimeBoundary::visitInsertionPoints(
+    llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
+    DeadEndBlocks *deBlocks) {
+  for (SILInstruction *user : lastUsers) {
+    if (!isa<TermInst>(user)) {
+      visitor(std::next(user->getIterator()));
+      continue;
+    }
+    auto *predBB = user->getParent();
+    for (SILBasicBlock *succ : predBB->getSuccessors()) {
+      if (deBlocks && deBlocks->isDeadEnd(succ))
+        continue;
+
+      assert(succ->getSinglePredecessorBlock() == predBB);
+      visitor(succ->begin());
+    }
+  }
+  for (SILBasicBlock *edge : boundaryEdges) {
+    if (deBlocks && deBlocks->isDeadEnd(edge))
+      continue;
+
+    visitor(edge->begin());
+  }
+}
+
 void ValueLifetimeAnalysis::propagateLiveness() {
   bool defIsInstruction = defValue.is<SILInstruction *>();
   assert(liveBlocks.empty() && "frontier computed twice");
@@ -320,8 +345,9 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *inst) {
 }
 
 // Searches \p bb backwards from the instruction before \p frontierInst
-// to the beginning of the list and returns true if we find a dealloc_ref
-// /before/ we find \p defValue (the instruction that defines our target value).
+// to the beginning of the list and returns true if we find a dealloc_ref or an
+// dealloc_stack_ref /before/ we find \p defValue (the instruction that
+// defines our target value).
 static bool
 blockContainsDeallocRef(SILBasicBlock *bb,
                         PointerUnion<SILInstruction *, SILArgument *> defValue,
@@ -330,7 +356,7 @@ blockContainsDeallocRef(SILBasicBlock *bb,
   SILBasicBlock::reverse_iterator iter = frontierInst->getReverseIterator();
   for (++iter; iter != End; ++iter) {
     SILInstruction *inst = &*iter;
-    if (isa<DeallocRefInst>(inst))
+    if (isa<DeallocRefInst>(inst) || isa<DeallocStackRefInst>(inst))
       return true;
     // We know that inst is not a nullptr, so if we have a SILArgument, this
     // will always fail as we want.

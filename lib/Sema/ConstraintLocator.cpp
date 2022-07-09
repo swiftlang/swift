@@ -47,6 +47,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
+  case ConstraintLocator::ConstructorMemberType:
   case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
@@ -60,6 +61,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
   case ConstraintLocator::OpenedGeneric:
+  case ConstraintLocator::OpenedOpaqueArchetype:
   case ConstraintLocator::WrappedValue:
   case ConstraintLocator::GenericParameter:
   case ConstraintLocator::GenericArgument:
@@ -90,6 +92,11 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::UnresolvedMemberChainResult:
   case ConstraintLocator::PlaceholderType:
   case ConstraintLocator::ImplicitConversion:
+  case ConstraintLocator::ImplicitDynamicMemberSubscript:
+  case ConstraintLocator::SyntacticElement:
+  case ConstraintLocator::PackType:
+  case ConstraintLocator::PackElement:
+  case ConstraintLocator::PatternBindingElement:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -320,6 +327,14 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "constructor member";
       break;
 
+    case ConstructorMemberType: {
+      auto memberTypeElt = elt.castTo<LocatorPathElt::ConstructorMemberType>();
+      out << "constructor member type";
+      if (memberTypeElt.isShortFormOrSelfDelegatingConstructor())
+        out << " (for short-form or self.init call)";
+      break;
+    }
+
     case FunctionArgument:
       out << "function argument";
       break;
@@ -416,6 +431,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     }
     case OpenedGeneric:
       out << "opened generic";
+      break;
+
+    case OpenedOpaqueArchetype:
+      out << "opened opaque archetype";
       break;
 
     case ConditionalRequirement: {
@@ -535,10 +554,39 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "placeholder type";
       break;
 
-    case ConstraintLocator::ImplicitConversion:
+    case ConstraintLocator::SyntacticElement:
+      // TODO: Would be great to print a kind of element this is e.g.
+      //       "if", "for each", "switch" etc.
+      out << "syntactic element";
+      break;
+
+    case ConstraintLocator::ImplicitDynamicMemberSubscript:
+      out << "implicit dynamic member subscript";
+      break;
+
+    case ConstraintLocator::ImplicitConversion: {
       auto convElt = elt.castTo<LocatorPathElt::ImplicitConversion>();
       out << "implicit conversion " << getName(convElt.getConversionKind());
       break;
+    }
+
+    case ConstraintLocator::PackType:
+      out << "pack type";
+      break;
+
+    case PackElement: {
+      auto packElt = elt.castTo<LocatorPathElt::PackElement>();
+      out << "pack element #" << llvm::utostr(packElt.getIndex());
+      break;
+    }
+
+    case PatternBindingElement: {
+      auto patternBindingElt =
+          elt.castTo<LocatorPathElt::PatternBindingElement>();
+      out << "pattern binding element #"
+          << llvm::utostr(patternBindingElt.getIndex());
+      break;
+    }
     }
   }
   out << ']';

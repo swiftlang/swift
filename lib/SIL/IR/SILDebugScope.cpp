@@ -60,5 +60,5 @@ SILFunction *SILDebugScope::getParentFunction() const {
 bool swift::maybeScopeless(const SILInstruction &inst) {
   if (inst.getFunction()->isBare())
     return true;
-  return !isa<DebugValueInst>(inst) && !isa<DebugValueAddrInst>(inst);
+  return !isa<DebugValueInst>(inst);
 }

@@ -72,11 +72,21 @@ enum ContextualTypePurpose : uint8_t {
                              ///< result type.
   CTP_Condition,        ///< Condition expression of various statements e.g.
                         ///< `if`, `for`, `while` etc.
+  CTP_CaseStmt,         ///< A single case statement associated with a `switch` or
+                        ///  a `do-catch` statement. It has to be convertible
+                        ///  to a type of a switch subject or an `Error` type.
   CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
                         ///< is expected to conform to 'Sequence' protocol.
+  CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop,
+                        ///  this element acts slightly differently compared to
+                        ///  \c CTP_ForEachStmt in a sence that it would
+                        ///  produce conformance constraints.
   CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type
+
+  CTP_ExprPattern,      ///< `~=` operator application associated with expression
+                        /// pattern.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
@@ -634,6 +644,32 @@ public:
   }
 };
 
+class LocatorPathElt::PackType : public StoredPointerElement<TypeBase> {
+public:
+  PackType(Type type)
+      : StoredPointerElement(PathElementKind::PackType, type.getPointer()) {
+    assert(type->getDesugaredType()->is<swift::PackType>());
+  }
+
+  Type getType() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::PackType;
+  }
+};
+
+class LocatorPathElt::PackElement final : public StoredIntegerElement<1> {
+public:
+  PackElement(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::PackElement, index) {}
+
+  unsigned getIndex() const { return getValue<0>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PackElement;
+  }
+};
+
 class LocatorPathElt::KeyPathComponent final : public StoredIntegerElement<1> {
 public:
   KeyPathComponent(unsigned index)
@@ -751,6 +787,10 @@ public:
   GenericTypeParamType *getType() const {
     return getStoredPointer();
   }
+    
+  bool isTypeSequence() const {
+    return getType()->isTypeSequence();
+  }
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == PathElementKind::GenericParameter;
@@ -782,6 +822,19 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::OpenedGeneric;
+  }
+};
+
+class LocatorPathElt::OpenedOpaqueArchetype final
+    : public StoredPointerElement<OpaqueTypeDecl> {
+public:
+  OpenedOpaqueArchetype(OpaqueTypeDecl *decl)
+      : StoredPointerElement(PathElementKind::OpenedOpaqueArchetype, decl) {}
+
+  OpaqueTypeDecl *getDecl() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::OpenedOpaqueArchetype;
   }
 };
 
@@ -940,6 +993,84 @@ public:
   }
 };
 
+class LocatorPathElt::ConstructorMemberType final
+    : public StoredIntegerElement<1> {
+public:
+  ConstructorMemberType(bool isShortFormOrSelfDelegating = false)
+      : StoredIntegerElement(ConstraintLocator::ConstructorMemberType,
+                             isShortFormOrSelfDelegating) {}
+
+  /// Whether this constructor overload is for a short-form init call such as
+  /// 'X(...)', or a 'self.init(...)' call. Such calls have additional ranking
+  /// rules.
+  bool isShortFormOrSelfDelegatingConstructor() const {
+    return bool(getValue());
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ConstructorMemberType;
+  }
+};
+
+class LocatorPathElt::SyntacticElement final
+    : public StoredPointerElement<void> {
+public:
+  SyntacticElement(ASTNode element)
+      : StoredPointerElement(PathElementKind::SyntacticElement,
+                             element.getOpaqueValue()) {
+    assert(element);
+  }
+
+  ASTNode getElement() const {
+    // Unfortunately \c getFromOpaqueValue doesn't produce an ASTNode.
+    auto node = ASTNode::getFromOpaqueValue(getStoredPointer());
+    if (auto *expr = node.dyn_cast<Expr *>())
+      return expr;
+
+    if (auto *stmt = node.dyn_cast<Stmt *>())
+      return stmt;
+
+    if (auto *decl = node.dyn_cast<Decl *>())
+      return decl;
+
+    if (auto *pattern = node.dyn_cast<Pattern *>())
+      return pattern;
+
+    if (auto *repr = node.dyn_cast<TypeRepr *>())
+      return repr;
+
+    if (auto *cond = node.dyn_cast<StmtConditionElement *>())
+      return cond;
+
+    if (auto *caseItem = node.dyn_cast<CaseLabelItem *>())
+      return caseItem;
+
+    llvm_unreachable("unhandled ASTNode element kind");
+  }
+
+  Stmt *asStmt() const {
+    auto node = ASTNode::getFromOpaqueValue(getStoredPointer());
+    return node.get<Stmt *>();
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::SyntacticElement;
+  }
+};
+
+class LocatorPathElt::PatternBindingElement final
+    : public StoredIntegerElement<1> {
+public:
+  PatternBindingElement(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::PatternBindingElement, index) {}
+
+  unsigned getIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PatternBindingElement;
+  }
+};
+
 namespace details {
   template <typename CustomPathElement>
   class PathElement {
@@ -1037,6 +1168,14 @@ public:
     if (last != path.rend())
       return last->getKind() == ConstraintLocator::AutoclosureResult;
 
+    return false;
+  }
+
+  bool isForRequirement(RequirementKind kind) const {
+    if (auto lastElt = last()) {
+      auto requirement = lastElt->getAs<LocatorPathElt::AnyRequirement>();
+      return requirement && kind == requirement->getRequirementKind();
+    }
     return false;
   }
 

@@ -45,7 +45,8 @@ void trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FunctionBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
     llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
-    OptRemark::Emitter &ORE);
+    OptRemark::Emitter &ORE,
+    bool isMandatory);
 
 /// Helper class to describe re-abstraction of function parameters done during
 /// specialization.
@@ -60,6 +61,11 @@ class ReabstractionInfo {
   /// For each bit set in Conversions, there is a bit set in TrivialArgs if the
   /// argument has a trivial type.
   SmallBitVector TrivialArgs;
+
+  /// A 1-bit means that the argument is a metatype argument. The argument is
+  /// dropped and replaced by a `metatype` instruction in the entry block.
+  /// Only used if `dropMetatypeArgs` is true.
+  SmallBitVector droppedMetatypeArgs;
 
   /// Set to true if the function has a re-abstracted (= converted from
   /// indirect to direct) resilient argument or return type. This can happen if
@@ -78,6 +84,10 @@ class ReabstractionInfo {
   /// specializer.
   bool ConvertIndirectToDirect;
 
+  /// If true, drop metatype arguments.
+  /// See `droppedMetatypeArgs`.
+  bool dropMetatypeArgs = false;
+  
   /// The first NumResults bits in Conversions refer to formal indirect
   /// out-parameters.
   unsigned NumFormalIndirectResults;
@@ -190,6 +200,7 @@ public:
                     SubstitutionMap ParamSubs,
                     IsSerialized_t Serialized,
                     bool ConvertIndirectToDirect = true,
+                    bool dropMetatypeArgs = false,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
@@ -241,6 +252,16 @@ public:
 
   /// Returns true if there are any conversions from indirect to direct values.
   bool hasConversions() const { return Conversions.any(); }
+
+  /// Returns true if the argument at `ArgIdx` is a dropped metatype argument.
+  /// See `droppedMetatypeArgs`.
+  bool isDroppedMetatypeArg(unsigned ArgIdx) const {
+    return droppedMetatypeArgs.test(ArgIdx);
+  }
+
+  /// Returns true if there are any dropped metatype arguments.
+  /// See `droppedMetatypeArgs`.
+  bool hasDroppedMetatypeArgs() const { return droppedMetatypeArgs.any(); }
 
   /// Remove the arguments of a partial apply, leaving the arguments for the
   /// partial apply result function.
@@ -336,11 +357,14 @@ class GenericFuncSpecializer {
   SubstitutionMap ContextSubs;
   std::string ClonedName;
 
+  bool isMandatory;
+
 public:
   GenericFuncSpecializer(SILOptFunctionBuilder &FuncBuilder,
                          SILFunction *GenericFunc,
                          SubstitutionMap ParamSubs,
-                         const ReabstractionInfo &ReInfo);
+                         const ReabstractionInfo &ReInfo,
+                         bool isMandatory = false);
 
   /// If we already have this specialization, reuse it.
   SILFunction *lookupSpecialization();

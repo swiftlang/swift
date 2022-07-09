@@ -120,6 +120,7 @@ extension String {
       )
       return result.asString
     case .error(let initialRange):
+      defer { _fixLifetime(result) }
       //This could be optimized to use excess tail capacity
       return repairUTF8(result.codeUnits, firstKnownBrokenRange: initialRange)
     }

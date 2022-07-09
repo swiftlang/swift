@@ -19,6 +19,7 @@
 #ifndef SWIFT_DECLCONTEXT_H
 #define SWIFT_DECLCONTEXT_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -72,6 +73,7 @@ namespace swift {
   class PrefixOperatorDecl;
   class ProtocolConformance;
   class ValueDecl;
+  class VarDecl;
   class Initializer;
   class ClassDecl;
   class SerializedAbstractClosureExpr;
@@ -199,6 +201,7 @@ struct FragileFunctionKind {
     AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer,
+    BackDeploy,
     None
   };
 
@@ -209,6 +212,9 @@ struct FragileFunctionKind {
     return (lhs.kind == rhs.kind &&
             lhs.allowUsableFromInline == rhs.allowUsableFromInline);
   }
+
+  /// Casts to `unsigned` for diagnostic %selects.
+  unsigned getSelector() { return static_cast<unsigned>(kind); }
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -221,7 +227,8 @@ struct FragileFunctionKind {
 /// and therefore can safely access trailing memory. If you need to create a
 /// macro context, please see GenericContext for how to minimize new entries in
 /// the ASTHierarchy enum below.
-class alignas(1 << DeclContextAlignInBits) DeclContext {
+class alignas(1 << DeclContextAlignInBits) DeclContext
+    : public ASTAllocated<DeclContext> {
   enum class ASTHierarchy : unsigned {
     Decl,
     Expr,
@@ -294,6 +301,9 @@ public:
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const;
 
+  /// Returns whether this context asynchronous
+  bool isAsyncContext() const;
+
   /// Returns whether this context has value semantics.
   bool hasValueSemantics() const;
 
@@ -349,6 +359,11 @@ public:
   /// If this DeclContext is a protocol extension, return the extended protocol.
   LLVM_READONLY
   ProtocolDecl *getExtendedProtocolDecl() const;
+
+  /// If this DeclContext is the initializer expression of a global or instance
+  /// property, return the VarDecl, otherwise return null.
+  LLVM_READONLY
+  VarDecl *getNonLocalVarDecl() const;
 
   /// Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
@@ -628,10 +643,6 @@ public:
   SWIFT_DEBUG_DUMPER(dumpContext());
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
                         bool onlyAPartialLine = false) const;
-
-  // Only allow allocation of DeclContext using the allocator in ASTContext.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(DeclContext));
   
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
@@ -826,6 +837,9 @@ public:
 
   /// Setup the loader for lazily-loaded members.
   void setMemberLoader(LazyMemberLoader *loader, uint64_t contextData);
+
+  /// Externally tell this context that it has no more lazy members, i.e. all lazy member loading is complete.
+  void setHasLazyMembers(bool hasLazyMembers) const;
 
   /// Load all of the members of this context.
   void loadAllMembers() const;

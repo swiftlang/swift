@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enforce-exclusivity=none -emit-sil -Onone %s -o %t/Onone.sil
-// RUN: %target-sil-opt %t/Onone.sil -inline -o %t/inlined.sil
+// RUN: %target-sil-opt -parse-serialized-sil %t/Onone.sil -inline -o %t/inlined.sil
 // RUN: %FileCheck %s --check-prefix=INLINE < %t/inlined.sil
-// RUN: %target-sil-opt -enable-sil-verify-all %t/inlined.sil -enforce-exclusivity=unchecked -diagnose-static-exclusivity -o /dev/null
+// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all %t/inlined.sil -enforce-exclusivity=unchecked -diagnose-static-exclusivity -o /dev/null
 
 public protocol SomeP {
   var someV: Int { get set }

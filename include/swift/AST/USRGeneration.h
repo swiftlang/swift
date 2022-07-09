@@ -21,6 +21,8 @@
 
 #include "swift/Basic/LLVM.h"
 
+#include <string>
+
 namespace swift {
 class Decl;
 class AbstractStorageDecl;
@@ -45,6 +47,10 @@ bool printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS);
 bool printValueDeclUSR(const ValueDecl *D, raw_ostream &OS);
 
 /// Prints out the USR for the given ModuleEntity.
+/// In case module aliasing is used, it prints the real module name. For example,
+/// if a file has `import Foo` and `-module-alias Foo=Bar` is passed, treat Foo as
+/// an alias and Bar as the real module name as its dependency. Note that the
+/// aliasing only applies to Swift modules.
 /// \returns true if it failed, false on success.
 bool printModuleUSR(ModuleEntity Mod, raw_ostream &OS);
 
@@ -60,6 +66,9 @@ bool printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS);
 /// Prints out the USR for the given Decl.
 /// \returns true if it failed, false on success.
 bool printDeclUSR(const Decl *D, raw_ostream &OS);
+
+/// Demangle a mangle-name-based USR to a human readable name.
+std::string demangleUSR(StringRef mangled);
 
 } // namespace ide
 } // namespace swift

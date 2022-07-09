@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # update-dependencies-bad.py - Fails on bad.swift -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -16,8 +16,6 @@
 # exit-by-SIGKILL
 #
 # ----------------------------------------------------------------------------
-
-from __future__ import print_function
 
 import os
 import shutil

@@ -96,8 +96,14 @@ class SILCombiner :
   /// The current iteration of the SILCombine.
   unsigned Iteration;
 
+  // The tracking list is used by `Builder` for newly added
+  // instructions, which we will periodically move to our worklist.
+  llvm::SmallVector<SILInstruction *, 64> TrackingList;
+  
   /// Builder used to insert instructions.
-  SILBuilder &Builder;
+  SILBuilder Builder;
+
+  SILOptFunctionBuilder FuncBuilder;
 
   /// Cast optimizer
   CastOptimizer CastOpt;
@@ -109,56 +115,12 @@ class SILCombiner :
   /// External context struct used by \see ownershipRAUWHelper.
   OwnershipFixupContext ownershipFixupContext;
   
-  /// For invoking Swift instruction passes in libswift.
-  LibswiftPassInvocation libswiftPassInvocation;
+  /// For invoking Swift instruction passes.
+  SwiftPassInvocation swiftPassInvocation;
 
 public:
   SILCombiner(SILFunctionTransform *parentTransform,
-              SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
-              AliasAnalysis *AA, DominanceAnalysis *DA,
-              ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
-              NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails,
-              bool enableCopyPropagation)
-      : parentTransform(parentTransform), AA(AA), DA(DA), PCA(PCA), CHA(CHA),
-        NLABA(NLABA), Worklist("SC"),
-        deleter(InstModCallbacks()
-                    .onDelete([&](SILInstruction *instToDelete) {
-                      // We allow for users in SILCombine to perform 2 stage
-                      // deletion, so we need to split the erasing of
-                      // instructions from adding operands to the worklist.
-                      eraseInstFromFunction(*instToDelete,
-                                            false /* don't add operands */);
-                    })
-                    .onNotifyWillBeDeleted(
-                        [&](SILInstruction *instThatWillBeDeleted) {
-                          Worklist.addOperandsToWorklist(
-                            *instThatWillBeDeleted);
-                        })
-                    .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
-                      Worklist.add(newlyCreatedInst);
-                    })
-                    .onSetUseValue([&](Operand *use, SILValue newValue) {
-                      use->set(newValue);
-                      Worklist.add(use->getUser());
-                    })),
-        deadEndBlocks(&B.getFunction()), MadeChange(false),
-        RemoveCondFails(removeCondFails),
-        enableCopyPropagation(enableCopyPropagation), Iteration(0), Builder(B),
-        CastOpt(
-            FuncBuilder, nullptr /*SILBuilderContext*/,
-            /* ReplaceValueUsesAction */
-            [&](SILValue Original, SILValue Replacement) {
-              replaceValueUsesWith(Original, Replacement);
-            },
-            /* ReplaceInstUsesAction */
-            [&](SingleValueInstruction *I, ValueBase *V) {
-              replaceInstUsesWith(*I, V);
-            },
-            /* EraseAction */
-            [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
-        deBlocks(&B.getFunction()),
-        ownershipFixupContext(getInstModCallbacks(), deBlocks),
-        libswiftPassInvocation(parentTransform->getPassManager(), this) {}
+              bool removeCondFails, bool enableCopyPropagation);
 
   bool runOnFunction(SILFunction &F);
 
@@ -278,7 +240,7 @@ public:
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
-  SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
+  SILInstruction *legacyVisitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitCopyValueInst(CopyValueInst *cvi);
   SILInstruction *visitDestroyValueInst(DestroyValueInst *dvi);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -308,7 +270,7 @@ public:
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
-  SILInstruction *visitStrongReleaseInst(StrongReleaseInst *SRI);
+  SILInstruction *legacyVisitStrongReleaseInst(StrongReleaseInst *SRI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
@@ -344,7 +306,6 @@ public:
 #include "swift/SILOptimizer/PassManager/Passes.def"
 
   /// Instruction visitor helpers.
-  SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
 
   // Optimize the "isConcrete" builtin.
   SILInstruction *optimizeBuiltinIsConcrete(BuiltinInst *I);
@@ -383,7 +344,7 @@ public:
 
   /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
   /// introduced during SILCombine for an owned value.
-  void canonicalizeOSSALifetimes();
+  void canonicalizeOSSALifetimes(SILInstruction *currentInst);
 
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
@@ -405,6 +366,8 @@ public:
   SILInstruction *tryFoldComposedUnaryForwardingInstChain(
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
+
+  SILInstruction *optimizeAlignment(PointerToAddressInst *ptrAdrInst);
 
   InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 

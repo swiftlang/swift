@@ -1,0 +1,44 @@
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 5.5 (swiftlang-1300.0.29.102 clang-1300.0.28.1)
+// swift-module-flags: -target x86_64-apple-macosx11.0 -enable-objc-interop -enable-library-evolution -module-name DerivedWitnesses
+import Swift
+
+public enum HasSynthesizedEquals : Int {
+  case x
+  case y
+
+  public static func == (a: HasSynthesizedEquals, b: HasSynthesizedEquals) -> Bool
+  public func hash(into hasher: inout Hasher)
+  public var hashValue: Int {
+    get
+  }
+
+  public init?(rawValue: Int)
+  public typealias RawValue = Int
+  public var rawValue: Int {
+    get
+  }
+}
+
+public enum UsesDefaultEquals : Int {
+  case x
+  case y
+
+  public init?(rawValue: Int)
+  public typealias RawValue = Int
+  public var rawValue: Int {
+    get
+  }
+}
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s16DerivedWitnesses20HasSynthesizedEqualsOSQAASQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed HasSynthesizedEquals, @in_guaranteed HasSynthesizedEquals, @thick HasSynthesizedEquals.Type) -> Bool {
+// CHECK: bb0(%0 : $*HasSynthesizedEquals, %1 : $*HasSynthesizedEquals, %2 : $@thick HasSynthesizedEquals.Type):
+// CHECK: function_ref @$s16DerivedWitnesses20HasSynthesizedEqualsO2eeoiySbAC_ACtFZ : $@convention(method) (HasSynthesizedEquals, HasSynthesizedEquals, @thin HasSynthesizedEquals.Type) -> Bool
+// CHECK: return
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s16DerivedWitnesses17UsesDefaultEqualsOSQAASQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed UsesDefaultEquals, @in_guaranteed UsesDefaultEquals, @thick UsesDefaultEquals.Type) -> Bool {
+// CHECK: bb0(%0 : $*UsesDefaultEquals, %1 : $*UsesDefaultEquals, %2 : $@thick UsesDefaultEquals.Type):
+// CHECK: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+// CHECK: return

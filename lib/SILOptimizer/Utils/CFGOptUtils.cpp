@@ -133,7 +133,7 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 }
 
 void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
-  assert(block->getArgument(argIndex)->isPhiArgument()
+  assert(block->getArgument(argIndex)->isPhi()
          && "Only should be used on phi arguments");
   block->eraseArgument(argIndex);
 
@@ -332,7 +332,8 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> cases;
     auto *defaultBB = replaceSwitchDest(sei, cases, oldDest, newDest);
     builder.createSwitchEnum(sei->getLoc(), sei->getOperand(), defaultBB,
-                             cases);
+                             cases, None, ProfileCounter(),
+                             sei->getForwardingOwnershipKind());
     sei->eraseFromParent();
     return;
   }
@@ -373,23 +374,8 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     builder.createCheckedCastBranch(
         cbi->getLoc(), cbi->isExact(), cbi->getOperand(),
         cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
-        successBB, failureBB, cbi->getTrueBBCount(), cbi->getFalseBBCount());
-    cbi->eraseFromParent();
-    return;
-  }
-
-  case TermKind::CheckedCastValueBranchInst: {
-    auto cbi = cast<CheckedCastValueBranchInst>(t);
-    assert(oldDest == cbi->getSuccessBB()
-           || oldDest == cbi->getFailureBB() && "Invalid edge index");
-    auto successBB =
-        oldDest == cbi->getSuccessBB() ? newDest : cbi->getSuccessBB();
-    auto failureBB =
-        oldDest == cbi->getFailureBB() ? newDest : cbi->getFailureBB();
-    builder.createCheckedCastValueBranch(
-        cbi->getLoc(), cbi->getOperand(), cbi->getSourceFormalType(),
-        cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
-        successBB, failureBB);
+        successBB, failureBB, cbi->getForwardingOwnershipKind(),
+        cbi->getTrueBBCount(), cbi->getFalseBBCount());
     cbi->eraseFromParent();
     return;
   }
@@ -736,7 +722,6 @@ static bool isSafeNonExitTerminator(TermInst *ti) {
   case TermKind::SwitchEnumAddrInst:
   case TermKind::DynamicMethodBranchInst:
   case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
     return true;
   case TermKind::UnreachableInst:

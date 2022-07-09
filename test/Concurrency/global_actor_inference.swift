@@ -1,5 +1,8 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -warn-concurrency %S/Inputs/other_global_actor_inference.swift
+// RUN: %target-typecheck-verify-swift -I %t -disable-availability-checking
 // REQUIRES: concurrency
+import other_global_actor_inference
 
 actor SomeActor { }
 
@@ -28,6 +31,14 @@ struct GenericGlobalActor<T> {
 @MainActor class Copper {}
 @MainActor func iron() {}
 
+struct Carbon {
+  @IntWrapper var atomicWeight: Int
+
+  func getWeight() -> Int {
+    return atomicWeight
+  }
+}
+
 // ----------------------------------------------------------------------
 // Check that @MainActor(blah) doesn't work
 // ----------------------------------------------------------------------
@@ -44,7 +55,7 @@ protocol P1 {
 }
 
 protocol P2 {
-  @SomeGlobalActor func method1() // expected-note {{'method1()' declared here}}
+  @SomeGlobalActor func method1()
   func method2()
 }
 
@@ -89,6 +100,17 @@ extension NotAllInP1: P1 {
 func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor' to make global function 'testNotAllInP1(nap1:)' part of global actor 'SomeGlobalActor'}}
   nap1.method() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method()' in a synchronous nonisolated context}}
   nap1.other() // okay
+}
+
+// Make sure we don't infer 'nonisolated' for stored properties.
+@MainActor
+protocol Interface {
+  nonisolated var baz: Int { get } // expected-note{{'baz' declared here}}
+}
+
+@MainActor
+class Object: Interface {
+  var baz: Int = 42 // expected-warning{{main actor-isolated property 'baz' cannot be used to satisfy nonisolated protocol requirement}}
 }
 
 
@@ -143,14 +165,12 @@ class C5 {
 }
 
 protocol P3 {
-  @OtherGlobalActor func method1() // expected-note{{'method1()' declared here}}
+  @OtherGlobalActor func method1()
   func method2()
 }
 
 class C6: P2, P3 {
   func method1() { }
-    // expected-error@-1{{instance method 'method1()' must be isolated to the global actor 'SomeGlobalActor' to satisfy corresponding requirement from protocol 'P2'}}
-    // expected-error@-2{{instance method 'method1()' must be isolated to the global actor 'OtherGlobalActor' to satisfy corresponding requirement from protocol 'P3'}}
   func method2() { }
 
   func testMethod() {
@@ -219,7 +239,7 @@ class SuperclassWithGlobalActors {
   func j() { }
 }
 
-@GenericGlobalActor<String> // expected-error@+1{{global actor 'GenericGlobalActor<String>'-isolated class 'SubclassWithGlobalActors' has different actor isolation from nonisolated superclass 'SuperclassWithGlobalActors'}}
+@GenericGlobalActor<String> // it's okay to add a global actor to nonisolated
 class SubclassWithGlobalActors : SuperclassWithGlobalActors {
   override func f() { } // okay: inferred to @GenericGlobalActor<Int>
 
@@ -251,12 +271,28 @@ func barSync() {
 }
 
 // ----------------------------------------------------------------------
+// Property observers
+// ----------------------------------------------------------------------
+
+@OtherGlobalActor
+struct Observed {
+  var thing: Int = 0 { // expected-note {{property declared here}}
+    didSet {}
+    willSet {}
+  }
+}
+
+func checkObserved(_ o: Observed) { // expected-note {{add '@OtherGlobalActor' to make global function 'checkObserved' part of global actor 'OtherGlobalActor'}}
+  _ = o.thing // expected-error {{global actor 'OtherGlobalActor'-isolated property 'thing' can not be referenced from a non-isolated context}}
+}
+
+// ----------------------------------------------------------------------
 // Property wrappers
 // ----------------------------------------------------------------------
 
 @propertyWrapper
 @OtherGlobalActor
-struct WrapperOnActor<Wrapped> {
+struct WrapperOnActor<Wrapped: Sendable> {
   private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
@@ -278,7 +314,19 @@ struct WrapperOnActor<Wrapped> {
 @propertyWrapper
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
+  
   public var wrappedValue: Wrapped
+
+  public var accessCount: Int
+
+  nonisolated public init(wrappedValue: Wrapped) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+@propertyWrapper
+public struct WrapperOnMainActor2<Wrapped> {
+  @MainActor public var wrappedValue: Wrapped
 
   public init(wrappedValue: Wrapped) {
     self.wrappedValue = wrappedValue
@@ -286,7 +334,7 @@ public struct WrapperOnMainActor<Wrapped> {
 }
 
 @propertyWrapper
-actor WrapperActor<Wrapped> {
+actor WrapperActor<Wrapped: Sendable> {
   var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
@@ -310,9 +358,9 @@ struct HasWrapperOnActor {
 
   // expected-note@+1 3{{to make instance method 'testErrors()'}}
   func testErrors() {
-    _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
-    _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
-    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
   }
 
   @MainActor mutating func testOnMain() {
@@ -345,7 +393,7 @@ actor WrapperActorBad1<Wrapped> {
 }
 
 @propertyWrapper
-actor WrapperActorBad2<Wrapped> {
+actor WrapperActorBad2<Wrapped: Sendable> {
   var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
@@ -367,23 +415,24 @@ actor WrapperActorBad2<Wrapped> {
 struct WrapperWithMainActorDefaultInit {
   var wrappedValue: Int { fatalError() }
 
-  @MainActor init() {} // expected-note {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  @MainActor init() {} // expected-note 2 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
 }
 
 actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 3{{property declared here}}
+  @WrapperWithMainActorDefaultInit var property: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
   func f() {
-    _ = synced // expected-error{{'synced' isolated to global actor}}
-    _ = $synced // expected-error{{'$synced' isolated to global actor}}
-    _ = _synced // expected-error{{'_synced' isolated to global actor}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced on a different actor instance}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced on a different actor instance}}
+    _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced on a different actor instance}}
 
     @WrapperWithMainActorDefaultInit var value: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
   }
 }
 
 @propertyWrapper
-struct WrapperOnSomeGlobalActor<Wrapped> {
+struct WrapperOnSomeGlobalActor<Wrapped: Sendable> {
   private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
@@ -480,9 +529,9 @@ struct HasWrapperOnUnsafeActor {
   }
 
   nonisolated func testErrors() {
-    _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from}}
-    _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from}}
-    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
   }
 
   @MainActor mutating func testOnMain() {
@@ -502,15 +551,24 @@ func acceptClosure<T>(_: () -> T) { }
 }
 
 // ----------------------------------------------------------------------
-// Unsafe main actor parameter annotation
+// Main actor that predates concurrency
 // ----------------------------------------------------------------------
-func takesUnsafeMainActor(@_unsafeMainActor fn: () -> Void) { }
+@preconcurrency func takesUnsafeMainActor(fn: @MainActor () -> Void) { }
 
 @MainActor func onlyOnMainActor() { }
 
 func useUnsafeMainActor() {
   takesUnsafeMainActor {
     onlyOnMainActor() // okay due to parameter attribute
+  }
+}
+
+// ----------------------------------------------------------------------
+// @IBAction implies @MainActor(unsafe)
+// ----------------------------------------------------------------------
+class SomeWidgetThing {
+  @IBAction func onTouch(_ object: AnyObject) {
+    onlyOnMainActor() // okay
   }
 }
 
@@ -537,4 +595,53 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
   acceptAsyncSendableClosureInheriting {
     await onlyOnMainActor() // expected-warning{{no 'async' operations occur within 'await' expression}}
   }
+}
+
+
+// defer bodies inherit global actor-ness
+@MainActor
+var statefulThingy: Bool = false // expected-note {{var declared here}}
+
+@MainActor
+func useFooInADefer() -> String { // expected-note {{calls to global function 'useFooInADefer()' from outside of its actor context are implicitly asynchronous}}
+  defer {
+    statefulThingy = true
+  }
+
+  return "hello"
+}
+
+// ----------------------------------------------------------------------
+// Dynamic replacement
+// ----------------------------------------------------------------------
+@_dynamicReplacement(for: dynamicOnMainActor)
+func replacesDynamicOnMainActor() {
+  onlyOnMainActor()
+}
+
+// ----------------------------------------------------------------------
+// Global-actor isolation of stored property initializer expressions
+// ----------------------------------------------------------------------
+
+class Cutter {
+  @MainActor var x = useFooInADefer()
+  @MainActor var y = { () -> Bool in
+      var z = statefulThingy
+      return z
+    }()
+}
+
+@SomeGlobalActor
+class Butter {
+  var a = useFooInADefer() // expected-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+
+  nonisolated let b = statefulThingy // expected-error {{main actor-isolated var 'statefulThingy' can not be referenced from a non-isolated context}}
+
+  var c: Int = {
+    return getGlobal7()
+  }()
+
+  lazy var d: Int = getGlobal7()
+
+  static var e: Int = getGlobal7()
 }

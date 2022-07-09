@@ -37,7 +37,8 @@ public:
   InPlaceInitializationResultPlan(Initialization *init) : init(init) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
     init->finishInitialization(SGF);
     return RValue::forInContext();
   }
@@ -65,7 +66,13 @@ public:
   void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
   override {
     assert(box && "buffer never emitted before activating cleanup?!");
-    SGF.B.createDeallocBox(loc, box);
+    auto theBox = box;
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      auto *bbi = cast<BeginBorrowInst>(theBox);
+      SGF.B.createEndBorrow(loc, bbi);
+      theBox = bbi->getOperand();
+    }
+    SGF.B.createDeallocBox(loc, theBox);
   }
   
   void dump(SILGenFunction &SGF) const override {
@@ -76,36 +83,56 @@ public:
 };
 
 /// Map a type expressed in terms of opened archetypes into a context-free
-/// dependent type, returning the type, a generic signature with parameters
-/// corresponding to each opened type,
-static std::tuple<CanType, CanGenericSignature, SubstitutionMap>
+/// dependent type, and return a substitution map with generic parameters
+/// corresponding to each distinct root opened archetype.
+static std::pair<CanType, SubstitutionMap>
 mapTypeOutOfOpenedExistentialContext(CanType t) {
+  auto &ctx = t->getASTContext();
+
   SmallVector<OpenedArchetypeType *, 4> openedTypes;
-  t->getOpenedExistentials(openedTypes);
+  t->getRootOpenedExistentials(openedTypes);
 
-  ArrayRef<Type> openedTypesAsTypes(
-    reinterpret_cast<const Type *>(openedTypes.data()),
-    openedTypes.size());
+  SmallVector<GenericTypeParamType *, 2> params;
+  SmallVector<Requirement, 2> requirements;
+  for (const unsigned i : indices(openedTypes)) {
+    auto *param = GenericTypeParamType::get(
+        /*type sequence*/ false, /*depth*/ 0, /*index*/ i, ctx);
+    params.push_back(param);
 
-  SmallVector<GenericTypeParamType *, 4> params;
-  for (unsigned i : indices(openedTypes)) {
-    params.push_back(GenericTypeParamType::get(0, i, t->getASTContext()));
+    Type constraintTy = openedTypes[i]->getExistentialType();
+    if (auto existentialTy = constraintTy->getAs<ExistentialType>())
+      constraintTy = existentialTy->getConstraintType();
+
+    requirements.emplace_back(RequirementKind::Conformance, param,
+                              constraintTy);
   }
-  
-  auto mappedSig = GenericSignature::get(params, {});
-  auto mappedSubs = SubstitutionMap::get(mappedSig, openedTypesAsTypes, {});
 
-  auto mappedTy = t.subst(
-    [&](SubstitutableType *t) -> Type {
-      auto index = std::find(openedTypes.begin(), openedTypes.end(), t)
-        - openedTypes.begin();
-      assert(index != openedTypes.end() - openedTypes.begin());
-      return params[index];
-    },
-    MakeAbstractConformanceForGenericType());
+  const auto mappedSubs = SubstitutionMap::get(
+      swift::buildGenericSignature(ctx, nullptr, params, requirements),
+      [&](SubstitutableType *t) -> Type {
+        return openedTypes[cast<GenericTypeParamType>(t)->getIndex()];
+      },
+      MakeAbstractConformanceForGenericType());
 
-  return std::make_tuple(mappedTy->getCanonicalType(mappedSig),
-                         mappedSig.getCanonicalSignature(), mappedSubs);
+  const auto mappedTy = t.subst(
+      [&](SubstitutableType *t) -> Type {
+        auto *archTy = cast<ArchetypeType>(t);
+        const auto index = std::find(openedTypes.begin(), openedTypes.end(),
+                                     archTy->getRoot()) -
+                           openedTypes.begin();
+        assert(index != openedTypes.end() - openedTypes.begin());
+
+        if (auto *dmt =
+                archTy->getInterfaceType()->getAs<DependentMemberType>()) {
+          return dmt->substRootParam(params[index],
+                                     MakeAbstractConformanceForGenericType());
+        }
+
+        return params[index];
+      },
+      MakeAbstractConformanceForGenericType());
+
+  return std::make_pair(mappedTy->getCanonicalType(), mappedSubs);
 }
 
 /// A result plan for an indirectly-returned opened existential value.
@@ -144,20 +171,25 @@ public:
 
     auto resultTy = SGF.getLoweredType(origType, substType).getASTType();
     CanType layoutTy;
-    CanGenericSignature layoutSig;
     SubstitutionMap layoutSubs;
-    std::tie(layoutTy, layoutSig, layoutSubs)
-      = mapTypeOutOfOpenedExistentialContext(resultTy);
+    std::tie(layoutTy, layoutSubs) =
+        mapTypeOutOfOpenedExistentialContext(resultTy);
 
+    CanGenericSignature layoutSig =
+        layoutSubs.getGenericSignature().getCanonicalSignature();
     auto boxLayout =
-        SILLayout::get(SGF.getASTContext(), layoutSig.getCanonicalSignature(),
-                       SILField(layoutTy->getCanonicalType(layoutSig), true));
+        SILLayout::get(SGF.getASTContext(), layoutSig,
+                       SILField(layoutTy->getCanonicalType(layoutSig), true),
+                       /*captures generics*/ false);
 
     resultBox = SGF.B.createAllocBox(loc,
       SILBoxType::get(SGF.getASTContext(),
                       boxLayout,
                       layoutSubs));
-    
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      resultBox = SGF.B.createBeginBorrow(loc, resultBox, /*isLexical=*/true);
+    }
+
     // Complete the cleanup to deallocate this buffer later, after we're
     // finished with the argument.
     static_cast<IndirectOpenedSelfCleanup&>(SGF.Cleanups.getCleanup(handle))
@@ -169,7 +201,8 @@ public:
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
     assert(resultBox && "never emitted temporary?!");
     
     // Lower the unabstracted result type.
@@ -209,7 +242,8 @@ public:
         rep(rep) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
     // Lower the unabstracted result type.
     auto &substTL = SGF.getTypeLowering(substType);
 
@@ -309,8 +343,10 @@ public:
         temporary(std::move(temporary)) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
-    RValue subResult = subPlan->finish(SGF, loc, substType, directResults);
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
+    RValue subResult = subPlan->finish(SGF, loc, substType, directResults,
+                                       bridgedForeignError);
     assert(subResult.isInContext() && "sub-plan didn't emit into context?");
     (void)subResult;
 
@@ -339,8 +375,10 @@ public:
       : init(init), subPlan(std::move(subPlan)) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
-    RValue subResult = subPlan->finish(SGF, loc, substType, directResults);
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
+    RValue subResult = subPlan->finish(SGF, loc, substType, directResults,
+                                       bridgedForeignError);
     ManagedValue value = std::move(subResult).getAsSingleValue(SGF, loc);
 
     init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
@@ -374,15 +412,17 @@ public:
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
     RValue tupleRV(substType);
 
     // Finish all the component tuples.
     auto substTupleType = cast<TupleType>(substType);
     assert(substTupleType.getElementTypes().size() == eltPlans.size());
     for (auto i : indices(substTupleType.getElementTypes())) {
-      RValue eltRV = eltPlans[i]->finish(
-          SGF, loc, substTupleType.getElementType(i), directResults);
+      RValue eltRV =
+          eltPlans[i]->finish(SGF, loc, substTupleType.getElementType(i),
+                              directResults, bridgedForeignError);
       tupleRV.addElement(std::move(eltRV));
     }
 
@@ -428,12 +468,14 @@ public:
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
     auto substTupleType = cast<TupleType>(substType);
     assert(substTupleType.getElementTypes().size() == eltPlans.size());
     for (auto i : indices(substTupleType.getElementTypes())) {
       auto eltType = substTupleType.getElementType(i);
-      RValue eltRV = eltPlans[i]->finish(SGF, loc, eltType, directResults);
+      RValue eltRV = eltPlans[i]->finish(SGF, loc, eltType, directResults,
+                                         bridgedForeignError);
       assert(eltRV.isInContext());
       (void)eltRV;
     }
@@ -457,6 +499,7 @@ class ForeignAsyncInitializationPlan final : public ResultPlan {
   SILType opaqueResumeType;
   SILValue resumeBuf;
   SILValue continuation;
+  ExecutorBreadcrumb breadcrumb;
   
 public:
   ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc,
@@ -475,14 +518,17 @@ public:
                             SmallVectorImpl<SILValue> &outList) const override {
     // A foreign async function shouldn't have any indirect results.
   }
-  
+
   ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF, SILLocation loc)
-  override {
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
+                                    AbstractionPattern origFormalType,
+                                    SILLocation loc) override {
     // Get the current continuation for the task.
-    bool throws = calleeTypeInfo.foreign.async
-        ->completionHandlerErrorParamIndex().hasValue();
-    
+    bool throws =
+        calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
+            .hasValue() ||
+        calleeTypeInfo.foreign.error.hasValue();
+
     continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
                                calleeTypeInfo.substResultType, throws);
 
@@ -491,7 +537,7 @@ public:
     auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
 
     auto errorTy = throws
-      ? SGF.getASTContext().getExceptionType()
+      ? SGF.getASTContext().getErrorExistentialType()
       : SGF.getASTContext().getNeverType();
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
                                                 { calleeTypeInfo.substResultType, errorTy })
@@ -525,15 +571,15 @@ public:
       impFnTy = cast<SILFunctionType>(impTy.getASTType());
     }
     auto env = SGF.F.getGenericEnvironment();
-    auto sig = env ? env->getGenericSignature()->getCanonicalSignature()
+    auto sig = env ? env->getGenericSignature().getCanonicalSignature()
                    : CanGenericSignature();
-    SILFunction *impl = SGF.SGM
-      .getOrCreateForeignAsyncCompletionHandlerImplFunction(
-                  cast<SILFunctionType>(impFnTy->mapTypeOutOfContext()
-                                               ->getCanonicalType(sig)),
-                  continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
-                  sig,
-                  *calleeTypeInfo.foreign.async);
+    SILFunction *impl =
+        SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
+            cast<SILFunctionType>(
+                impFnTy->mapTypeOutOfContext()->getCanonicalType(sig)),
+            continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
+            origFormalType, sig, *calleeTypeInfo.foreign.async,
+            calleeTypeInfo.foreign.error);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
     
     // Initialize the block object for the completion handler.
@@ -551,49 +597,130 @@ public:
     // _Block_copy-ing it.
     return ManagedValue::forUnmanaged(block);
   }
-  
+
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&crumb) override {
+    assert(!breadcrumb.needsEmit() && "overwriting an existing breadcrumb?");
+    breadcrumb = std::move(crumb);
+  }
+
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
     // There should be no direct results from the call.
     assert(directResults.empty());
     
     // Await the continuation we handed off to the completion handler.
     SILBasicBlock *resumeBlock = SGF.createBasicBlock();
     SILBasicBlock *errorBlock = nullptr;
-    auto errorParamIndex = calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex();
-    if (errorParamIndex) {
+    bool throws =
+        calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
+            .hasValue() ||
+        calleeTypeInfo.foreign.error.hasValue();
+    if (throws) {
       errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
     }
-    
+
+    auto *awaitBB = SGF.B.getInsertionBB();
+    if (bridgedForeignError) {
+      // Avoid a critical edge from the block which branches to the await and
+      // foreign error blocks to the await block (to which the error block will
+      // be made to branch in a moment) by introducing a trampoline which will
+      // branch to the await block.
+      awaitBB = SGF.createBasicBlock();
+      SGF.B.createBranch(loc, awaitBB);
+
+      // Finish emitting the foreign error block:
+      // (1) fulfill the unsafe continuation with the foreign error
+      // (2) branch to the await block
+      {
+        // First, fulfill the unsafe continuation with the foreign error.
+        // Currently, that block's code looks something like
+        //     %foreignError = ... : $*Optional<NSError>
+        //     %converter = function_ref _convertNSErrorToError(_:)
+        //     %error = apply %converter(%foreignError)
+        //     [... insert here ...]
+        //     destroy_value %error
+        //     destroy_value %foreignError
+        // Insert code to fulfill it after the native %error is defined.  That
+        // code should structure the RawUnsafeContinuation (continuation) into
+        // an appropriately typed UnsafeContinuation and then pass that together
+        // with (a copy of) the error to
+        // _resumeUnsafeThrowingContinuationWithError.
+        // [foreign_error_block_with_foreign_async_convention]
+        SGF.B.setInsertionPoint(
+            ++bridgedForeignError->getDefiningInstruction()->getIterator());
+
+        auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
+
+        auto errorTy = SGF.getASTContext().getErrorExistentialType();
+        auto continuationBGT =
+            BoundGenericType::get(continuationDecl, Type(),
+                                  {calleeTypeInfo.substResultType, errorTy});
+        auto env = SGF.F.getGenericEnvironment();
+        auto sig = env ? env->getGenericSignature().getCanonicalSignature()
+                       : CanGenericSignature();
+        auto mappedContinuationTy =
+            continuationBGT->mapTypeOutOfContext()->getCanonicalType(sig);
+        auto resumeType =
+            cast<BoundGenericType>(mappedContinuationTy).getGenericArgs()[0];
+        auto continuationTy = continuationBGT->getCanonicalType();
+
+        auto errorIntrinsic =
+            SGF.SGM.getResumeUnsafeThrowingContinuationWithError();
+        Type replacementTypes[] = {
+            SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
+        auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
+                                         replacementTypes,
+                                         ArrayRef<ProtocolConformanceRef>{});
+        auto wrappedContinuation = SGF.B.createStruct(
+            loc, SILType::getPrimitiveObjectType(continuationTy),
+            {continuation});
+
+        auto continuationMV =
+            ManagedValue::forUnmanaged(SILValue(wrappedContinuation));
+        SGF.emitApplyOfLibraryIntrinsic(
+            loc, errorIntrinsic, subs,
+            {continuationMV,
+             ManagedValue::forUnmanaged(bridgedForeignError).copy(SGF, loc)},
+            SGFContext());
+
+        // Second, emit a branch from the end of the foreign error block to the
+        // await block, to await the continuation which was just fulfilled.
+        SGF.B.setInsertionPoint(
+            bridgedForeignError->getDefiningInstruction()->getParent());
+        SGF.B.createBranch(loc, awaitBB);
+      }
+
+      SGF.B.emitBlock(awaitBB);
+    }
     SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
     
     // Propagate an error if we have one.
     if (errorBlock) {
       SGF.B.emitBlock(errorBlock);
+      breadcrumb.emit(SGF, loc);
       
       Scope errorScope(SGF, loc);
-      
-      auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
-        ->getCanonicalType();
-      auto errorVal
-        = SGF.B.createOwnedPhiArgument(SILType::getPrimitiveObjectType(errorTy));
-      
+
+      auto errorTy = SGF.getASTContext().getErrorExistentialType();
+      auto errorVal = SGF.B.createTermResult(
+        SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
+
       SGF.emitThrow(loc, errorVal, true);
     }
     
     SGF.B.emitBlock(resumeBlock);
+    breadcrumb.emit(SGF, loc);
     
     // The incoming value is the maximally-abstracted result type of the
     // continuation. Move it out of the resume buffer and reabstract it if
     // necessary.
-    auto resumeResult = SGF.emitLoad(loc, resumeBuf,
-      calleeTypeInfo.origResultType
-         ? *calleeTypeInfo.origResultType
-         : AbstractionPattern(calleeTypeInfo.substResultType),
-                 calleeTypeInfo.substResultType,
-                 SGF.getTypeLowering(calleeTypeInfo.substResultType),
-                 SGFContext(), IsTake);
-    
+    auto resumeResult =
+        SGF.emitLoad(loc, resumeBuf, AbstractionPattern::getOpaque(),
+                     calleeTypeInfo.substResultType,
+                     SGF.getTypeLowering(calleeTypeInfo.substResultType),
+                     SGFContext(), IsTake);
+
     return RValue(SGF, loc, calleeTypeInfo.substResultType, resumeResult);
   }
 };
@@ -631,6 +758,23 @@ public:
 
     auto errorType =
         CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
+
+    // In cases when from swift, we call objc imported methods written like so:
+    //
+    // (1) - (BOOL)submit:(NSError *_Nonnull __autoreleasing *_Nullable)errorOut;
+    //
+    // the clang importer will successfully import the given method as having a
+    // non-null NSError. This doesn't follow the normal convention where we
+    // expect the NSError to be Optional<NSError>. In order to preserve source
+    // compatibility, we want to allow SILGen to handle this behavior. Luckily
+    // in this case, NSError and Optional<NSError> are layout compatible, so we
+    // can just pass in the Optional<NSError> and everything works.
+    if (auto nsErrorTy = SGF.getASTContext().getNSErrorType()->getCanonicalType()) {
+      if (errorType == nsErrorTy) {
+        errorType = errorType.wrapInOptionalType();
+      }
+    }
+
     auto &errorTL = SGF.getTypeLowering(errorType);
 
     // Allocate a temporary.
@@ -653,15 +797,28 @@ public:
                                 AbstractionPattern(errorType), errorType);
   }
 
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&breadcrumb) override {
+    subPlan->deferExecutorBreadcrumb(std::move(breadcrumb));
+  }
+
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults) override {
-    return subPlan->finish(SGF, loc, substType, directResults);
+                ArrayRef<ManagedValue> &directResults,
+                SILValue bridgedForeignError) override {
+    return subPlan->finish(SGF, loc, substType, directResults,
+                           bridgedForeignError);
   }
 
   void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
                             SmallVectorImpl<SILValue> &outList) const override {
     subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
+  }
+
+  ManagedValue
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
+                                    AbstractionPattern origFormalType,
+                                    SILLocation loc) override {
+    return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
   }
 
   Optional<std::pair<ManagedValue, ManagedValue>>
@@ -694,12 +851,7 @@ public:
 ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
                                                      SILLocation loc) {
   // First check if we have a foreign error and/or async convention.
-  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
-    // Create a result plan that gets the result schema from the completion
-    // handler callback's arguments.
-    // completion handler.
-    return ResultPlanPtr(new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
-  } else if (auto foreignError = calleeTypeInfo.foreign.error) {
+  if (auto foreignError = calleeTypeInfo.foreign.error) {
     // Handle the foreign error first.
     //
     // The plan needs to be built using the formal result type after foreign-error
@@ -708,7 +860,8 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
     // These conventions make the formal result type ().
     case ForeignErrorConvention::ZeroResult:
     case ForeignErrorConvention::NonZeroResult:
-      assert(calleeTypeInfo.substResultType->isVoid());
+      assert(calleeTypeInfo.substResultType->isVoid() ||
+             calleeTypeInfo.foreign.async);
       allResults.clear();
       break;
 
@@ -733,10 +886,21 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
     }
     }
 
-    ResultPlanPtr subPlan = build(init, calleeTypeInfo.origResultType.getValue(),
-                                  calleeTypeInfo.substResultType);
+    ResultPlanPtr subPlan;
+    if (auto foreignAsync = calleeTypeInfo.foreign.async) {
+      subPlan = ResultPlanPtr(
+          new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
+    } else {
+      subPlan = build(init, calleeTypeInfo.origResultType.getValue(),
+                      calleeTypeInfo.substResultType);
+    }
     return ResultPlanPtr(new ForeignErrorInitializationPlan(
         SGF, loc, calleeTypeInfo, std::move(subPlan)));
+  } else if (auto foreignAsync = calleeTypeInfo.foreign.async) {
+    // Create a result plan that gets the result schema from the completion
+    // handler callback's arguments.
+    return ResultPlanPtr(
+        new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
   } else {
     // Otherwise, we can just call build.
     return build(init, calleeTypeInfo.origResultType.getValue(),

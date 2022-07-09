@@ -231,10 +231,7 @@ public:
     extractAllElements(origResult, Builder, origResults);
 
     // Get and partially apply the pullback.
-    auto vjpGenericEnv = vjp->getGenericEnvironment();
-    auto vjpSubstMap = vjpGenericEnv
-                           ? vjpGenericEnv->getForwardingSubstitutionMap()
-                           : vjp->getForwardingSubstitutionMap();
+    auto vjpSubstMap = vjp->getForwardingSubstitutionMap();
     auto *pullbackRef = Builder.createFunctionRef(loc, pullback);
 
     // Prepare partial application arguments.
@@ -257,13 +254,10 @@ public:
     auto *pullbackPartialApply = Builder.createPartialApply(
         loc, pullbackRef, vjpSubstMap, {partialApplyArg},
         ParameterConvention::Direct_Guaranteed);
-    auto pullbackType = vjp->getLoweredFunctionType()
-                            ->getResults()
-                            .back()
-                            .getSILStorageInterfaceType();
-    pullbackType = pullbackType.substGenericArgs(
-        getModule(), vjpSubstMap, TypeExpansionContext::minimal());
-    pullbackType = pullbackType.subst(getModule(), vjpSubstMap);
+    auto pullbackType = vjp->mapTypeIntoContext(
+        vjp->getConventions().getSILType(
+            vjp->getLoweredFunctionType()->getResults().back(),
+            vjp->getTypeExpansionContext()));
     auto pullbackFnType = pullbackType.castTo<SILFunctionType>();
     auto pullbackSubstType =
         pullbackPartialApply->getType().castTo<SILFunctionType>();
@@ -375,20 +369,6 @@ public:
         createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getSuccessBB()),
         createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getFailureBB()),
         ccbi->getTrueBBCount(), ccbi->getFalseBBCount());
-  }
-
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *ccvbi) {
-    Builder.setCurrentDebugScope(getOpScope(ccvbi->getDebugScope()));
-    // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(ccvbi);
-    // Create a new `checked_cast_value_branch` instruction.
-    getBuilder().createCheckedCastValueBranch(
-        ccvbi->getLoc(), getOpValue(ccvbi->getOperand()),
-        getOpASTType(ccvbi->getSourceFormalType()),
-        getOpType(ccvbi->getTargetLoweredType()),
-        getOpASTType(ccvbi->getTargetFormalType()),
-        createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getSuccessBB()),
-        createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getFailureBB()));
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi) {
@@ -823,9 +803,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // signature: when witness generic signature has same-type requirements
   // binding all generic parameters to concrete types, VJP function type uses
   // all the concrete types and VJP generic signature is null.
-  CanGenericSignature witnessCanGenSig;
-  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
-    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // Given a type, returns its formal SIL parameter info.
@@ -985,8 +963,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.
   auto pbGenericSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
-  auto *pbGenericEnv =
-      pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
+  auto *pbGenericEnv = pbGenericSig.getGenericEnvironment();
   auto pbType = SILFunctionType::get(
       pbGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
@@ -999,7 +976,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
       pbGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, vjp->isSerialized(),
-      original->isDynamicallyReplaceable());
+      original->isDynamicallyReplaceable(), original->isDistributed());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
   return pullback;

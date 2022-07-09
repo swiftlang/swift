@@ -17,10 +17,12 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -38,6 +40,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
@@ -92,7 +95,6 @@ namespace swift {
   class TypeVariableType;
   class TupleType;
   class FunctionType;
-  class GenericSignatureBuilder;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
@@ -105,6 +107,8 @@ namespace swift {
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
+  enum class BuiltinConformanceKind;
+  class BuiltinProtocolConformance;
   enum class ProtocolConformanceState;
   class Pattern;
   enum PointerTypeKind : unsigned;
@@ -112,7 +116,6 @@ namespace swift {
   class TupleTypeElt;
   class EnumElementDecl;
   class ProtocolDecl;
-  class RequirementMachine;
   class SubstitutableType;
   class SourceManager;
   class ValueDecl;
@@ -127,7 +130,6 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
-  class TypeCheckCompletionCallback;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -135,25 +137,17 @@ namespace namelookup {
   class ImportCache;
 }
 
+namespace rewriting {
+  class RewriteContext;
+}
+
 namespace syntax {
   class SyntaxArena;
 }
 
-/// The arena in which a particular ASTContext allocation will go.
-enum class AllocationArena {
-  /// The permanent arena, which is tied to the lifetime of
-  /// the ASTContext.
-  ///
-  /// All global declarations and types need to be allocated into this arena.
-  /// At present, everything that is not a type involving a type variable is
-  /// allocated in this arena.
-  Permanent,
-  /// The constraint solver's temporary arena, which is tied to the
-  /// lifetime of a particular instance of the constraint solver.
-  ///
-  /// Any type involving a type variable is allocated in this arena.
-  ConstraintSolver
-};
+namespace ide {
+  class TypeCheckCompletionCallback;
+}
 
 /// Lists the set of "known" Foundation entities that are used in the
 /// compiler.
@@ -229,12 +223,13 @@ class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
 
-  ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-             SearchPathOptions &SearchPathOpts,
-             ClangImporterOptions &ClangImporterOpts,
-             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-             SourceManager &SourceMgr,
-             DiagnosticEngine &Diags);
+  ASTContext(
+      LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
+      SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
+      ClangImporterOptions &ClangImporterOpts,
+      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -245,11 +240,13 @@ public:
 
   void operator delete(void *Data) throw();
 
-  static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-                         SearchPathOptions &SearchPathOpts,
-                         ClangImporterOptions &ClangImporterOpts,
-                         symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-                         SourceManager &SourceMgr, DiagnosticEngine &Diags);
+  static ASTContext *
+  get(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
+      SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
+      ClangImporterOptions &ClangImporterOpts,
+      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -263,6 +260,9 @@ public:
 
   /// The type checker options.
   const TypeCheckerOptions &TypeCheckerOpts;
+
+  /// Options for SIL.
+  const SILOptions &SILOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -279,7 +279,16 @@ public:
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
 
-  TypeCheckCompletionCallback *CompletionCallback = nullptr;
+  /// If the shared pointer is not a \c nullptr and the pointee is \c true,
+  /// all operations working on this ASTContext should be aborted at the next
+  /// possible opportunity.
+  /// This is used by SourceKit to cancel requests for which the result is no
+  /// longer of interest.
+  /// The returned result will be discarded, so the operation that acknowledges
+  /// the cancellation might return with any result.
+  std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
+
+  ide::TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
@@ -354,11 +363,24 @@ private:
     DelayedPatternContexts;
 
   /// Cache of module names that fail the 'canImport' test in this context.
-  mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
-  
+  mutable llvm::StringSet<> FailedModuleImportNames;
+
+  /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
+  /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
+  /// if the module names appearing in source files are aliases or real names.
+  /// \see ASTContext::getRealModuleName.
+  ///
+  /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
+  /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
+  mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
+
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
+
+  /// An optional generic callback function invoked prior to importing a module.
+  mutable std::function<bool(llvm::StringRef ModuleName, bool IsOverlay)>
+      PreModuleImportCallback;
 
 public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
@@ -469,7 +491,7 @@ public:
                               setVector.size());
   }
 
-  /// Retrive the syntax node memory manager for this context.
+  /// Retrieve the syntax node memory manager for this context.
   llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
 
   /// Set a new stats reporter.
@@ -480,14 +502,42 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
+  /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
+  /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
+  /// the names of the imported or referenced modules in source files in the main module, and X and Y
+  /// are the real (physical) module names on disk.
+  void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+
+  /// Look up option used in \c getRealModuleName when module aliasing is applied.
+  enum class ModuleAliasLookupOption {
+    alwaysRealName,
+    realNameFromAlias,
+    aliasFromRealName
+  };
+
+  /// Look up the module alias map by the given \p key and a lookup \p option.
+  ///
+  /// \param key A module alias or real name to look up the map by.
+  /// \param option A look up option \c ModuleAliasLookupOption. Defaults to alwaysRealName.
+  ///
+  /// \return The real name or alias mapped to the key.
+  ///         If no aliasing is used, return \p key regardless of \p option.
+  ///         If \p option is alwaysRealName, return the real module name whether the \p key is an alias
+  ///         or a real name.
+  ///         If \p option is realNameFromAlias, only return a real name if \p key is an alias.
+  ///         If \p option is aliasFromRealName, only return an alias if \p key is a real name.
+  ///         Else return a real name or an alias mapped to the \p key.
+  Identifier getRealModuleName(Identifier key,
+                               ModuleAliasLookupOption option = ModuleAliasLookupOption::alwaysRealName) const;
+
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,
                                         PrecedenceGroupDecl *right) const;
 
   /// Retrieve the declaration of Swift.Error.
   ProtocolDecl *getErrorDecl() const;
-  CanType getExceptionType() const;
-  
+  CanType getErrorExistentialType() const;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of Swift.NAME. */ \
   DECL_CLASS *get##NAME##Decl() const; \
@@ -511,7 +561,13 @@ public:
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
-  /// Retrieve the type Swift.AnyObject.
+  /// Retrieve the type Swift.Any as an existential type.
+  CanType getAnyExistentialType() const;
+
+  /// Retrieve the type Swift.AnyObject as a constraint.
+  CanType getAnyObjectConstraint() const;
+
+  /// Retrieve the type Swift.AnyObject as an existential type.
   CanType getAnyObjectType() const;
 
 #define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
@@ -580,7 +636,10 @@ public:
   ConcreteDeclRef getBuiltinInitDecl(NominalTypeDecl *decl,
                                      KnownProtocolKind builtinProtocol,
                 llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
-  
+
+  /// Retrieve _StringProcessing.Regex.init(_regexString: String, version: Int).
+  ConcreteDeclRef getRegexInitDecl(Type regexType) const;
+
   /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
   FuncDecl *getLessThanIntDecl() const;
 
@@ -602,6 +661,68 @@ public:
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
+
+  /// Retrieve the declaration of DistributedActorSystem.remoteCall(Void)(...).
+  ///
+  /// \param actorOrSystem distributed actor or actor system to get the
+  /// remoteCall function for. Since the method we're looking for is an ad-hoc
+  /// requirement, a specific type MUST be passed here as it is not possible
+  /// to obtain the decl from just the `DistributedActorSystem` protocol type.
+  /// \param isVoidReturn true if the call will be returning `Void`.
+  AbstractFunctionDecl *getRemoteCallOnDistributedActorSystem(
+      NominalTypeDecl *actorOrSystem,
+      bool isVoidReturn) const;
+
+  /// Retrieve the declaration of DistributedActorSystem.make().
+  ///
+  /// \param thunk the function from which we'll be invoking things on the obtained
+  /// actor system; This way we'll always get the right type, taking care of any
+  /// where clauses etc.
+  FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
+      AbstractFunctionDecl *thunk) const;
+
+  // Retrieve the declaration of
+  // DistributedInvocationEncoder.recordGenericSubstitution(_:).
+  //
+  // \param nominal optionally provide a 'NominalTypeDecl' from which the
+  // function decl shall be extracted. This is useful to avoid witness calls
+  // through the protocol which is looked up when nominal is null.
+  FuncDecl *getRecordGenericSubstitutionOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordArgument(_:).
+  //
+  // \param nominal optionally provide a 'NominalTypeDecl' from which the
+  // function decl shall be extracted. This is useful to avoid witness calls
+  // through the protocol which is looked up when nominal is null.
+  AbstractFunctionDecl *getRecordArgumentOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordReturnType(_:).
+  AbstractFunctionDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordErrorType(_:).
+  AbstractFunctionDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of
+  // DistributedTargetInvocationDecoder.getDecodeNextArgumentOnDistributedInvocationDecoder(_:).
+  AbstractFunctionDecl *getDecodeNextArgumentOnDistributedInvocationDecoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of
+  // getOnReturnOnDistributedTargetInvocationResultHandler.onReturn(_:).
+  AbstractFunctionDecl *getOnReturnOnDistributedTargetInvocationResultHandler(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
+  //
+  // \param nominal optionally provide a 'NominalTypeDecl' from which the
+  // function decl shall be extracted. This is useful to avoid witness calls
+  // through the protocol which is looked up when nominal is null.
+  FuncDecl *getDoneRecordingOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
 
   /// Look for the declaration with the given name within the
   /// passed in module.
@@ -663,7 +784,7 @@ public:
   /// \p templateArgs must be empty. \p templateParams and \p genericArgs must
   /// be equal in size.
   ///
-  /// \returns nullptr if successful. If an error occors, returns a list of
+  /// \returns nullptr if successful. If an error occurs, returns a list of
   /// types that couldn't be converted.
   std::unique_ptr<TemplateInstantiationError> getClangTemplateArguments(
       const clang::TemplateParameterList *templateParams,
@@ -747,12 +868,27 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the back-deployed availability for concurrency.
+  AvailabilityContext getBackDeployedConcurrencyAvailability();
+
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
   /// Get the runtime availability of getters and setters of multi payload enum
   /// tag single payloads.
   AvailabilityContext getMultiPayloadEnumTagSinglePayload();
+
+  /// Get the runtime availability of the Objective-C enabled
+  /// swift_isUniquelyReferenced functions.
+  AvailabilityContext getObjCIsUniquelyReferencedAvailability();
+
+  /// Get the runtime availability of metadata manipulation runtime functions
+  /// for extended existential types.
+  AvailabilityContext getParameterizedExistentialRuntimeAvailability();
+
+  /// Get the runtime availability of immortal ref-count symbols, which are
+  /// needed to place array buffers into constant data sections.
+  AvailabilityContext getImmortalRefCountSymbolsAvailability();
 
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
@@ -774,6 +910,15 @@ public:
   /// compiler for the target platform.
   AvailabilityContext getSwift56Availability();
 
+  /// Get the runtime availability of features introduced in the Swift 5.7
+  /// compiler for the target platform.
+  AvailabilityContext getSwift57Availability();
+
+  // Note: Update this function if you add a new getSwiftXYAvailability above.
+  /// Get the runtime availability for a particular version of Swift (5.0+).
+  AvailabilityContext
+  getSwift5PlusAvailability(llvm::VersionTuple swiftVersion);
+
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.
   AvailabilityContext getSwiftFutureAvailability();
@@ -793,6 +938,7 @@ public:
   const CanType TheErrorType;             /// This is the ErrorType singleton.
   const CanType TheUnresolvedType;        /// This is the UnresolvedType singleton.
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
+  const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
 #define SINGLETON_TYPE(SHORT_ID, ID) \
   const CanType The##SHORT_ID##Type;
@@ -850,6 +996,13 @@ public:
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
 
+  /// Compute the extra implicit framework search paths on Apple platforms:
+  /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
+  std::vector<std::string> getDarwinImplicitFrameworkSearchPaths() const;
+
+  /// Return a set of all possible filesystem locations where modules can be found.
+  llvm::StringSet<> getAllModuleSearchPathsSet() const;
+
   /// Load extensions to the given nominal type from the external
   /// module loaders.
   ///
@@ -860,11 +1013,11 @@ public:
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
 
-  /// Load the methods within the given class that produce
+  /// Load the methods within the given type that produce
   /// Objective-C class or instance methods with the given selector.
   ///
-  /// \param classDecl The class in which we are searching for @objc methods.
-  /// The search only considers this class and its extensions; not any
+  /// \param tyDecl The type in which we are searching for @objc methods.
+  /// The search only considers this type and its extensions; not any
   /// superclasses.
   ///
   /// \param selector The selector to search for.
@@ -882,7 +1035,11 @@ public:
   ///
   /// \param swiftOnly If true, only loads methods from imported Swift modules,
   /// skipping the Clang importer.
-  void loadObjCMethods(ClassDecl *classDecl, ObjCSelector selector,
+  ///
+  /// \note Passing a protocol is supported, but currently a no-op, because
+  /// Objective-C protocols cannot be extended in ways that make the ObjC method
+  /// lookup table relevant.
+  void loadObjCMethods(NominalTypeDecl *tyDecl, ObjCSelector selector,
                        bool isInstanceMethod, unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods,
                        bool swiftOnly = false);
@@ -917,10 +1074,10 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModuleImpl(ImportPath::Element ModulePath,
-                           llvm::VersionTuple version,
-                           bool underlyingVersion,
+  bool canImportModuleImpl(ImportPath::Module ModulePath,
+                           llvm::VersionTuple version, bool underlyingVersion,
                            bool updateFailingList) const;
+
 public:
   namelookup::ImportCache &getImportCache() const;
 
@@ -949,10 +1106,10 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(ImportPath::Element ModulePath,
+  bool canImportModule(ImportPath::Module ModulePath,
                        llvm::VersionTuple version = llvm::VersionTuple(),
                        bool underlyingVersion = false);
-  bool canImportModule(ImportPath::Element ModulePath,
+  bool canImportModule(ImportPath::Module ModulePath,
                        llvm::VersionTuple version = llvm::VersionTuple(),
                        bool underlyingVersion = false) const;
 
@@ -968,6 +1125,9 @@ public:
   /// If a module by this name has already been loaded, the existing module will
   /// be returned.
   ///
+  /// \param ModulePath The module's \c ImportPath which describes
+  /// the name of the module being loaded, possibly including submodules.
+
   /// \returns The requested module, or NULL if the module cannot be found.
   ModuleDecl *getModule(ImportPath::Module ModulePath);
 
@@ -1026,12 +1186,19 @@ public:
   SelfProtocolConformance *
   getSelfConformance(ProtocolDecl *protocol);
 
+  /// Produce the builtin conformance for some structural type to some protocol.
+  BuiltinProtocolConformance *
+  getBuiltinConformance(Type type, ProtocolDecl *protocol,
+                        GenericSignature genericSig,
+                        ArrayRef<Requirement> conditionalRequirements,
+                        BuiltinConformanceKind kind);
+
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the
   /// conformance itself, along with a bit indicating whether this diagnostic
   /// produces an error.
   struct DelayedConformanceDiag {
-    ValueDecl *Requirement;
+    const ValueDecl *Requirement;
     std::function<void()> Callback;
     bool IsError;
   };
@@ -1138,14 +1305,6 @@ public:
   /// Increments \c NumTypoCorrections then checks this against the limit in
   /// the language options.
   bool shouldPerformTypoCorrection();
-  
-private:
-  /// Register the given generic signature builder to be used as the canonical
-  /// generic signature builder for the given signature, if we don't already
-  /// have one.
-  void registerGenericSignatureBuilder(GenericSignature sig,
-                                       GenericSignatureBuilder &&builder);
-  friend class GenericSignatureBuilder;
 
 private:
   friend class IntrinsicInfo;
@@ -1153,32 +1312,43 @@ private:
   llvm::LLVMContext &getIntrinsicScratchContext() const;
 
 public:
-  /// Retrieve or create the stored generic signature builder for the given
-  /// canonical generic signature and module.
-  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
-                                                     CanGenericSignature sig);
+  rewriting::RewriteContext &getRewriteContext();
 
-  /// Retrieve or create a term rewriting system for answering queries on
-  /// type parameters written against the given generic signature.
-  RequirementMachine *getOrCreateRequirementMachine(
+  /// This is a hack to break cycles. Don't introduce new callers of this
+  /// method.
+  bool isRecursivelyConstructingRequirementMachine(
       CanGenericSignature sig);
+
+  /// This is a hack to break cycles. Don't introduce new callers of this
+  /// method.
+  bool isRecursivelyConstructingRequirementMachine(
+      const ProtocolDecl *proto);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
 
   /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given protocol or composition type, like <T: type>.
-  CanGenericSignature getOpenedArchetypeSignature(Type type);
+  /// to the given protocol or composition type, like <T: P>.
+  ///
+  /// The opened archetype may have a different set of conformances from the
+  /// corresponding existential. The opened archetype conformances are dictated
+  /// by the ABI for generic arguments, while the existential value conformances
+  /// are dictated by their layout (see \c Type::getExistentialLayout()). In
+  /// particular, the opened archetype signature does not have requirements for
+  /// conformances inherited from superclass constraints while existential
+  /// values do.
+  CanGenericSignature getOpenedArchetypeSignature(Type type,
+                                                  GenericSignature parentSig);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);
 
   enum class OverrideGenericSignatureReqCheck {
-    /// Base method's generic requirements are satisifed by derived method
+    /// Base method's generic requirements are satisfied by derived method
     BaseReqSatisfiedByDerived,
 
-    /// Derived method's generic requirements are satisifed by base method
+    /// Derived method's generic requirements are satisfied by base method
     DerivedReqSatisfiedByBase
   };
 
@@ -1220,6 +1390,17 @@ public:
   /// Retrieve the name of to be used for the entry point, either main or an
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
+
+  Type getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
+                                            Identifier member);
+
+  /// Find the concrete invocation decoder associated with the given actor.
+  NominalTypeDecl *
+  getDistributedActorInvocationDecoder(NominalTypeDecl *);
+
+  /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
+  /// invocation decoder of the given distributed actor.
+  FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
 
 private:
   friend Decl;

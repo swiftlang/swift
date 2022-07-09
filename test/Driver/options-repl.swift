@@ -16,7 +16,11 @@
 
 
 // RUN: %swift_driver -sdk "" -lldb-repl -### | %FileCheck -check-prefix=LLDB %s
-// RUN: %swift_driver -sdk "" -lldb-repl -D A -DB -D C -DD -L /path/to/libraries -L /path/to/more/libraries -F /path/to/frameworks -lsomelib -framework SomeFramework -sdk / -I "this folder" -module-name Test -target %target-triple -### | %FileCheck -check-prefix=LLDB-OPTS %s
+// RUN: %swift_driver -sdk "" -lldb-repl -D A -DB -D C -DD -L /path/to/libraries -L /path/to/more/libraries -F /path/to/frameworks -lsomelib -l otherlib -framework SomeFramework -sdk / -I "this folder" -module-name Test -target %target-triple -### | %FileCheck -check-prefix=LLDB-OPTS %s
+
+// swift-frontend cannot be copied to another location with bootstrapping because
+// it will not find the libswiftCore library with its relative RPATH.
+// UNSUPPORTED: bootstrapping_mode
 
 // LLDB: lldb{{(\.exe)?"?}} {{"?}}--repl=
 // LLDB-NOT: -module-name
@@ -30,6 +34,7 @@
 // LLDB-OPTS-DAG: -L /path/to/more/libraries
 // LLDB-OPTS-DAG: -F /path/to/frameworks
 // LLDB-OPTS-DAG: -lsomelib
+// LLDB-OPTS-DAG: -lotherlib
 // LLDB-OPTS-DAG: -framework SomeFramework
 // LLDB-OPTS-DAG: -I \"this folder\"
 // LLDB-OPTS: "

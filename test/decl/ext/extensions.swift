@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 extension extension_for_invalid_type_1 { // expected-error {{cannot find type 'extension_for_invalid_type_1' in scope}}
   func f() { }
@@ -10,7 +10,7 @@ extension extension_for_invalid_type_3 { // expected-error {{cannot find type 'e
   init() {}
 }
 extension extension_for_invalid_type_4 { // expected-error {{cannot find type 'extension_for_invalid_type_4' in scope}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
 }
 extension extension_for_invalid_type_5 { // expected-error {{cannot find type 'extension_for_invalid_type_5' in scope}}
   typealias X = Int
@@ -36,6 +36,12 @@ protocol NestingTest5 {
 }
 func nestingTest6() {
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
+}
+extension Array {
+  func foo() {
+    extension Array { // expected-error {{declaration is only valid at file scope}}
+    }
+  }
 }
 
 //===--- Test that we only allow extensions only for nominal types.
@@ -339,7 +345,8 @@ extension Tree.LimbContent.Contents {
 }
 
 extension Tree.BoughPayload.Contents {
- // expected-error@-1 {{constrained extension must be declared on the unspecialized generic type 'Nest'}}
+  // expected-error@-1 {{extension of type 'Tree.BoughPayload.Contents' (aka 'Nest<Int>') must be declared as an extension of 'Nest<Int>'}}
+  // expected-note@-2 {{did you mean to extend 'Nest<Int>' instead?}}
 }
 
 // SR-10466 Check 'where' clause when referencing type defined inside extension

@@ -23,8 +23,6 @@
 #
 # ===---------------------------------------------------------------------===//
 
-from __future__ import print_function
-
 import cgi
 import os
 import re

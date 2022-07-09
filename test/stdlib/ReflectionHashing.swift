@@ -2,6 +2,7 @@
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 // This file contains reflection tests that depend on hash values.
 // Don't add other tests here.

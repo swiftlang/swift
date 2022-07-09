@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-async-top-level -emit-silgen %s | %FileCheck %s
 
 guard let x: Int = nil else { while true { } }
 

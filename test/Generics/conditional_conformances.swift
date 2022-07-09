@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 {}
@@ -49,12 +49,14 @@ struct RedundantSame<T: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSame
 // CHECK-NEXT: (normal_conformance type=RedundantSame<T> protocol=P2)
 extension RedundantSame: P2 where T: P1 {}
+// expected-warning@-1 {{redundant conformance constraint 'T' : 'P1'}}
 
 struct RedundantSuper<T: P4> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSuper
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSuper
 // CHECK-NEXT: (normal_conformance type=RedundantSuper<T> protocol=P2)
 extension RedundantSuper: P2 where T: P1 {}
+// expected-warning@-1 {{redundant conformance constraint 'T' : 'P1'}}
 
 struct OverlappingSub<T: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=OverlappingSub
@@ -187,6 +189,7 @@ struct ClassLessSpecific<T: C3> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassLessSpecific
 // CHECK-NEXT: (normal_conformance type=ClassLessSpecific<T> protocol=P2)
 extension ClassLessSpecific: P2 where T: C1 {}
+// expected-warning@-1 {{redundant superclass constraint 'T' : 'C1'}}
 
 
 // Inherited conformances:
@@ -229,10 +232,12 @@ func inheritequal_bad<U>(_: U) {
 
 struct InheritLess<T> {}
 extension InheritLess: P2 where T: P1 {}
-extension InheritLess: P5 {} // expected-error{{type 'T' does not conform to protocol 'P1'}}
-// expected-error@-1{{'P5' requires that 'T' conform to 'P1'}}
-// expected-note@-2{{requirement specified as 'T' : 'P1'}}
-// expected-note@-3{{requirement from conditional conformance of 'InheritLess<T>' to 'P2'}}
+extension InheritLess: P5 {}
+// expected-error@-1 {{type 'InheritLess<T>' does not conform to protocol 'P5'}}
+// expected-error@-2 {{type 'T' does not conform to protocol 'P1'}}
+// expected-error@-3 {{'P5' requires that 'T' conform to 'P1'}}
+// expected-note@-4 {{requirement specified as 'T' : 'P1'}}
+// expected-note@-5 {{requirement from conditional conformance of 'InheritLess<T>' to 'P2'}}
 
 
 struct InheritMore<T> {}
@@ -330,6 +335,8 @@ struct RedundancyOrderDependenceGood<T: P1, U> {}
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceGood<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T U)
 extension RedundancyOrderDependenceGood: P2 where U: P1, T == U {}
+// expected-warning@-1 {{redundant conformance constraint 'U' : 'P1'}}
+
 struct RedundancyOrderDependenceBad<T, U: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad

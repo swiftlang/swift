@@ -1,12 +1,15 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: foundation
 
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
+
 import Foundation
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Manager {
     static var shared = Manager()
 
@@ -22,7 +25,7 @@ actor Manager {
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test() {
     detach {
         let x = await Manager.shared.manage()
@@ -34,7 +37,7 @@ func test() {
     }
 }
 
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
  test()
  sleep(30)
 } else {

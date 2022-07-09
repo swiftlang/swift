@@ -108,7 +108,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   // pointers as we lazily deserialize them.
   allocateBuffer(Decls, core->Decls);
   allocateBuffer(LocalDeclContexts, core->LocalDeclContexts);
-  allocateBuffer(NormalConformances, core->NormalConformances);
+  allocateBuffer(Conformances, core->Conformances);
   allocateBuffer(SILLayouts, core->SILLayouts);
   allocateBuffer(Types, core->Types);
   allocateBuffer(ClangTypes, core->ClangTypes);
@@ -131,8 +131,15 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   Status status = Status::Valid;
 
   ModuleDecl *M = file->getParentModule();
-  if (M->getName().str() != Core->Name)
+  // The real (on-disk) name of the module should be checked here as that's the
+  // actually loaded module. In case module aliasing is used when building the main
+  // module, e.g. -module-name MyModule -module-alias Foo=Bar, the loaded module
+  // that maps to 'Foo' is actually Bar.swiftmodule|.swiftinterface (applies to swift
+  // modules only), which is retrieved via M->getRealName(). If no module aliasing is
+  // used, M->getRealName() will return the same value as M->getName(), which is 'Foo'.
+  if (M->getRealName().str() != Core->Name) {
     return error(Status::NameMismatch);
+  }
 
   ASTContext &ctx = getContext();
 
@@ -149,9 +156,16 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
       return error(status);
   }
 
-  for (const auto &searchPath : Core->SearchPaths)
-    ctx.addSearchPath(searchPath.Path, searchPath.IsFramework,
-                      searchPath.IsSystem);
+  StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
+  if (SDKPath.empty() ||
+      !Core->ModuleInputBuffer->getBufferIdentifier().startswith(SDKPath)) {
+    for (const auto &searchPath : Core->SearchPaths) {
+      ctx.addSearchPath(
+        ctx.SearchPathOpts.SearchPathRemapper.remapPath(searchPath.Path),
+        searchPath.IsFramework,
+        searchPath.IsSystem);
+    }
+  }
 
   auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
@@ -340,12 +354,11 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
     /*RequiresNullTerminator=*/false);
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
-  serialization::ValidationInfo loadInfo =
-     ModuleFileSharedCore::load(modulePath.str(),
-                      std::move(newBuf),
-                      nullptr,
-                      nullptr,
-                      /*isFramework*/isFramework, loadedModuleFile);
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      modulePath.str(), std::move(newBuf), nullptr, nullptr,
+      /*isFramework*/ isFramework, Ctx.SILOpts.EnableOSSAModules, Ctx.LangOpts.SDKName,
+      Ctx.SearchPathOpts.DeserializedPathRecoverer,
+      loadedModuleFile);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
 }
@@ -600,7 +613,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
 }
 
 void ModuleFile::loadObjCMethods(
-       ClassDecl *classDecl,
+       NominalTypeDecl *typeDecl,
        ObjCSelector selector,
        bool isInstanceMethod,
        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
@@ -614,7 +627,7 @@ void ModuleFile::loadObjCMethods(
     return;
   }
 
-  std::string ownerName = Mangle::ASTMangler().mangleNominalType(classDecl);
+  std::string ownerName = Mangle::ASTMangler().mangleNominalType(typeDecl);
   auto results = *known;
   for (const auto &result : results) {
     // If the method is the wrong kind (instance vs. class), skip it.
@@ -752,7 +765,15 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
     // one.
     if (name.isSimpleName()) {
       for (auto item : *iter) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          consumeError(declOrError.takeError());
+          continue;
+        }
+
+        auto vd = cast<ValueDecl>(declOrError.get());
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
@@ -762,7 +783,15 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
       }
     } else {
       for (auto item : *iter) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          consumeError(declOrError.takeError());
+          continue;
+        }
+
+        auto vd = cast<ValueDecl>(declOrError.get());
         if (!vd->getName().matchesRef(name))
           continue;
 
@@ -778,7 +807,15 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
   }
 
   for (auto item : *iter) {
-    auto vd = cast<ValueDecl>(getDecl(item.second));
+    auto declOrError = getDeclChecked(item.second);
+    if (!declOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      consumeError(declOrError.takeError());
+      continue;
+    }
+
+    auto vd = cast<ValueDecl>(declOrError.get());
     results.push_back(vd);
   }
 }
@@ -796,6 +833,8 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
       for (auto item : list) {
         auto decl = getDeclChecked(item.second);
         if (!decl) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(decl.takeError());
           llvm::consumeError(decl.takeError());
           continue;
         }
@@ -817,6 +856,8 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
     for (auto item : list) {
         auto decl = getDeclChecked(item.second);
         if (!decl) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(decl.takeError());
           llvm::consumeError(decl.takeError());
           continue;
         }
@@ -951,9 +992,9 @@ ModuleFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl *> &results)
   }
 }
 
-void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
+void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results, bool recursive) {
   if (UnderlyingModule)
-    UnderlyingModule->getDisplayDecls(results);
+    UnderlyingModule->getDisplayDecls(results, recursive);
 
   PrettyStackTraceModuleFile stackEntry(*this);
   getImportDecls(results);
@@ -981,6 +1022,13 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
     return None;
 
   return getCommentForDeclByUSR(USRBuffer.str());
+}
+
+void ModuleFile::collectSerializedSearchPath(
+    llvm::function_ref<void(StringRef)> callback) const {
+  for (auto path: Core->SearchPaths) {
+    callback(path.Path);
+  }
 }
 
 void ModuleFile::collectBasicSourceFileInfo(

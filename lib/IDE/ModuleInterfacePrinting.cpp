@@ -22,6 +22,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/PrimitiveParsing.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
@@ -207,8 +208,9 @@ void swift::ide::collectModuleGroups(ModuleDecl *M,
   for (auto File : M->getFiles()) {
     File->collectAllGroups(Into);
   }
-  std::sort(Into.begin(), Into.end(),
-            [](StringRef L, StringRef R) { return L.compare_lower(R) < 0; });
+  std::sort(Into.begin(), Into.end(), [](StringRef L, StringRef R) {
+    return L.compare_insensitive(R) < 0;
+  });
 }
 
 /// Determine whether the given extension has a Clang node that
@@ -377,7 +379,7 @@ static bool printModuleInterfaceDecl(Decl *D,
 /// Sorts import declarations for display.
 static bool compareImports(ImportDecl *LHS, ImportDecl *RHS) {
   return LHS->getImportPath() < RHS->getImportPath();
-};
+}
 
 /// Sorts Swift declarations for display.
 static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
@@ -392,18 +394,18 @@ static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
     // FIXME: not sufficient to establish a total order for overloaded decls.
   }
   return LHS->getKind() < RHS->getKind();
-};
+}
 
 static std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
 getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
                                SmallVectorImpl<Decl *> &Decls,
                                AccessLevel AccessFilter) {
-  Overlay->getDisplayDecls(Decls);
+  swift::getTopLevelDeclsForDisplay(Overlay, Decls);
 
   // Collect the imports of the underlying module so we can filter them out.
   SmallPtrSet<ModuleDecl *, 8> PrevImported;
   SmallVector<Decl*, 1> DeclaringDecls;
-  Declaring->getDisplayDecls(DeclaringDecls);
+  swift::getTopLevelDeclsForDisplay(Declaring, DeclaringDecls);
   for (auto *D: DeclaringDecls) {
     if (auto *ID = dyn_cast<ImportDecl>(D))
       PrevImported.insert(ID->getModule());
@@ -547,7 +549,7 @@ void swift::ide::printModuleInterface(
   adjustPrintOptions(AdjustedOptions);
 
   SmallVector<Decl *, 1> Decls;
-  TopLevelMod->getDisplayDecls(Decls);
+  swift::getTopLevelDeclsForDisplay(TopLevelMod, Decls);
 
   SmallVector<ImportDecl *, 1> ImportDecls;
   llvm::DenseSet<const clang::Module *> ClangModulesForImports;
@@ -623,9 +625,7 @@ void swift::ide::printModuleInterface(
         return true;
       if (ImportedMod == TargetClangMod)
         return false;
-      // FIXME: const-ness on the clang API.
-      return ImportedMod->isSubModuleOf(
-        const_cast<clang::Module*>(TargetClangMod));
+      return ImportedMod->isSubModuleOf(TargetClangMod);
     };
 
     if (auto ID = dyn_cast<ImportDecl>(D)) {
@@ -660,7 +660,28 @@ void swift::ide::printModuleInterface(
     };
 
     if (auto clangNode = getEffectiveClangNode(D)) {
-      addToClangDecls(D, clangNode);
+      if (auto namespaceDecl =
+              dyn_cast_or_null<clang::NamespaceDecl>(clangNode.getAsDecl())) {
+        // An imported namespace decl will contain members from all redecls, so
+        // make sure we add all the redecls.
+        for (auto redecl : namespaceDecl->redecls()) {
+          // Namespace redecls may exist across mutliple modules. We want to
+          // add the decl "D" to every module that has a redecl. But we only
+          // want to add "D" once to prevent duplicate printing.
+          clang::SourceLocation loc = redecl->getLocation();
+          auto *owningModule = Importer.getClangOwningModule(redecl);
+          auto found = ClangDecls.find(owningModule);
+          if (found != ClangDecls.end() &&
+              // Don't re-add this decl if it already exists for "OwningModule".
+              llvm::find_if(found->second, [D](auto p) {
+                return p.first == D;
+              }) == found->second.end()) {
+            found->second.push_back({D, loc});
+          }
+        }
+      } else {
+        addToClangDecls(D, clangNode);
+      }
       continue;
     }
 
@@ -955,7 +976,7 @@ void ClangCommentPrinter::printDeclPost(const Decl *D,
     return;
 
   for (auto CommentText : PendingComments) {
-    *this << " " << ASTPrinter::sanitizeUtf8(CommentText);
+    *this << " " << unicode::sanitizeUTF8(CommentText);
   }
   PendingComments.clear();
   if (auto ClangN = swift::ide::getEffectiveClangNode(D))
@@ -1046,7 +1067,7 @@ void ClangCommentPrinter::printComment(StringRef RawText, unsigned StartCol) {
   trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
 
   for (auto Line : Lines) {
-    *this << ASTPrinter::sanitizeUtf8(Line) << "\n";
+    *this << unicode::sanitizeUTF8(Line) << "\n";
     printIndent();
   }
 }

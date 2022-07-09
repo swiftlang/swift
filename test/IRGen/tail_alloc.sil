@@ -30,7 +30,7 @@ sil @alloc_on_stack : $@convention(thin) () -> () {
 bb0:
   %c = integer_literal $Builtin.Word, 2 // size = 17 + 3(padding) + 2 * 4 = 28
   %o1 = alloc_ref [stack] [tail_elems $Int32 * %c : $Builtin.Word] $TestClass
-  dealloc_ref [stack] %o1 : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
   %r = tuple()
   return %r : $()
 }

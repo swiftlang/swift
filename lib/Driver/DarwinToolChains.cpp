@@ -22,10 +22,10 @@
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
-#include "clang/Driver/DarwinSDKInfo.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -321,10 +321,29 @@ toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
 
 void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
                                        const JobContext &context) const {
-  llvm::SmallString<128> LTOLibPath;
-  if (findXcodeClangLibPath("libLTO.dylib", LTOLibPath)) {
+  if (!context.OI.LibLTOPath.empty()) {
+    // Check for user-specified LTO library.
     Arguments.push_back("-lto_library");
-    Arguments.push_back(context.Args.MakeArgString(LTOLibPath));
+    Arguments.push_back(context.Args.MakeArgString(context.OI.LibLTOPath));
+  } else {
+    // Check for relative libLTO.dylib. This would be the expected behavior in an
+    // Xcode toolchain.
+    StringRef P = llvm::sys::path::parent_path(getDriver().getSwiftProgramPath());
+    llvm::SmallString<128> LibLTOPath(P);
+    llvm::sys::path::remove_filename(LibLTOPath); // Remove '/bin'
+    llvm::sys::path::append(LibLTOPath, "lib");
+    llvm::sys::path::append(LibLTOPath, "libLTO.dylib");
+    if (llvm::sys::fs::exists(LibLTOPath)) {
+      Arguments.push_back("-lto_library");
+      Arguments.push_back(context.Args.MakeArgString(LibLTOPath));
+    } else {
+      // Use libLTO.dylib from the default toolchain if a relative one does not exist.
+      llvm::SmallString<128> LibLTOPath;
+      if (findXcodeClangLibPath("libLTO.dylib", LibLTOPath)) {
+        Arguments.push_back("-lto_library");
+        Arguments.push_back(context.Args.MakeArgString(LibLTOPath));
+      }
+    }
   }
 }
 
@@ -390,6 +409,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
     } else if (value.equals("5.1")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
+    } else if (value.equals("5.5")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = None;
     } else {
@@ -450,7 +471,7 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       Arguments.push_back("-rpath");
       Arguments.push_back(context.Args.MakeArgString(path));
     }
-  } else if (!tripleRequiresRPathForSwiftInOS(getTriple()) ||
+  } else if (!tripleRequiresRPathForSwiftLibrariesInOS(getTriple()) ||
              context.Args.hasArg(options::OPT_no_stdlib_rpath)) {
     // If targeting an OS with Swift in /usr/lib/swift, the LC_ID_DYLIB
     // install_name the stdlib will be an absolute path like
@@ -478,9 +499,11 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
     // package isn't installed.
     Arguments.push_back("-rpath");
     Arguments.push_back(context.Args.MakeArgString("/usr/lib/swift"));
-    // We don't need an rpath for /System/iOSSupport/usr/lib/swift because...
-    assert(!tripleIsMacCatalystEnvironment(getTriple())
-           && "macCatalyst not supported without Swift-in-the-OS");
+    // We don’t need an rpath for /System/iOSSupport/usr/lib/swift because:
+    // 1. The standard library and overlays were part of the OS before
+    //    Catalyst was introduced, so they are always available for Catalyst.
+    // 2. The _Concurrency back-deployment library is zippered, whereas only
+    //    unzippered frameworks need an unzippered twin in /System/iOSSupport.
   }
 }
 
@@ -577,11 +600,11 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         micro = 0;
       }
 
-      // Mac Catalyst was introduced with an iOS deployment target of 13.0;
+      // Mac Catalyst was introduced with an iOS deployment target of 13.1;
       // the linker doesn't want to see a deployment target before that.
       if (major < 13) {
         major = 13;
-        minor = 0;
+        minor = 1;
         micro = 0;
       }
     } else {
@@ -777,7 +800,9 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-no_objc_category_merging");
 
   // These custom arguments should be right before the object file at the end.
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgsExcept(Arguments, {options::OPT_linker_option_Group},
+                                {options::OPT_l});
+  ToolChain::addLinkedLibArgs(context.Args, Arguments);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
 
   // This should be the last option, for convenience in checking output.
@@ -832,6 +857,14 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   if (const char *S = ::getenv("RC_DEBUG_OPTIONS"))
     return S[0] != '\0';
   return false;
+}
+
+std::string toolchains::Darwin::getGlobalDebugPathRemapping() const {
+  // This matches the behavior in Clang (see
+  // clang/lib/driver/ToolChains/Darwin.cpp).
+  if (const char *S = ::getenv("RC_DEBUG_PREFIX_MAP"))
+    return S;
+  return {};
 }
 
 static void validateLinkObjcRuntimeARCLiteLib(const toolchains::Darwin &TC,
@@ -935,7 +968,7 @@ toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
                                        const OutputInfo &outputInfo) const {
   // If we have been provided with an SDK, go read the SDK information.
   if (!outputInfo.SDKPath.empty()) {
-    auto SDKInfoOrErr = clang::driver::parseDarwinSDKInfo(
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
         *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
     if (SDKInfoOrErr) {
       SDKInfo = *SDKInfoOrErr;

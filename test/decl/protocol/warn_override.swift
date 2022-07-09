@@ -19,7 +19,7 @@ protocol P1: P0 {
   var prop: A { get } // expected-warning{{implicit override should be marked with 'override' or suppressed with '@_nonoverride'}}
 }
 
-// Silence warnings with @_nonoveride.
+// Silence warnings with @_nonoverride.
 protocol P2: P0 {
   @_nonoverride
   associatedtype A

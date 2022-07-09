@@ -113,7 +113,7 @@ class MyNSError : NSError {
 // CHECK:   [[NSERROR_SUBCLASS:%.*]] = apply {{.*}}({{.*}}) : $@convention(method) (@thick MyNSError.Type) -> @owned MyNSError
 // CHECK:   [[UPCAST:%.*]] = upcast [[NSERROR_SUBCLASS]] : $MyNSError to $NSError
 // CHECK:   [[EXISTENTIAL_REF:%.*]] = init_existential_ref [[UPCAST]]
-// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [[EXISTENTIAL_REF]]
+// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [lexical] [[EXISTENTIAL_REF]]
 // CHECK:   [[COPY_BORROWED_EXISTENTIAL_REF:%.*]] = copy_value [[BORROWED_EXISTENTIAL_REF]]
 // CHECK:   end_borrow [[BORROWED_EXISTENTIAL_REF]]
 // CHECK:   destroy_value [[EXISTENTIAL_REF]]
@@ -170,6 +170,6 @@ extension Error {
 }
 
 class Gizmoid : NSObject {
-  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s10objc_error7GizmoidC3fooACyt_tKcfcTo : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned Gizmoid) -> @owned Optional<Gizmoid>
+  // CHECK-LABEL: sil private [thunk] [ossa] @$s10objc_error7GizmoidC3fooACyt_tKcfcTo : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned Gizmoid) -> @owned Optional<Gizmoid>
   @objc init(foo: ()) throws {}
 }

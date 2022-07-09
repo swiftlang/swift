@@ -196,7 +196,7 @@ extern "C" {
 // * `d` is the number to be formatted
 // * `dest` is a buffer of length `length`
 //
-// Ouput:
+// Output:
 // * Return value is the length of the string placed into `dest`
 //   or zero if the buffer is too small.
 // * For infinity, it copies "inf" or "-inf".

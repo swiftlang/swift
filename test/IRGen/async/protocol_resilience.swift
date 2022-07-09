@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-experimental-concurrency -g -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/Inputs/resilient_protocol.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-experimental-concurrency -g -enable-library-evolution %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend -emit-module  -disable-availability-checking -g -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/Inputs/resilient_protocol.swift
+// RUN: %target-swift-frontend -I %t -emit-ir  -disable-availability-checking -g -enable-library-evolution %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-cpu -check-prefix CHECK-%target-import-type %s
 // REQUIRES: concurrency
 
 import resilient_protocol
@@ -27,7 +27,11 @@ public protocol MyAwaitable {
 // CHECK-SAME: %swift.async_func_pointer* @"$s19protocol_resilience19ConformsToAwaitableVyxG010resilient_A00E0AaeFP4wait6ResultQzyYaFTWTu"
 
 // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience14callsAwaitabley6ResultQzxYa010resilient_A00D0RzlF"(%swift.opaque* noalias nocapture %0, %swift.context* swiftasync %1, %swift.opaque* noalias nocapture %2, %swift.type* %T, i8** %T.Awaitable)
-// CHECK: %swift.async_func_pointer* @"$s18resilient_protocol9AwaitableP4wait6ResultQzyYaFTjTu"
+// CHECK-DIRECT: %swift.async_func_pointer* @"$s18resilient_protocol9AwaitableP4wait6ResultQzyYaFTjTu"
+// CHECK-INDIRECT: [[LOAD:%[0-9]+]] = load %swift.async_func_pointer*, %swift.async_func_pointer** inttoptr (i64 and (i64 add (i64 ptrtoint (%swift.async_func_pointer** @"\01__imp_$s18resilient_protocol9AwaitableP4wait6ResultQzyYaFTjTu" to i64), i64 1), i64 -2) to %swift.async_func_pointer**), align {{4|8}}
+// CHECK-INDIRECT: select i1 icmp eq (i64 and (i64 add (i64 ptrtoint (%swift.async_func_pointer** @"\01__imp_$s18resilient_protocol9AwaitableP4wait6ResultQzyYaFTjTu" to i64), i64 1), i64 1), i64 0),
+// CHECK-INDIRECT-SAME: %swift.async_func_pointer* inttoptr (i64 add (i64 ptrtoint (%swift.async_func_pointer** @"\01__imp_$s18resilient_protocol9AwaitableP4wait6ResultQzyYaFTjTu" to i64), i64 1) to %swift.async_func_pointer*),
+// CHECK-INDIRECT-SAME: %swift.async_func_pointer* [[LOAD]]
 // CHECK: ret void
 public func callsAwaitable<T : Awaitable>(_ t: T) async -> T.Result {
   return await t.wait()

@@ -26,8 +26,9 @@
 #include "JumpDest.h"
 #include "ManagedValue.h"
 #include "RValue.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/Basic/ProfileCounter.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILLocation.h"
 
 namespace swift {
 namespace Lowering {
@@ -125,17 +126,34 @@ public:
                                              ManagedValue originalValue);
 #include "swift/AST/ReferenceStorage.def"
 
-  ManagedValue createOwnedPhiArgument(SILType type);
-  ManagedValue createGuaranteedPhiArgument(SILType type);
-
-  /// For arguments from terminators that are "transforming terminators". These
-  /// types of guaranteed arguments are validated as part of the operand of the
-  /// transforming terminator since transforming terminators are guaranteed to
-  /// be the only predecessor of our parent block.
+  /// Create the block argument for an OwnershipForwardingTermInst result
+  /// (checked_cast_br or switch_enum). Allows creating terminator
+  /// results separately from creating the terminator. Alternatively, the result
+  /// can be directly created as follows:
   ///
-  /// NOTE: Two examples of transforming terminators are switch_enum,
-  /// checked_cast_br.
-  ManagedValue createGuaranteedTransformingTerminatorArgument(SILType type);
+  ///   ManagedValue::forForwardedRValue(term->createResult(succBB, resultTy))
+  ///
+  /// For a switch_enum with a default payload, use:
+  ///
+  ///   ManagedValue::forForwardedRValue(switchEnum->createDefaultResult())
+  ///
+  ManagedValue createForwardedTermResult(SILType type);
+
+  /// Create a terminator result with specified ownership.
+  ///
+  /// Typically for an apply's return or error value, which should use
+  /// OwnershipKind::Owned. For OwnershipForwardingTermInst (checked_cast_br or
+  /// switch_enum), use createForwardedTermResult instead.
+  ManagedValue createTermResult(SILType type, ValueOwnershipKind ownership);
+
+  /// Create the block argument for an Optional switch_enum.
+  ManagedValue createOptionalSomeResult(SwitchEnumInst *switchEnum) {
+    return ManagedValue::forForwardedRValue(
+        SGF, switchEnum->createOptionalSomeResult());
+  }
+
+  // Create the block argument for a phi.
+  ManagedValue createPhi(SILType type, ValueOwnershipKind ownership);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
@@ -206,7 +224,8 @@ public:
 
   /// Create a SILArgument for an input parameter. Asserts if used to create a
   /// function argument for an out parameter.
-  ManagedValue createInputFunctionArgument(SILType type, ValueDecl *decl);
+  ManagedValue createInputFunctionArgument(SILType type, ValueDecl *decl,
+                                           bool isNoImplicitCopy = false);
 
   /// Create a SILArgument for an input parameter. Uses \p loc to create any
   /// copies necessary. Asserts if used to create a function argument for an out
@@ -230,13 +249,6 @@ public:
                             const TypeLowering &lowering, SGFContext context,
                             llvm::function_ref<void(SILValue)> rvalueEmitter);
 
-  using SILBuilder::createUnconditionalCheckedCastValue;
-  ManagedValue
-  createUnconditionalCheckedCastValue(SILLocation loc,
-                                      ManagedValue op,
-                                      CanType srcFormalTy,
-                                      SILType destLoweredTy,
-                                      CanType destFormalTy);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
                                               ManagedValue op,
@@ -252,15 +264,6 @@ public:
                                SILBasicBlock *falseBlock,
                                ProfileCounter Target1Count,
                                ProfileCounter Target2Count);
-
-  using SILBuilder::createCheckedCastValueBranch;
-  void createCheckedCastValueBranch(SILLocation loc,
-                                    ManagedValue op,
-                                    CanType srcFormalTy,
-                                    SILType destLoweredTy,
-                                    CanType destFormalTy,
-                                    SILBasicBlock *trueBlock,
-                                    SILBasicBlock *falseBlock);
 
   using SILBuilder::createUpcast;
   ManagedValue createUpcast(SILLocation loc, ManagedValue original,
@@ -360,7 +363,19 @@ public:
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
                            ArrayRef<ManagedValue> Args);
 
-  using SILBuilder::createReturn;
+  ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue) {
+    // If we have a move only type as our "result type", convert it back to
+    // being a copyable type. Move only types are never returned today and we
+    // will rely on the SIL level move only and no escape checker to validate
+    // that this is a correct usage. So just make the types line up.
+    if (ReturnValue->getType().isMoveOnlyWrapped()) {
+      auto cvtLoc = RegularLocation::getAutoGeneratedLocation();
+      ReturnValue =
+          createOwnedMoveOnlyWrapperToCopyableValue(cvtLoc, ReturnValue);
+    }
+    return SILBuilder::createReturn(Loc, ReturnValue);
+  }
+
   ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
 
   ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue,
@@ -372,6 +387,9 @@ public:
   void emitDestructureValueOperation(
       SILLocation loc, ManagedValue value,
       function_ref<void(unsigned, ManagedValue)> func);
+  void emitDestructureValueOperation(
+      SILLocation loc, ManagedValue value,
+      SmallVectorImpl<ManagedValue> &destructuredValues);
 
   using SILBuilder::createProjectBox;
   ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
@@ -380,6 +398,22 @@ public:
   using SILBuilder::createMarkDependence;
   ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
                                     ManagedValue base);
+
+  using SILBuilder::createBeginBorrow;
+  ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
+                                 bool isLexical = false);
+
+  using SILBuilder::createMoveValue;
+  ManagedValue createMoveValue(SILLocation loc, ManagedValue value);
+
+  using SILBuilder::createOwnedMoveOnlyWrapperToCopyableValue;
+  ManagedValue createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,
+                                                         ManagedValue value);
+
+  using SILBuilder::createGuaranteedMoveOnlyWrapperToCopyableValue;
+  ManagedValue
+  createGuaranteedMoveOnlyWrapperToCopyableValue(SILLocation loc,
+                                                 ManagedValue value);
 };
 
 } // namespace Lowering

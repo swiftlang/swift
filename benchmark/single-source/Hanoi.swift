@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,11 +14,12 @@
 // <rdar://problem/22151932>
 import TestsUtils
 
-public let Hanoi = BenchmarkInfo(
-  name: "Hanoi",
-  runFunction: run_Hanoi,
-  tags: [.validation, .algorithm],
-  legacyFactor: 10)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "Hanoi",
+    runFunction: run_Hanoi,
+    tags: [.validation, .algorithm],
+    legacyFactor: 10)
 
 struct Move {
    var from: String
@@ -45,8 +46,8 @@ class TowersOfHanoi {
 }
 
 @inline(never)
-public func run_Hanoi(_ N: Int) {
-  for _ in 1...10*N {
+public func run_Hanoi(_ n: Int) {
+  for _ in 1...10*n {
     let hanoi: TowersOfHanoi = TowersOfHanoi()
     hanoi.solve(10, start: "A", auxiliary: "B", end: "C")
   }

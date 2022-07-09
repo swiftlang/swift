@@ -12,10 +12,10 @@
 // Make sure that the destroy_addr instruction has the same scope of the
 // instructions surrounding it.
 
-// CHECK:   destroy_addr %7 : $*Any, loc {{.*}}:22:19, scope 1
-// CHECK:   dealloc_stack %12 : $*Optional<Any>, loc {{.*}}:22:23, scope 1
-// CHECK:   dealloc_stack %7 : $*Any, loc {{.*}}:22:23, scope 1
-// CHECK:   dealloc_stack %6 : $*A, loc {{.*}}:22:7, scope 1
+// CHECK:   destroy_addr %7 : $*Any, loc {{.*}}:22:19, scope 3
+// CHECK:   dealloc_stack %12 : $*Optional<Any>, loc {{.*}}:22:23, scope 3
+// CHECK:   dealloc_stack %7 : $*Any, loc {{.*}}:22:23, scope 3
+// CHECK:   dealloc_stack %6 : $*A, loc {{.*}}:22:7, scope 3
 
 import Foundation
 func indexedSubscripting(b b: B, idx: Int, a: A) {

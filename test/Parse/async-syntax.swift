@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -verify-syntax-tree
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -verify-syntax-tree
 
 // REQUIRES: concurrency
 

@@ -13,6 +13,7 @@
 #ifndef SWIFT_SEMA_MISC_DIAGNOSTICS_H
 #define SWIFT_SEMA_MISC_DIAGNOSTICS_H
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Expr.h"
@@ -26,16 +27,20 @@ namespace swift {
   class AbstractFunctionDecl;
   class ApplyExpr;
   class CallExpr;
+  class ClosureExpr;
   class DeclContext;
+  class Decl;
   class Expr;
   class InFlightDiagnostic;
   class Stmt;
   class TopLevelCodeDecl;
   class ValueDecl;
+  class ForEachStmt;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
-                                     bool isExprStmt);
+void performSyntacticExprDiagnostics(
+    const Expr *E, const DeclContext *DC,
+    bool isExprStmt, bool disableExprAvailabilityChecking = false);
 
 /// Emit diagnostics for a given statement.
 void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
@@ -54,15 +59,14 @@ void fixItAccess(InFlightDiagnostic &diag,
                  bool isForSetter = false,
                  bool shouldUseDefaultAccess = false);
 
-/// Emit fix-its to correct the argument labels in \p expr, which is the
-/// argument tuple or single argument of a call.
+/// Emit fix-its to correct the argument labels in \p argList.
 ///
 /// If \p existingDiag is null, the fix-its will be attached to an appropriate
 /// error diagnostic.
 ///
 /// \returns true if the issue was diagnosed
 bool diagnoseArgumentLabelError(ASTContext &ctx,
-                                Expr *expr,
+                                const ArgumentList *argList,
                                 ArrayRef<Identifier> newNames,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
@@ -98,7 +102,7 @@ void diagnoseConstantArgumentRequirement(const Expr *expr,
 /// emitted.  Else the fixits are attached to the returned diagnostic.
 ///
 /// \returns true iff any fix-its were attached to \p diag.
-bool computeFixitsForOverridenDeclaration(
+bool computeFixitsForOverriddenDeclaration(
     ValueDecl *decl, const ValueDecl *base,
     llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag);
 
@@ -111,10 +115,27 @@ void fixItEncloseTrailingClosure(ASTContext &ctx,
 /// Check that we use the async version of a function where available
 ///
 /// If a completion-handler function is called from an async context and it has
-/// a '@completionHandlerAsync' attribute, we emit a diagnostic suggesting the
-/// async call.
+/// a '@available' attribute with renamed field pointing to an async function,
+/// we emit a diagnostic suggesting the async call.
 void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
 void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
+
+/// Detect and diagnose a missing `try` in `for-in` loop sequence
+/// expression in async context (denoted with `await` keyword).
+bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
+                                           ForEachStmt *forEach);
+
+class BaseDiagnosticWalker : public ASTWalker {
+  bool walkToDeclPre(Decl *D) override;
+
+  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+    return false;
+  }
+
+private:
+  static bool shouldWalkIntoDeclInClosureContext(Decl *D);
+};
+
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

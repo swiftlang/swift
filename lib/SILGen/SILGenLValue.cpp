@@ -94,7 +94,8 @@ static void pushWriteback(SILGenFunction &SGF,
   cleanup.Depth = context.stable_begin();
 }
 
-static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2);
+static bool areCertainlyEqualArgumentLists(const ArgumentList *l1,
+                                           const ArgumentList *l2);
 
 void ExclusiveBorrowFormalAccess::diagnoseConflict(
                                     const ExclusiveBorrowFormalAccess &rhs,
@@ -115,10 +116,10 @@ void ExclusiveBorrowFormalAccess::diagnoseConflict(
     return;
   }
 
-  auto lhsStorage = component->getAccessedStorage();
+  auto lhsStorage = component->getAccessStorage();
   if (!lhsStorage) return;
 
-  auto rhsStorage = rhs.component->getAccessedStorage();
+  auto rhsStorage = rhs.component->getAccessStorage();
   if (!rhsStorage) return;
 
   // If the decls match, then this could conflict.
@@ -168,10 +169,10 @@ void ExclusiveBorrowFormalAccess::diagnoseConflict(
   if (!lhsStorage->Indices->isObviouslyEqual(*rhsStorage->Indices)) {
     // If the index value doesn't lower to literally the same SILValue's,
     // do some fuzzy matching to catch the common case.
-    if (!lhsStorage->IndexExprForDiagnostics ||
-        !rhsStorage->IndexExprForDiagnostics ||
-        !areCertainlyEqualIndices(lhsStorage->IndexExprForDiagnostics,
-                                  rhsStorage->IndexExprForDiagnostics))
+    if (!lhsStorage->ArgListForDiagnostics ||
+        !rhsStorage->ArgListForDiagnostics ||
+        !areCertainlyEqualArgumentLists(lhsStorage->ArgListForDiagnostics,
+                                        rhsStorage->ArgListForDiagnostics))
       return;
   }
 
@@ -239,8 +240,14 @@ static bool shouldUseUnsafeEnforcement(VarDecl *var) {
   if (var->isDebuggerVar())
     return true;
 
-  // TODO: Check for the explicit "unsafe" attribute.
   return false;
+}
+
+static bool hasExclusivityAttr(VarDecl *var, ExclusivityAttr::Mode mode) {
+  if (!var)
+    return false;
+  auto *exclAttr = var->getAttrs().getAttribute<ExclusivityAttr>();
+  return exclAttr && exclAttr->getMode() == mode;
 }
 
 Optional<SILAccessEnforcement>
@@ -256,6 +263,10 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
   if (getOptions().EnforceExclusivityDynamic) {
     if (var && shouldUseUnsafeEnforcement(var))
       return SILAccessEnforcement::Unsafe;
+    if (hasExclusivityAttr(var, ExclusivityAttr::Unchecked))
+      return SILAccessEnforcement::Unsafe;
+    return SILAccessEnforcement::Dynamic;
+  } else if (hasExclusivityAttr(var, ExclusivityAttr::Checked)) {
     return SILAccessEnforcement::Dynamic;
   }
   return None;
@@ -531,7 +542,7 @@ namespace {
       llvm_unreachable("called project on a pseudo-component");
     }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
+    Optional<AccessStorage> getAccessStorage() const override {
       return None;
     }
   };
@@ -564,7 +575,8 @@ namespace {
 } // end anonymous namespace
 
 static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
-                                 SILValue addr, LValueTypeData typeData,
+                                 ManagedValue base, SILValue addr,
+                                 LValueTypeData typeData,
                                  SGFAccessKind accessKind,
                                  SILAccessEnforcement enforcement,
                                  Optional<ActorIsolation> actorIso) {
@@ -574,10 +586,8 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
   assert(SGF.isInFormalEvaluationScope() &&
          "tried to enter access scope without a writeback scope!");
 
-  // Only expecting global-actor isolation here, since there's no base / self.
-  assert(!actorIso || actorIso->isGlobalActor());
   ExecutorBreadcrumb prevExecutor =
-      SGF.emitHopToTargetActor(loc, actorIso, /*maybeSelf=*/None);
+      SGF.emitHopToTargetActor(loc, actorIso, base);
 
   // Enter the access.
   addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement,
@@ -596,13 +606,14 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
 }
 
 static ManagedValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
-                                     ManagedValue addr, LValueTypeData typeData,
+                                     ManagedValue base, ManagedValue addr,
+                                     LValueTypeData typeData,
                                      SGFAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
                                      Optional<ActorIsolation> actorIso) {
   return ManagedValue::forLValue(
-           enterAccessScope(SGF, loc, addr.getLValueAddress(), typeData,
-                            accessKind, enforcement, actorIso));
+      enterAccessScope(SGF, loc, base, addr.getLValueAddress(), typeData,
+                       accessKind, enforcement, actorIso));
 }
 
 // Find the base of the formal access at `address`. If the base requires an
@@ -617,9 +628,9 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  auto storage = AccessedStorage::compute(address);
+  auto storage = AccessStorage::compute(address);
   // Unsafe access may have invalid storage (e.g. a RawPointer).
-  if (storage && !isPossibleFormalAccessBase(storage, &SGF.F))
+  if (storage && !isPossibleFormalAccessStorage(storage, &SGF.F))
     return address;
 
   auto BAI =
@@ -738,6 +749,8 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
+    VarDecl *getField() const { return Field; }
+
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
       assert(base.getType().hasReferenceSemantics() &&
@@ -758,7 +771,7 @@ namespace {
       // declarations. Access marker verification is aware of these cases.
       if (!IsNonAccessing && !Field->isLet()) {
         if (auto enforcement = SGF.getDynamicEnforcement(Field)) {
-          result = enterAccessScope(SGF, loc, result, getTypeData(),
+          result = enterAccessScope(SGF, loc, base, result, getTypeData(),
                                     getAccessKind(), *enforcement,
                                     takeActorIsolation());
         }
@@ -929,7 +942,7 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
+    Optional<AccessStorage> getAccessStorage() const override {
       return None;
     }
 
@@ -1034,9 +1047,9 @@ namespace {
         return Value;
 
       SILValue addr = Value.getLValueAddress();
-      addr = enterAccessScope(SGF, loc, addr, getTypeData(),
-                              getAccessKind(), *Enforcement,
-                              takeActorIsolation());
+      addr =
+          enterAccessScope(SGF, loc, base, addr, getTypeData(), getAccessKind(),
+                           *Enforcement, takeActorIsolation());
 
       return ManagedValue::forLValue(addr);
     }
@@ -1080,32 +1093,31 @@ static bool isReadNoneFunction(const Expr *e) {
   return false;
 }
 
-
-/// Given two expressions used as indexes to the same SubscriptDecl (and thus
+/// Given two expressions used as arguments to the same SubscriptDecl (and thus
 /// are guaranteed to have the same AST type) check to see if they are going to
 /// produce the same value.
-static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
+static bool areCertainlyEqualArgs(const Expr *e1, const Expr *e2) {
   if (e1->getKind() != e2->getKind()) return false;
-  
+
   // Look through ParenExpr's.
   if (auto *pe1 = dyn_cast<ParenExpr>(e1)) {
     auto *pe2 = cast<ParenExpr>(e2);
-    return areCertainlyEqualIndices(pe1->getSubExpr(), pe2->getSubExpr());
+    return areCertainlyEqualArgs(pe1->getSubExpr(), pe2->getSubExpr());
   }
-  
+
   // Calls are identical if the callee and operands are identical and we know
   // that the call is something that is "readnone".
   if (auto *ae1 = dyn_cast<ApplyExpr>(e1)) {
     auto *ae2 = cast<ApplyExpr>(e2);
-    return areCertainlyEqualIndices(ae1->getFn(), ae2->getFn()) &&
-           areCertainlyEqualIndices(ae1->getArg(), ae2->getArg()) &&
+    return areCertainlyEqualArgs(ae1->getFn(), ae2->getFn()) &&
+           areCertainlyEqualArgumentLists(ae1->getArgs(), ae2->getArgs()) &&
            isReadNoneFunction(ae1->getFn());
   }
-  
+
   // TypeExpr's that produce the same metatype type are identical.
   if (isa<TypeExpr>(e1))
     return true;
-  
+
   if (auto *dre1 = dyn_cast<DeclRefExpr>(e1)) {
     auto *dre2 = cast<DeclRefExpr>(e2);
     return dre1->getDecl() == dre2->getDecl() &&
@@ -1127,20 +1139,19 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
     return bl1->getValue() == cast<BooleanLiteralExpr>(e2)->getValue();
   if (auto *sl1 = dyn_cast<StringLiteralExpr>(e1))
     return sl1->getValue() == cast<StringLiteralExpr>(e2)->getValue();
-  
+
   // Compare tuple expressions.
   if (auto *te1 = dyn_cast<TupleExpr>(e1)) {
     auto *te2 = cast<TupleExpr>(e2);
 
-    // Easy checks: # of elements, trailing closures, element names.
+    // Easy checks: # of elements, element names.
     if (te1->getNumElements() != te2->getNumElements() ||
-        te1->hasTrailingClosure() != te2->hasTrailingClosure() ||
         te1->getElementNames() != te2->getElementNames()) {
       return false;
     }
 
     for (unsigned i = 0, n = te1->getNumElements(); i != n; ++i) {
-      if (!areCertainlyEqualIndices(te1->getElement(i), te2->getElement(i)))
+      if (!areCertainlyEqualArgs(te1->getElement(i), te2->getElement(i)))
         return false;
     }
 
@@ -1149,6 +1160,23 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
 
   // Otherwise, we have no idea if they are identical.
   return false;
+}
+
+/// Given two argument lists to the same SubscriptDecl (and thus are guaranteed
+/// to have the same AST type) check to see if they are going to produce the
+/// same value.
+static bool areCertainlyEqualArgumentLists(const ArgumentList *l1,
+                                           const ArgumentList *l2) {
+  if (l1->size() != l2->size())
+    return false;
+
+  for (auto idx : indices(*l1)) {
+    if (l1->getLabel(idx) != l2->getLabel(idx))
+      return false;
+    if (!areCertainlyEqualArgs(l1->getExpr(idx), l2->getExpr(idx)))
+      return false;
+  }
+  return true;
 }
 
 static LValueOptions getBaseOptions(LValueOptions options,
@@ -1178,8 +1206,8 @@ namespace {
     // The VarDecl or SubscriptDecl being get/set.
     AbstractStorageDecl *Storage;
 
-    /// The subscript index expression.  Useless
-    Expr *IndexExprForDiagnostics;
+    /// The subscript argument list.  Useless
+    ArgumentList *ArgListForDiagnostics;
     PreparedArguments Indices;
 
     /// AST type of the base expression, in case the accessor call
@@ -1217,10 +1245,10 @@ namespace {
                     AbstractStorageDecl *storage,
                     CanType baseFormalType,
                     LValueTypeData typeData,
-                    Expr *indexExprForDiagnostics,
+                    ArgumentList *argListForDiagnostics,
                     PreparedArguments &&indices)
       : Base(typeData, kind), Storage(storage),
-        IndexExprForDiagnostics(indexExprForDiagnostics),
+        ArgListForDiagnostics(argListForDiagnostics),
         Indices(std::move(indices)),
         BaseFormalType(baseFormalType)
     {
@@ -1231,7 +1259,7 @@ namespace {
                     SILLocation loc)
       : Base(copied.getTypeData(), copied.getKind()),
         Storage(copied.Storage),
-        IndexExprForDiagnostics(copied.IndexExprForDiagnostics),
+        ArgListForDiagnostics(copied.ArgListForDiagnostics),
         Indices(copied.Indices.copy(SGF, loc)) ,
         BaseFormalType(copied.BaseFormalType) {}
 
@@ -1245,9 +1273,9 @@ namespace {
     
     void printBase(raw_ostream &OS, unsigned indent, StringRef name) const {
       OS.indent(indent) << name << "(" << Storage->getBaseName() << ")";
-      if (IndexExprForDiagnostics) {
+      if (ArgListForDiagnostics) {
         OS << " subscript_index:\n";
-        IndexExprForDiagnostics->dump(OS, 2);
+        ArgListForDiagnostics->dump(OS, 2);
       }
       OS << '\n';
     }
@@ -1270,18 +1298,20 @@ namespace {
   public:
     AccessorBasedComponent(PathComponent::KindTy kind,
                            AbstractStorageDecl *decl, SILDeclRef accessor,
-                           bool isSuper, bool isDirectAccessorUse,
+                           bool isSuper,
+                           bool isDirectAccessorUse,
                            SubstitutionMap substitutions,
                            CanType baseFormalType, LValueTypeData typeData,
-                           Expr *indexExprForDiagnostics,
+                           ArgumentList *argListForDiagnostics,
                            PreparedArguments &&indices,
                            bool isOnSelfParameter = false,
                            Optional<ActorIsolation> actorIso = None)
-        : super(kind, decl, baseFormalType, typeData, indexExprForDiagnostics,
+        : super(kind, decl, baseFormalType, typeData, argListForDiagnostics,
                 std::move(indices)),
           Accessor(accessor), IsSuper(isSuper),
           IsDirectAccessorUse(isDirectAccessorUse),
-          IsOnSelfParameter(isOnSelfParameter), Substitutions(substitutions),
+          IsOnSelfParameter(isOnSelfParameter),
+          Substitutions(substitutions),
           ActorIso(actorIso) {}
 
     AccessorBasedComponent(const AccessorBasedComponent &copied,
@@ -1306,18 +1336,20 @@ namespace {
 
      GetterSetterComponent(AbstractStorageDecl *decl,
                            SILDeclRef accessor,
-                           bool isSuper, bool isDirectAccessorUse,
+                           bool isSuper,
+                           bool isDirectAccessorUse,
                            SubstitutionMap substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
-                           Expr *subscriptIndexExpr,
+                           ArgumentList *subscriptArgList,
                            PreparedArguments &&indices,
                            bool isOnSelfParameter,
                            Optional<ActorIsolation> actorIso)
       : AccessorBasedComponent(GetterSetterKind, decl, accessor, isSuper,
                                isDirectAccessorUse, substitutions,
-                               baseFormalType, typeData, subscriptIndexExpr,
-                               std::move(indices), isOnSelfParameter, actorIso)
+                               baseFormalType, typeData, subscriptArgList,
+                               std::move(indices), isOnSelfParameter,
+                               actorIso)
     {
       assert(getAccessorDecl()->isGetterOrSetter());
     }
@@ -1609,25 +1641,26 @@ namespace {
       assert(getAccessorDecl()->isGetter());
 
       SILDeclRef getter = Accessor;
-      ExecutorBreadcrumb prevExecutor;
       RValue rvalue;
-      {
-        FormalEvaluationScope scope(SGF);
+      FormalEvaluationScope scope(SGF);
 
-        // If the 'get' is in the context of the target's actor, do a hop first.
-        prevExecutor = SGF.emitHopToTargetActor(loc, ActorIso, base);
+      // FIXME: This somewhat silly, because the original expression should
+      // already have one of these.
+      Optional<ImplicitActorHopTarget> implicitActorHopTarget;
+      if (ActorIso) {
+        implicitActorHopTarget = ActorIso->isGlobalActor()
+            ? ImplicitActorHopTarget::forGlobalActor(
+              ActorIso->getGlobalActor())
+            : ImplicitActorHopTarget::forInstanceSelf();
+      }
 
-        auto args =
-            std::move(*this).prepareAccessorArgs(SGF, loc, base, getter);
+      auto args =
+          std::move(*this).prepareAccessorArgs(SGF, loc, base, getter);
 
-        rvalue = SGF.emitGetAccessor(
-            loc, getter, Substitutions, std::move(args.base), IsSuper,
-            IsDirectAccessorUse, std::move(args.Indices), c, IsOnSelfParameter);
-
-      } // End the evaluation scope before any hop back to the current executor.
-
-      // If we hopped to the target's executor, then we need to hop back.
-      prevExecutor.emit(SGF, loc);
+      rvalue = SGF.emitGetAccessor(
+          loc, getter, Substitutions, std::move(args.base), IsSuper,
+          IsDirectAccessorUse, std::move(args.Indices), c,
+          IsOnSelfParameter, implicitActorHopTarget);
 
       return rvalue;
     }
@@ -1646,10 +1679,10 @@ namespace {
     /// the same dynamic PathComponent type as the receiver) to see if they are
     /// identical.  If so, there is a conflicting writeback happening, so emit a
     /// diagnostic.
-    Optional<AccessedStorage> getAccessedStorage() const override {
-      return AccessedStorage{Storage, IsSuper,
+    Optional<AccessStorage> getAccessStorage() const override {
+      return AccessStorage{Storage, IsSuper,
                              Indices.isNull() ? nullptr : &Indices,
-                             IndexExprForDiagnostics };
+                             ArgListForDiagnostics };
     }
   };
 
@@ -1670,11 +1703,11 @@ namespace {
                                     AccessStrategy writeStrategy,
                                     CanType baseFormalType,
                                     LValueTypeData typeData,
-                                    Expr *indexExprForDiagnostics,
+                                    ArgumentList *argListForDiagnostics,
                                     PreparedArguments &&indices,
                                     bool isOnSelfParameter)
       : AccessComponent(MaterializeToTemporaryKind, storage, baseFormalType,
-                        typeData, indexExprForDiagnostics, std::move(indices)),
+                        typeData, argListForDiagnostics, std::move(indices)),
         Substitutions(subs),
         ReadStrategy(readStrategy), WriteStrategy(writeStrategy),
         Options(options), IsSuper(isSuper), IsOnSelfParameter(isOnSelfParameter)
@@ -1690,7 +1723,7 @@ namespace {
                                             Options,
                                             ReadStrategy, WriteStrategy,
                                             BaseFormalType, getTypeData(),
-                                            IndexExprForDiagnostics,
+                                            ArgListForDiagnostics,
                                             std::move(clonedIndices),
                                             IsOnSelfParameter);
       return std::unique_ptr<LogicalPathComponent>(clone);
@@ -1712,10 +1745,10 @@ namespace {
       return SGF.emitAssignToLValue(loc, std::move(value), std::move(lv));
     }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
-      return AccessedStorage{Storage, IsSuper,
+    Optional<AccessStorage> getAccessStorage() const override {
+      return AccessStorage{Storage, IsSuper,
                              Indices.isNull() ? nullptr : &Indices,
-                             IndexExprForDiagnostics};
+                             ArgListForDiagnostics};
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
@@ -1739,7 +1772,7 @@ namespace {
                                        Options, IsSuper, accessKind, strategy,
                                        getSubstFormalType(),
                                        std::move(Indices),
-                                       IndexExprForDiagnostics);
+                                       ArgListForDiagnostics);
       } else {
         auto var = cast<VarDecl>(Storage);
         if (base) {
@@ -1764,16 +1797,18 @@ namespace {
     SILType SubstFieldType;
   public:
      AddressorComponent(AbstractStorageDecl *decl, SILDeclRef accessor,
-                        bool isSuper, bool isDirectAccessorUse,
+                        bool isSuper,
+                        bool isDirectAccessorUse,
                         SubstitutionMap substitutions,
                         CanType baseFormalType, LValueTypeData typeData,
                         SILType substFieldType,
-                        Expr *indexExprForDiagnostics,
+                        ArgumentList *argListForDiagnostics,
                         PreparedArguments &&indices, bool isOnSelfParameter)
       : AccessorBasedComponent(AddressorKind, decl, accessor, isSuper,
-                               isDirectAccessorUse, substitutions,
+                               isDirectAccessorUse,
+                               substitutions,
                                baseFormalType, typeData,
-                               indexExprForDiagnostics, std::move(indices),
+                               argListForDiagnostics, std::move(indices),
                                isOnSelfParameter),
         SubstFieldType(substFieldType)
     {
@@ -1793,14 +1828,14 @@ namespace {
             std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
         addr = SGF.emitAddressorAccessor(
             loc, Accessor, Substitutions, std::move(args.base), IsSuper,
-            IsDirectAccessorUse, std::move(args.Indices), SubstFieldType,
-            IsOnSelfParameter);
+            IsDirectAccessorUse, std::move(args.Indices),
+            SubstFieldType, IsOnSelfParameter);
       }
 
       // Enter an unsafe access scope for the access.
-      addr = enterAccessScope(SGF, loc, addr, getTypeData(), getAccessKind(),
-                              SILAccessEnforcement::Unsafe,
-                              ActorIso);
+      addr =
+          enterAccessScope(SGF, loc, base, addr, getTypeData(), getAccessKind(),
+                           SILAccessEnforcement::Unsafe, ActorIso);
 
       return addr;
     }
@@ -1815,19 +1850,19 @@ namespace {
     AbstractStorageDecl *Storage;
     bool IsSuper;
     PreparedArguments PeekedIndices;
-    Expr *IndexExprForDiagnostics;
+    ArgumentList *ArgListForDiagnostics;
   public:
     EndApplyPseudoComponent(const LValueTypeData &typeData,
                             CleanupHandle endApplyHandle,
                             AbstractStorageDecl *storage,
                             bool isSuper,
                             PreparedArguments &&peekedIndices,
-                            Expr *indexExprForDiagnostics)
+                            ArgumentList *argListForDiagnostics)
       : WritebackPseudoComponent(typeData),
         EndApplyHandle(endApplyHandle),
         Storage(storage), IsSuper(isSuper),
         PeekedIndices(std::move(peekedIndices)),
-        IndexExprForDiagnostics(indexExprForDiagnostics) {}
+        ArgListForDiagnostics(argListForDiagnostics) {}
 
   private:
     void writeback(SILGenFunction &SGF, SILLocation loc,
@@ -1846,10 +1881,10 @@ namespace {
       OS.indent(indent) << "EndApplyPseudoComponent";
     }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
-      return AccessedStorage{Storage, IsSuper,
+    Optional<AccessStorage> getAccessStorage() const override {
+      return AccessStorage{Storage, IsSuper,
                              PeekedIndices.isNull() ? nullptr : &PeekedIndices,
-                             IndexExprForDiagnostics};
+                             ArgListForDiagnostics};
     }
   };
 }
@@ -1862,11 +1897,11 @@ static void pushEndApplyWriteback(SILGenFunction &SGF, SILLocation loc,
                                   bool isSuper = false,
                                   PreparedArguments &&indices
                                     = PreparedArguments(),
-                                  Expr *indexExprForDiagnostics = nullptr) {
+                                  ArgumentList *argListForDiagnostics = nullptr) {
   std::unique_ptr<LogicalPathComponent>
     component(new EndApplyPseudoComponent(typeData, endApplyHandle,
                                           storage, isSuper, std::move(indices),
-                                          indexExprForDiagnostics));
+                                          argListForDiagnostics));
   pushWriteback(SGF, loc, std::move(component), /*for diagnostics*/ base,
                 MaterializedLValue());
 }
@@ -1881,13 +1916,14 @@ namespace {
                                bool isSuper, bool isDirectAccessorUse,
                                SubstitutionMap substitutions,
                                CanType baseFormalType, LValueTypeData typeData,
-                               Expr *indexExprForDiagnostics,
+                               ArgumentList *argListForDiagnostics,
                                PreparedArguments &&indices,
                                bool isOnSelfParameter)
         : AccessorBasedComponent(
               CoroutineAccessorKind, decl, accessor, isSuper,
-              isDirectAccessorUse, substitutions, baseFormalType, typeData,
-              indexExprForDiagnostics, std::move(indices), isOnSelfParameter) {}
+              isDirectAccessorUse,
+              substitutions, baseFormalType, typeData,
+              argListForDiagnostics, std::move(indices), isOnSelfParameter) {}
 
     using AccessorBasedComponent::AccessorBasedComponent;
 
@@ -1910,7 +1946,7 @@ namespace {
       // Push a writeback that ends the access.
       pushEndApplyWriteback(SGF, loc, endApplyHandle, getTypeData(),
                             base, Storage, IsSuper, std::move(peekedIndices),
-                            IndexExprForDiagnostics);
+                            ArgListForDiagnostics);
 
       auto decl = cast<AccessorDecl>(Accessor.getFuncDecl());
 
@@ -2082,7 +2118,7 @@ namespace {
                                       SGFContext());
     }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
+    Optional<AccessStorage> getAccessStorage() const override {
       return None;
     }
 
@@ -2289,7 +2325,7 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
+    Optional<AccessStorage> getAccessStorage() const override {
       return None;
     }
 
@@ -2374,7 +2410,7 @@ void LValue::addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                                 AccessStrategy accessStrategy,
                                 CanType formalRValueType,
                                 PreparedArguments &&indices,
-                                Expr *indexExprForDiagnostics) {
+                                ArgumentList *argListForDiagnostics) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
     assert(indices.isNull());
     addMemberVarComponent(SGF, loc, var, subs, options, isSuper,
@@ -2383,7 +2419,7 @@ void LValue::addMemberComponent(SILGenFunction &SGF, SILLocation loc,
     auto subscript = cast<SubscriptDecl>(storage);
     addMemberSubscriptComponent(SGF, loc, subscript, subs, options, isSuper,
                                 accessKind, accessStrategy, formalRValueType,
-                                std::move(indices), indexExprForDiagnostics);
+                                std::move(indices), argListForDiagnostics);
   }
 }
 
@@ -2620,10 +2656,13 @@ namespace {
       }
 
       case AccessStrategy::DirectToAccessor:
-        return asImpl().emitUsingAccessor(strategy.getAccessor(), true);
+        return asImpl()
+            .emitUsingAccessor(strategy.getAccessor(),
+                               /*isDirect=*/true);
 
       case AccessStrategy::DispatchToAccessor:
-        return asImpl().emitUsingAccessor(strategy.getAccessor(), false);
+        return asImpl().emitUsingAccessor(strategy.getAccessor(),
+                                          /*isDirect=*/false);
 
       case AccessStrategy::MaterializeToTemporary: {
         auto typeData = getLogicalStorageTypeData(
@@ -2632,17 +2671,23 @@ namespace {
                                                  strategy.getWriteStrategy(),
                                                  typeData);
       }
+
+      case AccessStrategy::DispatchToDistributedThunk:
+        return asImpl().emitUsingDistributedThunk();
       }
       llvm_unreachable("unknown kind");
     }
 
-    void emitUsingAccessor(AccessorKind accessorKind, bool isDirect) {
+    void emitUsingAccessor(AccessorKind accessorKind,
+                           bool isDirect) {
       auto accessor =
         SGF.SGM.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
 
       switch (accessorKind) {
-      case AccessorKind::Get:
       case AccessorKind::Set: {
+        LLVM_FALLTHROUGH;
+      }
+      case AccessorKind::Get: {
         auto typeData = getLogicalStorageTypeData(
             SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
         return asImpl().emitUsingGetterSetter(accessor, isDirect, typeData);
@@ -2767,12 +2812,14 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
           PreparedArguments(), /*isOnSelfParameter*/ false);
     }
 
-    void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
+    void emitUsingGetterSetter(SILDeclRef accessor,
+                               bool isDirect,
                                LValueTypeData typeData) {
       LV.add<GetterSetterComponent>(
           Storage, accessor,
-          /*isSuper=*/false, isDirect, Subs, CanType(), typeData, nullptr,
-          PreparedArguments(), /* isOnSelfParameter */ false,
+          /*isSuper=*/false, isDirect, Subs, CanType(), typeData,
+          nullptr, PreparedArguments(),
+          /*isOnSelfParameter=*/false,
           ActorIso);
     }
 
@@ -2797,9 +2844,10 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
 
       // The only other case that should get here is a global variable.
       if (!address) {
-        address = SGF.emitGlobalVariableRef(Loc, Storage);
+        address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
       } else {
-        assert(!ActorIso && "local var should not be actor isolated!");
+        assert((!ActorIso || Storage->isTopLevelGlobal()) &&
+               "local var should not be actor isolated!");
       }
       assert(address.isLValue() &&
              "physical lvalue decl ref must evaluate to an address");
@@ -2825,6 +2873,11 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       if (address.getType().is<ReferenceStorageType>())
         LV.add<OwnershipComponent>(typeData);
     }
+
+    void emitUsingDistributedThunk() {
+      llvm_unreachable("cannot dispatch non-member var via distributed thunk");
+    }
+
   } emitter(SGF, loc, var, subs, accessKind, formalRValueType, options,
             actorIso, *this);
 
@@ -2837,14 +2890,6 @@ SILGenFunction::maybeEmitValueOfLocalVarDecl(
   // For local decls, use the address we allocated or the value if we have it.
   auto It = VarLocs.find(var);
   if (It != VarLocs.end()) {
-    // If the variable is part of an async let, ensure that the child task
-    // has completed first.
-    if (var->isAsyncLet() && accessKind != AccessKind::Write) {
-      auto patternBinding = var->getParentPatternBinding();
-      unsigned index = patternBinding->getPatternEntryIndexForVarDecl(var);
-      completeAsyncLetChildTask(patternBinding, index);
-    }
-
     // If this has an address, return it.  By-value let's have no address.
     SILValue ptr = It->second.value;
     if (ptr->getType().isAddress())
@@ -2868,6 +2913,9 @@ SILGenFunction::emitAddressOfLocalVarDecl(SILLocation loc, VarDecl *var,
   assert(var->getDeclContext()->isLocalContext());
   assert(var->getImplInfo().isSimpleStored());
   AccessKind astAccessKind = mapAccessKind(accessKind);
+  
+  assert(!var->isAsyncLet() && "async let does not have an address");
+  
   auto address = maybeEmitValueOfLocalVarDecl(var, astAccessKind);
   assert(address);
   assert(address.isLValue());
@@ -2883,6 +2931,12 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
   FormalEvaluationScope scope(*this);
 
   auto *var = cast<VarDecl>(declRef.getDecl());
+  // If the variable is part of an async let, get the result from the child
+  // task.
+  if (var->isAsyncLet()) {
+    return RValue(*this, loc, formalRValueType,
+                  emitReadAsyncLetBinding(loc, var));
+  }
   auto localValue = maybeEmitValueOfLocalVarDecl(var, AccessKind::Read);
 
   // If this VarDecl is represented as an address, emit it as an lvalue, then
@@ -3119,11 +3173,11 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
   }
 
   case AccessStrategy::DirectToAccessor:
-  case AccessStrategy::DispatchToAccessor: {
+  case AccessStrategy::DispatchToAccessor:
+  case AccessStrategy::DispatchToDistributedThunk: {
     auto accessor = member->getOpaqueAccessor(strategy.getAccessor());
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
-    
   }
   llvm_unreachable("bad access strategy");
 }
@@ -3137,8 +3191,7 @@ bool isCallToReplacedInDynamicReplacement(SILGenFunction &SGF,
                                           bool &isObjCReplacementSelfCall);
 
 static bool isCallToSelfOfCurrentFunction(SILGenFunction &SGF, LookupExpr *e) {
-  return SGF.FunctionDC->getAsDecl() &&
-         isa<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()) &&
+  return isa_and_nonnull<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()) &&
          e->getBase()->isSelfExprOf(
              cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false);
 }
@@ -3221,7 +3274,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
   bool IsOnSelfParameter; // Is self the self parameter in context.
   CanType BaseFormalType;
   SubstitutionMap Subs;
-  Expr *IndexExprForDiagnostics;
+  ArgumentList *ArgListForDiagnostics;
   PreparedArguments Indices;
   // If any, holds the actor we must switch to when performing the access.
   Optional<ActorIsolation> ActorIso;
@@ -3230,13 +3283,13 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                              StorageType *storage, SubstitutionMap subs,
                              bool isSuper, SGFAccessKind accessKind,
                              CanType formalRValueType, LValueOptions options,
-                             LValue &lv, Expr *indexExprForDiagnostics,
+                             LValue &lv, ArgumentList *argListForDiagnostics,
                              PreparedArguments &&indices, bool isSelf = false,
                              Optional<ActorIsolation> actorIso = None)
       : super(SGF, storage, accessKind, formalRValueType), LV(lv),
         Options(options), Loc(loc), IsSuper(isSuper), IsOnSelfParameter(isSelf),
         BaseFormalType(lv.getSubstFormalType()), Subs(subs),
-        IndexExprForDiagnostics(indexExprForDiagnostics),
+        ArgListForDiagnostics(argListForDiagnostics),
         Indices(std::move(indices)), ActorIso(actorIso) {}
 
   void emitUsingAddressor(SILDeclRef addressor, bool isDirect,
@@ -3247,7 +3300,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
 
     LV.add<AddressorComponent>(Storage, addressor, IsSuper, isDirect, Subs,
                                BaseFormalType, typeData, varStorageType,
-                               IndexExprForDiagnostics, std::move(Indices),
+                               ArgListForDiagnostics, std::move(Indices),
                                IsOnSelfParameter);
   }
 
@@ -3256,15 +3309,16 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
     assert(!ActorIso);
     LV.add<CoroutineAccessorComponent>(
         Storage, accessor, IsSuper, isDirect, Subs, BaseFormalType, typeData,
-        IndexExprForDiagnostics, std::move(Indices), IsOnSelfParameter);
+        ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter);
   }
 
-  void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
+  void emitUsingGetterSetter(SILDeclRef accessor,
+                             bool isDirect,
                              LValueTypeData typeData) {
     LV.add<GetterSetterComponent>(
-        Storage, accessor, IsSuper, isDirect, Subs, BaseFormalType, typeData,
-        IndexExprForDiagnostics, std::move(Indices), IsOnSelfParameter,
-        ActorIso);
+        Storage, accessor, IsSuper, isDirect, Subs,
+        BaseFormalType, typeData, ArgListForDiagnostics, std::move(Indices),
+        IsOnSelfParameter, ActorIso);
   }
 
   void emitUsingMaterialization(AccessStrategy readStrategy,
@@ -3273,7 +3327,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
     assert(!ActorIso);
     LV.add<MaterializeToTemporaryComponent>(
         Storage, IsSuper, Subs, Options, readStrategy, writeStrategy,
-        BaseFormalType, typeData, IndexExprForDiagnostics, std::move(Indices),
+        BaseFormalType, typeData, ArgListForDiagnostics, std::move(Indices),
         IsOnSelfParameter);
   }
 };
@@ -3329,6 +3383,19 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
         LV.add<OwnershipComponent>(typeData);
       }
     }
+
+    void emitUsingDistributedThunk() {
+      auto *var = cast<VarDecl>(Storage);
+      SILDeclRef accessor(var->getAccessor(AccessorKind::Get),
+                          SILDeclRef::Kind::Func,
+                          /*isForeign=*/false, /*isDistributed=*/true);
+
+      auto typeData = getLogicalStorageTypeData(
+          SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
+
+      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/true, typeData);
+    }
+
   } emitter(SGF, loc, var, subs, isSuper, accessKind,
             formalRValueType, options, *this,
             /*indices for diags*/ nullptr, /*indices*/ PreparedArguments(),
@@ -3386,14 +3453,14 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   if (e->isImplicitlyAsync())
     actorIso = getActorIsolation(decl);
 
-  Expr *indexExpr = e->getIndex();
-  auto indices = SGF.prepareSubscriptIndices(decl, subs, strategy, indexExpr);
+  auto *argList = e->getArgs();
+  auto indices = SGF.prepareSubscriptIndices(decl, subs, strategy, argList);
 
   CanType formalRValueType = getSubstFormalRValueType(e);
   lv.addMemberSubscriptComponent(SGF, e, decl, subs,
                                  options, e->isSuper(), accessKind, strategy,
                                  formalRValueType, std::move(indices),
-                                 indexExpr, isOnSelfParameter, actorIso);
+                                 argList, isOnSelfParameter, actorIso);
   return lv;
 }
 
@@ -3493,7 +3560,7 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                          AccessStrategy strategy,
                                          CanType formalRValueType,
                                          PreparedArguments &&indices,
-                                         Expr *indexExprForDiagnostics,
+                                         ArgumentList *argListForDiagnostics,
                                          bool isOnSelfParameter,
                                          Optional<ActorIsolation> actorIso) {
   struct MemberSubscriptAccessEmitter
@@ -3504,8 +3571,12 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
     void emitUsingStorage(LValueTypeData typeData) {
       llvm_unreachable("subscripts never have storage");
     }
+
+    void emitUsingDistributedThunk() {
+      llvm_unreachable("subscripts cannot be dispatch via distributed thunk");
+    }
   } emitter(SGF, loc, decl, subs, isSuper, accessKind, formalRValueType,
-            options, *this, indexExprForDiagnostics, std::move(indices),
+            options, *this, argListForDiagnostics, std::move(indices),
             isOnSelfParameter, actorIso);
 
   emitter.emitUsingStrategy(strategy);
@@ -3719,12 +3790,13 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                       const TypeLowering &rvalueTL,
                                       SGFContext C, IsTake_t isTake,
                                       bool isAddrGuaranteed) {
+  SILType addrType = addr->getType();
   // Get the lowering for the address type.  We can avoid a re-lookup
   // in the very common case of this being equivalent to the r-value
   // type.
-  auto &addrTL =
-    (addr->getType() == rvalueTL.getLoweredType().getAddressType()
-       ? rvalueTL : getTypeLowering(addr->getType()));
+  auto &addrTL = (addrType == rvalueTL.getLoweredType().getAddressType()
+                      ? rvalueTL
+                      : getTypeLowering(addrType));
 
   // Never do a +0 load together with a take.
   bool isPlusZeroOk = (isTake == IsNotTake &&
@@ -3740,10 +3812,15 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
 
     // Copy the address-only value.
     return B.bufferForExpr(
-        loc, rvalueTL.getLoweredType(), rvalueTL, C,
-        [&](SILValue newAddr) {
-          emitSemanticLoadInto(loc, addr, addrTL, newAddr, rvalueTL,
-                               isTake, IsInitialization);
+        loc, rvalueTL.getLoweredType(), rvalueTL, C, [&](SILValue newAddr) {
+          // If our dest address is a move only value from C, we can not reuse
+          // rvalueTL here.
+          SILType newAddrType = newAddr->getType();
+          auto &newAddrTL = newAddrType.isMoveOnlyWrapped()
+                                ? getTypeLowering(newAddrType)
+                                : rvalueTL;
+          return emitSemanticLoadInto(loc, addr, addrTL, newAddr, newAddrTL,
+                                      isTake, IsInitialization);
         });
   }
 
@@ -3794,8 +3871,15 @@ ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
     return B.formalAccessBufferForExpr(
         loc, rvalueTL.getLoweredType(), rvalueTL, C,
         [&](SILValue addressForCopy) {
-          emitSemanticLoadInto(loc, addr, addrTL, addressForCopy, rvalueTL,
-                               isTake, IsInitialization);
+          // If our dest address is a move only value from C, we can not reuse
+          // rvalueTL here.
+          SILType addressForCopyType = addressForCopy->getType();
+          auto &addressForCopyTL = addressForCopyType.isMoveOnlyWrapped()
+                                       ? getTypeLowering(addressForCopyType)
+                                       : rvalueTL;
+          return emitSemanticLoadInto(loc, addr, addrTL, addressForCopy,
+                                      addressForCopyTL, isTake,
+                                      IsInitialization);
         });
   }
 
@@ -4013,9 +4097,33 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
   assert(srcTL.getLoweredType().getAddressType() == src->getType());
   assert(rvalueTL.isLoadable() || !silConv.useLoweredAddresses());
 
-  // Easy case: the types match.
-  if (srcTL.getLoweredType() == rvalueTL.getLoweredType()) {
+  SILType srcType = srcTL.getLoweredType();
+  SILType rvalueType = rvalueTL.getLoweredType();
+
+  // Easy case: the types match exactly.
+  if (srcType == rvalueType) {
     return srcTL.emitLoadOfCopy(B, loc, src, isTake);
+  }
+
+  // Harder case: the srcTL and the rvalueTL match without move only.
+  if (srcType.removingMoveOnlyWrapper() ==
+      rvalueType.removingMoveOnlyWrapper()) {
+    // Ok, we know that one must be move only and the other must not be. Thus we
+    // perform one of two things:
+    //
+    // 1. If our source address is move only and our rvalue type is not move
+    // only, lets perform a load [copy] and a moveonly_to_copyable. We just need
+    // to insert something so that the move only checker knows that this copy of
+    // the move only address must be a last use.
+    //
+    // 2. If our dest value type is move only and our rvalue type is not move
+    // only, then we perform a load [copy] + copyable_to_moveonly.
+    SILValue newCopy = srcTL.emitLoadOfCopy(B, loc, src, isTake);
+    if (newCopy->getType().isMoveOnlyWrapped()) {
+      return B.createOwnedMoveOnlyWrapperToCopyableValue(loc, newCopy);
+    }
+
+    return B.createCopyableToMoveOnlyWrapperValue(loc, newCopy);
   }
 
   return emitLoadOfSemanticRValue(*this, loc, src, rvalueTL, isTake);
@@ -4039,6 +4147,23 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
     return;
   }
 
+  // Then see if our source address was a move only type and our dest was
+  // not. In such a case, just cast away the move only and perform a
+  // copy_addr. We are going to error on this later after SILGen.
+  if (srcTL.getLoweredType().removingMoveOnlyWrapper() ==
+      destTL.getLoweredType().removingMoveOnlyWrapper()) {
+    // In such a case, for now emit B.createCopyAddr. In the future, insert the
+    // address version of moveonly_to_copyable.
+    if (src->getType().isMoveOnlyWrapped())
+      src = B.createUncheckedAddrCast(
+          loc, src, srcTL.getLoweredType().removingMoveOnlyWrapper());
+    if (dest->getType().isMoveOnlyWrapped())
+      dest = B.createUncheckedAddrCast(
+          loc, dest, destTL.getLoweredType().removingMoveOnlyWrapper());
+    B.createCopyAddr(loc, src, dest, isTake, isInit);
+    return;
+  }
+
   auto rvalue = emitLoadOfSemanticRValue(*this, loc, src, srcTL, isTake);
   emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
 }
@@ -4050,6 +4175,20 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
                                        const TypeLowering &destTL,
                                        IsInitialization_t isInit) {
   assert(destTL.getLoweredType().getAddressType() == dest->getType());
+
+  // If our rvalue is a move only value, insert a moveonly_to_copyable
+  // instruction. This type must have come from the usage of an @_noImplicitCopy
+  // or @_isNoEscape. We rely on the relevant checkers at the SIL level to
+  // validate that this is safe to do. SILGen is just leaving in crumbs to be
+  // checked.
+  //
+  // TODO: For now we are only supporting objects since we are setup to handle
+  // lets when opaque values are enabled. We may also in the future support
+  // vars. If we do that before opaque values are enabled, we will use it to
+  // also handle address only lets.
+  if (rvalue->getType().isMoveOnlyWrapped() && rvalue->getType().isObject()) {
+    rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
+  }
 
   // Easy case: the types match.
   if (rvalue->getType() == destTL.getLoweredType()) {
@@ -4199,7 +4338,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
         auto actorIso = component.asPhysical().takeActorIsolation();
 
         // If the load must happen in the context of an actor, do a hop first.
-        prevExecutor = emitHopToTargetActor(loc, actorIso, /*actorSelf=*/None);
+        prevExecutor = emitHopToTargetActor(loc, actorIso, addr);
         projection =
             emitLoad(loc, projection.getValue(), origFormalType,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);
@@ -4478,6 +4617,18 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
   emitAssignToLValue(loc, ArgumentSource(loc, std::move(src)), std::move(dest));
 }
 
+namespace {
+
+} // end anonymous namespace
+
+/// Checks if the last component of the LValue refers to the given var decl.
+static bool referencesVar(PathComponent const& comp, VarDecl *var) {
+  if (comp.getKind() != PathComponent::RefElementKind)
+    return false;
+
+  return static_cast<RefElementComponent const&>(comp).getField() == var;
+}
+
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         ArgumentSource &&src,
                                         LValue &&dest) {
@@ -4486,6 +4637,12 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // cleanup of materialized LValues immediately, before evaluating the next
   // LValue. For example: (x[i], x[j]) = a, b
   ArgumentScope argScope(*this, loc);
+
+  // If this is an assignment to a distributed actor's actorSystem, push
+  // a clean-up to also initialize its id.
+  if (LLVM_UNLIKELY(DistActorCtorContext) &&
+      referencesVar(**(dest.end()-1), DistActorCtorContext->getSystemVar()))
+    Cleanups.pushCleanup<InitializeDistActorIdentity>(*DistActorCtorContext);
 
   // If the last component is a getter/setter component, use a special
   // generation pattern that allows us to peephole the emission of the RHS.
@@ -4577,6 +4734,13 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
     emitAssignToLValue(loc, std::move(loaded), std::move(dest));
     return;
   }
+
+  // If this is an assignment to a distributed actor's actorSystem, push
+  // a clean-up to also initialize its id.
+  // FIXME: in what situations does this lvalue to lvalue assign happen?
+  if (LLVM_UNLIKELY(DistActorCtorContext) &&
+      referencesVar(**(dest.end()-1), DistActorCtorContext->getSystemVar()))
+    Cleanups.pushCleanup<InitializeDistActorIdentity>(*DistActorCtorContext);
 
   auto &rvalueTL = getTypeLowering(src.getTypeOfRValue());
 

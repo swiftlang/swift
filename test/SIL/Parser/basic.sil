@@ -310,7 +310,7 @@ bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   return %7 : $()
 }
 
-protocol ClassBound : class {
+protocol ClassBound : AnyObject {
   func classBoundMethod()
 }
 
@@ -746,8 +746,8 @@ sil @test_stack_flag : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_ref [stack] $Class1
   %0 = alloc_ref [stack] $Class1
-  // CHECK: dealloc_ref [stack] %0 : $Class1
-  dealloc_ref [stack] %0 : $Class1
+  // CHECK: dealloc_stack_ref %0 : $Class1
+  dealloc_stack_ref  %0 : $Class1
   %2 = tuple ()
   return %2 : $()
 }
@@ -837,7 +837,7 @@ bb0(%t : $T):
   return %1 : $()
 }
 
-protocol ClassP : class {}
+protocol ClassP : AnyObject {}
 
 enum MaybePair {
   case Neither
@@ -1230,6 +1230,27 @@ bb0:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @test_alloc_stack_flags
+sil @test_alloc_stack_flags : $() -> () {
+  // CHECK: alloc_stack $Builtin.NativeObject
+  %instance = alloc_stack $Builtin.NativeObject
+  dealloc_stack %instance : $*Builtin.NativeObject
+  // CHECK: alloc_stack [dynamic_lifetime]
+  %instance2 = alloc_stack [dynamic_lifetime] $Builtin.NativeObject
+  dealloc_stack %instance2 : $*Builtin.NativeObject
+  // CHECK: alloc_stack [lexical]
+  %instance3 = alloc_stack [lexical] $Builtin.NativeObject
+  dealloc_stack %instance3 : $*Builtin.NativeObject
+  // CHECK: alloc_stack [dynamic_lifetime] [lexical]
+  %instance4 = alloc_stack [dynamic_lifetime] [lexical] $Builtin.NativeObject
+  dealloc_stack %instance4 : $*Builtin.NativeObject
+  // CHECK: alloc_stack [dynamic_lifetime] [lexical]
+  %instance5 = alloc_stack [lexical] [dynamic_lifetime] $Builtin.NativeObject
+  dealloc_stack %instance5 : $*Builtin.NativeObject
+  %res = tuple ()
+  return %res : $()
+}
+
 sil_global @staticProp: $Int
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
@@ -1271,7 +1292,7 @@ sil @debug_value : $@convention(thin) (Int, @in P, AnyObject) -> () {
 bb0(%0 : $Int, %1 : $*P, %2 : $AnyObject):
   debug_value %0 : $Int         // CHECK: debug_value %0 : $Int
   debug_value [poison] %2 : $AnyObject // CHECK: debug_value [poison] %2 : $AnyObject
-  debug_value_addr %1 : $*P     // CHECK: debug_value_addr %1 : $*P
+  debug_value %1 : $*P, expr op_deref // CHECK: debug_value %1 : $*P, expr op_deref
   unreachable
 }
 
@@ -1329,13 +1350,6 @@ entry(%x : $Class1, %w : $Builtin.Word):
 
 // CHECK-LABEL: sil [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
 sil [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
-bb0:
-  %0 = tuple ()
-  return %0 : $()
-}
-
-// CHECK-LABEL: sil shared_external @test_shared_external_definition : $@convention(thin) () -> () {
-sil shared_external @test_shared_external_definition : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -1571,6 +1585,18 @@ bb0(%0 : $Builtin.RawPointer, %1 : $X):
   store %1 to %3 : $*X
   // CHECK: [[T3:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [strict] $*X
   // CHECK-NEXT: store %1 to [[T3]] : $*X
+  %5 = pointer_to_address %0 : $Builtin.RawPointer to [align=1] $*X
+  store %1 to %5 : $*X
+  // CHECK: [[T4:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [align=1] $*X
+  // CHECK-NEXT: store %1 to [[T4]] : $*X
+  %7 = pointer_to_address %0 : $Builtin.RawPointer to [align=8] $*X
+  store %1 to %7 : $*X
+  // CHECK: [[T5:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [align=8] $*X
+  // CHECK-NEXT: store %1 to [[T5]] : $*X
+  %9 = pointer_to_address %0 : $Builtin.RawPointer to [align=4294967296] $*X
+  store %1 to %9 : $*X
+  // CHECK: [[T6:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [align=4294967296] $*X
+  // CHECK-NEXT: store %1 to [[T6]] : $*X
   %28 = tuple ()
   return %28 : $()
 }
@@ -1578,8 +1604,12 @@ bb0(%0 : $Builtin.RawPointer, %1 : $X):
 // CHECK-LABEL: sil @test_bind_memory
 sil @test_bind_memory : $(Builtin.RawPointer, Builtin.Word) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $*X
-  // CHECK: bind_memory {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*X
+  %2 = bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $*X
+  // CHECK: [[BIND:%.*]] = bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $*X
+  %3 = rebind_memory %0 : $Builtin.RawPointer to %2 : $Builtin.Word
+  // CHECK: [[REBIND:%.*]] = rebind_memory %0 : $Builtin.RawPointer to [[BIND]] : $Builtin.Word
+  %4 = rebind_memory %0 : $Builtin.RawPointer to %3 : $Builtin.Word
+  // CHECK: %{{.*}} = rebind_memory %0 : $Builtin.RawPointer to [[REBIND]] : $Builtin.Word
   %28 = tuple ()
   return %28 : $()
 }
@@ -1683,6 +1713,13 @@ bb0:
 
 // CHECK-LABEL: sil [lazy_getter] @test_lazy_getter
 sil [lazy_getter] @test_lazy_getter : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil hidden [distributed] @test_distributed_method
+sil hidden [distributed] @test_distributed_method : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

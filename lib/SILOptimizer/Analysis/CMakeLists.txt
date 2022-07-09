@@ -1,7 +1,7 @@
 target_sources(swiftSILOptimizer PRIVATE
   ARCAnalysis.cpp
   AccessSummaryAnalysis.cpp
-  AccessedStorageAnalysis.cpp
+  AccessStorageAnalysis.cpp
   AliasAnalysis.cpp
   Analysis.cpp
   ArraySemantic.cpp

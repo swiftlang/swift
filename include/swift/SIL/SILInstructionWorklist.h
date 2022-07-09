@@ -37,6 +37,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -66,19 +67,12 @@ template <typename VectorT = std::vector<SILInstruction *>,
 class SILInstructionWorklist : SILInstructionWorklistBase {
   BlotSetVector<SILInstruction *, VectorT, MapT> worklist;
 
-  /// For invoking Swift instruction passes in libswift.
-  LibswiftPassInvocation *libswiftPassInvocation = nullptr;
-
   void operator=(const SILInstructionWorklist &rhs) = delete;
   SILInstructionWorklist(const SILInstructionWorklist &worklist) = delete;
 
 public:
   SILInstructionWorklist(const char *loggingName = "InstructionWorklist")
       : SILInstructionWorklistBase(loggingName) {}
-
-  void setLibswiftPassInvocation(LibswiftPassInvocation *invocation) {
-    libswiftPassInvocation = invocation;
-  }
 
   /// Returns true if the worklist is empty.
   bool isEmpty() const { return worklist.empty(); }
@@ -185,7 +179,10 @@ public:
   /// Intended to be called during visitation after \p instruction has been
   /// removed from the worklist.
   ///
-  /// \p instruction the instruction whose usages will be replaced
+  /// \p instruction the instruction whose usages will be replaced. This
+  /// instruction may already be deleted to maintain valid SIL. For example, if
+  /// it was a block terminator.
+  ///
   /// \p result the instruction whose usages will replace \p instruction
   ///
   /// \return whether the instruction was deleted or modified.
@@ -306,7 +303,9 @@ public:
   void eraseInstFromFunction(SILInstruction &instruction,
                              SILBasicBlock::iterator &iterator,
                              bool addOperandsToWorklist = true) {
-    // Delete any debug users first.
+    // Try to salvage debug info first.
+    swift::salvageDebugInfo(&instruction);
+    // Then delete old debug users.
     for (auto result : instruction.getResults()) {
       while (!result->use_empty()) {
         auto *user = result->use_begin()->getUser();

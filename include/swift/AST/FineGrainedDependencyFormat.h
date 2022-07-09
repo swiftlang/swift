@@ -35,7 +35,7 @@ using llvm::BCRecordLayout;
 
 /// Every .swiftdeps file begins with these 4 bytes, for easy identification when
 /// debugging.
-const unsigned char FINE_GRAINED_DEPDENENCY_FORMAT_SIGNATURE[] = {'D', 'E', 'P', 'S'};
+const unsigned char FINE_GRAINED_DEPENDENCY_FORMAT_SIGNATURE[] = {'D', 'E', 'P', 'S'};
 
 const unsigned FINE_GRAINED_DEPENDENCY_FORMAT_VERSION_MAJOR = 1;
 

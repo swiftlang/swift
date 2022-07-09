@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__wasi__)
 #include <unistd.h>
 #elif defined(_WIN32)
 #include <io.h>
@@ -658,22 +658,39 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
 
 }
 
-static void
-asyncTaskIterationCallback(swift_reflection_ptr_t AllocationPtr, unsigned Count,
-                           swift_async_task_allocation_chunk_t Chunks[],
-                           void *ContextPtr) {
-  printf("  Allocation block %#" PRIx64 "\n", (uint64_t)AllocationPtr);
-  for (unsigned i = 0; i < Count; i++)
-    printf("    Chunk at %#" PRIx64 " length %u kind %u\n",
-           (uint64_t)Chunks[i].Start, Chunks[i].Length, Chunks[i].Kind);
-}
-
 int reflectAsyncTask(SwiftReflectionContextRef RC,
                      const PipeMemoryReader Pipe) {
   uintptr_t AsyncTaskInstance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
   printf("Async task %#" PRIx64 "\n", (uint64_t)AsyncTaskInstance);
-  swift_reflection_iterateAsyncTaskAllocations(
-      RC, AsyncTaskInstance, asyncTaskIterationCallback, NULL);
+
+  swift_async_task_slab_return_t SlabPtrResult =
+      swift_reflection_asyncTaskSlabPointer(RC, AsyncTaskInstance);
+  if (SlabPtrResult.Error) {
+    printf("swift_reflection_asyncTaskSlabPointer failed: %s\n",
+           SlabPtrResult.Error);
+  } else {
+    swift_reflection_ptr_t SlabPtr = SlabPtrResult.SlabPtr;
+    while (SlabPtr) {
+      printf("  Slab pointer %#" PRIx64 "\n", (uint64_t)SlabPtr);
+      swift_async_task_slab_allocations_return_t AllocationsResult =
+          swift_reflection_asyncTaskSlabAllocations(RC, SlabPtr);
+      if (AllocationsResult.Error) {
+        printf("swift_reflection_asyncTaskSlabAllocations failed: %s\n",
+               AllocationsResult.Error);
+        SlabPtr = 0;
+      } else {
+        printf("    Slab size %" PRIu64 "\n",
+               (uint64_t)AllocationsResult.SlabSize);
+        for (unsigned i = 0; i < AllocationsResult.ChunkCount; i++) {
+          swift_async_task_allocation_chunk_t Chunk =
+              AllocationsResult.Chunks[i];
+          printf("    Chunk at %#" PRIx64 " length %u kind %u\n",
+                 (uint64_t)Chunk.Start, Chunk.Length, Chunk.Kind);
+        }
+        SlabPtr = AllocationsResult.NextSlab;
+      }
+    }
+  }
 
   printf("\n\n");
   PipeMemoryReader_sendDoneMessage(&Pipe);

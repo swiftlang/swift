@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Omits a specified number of elements from the base asynchronous sequence,
   /// then passes through all remaining elements.
@@ -22,12 +22,12 @@ extension AsyncSequence {
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `10`. The `dropFirst(_:)` method causes the modified
-  /// sequence to ignore the values `0` through `4`, and instead emit `5` through `10`:
+  /// sequence to ignore the values `1` through `3`, and instead emit `4` through `10`:
   ///
   ///     for await number in Counter(howHigh: 10).dropFirst(3) {
-  ///         print("\(number) ", terminator: " ")
+  ///         print(number, terminator: " ")
   ///     }
-  ///     // prints "4 5 6 7 8 9 10"
+  ///     // Prints "4 5 6 7 8 9 10"
   ///
   /// If the number of elements to drop exceeds the number of elements in the
   /// sequence, the result is an empty sequence.
@@ -48,8 +48,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence which omits a specified number of elements from the
 /// base asynchronous sequence, then passes through all remaining elements.
-@available(SwiftStdlib 5.5, *)
-@frozen
+@available(SwiftStdlib 5.1, *)
 public struct AsyncDropFirstSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -57,14 +56,14 @@ public struct AsyncDropFirstSequence<Base: AsyncSequence> {
   @usableFromInline
   let count: Int
   
-  @inlinable 
+  @usableFromInline 
   init(_ base: Base, dropping count: Int) {
     self.base = base
     self.count = count
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncDropFirstSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///
@@ -75,7 +74,6 @@ extension AsyncDropFirstSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the drop-first sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -83,7 +81,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
     @usableFromInline
     var count: Int
 
-    @inlinable
+    @usableFromInline
     init(_ baseIterator: Base.AsyncIterator, count: Int) {
       self.baseIterator = baseIterator
       self.count = count
@@ -118,7 +116,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncDropFirstSequence {
   /// Omits a specified number of elements from the base asynchronous sequence,
   /// then passes through all remaining elements.
@@ -137,3 +135,13 @@ extension AsyncDropFirstSequence {
     return AsyncDropFirstSequence(base, dropping: self.count + count)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncDropFirstSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncDropFirstSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

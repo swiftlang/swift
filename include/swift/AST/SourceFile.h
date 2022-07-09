@@ -17,12 +17,23 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
 
 class PersistentParserState;
+
+/// Kind of import affecting how a decl can be reexported.
+/// This is a subset of \c DisallowedOriginKind.
+///
+/// \sa getRestrictedImportKind
+enum class RestrictedImportKind {
+  ImplementationOnly,
+  Implicit,
+  None // No restriction, i.e. the module is imported publicly.
+};
 
 /// A file containing Swift source code.
 ///
@@ -84,13 +95,14 @@ private:
   /// This is \c None until it is filled in by the import resolution phase.
   Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
 
+  /// Which imports have made use of @preconcurrency.
+  llvm::SmallDenseSet<AttributedImport<ImportedModule>>
+      PreconcurrencyImportsUsed;
+
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
   /// same module.
   mutable Identifier PrivateDiscriminator;
-
-  /// A synthesized file corresponding to this file, created on-demand.
-  SynthesizedFileUnit *SynthesizedFile = nullptr;
 
   /// The root TypeRefinementContext for this SourceFile.
   ///
@@ -242,11 +254,20 @@ public:
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
   /// A selector that is used by two different declarations in the same class.
-  /// Fields: classDecl, selector, isInstanceMethod.
-  using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
+  struct ObjCMethodConflict {
+    NominalTypeDecl *typeDecl;
+    ObjCSelector selector;
+    bool isInstanceMethod;
+
+    ObjCMethodConflict(NominalTypeDecl *typeDecl, ObjCSelector selector,
+                       bool isInstanceMethod)
+        : typeDecl(typeDecl), selector(selector),
+          isInstanceMethod(isInstanceMethod)
+    {}
+  };
 
   /// List of Objective-C member conflicts we have found during type checking.
-  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
+  llvm::SetVector<ObjCMethodConflict> ObjCMethodConflicts;
 
   /// List of attributes added by access notes, used to emit remarks for valid
   /// ones.
@@ -287,6 +308,10 @@ public:
 
   ~SourceFile();
 
+  bool hasImports() const {
+    return Imports.hasValue();
+  }
+
   /// Retrieve an immutable view of the source file's imports.
   ArrayRef<AttributedImport<ImportedModule>> getImports() const {
     return *Imports;
@@ -295,6 +320,14 @@ public:
   /// Set the imports for this source file. This gets called by import
   /// resolution.
   void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
+
+  /// Whether the given import has used @preconcurrency.
+  bool hasImportUsedPreconcurrency(
+      AttributedImport<ImportedModule> import) const;
+
+  /// Note that the given import has used @preconcurrency/
+  void setImportUsedPreconcurrency(
+      AttributedImport<ImportedModule> import);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.
@@ -313,7 +346,8 @@ public:
   /// If not, we can fast-path module checks.
   bool hasImplementationOnlyImports() const;
 
-  bool isImportedImplementationOnly(const ModuleDecl *module) const;
+  /// Get the most permissive restriction applied to the imports of \p module.
+  RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
 
   /// Find all SPI names imported from \p importedModule by this file,
   /// collecting the identifiers in \p spiGroups.
@@ -322,7 +356,7 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
-  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 
   bool shouldCrossImport() const;
@@ -408,11 +442,6 @@ public:
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
-
-  /// Returns the synthesized file for this source file, if it exists.
-  SynthesizedFileUnit *getSynthesizedFile() const { return SynthesizedFile; };
-
-  SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   virtual bool walk(ASTWalker &walker) override;
 
@@ -515,7 +544,7 @@ public:
   /// null if the context hierarchy has not been built yet. Use
   /// TypeChecker::getOrBuildTypeRefinementContext() to get a built
   /// root of the hierarchy.
-  TypeRefinementContext *getTypeRefinementContext();
+  TypeRefinementContext *getTypeRefinementContext() const;
 
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);
@@ -574,6 +603,9 @@ public:
 
   ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
 
+  /// Returns true if the source file contains concurrency in the top-level
+  bool isAsyncTopLevelSourceFile() const;
+
 private:
 
   /// If not \c None, the underlying vector contains the parsed tokens of this
@@ -624,5 +656,31 @@ inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
   out << "source_file " << '\"' << SF->getFilename() << '\"';
 }
 } // end namespace swift
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::SourceFile::ObjCMethodConflict> {
+  using ObjCMethodConflict = swift::SourceFile::ObjCMethodConflict;
+
+  static inline ObjCMethodConflict getEmptyKey() {
+    return ObjCMethodConflict(nullptr, {}, false);
+  }
+  static inline ObjCMethodConflict getTombstoneKey() {
+    return ObjCMethodConflict(nullptr, {}, true);
+  }
+  static inline unsigned getHashValue(ObjCMethodConflict a) {
+    return hash_combine(hash_value(a.typeDecl),
+                  DenseMapInfo<swift::ObjCSelector>::getHashValue(a.selector),
+                  hash_value(a.isInstanceMethod));
+  }
+  static bool isEqual(ObjCMethodConflict a, ObjCMethodConflict b) {
+    return a.typeDecl == b.typeDecl && a.selector == b.selector &&
+           a.isInstanceMethod == b.isInstanceMethod;
+  }
+};
+
+}
+
 
 #endif

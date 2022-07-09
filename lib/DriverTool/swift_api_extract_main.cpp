@@ -65,7 +65,7 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName =
           llvm::sys::path::stem(MainExecutablePath).str();
-      Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
+      Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift API Extract", options::SwiftAPIExtractOption, 0,
                        /*ShowAllAliases*/ false);
       return 1;
@@ -197,8 +197,9 @@ public:
   }
 
   int extractAPI() {
-    if (Instance.setup(Invocation)) {
-      llvm::outs() << "Failed to setup compiler instance\n";
+    std::string InstanceSetupError;
+    if (Instance.setup(Invocation, InstanceSetupError)) {
+      llvm::outs() << InstanceSetupError << '\n';
       return 1;
     }
 

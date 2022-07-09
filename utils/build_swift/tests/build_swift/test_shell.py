@@ -7,16 +7,13 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from __future__ import absolute_import, unicode_literals
-
+import builtins
 import collections
 import sys
 import unittest
+from io import StringIO
 
 from build_swift import shell
-
-import six
-from six import StringIO
 
 from .. import utils
 
@@ -48,7 +45,7 @@ except ImportError:
 # -----------------------------------------------------------------------------
 # Constants
 
-_OPEN_NAME = '{}.open'.format(six.moves.builtins.__name__)
+_OPEN_NAME = '{}.open'.format(builtins.__name__)
 
 
 # -----------------------------------------------------------------------------
@@ -68,7 +65,7 @@ class TestHelpers(unittest.TestCase):
 
         result = shell._flatmap(duplicate, [1, 2, 3])
 
-        self.assertIsInstance(result, collections.Iterable)
+        self.assertIsInstance(result, collections.abc.Iterable)
         self.assertEqual(list(result), [1, 1, 2, 2, 3, 3])
 
     # -------------------------------------------------------------------------
@@ -90,7 +87,7 @@ class TestHelpers(unittest.TestCase):
 
         self.assertEqual(
             shell._convert_pathlib_path(path),
-            six.text_type(path))
+            str(path))
 
     # -------------------------------------------------------------------------
     # _get_stream_file
@@ -192,59 +189,6 @@ class TestDecorators(unittest.TestCase):
     """Unit tests for the decorators defined in the build_swift.shell module
     used to backport or add functionality to the subprocess wrappers.
     """
-
-    # -------------------------------------------------------------------------
-    # _backport_devnull
-
-    @utils.requires_module('unittest.mock')
-    @patch(_OPEN_NAME, new_callable=mock_open)
-    @patch('build_swift.shell._PY_VERSION', (3, 2))
-    def test_backport_devnull_stdout_kwarg(self, mock_open):
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
-
-        @shell._backport_devnull
-        def func(command, **kwargs):
-            self.assertEqual(kwargs['stdout'], mock_file)
-
-        func('', stdout=shell.DEVNULL)
-        assert(mock_open.return_value.__enter__.called)
-        assert(mock_open.return_value.__exit__.called)
-
-    @utils.requires_module('unittest.mock')
-    @patch(_OPEN_NAME, new_callable=mock_open)
-    @patch('build_swift.shell._PY_VERSION', (3, 2))
-    def test_backport_devnull_stderr_kwarg(self, mock_open):
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
-
-        @shell._backport_devnull
-        def func(command, **kwargs):
-            self.assertEqual(kwargs['stderr'], mock_file)
-
-        func('', stderr=shell.DEVNULL)
-        assert(mock_open.return_value.__enter__.called)
-        assert(mock_open.return_value.__exit__.called)
-
-    @utils.requires_module('unittest.mock')
-    @patch(_OPEN_NAME, new_callable=mock_open)
-    def test_backport_devnull_does_not_open(self, mock_open):
-        @shell._backport_devnull
-        def func(command):
-            pass
-
-        func('')
-        mock_open.return_value.__enter__.assert_not_called()
-        mock_open.return_value.__exit__.assert_not_called()
-
-    @utils.requires_module('unittest.mock')
-    @patch('build_swift.shell._PY_VERSION', (3, 3))
-    def test_backport_devnull_noop_starting_with_python_3_3(self):
-        def func():
-            pass
-
-        self.assertEqual(shell._backport_devnull(func), func)
-
     # -------------------------------------------------------------------------
     # _normalize_command
 
@@ -368,20 +312,14 @@ class TestSubprocessWrappers(unittest.TestCase):
     @patch('subprocess.check_output')
     def test_check_output(self, mock_check_output):
         # Before Python 3 the subprocess.check_output function returned bytes.
-        if six.PY3:
-            mock_check_output.return_value = ''
-        else:
-            mock_check_output.return_value = b''
+        mock_check_output.return_value = ''
 
         output = shell.check_output('ls')
 
         # We always expect str (utf-8) output
-        self.assertIsInstance(output, six.text_type)
+        self.assertIsInstance(output, str)
 
-        if six.PY3:
-            mock_check_output.assert_called_with('ls', encoding='utf-8')
-        else:
-            mock_check_output.assert_called_with('ls')
+        mock_check_output.assert_called_with('ls', encoding='utf-8')
 
 
 class TestShellUtilities(unittest.TestCase):
@@ -468,7 +406,7 @@ class TestShellUtilities(unittest.TestCase):
     @patch('build_swift.shell._convert_pathlib_path')
     def test_pushd_converts_pathlib_path(self, mock_convert):
         path = Path('/other/path')
-        mock_convert.return_value = six.text_type(path)
+        mock_convert.return_value = str(path)
 
         shell.pushd(path)
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -86,8 +86,8 @@ let tweet = "Worst thing about working on String is that it breaks *everything*.
 
 // Pre-commit benchmark: simple scalar walk
 @inline(never)
-public func run_StringWalk(_ N: Int) {
-  return run_StringWalk_ascii_unicodeScalars(N)
+public func run_StringWalk(_ n: Int) {
+  return run_StringWalk_ascii_unicodeScalars(n)
 }
 
 // Extended String benchmarks:
@@ -101,7 +101,7 @@ let charactersMultiplier = baseMultiplier / 5
 
 // An extended benchmark suite exercising finer-granularity behavior of our
 // Strings.
-public let StringWalk = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk",
     runFunction: run_StringWalk,
@@ -139,15 +139,15 @@ public let StringWalk = [
 %   for (Kind, View) in zip(Kinds, [".unicodeScalars", ""]):
 
 @inline(never)
-public func run_StringWalk_${Name}_${Kind}(_ N: Int) {
-  for _ in 1...${Kind}Multiplier*N {
+public func run_StringWalk_${Name}_${Kind}(_ n: Int) {
+  for _ in 1...${Kind}Multiplier*n {
     count_${Kind}(${Name}${View})
   }
 }
 
 @inline(never)
-public func run_StringWalk_${Name}_${Kind}_Backwards(_ N: Int) {
-  for _ in 1...${Kind}Multiplier*N {
+public func run_StringWalk_${Name}_${Kind}_Backwards(_ n: Int) {
+  for _ in 1...${Kind}Multiplier*n {
     count_${Kind}_rev(${Name}${View}.reversed())
   }
 }
@@ -157,9 +157,9 @@ public func run_StringWalk_${Name}_${Kind}_Backwards(_ N: Int) {
 let ${Name}Characters = Array(${Name})
 
 @inline(never)
-public func run_CharIteration_${Name}_unicodeScalars(_ N: Int) {
+public func run_CharIteration_${Name}_unicodeScalars(_ n: Int) {
   var count = 0
-  for _ in 1...unicodeScalarsMultiplier*N {
+  for _ in 1...unicodeScalarsMultiplier*n {
     for c in ${Name}Characters {
       for u in c.unicodeScalars {
         count |= Int(u.value)
@@ -170,9 +170,9 @@ public func run_CharIteration_${Name}_unicodeScalars(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharIteration_${Name}_unicodeScalars_Backwards(_ N: Int) {
+public func run_CharIteration_${Name}_unicodeScalars_Backwards(_ n: Int) {
   var count = 0
-  for _ in 1...unicodeScalarsMultiplier*N {
+  for _ in 1...unicodeScalarsMultiplier*n {
     for c in ${Name}Characters {
       for u in c.unicodeScalars.reversed() {
         count |= Int(u.value)
@@ -183,9 +183,9 @@ public func run_CharIteration_${Name}_unicodeScalars_Backwards(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharIndexing_${Name}_unicodeScalars(_ N: Int) {
+public func run_CharIndexing_${Name}_unicodeScalars(_ n: Int) {
   var count = 0
-  for _ in 1...unicodeScalarsMultiplier*N {
+  for _ in 1...unicodeScalarsMultiplier*n {
     for c in ${Name}Characters {
       let s = c.unicodeScalars
       for i in s.indices {
@@ -197,9 +197,9 @@ public func run_CharIndexing_${Name}_unicodeScalars(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharIndexing_${Name}_unicodeScalars_Backwards(_ N: Int) {
+public func run_CharIndexing_${Name}_unicodeScalars_Backwards(_ n: Int) {
   var count = 0
-  for _ in 1...unicodeScalarsMultiplier*N {
+  for _ in 1...unicodeScalarsMultiplier*n {
     for c in ${Name}Characters {
       let s = c.unicodeScalars
       for i in s.indices.reversed() {

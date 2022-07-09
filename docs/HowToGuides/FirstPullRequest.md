@@ -15,12 +15,12 @@ contribution process.
 
 In case you don't have something specific you'd like to work on, such as
 implementing something for a Swift Evolution pitch, you could start off by
-working on a bug labeled `StarterBug` on [Swift JIRA][StarterBug]. If the
-bug hasn't been assigned to someone, check the comments in case someone has
+working on a bug labeled `StarterBug` on [Swift repository 'Issues' tab][StarterBug]. 
+If the issue hasn't been assigned to someone, check the comments in case someone has
 already started working on it. If not, feel free to assign it to yourself and
 start working on it!
 
-[StarterBug]: https://bugs.swift.org/issues/?jql=labels%20%3D%20StarterBug%20AND%20(status%20%3D%20Open%20OR%20status%20%3D%20Reopened)%20AND%20project%20%3D%20Swift
+[StarterBug]: https://github.com/apple/swift/issues?q=is%3Aissue+is%3Aopen+label%3AStarterBug
 
 ## Getting Help
 
@@ -159,10 +159,10 @@ to merge your changes. :tada:
 
 That's totally okay! There is no shame in that. You only have limited time and
 energy in a day. If you can, leave a comment on the bug report/pull request
-that you will not be able to continue and unassign yourself from the bug on
-JIRA. Don't worry about trying to explain _why_ you aren't able to contribute
-further. We understand. Unanticipated things come up all the time and you
-should do what _works for you_.
+that you will not be able to continue and unassign yourself from the issue on
+Github. Don't worry about trying to explain _why_ you aren't 
+able to contribute further. We understand. Unanticipated things come up all 
+the time and you should do what _works for you_.
 
 This point also applies if you don't have time right now but hope to get to
 something in the near future. Please don't feel sad or apologetic!

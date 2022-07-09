@@ -145,7 +145,7 @@ public:
   bool isBitwiseTakable() const { return BitwiseTakable; }
 
   void dump() const;
-  void dump(FILE *file, unsigned Indent = 0) const;
+  void dump(std::ostream &stream, unsigned Indent = 0) const;
 
   // Using the provided reader, inspect our value.
   // Return false if we can't inspect value.
@@ -359,6 +359,11 @@ public:
   const TypeInfo *
   getClassInstanceTypeInfo(const TypeRef *TR, unsigned start,
                            remote::TypeInfoProvider *ExternalTypeInfo);
+
+  unsigned targetPointerSize() {
+    auto *rawPointerTI = getTypeInfo(getRawPointerTypeRef(), nullptr);
+    return rawPointerTI->getSize();
+  }
 
 private:
   friend class swift::reflection::LowerType;

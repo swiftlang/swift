@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch -parse-as-library -sanitize=thread)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library -sanitize=thread)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -20,12 +20,12 @@ enum HomeworkError: Error, Equatable {
   case dogAteIt(String)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func formGreeting(name: String) async -> String {
   return "Hello \(name) from async world"
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testSimple(
   name: String, dogName: String, shouldThrow: Bool, doSuspend: Bool
 ) async {
@@ -78,7 +78,7 @@ func testSimple(
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: false)

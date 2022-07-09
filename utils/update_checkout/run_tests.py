@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This source file is part of the Swift.org open source project
 #
@@ -12,9 +12,6 @@
 """
 Small script used to easily run the update_checkout module unit tests.
 """
-
-
-from __future__ import absolute_import, unicode_literals
 
 import os
 import shutil

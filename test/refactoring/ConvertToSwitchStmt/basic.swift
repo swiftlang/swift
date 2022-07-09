@@ -57,13 +57,13 @@ func checkCaseCondition() {
 }
 
 func checkOptionalBindingCondition(optional: String?) {
-  if let unwraped = optional {
-    print(unwraped)
+  if let unwrapped = optional {
+    print(unwrapped)
   }
 
-  if var unwraped = optional {
-    unwraped += "!"
-    print(unwraped)
+  if var unwrapped = optional {
+    unwrapped += "!"
+    print(unwrapped)
   }
 }
 
@@ -131,7 +131,7 @@ func checkEmptyBody(e: E) {
   }
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=9:3 -end-pos=16:4 > %t.result/L9-3.swift
 // RUN: %target-swift-frontend-typecheck %t.result/L9-3.swift

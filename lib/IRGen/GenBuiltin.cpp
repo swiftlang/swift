@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
 
@@ -29,6 +30,7 @@
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenConcurrency.h"
+#include "GenDistributed.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
@@ -120,10 +122,12 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
-                            Identifier FnId, SILType resultType,
-                            ArrayRef<SILType> argTypes,
-                            Explosion &args, Explosion &out,
-                            SubstitutionMap substitutions) {
+                            BuiltinInst *Inst, ArrayRef<SILType> argTypes,
+                            Explosion &args, Explosion &out) {
+  Identifier FnId = Inst->getName();
+  SILType resultType = Inst->getType();
+  SubstitutionMap substitutions = Inst->getSubstitutions();
+
   if (Builtin.ID == BuiltinValueKind::COWBufferForReading) {
     // Just forward the incoming argument.
     assert(args.size() == 1 && "Expecting one incoming argument");
@@ -236,6 +240,26 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         taskOptions,
         taskFunction,
         taskContext,
+        nullptr,
+        substitutions
+        );
+
+    out.add(asyncLet);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+    auto taskOptions = args.claimNext();
+    auto taskFunction = args.claimNext();
+    auto taskContext = args.claimNext();
+    auto localBuffer = args.claimNext();
+
+    auto asyncLet = emitBuiltinStartAsyncLet(
+        IGF,
+        taskOptions,
+        taskFunction,
+        taskContext,
+        localBuffer,
         substitutions
         );
 
@@ -245,6 +269,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::EndAsyncLet) {
     emitEndAsyncLet(IGF, args.claimNext());
+    // Ignore a second operand which is inserted by ClosureLifetimeFixup and
+    // only used for dependency tracking.
+    (void)args.claimAll();
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::EndAsyncLetLifetime) {
+    IGF.Builder.CreateLifetimeEnd(args.claimNext());
     // Ignore a second operand which is inserted by ClosureLifetimeFixup and
     // only used for dependency tracking.
     (void)args.claimAll();
@@ -360,25 +392,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
-    auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
-    auto actor = args.claimNext();
-    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-    // init(resolve address, using transport)
-    auto call = IGF.Builder.CreateCall(fn, {
-      actor
-      // TODO: might have to carry `address, transport` depending on how we implement the resolve initializers
-    });
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    return;
-  }
-
-  if (Builtin.ID == BuiltinValueKind::DestroyDistributedActor) {
-    auto fn = IGF.IGM.getDistributedActorDestroyFn();
-    auto actor = args.claimNext();
-    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-    auto call = IGF.Builder.CreateCall(fn, {actor});
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    call->setDoesNotThrow();
+    auto actorMetatype = args.claimNext();
+    emitDistributedActorInitializeRemote(IGF, resultType, actorMetatype, out);
     return;
   }
 
@@ -577,10 +592,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   
     auto *fn = cast<llvm::Function>(IGF.IGM.getWillThrowFn());
     auto error = args.claimNext();
+    auto errorTy = IGF.IGM.Context.getErrorExistentialType();
     auto errorBuffer = IGF.getCalleeErrorResultSlot(
-        SILType::getPrimitiveObjectType(IGF.IGM.Context.getErrorDecl()
-                                            ->getDeclaredInterfaceType()
-                                            ->getCanonicalType()));
+        SILType::getPrimitiveObjectType(errorTy));
     IGF.Builder.CreateStore(error, errorBuffer);
     
     auto context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
@@ -588,10 +602,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::CallInst *call = IGF.Builder.CreateCall(fn,
                                         {context, errorBuffer.getAddress()});
     call->setCallingConv(IGF.IGM.SwiftCC);
-    call->addAttribute(llvm::AttributeList::FunctionIndex,
-                       llvm::Attribute::NoUnwind);
-    call->addAttribute(llvm::AttributeList::FirstArgIndex + 1,
-                       llvm::Attribute::ReadOnly);
+    call->addFnAttr(llvm::Attribute::NoUnwind);
+    call->addParamAttr(1, llvm::Attribute::ReadOnly);
 
     auto attrs = call->getAttributes();
     IGF.IGM.addSwiftSelfAttributes(attrs, 0);
@@ -693,7 +705,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
-  
+  if (Builtin.ID == BuiltinValueKind::Ifdef) {
+    // Ifdef not constant folded, which means it was not @_alwaysEmitIntoClient
+    IGF.IGM.error(
+        Inst->getLoc().getSourceLoc(),
+        "Builtin.ifdef can only be used in @_alwaysEmitIntoClient functions");
+    out.add(IGF.Builder.getInt32(0));
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::CmpXChg) {
     SmallVector<Type, 4> Types;
     StringRef BuiltinName =
@@ -739,7 +759,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(cmp->getType()));
     llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(
-        pointer, cmp, newval, successOrdering, failureOrdering,
+        pointer, cmp, newval, llvm::MaybeAlign(),
+        successOrdering, failureOrdering,
         isSingleThread ? llvm::SyncScope::SingleThread
                        : llvm::SyncScope::System);
     cast<llvm::AtomicCmpXchgInst>(value)->setVolatile(isVolatile);
@@ -807,7 +828,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(val->getType()));
     llvm::Value *value = IGF.Builder.CreateAtomicRMW(
-        SubOpcode, pointer, val, ordering,
+        SubOpcode, pointer, val, llvm::MaybeAlign(), ordering,
         isSingleThread ? llvm::SyncScope::SingleThread
                        : llvm::SyncScope::System);
     cast<AtomicRMWInst>(value)->setVolatile(isVolatile);
@@ -1199,6 +1220,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::TargetOSVersionAtLeast) {
+    auto major = args.claimNext();
+    auto minor = args.claimNext();
+    auto patch = args.claimNext();
+    auto result = IGF.emitTargetOSVersionAtLeastCall(major, minor, patch);
+    out.add(result);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
     llvm::Value *entrypointArgs[7];
     auto argIter = IGF.CurFn->arg_begin();
@@ -1281,6 +1311,40 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto size = args.claimNext();
     out.add(
         emitAutoDiffAllocateSubcontext(IGF, allocatorAddr, size).getAddress());
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::Move) {
+    auto input = args.claimNext();
+    auto result = args.claimNext();
+    SILType addrTy = argTypes[0];
+    const TypeInfo &addrTI = IGF.getTypeInfo(addrTy);
+    Address inputAttr = addrTI.getAddressForPointer(input);
+    Address resultAttr = addrTI.getAddressForPointer(result);
+    addrTI.initializeWithTake(IGF, resultAttr, inputAttr, addrTy, false);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::Copy) {
+    auto input = args.claimNext();
+    auto result = args.claimNext();
+    SILType addrTy = argTypes[0];
+    const TypeInfo &addrTI = IGF.getTypeInfo(addrTy);
+    Address inputAttr = addrTI.getAddressForPointer(input);
+    Address resultAttr = addrTI.getAddressForPointer(result);
+    addrTI.initializeWithCopy(IGF, resultAttr, inputAttr, addrTy, false);
+    return;
+  }
+  if (Builtin.ID == BuiltinValueKind::AssumeAlignment) {
+    // A no-op pointer cast that passes on its first value. Common occurrences of
+    // this builtin should already be removed with the alignment guarantee moved
+    // to the subsequent load or store.
+    //
+    // TODO: Consider lowering to an LLVM intrinsic if there is any benefit:
+    // 'call void @llvm.assume(i1 true) ["align"(i32* %arg0, i32 %arg1)]'
+    auto pointerSrc = args.claimNext();
+    (void)args.claimAll();
+    out.add(pointerSrc);
     return;
   }
 

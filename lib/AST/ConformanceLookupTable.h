@@ -39,7 +39,7 @@ class ModuleDecl;
 /// This table is a lower-level detail that clients should generally not
 /// access directly. Rather, one should use the protocol- and
 /// conformance-centric entry points in \c NominalTypeDecl and \c DeclContext.
-class ConformanceLookupTable {
+class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// Describes the stage at which a particular nominal type or
   /// extension's conformances has been processed.
   enum class ConformanceStage : uint8_t {
@@ -120,10 +120,10 @@ class ConformanceLookupTable {
 
     /// Create a synthesized conformance.
     ///
-    /// The given nominal type declaration will get a synthesized
+    /// The given declaration context (for a type) will get a synthesized
     /// conformance to the requested protocol.
-    static ConformanceSource forSynthesized(NominalTypeDecl *typeDecl) {
-      return ConformanceSource(typeDecl, ConformanceEntryKind::Synthesized);
+    static ConformanceSource forSynthesized(DeclContext *dc) {
+      return ConformanceSource(dc, ConformanceEntryKind::Synthesized);
     }
 
     /// Return a new conformance source with the given location of "@unchecked".
@@ -188,9 +188,9 @@ class ConformanceLookupTable {
 
     /// For a synthesized conformance, retrieve the nominal type decl
     /// that will receive the conformance.
-    NominalTypeDecl *getSynthesizedDecl() const {
+    DeclContext *getSynthesizedDeclContext() const {
       assert(getKind() == ConformanceEntryKind::Synthesized);
-      return static_cast<NominalTypeDecl *>(Storage.getPointer());
+      return static_cast<DeclContext *>(Storage.getPointer());
     }
 
     /// Get the declaration context that this conformance will be
@@ -199,7 +199,7 @@ class ConformanceLookupTable {
   };
 
   /// An entry in the conformance table.
-  struct ConformanceEntry {
+  struct ConformanceEntry : public ASTAllocated<ConformanceEntry> {
     /// The source location within the current context where the
     /// protocol conformance was specified.
     SourceLoc Loc;
@@ -299,11 +299,6 @@ class ConformanceLookupTable {
 
       return Loc;
     }
-
-    // Only allow allocation of conformance entries using the
-    // allocator in ASTContext.
-    void *operator new(size_t Bytes, ASTContext &C,
-                       unsigned Alignment = alignof(ConformanceEntry));
 
     SWIFT_DEBUG_DUMP;
     void dump(raw_ostream &os, unsigned indent = 0) const;
@@ -433,7 +428,8 @@ public:
 
   /// Add a synthesized conformance to the lookup table.
   void addSynthesizedConformance(NominalTypeDecl *nominal,
-                                 ProtocolDecl *protocol);
+                                 ProtocolDecl *protocol,
+                                 DeclContext *conformanceDC);
 
   /// Register an externally-supplied protocol conformance.
   void registerProtocolConformance(ProtocolConformance *conformance,
@@ -445,8 +441,7 @@ public:
   /// conformances found for this protocol and nominal type.
   ///
   /// \returns true if any conformances were found. 
-  bool lookupConformance(ModuleDecl *module,
-                         NominalTypeDecl *nominal,
+  bool lookupConformance(NominalTypeDecl *nominal,
                          ProtocolDecl *protocol, 
                          SmallVectorImpl<ProtocolConformance *> &conformances);
 
@@ -457,9 +452,12 @@ public:
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
 
   /// Retrieve the complete set of protocols to which this nominal
-  /// type conforms.
+  /// type conforms (if the set contains a protocol, the same is true for any
+  /// inherited protocols).
+  ///
+  /// \param sorted Whether to sort the protocols in canonical order.
   void getAllProtocols(NominalTypeDecl *nominal,
-                       SmallVectorImpl<ProtocolDecl *> &scratch);
+                       SmallVectorImpl<ProtocolDecl *> &scratch, bool sorted);
 
   /// Retrieve the complete set of protocol conformances for this
   /// nominal type.
@@ -479,16 +477,6 @@ public:
   getSatisfiedProtocolRequirementsForMember(const ValueDecl *member,
                                             NominalTypeDecl *nominal,
                                             bool sorted);
-
-  // Only allow allocation of conformance lookup tables using the
-  // allocator in ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(ConformanceLookupTable));
-
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;

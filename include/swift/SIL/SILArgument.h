@@ -22,6 +22,7 @@ namespace swift {
 
 class SILBasicBlock;
 class SILModule;
+class SILPhiArgument;
 class SILUndef;
 class TermInst;
 
@@ -111,11 +112,19 @@ public:
            node->getKind() <= SILNodeKind::Last_SILArgument;
   }
 
+  bool isNoImplicitCopy() const;
+
   unsigned getIndex() const;
 
-  /// Return true if this block argument is actually a phi argument as
-  /// opposed to a cast or projection.
-  bool isPhiArgument() const;
+  /// Return non-null if \p value is a phi.
+  static SILPhiArgument *isPhi(SILValue value);
+
+  /// Return non-null if \p value is a terminator result.
+  static SILPhiArgument *isTerminatorResult(SILValue value);
+
+  /// Return true if this block argument is a phi as opposed to a terminator
+  /// result.
+  bool isPhi() const;
 
   /// Return true if this block argument is a terminator result.
   bool isTerminatorResult() const;
@@ -183,7 +192,7 @@ public:
 
   /// Return the terminator instruction for which this argument is a result,
   /// otherwise return nullptr.
-  TermInst *getTerminatorForResultArg() const;
+  TermInst *getTerminatorForResult() const;
 
   /// Return the SILArgumentKind of this argument.
   SILArgumentKind getKind() const {
@@ -215,12 +224,12 @@ class SILPhiArgument : public SILArgument {
       : SILArgument(ValueKind::SILPhiArgument, type, ownershipKind, decl) {}
 
 public:
-  /// Return true if this is block argument is actually a phi argument as
-  /// opposed to a cast or projection.
-  bool isPhiArgument() const;
+  /// Return true if this is block argument is a phi, as opposed to a terminator
+  /// result.
+  bool isPhi() const;
 
   /// Return true if this block argument is a terminator result.
-  bool isTerminatorResult() const { return !isPhiArgument(); }
+  bool isTerminatorResult() const { return !isPhi(); }
 
   /// If this argument is a phi, return the incoming phi value for the given
   /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
@@ -299,7 +308,7 @@ public:
 
   /// Return the terminator instruction for which this argument is a result,
   /// otherwise return nullptr.
-  TermInst *getTerminatorForResultArg() const;
+  TermInst *getTerminatorForResult() const;
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
@@ -311,11 +320,15 @@ public:
 class SILFunctionArgument : public SILArgument {
   friend class SILBasicBlock;
 
+  bool noImplicitCopy = false;
+
   SILFunctionArgument(SILBasicBlock *parentBlock, SILType type,
                       ValueOwnershipKind ownershipKind,
-                      const ValueDecl *decl = nullptr)
+                      const ValueDecl *decl = nullptr,
+                      bool isNoImplicitCopy = false)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
-                    ownershipKind, decl) {}
+                    ownershipKind, decl),
+        noImplicitCopy(isNoImplicitCopy) {}
   // A special constructor, only intended for use in
   // SILBasicBlock::replaceFunctionArg.
   explicit SILFunctionArgument(SILType type, ValueOwnershipKind ownershipKind,
@@ -324,6 +337,10 @@ class SILFunctionArgument : public SILArgument {
   }
 
 public:
+  bool isNoImplicitCopy() const { return noImplicitCopy; }
+
+  void setNoImplicitCopy(bool newValue) { noImplicitCopy = newValue; }
+
   bool isIndirectResult() const;
 
   SILArgumentConvention getArgumentConvention() const;
@@ -355,14 +372,38 @@ public:
 // Out of line Definitions for SILArgument to avoid Forward Decl issues
 //===----------------------------------------------------------------------===//
 
-inline bool SILArgument::isPhiArgument() const {
+/// Return non-null if \p value is a real phi argument.
+inline SILPhiArgument *SILArgument::isPhi(SILValue value) {
+  if (auto *arg = dyn_cast<SILPhiArgument>(value)) {
+    if (arg->isPhi())
+      return arg;
+  }
+  return nullptr;
+}
+
+inline bool SILArgument::isPhi() const {
   switch (getKind()) {
   case SILArgumentKind::SILPhiArgument:
-    return cast<SILPhiArgument>(this)->isPhiArgument();
+    return cast<SILPhiArgument>(this)->isPhi();
   case SILArgumentKind::SILFunctionArgument:
     return false;
   }
   llvm_unreachable("Covered switch is not covered?!");
+}
+
+/// Return non-null if \p value is a terminator result.
+inline SILPhiArgument *SILArgument::isTerminatorResult(SILValue value) {
+  if (auto *arg = dyn_cast<SILPhiArgument>(value)) {
+    if (arg->isTerminatorResult())
+      return arg;
+  }
+  return nullptr;
+}
+
+inline bool SILArgument::isNoImplicitCopy() const {
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(this))
+    return fArg->isNoImplicitCopy();
+  return false;
 }
 
 inline bool SILArgument::isTerminatorResult() const {
@@ -445,10 +486,10 @@ inline TermInst *SILArgument::getSingleTerminator() const {
   llvm_unreachable("Covered switch is not covered?!");
 }
 
-inline TermInst *SILArgument::getTerminatorForResultArg() const {
+inline TermInst *SILArgument::getTerminatorForResult() const {
   switch (getKind()) {
   case SILArgumentKind::SILPhiArgument:
-    return cast<SILPhiArgument>(this)->getTerminatorForResultArg();
+    return cast<SILPhiArgument>(this)->getTerminatorForResult();
   case SILArgumentKind::SILFunctionArgument:
     return nullptr;
   }

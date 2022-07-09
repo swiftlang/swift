@@ -13,20 +13,18 @@
 #ifndef SWIFT_REWRITESYSTEM_H
 #define SWIFT_REWRITESYSTEM_H
 
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/LayoutConstraint.h"
-#include "swift/AST/Types.h"
-#include "swift/Basic/Statistic.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Allocator.h"
-#include "llvm/Support/TrailingObjects.h"
-#include <algorithm>
+#include "swift/AST/Requirement.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "llvm/ADT/DenseSet.h"
 
-#include "ProtocolGraph.h"
+#include "Debug.h"
+#include "Diagnostics.h"
+#include "RewriteLoop.h"
+#include "Rule.h"
+#include "Symbol.h"
+#include "Term.h"
+#include "Trie.h"
+#include "TypeDifference.h"
 
 namespace llvm {
   class raw_ostream;
@@ -36,482 +34,23 @@ namespace swift {
 
 namespace rewriting {
 
-class EquivalenceClassMap;
-class MutableTerm;
+class PropertyMap;
 class RewriteContext;
-class Term;
+class RewriteSystem;
 
-/// The smallest element in the rewrite system.
-///
-/// enum Atom {
-///   case name(Identifier)
-///   case protocol(Protocol)
-///   case type([Protocol], Identifier)
-///   case genericParam(index: Int, depth: Int)
-///   case layout(LayoutConstraint)
-///   case superclass(CanType, substitutions: [Term])
-///   case concrete(CanType, substitutions: [Term])
-/// }
-///
-/// For the concrete type atoms (`superclass` and `concrete`),
-/// the type's structural components must either be concrete, or
-/// generic parameters. All generic parameters must have a depth
-/// of 0; the generic parameter index corresponds to an index in
-/// the `substitutions` array.
-///
-/// For example, the superclass requirement
-/// "T : MyClass<U.X, (Int) -> V.A.B>" is denoted with an atom
-/// structured as follows:
-///
-/// - type: MyClass<τ_0_0, (Int) -> τ_0_1>
-/// - substitutions:
-///   - U.X
-///   - V.A.B
-///
-/// Out-of-line methods are documented in RewriteSystem.cpp.
-class Atom final {
-public:
-  enum class Kind : uint8_t {
-    //////
-    ////// Special atom kind that is both type-like and property-like:
-    //////
+/// Result type for RequirementMachine::computeCompletion().
+enum class CompletionResult {
+  /// Completion was successful.
+  Success,
 
-    /// When appearing at the start of a term, denotes a nested
-    /// type of a protocol 'Self' type.
-    ///
-    /// When appearing at the end of a term, denotes that the
-    /// term's type conforms to the protocol.
-    Protocol,
+  /// Maximum number of rules exceeded.
+  MaxRuleCount,
 
-    //////
-    ////// "Type-like" atom kinds:
-    //////
+  /// Maximum rule length exceeded.
+  MaxRuleLength,
 
-    /// An associated type [P:T] or [P&Q&...:T]. The parent term
-    /// must be known to conform to P (or P, Q, ...).
-    AssociatedType,
-
-    /// A generic parameter, uniquely identified by depth and
-    /// index. Can only appear at the beginning of a term, where
-    /// it denotes a generic parameter of the top-level generic
-    /// signature.
-    GenericParam,
-
-    /// An unbound identifier name.
-    Name,
-
-    //////
-    ////// "Property-like" atom kinds:
-    //////
-
-    /// When appearing at the end of a term, denotes that the
-    /// term's type satisfies the layout constraint.
-    Layout,
-
-    /// When appearing at the end of a term, denotes that the term
-    /// is a subclass of the superclass constraint.
-    Superclass,
-
-    /// When appearing at the end of a term, denotes that the term
-    /// is exactly equal to the concrete type.
-    ConcreteType,
-  };
-
-private:
-  friend class RewriteContext;
-
-  struct Storage;
-
-private:
-  const Storage *Ptr;
-
-  Atom(const Storage *ptr) : Ptr(ptr) {}
-
-public:
-  Kind getKind() const;
-
-  /// A property records something about a type term; either a protocol
-  /// conformance, a layout constraint, or a superclass or concrete type
-  /// constraint.
-  bool isProperty() const {
-    auto kind = getKind();
-    return (kind == Atom::Kind::Protocol ||
-            kind == Atom::Kind::Layout ||
-            kind == Atom::Kind::Superclass ||
-            kind == Atom::Kind::ConcreteType);
-  }
-
-  bool isSuperclassOrConcreteType() const {
-    auto kind = getKind();
-    return (kind == Kind::Superclass || kind == Kind::ConcreteType);
-  }
-
-  Identifier getName() const;
-
-  const ProtocolDecl *getProtocol() const;
-
-  ArrayRef<const ProtocolDecl *> getProtocols() const;
-
-  GenericTypeParamType *getGenericParam() const;
-
-  LayoutConstraint getLayoutConstraint() const;
-
-  CanType getSuperclass() const;
-
-  CanType getConcreteType() const;
-
-  ArrayRef<Term> getSubstitutions() const;
-
-  /// Returns an opaque pointer that uniquely identifies this atom.
-  const void *getOpaquePointer() const {
-    return Ptr;
-  }
-
-  static Atom forName(Identifier name,
-                      RewriteContext &ctx);
-
-  static Atom forProtocol(const ProtocolDecl *proto,
-                          RewriteContext &ctx);
-
-  static Atom forAssociatedType(const ProtocolDecl *proto,
-                                Identifier name,
-                                RewriteContext &ctx);
-
-  static Atom forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
-                                Identifier name,
-                                RewriteContext &ctx);
-
-  static Atom forGenericParam(GenericTypeParamType *param,
-                              RewriteContext &ctx);
-
-  static Atom forLayout(LayoutConstraint layout,
-                        RewriteContext &ctx);
-
-  static Atom forSuperclass(CanType type,
-                            ArrayRef<Term> substitutions,
-                            RewriteContext &ctx);
-
-  static Atom forConcreteType(CanType type,
-                              ArrayRef<Term> substitutions,
-                              RewriteContext &ctx);
-
-  int compare(Atom other, const ProtocolGraph &protos) const;
-
-  Atom transformConcreteSubstitutions(
-      llvm::function_ref<Term(Term)> fn,
-      RewriteContext &ctx) const;
-
-  Atom prependPrefixToConcreteSubstitutions(
-      const MutableTerm &prefix,
-      RewriteContext &ctx) const;
-
-  void dump(llvm::raw_ostream &out) const;
-
-  friend bool operator==(Atom lhs, Atom rhs) {
-    return lhs.Ptr == rhs.Ptr;
-  }
-
-  friend bool operator!=(Atom lhs, Atom rhs) {
-    return !(lhs == rhs);
-  }
-
-  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Atom atom) {
-    atom.dump(out);
-    return out;
-  }
-};
-
-/// See the implementation of MutableTerm::checkForOverlap() for a discussion.
-enum class OverlapKind {
-  /// Terms do not overlap.
-  None,
-  /// First kind of overlap (TUV vs U).
-  First,
-  /// Second kind of overlap (TU vs UV).
-  Second
-};
-
-/// A term is a sequence of one or more atoms.
-///
-/// The Term type is a uniqued, permanently-allocated representation,
-/// used to represent terms in the rewrite rules themselves. See also
-/// MutableTerm for the other representation.
-///
-/// The first atom in the term must be a protocol, generic parameter, or
-/// associated type atom.
-///
-/// A layout, superclass or concrete type atom must only appear at the
-/// end of a term.
-///
-/// Out-of-line methods are documented in RewriteSystem.cpp.
-class Term final {
-  friend class RewriteContext;
-
-  struct Storage;
-
-  const Storage *Ptr;
-
-  Term(const Storage *ptr) : Ptr(ptr) {}
-
-public:
-  size_t size() const;
-
-  ArrayRef<Atom>::const_iterator begin() const;
-
-  ArrayRef<Atom>::const_iterator end() const;
-
-  Atom back() const;
-
-  Atom operator[](size_t index) const;
-
-  /// Returns an opaque pointer that uniquely identifies this term.
-  const void *getOpaquePointer() const {
-    return Ptr;
-  }
-
-  static Term get(const MutableTerm &term, RewriteContext &ctx);
-
-  void dump(llvm::raw_ostream &out) const;
-
-  friend bool operator==(Term lhs, Term rhs) {
-    return lhs.Ptr == rhs.Ptr;
-  }
-
-  friend bool operator!=(Term lhs, Term rhs) {
-    return !(lhs == rhs);
-  }
-
-  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Term term) {
-    term.dump(out);
-    return out;
-  }
-};
-
-/// A term is a sequence of one or more atoms.
-///
-/// The MutableTerm type is a dynamically-allocated representation,
-/// used to represent temporary values in simplification and completion.
-/// See also Term for the other representation.
-///
-/// The first atom in the term must be a protocol, generic parameter, or
-/// associated type atom.
-///
-/// A layout constraint atom must only appear at the end of a term.
-///
-/// Out-of-line methods are documented in RewriteSystem.cpp.
-class MutableTerm final {
-  llvm::SmallVector<Atom, 3> Atoms;
-
-public:
-  /// Creates an empty term. At least one atom must be added for the term
-  /// to become valid.
-  MutableTerm() {}
-
-  explicit MutableTerm(decltype(Atoms)::const_iterator begin,
-                       decltype(Atoms)::const_iterator end)
-    : Atoms(begin, end) {}
-
-  explicit MutableTerm(llvm::SmallVector<Atom, 3> &&atoms)
-    : Atoms(std::move(atoms)) {}
-
-  explicit MutableTerm(ArrayRef<Atom> atoms)
-    : Atoms(atoms.begin(), atoms.end()) {}
-
-  explicit MutableTerm(Term term)
-    : Atoms(term.begin(), term.end()) {}
-
-  void add(Atom atom) {
-    Atoms.push_back(atom);
-  }
-
-  void append(Term other) {
-    Atoms.append(other.begin(), other.end());
-  }
-
-  void append(const MutableTerm &other) {
-    Atoms.append(other.begin(), other.end());
-  }
-
-  int compare(const MutableTerm &other, const ProtocolGraph &protos) const;
-
-  bool empty() const { return Atoms.empty(); }
-
-  size_t size() const { return Atoms.size(); }
-
-  decltype(Atoms)::const_iterator begin() const { return Atoms.begin(); }
-  decltype(Atoms)::const_iterator end() const { return Atoms.end(); }
-
-  decltype(Atoms)::iterator begin() { return Atoms.begin(); }
-  decltype(Atoms)::iterator end() { return Atoms.end(); }
-
-  Atom back() const {
-    return Atoms.back();
-  }
-
-  Atom &back() {
-    return Atoms.back();
-  }
-
-  Atom operator[](size_t index) const {
-    return Atoms[index];
-  }
-
-  Atom &operator[](size_t index) {
-    return Atoms[index];
-  }
-
-  decltype(Atoms)::const_iterator findSubTerm(
-      const MutableTerm &other) const;
-
-  decltype(Atoms)::iterator findSubTerm(
-      const MutableTerm &other);
-
-  /// Returns true if this term contains, or is equal to, \p other.
-  bool containsSubTerm(const MutableTerm &other) const {
-    return findSubTerm(other) != end();
-  }
-
-  bool rewriteSubTerm(const MutableTerm &lhs, const MutableTerm &rhs);
-
-  OverlapKind checkForOverlap(const MutableTerm &other,
-                              MutableTerm &t,
-                              MutableTerm &v) const;
-
-  void dump(llvm::raw_ostream &out) const;
-
-  friend bool operator==(const MutableTerm &lhs, const MutableTerm &rhs) {
-    if (lhs.size() != rhs.size())
-      return false;
-
-    return std::equal(lhs.begin(), lhs.end(), rhs.begin());
-  }
-
-  friend bool operator!=(const MutableTerm &lhs, const MutableTerm &rhs) {
-    return !(lhs == rhs);
-  }
-
-  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                                       const MutableTerm &term) {
-    term.dump(out);
-    return out;
-  }
-};
-
-/// A global object that can be shared by multiple rewrite systems.
-///
-/// It stores uniqued atoms and terms.
-///
-/// Out-of-line methods are documented in RewriteSystem.cpp.
-class RewriteContext final {
-  friend class Atom;
-  friend class Term;
-
-  /// Allocator for uniquing atoms and terms.
-  llvm::BumpPtrAllocator Allocator;
-
-  /// Folding set for uniquing atoms.
-  llvm::FoldingSet<Atom::Storage> Atoms;
-
-  /// Folding set for uniquing terms.
-  llvm::FoldingSet<Term::Storage> Terms;
-
-  RewriteContext(const RewriteContext &) = delete;
-  RewriteContext(RewriteContext &&) = delete;
-  RewriteContext &operator=(const RewriteContext &) = delete;
-  RewriteContext &operator=(RewriteContext &&) = delete;
-
-  ASTContext &Context;
-
-public:
-  /// Statistical counters.
-  UnifiedStatsReporter *Stats;
-
-  RewriteContext(ASTContext &ctx) : Context(ctx), Stats(ctx.Stats) {}
-
-  Term getTermForType(CanType paramType, const ProtocolDecl *proto);
-
-  MutableTerm getMutableTermForType(CanType paramType,
-                                    const ProtocolDecl *proto);
-
-  ASTContext &getASTContext() { return Context; }
-
-  Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const ProtocolGraph &protos) const;
-
-  Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const ProtocolGraph &protos) const;
-
-  Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix,
-                      const ProtocolGraph &protos) const;
-};
-
-/// A rewrite rule that replaces occurrences of LHS with RHS.
-///
-/// LHS must be greater than RHS in the linear order over terms.
-///
-/// Out-of-line methods are documented in RewriteSystem.cpp.
-class Rule final {
-  MutableTerm LHS;
-  MutableTerm RHS;
-  bool deleted;
-
-public:
-  Rule(const MutableTerm &lhs, const MutableTerm &rhs)
-      : LHS(lhs), RHS(rhs), deleted(false) {}
-
-  const MutableTerm &getLHS() const { return LHS; }
-  const MutableTerm &getRHS() const { return RHS; }
-
-  bool apply(MutableTerm &term) const {
-    return term.rewriteSubTerm(LHS, RHS);
-  }
-
-  OverlapKind checkForOverlap(const Rule &other,
-                              MutableTerm &t,
-                              MutableTerm &v) const {
-    return LHS.checkForOverlap(other.LHS, t, v);
-  }
-
-  bool canReduceLeftHandSide(const Rule &other) const {
-    return LHS.containsSubTerm(other.LHS);
-  }
-
-  /// Returns if the rule was deleted.
-  bool isDeleted() const {
-    return deleted;
-  }
-
-  /// Deletes the rule, which removes it from consideration in term
-  /// simplification and completion. Deleted rules are simply marked as
-  /// such instead of being physically removed from the rules vector
-  /// in the rewrite system, to ensure that indices remain valid across
-  /// deletion.
-  void markDeleted() {
-    assert(!deleted);
-    deleted = true;
-  }
-
-  /// Returns the length of the left hand side.
-  unsigned getDepth() const {
-    return LHS.size();
-  }
-
-  /// Partial order on rules orders rules by their left hand side.
-  int compare(const Rule &other,
-              const ProtocolGraph &protos) const {
-    return LHS.compare(other.LHS, protos);
-  }
-
-  void dump(llvm::raw_ostream &out) const;
-
-  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                                       const Rule &rule) {
-    rule.dump(out);
-    return out;
-  }
+  /// Maximum concrete type nesting depth exceeded.
+  MaxConcreteNesting
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -521,43 +60,63 @@ class RewriteSystem final {
   /// Rewrite context for memory allocation.
   RewriteContext &Context;
 
+  /// If this is a rewrite system for a connected component of protocols,
+  /// this array is non-empty. Otherwise, it is a rewrite system for a
+  /// top-level generic signature and this array is empty.
+  ArrayRef<const ProtocolDecl *> Protos;
+
+  /// The requirements written in source code.
+  std::vector<StructuralRequirement> WrittenRequirements;
+
   /// The rules added so far, including rules from our client, as well
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
 
-  /// The graph of all protocols transitively referenced via our set of
-  /// rewrite rules, used for the linear order on atoms.
-  ProtocolGraph Protos;
+  unsigned FirstLocalRule = 0;
 
-  /// A list of pending terms for the associated type merging completion
-  /// heuristic.
+  /// A prefix trie of rule left hand sides to optimize lookup. The value
+  /// type is an index into the Rules array defined above.
+  Trie<unsigned, MatchKind::Shortest> Trie;
+
+  /// The set of protocols known to this rewrite system.
   ///
-  /// The pair (lhs, rhs) satisfies the following conditions:
-  /// - lhs > rhs
-  /// - all atoms but the last are pair-wise equal in lhs and rhs
-  /// - the last atom in both lhs and rhs is an associated type atom
-  /// - the last atom in both lhs and rhs has the same name
+  /// See RuleBuilder::ReferencedProtocols for a more complete explanation.
   ///
-  /// See RewriteSystem::processMergedAssociatedTypes() for details.
-  std::vector<std::pair<MutableTerm, MutableTerm>> MergedAssociatedTypes;
+  /// For the most part, this is only used while building the rewrite system,
+  /// but conditional requirement inference forces us to be able to add new
+  /// protocols to the rewrite system after the fact, so this little bit of
+  /// RuleBuilder state outlives the initialization phase.
+  llvm::DenseSet<const ProtocolDecl *> ReferencedProtocols;
 
-  /// A list of pending pairs for checking overlap in the completion
-  /// procedure.
-  std::deque<std::pair<unsigned, unsigned>> Worklist;
+  DebugOptions Debug;
 
-  /// Set these to true to enable debugging output.
-  unsigned DebugSimplify : 1;
-  unsigned DebugAdd : 1;
-  unsigned DebugMerge : 1;
-  unsigned DebugCompletion : 1;
+  /// Whether we've initialized the rewrite system with a call to initialize().
+  unsigned Initialized : 1;
+
+  /// Whether we've computed the confluent completion at least once.
+  ///
+  /// It might be computed multiple times if the property map's concrete type
+  /// unification procedure adds new rewrite rules.
+  unsigned Complete : 1;
+
+  /// Whether we've minimized the rewrite system.
+  unsigned Minimized : 1;
+
+  /// Whether the rewrite system is finalized, immutable, and ready for
+  /// generic signature queries.
+  unsigned Frozen : 1;
+
+  /// If set, the completion procedure records rewrite loops describing the
+  /// identities among rewrite rules discovered while resolving critical pairs.
+  unsigned RecordLoops : 1;
+
+  /// The length of the longest initial rule, used for the MaxRuleLength
+  /// completion non-termination heuristic.
+  unsigned LongestInitialRule : 16;
 
 public:
-  explicit RewriteSystem(RewriteContext &ctx) : Context(ctx) {
-    DebugSimplify = false;
-    DebugAdd = false;
-    DebugMerge = false;
-    DebugCompletion = false;
-  }
+  explicit RewriteSystem(RewriteContext &ctx);
+  ~RewriteSystem();
 
   RewriteSystem(const RewriteSystem &) = delete;
   RewriteSystem(RewriteSystem &&) = delete;
@@ -567,49 +126,311 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
-  /// Return the object recording information about known protocols.
-  const ProtocolGraph &getProtocols() const { return Protos; }
+  llvm::DenseSet<const ProtocolDecl *> &getReferencedProtocols() {
+    return ReferencedProtocols;
+  }
 
-  void initialize(std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
-                  ProtocolGraph &&protos);
+  DebugOptions getDebugOptions() const { return Debug; }
 
-  Atom simplifySubstitutionsInSuperclassOrConcreteAtom(Atom atom) const;
+  void initialize(bool recordLoops,
+                  ArrayRef<const ProtocolDecl *> protos,
+                  std::vector<StructuralRequirement> &&writtenRequirements,
+                  std::vector<Rule> &&importedRules,
+                  std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
 
-  bool addRule(MutableTerm lhs, MutableTerm rhs);
+  unsigned getLongestInitialRule() const {
+    return LongestInitialRule;
+  }
 
-  bool simplify(MutableTerm &term) const;
+  ArrayRef<const ProtocolDecl *> getProtocols() const {
+    return Protos;
+  }
 
-  enum class CompletionResult {
-    /// Confluent completion was computed successfully.
-    Success,
+  bool isKnownProtocol(const ProtocolDecl *proto) const {
+    return ReferencedProtocols.count(proto) > 0;
+  }
 
-    /// Maximum number of iterations reached.
-    MaxIterations,
+  unsigned getRuleID(const Rule &rule) const {
+    assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
+    return (unsigned)(&rule - &*Rules.begin());
+  }
 
-    /// Completion produced a rewrite rule whose left hand side has a length
-    /// exceeding the limit.
-    MaxDepth
-  };
+  /// Get an array of all rewrite rules.
+  ArrayRef<Rule> getRules() const {
+    return Rules;
+  }
+
+  /// Get an array of rewrite rules, not including rewrite rules imported
+  /// from referenced protocols.
+  ArrayRef<Rule> getLocalRules() const {
+    return getRules().slice(FirstLocalRule);
+  }
+
+  /// Get the rewrite rule at the given index. Note that this is an index
+  /// into getRules(), *NOT* getLocalRules().
+  Rule &getRule(unsigned ruleID) {
+    return Rules[ruleID];
+  }
+
+  const Rule &getRule(unsigned ruleID) const {
+    return Rules[ruleID];
+  }
+
+  bool addRule(MutableTerm lhs, MutableTerm rhs,
+               const RewritePath *path=nullptr);
+
+  bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
+
+  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
+                       Optional<unsigned> requirementID);
+
+  void addRules(std::vector<Rule> &&importedRules,
+                std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+                std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+
+  bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
+
+  Optional<unsigned>
+  simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
+                        RewritePath *path=nullptr);
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Completion
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  /// Pairs of rules which have already been checked for overlap.
+  llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
   std::pair<CompletionResult, unsigned>
-  computeConfluentCompletion(unsigned maxIterations,
-                             unsigned maxDepth);
+  computeConfluentCompletion(unsigned maxRuleCount,
+                             unsigned maxRuleLength);
+
+  void simplifyLeftHandSides();
 
   void simplifyRightHandSides();
 
-  std::pair<CompletionResult, unsigned>
-  buildEquivalenceClassMap(EquivalenceClassMap &map,
-                           unsigned maxIterations,
-                           unsigned maxDepth);
+  void simplifyLeftHandSideSubstitutions(const PropertyMap *map);
 
-  void dump(llvm::raw_ostream &out) const;
+  enum ValidityPolicy {
+    AllowInvalidRequirements,
+    DisallowInvalidRequirements
+  };
+
+  void verifyRewriteRules(ValidityPolicy policy) const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Diagnostics
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
+
+  void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                  SourceLoc signatureLoc,
+                                  const PropertyMap &map,
+                                  TypeArrayView<GenericTypeParamType> genericParams);
 
 private:
-  Optional<std::pair<MutableTerm, MutableTerm>>
-  computeCriticalPair(const Rule &lhs, const Rule &rhs) const;
+  struct CriticalPair {
+    MutableTerm LHS;
+    MutableTerm RHS;
+    RewritePath Path;
 
-  Atom mergeAssociatedTypes(Atom lhs, Atom rhs) const;
-  void processMergedAssociatedTypes();
+    CriticalPair(MutableTerm lhs, MutableTerm rhs, RewritePath path)
+      : LHS(lhs), RHS(rhs), Path(path) {}
+  };
+
+  bool
+  computeCriticalPair(
+      ArrayRef<Symbol>::const_iterator from,
+      const Rule &lhs, const Rule &rhs,
+      std::vector<CriticalPair> &pairs,
+      std::vector<RewriteLoop> &loops) const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Relations are "pseudo-rules" introduced by the property map
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+public:
+  /// The left hand side is known to be smaller than the right hand side.
+  using Relation = std::pair<Term, Term>;
+
+private:
+  /// The map's values are indices into the vector. The map is used for
+  /// uniquing, then the index is returned and lookups are performed into
+  /// the vector.
+  llvm::DenseMap<Relation, unsigned> RelationMap;
+  std::vector<Relation> Relations;
+
+public:
+  unsigned recordRelation(Term lhs, Term rhs);
+  Relation getRelation(unsigned index) const;
+
+  unsigned recordRelation(Symbol lhs, Symbol rhs);
+
+  unsigned recordConcreteConformanceRelation(
+      Symbol concreteSymbol, Symbol protocolSymbol,
+      Symbol concreteConformanceSymbol);
+
+  unsigned recordConcreteTypeWitnessRelation(
+      Symbol concreteConformanceSymbol,
+      Symbol associatedTypeSymbol,
+      Symbol typeWitnessSymbol);
+
+  unsigned recordSameTypeWitnessRelation(
+      Symbol concreteConformanceSymbol,
+      Symbol associatedTypeSymbol);
+
+private:
+  /// The map's values are indices into the vector. The map is used for
+  /// uniquing, then the index is returned and lookups are performed into
+  /// the vector.
+  llvm::DenseMap<std::tuple<Term, Symbol, Symbol>, unsigned> DifferenceMap;
+  std::vector<TypeDifference> Differences;
+
+  /// Avoid duplicate work when simplifying substitutions or rebuilding
+  /// the property map.
+  llvm::DenseSet<unsigned> CheckedDifferences;
+
+public:
+  unsigned recordTypeDifference(const TypeDifference &difference);
+
+  bool
+  computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
+                        Optional<unsigned> &lhsDifferenceID,
+                        Optional<unsigned> &rhsDifferenceID);
+
+  const TypeDifference &getTypeDifference(unsigned index) const;
+
+  void processTypeDifference(const TypeDifference &difference,
+                             unsigned differenceID,
+                             unsigned lhsRuleID,
+                             const RewritePath &rhsPath);
+
+  void buildRewritePathForJoiningTerms(MutableTerm lhsTerm,
+                                       MutableTerm rhsTerm,
+                                       RewritePath *path) const;
+
+  void buildRewritePathForUnifier(Term key,
+                                  unsigned lhsRuleID,
+                                  const RewritePath &rhsPath,
+                                  RewritePath *path) const;
+
+private:
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Homotopy reduction
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  /// Homotopy generators for this rewrite system. These are the
+  /// rewrite loops which rewrite a term back to itself.
+  ///
+  /// In the category theory interpretation, a rewrite rule is a generating
+  /// 2-cell, and a rewrite path is a 2-cell made from a composition of
+  /// generating 2-cells.
+  ///
+  /// Homotopy generators, in turn, are 3-cells. The special case of a
+  /// 3-cell discovered during completion can be viewed as two parallel
+  /// 2-cells; this is actually represented as a single 2-cell forming a
+  /// loop around a base point.
+  ///
+  /// This data is used by the homotopy reduction and minimal conformances
+  /// algorithms.
+  std::vector<RewriteLoop> Loops;
+
+  /// A list of pairs where the first element is a rule number and the second
+  /// element is an equivalent rewrite path in terms of non-redundant rules.
+  std::vector<std::pair<unsigned, RewritePath>> RedundantRules;
+
+  /// Pairs of rules which together preclude a concrete type from satisfying the
+  /// requirements of the generic signature.
+  ///
+  /// Conflicts are detected in property map construction. Conflicts are
+  /// diagnosed and one of the rules in each pair is dropped during
+  /// minimization.
+  std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
+
+  void propagateExplicitBits();
+
+  void propagateRedundantRequirementIDs();
+
+  using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
+                                                       unsigned ruleID)>;
+
+  Optional<std::pair<unsigned, unsigned>>
+  findRuleToDelete(EliminationPredicate isRedundantRuleFn);
+
+  void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
+
+  void performHomotopyReduction(EliminationPredicate isRedundantRuleFn);
+
+public:
+  // Utilities for minimal conformances algorithm, defined in
+  // MinimalConformances.cpp.
+
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term,
+      SmallVectorImpl<unsigned> &result) const;
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term, unsigned ruleID,
+      SmallVectorImpl<unsigned> &result) const;
+
+  void computeCandidateConformancePaths(
+      const PropertyMap &map,
+      llvm::MapVector<unsigned,
+                      std::vector<SmallVector<unsigned, 2>>> &paths) const;
+
+private:
+  void computeMinimalConformances(
+      const PropertyMap &map,
+      llvm::DenseSet<unsigned> &redundantConformances) const;
+
+public:
+  void recordRewriteLoop(MutableTerm basepoint,
+                         RewritePath path);
+
+  void recordConflict(unsigned existingRuleID, unsigned newRuleID);
+
+  bool isInMinimizationDomain(const ProtocolDecl *proto) const;
+
+  ArrayRef<RewriteLoop> getLoops() const {
+    return Loops;
+  }
+
+  void minimizeRewriteSystem(const PropertyMap &map);
+
+  GenericSignatureErrors getErrors() const;
+
+  struct MinimizedProtocolRules {
+    std::vector<unsigned> Requirements;
+    std::vector<unsigned> TypeAliases;
+  };
+
+  llvm::DenseMap<const ProtocolDecl *, MinimizedProtocolRules>
+  getMinimizedProtocolRules() const;
+
+  std::vector<unsigned> getMinimizedGenericSignatureRules() const;
+
+private:
+  void verifyRewriteLoops() const;
+
+  void verifyRedundantConformances(
+      const llvm::DenseSet<unsigned> &redundantConformances) const;
+
+  void verifyMinimizedRules(
+      const llvm::DenseSet<unsigned> &redundantConformances) const;
+
+public:
+  void freeze();
+
+  void dump(llvm::raw_ostream &out) const;
 };
 
 } // end namespace rewriting

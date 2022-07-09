@@ -24,6 +24,10 @@ constexpr static const StringLiteral STDLIB_NAME = "Swift";
 constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
 /// The name of the Concurrency module, which supports that extension.
 constexpr static const StringLiteral SWIFT_CONCURRENCY_NAME = "_Concurrency";
+/// The name of the Distributed module, which supports that extension.
+constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
+/// The name of the StringProcessing module, which supports that extension.
+constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProcessing";
 /// The name of the SwiftShims module, which contains private stdlib decls.
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the Builtin module, which contains Builtin functions.
@@ -55,6 +59,14 @@ constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
 
 /// The name of the Builtin type prefix
 constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
+
+/// The default SPI group name to associate with Clang SPIs.
+constexpr static const StringLiteral CLANG_MODULE_DEFAULT_SPI_GROUP_NAME =
+  "OBJC_DEFAULT_SPI_GROUP";
+
+/// The attribute name for @_spi_available
+constexpr static const StringLiteral SPI_AVAILABLE_ATTRNAME =
+  "_spi_available";
 
 /// A composition class containing a StringLiteral for the names of
 /// Swift builtins. The reason we use this is to ensure that we when

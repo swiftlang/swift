@@ -1,42 +1,43 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 // RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
+
 struct S {}
 class C {}
 
 struct G1<T : AnyObject> {}
 
-// CHECK-LABEL: Generic signature: <T where T == S>
+// CHECK: ExtensionDecl line={{.*}} base=G1
+// CHECK-NEXT: Generic signature: <T>
 extension G1 where T == S {}
-// expected-error@-1 {{'T' requires that 'S' be a class type}}
-// expected-note@-2 {{same-type constraint 'T' == 'S' implied here}}
+// expected-error@-1 {{no type for 'T' can satisfy both 'T : AnyObject' and 'T == S'}}
 
-// CHECK-LABEL: Generic signature: <T where T == C>
+// CHECK: ExtensionDecl line={{.*}} base=G1
+// CHECK-NEXT: Generic signature: <T where T == C>
 extension G1 where T == C {}
 
 struct G2<U> {}
 
-// CHECK-LABEL: Generic signature: <U where U == S>
+// CHECK: ExtensionDecl line={{.*}} base=G2
+// CHECK-NEXT: Generic signature: <U>
 extension G2 where U == S, U : AnyObject {}
-// expected-error@-1 {{'U' requires that 'S' be a class type}}
-// expected-note@-2 {{same-type constraint 'U' == 'S' implied here}}
-// expected-note@-3 {{constraint 'U' : 'AnyObject' implied here}}
+// expected-error@-1 {{no type for 'U' can satisfy both 'U : AnyObject' and 'U == S'}}
 
-// CHECK-LABEL: Generic signature: <U where U == C>
+// CHECK: ExtensionDecl line={{.*}} base=G2
+// CHECK-NEXT: Generic signature: <U where U == C>
 extension G2 where U == C, U : AnyObject {}
 // expected-warning@-1 {{redundant constraint 'U' : 'AnyObject'}}
-// expected-note@-2 {{constraint 'U' : 'AnyObject' implied here}}
 
-// CHECK-LABEL: Generic signature: <U where U : C>
+// CHECK: ExtensionDecl line={{.*}} base=G2
+// CHECK-NEXT: Generic signature: <U where U : C>
 extension G2 where U : C, U : AnyObject {}
 // expected-warning@-1 {{redundant constraint 'U' : 'AnyObject'}}
-// expected-note@-2 {{constraint 'U' : 'AnyObject' implied here}}
 
 // Explicit AnyObject conformance vs derived same-type
 protocol P {
   associatedtype A where A == C
 }
 
-// CHECK-LABEL: Generic signature: <T where T : P>
+// CHECK: .explicitAnyObjectIsRedundant@
+// CHECK-NEXT: Generic signature: <T where T : P>
 func explicitAnyObjectIsRedundant<T : P>(_: T) where T.A : AnyObject {}
 // expected-warning@-1 {{redundant constraint 'T.A' : 'AnyObject'}}
-// expected-note@-2 {{constraint 'T.A' : 'AnyObject' implied here}}

@@ -1,3 +1,4 @@
+// REQUIRES: rdar81115750
 // REQUIRES: CPU=arm64,OS=macosx
 
 // Doesn't autolink compatibility library because target OS doesn't need it

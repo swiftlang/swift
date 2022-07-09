@@ -12,6 +12,6 @@ struct Foo<T> {
 let x: Foo<Bar>? = Foo<Bar>()
 x.#^FOO_OPTIONAL_1^#
 // FOO_OPTIONAL_1: Begin completions, 7 items
-// FOO_OPTIONAL_1-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.myFunction({#(foobar): Bar#})[#Void#]; name=myFunction(foobar: Bar)
+// FOO_OPTIONAL_1-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.myFunction({#(foobar): Bar#})[#Void#]; name=myFunction(:)
 // FOO_OPTIONAL_1-DAG: Keyword[self]/CurrNominal: self[#Foo<Bar>?#]; name=self
 // FOO_OPTIONAL_1: End completions

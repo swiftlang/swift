@@ -27,6 +27,18 @@ static StringRef getRuntimeLibPath() {
   return sys::path::parent_path(SWIFTLIB_DIR);
 }
 
+static SmallString<128> getSwiftExecutablePath() {
+  SmallString<128> path = sys::path::parent_path(getRuntimeLibPath());
+  sys::path::append(path, "bin", "swift-frontend");
+  return path;
+}
+
+static void *createCancallationToken() {
+  static std::atomic<size_t> handle(1000);
+  return reinterpret_cast<void *>(
+      handle.fetch_add(1, std::memory_order_relaxed));
+}
+
 namespace {
 
 class NullEditorConsumer : public EditorConsumer {
@@ -93,6 +105,7 @@ public:
 struct TestCursorInfo {
   // Empty if no error.
   std::string Error;
+  std::string InternalDiagnostic;
   std::string Name;
   std::string Typename;
   std::string Filename;
@@ -106,7 +119,8 @@ class CursorInfoTest : public ::testing::Test {
   NullEditorConsumer Consumer;
 
 public:
-  LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
+  SourceKit::Context &getContext() { return Ctx; }
+  LangSupport &getLang() { return getContext().getSwiftLangSupport(); }
 
   void SetUp() override {
     llvm::InitializeAllTargets();
@@ -117,7 +131,8 @@ public:
   }
 
   CursorInfoTest()
-      : Ctx(*new SourceKit::Context(getRuntimeLibPath(),
+      : Ctx(*new SourceKit::Context(getSwiftExecutablePath(),
+                                    getRuntimeLibPath(),
                                     /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
                                     /*dispatchOnMain=*/false)) {
@@ -144,31 +159,37 @@ public:
     getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer);
   }
 
-  TestCursorInfo getCursor(const char *DocName, unsigned Offset,
-                           ArrayRef<const char *> CArgs) {
+  TestCursorInfo
+  getCursor(const char *DocName, unsigned Offset, ArrayRef<const char *> CArgs,
+            SourceKitCancellationToken CancellationToken = nullptr,
+            bool CancelOnSubsequentRequest = false) {
     auto Args = makeArgs(DocName, CArgs);
     Semaphore sema(0);
 
     TestCursorInfo TestInfo;
-    getLang().getCursorInfo(DocName, Offset, 0, false, false, false, Args, None,
-      [&](const RequestResult<CursorInfoData> &Result) {
-        assert(!Result.isCancelled());
-        if (Result.isError()) {
-          TestInfo.Error = Result.getError().str();
+    getLang().getCursorInfo(
+        DocName, Offset, /*Length=*/0, /*Actionables=*/false,
+        /*SymbolGraph=*/false, CancelOnSubsequentRequest, Args,
+        /*vfsOptions=*/None, CancellationToken,
+        [&](const RequestResult<CursorInfoData> &Result) {
+          assert(!Result.isCancelled());
+          if (Result.isError()) {
+            TestInfo.Error = Result.getError().str();
+            sema.signal();
+            return;
+          }
+          const CursorInfoData &Info = Result.value();
+          TestInfo.InternalDiagnostic = Info.InternalDiagnostic.str();
+          if (!Info.Symbols.empty()) {
+            const CursorSymbolInfo &MainSymbol = Info.Symbols[0];
+            TestInfo.Name = std::string(MainSymbol.Name.str());
+            TestInfo.Typename = MainSymbol.TypeName.str();
+            TestInfo.Filename = MainSymbol.Location.Filename.str();
+            TestInfo.Offset = MainSymbol.Location.Offset;
+            TestInfo.Length = MainSymbol.Location.Length;
+          }
           sema.signal();
-          return;
-        }
-        const CursorInfoData &Info = Result.value();
-        if (!Info.Symbols.empty()) {
-          const CursorSymbolInfo &MainSymbol = Info.Symbols[0];
-          TestInfo.Name = std::string(MainSymbol.Name.str());
-          TestInfo.Typename = MainSymbol.TypeName.str();
-          TestInfo.Filename = MainSymbol.Location.Filename.str();
-          TestInfo.Offset = MainSymbol.Location.Offset;
-          TestInfo.Length = MainSymbol.Location.Length;
-        }
-        sema.signal();
-      });
+        });
 
     bool expired = sema.wait(60 * 1000);
     if (expired)
@@ -255,6 +276,8 @@ TEST_F(CursorInfoTest, EditBefore) {
   auto FooRefOffs = findOffset("foo;", Contents);
   auto FooOffs = findOffset("foo =", Contents);
   auto Info = getCursor(DocName, FooRefOffs, Args);
+  EXPECT_STREQ("", Info.Error.c_str());
+  EXPECT_STREQ("", Info.InternalDiagnostic.c_str());
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
   EXPECT_STREQ(DocName, Info.Filename.c_str());
@@ -272,6 +295,8 @@ TEST_F(CursorInfoTest, EditBefore) {
 
   // Should not wait for the new AST, it should give the previous answer.
   Info = getCursor(DocName, FooRefOffs, Args);
+  EXPECT_STREQ("", Info.Error.c_str());
+  EXPECT_STREQ("", Info.InternalDiagnostic.c_str());
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
   EXPECT_STREQ(DocName, Info.Filename.c_str());
@@ -290,6 +315,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
   auto FooRefOffs = findOffset("foo", Contents);
   auto FooOffs = findOffset("foo =", Contents);
   auto Info = getCursor(DocName, FooRefOffs, Args);
+  EXPECT_STREQ("", Info.Error.c_str());
+  EXPECT_STREQ("", Info.InternalDiagnostic.c_str());
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
 
@@ -302,6 +329,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
   // Should wait for the new AST, because the declaration location for the 'foo'
   // reference has been edited out.
   Info = getCursor(DocName, FooRefOffs, Args);
+  EXPECT_STREQ("", Info.Error.c_str());
+  EXPECT_STREQ("", Info.InternalDiagnostic.c_str());
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("[Int : Int]", Info.Typename.c_str());
   EXPECT_EQ(FooOffs, Info.Offset);
@@ -367,8 +396,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
-// This test is failing occassionally in CI: rdar://55314062
-TEST_F(CursorInfoTest, DISABLED_CursorInfoMustWaitDueTokenRace) {
+TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   const char *DocName = "test.swift";
   const char *Contents = "let value = foo\n"
                          "let foo = 0\n";
@@ -394,4 +422,93 @@ TEST_F(CursorInfoTest, DISABLED_CursorInfoMustWaitDueTokenRace) {
   EXPECT_STREQ("Int", Info.Typename.c_str());
   EXPECT_EQ(FooOffs, Info.Offset);
   EXPECT_EQ(strlen("fog"), Info.Length);
+}
+
+// Disabled until we re-enable cancellation (rdar://91251055)
+TEST_F(CursorInfoTest, DISABLED_CursorInfoCancelsPreviousRequest) {
+  // TODO: This test case relies on the following snippet being slow to type 
+  // check so that the first cursor info request takes longer to execute than it 
+  // takes time to schedule the second request. If that is fixed, we need to 
+  // find a new way to cause slow type checking. rdar://80582770
+  const char *SlowDocName = "slow.swift";
+  const char *SlowContents = "func foo(x: Invalid1, y: Invalid2) {\n"
+                             "    x / y / x / y / x / y / x / y\n"
+                             "}\n";
+  auto SlowOffset = findOffset("x", SlowContents);
+  const char *Args[] = {"-parse-as-library"};
+  std::vector<const char *> ArgsForSlow = llvm::makeArrayRef(Args).vec();
+  ArgsForSlow.push_back(SlowDocName);
+
+  const char *FastDocName = "fast.swift";
+  const char *FastContents = "func bar() {\n"
+                             "    let foo = 123\n"
+                             "}\n";
+  auto FastOffset = findOffset("foo", FastContents);
+  std::vector<const char *> ArgsForFast = llvm::makeArrayRef(Args).vec();
+  ArgsForFast.push_back(FastDocName);
+
+  open(SlowDocName, SlowContents, llvm::makeArrayRef(Args));
+  open(FastDocName, FastContents, llvm::makeArrayRef(Args));
+
+  // Schedule a cursor info request that takes long to execute. This should be
+  // cancelled as the next cursor info (which is faster) gets requested.
+  Semaphore FirstCursorInfoSema(0);
+  getLang().getCursorInfo(
+      SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
+      /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
+      /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
+      [&](const RequestResult<CursorInfoData> &Result) {
+        EXPECT_TRUE(Result.isCancelled());
+        FirstCursorInfoSema.signal();
+      });
+
+  auto Info = getCursor(FastDocName, FastOffset, Args,
+                        /*CancellationToken=*/nullptr,
+                        /*CancelOnSubsequentRequest=*/true);
+  EXPECT_STREQ("foo", Info.Name.c_str());
+  EXPECT_STREQ("Int", Info.Typename.c_str());
+  EXPECT_EQ(FastOffset, Info.Offset);
+  EXPECT_EQ(strlen("foo"), Info.Length);
+
+  bool expired = FirstCursorInfoSema.wait(30 * 1000);
+  if (expired)
+    llvm::report_fatal_error("Did not receive a resonse for the first request");
+}
+
+// Disabled until we re-enable cancellation (rdar://91251055)
+TEST_F(CursorInfoTest, DISABLED_CursorInfoCancellation) {
+  // TODO: This test case relies on the following snippet being slow to type
+  // check so that the first cursor info request takes longer to execute than it
+  // takes time to schedule the second request. If that is fixed, we need to
+  // find a new way to cause slow type checking. rdar://80582770
+  const char *SlowDocName = "slow.swift";
+  const char *SlowContents = "func foo(x: Invalid1, y: Invalid2) {\n"
+                             "    x / y / x / y / x / y / x / y\n"
+                             "}\n";
+  auto SlowOffset = findOffset("x", SlowContents);
+  const char *Args[] = {"-parse-as-library"};
+  std::vector<const char *> ArgsForSlow = llvm::makeArrayRef(Args).vec();
+  ArgsForSlow.push_back(SlowDocName);
+
+  open(SlowDocName, SlowContents, llvm::makeArrayRef(Args));
+
+  SourceKitCancellationToken CancellationToken = createCancallationToken();
+
+  // Schedule a cursor info request that takes long to execute. This should be
+  // cancelled as the next cursor info (which is faster) gets requested.
+  Semaphore CursorInfoSema(0);
+  getLang().getCursorInfo(
+      SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
+      /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/false, ArgsForSlow,
+      /*vfsOptions=*/None, /*CancellationToken=*/CancellationToken,
+      [&](const RequestResult<CursorInfoData> &Result) {
+        EXPECT_TRUE(Result.isCancelled());
+        CursorInfoSema.signal();
+      });
+
+  getContext().getRequestTracker()->cancel(CancellationToken);
+
+  bool expired = CursorInfoSema.wait(30 * 1000);
+  if (expired)
+    llvm::report_fatal_error("Did not receive a resonse for the first request");
 }

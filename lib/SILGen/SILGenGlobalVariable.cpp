@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGenFunction.h"
+#include "ExecutorBreadcrumb.h"
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
@@ -66,7 +67,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 }
 
 ManagedValue
-SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
+SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var,
+                                      Optional<ActorIsolation> actorIso) {
   assert(!VarLocs.count(var));
 
   if (var->isLazilyInitializedGlobal()) {
@@ -75,7 +77,21 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
                             SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor),
                                                   NotForDefinition);
     SILValue accessor = B.createFunctionRefFor(loc, accessorFn);
+
+    // The accessor to obtain a global's address may need to initialize the
+    // variable first. So, we must call this accessor with the same
+    // isolation that the variable itself requires during access.
+    ExecutorBreadcrumb prevExecutor = emitHopToTargetActor(loc, actorIso,
+                                                                /*base=*/None);
+
     SILValue addr = B.createApply(loc, accessor, SubstitutionMap(), {});
+
+    // FIXME: often right after this, we will again hop to the actor to
+    // read from this address. it would be better to merge these two hops
+    // pairs of hops together. Alternatively, teaching optimizations to
+    // expand the scope of two nearly-adjacent pairs would be good.
+    prevExecutor.emit(*this, loc); // hop back after call.
+
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
     addr = B.createPointerToAddress(
@@ -211,6 +227,12 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
 void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding,
                                                unsigned pbdEntry) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(binding->getDeclContext());
+
+  // Add unused context pointer argument required to pass to `Builtin.once`
+  SILBasicBlock &entry = *F.begin();
+  SILType rawPointerSILTy =
+      getLoweredLoadableType(getASTContext().TheRawPointerType);
+  entry.createFunctionArgument(rawPointerSILTy);
 
   {
     Scope scope(Cleanups, binding);

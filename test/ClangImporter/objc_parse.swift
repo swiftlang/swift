@@ -202,7 +202,7 @@ func checkHive(_ hive: Hive, b: Bee) {
 // Protocols
 func testProtocols(_ b: B, bp: BProto) {
   var bp2 : BProto = b
-  var b2 : B = bp // expected-error{{cannot convert value of type 'BProto' to specified type 'B'}}
+  var b2 : B = bp // expected-error{{cannot convert value of type 'any BProto' to specified type 'B'}}
   bp.method(1, with: 2.5 as Float)
   bp.method(1, withFoo: 2.5) // expected-error{{incorrect argument label in call (have '_:withFoo:', expected '_:with:')}}
   bp2 = b.getAsProto()
@@ -210,7 +210,7 @@ func testProtocols(_ b: B, bp: BProto) {
   var c1 : Cat1Proto = b
   var bcat1 = b.getAsProtoWithCat()!
   c1 = bcat1
-  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'BProto' in assignment}}
+  bcat1 = c1 // expected-error{{value of type 'any Cat1Proto' does not conform to 'BProto' in assignment}}
 }
 
 // Methods only defined in a protocol
@@ -315,7 +315,7 @@ func ivars(_ hive: Hive) {
   hive.queen.description() // expected-error{{value of type 'Hive' has no member 'queen'}}
 }
 
-class NSObjectable : NSObjectProtocol {
+class NSObjectable : NSObjectProtocol { // expected-error {{cannot declare conformance to 'NSObjectProtocol' in Swift; 'NSObjectable' should inherit 'NSObject' instead}}
   @objc var description : String { return "" }
   @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
   @objc(isKindOfClass:) func isKind(of aClass: AnyClass) -> Bool { return false }
@@ -469,10 +469,10 @@ func testProtocolMappingDifferentModules(_ obj: ObjCParseExtrasToo.ProtoOrClass,
 
   let _: ProtoOrClass? // expected-error{{'ProtoOrClass' is ambiguous for type lookup in this context}}
 
-  _ = ObjCParseExtrasToo.ClassInHelper() // expected-error{{'ClassInHelper' cannot be constructed because it has no accessible initializers}}
+  _ = ObjCParseExtrasToo.ClassInHelper() // expected-error{{'any ClassInHelper' cannot be constructed because it has no accessible initializers}}
   _ = ObjCParseExtrasToo.ProtoInHelper()
   _ = ObjCParseExtrasTooHelper.ClassInHelper()
-  _ = ObjCParseExtrasTooHelper.ProtoInHelper() // expected-error{{'ProtoInHelper' cannot be constructed because it has no accessible initializers}}
+  _ = ObjCParseExtrasTooHelper.ProtoInHelper() // expected-error{{'any ProtoInHelper' cannot be constructed because it has no accessible initializers}}
 }
 
 func testProtocolClassShadowing(_ obj: ClassInHelper, p: ProtoInHelper) {
@@ -544,11 +544,11 @@ func testStrangeSelectors(obj: StrangeSelectors) {
 
 func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
                            plainObj: NSObject, plainCell: SomeCell) {
-  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'NSObject'}} 
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'any NSCopying & NSObjectProtocol') is not convertible to 'NSObject'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
   _ = obj as NSObjectProtocol
   _ = obj as NSCopying
-  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'}}
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'any NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
 
   _ = cell as NSObject
@@ -556,8 +556,8 @@ func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
   _ = cell as NSCopying
   _ = cell as SomeCell
   
-  _ = plainObj as CopyableNSObject // expected-error {{value of type 'NSObject' does not conform to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') in coercion}} 
-  _ = plainCell as CopyableSomeCell // expected-error {{value of type 'SomeCell' does not conform to 'CopyableSomeCell' (aka 'SomeCell & NSCopying') in coercion}}
+  _ = plainObj as CopyableNSObject // expected-error {{cannot convert value of type 'NSObject' to type 'CopyableNSObject' (aka 'any NSCopying & NSObjectProtocol') in coercion}}
+  _ = plainCell as CopyableSomeCell // expected-error {{cannot convert value of type 'SomeCell' to type 'CopyableSomeCell' (aka 'any SomeCell & NSCopying') in coercion}}
 }
 
 extension Printing {

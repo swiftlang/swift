@@ -28,7 +28,7 @@ func g0(_: (inout X) -> (Float) -> ()) {}
 _ = x.f0(i)
 x.f0(i).f1(i)
 
-g0(X.f1) // expected-error{{partial application of 'mutating' method}}
+g0(X.f1) // expected-error{{cannot reference 'mutating' method as function value}}
 
 _ = x.f0(x.f2(1))
 _ = x.f0(1).f2(i)
@@ -74,7 +74,7 @@ struct GZ<T> {
 
 var z = Z(i: 0)
 var getI = z.getI
-var incI = z.incI // expected-error{{partial application of 'mutating'}}
+var incI = z.incI // expected-error{{cannot reference 'mutating' method as function value}}
 var zi = z.getI()
 var zcurried1 = z.curried
 var zcurried2 = z.curried(0)
@@ -595,10 +595,10 @@ func rdar50679161() {
 
   func foo() {
     _ = { () -> Void in
+      // Missing `.self` or `init` is not diagnosed here because there are errors in
+      // `if let` statement and `MiscDiagnostics` only run if the body is completely valid.
       var foo = S
-      // expected-error@-1 {{expected member name or constructor call after type name}}
-      // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-      // expected-note@-3 {{use '.self' to reference the type object}}
+
       if let v = Int?(1) {
         var _ = Q(
           a: v + foo.w,
@@ -609,6 +609,14 @@ func rdar50679161() {
           // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
         )
       }
+    }
+
+    _ = { () -> Void in
+      var foo = S
+      // expected-error@-1 {{expected member name or constructor call after type name}}
+      // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+      // expected-note@-3 {{use '.self' to reference the type object}}
+      print(foo)
     }
   }
 }
@@ -622,7 +630,6 @@ func rdar_50467583_and_50909555() {
     // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
     // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
     // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
-    // expected-note@-5 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
   }
   
   // rdar://problem/50909555
@@ -681,7 +688,7 @@ func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: I
   _ = pair[1] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; did you mean to use '.1'?}} {{11-14=.1}}
   _ = pair[2] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
   _ = pair[100] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
-  _ = pair["strting"] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
+  _ = pair["string"] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
   _ = pair[-1] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
   _ = pair[1, 1] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
   _ = void[0] // expected-error {{value of type 'Void' has no subscripts}}
@@ -693,7 +700,7 @@ func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: I
   _ = alias[1] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); did you mean to use '.1'?}} {{12-15=.1}}
   _ = alias[2] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
   _ = alias[100] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
-  _ = alias["strting"] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
+  _ = alias["string"] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
   _ = alias[-1] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
   _ = alias[1, 1] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
   _ = alias[0x00] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
@@ -704,7 +711,7 @@ func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: I
   _ = labeled[1] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; did you mean to use '.1'?}} {{14-17=.1}}
   _ = labeled[2] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
   _ = labeled[100] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
-  _ = labeled["strting"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled["string"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
   _ = labeled[-1] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
   _ = labeled[1, 1] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
   _ = labeled[0x00] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
@@ -745,4 +752,26 @@ func fSR14533(_ s: SR14533) {
   for (x1, x2) in zip(s.xs, s.ys) {
     // expected-error@-1{{value of type 'SR14533' has no member 'ys'}}
   }
+}
+
+// rdar://92358570
+class SomeClassBound {}
+protocol ClassBoundProtocol: SomeClassBound {
+}
+
+struct RDAR92358570<Element> {}
+
+extension RDAR92358570 where Element : SomeClassBound {
+// expected-note@-1 2 {{where 'Element' = 'any ClassBoundProtocol', 'SomeClassBound' = 'AnyObject'}}
+// expected-note@-2 2 {{where 'Element' = 'any SomeClassBound & ClassBoundProtocol', 'SomeClassBound' = 'AnyObject'}}
+  func doSomething() {}
+  static func doSomethingStatically() {}
+}
+
+func rdar92358570(_ x: RDAR92358570<ClassBoundProtocol>, _ y: RDAR92358570<SomeClassBound & ClassBoundProtocol>) {
+  x.doSomething() // expected-error {{referencing instance method 'doSomething()' on 'RDAR92358570' requires that 'any ClassBoundProtocol' inherit from 'AnyObject'}}
+  RDAR92358570<ClassBoundProtocol>.doSomethingStatically() // expected-error {{referencing static method 'doSomethingStatically()' on 'RDAR92358570' requires that 'any ClassBoundProtocol' inherit from 'AnyObject'}}
+
+  y.doSomething() // expected-error {{referencing instance method 'doSomething()' on 'RDAR92358570' requires that 'any SomeClassBound & ClassBoundProtocol' inherit from 'AnyObject'}}
+  RDAR92358570<SomeClassBound & ClassBoundProtocol>.doSomethingStatically() // expected-error {{referencing static method 'doSomethingStatically()' on 'RDAR92358570' requires that 'any SomeClassBound & ClassBoundProtocol' inherit from 'AnyObject'}}
 }

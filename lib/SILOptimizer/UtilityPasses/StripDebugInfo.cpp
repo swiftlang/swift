@@ -25,8 +25,7 @@ static void stripFunction(SILFunction *F) {
       SILInstruction *Inst = &*II;
       ++II;
 
-      if (!isa<DebugValueInst>(Inst) &&
-          !isa<DebugValueAddrInst>(Inst))
+      if (!isa<DebugValueInst>(Inst))
         continue;
 
       Inst->eraseFromParent();

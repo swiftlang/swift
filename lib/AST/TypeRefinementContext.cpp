@@ -64,6 +64,16 @@ TypeRefinementContext::createForDecl(ASTContext &Ctx, Decl *D,
       TypeRefinementContext(Ctx, D, Parent, SrcRange, Info, ExplicitInfo);
 }
 
+TypeRefinementContext *TypeRefinementContext::createForDeclImplicit(
+    ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
+    const AvailabilityContext &Info, SourceRange SrcRange) {
+  assert(D);
+  assert(Parent);
+  return new (Ctx) TypeRefinementContext(
+      Ctx, IntroNode(D, Reason::DeclImplicit), Parent, SrcRange, Info,
+      AvailabilityContext::alwaysAvailable());
+}
+
 TypeRefinementContext *
 TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
                                            TypeRefinementContext *Parent,
@@ -137,13 +147,6 @@ TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
       Ctx, S, Parent, S->getBody()->getSourceRange(), Info, /* ExplicitInfo */Info);
 }
 
-// Only allow allocation of TypeRefinementContext using the allocator in
-// ASTContext.
-void *TypeRefinementContext::operator new(size_t Bytes, ASTContext &C,
-                                          unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 TypeRefinementContext *
 TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
                                                  SourceManager &SM) {
@@ -177,6 +180,7 @@ void TypeRefinementContext::dump(raw_ostream &OS, SourceManager &SrcMgr) const {
 SourceLoc TypeRefinementContext::getIntroductionLoc() const {
   switch (getReason()) {
   case Reason::Decl:
+  case Reason::DeclImplicit:
     return Node.getAsDecl()->getLoc();
 
   case Reason::IfStmtThenBranch:
@@ -290,6 +294,7 @@ TypeRefinementContext::getAvailabilityConditionVersionSourceRange(
       Node.getAsWhileStmt()->getCond(), Platform, Version);
 
   case Reason::Root:
+  case Reason::DeclImplicit:
     return SourceRange();
   }
 
@@ -303,13 +308,15 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
 
   OS << " versions=" << AvailabilityInfo.getOSVersion().getAsString();
 
-  if (getReason() == Reason::Decl) {
+  if (getReason() == Reason::Decl || getReason() == Reason::DeclImplicit) {
     Decl *D = Node.getAsDecl();
     OS << " decl=";
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       OS << VD->getName();
     } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       OS << "extension." << ED->getExtendedType().getString();
+    } else if (isa<TopLevelCodeDecl>(D)) {
+      OS << "<top-level-code>";
     }
   }
 
@@ -318,6 +325,10 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
     OS << " src_range=";
     R.print(OS, SrcMgr, /*PrintText=*/false);
   }
+
+  if (!ExplicitAvailabilityInfo.isAlwaysAvailable())
+    OS << " explicit_versions="
+       << ExplicitAvailabilityInfo.getOSVersion().getAsString();
 
   for (TypeRefinementContext *Child : Children) {
     OS << '\n';
@@ -338,6 +349,9 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
 
   case Reason::Decl:
     return "decl";
+
+  case Reason::DeclImplicit:
+    return "decl_implicit";
 
   case Reason::IfStmtThenBranch:
     return "if_then";

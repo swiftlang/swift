@@ -1,0 +1,416 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
+sil_stage canonical
+
+import Builtin
+import Swift
+
+public class EE {
+  init()
+}
+
+public class BB {
+  init()
+}
+
+public class CC : BB {
+  @inline(never) init(e: EE)
+  override init()
+}
+
+public protocol PP {
+  var prop1: BB? { get }
+}
+
+public class DD : PP {
+  public var prop1: BB? { get }
+  init()
+}
+
+class B {}
+class E : B {}
+
+sil [ossa] @unknown : $@convention(thin) () -> ()
+
+sil [ossa] @adder : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+
+sil [ossa] @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+sil [ossa] @non_throwing_closure : $@convention(thin) (Int) -> Int
+
+sil [ossa] @rethrowGuaranteed : $@convention(thin) (@guaranteed (Optional<B>, B)) -> Int
+sil [ossa] @rethrowOwned : $@convention(thin) (@owned (Optional<B>, B)) -> Int
+
+// CHECK-LABEL: sil [ossa] @replace_try_apply_with_apply
+// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return [[R]] : $Int
+sil [ossa] @replace_try_apply_with_apply : $@convention(thin) () -> Int {
+bb0:
+  %as = alloc_stack $Builtin.Int32
+  %0 = function_ref @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+  %1 = function_ref @non_throwing_closure : $@convention(thin) (Int) -> Int
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int) -> Int to $@callee_owned (Int) -> Int
+  %3 = convert_function %2 : $@callee_owned (Int) -> Int to $@callee_owned (Int) -> (Int, @error Error)
+  try_apply %0(%3) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Int):
+  dealloc_stack %as: $*Builtin.Int32
+  return %5 : $Int
+
+bb2(%8 : @owned $Error):
+  dealloc_stack %as: $*Builtin.Int32
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @replace_try_apply_with_apply_cast_return_type : $@convention(method) (@guaranteed DD) -> @owned Optional<BB>
+// CHECK: bb0
+// CHECK: [[INIT:%.*]] = apply %{{.*}}
+// CHECK: [[COPY:%.*]] = copy_value [[INIT]] : $@callee_owned (@owned EE) -> @owned CC
+// CHECK: [[CVT:%.*]] = convert_function [[INIT]]
+// CHECK-NOT: try_apply
+// CHECK: destroy_value [[CVT]] : $@callee_owned (@owned EE) -> (@owned Optional<BB>, @error Error)
+// CHECK: apply [[COPY]]
+// Check that return value is properly casted
+// CHECK-NEXT: enum $Optional<CC>, #Optional.some!enumelt, %{{.*}} : $CC
+// CHECK-NEXT: upcast %{{.*}} : $Optional<CC> to $Optional<BB>
+// CHECK-NEXT: return
+sil [ossa] @replace_try_apply_with_apply_cast_return_type: $@convention(method) (@guaranteed DD) -> @owned Optional<BB> {
+bb0(%0 : @guaranteed $DD):
+  %1 = alloc_ref $EE
+  debug_value %1 : $EE
+  %3 = function_ref @initCC : $@convention(thin) (@thick CC.Type) -> @owned @callee_owned (@owned EE) -> @owned CC
+  %4 = metatype $@thick CC.Type
+  %5 = apply %3(%4) : $@convention(thin) (@thick CC.Type) -> @owned @callee_owned (@owned EE) -> @owned CC
+  %6 = convert_function %5 : $@callee_owned (@owned EE) -> @owned CC to $@callee_owned (@owned EE) -> (@owned Optional<BB>, @error Error)
+  try_apply %6(%1) : $@callee_owned (@owned EE) -> (@owned Optional<BB>, @error Error), normal bb1, error bb2
+
+bb1(%8 : @owned $Optional<BB>):
+  return %8 : $Optional<BB>
+
+bb2(%10 : @owned $Error):
+  unreachable
+}
+
+// Check that we don't crash on this, because we perform casting
+// if the argument types of the converted function types do not match.
+// CHECK-LABEL: try_apply_with_apply_of_cast_argument
+// CHECK-NOT: try_apply {{%[0-9]+}}
+// CHECK: convert_function
+// CHECK: upcast
+// CHECK: apply
+// CHECK-NOT: try_apply
+// CHECK: return
+sil [ossa] @try_apply_with_apply_of_cast_argument: $@convention(method) (@owned CC) -> @owned BB {
+bb0(%0 : @owned $CC):
+  %3 = function_ref @takeBB : $@convention(thin) (@owned BB) -> @owned BB
+  %6 = convert_function %3 : $@convention(thin) (@owned BB) -> @owned BB to $@convention(thin) (@owned CC) -> (@owned BB, @error Error)
+  try_apply %6(%0) : $@convention(thin) (@owned CC) -> (@owned BB, @error Error), normal bb1, error bb2
+
+bb1(%8 : @owned $BB):
+  return %8 : $BB
+
+bb2(%10 : @owned $Error):
+  // Prevent that the conversion is done because the error block is empty and unreachable.
+  %12 = function_ref @unknown : $@convention(thin) () -> ()
+  apply %12() : $@convention(thin) () -> ()
+  unreachable
+}
+
+sil [noinline] @initCC : $@convention(thin) (@thick CC.Type) -> @owned @callee_owned (@owned EE) -> @owned CC
+
+sil [noinline] @takeBB : $@convention(thin) (@owned BB) -> @owned BB
+
+// Check that we don't crash on this.
+// The compiler should be able to cast between the labeled and unlabeled return tuple types.
+// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_tuple
+// CHECK: [[T0:%.*]] = apply {{%[0-9]+}}
+// CHECK: return [[T0]]
+sil [ossa] @try_apply_with_convert_function_returning_casted_tuple: $@convention(thin) () -> (Int32, Int32) {
+bb0:
+  %3 = function_ref @returnTuple : $@convention(thin) () -> (Int32, Int32)
+  %6 = convert_function %3 : $@convention(thin) () -> (Int32, Int32) to $@convention(thin) () -> (Int32, Int32, @error Error)
+  try_apply %6() : $@convention(thin) () -> (Int32, Int32, @error Error), normal bb1, error bb2
+
+bb1(%8 : $(Int32, Int32)):
+  return %8 : $(Int32, Int32)
+
+bb2(%10 : @owned $Error):
+  // Prevent that the conversion is done because the error block is empty and unreachable.
+  %12 = function_ref @unknown : $@convention(thin) () -> ()
+  apply %12() : $@convention(thin) () -> ()
+  unreachable
+}
+
+sil [noinline] @returnTuple: $@convention(thin) () -> (Int32, Int32)
+
+public class AAA {
+}
+
+public class BBB : AAA {
+}
+
+@inline(never) func returnUnlabeledTuple(b: BBB) -> (BBB, BBB)
+
+func testit(f: (BBB) throws -> (AAA, AAA), _ b: BBB) throws -> (AAA, AAA)
+
+func callit(b: BBB) throws -> (AAA, AAA)
+
+sil [ossa] [noinline] @returnUnlabeledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) {
+bb0(%0 : @owned $BBB):
+  debug_value %0 : $BBB
+  %0a = copy_value %0 : $BBB
+  %3 = tuple (%0a : $BBB, %0 : $BBB)
+  return %3 : $(BBB, BBB)
+}
+
+sil [ossa] @testFunctorReturningUnlabeledTuple : $@convention(thin) (@owned @callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error), @owned BBB) -> (@owned (AAA, AAA), @error Error) {
+bb0(%0 : @owned $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error), %1 : @owned $BBB):
+  debug_value %0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error)
+  debug_value %1 : $BBB
+  %0a = copy_value %0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error)
+  %1a = copy_value %1 : $BBB
+  try_apply %0a(%1a) : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error), normal bb1, error bb2
+
+bb1(%7 : @owned $(AAA, AAA)):
+  (%8, %9) = destructure_tuple %7 : $(AAA, AAA)
+  %10 = tuple (%8 : $AAA, %9 : $AAA)
+  destroy_value %1 : $BBB
+  destroy_value %0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error)
+  return %10 : $(AAA, AAA)
+
+bb2(%14 : @owned $Error):
+  destroy_value %1 : $BBB
+  destroy_value %0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error)
+  throw %14 : $Error
+}
+
+
+// Check that we don't crash on this. Currently we just do not optimize try_apply if
+// we cannot cast the actual return type into expected return type.
+// TODO: Change the checks when we support more complex casts of return types.
+// CHECK-LABEL: @testCallingFunctionWithFunctorReturningUnlabeledTuple
+// CHECK: try_apply {{%[0-9]+}}
+// CHECK: return
+sil [ossa] @testCallingFunctionWithFunctorReturningUnlabeledTuple : $@convention(thin) (@owned BBB) -> (@owned (AAA, AAA), @error Error) {
+bb0(%0 : @owned $BBB):
+  debug_value %0 : $BBB
+
+  %2 = function_ref @testFunctorReturningUnlabeledTuple : $@convention(thin) (@owned @callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error), @owned BBB) -> (@owned (AAA, AAA), @error Error)
+
+  %3 = function_ref @returnUnlabeledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB)
+  %4 = thin_to_thick_function %3 : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) to $@callee_owned (@owned BBB) -> @owned (BBB, BBB)
+  %5 = convert_function %4 : $@callee_owned (@owned BBB) -> @owned (BBB, BBB) to $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error)
+  %0a = copy_value %0 : $BBB
+  try_apply %2(%5, %0a) : $@convention(thin) (@owned @callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error Error), @owned BBB) -> (@owned (AAA, AAA), @error Error), normal bb1, error bb2
+
+bb1(%8 : @owned $(AAA, AAA)):
+  (%9, %10) = destructure_tuple %8 : $(AAA, AAA)
+  %11 = tuple (%9 : $AAA, %10 : $AAA)
+  destroy_value %0 : $BBB
+  return %11 : $(AAA, AAA)
+
+bb2(%14 : @owned $Error):
+  destroy_value %0 : $BBB
+  throw %14 : $Error
+}
+
+struct UP<T> {
+
+}
+
+struct UBP<A> {
+}
+
+struct CAB<A> {
+
+}
+
+sil [ossa] @CABIdentityGetter : $@convention(thin) <τ_0_0> (UBP<τ_0_0>) -> UP<()>
+sil [ossa] @CABwithUnsafeBufferPointer : $@convention(method) <τ_0_0><τ_1_0> (@owned @callee_owned (UBP<τ_0_0>) -> (@out τ_1_0, @error Error), @guaranteed CAB<τ_0_0>) -> (@out τ_1_0, @error Error)
+sil [ossa] @thunk_helper : $@convention(thin) <τ_0_0> (UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error Error)) -> (@out UP<()>, @error Error)
+
+// CHECK-LABEL: sil [ossa] @check_parameters_casting_with_generics :
+// CHECK-NOT: try_apply
+// CHECK: apply [nothrow] %{{.*}}<Element, UP<()>>
+// CHECK: return
+sil [ossa] @check_parameters_casting_with_generics : $@convention(method) <Element> (CAB<Element>) -> UP<()> {
+bb0(%0 : $CAB<Element>):
+  // function_ref Swift._ContiguousArrayBuffer.withUnsafeBufferPointer <A><B> (CAB<A>)((Swift.UBP<A>) throws -> B) throws -> B
+  %2 = function_ref @CABwithUnsafeBufferPointer : $@convention(method) <τ_0_0><τ_1_0> (@owned @callee_owned (UBP<τ_0_0>) -> (@out τ_1_0, @error Error), @guaranteed CAB<τ_0_0>) -> (@out τ_1_0, @error Error)
+  // function_ref Swift._ContiguousArrayBuffer.(identity.getter : UP<()>).(closure #1)
+  %3 = function_ref @CABIdentityGetter : $@convention(thin) <τ_0_0> (UBP<τ_0_0>) -> UP<()>
+  %4 = partial_apply %3<Element>() : $@convention(thin) <τ_0_0> (UBP<τ_0_0>) -> UP<()>
+  %5 = convert_function %4 : $@callee_owned (UBP<Element>) -> UP<()> to $@callee_owned (UBP<Element>) -> (UP<()>, @error Error)
+  // function_ref reabstraction thunk helper <A> from @callee_owned (@unowned UBP<A>) -> (@unowned UP<()>, @error @owned Swift.Error) to @callee_owned (@unowned UBP<A>) -> (@out UP<()>, @error @owned Swift.Error)
+  %6 = function_ref @thunk_helper : $@convention(thin) <τ_0_0> (UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error Error)) -> (@out UP<()>, @error Error)
+  %7 = partial_apply %6<Element>(%5) : $@convention(thin) <τ_0_0> (UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error Error)) -> (@out UP<()>, @error Error)
+  %8 = alloc_stack $UP<()>
+  %9 = unchecked_addr_cast %8 : $*UP<()> to $*UP<()>
+  %10 = convert_function %7 : $@callee_owned (UBP<Element>) -> (@out UP<()>, @error Error) to $@callee_owned (UBP<Element>) -> (@out UP<()>, @error Error)
+  try_apply %2<Element, UP<()>>(%8, %10, %0) : $@convention(method) <τ_0_0><τ_1_0> (@owned @callee_owned (UBP<τ_0_0>) -> (@out τ_1_0, @error Error), @guaranteed CAB<τ_0_0>) -> (@out τ_1_0, @error Error), normal bb1, error bb2
+
+bb1(%12 : $()):
+  %13 = load [trivial] %8 : $*UP<()>
+  dealloc_stack %8 : $*UP<()>
+  return %13 : $UP<()>
+
+bb2(%16 : @owned $Error):
+  unreachable
+}
+
+// Test try_apply to apply conversion where the owned callee is defined in a non-postdominated block.
+//
+// CHECK-LABEL: sil [ossa] @test_owned_callee : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+// CHECK:   [[PA:%.*]] = partial_apply %2(%0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+// CHECK:   [[COPY:%.*]] = copy_value [[PA]] : $@callee_owned (Builtin.Int32) -> Builtin.Int32
+// CHECK:   [[CVT:%.*]] = convert_function [[PA]] : $@callee_owned (Builtin.Int32) -> Builtin.Int32 to $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error)
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:   destroy_value %5 : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error)
+// CHECK:   [[CALL:%.*]] = apply [[COPY]]
+// CHECK:   br bb3([[CALL]] : $Builtin.Int32)
+// CHECK: bb2:                                              // Preds: bb0
+// CHECK:   destroy_value [[COPY]] : $@callee_owned (Builtin.Int32) -> Builtin.Int32
+// CHECK:   destroy_value [[CVT]] : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error)
+// CHECK:   br bb3(
+// CHECK: bb3(
+// CHECK-NEXT: return
+// CHECK-LABEL: } // end sil function 'test_owned_callee'
+sil [ossa] @test_owned_callee : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %f = function_ref @adder : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %pa = partial_apply %f(%0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %conv = convert_function %pa : $@callee_owned (Builtin.Int32) -> (Builtin.Int32) to $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  // Test OSSA cleanup by creating a leaking block.
+  cond_br undef, bb1, bb4
+
+bb1:
+  try_apply %conv(%1) : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error), normal bb2, error bb3
+
+bb2(%r : $Builtin.Int32):
+	br bb5(%r : $Builtin.Int32)
+
+bb3(%e : $Error):
+  %r1 = integer_literal $Builtin.Int32, 0
+	br bb5(%r1 : $Builtin.Int32)
+
+bb4:
+  %const = integer_literal $Builtin.Int32, 1
+  destroy_value %conv : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  br bb5(%const : $Builtin.Int32)
+
+bb5(%res : $Builtin.Int32):
+  return  %res : $Builtin.Int32
+}
+
+
+// TODO: The extra copy/destroy here could be avoided.
+//
+// CHECK-LABEL: sil [ossa] @test_noescape
+// CHECK:  [[FN:%.*]] = function_ref @adder
+// CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
+// CHECK:  [[COPY:%.*]] = copy_value [[PA]] : $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32
+// CHECK-NOT: try_apply
+// CHECK:  apply [[COPY]](%1)
+// CHECK:  destroy_value [[COPY]] : $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32
+// CHECK: return
+sil [ossa] @test_noescape : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %f = function_ref @adder : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %conv = convert_function %pa : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32) to $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  %ne = convert_escape_to_noescape %conv : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error) to $@noescape @callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  try_apply %ne(%1) : $@noescape @callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error), normal bb1, error bb2
+
+bb1(%r : $Builtin.Int32):
+	br bb3(%r : $Builtin.Int32)
+
+bb2(%e : $Error):
+  %r1 = integer_literal $Builtin.Int32, 0
+	br bb3(%r1 : $Builtin.Int32)
+
+bb3(%res : $Builtin.Int32):
+  destroy_value %conv : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  return  %res : $Builtin.Int32
+}
+
+// Test castValueToABICompatibleType with guaranteed tuples and optionals.
+// Create a nested borrow scope for the Optional tuple element
+//
+// CHECK-LABEL: sil [ossa] @replaceTryApplyGuaranteedTuple : $@convention(thin) (@guaranteed Optional<B>, @guaranteed E) -> Int {
+// CHECK: bb0(%0 : @guaranteed $Optional<B>, %1 : @guaranteed $E):
+// CHECK:   [[INCAST:%.*]] = unchecked_ref_cast %0 : $Optional<B> to $Optional<AAA>
+// CHECK:   [[INTUP:%.*]] = tuple ([[INCAST]] : $Optional<AAA>, %1 : $E)
+// CHECK:  ([[EXTR0:%.*]], [[EXTR1:%.*]]) = destructure_tuple [[INTUP]] : $(Optional<AAA>, E)
+// CHECK:   switch_enum [[EXTR0]] : $Optional<AAA>, case #Optional.some!enumelt: bb1, default bb2
+// CHECK: bb1([[UNWRAP:%.*]] : @guaranteed $AAA):
+// CHECK:   [[ACAST:%.*]] = unchecked_ref_cast [[UNWRAP]] : $AAA to $B
+// CHECK:   [[SOME:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[ACAST]] : $B
+// CHECK:   [[BORROWSOME:%.*]] = begin_borrow [[SOME]] : $Optional<B>
+// CHECK:   br bb3([[BORROWSOME]] : $Optional<B>)
+// CHECK: bb2:
+// CHECK:   [[NONE:%.*]] = enum $Optional<B>, #Optional.none!enumelt
+// CHECK:   [[BORROWNONE:%.*]] = begin_borrow [[NONE]] : $Optional<B>
+// CHECK:   br bb3([[BORROWNONE]] : $Optional<B>)
+// CHECK: bb3([[REWRAP:%.*]] : @guaranteed $Optional<B>):
+// CHECK:   [[ECAST:%.*]] = upcast [[EXTR1]] : $E to $B
+// CHECK:   [[OUTTUP:%.*]] = tuple ([[REWRAP]] : $Optional<B>, [[ECAST]] : $B)
+// CHECK:   apply %{{.*}}([[OUTTUP]]) : $@convention(thin) (@guaranteed (Optional<B>, B)) -> Int
+// CHECK:   end_borrow [[REWRAP]] : $Optional<B>
+// CHECK:   return
+// CHECK-LABEL: } // end sil function 'replaceTryApplyGuaranteedTuple'
+sil [ossa] @replaceTryApplyGuaranteedTuple : $@convention(thin) (@guaranteed Optional<B>, @guaranteed E) -> Int {
+bb0(%0 : @guaranteed $Optional<B>, %1 : @guaranteed $E):
+  %cast = unchecked_ref_cast %0 : $Optional<B> to $Optional<AAA>
+  %tuple = tuple (%cast : $Optional<AAA>, %1 : $E)
+  %2 = function_ref @rethrowGuaranteed : $@convention(thin) (@guaranteed (Optional<B>, B)) -> Int
+  %3 = convert_function %2 : $@convention(thin) (@guaranteed (Optional<B>, B)) -> Int to $@convention(thin) (@guaranteed (Optional<AAA>, E)) -> (Int, @error Error)
+  try_apply %3(%tuple) : $@convention(thin) (@guaranteed (Optional<AAA>, E)) -> (Int, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Int):
+  return %5 : $Int
+
+bb2(%8 : @owned $Error):
+  unreachable
+}
+
+// Test castValueToABICompatibleType with owned tuples and optionals.
+// Create a destructure for the Optional tuple element.
+//
+// CHECK-LABEL: sil [ossa] @replaceTryApplyOwnedTuple : $@convention(thin) (@owned Optional<B>, @owned E) -> Int {
+// CHECK: bb0(%0 : @owned $Optional<B>, %1 : @owned $E):
+// CHECK:  [[INCAST:%.*]] = unchecked_ref_cast %0 : $Optional<B> to $Optional<AAA>
+// CHECK:  [[INTUP:%.*]] = tuple ([[INCAST]] : $Optional<AAA>, %1 : $E)
+// CHECK:  ([[EXTR0:%.*]], [[EXTR1:%.*]]) = destructure_tuple [[INTUP]] : $(Optional<AAA>, E)
+// CHECK:  switch_enum [[EXTR0]] : $Optional<AAA>, case #Optional.some!enumelt: bb1, default bb2
+// CHECK: bb1([[UNWRAP:%.*]] : @owned $AAA):
+// CHECK:  [[ACAST:%.*]] = unchecked_ref_cast [[UNWRAP]] : $AAA to $B
+// CHECK:  [[SOME:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[ACAST]] : $B
+// CHECK:  br bb3([[SOME]] : $Optional<B>)
+// CHECK: bb2:
+// CHECK:  [[NONE:%.*]] = enum $Optional<B>, #Optional.none!enumelt
+// CHECK:  br bb3([[NONE]] : $Optional<B>)
+// CHECK: bb3([[REWRAP:%.*]] : @owned $Optional<B>):
+// CHECK:  [[ECAST:%.*]] = upcast [[EXTR1]] : $E to $B
+// CHECK:  [[OUTTUP:%.*]] = tuple ([[REWRAP]] : $Optional<B>, [[ECAST]] : $B)
+// CHECK:  apply %{{.*}}([[OUTTUP]]) : $@convention(thin) (@owned (Optional<B>, B)) -> Int
+// CHECK:  return
+// CHECK-LABEL: } // end sil function 'replaceTryApplyOwnedTuple'
+sil [ossa] @replaceTryApplyOwnedTuple : $@convention(thin) (@owned Optional<B>, @owned E) -> Int {
+bb0(%0 : @owned $Optional<B>, %1 : @owned $E):
+  %cast = unchecked_ref_cast %0 : $Optional<B> to $Optional<AAA>
+  %tuple = tuple (%cast : $Optional<AAA>, %1 : $E)
+  %2 = function_ref @rethrowOwned : $@convention(thin) (@owned (Optional<B>, B)) -> Int
+  %3 = convert_function %2 : $@convention(thin) (@owned (Optional<B>, B)) -> Int to $@convention(thin) (@owned (Optional<AAA>, E)) -> (Int, @error Error)
+  try_apply %3(%tuple) : $@convention(thin) (@owned (Optional<AAA>, E)) -> (Int, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Int):
+  return %5 : $Int
+
+bb2(%8 : @owned $Error):
+  unreachable
+}
+

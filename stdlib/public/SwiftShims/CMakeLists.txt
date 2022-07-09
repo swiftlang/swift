@@ -19,34 +19,10 @@ set(sources
   System.h
   Target.h
   ThreadLocalStorage.h
-  UnicodeShims.h
+  UnicodeData.h
   Visibility.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
-
-  DispatchOverlayShims.h
-  ObjectiveCOverlayShims.h
-  XCTestOverlayShims.h
-
-  CoreFoundationOverlayShims.h
-  CFCharacterSetShims.h
-  CFHashingShims.h
-
-  FoundationOverlayShims.h
-  FoundationShimSupport.h
-  NSCalendarShims.h
-  NSCharacterSetShims.h
-  NSCoderShims.h
-  NSDataShims.h
-  NSDictionaryShims.h
-  NSErrorShims.h
-  NSFileManagerShims.h
-  NSIndexPathShims.h
-  NSIndexSetShims.h
-  NSKeyedArchiverShims.h
-  NSLocaleShims.h
-  NSTimeZoneShims.h
-  NSUndoManagerShims.h
 
   module.modulemap
   )
@@ -90,7 +66,7 @@ endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
 
-add_custom_target("copy_shim_headers"
+add_custom_target("copy_shim_headers" ALL
     DEPENDS "${outputs}"
     COMMENT "Copying SwiftShims module to ${output_dir}")
 
@@ -176,6 +152,30 @@ if(NOT SWIFT_BUILT_STANDALONE)
   endforeach()
 endif()
 
+if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
+  foreach(bootstrapping "0" "1")
+    get_bootstrapping_path(outdir ${SWIFTLIB_DIR} ${bootstrapping})
+    set(target_name "symlink-headers-bootstrapping${bootstrapping}")
+
+    add_custom_command_target(unused_var
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" "${outdir}"
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" ${cmake_symlink_option}
+          ${output_dir} "${outdir}/shims"
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+          "${clang_headers_location}"
+          "${outdir}/clang"
+
+        CUSTOM_TARGET_NAME ${target_name}
+        OUTPUT "${outdir}/shims" "${outdir}/clang"
+        COMMENT "Symlinking headers for bootstrapping0")
+
+    add_dependencies(${target_name} copy_shim_headers)
+  endforeach()
+endif()
+
 swift_install_in_component(FILES ${sources}
                            DESTINATION "lib/swift/shims"
                            COMPONENT stdlib)
@@ -200,16 +200,26 @@ if(SWIFT_BUILD_STATIC_STDLIB)
                              PATTERN "*.h")
 endif()
 
+if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
+  # This will still link against the Swift-forked clang headers if the Swift
+  # toolchain was built with SWIFT_INCLUDE_TOOLS.
+  set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default ${clang_headers_location})
+else()
+  set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default "../clang/${CLANG_VERSION}")
+endif()
+
+set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET
+  ${SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default} CACHE STRING "The target of the installed symlink at lib/swift/clang")
 
 swift_install_symlink_component(clang-resource-dir-symlink
   LINK_NAME clang
-  TARGET ../clang/${CLANG_VERSION}
+  TARGET ${SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET}
   DESTINATION "lib/swift")
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   swift_install_symlink_component(clang-resource-dir-symlink
     LINK_NAME clang
-    TARGET ../clang/${CLANG_VERSION}
+    TARGET ${SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET}
     DESTINATION "lib/swift_static")
 endif()
 

@@ -27,7 +27,7 @@ class CMark(cmake_product.CMakeProduct):
     def is_before_build_script_impl_product(cls):
         """is_before_build_script_impl_product -> bool
 
-        Whether this product is build before any build-script-impl products.
+        Whether this product is built before any build-script-impl products.
         """
         return True
 
@@ -52,18 +52,22 @@ class CMark(cmake_product.CMakeProduct):
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
                                   self.args.cmark_build_variant)
 
+        self.cmake_options.define('CMARK_THREADING', 'ON')
+
         (platform, arch) = host_target.split('-')
+
+        common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
+        self.cmake_options.define('CMAKE_C_FLAGS', common_c_flags)
+        self.cmake_options.define('CMAKE_CXX_FLAGS', common_c_flags)
 
         if host_target.startswith("macosx") or \
            host_target.startswith("iphone") or \
            host_target.startswith("appletv") or \
            host_target.startswith("watch"):
-
-            common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
-
-            self.cmake_options.define('CMAKE_C_FLAGS', common_c_flags)
-            self.cmake_options.define('CMAKE_CXX_FLAGS', common_c_flags)
             toolchain_file = self.generate_darwin_toolchain_file(platform, arch)
+            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+        elif platform == "linux":
+            toolchain_file = self.generate_linux_toolchain_file(platform, arch)
             self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
 
         self.build_with_cmake(["all"], self.args.cmark_build_variant, [])

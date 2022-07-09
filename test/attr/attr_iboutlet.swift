@@ -4,7 +4,7 @@
 import Foundation
 
 // expected-error@+1 {{@IBOutlet property cannot have non-object type 'Int'}}
-@IBOutlet // expected-error {{only instance properties can be declared @IBOutlet}} {{1-11=}}
+@IBOutlet // expected-error {{only class instance properties can be declared @IBOutlet}} {{1-11=}}
 var iboutlet_global: Int?
 
 @IBOutlet // expected-error {{@IBOutlet may only be used on 'var' declarations}} {{1-11=}}
@@ -22,7 +22,7 @@ class IBOutletWrapperTy {
 
   @IBOutlet
   class var staticValue: IBOutletWrapperTy? = 52  // expected-error {{cannot convert value of type 'Int' to specified type 'IBOutletWrapperTy?'}}
-  // expected-error@-2 {{only instance properties can be declared @IBOutlet}} {{3-12=}}
+  // expected-error@-2 {{only class instance properties can be declared @IBOutlet}} {{3-12=}}
   // expected-error@-2 {{class stored properties not supported}}
 
   @IBOutlet // expected-error {{@IBOutlet may only be used on 'var' declarations}} {{3-13=}}

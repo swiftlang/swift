@@ -368,7 +368,7 @@ private:
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
   /// file being integrated. \p preexistingNodeInPlace holds the node
   /// representing the same Decl that already exists, if there is one. \p
-  /// prexisintExpat holds a node with the same key that already exists, but was
+  /// preexistingExpat holds a node with the same key that already exists, but was
   /// not known to reside in any swiftDeps file. Return a bool indicating if
   /// this node represents a change that must be propagated, and the integrated
   /// ModuleDepGraphNode.
@@ -448,7 +448,7 @@ public:
       std::vector<ModuleDepGraphNode *> &foundDependents,
       ModuleDepGraphNode *definition);
 
-  /// Givien a set of nodes, return the set of swiftDeps for the jobs those
+  /// Given a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
   std::vector<std::string>
   computeSwiftDepsFromNodes(ArrayRef<const ModuleDepGraphNode *> nodes) const;

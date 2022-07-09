@@ -33,8 +33,10 @@ CallerAnalysis::FunctionInfo::FunctionInfo(SILFunction *f)
     : callerStates(),
       // TODO: Make this more aggressive by considering
       // final/visibility/etc.
-      mayHaveIndirectCallers(f->getDynamicallyReplacedFunction() ||
-                             canBeCalledIndirectly(f->getRepresentation())),
+      mayHaveIndirectCallers(
+          f->getDynamicallyReplacedFunction() ||
+          f->getReferencedAdHocRequirementWitnessFunction() ||
+          canBeCalledIndirectly(f->getRepresentation())),
       mayHaveExternalCallers(f->isPossiblyUsedExternally() ||
                              f->isAvailableExternally()) {}
 
@@ -447,7 +449,7 @@ void CallerAnalysis::dump() const { print(llvm::errs()); }
 void CallerAnalysis::print(const char *filePath) const {
   using namespace llvm::sys;
   std::error_code error;
-  llvm::raw_fd_ostream fileOutputStream(filePath, error, fs::F_Text);
+  llvm::raw_fd_ostream fileOutputStream(filePath, error, fs::OF_Text);
   if (error) {
     llvm::errs() << "Failed to open path \"" << filePath << "\" for writing.!";
     llvm_unreachable("default error handler");

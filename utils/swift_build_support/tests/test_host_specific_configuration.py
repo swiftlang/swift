@@ -101,6 +101,17 @@ class ToolchainTestCase(unittest.TestCase):
 
         self.assertEqual(len(hsc.swift_stdlib_build_targets), 0)
 
+    def test_should_not_build_stdlib_when_targets_are_empty(self):
+        args = self.default_args()
+        args.host_target = 'macosx-x86_64'
+        args.stdlib_deployment_targets = []
+
+        hsc = HostSpecificConfiguration('macosx-arm64', args)
+
+        self.assertEqual(len(hsc.sdks_to_configure), 0)
+
+        self.assertEqual(len(hsc.swift_stdlib_build_targets), 0)
+
     def generate_should_skip_building_platform(
             host_target, sdk_name, build_target, build_arg_name):
         def test(self):

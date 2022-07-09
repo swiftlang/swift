@@ -12,7 +12,7 @@
 
 import Swift
 
-/// A type that that asychronously supplies the values of a sequence one at a
+/// A type that asynchronously supplies the values of a sequence one at a
 /// time.
 ///
 /// The `AsyncIteratorProtocol` defines the type returned by the
@@ -26,18 +26,19 @@ import Swift
 /// conforms to `AsyncIteratorProtocol`. The following example shows a `Counter`
 /// type that uses an inner iterator to monotonically generate `Int` values
 /// until reaching a `howHigh` value. While this example isn't itself
-/// asychronous, it shows the shape of a custom sequence and iterator, and how
+/// asynchronous, it shows the shape of a custom sequence and iterator, and how
 /// to use it as if it were asynchronous:
 ///
-///     struct Counter : AsyncSequence {
+///     struct Counter: AsyncSequence {
 ///         typealias Element = Int
 ///         let howHigh: Int
 ///
-///         struct AsyncIterator : AsyncIteratorProtocol {
+///         struct AsyncIterator: AsyncIteratorProtocol {
 ///             let howHigh: Int
 ///             var current = 1
+///
 ///             mutating func next() async -> Int? {
-///                 // A genuinely asychronous implementation uses the `Task`
+///                 // A genuinely asynchronous implementation uses the `Task`
 ///                 // API to check for cancellation here and return early.
 ///                 guard current <= howHigh else {
 ///                     return nil
@@ -59,7 +60,7 @@ import Swift
 ///     for await i in Counter(howHigh: 10) {
 ///       print(i, terminator: " ")
 ///     }
-///     // Prints: 1 2 3 4 5 6 7 8 9 10
+///     // Prints "1 2 3 4 5 6 7 8 9 10"
 ///
 /// ### End of Iteration
 ///
@@ -84,7 +85,7 @@ import Swift
 /// If the iterator needs to clean up on cancellation, it can do so after
 /// checking for cancellation as described above, or in `deinit` if it's
 /// a reference type.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @rethrows
 public protocol AsyncIteratorProtocol {
   associatedtype Element

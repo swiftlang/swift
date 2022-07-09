@@ -1,23 +1,23 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input always
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
 /// Tests that only the specific group we cancelAll on is cancelled,
 /// and not accidentally all tasks in all groups within the given parent task.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_cancelAll_onlySpecificGroup() async {
   async let g1: Int = withTaskGroup(of: Int.self) { group in
 
@@ -79,7 +79,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
 
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancelAll_onlySpecificGroup()

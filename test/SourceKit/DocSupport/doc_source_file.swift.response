@@ -1960,7 +1960,7 @@
     key.kind: source.lang.swift.decl.extension.class,
     key.offset: 649,
     key.length: 112,
-    key.fully_annotated_decl: "<decl.extension.class>extension <decl.name><ref.class usr=\"s:4main2CCC\">CC</ref.class></decl.name> : <ref.protocol usr=\"s:4main4ProtP\">Prot</ref.protocol></decl.extension.class>",
+    key.fully_annotated_decl: "<decl.extension.class><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.class usr=\"s:4main2CCC\">CC</ref.class></decl.name> : <ref.protocol usr=\"s:4main4ProtP\">Prot</ref.protocol></decl.extension.class>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,

@@ -57,13 +57,13 @@ import ctypes
 @_private(sourceFile: "AppKit.swift") import AppKit
 
 // CLANG_CTYPES: Begin completions
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem/keyword[Foo1, Struct1]:    FooStruct1[#FooStruct1#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem/keyword[Foo2]:    FooStruct2[#FooStruct2#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem/recommended[Foo2, Foo1]: FooStruct3[#FooStruct3#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem/recommendedover[Foo3, Foo2]: FooStruct4[#FooStruct4#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem:    FooStruct1[#FooStruct1#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem:    FooStruct2[#FooStruct2#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem: FooStruct3[#FooStruct3#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem: FooStruct4[#FooStruct4#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem:    FooStruct5[#FooStruct5#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem/recommendedover[ro1, ro2, ro3, ro4]/recommended[r1, r2, r3]/keyword[k1, k2, k3, k4]:    FooStruct6[#FooStruct6#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]/IsSystem/keyword[Foo2]: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem:    FooStruct6[#FooStruct6#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]/IsSystem: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
 // CLANG_CTYPES: End completions
 
 // CLANG_MACROS: Begin completions

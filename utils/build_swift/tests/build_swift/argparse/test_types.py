@@ -7,8 +7,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from __future__ import absolute_import, unicode_literals
-
 import os.path
 import platform
 import unittest
@@ -157,10 +155,15 @@ class TestClangVersionType(unittest.TestCase):
         self.assertIsInstance(version, types.Version)
         self.assertEqual(version.components, (1, 0, 0, 1))
 
+        version = clang_version_type('1.0.0.1.2')
+        self.assertIsInstance(version, types.Version)
+        self.assertEqual(version.components, (1, 0, 0, 1, 2))
+
         clang_version_type('1.0.0')
         clang_version_type('3.0.2.1')
         clang_version_type('200.0.56.3')
         clang_version_type('100000.0.0.1')
+        clang_version_type('5.6.0.994.2')
 
     def test_invalid_clang_version(self):
         clang_version_type = types.ClangVersionType()
@@ -170,9 +173,9 @@ class TestClangVersionType(unittest.TestCase):
         with self.assertRaises(ArgumentTypeError):
             clang_version_type('3.0')
         with self.assertRaises(ArgumentTypeError):
-            clang_version_type('1.8.0.2.1')
+            clang_version_type('1.8.0.2.1.3')
         with self.assertRaises(ArgumentTypeError):
-            clang_version_type('100.0.56.1.1')
+            clang_version_type('100.0.56.1.1.1')
 
 
 class TestSwiftVersionType(unittest.TestCase):

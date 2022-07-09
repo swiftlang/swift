@@ -72,18 +72,18 @@ public struct IndexingIterator<Elements: Collection> {
   @usableFromInline
   internal var _position: Elements.Index
 
+  /// Creates an iterator over the given collection.
   @inlinable
   @inline(__always)
-  /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements) {
     self._elements = _elements
     self._position = _elements.startIndex
   }
 
+  /// Creates an iterator over the given collection.
   @inlinable
   @inline(__always)
-  /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements, _position: Elements.Index) {
     self._elements = _elements
@@ -335,7 +335,7 @@ extension IndexingIterator: Sendable
 /// or bidirectional collection must traverse the entire collection to count
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
-public protocol Collection: Sequence {
+public protocol Collection<Element>: Sequence {
   // FIXME: ideally this would be in MigrationSupport.swift, but it needs
   // to be on the protocol instead of as an extension
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
@@ -343,6 +343,12 @@ public protocol Collection: Sequence {
 
   // FIXME: Associated type inference requires this.
   override associatedtype Element
+
+  // FIXME: <rdar://problem/34142121>
+  // This typealias should be removed as it predates the source compatibility
+  // guarantees of Swift 3, but it cannot due to a bug.
+  @available(swift, deprecated: 3.2, obsoleted: 5.0, renamed: "Element")
+  typealias _Element = Element
 
   /// A type that represents a position in the collection.
   ///
@@ -387,12 +393,11 @@ public protocol Collection: Sequence {
   /// Returns an iterator over the elements of the collection.
   override __consuming func makeIterator() -> Iterator
 
-  /// A sequence that represents a contiguous subrange of the collection's
-  /// elements.
+  /// A collection representing a contiguous subrange of this collection's
+  /// elements. The subsequence shares indices with the original collection.
   ///
-  /// This associated type appears as a requirement in the `Sequence`
-  /// protocol, but it is restated here with stricter constraints. In a
-  /// collection, the subsequence should also conform to `Collection`.
+  /// The default subsequence type for collections that don't define their own
+  /// is `Slice`.
   associatedtype SubSequence: Collection = Slice<Self>
   where SubSequence.Index == Index,
         Element == SubSequence.Element,
@@ -707,39 +712,25 @@ extension Collection {
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
-      bounds.lowerBound <= index,
-      "Out of bounds: index < startIndex")
-    _precondition(
-      index < bounds.upperBound,
-      "Out of bounds: index >= endIndex")
+      bounds.lowerBound <= index && index < bounds.upperBound,
+      "Index out of bounds")
   }
 
   @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
-      bounds.lowerBound <= index,
-      "Out of bounds: index < startIndex")
-    _precondition(
-      index <= bounds.upperBound,
-      "Out of bounds: index > endIndex")
+      bounds.lowerBound <= index && index <= bounds.upperBound,
+      "Index out of bounds")
   }
 
   @inlinable
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
-      bounds.lowerBound <= range.lowerBound,
-      "Out of bounds: range begins before startIndex")
-    _precondition(
-      range.lowerBound <= bounds.upperBound,
-      "Out of bounds: range ends after endIndex")
-    _precondition(
-      bounds.lowerBound <= range.upperBound,
-      "Out of bounds: range ends before bounds.lowerBound")
-    _precondition(
+      bounds.lowerBound <= range.lowerBound &&
       range.upperBound <= bounds.upperBound,
-      "Out of bounds: range begins after bounds.upperBound")
+      "Range out of bounds")
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -1459,7 +1450,8 @@ extension Collection {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position `end`. 
+  /// The resulting subsequence *includes* the element at the position
+  /// specified by the `through` parameter.
   /// The following example searches for the index of the number `40` in an
   /// array of integers, and then prints the prefix of the array up to, and
   /// including, that index:
@@ -1479,10 +1471,10 @@ extension Collection {
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
   ///
-  /// - Parameter end: The index of the last element to include in the
-  ///   resulting subsequence. `end` must be a valid index of the collection
+  /// - Parameter position: The index of the last element to include in the
+  ///   resulting subsequence. `position` must be a valid index of the collection
   ///   that is not equal to the `endIndex` property.
-  /// - Returns: A subsequence up to, and including, the `end` position.
+  /// - Returns: A subsequence up to, and including, the given position.
   ///
   /// - Complexity: O(1)
   @inlinable

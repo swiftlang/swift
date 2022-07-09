@@ -74,7 +74,7 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
 
   unsigned bufferID = *sf->getBufferID();
 
-  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
+  // Lexer diagnostics have been emitted during skipping, so we disable lexer's
   // diagnostic engine here.
   Parser parser(bufferID, *sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
   // Disable libSyntax creation in the delayed parsing.
@@ -87,20 +87,21 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
       ctx.AllocateCopy(llvm::makeArrayRef(fingerprintAndMembers.members))};
 }
 
-BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *afd) const {
+BodyAndFingerprint
+ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
+                                           AbstractFunctionDecl *afd) const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
 
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
-    return nullptr;
+    return {};
 
   case BodyKind::TypeChecked:
   case BodyKind::Parsed:
-    return afd->Body;
+    return afd->BodyAndFP;
 
   case BodyKind::Synthesize: {
     BraceStmt *body;
@@ -110,19 +111,20 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
         afd, afd->Synthesizer.Context);
     assert(body && "cannot synthesize a null body");
     afd->setBodyKind(isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
-    return body;
+    return {body, Fingerprint::ZERO()};
   }
 
   case BodyKind::Unparsed: {
     // FIXME: How do we configure code completion?
     SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
     SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
-    unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
+    unsigned bufferID =
+        sourceMgr.findBufferContainingLoc(afd->getBodySourceRange().Start);
     Parser parser(bufferID, sf, /*SIL*/ nullptr);
     parser.SyntaxContext->disable();
-    auto body = parser.parseAbstractFunctionBodyDelayed(afd);
+    auto result = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
-    return body;
+    return result;
   }
   }
   llvm_unreachable("Unhandled BodyKind in switch");

@@ -297,16 +297,16 @@ enum class ExclusiveOrShared_t : unsigned {
 
 
 /// Tracks the in-progress accesses on per-storage-location basis.
-using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
+using StorageMap = llvm::SmallDenseMap<AccessStorage, AccessInfo, 4>;
 
 /// Represents two accesses that conflict and their underlying storage.
 struct ConflictingAccess {
   /// Create a conflict for two begin_access instructions in the same function.
-  ConflictingAccess(const AccessedStorage &Storage, const RecordedAccess &First,
+  ConflictingAccess(const AccessStorage &Storage, const RecordedAccess &First,
                     const RecordedAccess &Second)
       : Storage(Storage), FirstAccess(First), SecondAccess(Second) {}
 
-  const AccessedStorage Storage;
+  const AccessStorage Storage;
   const RecordedAccess FirstAccess;
   const RecordedAccess SecondAccess;
 };
@@ -401,9 +401,9 @@ canReplaceWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
 
     assert(isCallToStandardLibrarySwap(CE, Ctx));
     // swap() takes two arguments.
-    auto *ArgTuple = cast<TupleExpr>(CE->getArg());
-    const Expr *Arg1 = ArgTuple->getElement(0);
-    const Expr *Arg2 = ArgTuple->getElement(1);
+    auto *Args = CE->getArgs();
+    const Expr *Arg1 = Args->getExpr(0);
+    const Expr *Arg2 = Args->getExpr(1);
     if ((Arg1 == InOut1 && Arg2 == InOut2)) {
         FoundCall = CE;
       break;
@@ -463,17 +463,14 @@ canReplaceWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
   if (Base1Text != Base2Text)
     return false;
 
-  auto *Index1Paren = dyn_cast<ParenExpr>(SE1->getIndex());
-  if (!Index1Paren)
+  if (!SE1->getArgs()->isUnlabeledUnary() ||
+      !SE2->getArgs()->isUnlabeledUnary()) {
     return false;
-
-  auto *Index2Paren = dyn_cast<ParenExpr>(SE2->getIndex());
-  if (!Index2Paren)
-    return false;
+  }
 
   Base = SE1->getBase();
-  Index1 = Index1Paren->getSubExpr();
-  Index2 = Index2Paren->getSubExpr();
+  Index1 = SE1->getArgs()->getExpr(0);
+  Index2 = SE2->getArgs()->getExpr(0);
   return true;
 }
 
@@ -519,7 +516,7 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
                                          ArrayRef<ApplyInst *> CallsToSwap,
                                          ASTContext &Ctx) {
 
-  const AccessedStorage &Storage = Violation.Storage;
+  const AccessStorage &Storage = Violation.Storage;
   const RecordedAccess &FirstAccess = Violation.FirstAccess;
   const RecordedAccess &SecondAccess = Violation.SecondAccess;
   SILFunction *F = FirstAccess.getInstruction()->getFunction();
@@ -632,7 +629,7 @@ shouldReportAccess(const AccessInfo &Info,swift::SILAccessKind Kind,
 /// conflict.
 static Optional<ConflictingAccess>
 findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
-                              const AccessedStorage &AccessedStorage,
+                              const AccessStorage &AccessStorage,
                               const AccessInfo &InProgressInfo) {
   Optional<RecordedAccess> BestInProgressAccess;
   Optional<RecordedAccess> BestArgAccess;
@@ -658,7 +655,7 @@ findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
   if (!BestArgAccess)
     return None;
 
-  return ConflictingAccess(AccessedStorage, *BestInProgressAccess,
+  return ConflictingAccess(AccessStorage, *BestInProgressAccess,
                            *BestArgAccess);
 }
 
@@ -709,9 +706,9 @@ checkAccessSummary(ApplySite Apply, AccessState &State,
     SILValue Argument = Apply.getArgument(ArgumentIndex);
     assert(Argument->getType().isAddress());
 
-    // A valid AccessedStorage should always be found because Unsafe accesses
+    // A valid AccessStorage should always be found because Unsafe accesses
     // are not tracked by AccessSummaryAnalysis.
-    auto Storage = AccessedStorage::computeInScope(Argument);
+    auto Storage = AccessStorage::computeInScope(Argument);
     assert(Storage && "captured address must have valid storage");
     auto AccessIt = State.Accesses->find(Storage);
 
@@ -744,9 +741,9 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
     if (convention != SILArgumentConvention::Indirect_InoutAliasable)
       continue;
 
-    // A valid AccessedStorage should always be found because Unsafe accesses
+    // A valid AccessStorage should always be found because Unsafe accesses
     // are not tracked by AccessSummaryAnalysis.
-    auto Storage = AccessedStorage::computeInScope(argOper.get());
+    auto Storage = AccessStorage::computeInScope(argOper.get());
     assert(Storage && "captured address must have valid storage");
 
     // Are there any accesses in progress at the time of the call?
@@ -837,7 +834,7 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
       return;
 
     SILAccessKind Kind = BAI->getAccessKind();
-    const AccessedStorage &Storage = identifyFormalAccess(BAI);
+    const AccessStorage &Storage = identifyFormalAccess(BAI);
     assert(Storage && "unidentified formal access");
     // Storage may be associated with a nested access where the outer access is
     // "unsafe". That's ok because the outer access can itself be treated like a
@@ -858,7 +855,7 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
     if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
       return;
 
-    const AccessedStorage &Storage = identifyFormalAccess(BAI);
+    const AccessStorage &Storage = identifyFormalAccess(BAI);
     assert(Storage && "unidentified formal access");
     auto It = State.Accesses->find(identifyFormalAccess(BAI));
     AccessInfo &Info = It->getSecond();
@@ -983,7 +980,7 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
     if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
       return;
 
-    const AccessedStorage &Storage = identifyFormalAccess(BAI);
+    const AccessStorage &Storage = identifyFormalAccess(BAI);
     assert(Storage && "unidentified formal access");
     AccessInfo &Info = Accesses[Storage];
     if (Info.hasAccessesInProgress())
@@ -1019,30 +1016,30 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
       return;
   }
 
-  auto storage = AccessedStorage::compute(accessBegin);
-  // AccessedStorage::compute may return an invalid storage object if the
+  auto storage = AccessStorage::compute(accessBegin);
+  // AccessStorage::compute may return an invalid storage object if the
   // address producer is not recognized by its allowlist. For the purpose of
   // verification, we assume that this can only happen for local initialization,
   // not a formal memory access. The strength of verification rests on the
-  // completeness of the opcode list inside AccessedStorage::compute.
+  // completeness of the opcode list inside AccessStorage::compute.
   //
   // For the purpose of verification, an unidentified access is
   // unenforced. These occur in cases like global addressors and local buffers
   // that make use of RawPointers.
-  if (!storage || storage.getKind() == AccessedStorage::Unidentified)
+  if (!storage || storage.getKind() == AccessStorage::Unidentified)
     return;
 
   // Some identifiable addresses can also be recognized as local initialization
   // or other patterns that don't qualify as formal access.
-  if (!isPossibleFormalAccessBase(storage, memInst->getFunction()))
+  if (!isPossibleFormalAccessStorage(storage, memInst->getFunction()))
     return;
 
   // A box or stack variable may represent lvalues, but they can only conflict
   // with call sites in the same scope. Some initialization patters (stores to
   // the local value) aren't protected by markers, so we need this check.
   if (!isa<ApplySite>(memInst)
-      && (storage.getKind() == AccessedStorage::Box
-          || storage.getKind() == AccessedStorage::Stack)) {
+      && (storage.getKind() == AccessStorage::Box
+          || storage.getKind() == AccessStorage::Stack)) {
     return;
   }
 

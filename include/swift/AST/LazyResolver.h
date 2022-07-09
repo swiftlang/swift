@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_LAZYRESOLVER_H
 #define SWIFT_AST_LAZYRESOLVER_H
 
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
@@ -32,6 +31,7 @@ class NominalTypeDecl;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
+class ProtocolTypeAlias;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
@@ -60,9 +60,12 @@ public:
 /// Context data for protocols.
 class LazyProtocolData : public LazyIterableDeclContextData {
 public:
-  /// The context data used for loading all of the members of the iterable
-  /// context.
+  /// The context data used for loading a requirement signature.
   uint64_t requirementSignatureData = 0;
+  /// The context data used for loading the list of associated types.
+  uint64_t associatedTypesData = 0;
+  /// The context data used for loading the list of primary associated types.
+  uint64_t primaryAssociatedTypesData = 0;
 };
 
 /// A class that can lazily load members from a serialized format.
@@ -98,7 +101,18 @@ public:
   /// Loads the requirement signature for a protocol.
   virtual void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
-                           SmallVectorImpl<Requirement> &requirements) = 0;
+                           SmallVectorImpl<Requirement> &requirements,
+                           SmallVectorImpl<ProtocolTypeAlias> &typeAliases) = 0;
+
+  /// Loads the associated types of a protocol.
+  virtual void
+  loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
+                      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
+
+  /// Loads the primary associated types of a protocol.
+  virtual void
+  loadPrimaryAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
+                             SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
 
   /// Returns the replaced decl for a given @_dynamicReplacement(for:) attribute.
   virtual ValueDecl *

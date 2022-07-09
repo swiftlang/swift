@@ -20,6 +20,10 @@
 #include "swift/Runtime/Config.h"
 #include <assert.h>
 #include <atomic>
+#include <cstdlib>
+#if defined(_WIN64)
+#include <intrin.h>
+#endif
 
 // FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
 // a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
@@ -40,21 +44,25 @@
 
 namespace swift {
 namespace impl {
-
 /// The default implementation for swift::atomic<T>, which just wraps
 /// std::atomic with minor differences.
 ///
 /// TODO: should we make this use non-atomic operations when the runtime
 /// is single-threaded?
-template <class Value, size_t Size = sizeof(Value)>
+template <class Value, std::size_t Size = sizeof(Value)>
 class alignas(Size) atomic_impl {
   std::atomic<Value> value;
 public:
   constexpr atomic_impl(Value value) : value(value) {}
 
   /// Force clients to always pass an order.
-  Value load(std::memory_order order) {
+  Value load(std::memory_order order) const {
     return value.load(order);
+  }
+
+  /// Force clients to always pass an order.
+  void store(Value newValue, std::memory_order order) {
+    return value.store(newValue, order);
   }
 
   /// Force clients to always pass an order.
@@ -64,10 +72,16 @@ public:
     return value.compare_exchange_weak(oldValue, newValue, successOrder,
                                        failureOrder);
   }
+
+  bool compare_exchange_strong(Value &oldValue, Value newValue,
+                               std::memory_order successOrder,
+                               std::memory_order failureOrder) {
+    return value.compare_exchange_strong(oldValue, newValue, successOrder,
+                                         failureOrder);
+  }
 };
 
 #if defined(_WIN64)
-#include <intrin.h>
 
 /// MSVC's std::atomic uses an inline spin lock for 16-byte atomics,
 /// which is not only unnecessarily inefficient but also doubles the size
@@ -75,14 +89,14 @@ public:
 /// AMD processors that lack cmpxchg16b, so we just use the intrinsic.
 template <class Value>
 class alignas(2 * sizeof(void*)) atomic_impl<Value, 2 * sizeof(void*)> {
-  volatile Value atomicValue;
+  mutable volatile Value atomicValue;
 public:
   constexpr atomic_impl(Value initialValue) : atomicValue(initialValue) {}
 
   atomic_impl(const atomic_impl &) = delete;
   atomic_impl &operator=(const atomic_impl &) = delete;
 
-  Value load(std::memory_order order) {
+  Value load(std::memory_order order) const {
     assert(order == std::memory_order_relaxed ||
            order == std::memory_order_acquire ||
            order == std::memory_order_consume);
@@ -107,14 +121,28 @@ public:
     return reinterpret_cast<Value &>(resultArray);
   }
 
+  void store(Value newValue, std::memory_order order) {
+    assert(order == std::memory_order_relaxed ||
+           order == std::memory_order_release);
+    Value oldValue = load(std::memory_order_relaxed);
+    while (!compare_exchange_weak(oldValue, newValue,
+                                  /*success*/ order,
+                                  /*failure*/ std::memory_order_relaxed)) {
+      // try again
+    }
+  }
+
   bool compare_exchange_weak(Value &oldValue, Value newValue,
                              std::memory_order successOrder,
                              std::memory_order failureOrder) {
-    assert(failureOrder == std::memory_order_relaxed ||
-           failureOrder == std::memory_order_acquire ||
-           failureOrder == std::memory_order_consume);
-    assert(successOrder == std::memory_order_relaxed ||
-           successOrder == std::memory_order_release);
+    // We do not have weak CAS intrinsics, fallback to strong
+    return compare_exchange_strong(oldValue, newValue, successOrder,
+                                   failureOrder);
+  }
+
+  bool compare_exchange_strong(Value &oldValue, Value newValue,
+                               std::memory_order successOrder,
+                               std::memory_order failureOrder) {
 #if SWIFT_HAS_MSVC_ARM_ATOMICS
     if (successOrder == std::memory_order_relaxed &&
         failureOrder != std::memory_order_acquire) {
@@ -153,7 +181,7 @@ public:
 } // end namespace swift::impl
 
 /// A simple wrapper for std::atomic that provides the most important
-/// interfaces and fixes the API bug where all of the orderings dafault
+/// interfaces and fixes the API bug where all of the orderings default
 /// to sequentially-consistent.
 ///
 /// It also sometimes uses a different implementation in cases where
@@ -162,7 +190,7 @@ public:
 template <class T>
 class atomic : public impl::atomic_impl<T> {
 public:
-  atomic(T value) : impl::atomic_impl<T>(value) {}
+  constexpr atomic(T value) : impl::atomic_impl<T>(value) {}
 };
 
 } // end namespace swift

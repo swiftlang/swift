@@ -8,12 +8,13 @@
 //
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Inherited)) -emit-module-path %t/Inherited.swiftmodule -emit-module-interface-path %t/Inherited.swiftinterface -module-name Inherited %s
 // RUN: rm %t/Inherited.swiftmodule
+// RUN: %target-swift-typecheck-module-from-interface(%t/Inherited.swiftinterface)
 
 // 2) Check the interface includes the synthesized initializers of the base
 //    class in the derived class explicitly and uses the '= super' syntax to
 //    inherit its default arguments.
 //
-// RUN: cat %t/Inherited.swiftinterface | %FileCheck --check-prefix=INTERFACE %s
+// RUN: %FileCheck --check-prefix=INTERFACE %s < %t/Inherited.swiftinterface
 //
 // INTERFACE: public class Base {
 // INTERFACE:   public init(x: Swift.Int = 45, y: Swift.Int = 98)

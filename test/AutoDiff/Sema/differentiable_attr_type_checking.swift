@@ -93,7 +93,7 @@ func invalidDiffWrtClass(_ x: Class) -> Class {
 }
 
 protocol Proto {}
-// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Proto' does not conform to 'Differentiable'}}
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'any Proto' does not conform to 'Differentiable'}}
 @differentiable(reverse, wrt: x)
 func invalidDiffWrtExistential(_ x: Proto) -> Proto {
   return x
@@ -191,6 +191,7 @@ func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
+// expected-error @+1 {{'@differentiable' attribute does not yet support layout requirements}}
 @differentiable(reverse where T: AnyObject)
 func invalidAnyObjectRequirement<T: Differentiable>(x: T) -> T {
   return x
@@ -400,6 +401,16 @@ let _: @differentiable(reverse) (Float, Float) -> TF_521<Float> = { r, i in
   TF_521(real: r, imaginary: i)
 }
 
+// expected-error @+1 {{result type 'TF_521<Float>' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
+let _: @differentiable(reverse) (_, _) -> TF_521<Float> = { (r: Float, i: Float) in
+  TF_521(real: r, imaginary: i)
+}
+
+// expected-error @+1 {{result type 'TF_521<Float>' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
+let _: @differentiable(reverse) (Float, Float) -> _ = { r, i in
+  TF_521(real: r, imaginary: i)
+}
+
 // TF-296: Infer `@differentiable` wrt parameters to be to all parameters that conform to `Differentiable`.
 
 @differentiable(reverse)
@@ -554,7 +565,7 @@ public protocol HasRequirement {
 // expected-error @+1 {{type 'AttemptsToSatisfyRequirement' does not conform to protocol 'HasRequirement'}}
 public struct AttemptsToSatisfyRequirement: HasRequirement {
   // This `@differentiable` attribute does not satisfy the requirement because
-  // it is mroe constrained than the requirement's `@differentiable` attribute.
+  // it is more constrained than the requirement's `@differentiable` attribute.
   @differentiable(reverse where T: CustomStringConvertible)
   // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse, wrt: (x, y))' attribute to satisfy requirement}}
   public func requirement<T: Differentiable>(_ x: T, _ y: T) -> T { x }
@@ -716,3 +727,24 @@ struct Accessors: Differentiable {
 // expected-error @+1 {{cannot differentiate functions returning opaque result types}}
 @differentiable(reverse)
 func opaqueResult(_ x: Float) -> some Differentiable { x }
+
+// Test the function tupling conversion with @differentiable.
+func tuplify<Ts, U>(_ fn: @escaping (Ts) -> U) -> (Ts) -> U { fn }
+func tuplifyDifferentiable<Ts : Differentiable, U>(_ fn: @escaping @differentiable(reverse) (Ts) -> U) -> @differentiable(reverse) (Ts) -> U { fn }
+
+func testTupling(withoutNoDerivative: @escaping @differentiable(reverse) (Float, Float) -> Float,
+                 withNoDerivative: @escaping @differentiable(reverse) (Float, @noDerivative Float) -> Float) {
+  // We support tupling of differentiable functions as long as they drop @differentiable.
+  let _: ((Float, Float)) -> Float = tuplify(withoutNoDerivative)
+  let fn1 = tuplify(withoutNoDerivative)
+  _ = fn1((0, 0))
+
+  // In this case we also drop @noDerivative.
+  let _: ((Float, Float)) -> Float = tuplify(withNoDerivative)
+  let fn2 = tuplify(withNoDerivative)
+  _ = fn2((0, 0))
+
+  // We do not support tupling into an @differentiable function.
+  let _ = tuplifyDifferentiable(withoutNoDerivative) // expected-error {{cannot convert value of type '@differentiable(reverse) (Float, Float) -> Float' to expected argument type '@differentiable(reverse) (Float) -> Float'}}
+  let _ = tuplifyDifferentiable(withNoDerivative) // expected-error {{cannot convert value of type '@differentiable(reverse) (Float, @noDerivative Float) -> Float' to expected argument type '@differentiable(reverse) (Float) -> Float'}}
+}

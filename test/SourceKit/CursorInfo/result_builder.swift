@@ -51,6 +51,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // ATTR_NAME-NEXT: source.lang.swift
 // ATTR_NAME-NEXT: TaggedBuilder<Tag>.Type
 // ATTR_NAME-NEXT: $s11BuilderTest06TaggedA0VyxGmD
+// ATTR_NAME-NEXT: BuilderTest{{$}}
 // ATTR_NAME-NEXT: <Declaration>@resultBuilder struct TaggedBuilder&lt;Tag&gt;</Declaration>
 // ATTR_NAME-NEXT: <decl.struct><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@resultBuilder</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>TaggedBuilder</decl.name>&lt;<decl.generic_type_param usr="s:11BuilderTest06TaggedA0V3Tagxmfp"><decl.generic_type_param.name>Tag</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.struct>
 
@@ -62,6 +63,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // ATTR_GENERICARG-NEXT: source.lang.swift
 // ATTR_GENERICARG-NEXT: Color.Type
 // ATTR_GENERICARG-NEXT: $s11BuilderTest5ColorOmD
+// ATTR_GENERICARG-NEXT: BuilderTest{{$}}
 // ATTR_GENERICARG-NEXT: <Declaration>enum Color</Declaration>
 // ATTR_GENERICARG-NEXT: <decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>Color</decl.name></decl.enum>
 
@@ -73,6 +75,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CALL_BUILDERFUNC-NEXT: source.lang.swift
 // CALL_BUILDERFUNC-NEXT: <Result> (body: (Color) -> Result) -> ()
 // CALL_BUILDERFUNC-NEXT: $s4bodyyx11BuilderTest5ColorOXE_tcluD
+// CALL_BUILDERFUNC-NEXT: BuilderTest{{$}}
 // CALL_BUILDERFUNC-NEXT: <Declaration>func acceptColorTagged&lt;Result&gt;(@<Type usr="s:11BuilderTest06TaggedA0V">TaggedBuilder</Type>&lt;<Type usr="s:11BuilderTest5ColorO">Color</Type>&gt; body: (<Type usr="s:11BuilderTest5ColorO">Color</Type>) -&gt; <Type usr="s:11BuilderTest17acceptColorTagged4bodyyxAA0D0OXE_tlF6ResultL_xmfp">Result</Type>)</Declaration>
 // CALL_BUILDERFUNC-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>acceptColorTagged</decl.name>&lt;<decl.generic_type_param usr="s:11BuilderTest17acceptColorTagged4bodyyxAA0D0OXE_tlF6ResultL_xmfp"><decl.generic_type_param.name>Result</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@<ref.struct usr="s:11BuilderTest06TaggedA0V">TaggedBuilder</ref.struct>&lt;<ref.enum usr="s:11BuilderTest5ColorO">Color</ref.enum>&gt;</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <decl.var.parameter.argument_label>body</decl.var.parameter.argument_label>: <decl.var.parameter.type>(<decl.var.parameter><decl.var.parameter.type><ref.enum usr="s:11BuilderTest5ColorO">Color</ref.enum></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr="s:11BuilderTest17acceptColorTagged4bodyyxAA0D0OXE_tlF6ResultL_xmfp">Result</ref.generic_type_param></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
@@ -84,6 +87,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CLOSUREPARAM_DECL-NEXT: source.lang.swift
 // CLOSUREPARAM_DECL-NEXT: Color
 // CLOSUREPARAM_DECL-NEXT: $s11BuilderTest5ColorOD
+// CLOSUREPARAM_DECL-NEXT: BuilderTest{{$}}
 // CLOSUREPARAM_DECL-NEXT: <Declaration>let color: <Type usr="s:11BuilderTest5ColorO">Color</Type></Declaration>
 // CLOSUREPARAM_DECL-NEXT: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>color</decl.var.parameter.name>: <decl.var.parameter.type><ref.enum usr="s:11BuilderTest5ColorO">Color</ref.enum></decl.var.parameter.type></decl.var.parameter>
 
@@ -95,6 +99,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CLOSUREPARAM_USER-NEXT: source.lang.swift
 // CLOSUREPARAM_USER-NEXT: Color
 // CLOSUREPARAM_USER-NEXT: $s11BuilderTest5ColorOD
+// CLOSUREPARAM_USER-NEXT: BuilderTest{{$}}
 // CLOSUREPARAM_USER-NEXT: <Declaration>let color: <Type usr="s:11BuilderTest5ColorO">Color</Type></Declaration>
 // CLOSUREPARAM_USER-NEXT: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>color</decl.var.parameter.name>: <decl.var.parameter.type><ref.enum usr="s:11BuilderTest5ColorO">Color</ref.enum></decl.var.parameter.type></decl.var.parameter>
 
@@ -106,6 +111,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CAPTURED_VALUE-NEXT: source.lang.swift
 // CAPTURED_VALUE-NEXT: Int
 // CAPTURED_VALUE-NEXT: $sSiD
+// CAPTURED_VALUE-NEXT: BuilderTest{{$}}
 // CAPTURED_VALUE-NEXT: <Declaration>let i: <Type usr="s:Si">Int</Type></Declaration>
 // CAPTURED_VALUE-NEXT: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 

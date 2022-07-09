@@ -5,18 +5,20 @@
 
 import TestsUtils
 
-public let LuhnAlgoEager = BenchmarkInfo(
-  name: "LuhnAlgoEager",
-  runFunction: run_LuhnAlgoEager,
-  tags: [.algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "LuhnAlgoEager",
+    runFunction: run_LuhnAlgoEager,
+    tags: [.algorithm]
+  ),
+]
 
 @inline(never)
-public func run_LuhnAlgoEager(_ N: Int) {
+public func run_LuhnAlgoEager(_ n: Int) {
     let resultRef = true
     var result = false
 
-    for _ in 1...100*N {
+    for _ in 1...100*n {
         result = eagerchecksum(ccnum)
 
         if result != resultRef {
@@ -24,7 +26,7 @@ public func run_LuhnAlgoEager(_ N: Int) {
         }
     }
 
-    CheckResults(result == resultRef)
+    check(result == resultRef)
 }
 
 // Another version of the Luhn algorithm, similar to the one found here:
@@ -70,7 +72,7 @@ extension MapSomeSequenceView: Sequence {
 }
 
 // now extend a lazy collection to return that view
-// from a call to mapSome.  In pracice, when doing this,
+// from a call to mapSome.  In practice, when doing this,
 // you should do it for all the lazy wrappers
 // (i.e. random-access, forward and sequence)
 extension LazyCollectionProtocol {

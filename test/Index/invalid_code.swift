@@ -42,8 +42,6 @@ extension Protector where T: RangeReplaceableCollection {
   func append(_ newElement: T.Iterator.Element) {
     undefined { (foo: T) in
     // CHECK: [[@LINE-1]]:18 | param(local)/Swift | foo | {{.*}} | Def,RelChild
-    // CHECK: [[@LINE-2]]:18 | function/acc-get(local)/Swift | getter:foo | {{.*}} | Def,Impl,RelChild,RelAcc
-    // CHECK: [[@LINE-3]]:18 | function/acc-set(local)/Swift | setter:foo | {{.*}} | Def,Impl,RelChild,RelAcc
       _ = newElement
     }
   }

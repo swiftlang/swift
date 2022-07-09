@@ -17,13 +17,14 @@ func testLocalWrapper() {
   @Wrapper var value: Int
   // CHECK: [[A:%.*]] = alloc_box ${ var Wrapper<Int> }, var, name "_value"
   // CHECK: [[W:%.*]] = mark_uninitialized [var] [[A]] : ${ var Wrapper<Int> }
-  // CHECK: [[P:%.*]] = project_box [[W]] : ${ var Wrapper<Int> }
+  // CHECK: [[L:%[^,]+]] = begin_borrow [lexical] [[W]]
+  // CHECK: [[P:%.*]] = project_box [[L]] : ${ var Wrapper<Int> }
 
   value = 10
   // CHECK: [[I:%.*]] = function_ref @$s22property_wrapper_local16testLocalWrapperyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
   // CHECK: [[IPA:%.*]] = partial_apply [callee_guaranteed] [[I]]() : $@convention(thin) (Int) -> Wrapper<Int>
   // CHECK: [[S:%.*]] = function_ref @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
-  // CHECK-NEXT: [[C:%.*]] = copy_value [[W]] : ${ var Wrapper<Int> }
+  // CHECK-NEXT: [[C:%.*]] = copy_value [[L]] : ${ var Wrapper<Int> }
   // CHECK-NOT: mark_function_escape
   // CHECK-NEXT: [[SPA:%.*]] = partial_apply [callee_guaranteed] [[S]]([[C]]) : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
   // CHECK-NEXT: assign_by_wrapper {{%.*}} : $Int to [[P]] : $*Wrapper<Int>, init [[IPA]] : $@callee_guaranteed (Int) -> Wrapper<Int>, set [[SPA]] : $@callee_guaranteed (Int) -> ()
@@ -111,7 +112,7 @@ func testLocalLazy() {
   // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local13testLocalLazyyyF : $@convention(thin) () -> () {
 
   @Lazy var value = "hello!"
-  // CHECK: function_ref @$s22property_wrapper_local13testLocalLazyyyFSSycfu_ : $@convention(thin) () -> @owned String
+  // CHECK: function_ref @$s22property_wrapper_local13testLocalLazyyyFSSycfu_ :
   // CHECK: [[I:%.*]] = function_ref @$s22property_wrapper_local4LazyO12wrappedValueACyxGxyXA_tcfC : $@convention(method) <τ_0_0> (@owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>, @thin Lazy<τ_0_0>.Type) -> @out Lazy<τ_0_0>
   //CHECK: apply [[I]]<String>
 

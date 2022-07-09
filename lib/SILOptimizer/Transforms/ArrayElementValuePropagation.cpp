@@ -214,7 +214,10 @@ bool ArrayAllocation::replaceGetElements() {
     if (ConstantIndex == None)
       continue;
 
-    assert(*ConstantIndex >= 0 && "Must have a positive index");
+    // ElementValueMap keys are unsigned. Avoid implicit signed-unsigned
+    // conversion from an invalid index to a valid index.
+    if (*ConstantIndex < 0)
+      continue;
 
     auto EltValueIt = ElementValueMap.find(*ConstantIndex);
     if (EltValueIt == ElementValueMap.end())
@@ -278,12 +281,14 @@ bool ArrayAllocation::replaceAppendContentOf() {
     return false;
 
   auto Mangled = SILDeclRef(AppendFnDecl, SILDeclRef::Kind::Func).mangle();
-  SILFunction *AppendFn = M.findFunction(Mangled, SILLinkage::PublicExternal);
+  SILFunction *AppendFn = M.loadFunction(Mangled,
+                                         SILModule::LinkingMode::LinkAll);
   if (!AppendFn)
     return false;
 
   Mangled = SILDeclRef(ReserveFnDecl, SILDeclRef::Kind::Func).mangle();
-  SILFunction *ReserveFn = M.findFunction(Mangled, SILLinkage::PublicExternal);
+  SILFunction *ReserveFn = M.loadFunction(Mangled,
+                                          SILModule::LinkingMode::LinkAll);
   if (!ReserveFn)
     return false;
 

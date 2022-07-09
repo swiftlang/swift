@@ -39,6 +39,8 @@
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SNSomeProtocol:
 // CHECK-NEXT:     TU: SNSomeProtocol
+// CHECK-NEXT:   SWIFT_NAME:
+// CHECK-NEXT:     TU: Macro
 // CHECK-NEXT:   SomeClass:
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SomeProtocol:

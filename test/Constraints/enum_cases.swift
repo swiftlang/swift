@@ -171,3 +171,28 @@ struct EnumElementPatternFromContextualType<T> {
     }
   }
 }
+
+// SR-14408
+enum CompassPoint {
+    case North(Int)
+    case South
+    case East
+    case West
+}
+
+func isNorth(c : CompassPoint) -> Bool {
+  // expected-error@+1{{member 'North' expects argument of type 'Int'}}
+  return c == .North // expected-error {{binary operator '==' cannot be applied to two 'CompassPoint' operands}}
+  // expected-note@-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
+}
+
+func isNorth2(c : CompassPoint) -> Bool {
+  // expected-error@+1{{member 'North' expects argument of type 'Int'}}
+  return .North == c // expected-error {{binary operator '==' cannot be applied to two 'CompassPoint' operands}}
+  // expected-note@-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
+}
+
+func isSouth(c : CompassPoint) -> Bool {
+  return c == .South // expected-error {{binary operator '==' cannot be applied to two 'CompassPoint' operands}}
+  // expected-note@-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
+}

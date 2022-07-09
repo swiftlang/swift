@@ -354,11 +354,6 @@ case PatternKind::ID: foundRefutablePattern = true; break;
   return foundRefutablePattern;
 }
 
-/// Standard allocator for Patterns.
-void *Pattern::operator new(size_t numBytes, const ASTContext &C) {
-  return C.Allocate(numBytes, alignof(Pattern));
-}
-
 /// Find the name directly bound by this pattern.  When used as a
 /// tuple element in a function signature, such names become part of
 /// the type.

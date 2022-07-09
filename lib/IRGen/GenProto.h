@@ -197,6 +197,11 @@ namespace irgen {
       /// Metadata is derived from the Self witness table parameter
       /// passed via the WitnessMethod convention.
       SelfWitnessTable,
+
+      /// Metadata is obtained directly from the FixedType indicated. Used with
+      /// Objective-C generics, where the actual argument is erased at runtime
+      /// and its existential bound is used instead.
+      ErasedTypeMetadata,
     };
 
     static bool requiresSourceIndex(Kind kind) {
@@ -205,27 +210,55 @@ namespace irgen {
               kind == Kind::GenericLValueMetadata);
     }
 
+    static bool requiresFixedType(Kind kind) {
+      return (kind == Kind::ErasedTypeMetadata);
+    }
+
     enum : unsigned { InvalidSourceIndex = ~0U };
 
   private:
     /// The kind of source this is.
     Kind TheKind;
 
-    /// The parameter index, for ClassPointer and Metadata sources.
-    unsigned Index;
+    /// For ClassPointer, Metadata, and GenericLValueMetadata, the source index;
+    /// for ErasedTypeMetadata, the type; for others, Index should be set to
+    /// InvalidSourceIndex.
+    union {
+      unsigned Index;
+      CanType FixedType;
+    };
 
   public:
     CanType Type;
 
-    MetadataSource(Kind kind, unsigned index, CanType type)
+    MetadataSource(Kind kind, CanType type)
+      : TheKind(kind), Index(InvalidSourceIndex), Type(type)
+    {
+      assert(!requiresSourceIndex(kind) && !requiresFixedType(kind));
+    }
+
+
+    MetadataSource(Kind kind, CanType type, unsigned index)
       : TheKind(kind), Index(index), Type(type) {
-      assert(index != InvalidSourceIndex || !requiresSourceIndex(kind));
+      assert(requiresSourceIndex(kind));
+      assert(index != InvalidSourceIndex);
+    }
+
+    MetadataSource(Kind kind, CanType type, CanType fixedType)
+      : TheKind(kind), FixedType(fixedType), Type(type) {
+      assert(requiresFixedType(kind));
     }
 
     Kind getKind() const { return TheKind; }
+
     unsigned getParamIndex() const {
       assert(requiresSourceIndex(getKind()));
       return Index;
+    }
+
+    CanType getFixedType() const {
+      assert(requiresFixedType(getKind()));
+      return FixedType;
     }
   };
 

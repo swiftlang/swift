@@ -1,27 +1,27 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_NOMINAL_TOP | %FileCheck %s -check-prefix=POUND_DIRECTIVE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_NOMINAL_IN_IF | %FileCheck %s -check-prefix=POUND_DIRECTIVE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_NOMINAL_IN_ELSEIF | %FileCheck %s -check-prefix=POUND_DIRECTIVE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_NOMINAL_IN_ELSE | %FileCheck %s -check-prefix=POUND_DIRECTIVE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_GLOBAL_TOP | %FileCheck %s -check-prefix=POUND_DIRECTIVE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_GLOBAL_IN_IF | %FileCheck %s -check-prefix=POUND_DIRECTIVE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_GLOBAL_IN_ELSEIF | %FileCheck %s -check-prefix=POUND_DIRECTIVE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_GLOBAL_IN_ELSE | %FileCheck %s -check-prefix=POUND_DIRECTIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=POUND_NOMINAL_TOP | %FileCheck %s -check-prefix=POUND_DIRECTIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=POUND_NOMINAL_IN_IF | %FileCheck %s -check-prefix=POUND_DIRECTIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=POUND_NOMINAL_IN_ELSEIF | %FileCheck %s -check-prefix=POUND_DIRECTIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=POUND_NOMINAL_IN_ELSE | %FileCheck %s -check-prefix=POUND_DIRECTIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=POUND_GLOBAL_TOP | %FileCheck %s -check-prefix=POUND_DIRECTIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=POUND_GLOBAL_IN_IF | %FileCheck %s -check-prefix=POUND_DIRECTIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=POUND_GLOBAL_IN_ELSEIF | %FileCheck %s -check-prefix=POUND_DIRECTIVE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=POUND_GLOBAL_IN_ELSE | %FileCheck %s -check-prefix=POUND_DIRECTIVE
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_NOMINAL_1 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_NOMINAL_1 -D FOO -D BAR | %FileCheck %s -check-prefix=CONDITION -check-prefix=WITHFLAG
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_NOMINAL_2 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_GLOBAL_1 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_GLOBAL_2 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_GLOBAL_2 -D FOO -D BAR | %FileCheck %s -check-prefix=CONDITION -check-prefix=WITHFLAG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=CONDITION_NOMINAL_1 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=CONDITION_NOMINAL_1 -D FOO -D BAR | %FileCheck %s -check-prefix=CONDITION -check-prefix=WITHFLAG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=CONDITION_NOMINAL_2 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=CONDITION_GLOBAL_1 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=CONDITION_GLOBAL_2 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=CONDITION_GLOBAL_2 -D FOO -D BAR | %FileCheck %s -check-prefix=CONDITION -check-prefix=WITHFLAG
 
 // POUND_DIRECTIVE: Begin completions, 7 items
-// POUND_DIRECTIVE-DAG: Keyword[#sourceLocation]/None:      sourceLocation(file: {#String#}, line: {#Int#}); name=sourceLocation(file: String, line: Int)
-// POUND_DIRECTIVE-DAG: Keyword[#warning]/None:             warning("{#(message)#}"); name=warning("message")
-// POUND_DIRECTIVE-DAG: Keyword[#error]/None:               error("{#(message)#}"); name=error("message")
-// POUND_DIRECTIVE-DAG: Keyword[#if]/None:                  if {#(condition)#}; name=if condition
-// POUND_DIRECTIVE-DAG: Keyword[#elseif]/None:              elseif {#(condition)#}; name=elseif condition
-// POUND_DIRECTIVE-DAG: Keyword[#else]/None:                else; name=else
-// POUND_DIRECTIVE-DAG: Keyword[#endif]/None:               endif; name=endif
+// POUND_DIRECTIVE-DAG: Keyword[#sourceLocation]/None:      sourceLocation(file: {#String#}, line: {#Int#}); name=sourceLocation(file:line:); sourcetext=sourceLocation(file: <#T##String#>, line: <#T##Int#>)
+// POUND_DIRECTIVE-DAG: Keyword[#warning]/None:             warning("{#(message)#}"); name=warning(""); sourcetext=warning(\"<#T##message#>\")
+// POUND_DIRECTIVE-DAG: Keyword[#error]/None:               error("{#(message)#}"); name=error(""); sourcetext=error(\"<#T##message#>\")
+// POUND_DIRECTIVE-DAG: Keyword[#if]/None:                  if {#(condition)#}; name=if ; sourcetext=if <#T##condition#>
+// POUND_DIRECTIVE-DAG: Keyword[#elseif]/None:              elseif {#(condition)#}; name=elseif ; sourcetext=elseif <#T##condition#>
+// POUND_DIRECTIVE-DAG: Keyword[#else]/None:                else; name=else; sourcetext=else
+// POUND_DIRECTIVE-DAG: Keyword[#endif]/None:               endif; name=endif; sourcetext=endif
 
 class C {
 ##^POUND_NOMINAL_TOP^#
@@ -47,20 +47,20 @@ class C {
 
 // CONDITION: Begin completions
 // CONDITION-NOT: globalVar
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               os({#(name)#}); name=os(name)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               arch({#(name)#}); name=arch(name)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               canImport({#(module)#}); name=canImport(module)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               targetEnvironment(simulator); name=targetEnvironment(simulator)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(>={#(version)#}); name=swift(>=version)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(<{#(version)#}); name=swift(<version)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(>={#(version)#}); name=compiler(>=version)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(<{#(version)#}); name=compiler(<version)
-// CONDITION-DAG: Keyword[true]/None:                 true[#Bool#]; name=true
-// CONDITION-DAG: Keyword[false]/None:                false[#Bool#]; name=false
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               os({#(name)#}); name=os(); sourcetext=os(<#T##name#>)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               arch({#(name)#}); name=arch(); sourcetext=arch(<#T##name#>)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               canImport({#(module)#}); name=canImport(); sourcetext=canImport(<#T##module#>)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               targetEnvironment(simulator); name=targetEnvironment(simulator); sourcetext=targetEnvironment(simulator)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(>={#(version)#}); name=swift(>=); sourcetext=swift(>=<#T##version#>)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(<{#(version)#}); name=swift(<); sourcetext=swift(<<#T##version#>)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(>={#(version)#}); name=compiler(>=); sourcetext=compiler(>=<#T##version#>)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(<{#(version)#}); name=compiler(<); sourcetext=compiler(<<#T##version#>)
+// CONDITION-DAG: Keyword[true]/None:                 true[#Bool#]; name=true; sourcetext=true
+// CONDITION-DAG: Keyword[false]/None:                false[#Bool#]; name=false; sourcetext=false
 // CONDITION-NOT: globalVar
 
-// WITHFLAG: Keyword/CurrModule/Flair[ExprSpecific]:               FOO; name=FOO
-// WITHFLAG: Keyword/CurrModule/Flair[ExprSpecific]:               BAR; name=BAR
+// WITHFLAG: Keyword/CurrModule/Flair[ExprSpecific]:               FOO; name=FOO; sourcetext=FOO
+// WITHFLAG: Keyword/CurrModule/Flair[ExprSpecific]:               BAR; name=BAR; sourcetext=BAR
 
 // NOFLAG-NOT: FOO 
 // NOFLAG-NOT: BAR

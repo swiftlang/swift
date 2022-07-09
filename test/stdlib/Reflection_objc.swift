@@ -9,6 +9,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 //
 // DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.
 //

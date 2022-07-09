@@ -1,10 +1,13 @@
-// RUN: %target-sil-opt -silgen-cleanup %s | %FileCheck %s
+// RUN: %target-sil-opt -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
+// RUN: %target-sil-opt -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
 
 import Builtin
 
 sil_stage raw
 
-class Klass {}
+class Klass {
+  var property: Builtin.Int64
+}
 class SubKlass : Klass {}
 
 sil @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
@@ -26,14 +29,20 @@ struct UInt8 {
   var _value : Builtin.Int8
 }
 
+// =============================================================================
+// Test splitAggregateLoad
+//
+// Required for exclusivity diagnostics that are consistent across -Onone / -O
+// =============================================================================
+
 // CHECK-LABEL: sil [ossa] @struct_extract_load_to_load_struct_element_addr
-// CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
-// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
-// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
-// CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
-// CHECK-NEXT:  [[UINT8:%.*]] = struct $UInt8 ([[LITERAL]] : $Builtin.Int8)
-// CHECK-NEXT:  store [[UINT8]] to [trivial] [[IN]] : $*UInt8
-// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+// CHECKOPT: bb0([[IN:%[0-9]+]] : $*UInt8):
+// CHECKOPT-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
+// CHECKOPT-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
+// CHECKOPT-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECKOPT-NEXT:  [[UINT8:%.*]] = struct $UInt8 ([[LITERAL]] : $Builtin.Int8)
+// CHECKOPT-NEXT:  store [[UINT8]] to [trivial] [[IN]] : $*UInt8
+// CHECKOPT-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
 sil [ossa] @struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (Builtin.Int8) {
 bb0(%0 : $*UInt8):
   %1 = load [trivial] %0 : $*UInt8
@@ -45,13 +54,13 @@ bb0(%0 : $*UInt8):
 }
 
 // CHECK-LABEL: sil [ossa] @tuple_extract_load_to_load_tuple_element_addr
-// CHECK: bb0([[IN:%[0-9]+]] : $*(Builtin.Int8, Builtin.Int8)):
-// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = tuple_element_addr [[IN]] : $*(Builtin.Int8, Builtin.Int8), 0
-// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
-// CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
-// CHECK-NEXT:  [[IN_STORE_GEP:%[0-9]+]] = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
-// CHECK-NEXT:  store [[LITERAL]] to [trivial] [[IN_STORE_GEP]] : $*Builtin.Int8
-// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+// CHECKOPT: bb0([[IN:%[0-9]+]] : $*(Builtin.Int8, Builtin.Int8)):
+// CHECKOPT-NEXT:  [[IN_GEP:%[0-9]+]] = tuple_element_addr [[IN]] : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECKOPT-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
+// CHECKOPT-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECKOPT-NEXT:  [[IN_STORE_GEP:%[0-9]+]] = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECKOPT-NEXT:  store [[LITERAL]] to [trivial] [[IN_STORE_GEP]] : $*Builtin.Int8
+// CHECKOPT-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
 sil [ossa] @tuple_extract_load_to_load_tuple_element_addr : $@convention(thin) (@inout (Builtin.Int8, Builtin.Int8)) -> (Builtin.Int8) {
 bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   %1 = load [trivial] %0 : $*(Builtin.Int8, Builtin.Int8)
@@ -95,6 +104,7 @@ bb0(%0 : $*UInt8):
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
+// CHECK-LABEL: } // end sil function 'multiple_use_tuple_extract_load_to_load_tuple_element_addr'
 sil [ossa] @multiple_use_tuple_extract_load_to_load_tuple_element_addr : $@convention(thin) (@inout (Builtin.Int8, Builtin.Int8)) -> ((Builtin.Int8, Builtin.Int8), Builtin.Int8) {
 bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   %1 = load [trivial] %0 : $*(Builtin.Int8, Builtin.Int8)
@@ -116,18 +126,18 @@ struct X1 {
 }
 
 // CHECK-LABEL: sil private [ossa] @testLoadNontrivial : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
-// CHECK-LABEL: bb0(%0 : $*X1):
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*X1
-// CHECK: [[AA:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.a
-// CHECK: load [trivial] [[AA]] : $*Int
-// CHECK: [[OA1:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj1
-// CHECK: [[OV1:%.*]] = load [copy] [[OA1]] : $*Builtin.NativeObject
-// CHECK: [[OA2:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj2
-// CHECK: [[OV2:%.*]] = load [copy] [[OA2]] : $*Builtin.NativeObject
-// CHECK: end_access [[ACCESS]] : $*X1
-// CHECK: copy_value [[OV1]] : $Builtin.NativeObject
-// CHECK: copy_value [[OV2]] : $Builtin.NativeObject
-// CHECK: return
+// CHECKOPT-LABEL: bb0(%0 : $*X1):
+// CHECKOPT: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*X1
+// CHECKOPT: [[AA:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.a
+// CHECKOPT: load [trivial] [[AA]] : $*Int
+// CHECKOPT: [[OA1:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj1
+// CHECKOPT: [[OV1:%.*]] = load [copy] [[OA1]] : $*Builtin.NativeObject
+// CHECKOPT: [[OA2:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj2
+// CHECKOPT: [[OV2:%.*]] = load [copy] [[OA2]] : $*Builtin.NativeObject
+// CHECKOPT: end_access [[ACCESS]] : $*X1
+// CHECKOPT: copy_value [[OV1]] : $Builtin.NativeObject
+// CHECKOPT: copy_value [[OV2]] : $Builtin.NativeObject
+// CHECKOPT: return
 // CHECK-LABEL: } // end sil function 'testLoadNontrivial'
 sil private [ossa] @testLoadNontrivial : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
 bb0(%0 : $*X1):
@@ -156,18 +166,18 @@ bb0(%0 : $*X1):
 }
 
 // CHECK-LABEL: sil private [ossa] @testLoadBorrowNontrivial : $@convention(thin) (@in_guaranteed X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
-// CHECK: bb0([[ADDRESS:%.*]] : $*X1):
-// CHECK: [[AA:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.a
-// CHECK: load [trivial] [[AA]] : $*Int
-// CHECK: [[OA1:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.obj1
-// CHECK: [[OV1:%.*]] = load_borrow [[OA1]] : $*Builtin.NativeObject
-// CHECK: [[OA2:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.obj2
-// CHECK: [[OV2:%.*]] = load_borrow [[OA2]] : $*Builtin.NativeObject
-// CHECK: copy_value [[OV1]] : $Builtin.NativeObject
-// CHECK: copy_value [[OV2]] : $Builtin.NativeObject
-// CHECK: end_borrow [[OV1]]
-// CHECK: end_borrow [[OV2]]
-// CHECK: return
+// CHECKOPT: bb0([[ADDRESS:%.*]] : $*X1):
+// CHECKOPT: [[AA:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.a
+// CHECKOPT: load [trivial] [[AA]] : $*Int
+// CHECKOPT: [[OA1:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.obj1
+// CHECKOPT: [[OV1:%.*]] = load_borrow [[OA1]] : $*Builtin.NativeObject
+// CHECKOPT: [[OA2:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.obj2
+// CHECKOPT: [[OV2:%.*]] = load_borrow [[OA2]] : $*Builtin.NativeObject
+// CHECKOPT: copy_value [[OV1]] : $Builtin.NativeObject
+// CHECKOPT: copy_value [[OV2]] : $Builtin.NativeObject
+// CHECKOPT: end_borrow [[OV1]]
+// CHECKOPT: end_borrow [[OV2]]
+// CHECKOPT: return
 // CHECK-LABEL: } // end sil function 'testLoadBorrowNontrivial'
 sil private [ossa] @testLoadBorrowNontrivial : $@convention(thin) (@in_guaranteed X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
 bb0(%0 : $*X1):
@@ -187,6 +197,54 @@ bb0(%0 : $*X1):
   return %result : $(Int, Builtin.NativeObject, Builtin.NativeObject)
 }
 
+// FIXME rdar85638376: At -Onone, either preserve the original load
+// with its debug_value. But somehow prevent exclusivity diagnostics
+// from seeing the original load. At -O, generate the following fragments after the loads:
+// HECKOPT: debug_value [[V1]] : $Int, let, name "x1", type $X1, expr op_fragment:#X1.a
+// HECKOPT: debug_value [[V2]] : $Builtin.NativeObject, let, name "x1", type $X1, expr op_fragment:#X1.obj1
+// HECKOPT: debug_value [[V3]] : $Builtin.NativeObject, let, name "x1", type $X1, expr op_fragment:#X1.obj2
+//
+// CHECK-LABEL: sil private [ossa] @testLoadWithDebugInfo : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
+// CHECK: bb0(%0 : $*X1):
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*X1
+// CHECK: [[A1:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.a
+// CHECK: [[V1:%.*]] = load [trivial] [[A1]] : $*Int
+// CHECK: [[A2:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj1
+// CHECK: [[V2:%.*]] = load [copy] [[A2]] : $*Builtin.NativeObject
+// CHECK: [[A3:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj2
+// CHECK: [[V3:%.*]] = load [copy] [[A3]] : $*Builtin.NativeObject
+// CHECK: end_access [[ACCESS]] : $*X1
+// CHECK-LABEL: } // end sil function 'testLoadWithDebugInfo'
+sil private [ossa] @testLoadWithDebugInfo : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
+bb0(%0 : $*X1):
+  %access = begin_access [read] [unknown] %0 : $*X1
+  %load = load [copy] %access : $*X1
+  debug_value %load : $X1, let, name "x1"
+  end_access %access : $*X1
+
+  %borrowa = begin_borrow %load : $X1
+  %a = struct_extract %borrowa : $X1, #X1.a
+  end_borrow %borrowa : $X1
+
+  %borrow1 = begin_borrow %load : $X1
+  %o1 = struct_extract %borrow1 : $X1, #X1.obj1
+  %copy1 = copy_value %o1 : $Builtin.NativeObject
+  end_borrow %borrow1 : $X1
+
+  %borrow2 = begin_borrow %load : $X1
+  %o2 = struct_extract %borrow2 : $X1, #X1.obj2
+  %copy2 = copy_value %o2 : $Builtin.NativeObject
+  end_borrow %borrow2 : $X1
+
+  destroy_value %load : $X1
+
+  %result = tuple (%a : $Int, %copy1 : $Builtin.NativeObject, %copy2 : $Builtin.NativeObject)
+  return %result : $(Int, Builtin.NativeObject, Builtin.NativeObject)
+}
+
+// =============================================================================
+// Test broadenSingleElementStores
+// =============================================================================
 
 struct X2 {
   @_hasStorage @_hasInitialValue var obj: Builtin.NativeObject { get set }
@@ -217,13 +275,17 @@ bb0(%0 : $*X3, %1 : @guaranteed $Builtin.NativeObject):
   return %12 : $()
 }
 
+// =============================================================================
+// Test simple copy and borrow elimination
+// =============================================================================
+
 // We used to hit a memory error on this test.
 //
 // CHECK-LABEL: sil [ossa] @testDestructureTupleNoCrash : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.NativeObject)) -> () {
-// CHECK: bb0(
-// CHECK-NEXT: destroy_value
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECKOPT: bb0(
+// CHECKOPT-NEXT: destroy_value
+// CHECKOPT-NEXT: tuple
+// CHECKOPT-NEXT: return
 // CHECK: } // end sil function 'testDestructureTupleNoCrash'
 sil [ossa] @testDestructureTupleNoCrash : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.NativeObject)) -> () {
 bb0(%0 : @owned $(Builtin.NativeObject, Builtin.NativeObject)):
@@ -238,4 +300,65 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.NativeObject)):
   destroy_value %1 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
+}
+
+// debug_value must be preserved after eliminating the borrow.
+//
+// CHECK-LABEL: sil [ossa] @testBorrowElimination : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0(%0 : @guaranteed $Builtin.NativeObject):
+// CHECK: debug_value %0 : $Builtin.NativeObject, let, name "var"
+// CHECK: [[CP:%.*]] = copy_value %0 : $Builtin.NativeObject
+// CHECK: return [[CP]] : $Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'testBorrowElimination'
+sil [ossa] @testBorrowElimination : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  debug_value %1 : $Builtin.NativeObject, let, name "var"
+  %3 = copy_value %1 : $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
+}
+
+// debug_value must be preserved after eliminating the copy.
+//
+// FIXME: eliminateSimpleCopies removes all debug_values. Instead,
+// debug_value should be canonicalized first, before SILGenCleanup
+// eliminates copies.
+//
+// CHECK-LABEL: sil [ossa] @testCopyElimination : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0(%0 : @guaranteed $Builtin.NativeObject):
+// CHECK: [[CP:%.*]] = copy_value %0 : $Builtin.NativeObject
+// CHECKDEB: [[CP2:%.*]] = copy_value %0 : $Builtin.NativeObject
+// CHECKDEB: debug_value [[CP2]] : $Builtin.NativeObject, let, name "var"
+// CHECK: return [[CP]] : $Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'testCopyElimination'
+sil [ossa] @testCopyElimination : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = copy_value %0 : $Builtin.NativeObject
+  debug_value %2 : $Builtin.NativeObject, let, name "var"
+  destroy_value %2 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
+
+// Test SemanticARCOpts eliminateSimpleCopies. At -O, remove the
+// debug_value with the copy to avoid a lifetime violation. -Onone, do nothing.
+//
+// CHECK-LABEL: sil [ossa] @testSimpleCopyWithDebug : $@convention(thin) (@owned Klass) -> Builtin.Int64 {
+// CHECKOPT-NOT: copy_value
+// CHECKOPT-NOT: debug_value
+// CHECKDEB: copy_value
+// CHECKDEB: debug_value
+// CHECK-LABEL: } // end sil function 'testSimpleCopyWithDebug'
+sil [ossa] @testSimpleCopyWithDebug : $@convention(thin) (@owned Klass) -> Builtin.Int64 {
+bb9(%0 : @owned $Klass):
+  %borrow = begin_borrow %0 : $Klass
+  %p = ref_element_addr %borrow : $Klass, #Klass.property
+  %v = load [trivial] %p : $*Builtin.Int64
+  %copy = copy_value %borrow : $Klass
+  end_borrow %borrow : $Klass
+  debug_value %copy : $Klass, let, name "c"
+  destroy_value %copy : $Klass
+  destroy_value %0 : $Klass
+  return %v : $Builtin.Int64
 }

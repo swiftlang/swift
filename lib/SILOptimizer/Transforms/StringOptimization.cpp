@@ -437,10 +437,13 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
     switch (user->getKind()) {
       // Those instructions do not write to destAddr nor let they destAddr
       // escape.
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::LoadInst:
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (DebugValueInst::hasAddrVal(user))
+          break;
+        LLVM_FALLTHROUGH;
       default:
         if (!mayWriteToIdentifyableObject(user)) {
           // We don't handle user. It is some instruction which may write to
@@ -690,7 +693,7 @@ ApplyInst *StringOptimization::createStringInit(StringRef str,
       return nullptr;
     
     auto Mangled = SILDeclRef(makeUTF8Decl, SILDeclRef::Kind::Allocator).mangle();
-    makeUTF8Func = module.findFunction(Mangled, SILLinkage::PublicExternal);
+    makeUTF8Func = module.loadFunction(Mangled, SILModule::LinkingMode::LinkAll);
     if (!makeUTF8Func)
       return nullptr;
   }

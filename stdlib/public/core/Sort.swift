@@ -329,14 +329,19 @@ extension MutableCollection where Self: BidirectionalCollection {
   }
 }
 
+// FIXME(ABI): unused return value
 /// Merges the elements in the ranges `lo..<mid` and `mid..<hi` using `buffer`
 /// as out-of-place storage. Stable.
+///
+/// The unused return value is legacy ABI. It was originally added as a
+/// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
 ///
 /// - Precondition: `lo..<mid` and `mid..<hi` must already be sorted according
 ///   to `areInIncreasingOrder`.
 /// - Precondition: `buffer` must point to a region of memory at least as large
 ///   as `min(mid - lo, hi - mid)`.
 /// - Postcondition: `lo..<hi` is sorted according to `areInIncreasingOrder`.
+@discardableResult
 @inlinable
 internal func _merge<Element>(
   low: UnsafeMutablePointer<Element>,
@@ -439,7 +444,6 @@ internal func _merge<Element>(
     }
   }
 
-  // FIXME: Remove this, it works around rdar://problem/45044610
   return true
 }
 
@@ -506,14 +510,19 @@ internal func _findNextRun<C: RandomAccessCollection>(
 }
 
 extension UnsafeMutableBufferPointer {
+  // FIXME(ABI): unused return value
   /// Merges the elements at `runs[i]` and `runs[i - 1]`, using `buffer` as
   /// out-of-place storage.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `runs.count > 1` and `i > 0`
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
+  @discardableResult
   @inlinable
-  public mutating func _mergeRuns(
+  internal mutating func _mergeRuns(
     _ runs: inout [Range<Index>],
     at i: Int,
     buffer: UnsafeMutablePointer<Element>,
@@ -524,7 +533,7 @@ extension UnsafeMutableBufferPointer {
     let middle = runs[i].lowerBound
     let high = runs[i].upperBound
     
-    let result = try _merge(
+    try _merge(
       low: baseAddress! + low,
       mid: baseAddress! + middle,
       high: baseAddress! + high,
@@ -534,19 +543,23 @@ extension UnsafeMutableBufferPointer {
     runs[i - 1] = low..<high
     runs.remove(at: i)
 
-    // FIXME: Remove this, it works around rdar://problem/45044610
-    return result
+    return true
   }
-  
+
+  // FIXME(ABI): unused return value
   /// Merges upper elements of `runs` until the required invariants are
   /// satisfied.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
   /// - Precondition: The ranges in `runs` must be consecutive, such that for
   ///   any i, `runs[i].upperBound == runs[i + 1].lowerBound`.
+  @discardableResult
   @inlinable
-  public mutating func _mergeTopRuns(
+  internal mutating func _mergeTopRuns(
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -557,7 +570,7 @@ extension UnsafeMutableBufferPointer {
     // (b) - for c = runs.count - 1:
     //         - runs[c - 1].count > runs[c].count
     //
-    // Loop until the invariant is satisified for the top four elements of
+    // Loop until the invariant is satisfied for the top four elements of
     // `runs`. Because this method is called for every added run, and only
     // the top three runs are ever merged, this guarantees the invariant holds
     // for the whole array.
@@ -571,9 +584,6 @@ extension UnsafeMutableBufferPointer {
     // If W > X + Y, X > Y + Z, and Y > Z, then the invariants are satisfied
     // for the entirety of `runs`.
     
-    // FIXME: Remove this, it works around rdar://problem/45044610
-    var result = true
-
     // The invariant is always in place for a single element.
     while runs.count > 1 {
       var lastIndex = runs.count - 1
@@ -607,32 +617,36 @@ extension UnsafeMutableBufferPointer {
       }
       
       // Merge the runs at `i` and `i - 1`.
-      result = try result && _mergeRuns(
+      try _mergeRuns(
         &runs, at: lastIndex, buffer: buffer, by: areInIncreasingOrder)
     }
 
-    return result
+    return true
   }
-  
+
+  // FIXME(ABI): unused return value
   /// Merges elements of `runs` until only one run remains.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
   /// - Precondition: The ranges in `runs` must be consecutive, such that for
   ///   any i, `runs[i].upperBound == runs[i + 1].lowerBound`.
+  @discardableResult
   @inlinable
-  public mutating func _finalizeRuns(
+  internal mutating func _finalizeRuns(
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Bool {
-    // FIXME: Remove this, it works around rdar://problem/45044610
-    var result = true
     while runs.count > 1 {
-      result = try result && _mergeRuns(
+      try _mergeRuns(
         &runs, at: runs.count - 1, buffer: buffer, by: areInIncreasingOrder)
     }
-    return result
+
+    return true
   }
   
   /// Sorts the elements of this buffer according to `areInIncreasingOrder`,
@@ -650,9 +664,6 @@ extension UnsafeMutableBufferPointer {
         within: startIndex..<endIndex, by: areInIncreasingOrder)
       return
     }
-
-    // FIXME: Remove this, it works around rdar://problem/45044610
-    var result = true
 
     // Use array's allocating initializer to create a temporary buffer---this
     // keeps the buffer allocation going through the same tail-allocated path
@@ -685,17 +696,14 @@ extension UnsafeMutableBufferPointer {
         // Append this run and merge down as needed to maintain the `runs`
         // invariants.
         runs.append(start..<end)
-        result = try result && _mergeTopRuns(
+        try _mergeTopRuns(
           &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
         start = end
       }
       
-      result = try result && _finalizeRuns(
+      try _finalizeRuns(
         &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
       _internalInvariant(runs.count == 1, "Didn't complete final merge")
     }
-
-    // FIXME: Remove this, it works around rdar://problem/45044610
-    precondition(result)
   }
 }

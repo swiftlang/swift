@@ -21,6 +21,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
@@ -28,7 +29,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResult.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/Attr.h"
@@ -42,90 +43,39 @@ using namespace ide;
 // typeCheckContextAt(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 
-void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
-  while (isa<AbstractClosureExpr>(DC))
-    DC = DC->getParent();
-
+void swift::ide::typeCheckContextAt(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                                    SourceLoc Loc) {
   // Make sure the extension has been bound.
-  {
-    // Even if the extension is invalid (e.g. nested in a function or another
-    // type), we want to know the "intended nominal" of the extension so that
-    // we can know the type of 'Self'.
-    SmallVector<ExtensionDecl *, 1> extensions;
-    for (auto typeCtx = DC->getInnermostTypeContext(); typeCtx != nullptr;
-         typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
-      if (auto *ext = dyn_cast<ExtensionDecl>(typeCtx))
-        extensions.push_back(ext);
-    }
-    while (!extensions.empty()) {
-      extensions.back()->computeExtendedNominal();
-      extensions.pop_back();
-    }
-
-    // If the completion happens in the inheritance clause of the extension,
-    // 'DC' is the parent of the extension. We need to iterate the top level
-    // decls to find it. In theory, we don't need the extended nominal in the
-    // inheritance clause, but ASTScope lookup requires that. We don't care
-    // unless 'DC' is not 'SourceFile' because non-toplevel extensions are
-    // 'canNeverBeBound()' anyway.
-    if (auto *SF = dyn_cast<SourceFile>(DC)) {
-      auto &SM = DC->getASTContext().SourceMgr;
-      for (auto *decl : SF->getTopLevelDecls())
-        if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-          if (SM.rangeContainsTokenLoc(ext->getSourceRange(), Loc))
-            ext->computeExtendedNominal();
-    }
+  auto DC = TypeCheckCtx.getDeclContext();
+  // Even if the extension is invalid (e.g. nested in a function or another
+  // type), we want to know the "intended nominal" of the extension so that
+  // we can know the type of 'Self'.
+  SmallVector<ExtensionDecl *, 1> extensions;
+  for (auto typeCtx = DC->getInnermostTypeContext(); typeCtx != nullptr;
+       typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
+    if (auto *ext = dyn_cast<ExtensionDecl>(typeCtx))
+      extensions.push_back(ext);
+  }
+  while (!extensions.empty()) {
+    extensions.back()->computeExtendedNominal();
+    extensions.pop_back();
   }
 
-  // Type-check this context.
-  switch (DC->getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::SerializedLocal:
-  case DeclContextKind::EnumElementDecl:
-  case DeclContextKind::GenericTypeDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::ExtensionDecl:
-    // Nothing to do for these.
-    break;
-
-  case DeclContextKind::Initializer:
-    if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
-      if (auto *PBD = patternInit->getBinding()) {
-        auto i = patternInit->getBindingIndex();
-        PBD->getPattern(i)->forEachVariable(
-            [](VarDecl *VD) { (void)VD->getInterfaceType(); });
-        if (PBD->getInit(i)) {
-          if (!PBD->isInitializerChecked(i))
-            typeCheckPatternBinding(PBD, i);
-        }
-      }
-    } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
-        auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
-        (void)Param->getTypeCheckedDefaultExpr();
-      }
-    }
-    break;
-
-  case DeclContextKind::TopLevelCodeDecl:
-    swift::typeCheckASTNodeAtLoc(DC, Loc);
-    break;
-
-  case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = cast<AbstractFunctionDecl>(DC);
+  // If the completion happens in the inheritance clause of the extension,
+  // 'DC' is the parent of the extension. We need to iterate the top level
+  // decls to find it. In theory, we don't need the extended nominal in the
+  // inheritance clause, but ASTScope lookup requires that. We don't care
+  // unless 'DC' is not 'SourceFile' because non-toplevel extensions are
+  // 'canNeverBeBound()' anyway.
+  if (auto *SF = dyn_cast<SourceFile>(DC)) {
     auto &SM = DC->getASTContext().SourceMgr;
-    auto bodyRange = AFD->getBodySourceRange();
-    if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
-      swift::typeCheckASTNodeAtLoc(DC, Loc);
-    } else {
-      assert(bodyRange.isInvalid() && "The body should not be parsed if the "
-                                      "completion happens in the signature");
-    }
-    break;
+    for (auto *decl : SF->getTopLevelDecls())
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+        if (SM.rangeContainsTokenLoc(ext->getSourceRange(), Loc))
+          ext->computeExtendedNominal();
   }
-  }
+
+  swift::typeCheckASTNodeAtLoc(TypeCheckCtx, Loc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -212,62 +162,33 @@ public:
   CCExprRemover(ASTContext &Ctx) : Ctx(Ctx) {}
 
   Expr *visitCallExpr(CallExpr *E) {
-    SourceLoc lParenLoc, rParenLoc;
-    SmallVector<Identifier, 2> argLabels;
-    SmallVector<SourceLoc, 2> argLabelLocs;
-    SmallVector<Expr *, 2> args;
-    SmallVector<TrailingClosure, 2> trailingClosures;
-    bool removing = false;
+    auto *args = E->getArgs()->getOriginalArgs();
 
-    if (auto paren = dyn_cast<ParenExpr>(E->getArg())) {
-      if (isa<CodeCompletionExpr>(paren->getSubExpr())) {
-        lParenLoc = paren->getLParenLoc();
-        rParenLoc = paren->getRParenLoc();
-        removing = true;
+    Optional<unsigned> newTrailingClosureIdx;
+    SmallVector<Argument, 4> newArgs;
+    for (auto idx : indices(*args)) {
+      // Update the trailing closure index if we have one.
+      if (args->hasAnyTrailingClosures() &&
+          idx == *args->getFirstTrailingClosureIndex()) {
+        newTrailingClosureIdx = newArgs.size();
       }
-    } else if (auto tuple = dyn_cast<TupleExpr>(E->getArg())) {
-      lParenLoc = tuple->getLParenLoc();
-      rParenLoc = tuple->getRParenLoc();
-
-      assert((!E->getUnlabeledTrailingClosureIndex().hasValue() ||
-              (tuple->getNumElements() == E->getArgumentLabels().size() &&
-               tuple->getNumElements() == E->getArgumentLabelLocs().size())) &&
-             "CallExpr with trailing closure must have the same number of "
-             "argument labels");
-      assert(tuple->getNumElements() == E->getArgumentLabels().size());
-      assert(tuple->getNumElements() == E->getArgumentLabelLocs().size() ||
-             E->getArgumentLabelLocs().size() == 0);
-
-      bool hasArgumentLabelLocs = E->getArgumentLabelLocs().size() > 0;
-
-      for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i) {
-        if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
-          removing = true;
-          continue;
-        }
-
-        if (!E->getUnlabeledTrailingClosureIndex().hasValue() ||
-            i < *E->getUnlabeledTrailingClosureIndex()) {
-          // Normal arguments.
-          argLabels.push_back(E->getArgumentLabels()[i]);
-          if (hasArgumentLabelLocs)
-            argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
-          args.push_back(tuple->getElement(i));
-        } else {
-          // Trailing closure arguments.
-          trailingClosures.emplace_back(E->getArgumentLabels()[i],
-                                        E->getArgumentLabelLocs()[i],
-                                        tuple->getElement(i));
-        }
-      }
+      auto arg = args->get(idx);
+      if (!isa<CodeCompletionExpr>(arg.getExpr()))
+        newArgs.push_back(arg);
     }
-    if (removing) {
-      Removed = true;
-      return CallExpr::create(Ctx, E->getFn(), lParenLoc, args, argLabels,
-                              argLabelLocs, rParenLoc, trailingClosures,
-                              E->isImplicit());
-    }
-    return E;
+    if (newArgs.size() == args->size())
+      return E;
+
+    // If we ended up removing the last trailing closure, drop the index.
+    if (newTrailingClosureIdx && *newTrailingClosureIdx == newArgs.size())
+      newTrailingClosureIdx = None;
+
+    Removed = true;
+
+    auto *argList = ArgumentList::create(
+        Ctx, args->getLParenLoc(), newArgs, args->getRParenLoc(),
+        newTrailingClosureIdx, E->isImplicit());
+    return CallExpr::create(Ctx, E->getFn(), argList, E->isImplicit());
   }
 
   Expr *visitExpr(Expr *E) {
@@ -336,7 +257,7 @@ void swift::ide::collectPossibleReturnTypesFromContext(
               const_cast<DeclContext *>(DC), /*diagnostics=*/false);
 
           if (!type->hasError()) {
-            candidates.push_back(type);
+            candidates.push_back(DC->mapTypeIntoContext(type));
             return;
           }
         }
@@ -443,6 +364,19 @@ static void collectPossibleCalleesByQualifiedLookup(
   auto baseInstanceTy = baseTy->getMetatypeInstanceType();
   if (!baseInstanceTy->mayHaveMembers())
     return;
+
+  if (name == DeclNameRef::createConstructor()) {
+    // Existential types cannot be instantiated. e.g. 'MyProtocol()'.
+    if (baseInstanceTy->isExistentialType())
+      return;
+
+    // 'AnyObject' is not initializable.
+    if (baseInstanceTy->isAnyObject())
+      return;
+  }
+
+  // Make sure we've resolved implicit members.
+  namelookup::installSemanticMembersIfNeeded(baseInstanceTy, name);
 
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
@@ -656,12 +590,12 @@ static bool collectPossibleCalleesForApply(
   } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
       collectPossibleCalleesByQualifiedLookup(
-          DC, DSCE->getArg(), DeclNameRef(DRE->getDecl()->getName()),
+          DC, DSCE->getBase(), DeclNameRef(DRE->getDecl()->getName()),
           candidates);
     }
   } else if (auto CRCE = dyn_cast<ConstructorRefCallExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
-        DC, CRCE->getArg(), DeclNameRef::createConstructor(), candidates);
+        DC, CRCE->getBase(), DeclNameRef::createConstructor(), candidates);
   } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
         DC, TE, DeclNameRef::createConstructor(), candidates);
@@ -688,7 +622,7 @@ static bool collectPossibleCalleesForApply(
       fnType = *fnTypeOpt;
   }
 
-  if (!fnType || fnType->hasUnresolvedType() || fnType->hasError())
+  if (!fnType || fnType->hasError())
     return false;
   fnType = fnType->getWithoutSpecifierType();
 
@@ -730,47 +664,36 @@ static bool collectPossibleCalleesForSubscript(
   return !candidates.empty();
 }
 
-/// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr
-/// or \c ParenExpr.
+/// Get index of \p CCExpr in \p Args.
 /// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
-static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
+static bool getPositionInArgs(DeclContext &DC, ArgumentList *Args, Expr *CCExpr,
                               unsigned &Position, bool &HasName) {
-  if (isa<ParenExpr>(Args)) {
-    HasName = false;
-    Position = 0;
-    return true;
-  }
-
-  auto *tuple = dyn_cast<TupleExpr>(Args);
-  if (!tuple)
-    return false;
-
   auto &SM = DC.getASTContext().SourceMgr;
-  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-    if (SM.isBeforeInBuffer(tuple->getElement(i)->getEndLoc(),
-                            CCExpr->getStartLoc()))
+  for (auto idx : indices(*Args)) {
+    auto arg = Args->get(idx);
+    if (SM.isBeforeInBuffer(arg.getExpr()->getEndLoc(), CCExpr->getStartLoc()))
       continue;
-    HasName = tuple->getElementNameLoc(i).isValid();
-    Position = i;
+    HasName = arg.getLabelLoc().isValid();
+    Position = idx;
     return true;
   }
   return false;
 }
 
-/// For function call arguments \p Args, return the argument at \p Position
-/// computed by \c getPositionInArgs
-static Expr *getArgAtPosition(Expr *Args, unsigned Position) {
-  if (isa<ParenExpr>(Args)) {
-    assert(Position == 0);
-    return Args;
+/// Get index of \p CCExpr in \p TE.
+/// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
+static bool getPositionInTuple(DeclContext &DC, TupleExpr *TE, Expr *CCExpr,
+                               unsigned &Position, bool &HasName) {
+  auto &SM = DC.getASTContext().SourceMgr;
+  for (auto idx : indices(TE->getElements())) {
+    if (SM.isBeforeInBuffer(TE->getElement(idx)->getEndLoc(),
+                            CCExpr->getStartLoc()))
+      continue;
+    HasName = TE->getElementNameLoc(idx).isValid();
+    Position = idx;
+    return true;
   }
-
-  if (auto *tuple = dyn_cast<TupleExpr>(Args)) {
-    return tuple->getElement(Position);
-  } else {
-    llvm_unreachable("Unable to retrieve arg at position returned by "
-                     "getPositionInArgs?");
-  }
+  return false;
 }
 
 /// Get index of \p CCExpr in \p Params. Note that the position in \p Params may
@@ -780,17 +703,8 @@ static Expr *getArgAtPosition(Expr *Args, unsigned Position) {
 /// \returns the position index number on success, \c None if \p CCExpr is not
 /// a part of \p Args.
 static Optional<unsigned>
-getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
+getPositionInParams(DeclContext &DC, const ArgumentList *Args, Expr *CCExpr,
                     ArrayRef<AnyFunctionType::Param> Params, bool Lenient) {
-  if (isa<ParenExpr>(Args)) {
-    return 0;
-  }
-
-  auto *tuple = dyn_cast<TupleExpr>(Args);
-  if (!tuple) {
-    return None;
-  }
-
   auto &SM = DC.getASTContext().SourceMgr;
   unsigned PosInParams = 0;
   unsigned PosInArgs = 0;
@@ -800,11 +714,11 @@ getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
   // For each argument, we try to find a matching parameter either by matching
   // argument labels, in which case PosInParams may be advanced by more than 1,
   // or by advancing PosInParams and PosInArgs both by 1.
-  for (; PosInArgs < tuple->getNumElements(); ++PosInArgs) {
-    if (!SM.isBeforeInBuffer(tuple->getElement(PosInArgs)->getEndLoc(),
+  for (; PosInArgs < Args->size(); ++PosInArgs) {
+    if (!SM.isBeforeInBuffer(Args->getExpr(PosInArgs)->getEndLoc(),
                              CCExpr->getStartLoc())) {
       // The arg is after the code completion position. Stop.
-      if (LastParamWasVariadic && tuple->getElementName(PosInArgs).empty()) {
+      if (LastParamWasVariadic && Args->getLabel(PosInArgs).empty()) {
         // If the last parameter was variadic and this argument stands by itself
         // without a label, assume that it belongs to the previous vararg
         // list.
@@ -813,7 +727,7 @@ getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
       break;
     }
 
-    auto ArgName = tuple->getElementName(PosInArgs);
+    auto ArgName = Args->getLabel(PosInArgs);
     // If the last parameter we matched was variadic, we claim all following
     // unlabeled arguments for that variadic parameter -> advance PosInArgs but
     // not PosInParams.
@@ -838,9 +752,7 @@ getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
       }
     }
 
-    bool IsTrailingClosure =
-        PosInArgs >= tuple->getNumElements() - tuple->getNumTrailingElements();
-    if (!AdvancedPosInParams && IsTrailingClosure) {
+    if (!AdvancedPosInParams && Args->isTrailingClosureIndex(PosInArgs)) {
       // If the argument is a trailing closure, it can't match non-function
       // parameters. Advance to the next function parameter.
       for (unsigned i = PosInParams; i < Params.size(); ++i) {
@@ -864,7 +776,7 @@ getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
       }
     }
   }
-  if (PosInArgs < tuple->getNumElements() && PosInParams < Params.size()) {
+  if (PosInArgs < Args->size() && PosInParams < Params.size()) {
     // We didn't search until the end, so we found a position in Params. Success
     return PosInParams;
   } else {
@@ -902,15 +814,15 @@ class ExprContextAnalyzer {
   bool analyzeApplyExpr(Expr *E) {
     // Collect parameter lists for possible func decls.
     SmallVector<FunctionTypeAndDecl, 2> Candidates;
-    Expr *Args = nullptr;
+    ArgumentList *Args = nullptr;
     if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
       if (!collectPossibleCalleesForApply(*DC, applyExpr, Candidates))
         return false;
-      Args = applyExpr->getArg();
+      Args = applyExpr->getArgs();
     } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
       if (!collectPossibleCalleesForSubscript(*DC, subscriptExpr, Candidates))
         return false;
-      Args = subscriptExpr->getIndex();
+      Args = subscriptExpr->getArgs();
     } else {
       llvm_unreachable("unexpected expression kind");
     }
@@ -944,8 +856,8 @@ class ExprContextAnalyzer {
       //
       // Varargs are represented by a VarargExpansionExpr that contains an
       // ArrayExpr on the call side.
-      if (auto Vararg = dyn_cast<VarargExpansionExpr>(
-              getArgAtPosition(Args, PositionInArgs))) {
+      if (auto Vararg =
+              dyn_cast<VarargExpansionExpr>(Args->getExpr(PositionInArgs))) {
         if (auto Array = dyn_cast_or_null<ArrayExpr>(Vararg->getSubExpr())) {
           if (Array->getNumElements() > 0 &&
               !isa<CodeCompletionExpr>(Array->getElement(0))) {
@@ -962,9 +874,10 @@ class ExprContextAnalyzer {
       llvm::SmallVector<Optional<unsigned>, 2> posInParams;
       {
         bool found = false;
+        auto *originalArgs = Args->getOriginalArgs();
         for (auto &typeAndDecl : Candidates) {
           Optional<unsigned> pos = getPositionInParams(
-              *DC, Args, ParsedExpr, typeAndDecl.Type->getParams(),
+              *DC, originalArgs, ParsedExpr, typeAndDecl.Type->getParams(),
               /*lenient=*/false);
           posInParams.push_back(pos);
           found |= pos.hasValue();
@@ -974,7 +887,7 @@ class ExprContextAnalyzer {
           // non-matching argument labels mis-typed.
           for (auto i : indices(Candidates)) {
             posInParams[i] = getPositionInParams(
-                *DC, Args, ParsedExpr, Candidates[i].Type->getParams(),
+                *DC, originalArgs, ParsedExpr, Candidates[i].Type->getParams(),
                 /*lenient=*/true);
           }
         }
@@ -1152,7 +1065,8 @@ class ExprContextAnalyzer {
 
       unsigned Position = 0;
       bool HasName;
-      if (getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
+      if (getPositionInTuple(*DC, cast<TupleExpr>(Parent), ParsedExpr, Position,
+                             HasName)) {
         // The expected type may have fewer number of elements.
         if (Position < tupleT->getNumElements())
           recordPossibleType(tupleT->getElementType(Position));
@@ -1184,7 +1098,7 @@ class ExprContextAnalyzer {
       break;
     }
     case StmtKind::ForEach:
-      if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
+      if (auto SEQ = cast<ForEachStmt>(Parent)->getParsedSequence()) {
         if (containsTarget(SEQ)) {
           recordPossibleType(Context.getSequenceType());
         }
@@ -1296,8 +1210,8 @@ class ExprContextAnalyzer {
       auto AFD = dyn_cast<AbstractFunctionDecl>(initDC->getParent());
       if (!AFD)
         return;
-      auto *param = initDC->getParam();
-      recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      auto *var = initDC->getWrappedVar();
+      recordPossibleType(AFD->mapTypeIntoContext(var->getInterfaceType()));
       break;
     }
     }
@@ -1361,14 +1275,14 @@ public:
           // Iff the cursor is in argument position.
           auto call = cast<CallExpr>(E);
           auto fnRange = call->getFn()->getSourceRange();
-          auto argsRange = call->getArg()->getSourceRange();
+          auto argsRange = call->getArgs()->getSourceRange();
           auto exprRange = ParsedExpr->getSourceRange();
           return !SM.rangeContains(fnRange, exprRange) &&
                  SM.rangeContains(argsRange, exprRange);
         }
         case ExprKind::Subscript: {
           // Iff the cursor is in index position.
-          auto argsRange = cast<SubscriptExpr>(E)->getIndex()->getSourceRange();
+          auto argsRange = cast<SubscriptExpr>(E)->getArgs()->getSourceRange();
           return SM.rangeContains(argsRange, ParsedExpr->getSourceRange());
         }
         case ExprKind::Binary:

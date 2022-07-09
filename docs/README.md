@@ -102,7 +102,9 @@ documentation, please create a thread on the Swift forums under the
 - [DependencyAnalysis.md](/docs/DependencyAnalysis.md):
   Describes different kinds of dependencies across files in the same module,
   important for understanding incremental builds.
-- C and ObjC interoperability: Clang Importer and PrintAsObjC
+- [DifferentiableProgrammingImplementation.md](/docs/DifferentiableProgrammingImplementation.md):
+  Describes how automatic differentiation is implemented in the Swift compiler.
+- C and ObjC interoperability: Clang Importer and PrintAsClang
   - [CToSwiftNameTranslation.md](/docs/CToSwiftNameTranslation.md):
     Describes how C and ObjC entities are imported into Swift
     by the Clang Importer.
@@ -123,13 +125,16 @@ documentation, please create a thread on the Swift forums under the
     Describes how to maintain compatibility when changing the serialization
     format.
 - SIL and SIL Optimizations:
+  - [SILFunctionConventions.md](/docs/SILFunctionConventions.md):
+  - [SILMemoryAccess.md](/docs/SILMemoryAccess.md):
   - [SILProgrammersManual.md](/docs/SILProgrammersManual.md):
     Provides an overview of the implementation of SIL in the compiler.
   - [OptimizerDesign.md](/docs/OptimizerDesign.md):
     Describes the design of the optimizer pipeline.
   - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
-    operations on currency data types and optimizes accordingly.
+    operations on [currency](/docs/Lexicon.md#currency-type) data types and 
+    optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
 
 ### SourceKit subsystems
@@ -177,9 +182,17 @@ documentation, please create a thread on the Swift forums under the
   <!-- NOTE: Outdated -->
 - [Lexicon.md](/docs/Lexicon.md):
   Canonical reference for terminology used throughout the project.
-  
+- [UnderscoredAttributes.md](/docs/ReferenceGuides/UnderscoredAttributes.md):
+  Documents semantics for underscored (unstable) attributes.
+
 ### ABI
 
+- [CallConvSummary.rst](/docs/ABI/CallConvSummary.rst):
+	A concise summary of the calling conventions used for C/C++, Objective-C
+	and Swift on Apple platforms.  Contains references to source documents,
+	where further detail is required.
+- [CallingConvention.rst](/docs/ABI/CallingConvention.rst):
+  Describes in detail the Swift calling convention.
 - [GenericSignature.md](/docs/ABI/GenericSignature.md):
   Describes what generic signatures are and how they are used in the ABI,
   including the algorithms for minimization and canonicalization.
@@ -191,9 +204,6 @@ documentation, please create a thread on the Swift forums under the
 - [Mangling.rst](/docs/ABI/Mangling.rst):
   Describes the stable mangling scheme, which produces unique symbols for
   ABI-public declarations.
-- [RegisterUsage.md](/docs/ABI/RegisterUsage.md):
-  Summarizes the register allocation for ARM64 and x86_64 calling conventions,
-  including the context register (self) and error return register.
 - [TypeLayout.rst](/docs/ABI/TypeLayout.rst):
   Describes the algorithms/strategies for fragile struct and tuple layout;
   class layout; fragile enum layout; and existential container layout.
@@ -239,7 +249,7 @@ documentation, please create a thread on the Swift forums under the
     Describes the goals and design for Library Evolution.
 - [BuildManifesto.md](/docs/BuildManifesto.md):
   Provides an outline for modularizing the build system for the Swift toolchain.
-- [CppInteroperabilityManifesto.md](/docs/CppInteroperabilityManifesto.md):
+- [CppInteroperabilityManifesto.md](/docs/CppInteroperability/CppInteroperabilityManifesto.md):
   Describes the motivation and design for first-class Swift-C++ interoperability.
 - [DifferentiableProgramming.md](/docs/DifferentiableProgramming.md):
   Outlines a vision and design for first-class differentiable programming in Swift.

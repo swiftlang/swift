@@ -15,6 +15,8 @@
 
 #include "CodeCompletion.h"
 #include "SourceKit/Core/LangSupport.h"
+//#include "swift/IDE/CodeCompletionContext.h"
+#include "swift/IDE/SwiftCompletionInfo.h"
 #include "llvm/ADT/StringMap.h"
 
 namespace swift {
@@ -36,7 +38,7 @@ struct Options {
   bool addInnerResults = false;
   bool addInnerOperators = true;
   bool addInitsToTopLevel = false;
-  bool callPatternHeuristics = true;
+  bool callPatternHeuristics = false;
   bool hideUnderscores = true;
   bool reallyHideAllUnderscores = false;
   bool hideLowPriority = true;
@@ -44,6 +46,7 @@ struct Options {
   bool fuzzyMatching = true;
   bool annotatedDescription = false;
   bool includeObjectLiterals = true;
+  bool addCallWithNoDefaultArgs = true;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 
@@ -53,17 +56,11 @@ struct Options {
   unsigned popularityBonus = 2;
 };
 
-struct SwiftCompletionInfo {
-  swift::ASTContext *swiftASTContext = nullptr;
-  const swift::CompilerInvocation *invocation = nullptr;
-  swift::ide::CodeCompletionContext *completionContext = nullptr;
-};
-
 typedef llvm::StringMap<PopularityFactor> NameToPopularityMap;
 
 std::vector<Completion *>
 extendCompletions(ArrayRef<SwiftResult *> swiftResults, CompletionSink &sink,
-                  SwiftCompletionInfo &info,
+                  swift::ide::SwiftCompletionInfo &info,
                   const NameToPopularityMap *nameToPopularity,
                   const Options &options, Completion *prefix = nullptr,
                   bool clearFlair = false);

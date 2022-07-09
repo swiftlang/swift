@@ -60,7 +60,7 @@ bb0:
 
 // CHECK-LABEL: sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
 // CHECK: bb0(%0 : $*P):
-// CHECK:  debug_value_addr
+// CHECK:  debug_value {{.*}} expr op_deref
 // CHECK:  alloc_stack
 // CHECK:  copy_addr
 // CHECK:  open_existential_addr
@@ -72,7 +72,7 @@ bb0:
 // CHECK-LABEL: } // end sil function '$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF'
 sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
 bb0(%0 : $*P):
-  debug_value_addr %0 : $*P, var, name "a", argno 1
+  debug_value %0 : $*P, var, name "a", argno 1, expr op_deref
   %2 = alloc_stack $P                             
   copy_addr %0 to [initialization] %2 : $*P      
   %4 = open_existential_addr immutable_access %2 : $*P to $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P
@@ -94,7 +94,7 @@ sil_global hidden [let] @$global_var : $P
 
 // CHECK-LABEL: sil hidden [noinline] @$helper : $@convention(thin) (@in P) -> Int32 {
 // CHECK: bb0(%0 : $*P):
-// CHECK:   debug_value_addr
+// CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
 // CHECK:   destroy_addr
@@ -106,7 +106,7 @@ sil_global hidden [let] @$global_var : $P
 // CHECK-LABEL: } // end sil function '$helper'
 sil hidden [noinline] @$helper : $@convention(thin) (@in P) -> Int32 {
 bb0(%0 : $*P):
-  debug_value_addr %0 : $*P, var, name "a", argno 1
+  debug_value %0 : $*P, var, name "a", argno 1, expr op_deref
   %4 = alloc_stack $P
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P
@@ -169,8 +169,8 @@ bb3:
 // CHECK-LABEL: } // end sil function '$s7dealloc12wrap_foo_ncp1a1bSiAA1P_pz_AaE_pztFTf4ee_n'
 sil hidden [noinline] @$s7dealloc12wrap_foo_ncp1a1bSiAA1P_pz_AaE_pztF : $@convention(thin) (@in P, @in P) -> Int32 {
 bb0(%0 : $*P, %1 : $*P):
-  debug_value_addr %0 : $*P, var, name "a", argno 1
-  debug_value_addr %1 : $*P, var, name "b", argno 2
+  debug_value %0 : $*P, var, name "a", argno 1, expr op_deref
+  debug_value %1 : $*P, var, name "b", argno 2, expr op_deref
   %4 = alloc_stack $P
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P

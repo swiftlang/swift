@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-stdlib %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -60,7 +60,7 @@ func globalActorMetatypeFn<T>(_: T.Type) -> Any.Type {
   return Fn.self
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func f1_actor(_: (isolated Actor) -> Void) { }
 
 DemangleToMetadataTests.test("function types") {
@@ -119,7 +119,7 @@ DemangleToMetadataTests.test("function types") {
   expectEqual(MainActorFn.self, globalActorMetatypeFn(Float.self))
 
   // isolated parameters
-  if #available(SwiftStdlib 5.5, *) {
+  if #available(SwiftStdlib 5.1, *) {
     expectEqual(type(of: f1_actor), _typeByName("yyScA_pYiXEc")!)
     typealias IsolatedFn = ((isolated Actor) -> Void) -> Void
     expectEqual(IsolatedFn.self, type(of: f1_actor))
@@ -430,7 +430,7 @@ DemangleToMetadataTests.test("Nested types in extensions") {
                       .InnermostUConformsToP3<ConformsToP4a>.self,
     _typeByName("4main4SG11VA2A2P1RzlE016InnerTConformsToC0VA2A2P3Rd__rlE018InnermostUConformsfG0VyAA08ConformsfC0V_AA0jf5P2AndG0V_AA0jF3P4aVG")!)
 
-  // Failure case: Dictionary's outer `Key: Hashable` constraint not sastified
+  // Failure case: Dictionary's outer `Key: Hashable` constraint not satisfied
   expectNil(_typeByName("s10DictionaryV4mainE5InnerVyAC12ConformsToP1VSi_AC12ConformsToP1VG"))
   // Failure case: Dictionary's inner `V: P1` constraint not satisfied
   expectNil(_typeByName("s10DictionaryV4mainE5InnerVySSSi_AC12ConformsToP2VG"))
@@ -482,7 +482,7 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsConformsToP1
 }
 
-if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Round-trip with _mangledTypeName and _typeByName") {
     func roundTrip<T>(_ type: T.Type) {
       let mangledName: String? = _mangledTypeName(type)
@@ -515,7 +515,7 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   }
 }
 
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
   DemangleToMetadataTests.test("Concurrency standard substitutions") {
     expectEqual(TaskGroup<Int>.self, _typeByName("ScGySiG")!)
   }

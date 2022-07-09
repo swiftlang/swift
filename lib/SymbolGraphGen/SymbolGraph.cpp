@@ -99,6 +99,10 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   ExcludeAttrs.insert(std::make_pair("DAK_Postfix", DAK_Postfix));
   ExcludeAttrs.insert(std::make_pair("DAK_Infix", DAK_Infix));
 
+  // In "emit modules separately" jobs, access modifiers show up as attributes,
+  // but we don't want them to be printed in declarations
+  ExcludeAttrs.insert(std::make_pair("DAK_AccessControl", DAK_AccessControl));
+
   for (const auto &Entry : ExcludeAttrs) {
     Opts.ExcludeAttrList.push_back(Entry.getValue());
   }
@@ -431,16 +435,11 @@ SymbolGraph::recordRequirementRelationships(Symbol S) {
 void SymbolGraph::recordOptionalRequirementRelationships(Symbol S) {
   const auto VD = S.getSymbolDecl();
   if (const auto *Protocol = dyn_cast<ProtocolDecl>(VD->getDeclContext())) {
-    if (VD->isProtocolRequirement()) {
-      if (const auto *ClangDecl = VD->getClangDecl()) {
-        if (const auto *Method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
-          if (Method->isOptional()) {
-            recordEdge(Symbol(this, VD, nullptr),
-                       Symbol(this, Protocol, nullptr),
-                       RelationshipKind::OptionalRequirementOf());
-          }
-        }
-      }
+    if (VD->isProtocolRequirement() &&
+        VD->getAttrs().hasAttribute<OptionalAttr>()) {
+      recordEdge(Symbol(this, VD, nullptr),
+                 Symbol(this, Protocol, nullptr),
+                 RelationshipKind::OptionalRequirementOf());
     }
   }
 }
@@ -575,6 +574,56 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
   T->print(Printer, Options);
 }
 
+namespace {
+
+/// Returns the first satisfied protocol requirement for the given decl.
+const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
+  auto reqs = VD->getSatisfiedProtocolRequirements();
+
+  if (!reqs.empty())
+    return reqs.front();
+  else
+    return nullptr;
+}
+
+/// Returns the protocol that the given decl is a requirement or conformance of, if any.
+const ProtocolDecl *getSourceProtocol(const Decl *D) {
+  const auto *DC = D->getDeclContext();
+
+  // First check to see whether it's declared directly in the protocol decl
+  if (const auto *P = dyn_cast<ProtocolDecl>(DC))
+    return P;
+
+  // Next look at whether it's an extension on a protocol
+  if (const auto *Extension = dyn_cast<ExtensionDecl>(DC)) {
+    if (const auto *ExtendedProtocol = Extension->getExtendedProtocolDecl()) {
+      return ExtendedProtocol;
+    }
+  }
+
+  // Then check to see whether it's an implementation of a protocol requirement
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (const auto *Requirement = getProtocolRequirement(VD)) {
+      if (const auto *P = dyn_cast<ProtocolDecl>(Requirement->getDeclContext())) {
+        return P;
+      }
+    }
+  }
+
+  // If all those didn't work, there's no protocol to fetch
+  return nullptr;
+}
+
+/// Returns whether the given decl is from a protocol, and that protocol has an underscored name.
+bool isFromUnderscoredProtocol(const Decl *D) {
+  if (const auto *P = getSourceProtocol(D))
+    return P->hasUnderscoredNaming();
+
+  return false;
+}
+
+}
+
 bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
                                       bool IgnoreContext) const {
   // Don't record unconditionally private declarations
@@ -583,9 +632,29 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   }
 
   // Don't record effectively internal declarations if specified
-  if (Walker.Options.MinimumAccessLevel > AccessLevel::Internal &&
-      D->hasUnderscoredNaming()) {
-    return true;
+  if (D->hasUnderscoredNaming() || isFromUnderscoredProtocol(D)) {
+    // Some implicit decls from Clang with underscored names sneak in, so throw those out
+    if (const auto *clangD = D->getClangDecl()) {
+      if (clangD->isImplicit())
+        return true;
+    }
+
+    AccessLevel symLevel = AccessLevel::Public;
+    if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+      symLevel = VD->getFormalAccess();
+    }
+
+    // Underscored symbols should be treated as `internal`, unless they're already
+    // marked that way - in that case, treat them as `private`
+    AccessLevel effectiveLevel;
+    if (symLevel > AccessLevel::Internal) {
+      effectiveLevel = AccessLevel::Internal;
+    } else {
+      effectiveLevel = AccessLevel::Private;
+    }
+
+    if (Walker.Options.MinimumAccessLevel > effectiveLevel)
+      return true;
   }
 
   // Don't include declarations with the @_spi attribute unless the
@@ -648,20 +717,32 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   return false;
 }
 
+bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
+  return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
+    if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      return !AvAttr->hasPlatform()
+        && AvAttr->isUnconditionallyUnavailable();
+    }
+
+    return false;
+  });
+}
+
 /// Returns `true` if the symbol should be included as a node in the graph.
 bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
-  // If this decl isn't in this module, don't record it,
+  // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName()) {
+  if (D->getModuleContext()->getName() != M.getName() && !Walker.isConsideredExportedImported(D)) {
     return false;
   }
 
-  if (D->isImplicit()) {
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->getOverriddenDecl() && D->isImplicit()) {
+      return false;
+    }
+  } else {
     return false;
   }
-
-  if (!isa<ValueDecl>(D)) {
-    return false;
-  }
-  return !isImplicitlyPrivate(cast<ValueDecl>(D));
+  return !isImplicitlyPrivate(cast<ValueDecl>(D)) 
+    && !isUnconditionallyUnavailableOnAllPlatforms(cast<ValueDecl>(D));
 }

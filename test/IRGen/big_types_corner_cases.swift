@@ -168,7 +168,7 @@ class SuperSub : SuperBase {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) %0, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}}) %1)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK: [[LOAD:%.*]] = load %swift.refcounted*, %swift.refcounted** %.callInternalLet.data
-// CHECK: call swiftcc void %7(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
+// CHECK: call swiftcc void %{{[0-9]+}}(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
 // CHECK: ret void
 public struct MUseStruct {
   var x = BigStruct()
@@ -203,7 +203,7 @@ public func testGetFunc() {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC4testyyF"(%T22big_types_corner_cases7TestBigC* swiftself %0)
 // CHECK: [[CALL1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSayy22big_types_corner_cases9BigStructVcSgGMD"
 // CHECK: [[CALL2:%.*]] = call i8** @"$sSayy22big_types_corner_cases9BigStructVcSgGSayxGSlsWl
-// CHECK:  call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%swift.opaque* noalias nocapture sret({{.*}}) %{{[0-9]+}}, i8* bitcast ({{.*}}* @"$s22big_types_corner_cases9BigStruct{{.*}}_TRTA{{(\.ptrauth)?}}" to i8*), %swift.opaque* %{{[0-9]+}}, %swift.type* %{{[0-9]+}}, i8** [[CALL2]]
+// CHECK:  call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%swift.opaque* noalias nocapture sret({{.*}}) %{{[0-9]+}}, i8* bitcast ({{.*}}* @"$s22big_types_corner_cases7TestBig{{.*}}" to i8*), %swift.opaque* null, %swift.type* %{{[0-9]+}}, i8** [[CALL2]]
 class TestBig {
     typealias Handler = (BigStruct) -> Void
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -parse-as-library
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -parse-as-library
 // REQUIRES: concurrency
 
 func asyncFunc() async throws {}

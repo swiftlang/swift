@@ -338,6 +338,17 @@ code for the target that is not the build machine:
 * ``%target-swift-autolink-extract``: run ``swift-autolink-extract`` for the
   target to extract its autolink flags on platforms that support them (when the
   autolink-extract feature flag is set)
+  
+* ``%target-swift-emit-module-interface(`` *swift interface path* ``)``
+  *other arguments*: run ``swift-frontend`` for the target, emitting a
+  swiftinterface to the given path and passing additional default flags
+  appropriate for resilient frameworks.
+
+* ``%target-swift-typecheck-module-from-interface(`` *swift interface path*
+  ``)`` *other arguments*: run ``swift-frontend`` for the target, verifying
+  the swiftinterface at the given path and passing additional default flags
+  appropriate for resilient frameworks. Designed to be used in combination with
+  ``%target-swift-emit-module-interface()``.
 
 * ``%target-clang``: run the system's ``clang++`` for the target.
 
@@ -349,6 +360,9 @@ code for the target that is not the build machine:
 
 * ``%target-cc-options``: the clang flags to setup the target with the right
   architecture and platform version.
+
+* ``%target-sanitizer-opt``: if sanitizers are enabled for the build, the
+  corresponding ``-fsanitize=`` option.
 
 * ``%target-triple``: a triple composed of the ``%target-cpu``, the vendor,
   the ``%target-os``, and the operating system version number. Possible values
@@ -380,6 +394,16 @@ code for the target that is not the build machine:
 * ``%target-static-stdlib-path``: the path to the static standard library.
 
   Add ``REQUIRES: static_stdlib`` to the test.
+
+* ``%target-rtti-opt``: the ``-frtti`` or ``-fno-rtti`` option required to
+  link with the Swift libraries on the target platform.
+
+* ``%target-cxx-lib``: the argument to add to the command line when using
+  ``swiftc`` and linking in a C++ object file.  Typically ``-lc++`` or
+  ``-lstdc++`` depending on platform.
+
+* ``%target-msvc-runtime-opt``: for Windows, the MSVC runtime option, e.g.
+  ``-MD``, to use when building C/C++ code to link with Swift.
 
 Always use ``%target-*`` substitutions unless you have a good reason.  For
 example, an exception would be a test that checks how the compiler handles

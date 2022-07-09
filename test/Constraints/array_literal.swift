@@ -219,10 +219,10 @@ func joinWithNil<T>(s: String, a: Any, t: T, m: T.Type, p: Proto1 & Proto2, arr:
   let _: Int = a16 // expected-error{{value of type '[T.Type?]'}}
   
   let a17 = [p, nil]
-  let _: Int = a17 // expected-error{{value of type '[(Proto1 & Proto2)?]'}}
+  let _: Int = a17 // expected-error{{value of type '[(any Proto1 & Proto2)?]'}}
   
   let a18 = [nil, p]
-  let _: Int = a18 // expected-error{{value of type '[(Proto1 & Proto2)?]'}}
+  let _: Int = a18 // expected-error{{value of type '[(any Proto1 & Proto2)?]'}}
   
   let a19 = [arr, nil]
   let _: Int = a19 // expected-error{{value of type '[[Int]?]'}}
@@ -354,4 +354,11 @@ func testSR8385() {
   let _: [SR8385] = [.text("hello")]
   let _: [SR8385] = ["hello", SR8385.text("world")]
   let _: [SR8385] = ["hello", .text("world")]
+}
+
+struct TestMultipleOverloadedInits {
+  var x: Double
+  func foo() {
+    let _ = [Float(x), Float(x), Float(x), Float(x)]
+  }
 }

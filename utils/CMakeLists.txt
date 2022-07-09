@@ -14,4 +14,4 @@ swift_install_in_component(PROGRAMS swift-api-dump.py
 file(TO_CMAKE_PATH "${LLVM_BUILD_BINARY_DIR}/bin/FileCheck${CMAKE_EXECUTABLE_SUFFIX}" _SWIFT_UTILS_FILECHECK)
 swift_install_in_component(PROGRAMS "${_SWIFT_UTILS_FILECHECK}"
                            DESTINATION bin
-                           COMPONENT toolchain-dev-tools)
+                           COMPONENT llvm-toolchain-dev-tools)

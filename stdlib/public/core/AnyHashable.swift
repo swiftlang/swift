@@ -145,7 +145,13 @@ public struct AnyHashable {
   /// Creates a type-erased hashable value that wraps the given instance.
   ///
   /// - Parameter base: A hashable value to wrap.
+  @_specialize(where H == String)
   public init<H: Hashable>(_ base: H) {
+    if H.self == String.self {
+      self.init(_box: _ConcreteHashableBox(base))
+      return
+    }
+    
     if let custom =
       (base as? _HasCustomAnyHashableRepresentation)?._toCustomAnyHashable() {
       self = custom
@@ -252,6 +258,7 @@ extension AnyHashable: CustomDebugStringConvertible {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension AnyHashable: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
@@ -259,8 +266,9 @@ extension AnyHashable: CustomReflectable {
       children: ["value": base])
   }
 }
+#endif
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+@available(SwiftStdlib 5.5, *)
 extension AnyHashable: _HasCustomAnyHashableRepresentation {
 }
 

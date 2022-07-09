@@ -56,7 +56,6 @@ protocol MyProtocol {}
 // LIBRARY-DAG: Keyword[repeat]/None/Flair[ExprAtFileScope]: repeat; name=repeat
 // LIBRARY-DAG: Keyword[else]/None/Flair[ExprAtFileScope]: else; name=else
 // LIBRARY-DAG: Keyword[for]/None/Flair[ExprAtFileScope]: for; name=for
-// LIBRARY-DAG: Keyword[in]/None/Flair[ExprAtFileScope]: in; name=in
 // LIBRARY-DAG: Keyword[while]/None/Flair[ExprAtFileScope]: while; name=while
 // LIBRARY-DAG: Keyword[break]/None/Flair[ExprAtFileScope]: break; name=break
 // LIBRARY-DAG: Keyword[continue]/None/Flair[ExprAtFileScope]: continue; name=continue
@@ -72,10 +71,10 @@ protocol MyProtocol {}
 // LIBRARY-DAG: Literal[Boolean]/None/Flair[ExprAtFileScope]: true[#Bool#]; name=true
 // LIBRARY-DAG: Literal[Boolean]/None/Flair[ExprAtFileScope]: false[#Bool#]; name=false
 // LIBRARY-DAG: Literal[Nil]/None/Flair[ExprAtFileScope]: nil; name=nil
-// LIBRARY-DAG: Literal[String]/None/Flair[ExprAtFileScope]: "{#(abc)#}"[#String#]; name="abc"
-// LIBRARY-DAG: Literal[Array]/None/Flair[ExprAtFileScope]: [{#(values)#}][#Array#]; name=[values]
-// LIBRARY-DAG: Literal[Dictionary]/None/Flair[ExprAtFileScope]: [{#(key)#}: {#(value)#}][#Dictionary#]; name=[key: value]
-// LIBRARY-DAG: Literal[Tuple]/None/Flair[ExprAtFileScope]: ({#(values)#}); name=(values)
+// LIBRARY-DAG: Literal[String]/None/Flair[ExprAtFileScope]: "{#(abc)#}"[#String#]; name=""
+// LIBRARY-DAG: Literal[Array]/None/Flair[ExprAtFileScope]: [{#(values)#}][#Array#]; name=[]
+// LIBRARY-DAG: Literal[Dictionary]/None/Flair[ExprAtFileScope]: [{#(key)#}: {#(value)#}][#Dictionary#]; name=[: ]
+// LIBRARY-DAG: Literal[Tuple]/None/Flair[ExprAtFileScope]: ({#(values)#}); name=()
 // LIBRARY-DAG: Keyword[#fileID]/None/Flair[ExprAtFileScope]: #fileID[#String#]; name=#fileID
 // LIBRARY-DAG: Keyword[#file]/None/Flair[ExprAtFileScope]: #file[#String#]; name=#file
 // LIBRARY-DAG: Keyword[#filePath]/None/Flair[ExprAtFileScope]: #filePath[#String#]; name=#filePath
@@ -133,7 +132,6 @@ protocol MyProtocol {}
 // SCRIPT-DAG: Keyword[repeat]/None:               repeat; name=repeat
 // SCRIPT-DAG: Keyword[else]/None:                 else; name=else
 // SCRIPT-DAG: Keyword[for]/None:                  for; name=for
-// SCRIPT-DAG: Keyword[in]/None:                   in; name=in
 // SCRIPT-DAG: Keyword[while]/None:                while; name=while
 // SCRIPT-DAG: Keyword[break]/None:                break; name=break
 // SCRIPT-DAG: Keyword[continue]/None:             continue; name=continue
@@ -149,10 +147,10 @@ protocol MyProtocol {}
 // SCRIPT-DAG: Literal[Boolean]/None: true[#Bool#]; name=true
 // SCRIPT-DAG: Literal[Boolean]/None: false[#Bool#]; name=false
 // SCRIPT-DAG: Literal[Nil]/None: nil; name=nil
-// SCRIPT-DAG: Literal[String]/None: "{#(abc)#}"[#String#]; name="abc"
-// SCRIPT-DAG: Literal[Array]/None: [{#(values)#}][#Array#]; name=[values]
-// SCRIPT-DAG: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary#]; name=[key: value]
-// SCRIPT-DAG: Literal[Tuple]/None: ({#(values)#}); name=(values)
+// SCRIPT-DAG: Literal[String]/None: "{#(abc)#}"[#String#]; name=""
+// SCRIPT-DAG: Literal[Array]/None: [{#(values)#}][#Array#]; name=[]
+// SCRIPT-DAG: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary#]; name=[: ]
+// SCRIPT-DAG: Literal[Tuple]/None: ({#(values)#}); name=()
 // SCRIPT-DAG: Keyword[#fileID]/None: #fileID[#String#]; name=#fileID
 // SCRIPT-DAG: Keyword[#file]/None: #file[#String#]; name=#file
 // SCRIPT-DAG: Keyword[#filePath]/None: #filePath[#String#]; name=#filePath

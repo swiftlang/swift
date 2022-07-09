@@ -1,0 +1,655 @@
+//===--- vcruntime.modulemap ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+module _visualc_intrinsics [system] [extern_c] {
+  explicit module arm {
+    requires armv7
+    header "armintr.h"
+
+    explicit module neon {
+      requires neon
+      header "arm_neon.h"
+    }
+  }
+
+  explicit module aarch64 {
+    requires aarch64
+    header "arm64intr.h"
+
+    explicit module neon {
+      requires neon
+      header "arm64_neon.h"
+    }
+  }
+
+  explicit module intel {
+    requires x86
+    export *
+
+    header "immintrin.h"
+
+    explicit module mmx {
+      header "mmintrin.h"
+    }
+
+    explicit module sse {
+      export mmx
+      header "xmmintrin.h"
+    }
+
+    explicit module sse2 {
+      export sse
+      header "emmintrin.h"
+    }
+
+    explicit module sse3 {
+      export sse2
+      header "pmmintrin.h"
+    }
+
+    explicit module ssse3 {
+      export sse3
+      header "tmmintrin.h"
+    }
+
+    explicit module sse4_1 {
+      export ssse3
+      header "smmintrin.h"
+    }
+
+    explicit module sse4_2 {
+      export sse4_1
+      header "nmmintrin.h"
+    }
+
+    explicit module sse4a {
+      export sse3
+      header "ammintrin.h"
+    }
+
+    explicit module aes_pclmul {
+      header "wmmintrin.h"
+      export aes
+      export pclmul
+    }
+  }
+}
+
+module SAL [system] {
+  header "sal.h"
+  export *
+
+  module Concurrency {
+    header "concurrencysal.h"
+    export *
+  }
+}
+
+module vcruntime [system] {
+  use SAL
+  export SAL
+
+  header "vcruntime.h"
+
+  module setjmp {
+    header "setjmp.h"
+    export *
+  }
+
+  explicit module stdint {
+    header "stdint.h"
+    export *
+  }
+}
+
+module std_config [system] {
+  header "crtdefs.h"
+  header "crtversion.h"
+  export *
+}
+
+module std [system] {
+  requires cplusplus
+
+  module compat {
+    module cassert {
+      textual header "cassert"
+      export *
+    }
+
+    module ccomplex {
+      header "ccomplex"
+      export *
+    }
+
+    module cctype {
+      header "cctype"
+      export *
+    }
+
+    module cerrno {
+      header "cerrno"
+      export *
+    }
+
+    module cfenv {
+      header "cfenv"
+      export *
+    }
+
+    module cfloat {
+      header "cfloat"
+      export *
+    }
+
+    module cinttypes {
+      header "cinttypes"
+      export *
+    }
+
+    module ciso646 {
+      header "ciso646"
+      export *
+    }
+
+    module climits {
+      header "climits"
+      export *
+    }
+
+    module clocale {
+      header "clocale"
+      export *
+    }
+
+    module cmath {
+      header "cmath"
+      export *
+    }
+
+    module csetjmp {
+      header "csetjmp"
+      export *
+    }
+
+    module csignal {
+      header "csignal"
+      export *
+    }
+
+    module cstdalign {
+      header "cstdalign"
+      export *
+    }
+
+    module cstdarg {
+      header "cstdarg"
+      export *
+    }
+
+    module cstdbool {
+      header "cstdbool"
+      export *
+    }
+
+    module cstddef {
+      header "cstddef"
+      export *
+    }
+
+    module cstdint {
+      header "cstdint"
+      export *
+    }
+
+    module cstdio {
+      header "cstdio"
+      export *
+    }
+
+    module cstdlib {
+      header "cstdlib"
+      export *
+    }
+
+    module cstring {
+      header "cstring"
+      export *
+    }
+
+    module ctgmath {
+      header "ctgmath"
+      export *
+    }
+
+    module ctime {
+      header "ctime"
+      export *
+    }
+
+    module cuchar {
+      header "cuchar"
+      export *
+    }
+
+    module cwchar {
+      header "cwchar"
+      export *
+    }
+
+    module cwctype {
+      header "cwctype"
+      export *
+    }
+  }
+
+  module algorithm {
+    header "algorithm"
+    export *
+  }
+
+  module any {
+    header "any"
+    export *
+  }
+
+  module array {
+    header "array"
+    export *
+  }
+
+  module atomic {
+    header "atomic"
+    export *
+  }
+
+  module barrier {
+    header "barrier"
+    export *
+  }
+
+  module bit {
+    header "bit"
+    export *
+  }
+
+  module bitset {
+    header "bitset"
+    export *
+  }
+
+  module charconv {
+    header "charconv"
+    export *
+  }
+
+  module chrono {
+    header "chrono"
+    export *
+  }
+
+  module codecvt {
+    header "codecvt"
+    export *
+  }
+
+  module compare {
+    header "compare"
+    export *
+  }
+
+  module complex {
+    header "complex"
+    export *
+  }
+
+  module concepts {
+    header "concepts"
+    export *
+  }
+
+  module condition_variable {
+    header "condition_variable"
+    export *
+  }
+
+  module coroutine {
+    header "coroutine"
+    export *
+  }
+
+  module deque {
+    header "deque"
+    export *
+  }
+
+  module exception {
+    header "exception"
+    export *
+  }
+
+  module execution {
+    header "execution"
+    export *
+  }
+
+  module filesystem {
+    header "filesystem"
+    export *
+  }
+
+  module format {
+    header "format"
+    export *
+  }
+
+  module forward_list {
+    header "forward_list"
+    export *
+  }
+
+  module fstream {
+    header "fstream"
+    export *
+  }
+
+  module functional {
+    header "functional"
+    export *
+  }
+
+  module future {
+    header "future"
+    export *
+  }
+
+/*
+  module hash_map {
+    header "hash_map"
+    export *
+  }
+*/
+
+/*
+  module hash_set {
+    header "hash_set"
+    export *
+  }
+*/
+
+  module initializer_list {
+    header "initializer_list"
+    export *
+  }
+
+  module ios {
+    header "ios"
+    export *
+  }
+
+  module iosfwd {
+    header "iosfwd"
+    export *
+  }
+
+  module iostream {
+    header "iostream"
+    export *
+  }
+
+  module istream {
+    header "istream"
+    export *
+  }
+
+  module iterator {
+    header "iterator"
+    export *
+  }
+
+  module latch {
+    header "latch"
+    export *
+  }
+
+  module limits {
+    header "limits"
+    export *
+  }
+
+  module list {
+    header "list"
+    export *
+  }
+
+  module locale {
+    header "locale"
+    export *
+  }
+
+  module map {
+    header "map"
+    export *
+  }
+
+  module memory {
+    header "memory"
+    export *
+  }
+
+  module memory_resource {
+    header "memory_resource"
+    export *
+  }
+
+  module mutex {
+    header "mutex"
+    export *
+  }
+
+  module new {
+    header "new"
+    export *
+  }
+
+  module numbers {
+    header "numbers"
+    export *
+  }
+
+  module numeric {
+    header "numeric"
+    export *
+  }
+
+  module optional {
+    header "optional"
+    export *
+  }
+
+  module ostream {
+    header "ostream"
+    export *
+  }
+
+  module queue {
+    header "queue"
+    export *
+  }
+
+  module random {
+    header "random"
+    export *
+  }
+
+  module ranges {
+    header "ranges"
+    export *
+  }
+
+  module ratio {
+    header "ratio"
+    export *
+  }
+
+  module regex {
+    header "regex"
+    export *
+  }
+
+  module scoped_allocator {
+    header "scoped_allocator"
+    export *
+  }
+
+  module semaphore {
+    header "semaphore"
+    export *
+  }
+
+  module set {
+    header "set"
+    export *
+  }
+
+  module shared_mutex {
+    header "shared_mutex"
+    export *
+  }
+
+  module source_location {
+    header "source_location"
+    export *
+  }
+
+  module span {
+    header "span"
+    export *
+  }
+
+/*
+  module spanstream {
+    header "spanstream"
+    export *
+  }
+*/
+
+  module sstream {
+    header "sstream"
+    export *
+  }
+
+  module stack {
+    header "stack"
+    export *
+  }
+
+  module stdexcept {
+    header "stdexcept"
+    export *
+  }
+
+  module stop_token {
+    header "stop_token"
+    export *
+  }
+
+  module streambuf {
+    header "streambuf"
+    export *
+  }
+
+  module string {
+    header "string"
+    export *
+  }
+
+  module string_view {
+    header "string_view"
+    export *
+  }
+
+  module strstream {
+    header "strstream"
+    export *
+  }
+
+  module syncstream {
+    header "syncstream"
+    export *
+  }
+
+  module system_error {
+    header "system_error"
+    export *
+  }
+
+  module thread {
+    header "thread"
+    export *
+  }
+
+  module tuple {
+    header "tuple"
+    export *
+  }
+
+  module type_traits {
+    header "type_traits"
+    export *
+  }
+
+  module typeindex {
+    header "typeindex"
+    export *
+  }
+
+  module typeinfo {
+    header "typeinfo"
+    export *
+  }
+
+  module unordered_map {
+    header "unordered_map"
+    export *
+  }
+
+  module unordered_set {
+    header "unordered_set"
+    export *
+  }
+
+  module utility {
+    header "utility"
+    export *
+  }
+
+  module valarray {
+    header "valarray"
+    export *
+  }
+
+  module variant {
+    header "variant"
+    export *
+  }
+
+  module vector {
+    header "vector"
+    export *
+  }
+
+  module version {
+    header "version"
+    export *
+  }
+}

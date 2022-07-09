@@ -100,9 +100,7 @@ class SKStressTester(product.Product):
         return self.args.install_skstresstester
 
     def install(self, host_target):
-        install_destdir = swiftpm.SwiftPM.get_install_destdir(self.args,
-                                                              host_target,
-                                                              self.build_dir)
+        install_destdir = self.host_install_destdir(host_target)
         install_prefix = install_destdir + self.args.install_prefix
         self.run_build_script_helper('install', host_target, [
             '--prefix', install_prefix

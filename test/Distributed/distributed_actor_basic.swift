@@ -1,30 +1,25 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
+import FakeDistributedActorSystems
 
-@available(SwiftStdlib 5.5, *)
-distributed struct StructNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
-@available(SwiftStdlib 5.5, *)
-distributed class ClassNope {} // expected-error{{'distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
-@available(SwiftStdlib 5.5, *)
-distributed enum EnumNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
-@available(SwiftStdlib 5.5, *)
 distributed actor DA {
+}
 
-  class func classFunc() {
-    // expected-error@-1{{class methods are only allowed within classes; use 'static' to declare a static method}}
+distributed actor First {
+  distributed func one(second: Second) async throws {
+    try await second.two(first: self, second: second)
   }
+}
 
-  nonisolated distributed func nonisolatedDistributed() async {
-    // expected-error@-1{{function 'nonisolatedDistributed()' cannot be both 'nonisolated' and 'distributed'}}{{3-15=}}
-    fatalError()
-  }
-
-  distributed nonisolated func distributedNonisolated() async {
-    // expected-error@-1{{function 'distributedNonisolated()' cannot be both 'nonisolated' and 'distributed'}}{{15-27=}}
-    fatalError()
+distributed actor Second {
+  distributed func two(first: First, second: Second) async {
+    try! await first.one(second: self)
   }
 }

@@ -1,6 +1,4 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
-// rdar://problem/56255858 - failing on no-asserts builds
-// XFAIL: no_asserts
 
 public struct stuffStruct {
     var a: Int64 = 6

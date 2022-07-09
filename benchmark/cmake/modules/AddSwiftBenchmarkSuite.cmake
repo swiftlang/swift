@@ -478,10 +478,10 @@ function (swift_benchmark_compile_archopts)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
       list(APPEND bench_library_swiftmodules "${swiftmodule}")
 
-      # Only set "enable-cxx-interop" for tests in the "cxx-source" directory.
+      # Only set "enable-experimental-cxx-interop" for tests in the "cxx-source" directory.
       set(cxx_options "")
       if ("${module_name_path}" MATCHES ".*cxx-source/.*")
-        list(APPEND cxx_options "-Xfrontend" "-enable-cxx-interop" "-I" "${srcdir}/utils/CxxTests/")
+        list(APPEND cxx_options "-Xfrontend" "-enable-experimental-cxx-interop" "-I" "${srcdir}/utils/CxxTests/")
       endif()
 
       if ("${bench_flags}" MATCHES "-whole-module.*")
@@ -590,7 +590,7 @@ function (swift_benchmark_compile_archopts)
       "-whole-module-optimization"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
-      "-Xfrontend" "-enable-cxx-interop"
+      "-Xfrontend" "-enable-experimental-cxx-interop"
       "-I" "${srcdir}/utils/CxxTests/"
       "-o" "${objdir}/${module_name}.o"
       "${source}")
@@ -683,7 +683,7 @@ function (swift_benchmark_compile_archopts)
           ${objcfile}
           "-o" "${OUTPUT_EXEC}"
         COMMAND
-        "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")
+        "${srcdir}/../utils/swift-darwin-postprocess.py" "${OUTPUT_EXEC}")
   else()
     # TODO: rpath.
     add_custom_command(
@@ -708,7 +708,10 @@ function(swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
 
   if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
-    set(stdlib_dependencies "swift-frontend")
+    set(stdlib_dependencies "swift-frontend" "swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+      list(APPEND stdlib_dependencies "swiftDarwin-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    endif()
     foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
       string(FIND "${stdlib_dependency}" "Unittest" find_output)
       if("${find_output}" STREQUAL "-1")

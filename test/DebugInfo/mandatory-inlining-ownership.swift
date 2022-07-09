@@ -4,9 +4,9 @@
 // RUN:   -sil-print-after=mandatory-inlining \
 // RUN:   -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
 
-// CHECK: begin_borrow {{.*}} : $OSLog, loc {{.*}}, scope 4
-// CHECK: tuple (), loc {{.*}}, scope 4
-// CHECK: end_borrow %9 : $OSLog, loc {{.*}}, scope 4
+// CHECK: begin_borrow {{.*}} : $OSLog, loc {{.*}}, scope 5
+// CHECK: tuple (), loc {{.*}}, scope 5
+// CHECK: end_borrow %9 : $OSLog, loc {{.*}}, scope 5
 
 import os
 

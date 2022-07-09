@@ -16,6 +16,10 @@ def req : Separate<["-"], "req">,
   HelpText<"Request kind">;
 def req_EQ : Joined<["-"], "req=">, Alias<req>;
 
+def id : Separate<["-"], "id">,
+  HelpText<"If this is an async request, an ID that can be used to cancel the request">;
+def id_EQ : Joined<["-"], "id=">, Alias<id>;
+
 def offset : Separate<["-"], "offset">,
   HelpText<"byte offset">;
 def offset_EQ : Joined<["-"], "offset=">, Alias<offset>;
@@ -105,6 +109,10 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
     "disable-implicit-concurrency-module-import">,
   HelpText<"Disable implicit import of the _Concurrency module">;
 
+def disable_implicit_string_processing_module_import : Flag<["-"],
+    "disable-implicit-string-processing-module-import">,
+  HelpText<"Disable implicit import of the _StringProcessing module">;
+
 def end_pos : Separate<["-"], "end-pos">, HelpText<"line:col">;
 def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
 
@@ -134,6 +142,9 @@ def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-reques
 def time_request : Flag<["-"], "time-request">,
   HelpText<"Print the time taken to process the request">;
 
+def measure_instructions : Flag<["-"], "measure-instructions">,
+  HelpText<"Measure how many instructions the execution of this request took in the SourceKit process.">;
+
 def repeat_request : Separate<["-"], "repeat-request">,
   HelpText<"Repeat the request n times">, MetaVarName<"<n>">;
 def repeat_request_EQ : Joined<["-"], "repeat-request=">, Alias<repeat_request>;
@@ -150,8 +161,16 @@ def suppress_config_request : Flag<["-"], "suppress-config-request">,
 def module_cache_path: Separate<["-"], "module-cache-path">, HelpText<"module cache path">;
 def module_cache_path_EQ : Joined<["-"], "module-cache-path=">, Alias<module_cache_path>;
 
+def simulate_long_request : Separate<["-"], "simulate-long-request">,
+  HelpText<"Simulate that the request takes x ms longer to execute. The request can be cancelled while waiting this duration">;
+def simulate_long_request_EQ : Joined<["-"], "simulate-long-request=">, Alias<simulate_long_request>;
+
 def shell: Flag<["-"], "shell">,
   HelpText<"Run shell command">;
+
+def cancel : Separate<["-"], "cancel">,
+  HelpText<"Cancel all async requests with the given ID">;
+def cancel_EQ : Joined<["-"], "cancel=">, Alias<cancel>;
 
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;

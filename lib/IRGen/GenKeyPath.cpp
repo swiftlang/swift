@@ -70,7 +70,6 @@ enum KeyPathAccessor {
 
 static void
 bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
-                                     const KeyPathPatternComponent &component,
                                      GenericEnvironment *genericEnv,
                                      ArrayRef<GenericRequirement> requirements,
                                      llvm::Value *args,
@@ -87,7 +86,9 @@ bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
       requirements.size() * IGF.IGM.getPointerSize().getValue());
 
     auto genericArgsOffset = IGF.Builder.CreateSub(size, genericArgsSize);
-    args = IGF.Builder.CreateInBoundsGEP(args, genericArgsOffset);
+    args = IGF.Builder.CreateInBoundsGEP(
+        args->getType()->getScalarType()->getPointerElementType(), args,
+        genericArgsOffset);
   }
   bindFromGenericRequirementsBuffer(IGF, requirements,
     Address(args, IGF.IGM.getPointerAlignment()),
@@ -186,22 +187,22 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   case Getter:
     // Original accessor's args should be @in or @out, meaning they won't be
     // captured or aliased.
-    accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
-    accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
-    accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
-    accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
+    accessorThunk->addParamAttr(0, llvm::Attribute::NoCapture);
+    accessorThunk->addParamAttr(0, llvm::Attribute::NoAlias);
+    accessorThunk->addParamAttr(1, llvm::Attribute::NoCapture);
+    accessorThunk->addParamAttr(1, llvm::Attribute::NoAlias);
     // Output is sret.
-    accessorThunk->addAttribute(
-        1, llvm::Attribute::getWithStructRetType(
+    accessorThunk->addParamAttr(
+        0, llvm::Attribute::getWithStructRetType(
                IGM.getLLVMContext(), thunkParams[0]->getPointerElementType()));
     break;
   case Setter:
     // Original accessor's args should be @in or @out, meaning they won't be
     // captured or aliased.
-    accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
-    accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
-    accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
-    accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
+    accessorThunk->addParamAttr(0, llvm::Attribute::NoCapture);
+    accessorThunk->addParamAttr(0, llvm::Attribute::NoAlias);
+    accessorThunk->addParamAttr(1, llvm::Attribute::NoCapture);
+    accessorThunk->addParamAttr(1, llvm::Attribute::NoAlias);
     break;
   case Equals:
   case Hash:
@@ -236,7 +237,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
       break;
     }
     auto componentArgsBufSize = params.claimNext();
-    bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+    bindPolymorphicArgumentsFromComponentIndices(IGF,
                                                  genericEnv, requirements,
                                                  componentArgsBuf,
                                                  componentArgsBufSize,
@@ -266,7 +267,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   return accessorThunk;
 }
 
-static llvm::Constant *
+static llvm::Function *
 getLayoutFunctionForComputedComponent(IRGenModule &IGM,
                                     const KeyPathPatternComponent &component,
                                     GenericEnvironment *genericEnv,
@@ -281,6 +282,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
   auto layoutFn = llvm::Function::Create(fnTy,
     llvm::GlobalValue::PrivateLinkage, "keypath_get_arg_layout", IGM.getModule());
   layoutFn->setAttributes(IGM.constructInitialAttributes());
+  layoutFn->setCallingConv(IGM.SwiftCC);
     
   {
     IRGenFunction IGF(IGM, layoutFn);
@@ -383,6 +385,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         llvm::GlobalValue::PrivateLinkage, "keypath_destroy", IGM.getModule());
       destroy = destroyFn;
       destroyFn->setAttributes(IGM.constructInitialAttributes());
+      destroyFn->setCallingConv(IGM.SwiftCC);
       
       IRGenFunction IGF(IGM, destroyFn);
       if (IGM.DebugInfo)
@@ -391,7 +394,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       auto params = IGF.collectParameters();
       auto componentArgsBuf = params.claimNext();
       auto componentArgsBufSize = params.claimNext();
-      bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+      bindPolymorphicArgumentsFromComponentIndices(IGF,
                                      genericEnv, requirements,
                                      componentArgsBuf,
                                      componentArgsBufSize,
@@ -412,7 +415,10 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         } else {
           offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
         }
-        auto elt = IGF.Builder.CreateInBoundsGEP(componentArgsBuf, offset);
+        auto elt = IGF.Builder.CreateInBoundsGEP(componentArgsBuf->getType()
+                                                     ->getScalarType()
+                                                     ->getPointerElementType(),
+                                                 componentArgsBuf, offset);
         auto eltAddr = ti.getAddressForPointer(
           IGF.Builder.CreateBitCast(elt, ti.getStorageType()->getPointerTo()));
         ti.destroy(IGF, eltAddr, ty,
@@ -432,6 +438,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         llvm::GlobalValue::PrivateLinkage, "keypath_copy", IGM.getModule());
       copy = copyFn;
       copyFn->setAttributes(IGM.constructInitialAttributes());
+      copyFn->setCallingConv(IGM.SwiftCC);
       
       IRGenFunction IGF(IGM, copyFn);
       if (IGM.DebugInfo)
@@ -441,7 +448,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       auto sourceArgsBuf = params.claimNext();
       auto destArgsBuf = params.claimNext();
       auto componentArgsBufSize = params.claimNext();
-      bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+      bindPolymorphicArgumentsFromComponentIndices(IGF,
                                      genericEnv, requirements,
                                      sourceArgsBuf,
                                      componentArgsBufSize,
@@ -463,8 +470,12 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         } else {
           offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
         }
-        auto sourceElt = IGF.Builder.CreateInBoundsGEP(sourceArgsBuf, offset);
-        auto destElt = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
+        auto sourceElt = IGF.Builder.CreateInBoundsGEP(
+            sourceArgsBuf->getType()->getScalarType()->getPointerElementType(),
+            sourceArgsBuf, offset);
+        auto destElt = IGF.Builder.CreateInBoundsGEP(
+            destArgsBuf->getType()->getScalarType()->getPointerElementType(),
+            destArgsBuf, offset);
         auto sourceEltAddr = ti.getAddressForPointer(
           IGF.Builder.CreateBitCast(sourceElt,
                                     ti.getStorageType()->getPointerTo()));
@@ -484,10 +495,14 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto notAlignMask = IGF.Builder.CreateNot(envAlignMask);
         offset = IGF.Builder.CreateAdd(offset, envAlignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
-        
-        auto sourceEnv = IGF.Builder.CreateInBoundsGEP(sourceArgsBuf, offset);
-        auto destEnv = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
-        
+
+        auto sourceEnv = IGF.Builder.CreateInBoundsGEP(
+            sourceArgsBuf->getType()->getScalarType()->getPointerElementType(),
+            sourceArgsBuf, offset);
+        auto destEnv = IGF.Builder.CreateInBoundsGEP(
+            destArgsBuf->getType()->getScalarType()->getPointerElementType(),
+            destArgsBuf, offset);
+
         auto align = IGM.getPointerAlignment().getValue();
         IGF.Builder.CreateMemCpy(destEnv, llvm::MaybeAlign(align), sourceEnv,
                                  llvm::MaybeAlign(align),
@@ -532,7 +547,7 @@ struct KeyPathIndexOperand {
   const KeyPathPatternComponent *LastUser;
 };
 
-static llvm::Constant *
+static llvm::Function *
 getInitializerForComputedComponent(IRGenModule &IGM,
            const KeyPathPatternComponent &component,
            ArrayRef<KeyPathIndexOperand> operands,
@@ -545,6 +560,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
   auto initFn = llvm::Function::Create(fnTy,
     llvm::GlobalValue::PrivateLinkage, "keypath_arg_init", IGM.getModule());
   initFn->setAttributes(IGM.constructInitialAttributes());
+  initFn->setCallingConv(IGM.SwiftCC);
     
   {
     IRGenFunction IGF(IGM, initFn);
@@ -597,8 +613,10 @@ getInitializerForComputedComponent(IRGenModule &IGM,
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
       }
-      
-      auto ptr = IGF.Builder.CreateInBoundsGEP(src, offset);
+
+      auto ptr = IGF.Builder.CreateInBoundsGEP(
+          src->getType()->getScalarType()->getPointerElementType(), src,
+          offset);
       auto addr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
         ptr, ti.getStorageType()->getPointerTo()));
       srcAddresses.push_back(addr);
@@ -626,8 +644,10 @@ getInitializerForComputedComponent(IRGenModule &IGM,
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
       }
-      
-      auto ptr = IGF.Builder.CreateInBoundsGEP(dest, offset);
+
+      auto ptr = IGF.Builder.CreateInBoundsGEP(
+          dest->getType()->getScalarType()->getPointerElementType(), dest,
+          offset);
       auto destAddr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
         ptr, ti.getStorageType()->getPointerTo()));
       
@@ -656,7 +676,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
         auto notGenericEnvAlignMask = IGF.Builder.CreateNot(genericEnvAlignMask);
         offset = IGF.Builder.CreateAdd(offset, genericEnvAlignMask);
         offset = IGF.Builder.CreateAnd(offset, notGenericEnvAlignMask);
-        destGenericEnv = IGF.Builder.CreateInBoundsGEP(dest, offset);
+        destGenericEnv = IGF.Builder.CreateInBoundsGEP(
+            dest->getType()->getScalarType()->getPointerElementType(), dest,
+            offset);
       }
       
       auto align = IGM.getPointerAlignment().getValue();
@@ -678,7 +700,8 @@ emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type,
   // Mask the bottom bit to tell the key path runtime this is a mangled name
   // rather than a direct reference.
   auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
-  return llvm::ConstantExpr::getGetElementPtr(nullptr, constant, bitConstant);
+  return llvm::ConstantExpr::getGetElementPtr(
+    constant->getType()->getPointerElementType(), constant, bitConstant);
 }
 
 static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
@@ -930,7 +953,11 @@ emitKeyPathComponent(IRGenModule &IGM,
       // instantiation time.
       idResolution = idRef.isIndirect()
         ? KeyPathComponentHeader::IndirectPointer
-        : KeyPathComponentHeader::Resolved;
+        // Compute absolute reference from relative reference if target supports it.
+        // Otherwise, embed absolute reference directly.
+        : (IGM.getOptions().CompactAbsoluteFunctionPointer
+          ? KeyPathComponentHeader::ResolvedAbsolute
+          : KeyPathComponentHeader::Resolved);
       break;
     }
     case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
@@ -1065,8 +1092,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     fields.addInt32(header.getData());
     switch (idKind) {
     case KeyPathComponentHeader::Pointer:
-      // Use a relative offset to the referent.
-      fields.addRelativeAddress(idValue);
+      // Use a relative offset to the referent if value is not absolute.
+      if (idResolution == KeyPathComponentHeader::ResolvedAbsolute) {
+        fields.add(idValue);
+      } else {
+        fields.addRelativeAddress(idValue);
+      }
       break;
 
     case KeyPathComponentHeader::VTableOffset:
@@ -1077,12 +1108,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     }
 
     // Push the accessors, possibly thunked to marshal generic environment.
-    fields.addRelativeAddress(
+    fields.addCompactFunctionReference(
       getAccessorForComputedComponent(IGM, component, Getter,
                                       genericEnv, requirements,
                                       hasSubscriptIndices));
     if (settable)
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getAccessorForComputedComponent(IGM, component, Setter,
                                         genericEnv, requirements,
                                         hasSubscriptIndices));
@@ -1092,7 +1123,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       // arguments in the component. Thunk the SIL-level accessors to give the
       // runtime implementation a polymorphically-callable interface.
 
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getLayoutFunctionForComputedComponent(IGM, component,
                                               genericEnv, requirements));
       
@@ -1112,7 +1143,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       
       // Add an initializer function that copies generic arguments out of the
       // pattern argument buffer into the instantiated object.
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getInitializerForComputedComponent(IGM, component, operands,
                                            genericEnv, requirements));
     }
@@ -1185,12 +1216,9 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   // Collect the required parameters for the keypath's generic environment.
   SmallVector<GenericRequirement, 4> requirements;
   
-  GenericEnvironment *genericEnv = nullptr;
-  if (auto sig = pattern->getGenericSignature()) {
-    genericEnv = sig->getGenericEnvironment();
-    enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
-      [&](GenericRequirement reqt) { requirements.push_back(reqt); });
-  }
+  auto *genericEnv = pattern->getGenericSignature().getGenericEnvironment();
+  enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
+    [&](GenericRequirement reqt) { requirements.push_back(reqt); });
 
   // Start building the key path pattern.
   ConstantInitBuilder builder(*this);
@@ -1331,7 +1359,9 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                                            TheTrivialPropertyDescriptor);
       ApplyIRLinkage({linkInfo.getLinkage(),
                       linkInfo.getVisibility(),
-                      llvm::GlobalValue::DLLExportStorageClass})
+                      IRGen.Opts.InternalizeSymbols
+                          ? llvm::GlobalValue::DefaultStorageClass
+                          : llvm::GlobalValue::DLLExportStorageClass})
           .to(GA, linkInfo.isForDefinition());
     }
     return;

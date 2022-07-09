@@ -21,6 +21,7 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
@@ -53,7 +54,8 @@ public:
     // The protocol conformance descriptor gets added first.
     asDerived().addProtocolConformanceDescriptor();
 
-    for (const auto &reqt : protocol->getRequirementSignature()) {
+    auto requirements = protocol->getRequirementSignature().getRequirements();
+    for (const auto &reqt : requirements) {
       switch (reqt.getKind()) {
       // These requirements don't show up in the witness table.
       case RequirementKind::Superclass:
@@ -144,6 +146,7 @@ public:
     if (SILDeclRef::requiresNewWitnessTableEntry(func)) {
       asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
       addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+      addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
     }
   }
 
@@ -190,6 +193,16 @@ private:
               diffAttr->getDerivativeGenericSignature(),
               AFD->getASTContext())));
     }
+  }
+
+  void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
+                                              SILDeclRef::Kind kind) {
+    if (!AFD->isDistributed())
+      return;
+
+    // Add another which will be witnessed by the 'distributed thunk'
+    SILDeclRef declRef(AFD, kind);
+    asDerived().addMethod(declRef.asDistributed());
   }
 };
 

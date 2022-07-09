@@ -740,14 +740,17 @@ Reflection.test("Name of metatype of artificial subclass") {
   expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
 }
 
-@objc class StringConvertibleInDebugAndOtherwise : NSObject {
+@objc class StringConvertibleInDebugAndOtherwise_Native : NSObject {
   override var description: String { return "description" }
   override var debugDescription: String { return "debugDescription" }
 }
 
 Reflection.test("NSObject is properly CustomDebugStringConvertible") {
-  let object = StringConvertibleInDebugAndOtherwise()
-  expectEqual(String(reflecting: object), object.debugDescription)
+  let objectNative = StringConvertibleInDebugAndOtherwise_Native()
+  let objectObjC = StringConvertibleInDebugAndOtherwise_ObjC()
+
+  expectEqual(String(reflecting: objectNative), objectNative.debugDescription)
+  expectEqual(String(reflecting: objectObjC), objectObjC.debugDescription)
 }
 
 Reflection.test("NSRange QuickLook") {
@@ -793,8 +796,8 @@ RuntimeClassNamesTestSuite.test("private class nested in same-type-constrained e
   let base: NSData? = nil
   let util = base.asInner
 
-  let clas = unsafeBitCast(type(of: util), to: NSObject.self)
-  let desc = clas.description
+  let clazz = unsafeBitCast(type(of: util), to: NSObject.self)
+  let desc = clazz.description
   expectEqual("_TtCE1a", desc.prefix(7))
   expectEqual("Inner", desc.suffix(5))
 }

@@ -1,6 +1,4 @@
-// RUN: %target-sil-opt -enable-ossa-modules -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
-
-// -enable-ossa-modules happens to enable copy propagation during sil-combine, which these tests rely on.
+// RUN: %target-sil-opt -enable-ossa-modules -enable-copy-propagation -enable-lexical-lifetimes=false -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 import Swift
 import Builtin

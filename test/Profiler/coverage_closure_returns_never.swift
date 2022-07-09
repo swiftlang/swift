@@ -2,7 +2,8 @@
 
 // CHECK-LABEL: closure #1 (Swift.Never) -> Swift.Never in coverage_closure_returns_never.closure_with_fatal_error(Swift.Array<Swift.Never>) -> ()
 // CHECK: builtin "int_instrprof_increment"
-// CHECK-NEXT: debug_value {{.*}} : $Never
+// CHECK-NEXT: [[LOAD:%.*]] = load {{.*}} : $*Never
+// CHECK-NEXT: debug_value [[LOAD]] : $Never
 // CHECK-NEXT: unreachable
 
 func closure_with_fatal_error(_ arr: [Never]) {

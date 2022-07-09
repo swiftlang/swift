@@ -8,7 +8,7 @@ import Swift
 import Builtin
 import Swift
 
-protocol OtherKlass : class {}
+protocol OtherKlass : AnyObject {}
 
 class Klass {}
 

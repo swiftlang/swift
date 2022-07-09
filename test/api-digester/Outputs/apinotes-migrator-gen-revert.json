@@ -1,6 +1,17 @@
 [
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Import",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "",
+    "LeftComment": "objc_generics",
+    "RightUsr": "",
+    "RightComment": "Foundation",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Var",
     "NodeAnnotation": "RevertSimpleStringRepresentableUpdate",
     "ChildIndex": "0",

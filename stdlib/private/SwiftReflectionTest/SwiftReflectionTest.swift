@@ -131,6 +131,19 @@ import Glibc
 
 let rtldDefault: UnsafeMutableRawPointer? = nil
 
+#if INTERNAL_CHECKS_ENABLED
+@_silgen_name("swift_getMetadataSection")
+internal func _getMetadataSection(_ index: UInt) -> UnsafeRawPointer?
+
+@_silgen_name("swift_getMetadataSectionCount")
+internal func _getMetadataSectionCount() -> UInt
+
+@_silgen_name("swift_getMetadataSectionName")
+internal func _getMetadataSectionName(
+  _ metadata_section: UnsafeRawPointer
+) -> UnsafePointer<CChar>
+#endif
+
 extension Section {
   init(range: MetadataSectionRange) {
     self.startAddress = UnsafeRawPointer(bitPattern: range.start)!
@@ -139,6 +152,7 @@ extension Section {
 }
 
 internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
+#if INTERNAL_CHECKS_ENABLED
   return _getMetadataSection(UInt(i)).map { rawPointer in
     let name = _getMetadataSectionName(rawPointer)
     let metadataSection = rawPointer.bindMemory(to: MetadataSections.self, capacity: 1).pointee
@@ -150,10 +164,17 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
             typeref: Section(range: metadataSection.swift5_typeref),
             reflstr: Section(range: metadataSection.swift5_reflstr))
   }
+#else
+  return nil
+#endif
 }
 
 internal func getImageCount() -> UInt32 {
+#if INTERNAL_CHECKS_ENABLED
   return UInt32(_getMetadataSectionCount())
+#else
+  return 0
+#endif
 }
 
 internal func sendImages() {
@@ -352,25 +373,25 @@ internal func reflect(instanceAddress: UInt,
                       shouldUnwrapClassExistential: Bool = false) {
   while let command = readLine(strippingNewline: true) {
     switch command {
-    case String(validatingUTF8: RequestInstanceKind)!:
+    case RequestInstanceKind:
       sendValue(kind.rawValue)
-    case String(validatingUTF8: RequestShouldUnwrapClassExistential)!:
+    case RequestShouldUnwrapClassExistential:
       sendValue(shouldUnwrapClassExistential)
-    case String(validatingUTF8: RequestInstanceAddress)!:
+    case RequestInstanceAddress:
       sendValue(instanceAddress)
-    case String(validatingUTF8: RequestReflectionInfos)!:
+    case RequestReflectionInfos:
       sendReflectionInfos()
-    case String(validatingUTF8: RequestImages)!:
+    case RequestImages:
       sendImages()
-    case String(validatingUTF8: RequestReadBytes)!:
+    case RequestReadBytes:
       sendBytes()
-    case String(validatingUTF8: RequestSymbolAddress)!:
+    case RequestSymbolAddress:
       sendSymbolAddress()
-    case String(validatingUTF8: RequestStringLength)!:
+    case RequestStringLength:
       sendStringLength()
-    case String(validatingUTF8: RequestPointerSize)!:
+    case RequestPointerSize:
       sendPointerSize()
-    case String(validatingUTF8: RequestDone)!:
+    case RequestDone:
       return
     default:
       fatalError("Unknown request received: '\(Array(command.utf8))'!")

@@ -57,6 +57,7 @@
 
 #define DEBUG_TYPE "closure-specialization"
 #include "swift/Basic/Range.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -162,6 +163,14 @@ private:
 namespace {
 struct ClosureInfo;
 
+static SILFunction *getClosureCallee(SILInstruction *inst) {
+  if (auto *PAI = dyn_cast<PartialApplyInst>(inst))
+    return cast<FunctionRefInst>(PAI->getCallee())->getReferencedFunction();
+
+  auto *TTTFI = cast<ThinToThickFunctionInst>(inst);
+  return cast<FunctionRefInst>(TTTFI->getCallee())->getReferencedFunction();
+}
+
 class CallSiteDescriptor {
   ClosureInfo *CInfo;
   FullApplySite AI;
@@ -188,11 +197,7 @@ public:
   }
 
   SILFunction *getClosureCallee() const {
-    if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
-      return cast<FunctionRefInst>(PAI->getCallee())->getReferencedFunction();
-
-    auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
-    return cast<FunctionRefInst>(TTTFI->getCallee())->getReferencedFunction();
+    return ::getClosureCallee(getClosure());
   }
 
   bool closureHasRefSemanticContext() const {
@@ -484,9 +489,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 }
 
 IsSerialized_t CallSiteDescriptor::isSerialized() const {
-  if (getClosure()->getFunction()->isSerialized() &&
-      getApplyCallee()->isSerialized())
-    return IsSerializable;
+  if (getClosure()->getFunction()->isSerialized())
+    return IsSerialized;
   return IsNotSerialized;
 }
 
@@ -688,8 +692,8 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
       getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()), ClonedName,
       ClonedTy, ClosureUser->getGenericEnvironment(),
       ClosureUser->getLocation(), IsBare, ClosureUser->isTransparent(),
-      CallSiteDesc.isSerialized(), IsNotDynamic, ClosureUser->getEntryCount(),
-      ClosureUser->isThunk(),
+      CallSiteDesc.isSerialized(), IsNotDynamic, IsNotDistributed,
+      ClosureUser->getEntryCount(), ClosureUser->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
@@ -1065,6 +1069,59 @@ static bool canSpecializeFullApplySite(FullApplySiteKind kind) {
   llvm_unreachable("covered switch");
 }
 
+static int getSpecializationLevelRecursive(StringRef funcName, Demangler &parent) {
+  using namespace Demangle;
+
+  Demangler demangler;
+  demangler.providePreallocatedMemory(parent);
+
+  // Check for this kind of node tree:
+  //
+  // kind=Global
+  //   kind=FunctionSignatureSpecialization
+  //     kind=SpecializationPassID, index=1
+  //     kind=FunctionSignatureSpecializationParam
+  //       kind=FunctionSignatureSpecializationParamKind, index=5
+  //       kind=FunctionSignatureSpecializationParamPayload, text="..."
+  //
+  Node *root = demangler.demangleSymbol(funcName);
+  if (!root)
+    return 0;
+  if (root->getKind() != Node::Kind::Global)
+    return 0;
+  Node *funcSpec = root->getFirstChild();
+  if (!funcSpec || funcSpec->getNumChildren() < 2)
+    return 0;
+  if (funcSpec->getKind() != Node::Kind::FunctionSignatureSpecialization)
+    return 0;
+  Node *param = funcSpec->getChild(1);
+  if (param->getKind() != Node::Kind::FunctionSignatureSpecializationParam)
+    return 0;
+  if (param->getNumChildren() < 2)
+    return 0;
+  Node *kindNd = param->getChild(0);
+  if (kindNd->getKind() != Node::Kind::FunctionSignatureSpecializationParamKind)
+    return 0;
+  auto kind = FunctionSigSpecializationParamKind(kindNd->getIndex());
+  if (kind != FunctionSigSpecializationParamKind::ConstantPropFunction)
+    return 0;
+    
+  Node *payload = param->getChild(1);
+  if (payload->getKind() != Node::Kind::FunctionSignatureSpecializationParamPayload)
+    return 1;
+  // Check if the specialized function is a specialization itself.
+  return 1 + getSpecializationLevelRecursive(payload->getText(), demangler);
+}
+
+/// If \p function is a function-signature specialization for a constant-
+/// propagated function argument, returns 1.
+/// If \p function is a specialization of such a specialization, returns 2.
+/// And so on.
+static int getSpecializationLevel(SILFunction *f) {
+  Demangle::StackAllocatedDemangler<1024> demangler;
+  return getSpecializationLevelRecursive(f->getName(), demangler);
+}
+
 bool SILClosureSpecializerTransform::gatherCallSites(
     SILFunction *Caller,
     llvm::SmallVectorImpl<std::unique_ptr<ClosureInfo>> &ClosureCandidates,
@@ -1251,6 +1308,24 @@ bool SILClosureSpecializerTransform::gatherCallSites(
             !findAllNonFailureExitBBs(ApplyCallee, NonFailureExitBBs)) {
           continue;
         }
+
+        // Avoid an infinite specialization loop caused by repeated runs of
+        // ClosureSpecializer and CapturePropagation.
+        // CapturePropagation propagates constant function-literals. Such
+        // function specializations can then be optimized again by the
+        // ClosureSpecializer and so on.
+        // This happens if a closure argument is called _and_ referenced in
+        // another closure, which is passed to a recursive call. E.g.
+        //
+        // func foo(_ c: @escaping () -> ()) {
+        //   c()
+        //   foo({ c() })
+        // }
+        //
+        // A limit of 2 is good enough and will not be exceed in "regular"
+        // optimization scenarios.
+        if (getSpecializationLevel(getClosureCallee(ClosureInst)) > 2)
+          continue;
 
         // Compute the final release points of the closure. We will insert
         // release of the captured arguments here.

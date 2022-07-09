@@ -16,27 +16,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/Punycode.h"
-#include "swift/Demangling/ManglingUtils.h"
-#include "swift/Demangling/ManglingMacros.h"
+#include "DemanglerAssert.h"
+#include "RemanglerBase.h"
 #include "swift/AST/Ownership.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/ManglingUtils.h"
+#include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "RemanglerBase.h"
 #include <cstdio>
 #include <cstdlib>
 
 using namespace swift;
 using namespace Demangle;
 using namespace Mangle;
-
-[[noreturn]]
-static void unreachable(const char *Message) {
-  fprintf(stderr, "fatal error: %s\n", Message);
-  std::abort();
-}
 
 static char getCharOfNodeText(Node *node, unsigned idx) {
   switch (node->getKind()) {
@@ -206,6 +201,7 @@ class Remangler : public RemanglerBase {
     };
   };
 
+  // ###TODO: Consider fixing some of these asserts() to return errors somehow
   Node *getSingleChild(Node *node) {
     assert(node->getNumChildren() == 1);
     return node->getFirstChild();
@@ -228,6 +224,7 @@ class Remangler : public RemanglerBase {
     return getSingleChild(node);
   }
 
+  // Cannot fail
   void mangleIndex(Node::IndexType value) {
     if (value == 0) {
       Buffer << '_';
@@ -235,15 +232,16 @@ class Remangler : public RemanglerBase {
       Buffer << (value - 1) << '_';
     }
   }
-  void mangleDependentConformanceIndex(Node *node, unsigned depth);
+  ManglingError mangleDependentConformanceIndex(Node *node, unsigned depth);
 
-  void mangleChildNodes(Node *node, unsigned depth) {
-    mangleNodes(node->begin(), node->end(), depth);
+  ManglingError mangleChildNodes(Node *node, unsigned depth) {
+    return mangleNodes(node->begin(), node->end(), depth);
   }
-  void mangleChildNodesReversed(Node *node, unsigned depth) {
+  ManglingError mangleChildNodesReversed(Node *node, unsigned depth) {
     for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; ++Idx) {
-      mangleChildNode(node, Num - Idx - 1, depth);
+      RETURN_IF_ERROR(mangleChildNode(node, Num - Idx - 1, depth));
     }
+    return ManglingError::Success;
   }
 
   void mangleListSeparator(bool &isFirstListItem) {
@@ -258,32 +256,36 @@ class Remangler : public RemanglerBase {
       Buffer << 'y';
   }
 
-  void mangleNodes(Node::iterator i, Node::iterator e, unsigned depth) {
+  ManglingError mangleNodes(Node::iterator i, Node::iterator e,
+                            unsigned depth) {
     for (; i != e; ++i) {
-      mangle(*i, depth);
+      RETURN_IF_ERROR(mangle(*i, depth));
     }
+    return ManglingError::Success;
   }
 
-  void mangleSingleChildNode(Node *node, unsigned depth) {
-    assert(node->getNumChildren() == 1);
-    mangle(*node->begin(), depth);
+  ManglingError mangleSingleChildNode(Node *node, unsigned depth) {
+    if (node->getNumChildren() != 1)
+      return MANGLING_ERROR(ManglingError::MultipleChildNodes, node);
+    return mangle(*node->begin(), depth);
   }
 
-  void mangleChildNode(Node *node, unsigned index, unsigned depth) {
+  ManglingError mangleChildNode(Node *node, unsigned index, unsigned depth) {
     if (index < node->getNumChildren())
-      mangle(node->begin()[index], depth);
+      return mangle(node->begin()[index], depth);
+    return ManglingError::Success;
   }
 
-  void manglePureProtocol(Node *Proto, unsigned depth) {
+  ManglingError manglePureProtocol(Node *Proto, unsigned depth) {
     Proto = skipType(Proto);
     if (mangleStandardSubstitution(Proto))
-      return;
+      return ManglingError::Success;
 
-    mangleChildNodes(Proto, depth);
+    return mangleChildNodes(Proto, depth);
   }
 
-  void mangleProtocolList(Node *protocols, Node *superclass,
-                          bool hasExplicitAnyObject, unsigned depth);
+  ManglingError mangleProtocolList(Node *protocols, Node *superclass,
+                                   bool hasExplicitAnyObject, unsigned depth);
 
   bool trySubstitution(Node *node, SubstitutionEntry &entry,
                        bool treatAsIdentifier = false);
@@ -292,46 +294,50 @@ class Remangler : public RemanglerBase {
 
   bool mangleStandardSubstitution(Node *node);
 
+  // Cannot fail
   void mangleDependentGenericParamIndex(Node *node,
                                         const char *nonZeroPrefix = "",
                                         char zeroOp = 'z');
 
-  std::pair<int, Node *> mangleConstrainedType(Node *node, unsigned depth);
+  ManglingErrorOr<std::pair<int, Node *>> mangleConstrainedType(Node *node,
+                                                                unsigned depth);
 
-  void mangleFunctionSignature(Node *FuncType, unsigned depth) {
-    mangleChildNodesReversed(FuncType, depth);
+  ManglingError mangleFunctionSignature(Node *FuncType, unsigned depth) {
+    return mangleChildNodesReversed(FuncType, depth);
   }
 
-  void mangleGenericSpecializationNode(Node *node, const char *operatorStr,
-                                       unsigned depth);
-  void mangleAnyNominalType(Node *node, unsigned depth);
-  void mangleAnyGenericType(Node *node, StringRef TypeOp, unsigned depth);
-  void mangleGenericArgs(Node *node, char &Separator, unsigned depth,
-                         bool fullSubstitutionMap = false);
-  void mangleAnyConstructor(Node *node, char kindOp, unsigned depth);
-  void mangleAbstractStorage(Node *node, StringRef accessorCode,
-                             unsigned depth);
-  void mangleAnyProtocolConformance(Node *node, unsigned depth);
+  ManglingError mangleGenericSpecializationNode(Node *node,
+                                                const char *operatorStr,
+                                                unsigned depth);
+  ManglingError mangleAnyNominalType(Node *node, unsigned depth);
+  ManglingError mangleAnyGenericType(Node *node, StringRef TypeOp,
+                                     unsigned depth);
+  ManglingError mangleGenericArgs(Node *node, char &Separator, unsigned depth,
+                                  bool fullSubstitutionMap = false);
+  ManglingError mangleAnyConstructor(Node *node, char kindOp, unsigned depth);
+  ManglingError mangleAbstractStorage(Node *node, StringRef accessorCode,
+                                      unsigned depth);
+  ManglingError mangleAnyProtocolConformance(Node *node, unsigned depth);
 
-  void mangleKeyPathThunkHelper(Node *node, StringRef op, unsigned depth);
+  ManglingError mangleKeyPathThunkHelper(Node *node, StringRef op,
+                                         unsigned depth);
 
-  void mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op,
-                                           unsigned depth);
+  ManglingError mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op,
+                                                    unsigned depth);
 
-#define NODE(ID) void mangle##ID(Node *node, unsigned depth);
+#define NODE(ID) ManglingError mangle##ID(Node *node, unsigned depth);
 #define CONTEXT_NODE(ID)                                                       \
-  void mangle##ID(Node *node, unsigned depth);                                 \
-//    void mangle##ID(Node *node, unsigned depth, EntityContext &ctx);
+  ManglingError mangle##ID(Node *node, unsigned depth);                        \
+//    ManglingError mangle##ID(Node *node, unsigned depth, EntityContext &ctx);
 #include "swift/Demangling/DemangleNodes.def"
 
 public:
   Remangler(SymbolicResolver Resolver, NodeFactory &Factory)
        : RemanglerBase(Factory), Resolver(Resolver) { }
 
-  void mangle(Node *node, unsigned depth) {
+  ManglingError mangle(Node *node, unsigned depth) {
     if (depth > Remangler::MaxDepth) {
-      // FIXME: error handling needs doing properly (rdar://79725187)
-      unreachable("too complex to remangle");
+      return MANGLING_ERROR(ManglingError::TooComplex, node);
     }
 
     switch (node->getKind()) {
@@ -340,7 +346,7 @@ public:
     return mangle##ID(node, depth);
 #include "swift/Demangling/DemangleNodes.def"
     }
-    unreachable("bad demangling tree node");
+    return MANGLING_ERROR(ManglingError::BadNodeKind, node);
   }
 };
 
@@ -397,7 +403,8 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
   if (node->getChild(1)->getKind() != Node::Kind::Identifier)
     return false;
 
-  if (auto Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
+  if (auto Subst = getStandardTypeSubst(
+          node->getChild(1)->getText(), /*allowConcurrencyManglings=*/true)) {
     if (!SubstMerging.tryMergeSubst(*this, *Subst, /*isStandardSubst*/ true)) {
       Buffer << 'S' << *Subst;
     }
@@ -409,6 +416,11 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
 void Remangler::mangleDependentGenericParamIndex(Node *node,
                                                  const char *nonZeroPrefix,
                                                  char zeroOp) {
+  if (node->getKind() == Node::Kind::ConstrainedExistentialSelf) {
+    Buffer << 's';
+    return;
+  }
+
   auto paramDepth = node->getChild(0)->getIndex();
   auto index = node->getChild(1)->getIndex();
 
@@ -427,74 +439,81 @@ void Remangler::mangleDependentGenericParamIndex(Node *node,
   Buffer << zeroOp;
 }
 
-std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node,
-                                                        unsigned depth) {
+ManglingErrorOr<std::pair<int, Node *>>
+Remangler::mangleConstrainedType(Node *node, unsigned depth) {
   if (node->getKind() == Node::Kind::Type)
     node = getChildOfType(node);
 
   SubstitutionEntry entry;
   if (trySubstitution(node, entry))
-    return {-1, nullptr};
+    return std::pair<int, Node *>{-1, nullptr};
 
   Vector<Node *> Chain;
   while (node->getKind() == Node::Kind::DependentMemberType) {
     Chain.push_back(node->getChild(1), Factory);
     node = getChildOfType(node->getFirstChild());
   }
-  
-  if (node->getKind() != Node::Kind::DependentGenericParamType) {
-    mangle(node, depth + 1);
+
+  if (node->getKind() != Node::Kind::DependentGenericParamType &&
+      node->getKind() != Node::Kind::ConstrainedExistentialSelf) {
+    RETURN_IF_ERROR(mangle(node, depth + 1));
+    if (!Chain.size())
+      return std::pair<int, Node *>{-1, nullptr};
     node = nullptr;
   }
 
   const char *ListSeparator = (Chain.size() > 1 ? "_" : "");
   for (unsigned i = 1, n = Chain.size(); i <= n; ++i) {
     Node *DepAssocTyRef = Chain[n - i];
-    mangle(DepAssocTyRef, depth + 1);
+    RETURN_IF_ERROR(mangle(DepAssocTyRef, depth + 1));
     Buffer << ListSeparator;
     ListSeparator = "";
   }
   if (!Chain.empty())
     addSubstitution(entry);
-  return {(int)Chain.size(), node};
+  return std::pair<int, Node *>{(int)Chain.size(), node};
 }
 
-void Remangler::mangleAnyGenericType(Node *node, StringRef TypeOp,
-                                     unsigned depth) {
+ManglingError Remangler::mangleAnyGenericType(Node *node, StringRef TypeOp,
+                                              unsigned depth) {
   SubstitutionEntry entry;
-  if (trySubstitution(node, entry)) return;
-  mangleChildNodes(node, depth + 1);
-  Buffer << TypeOp;
-  addSubstitution(entry);
+  if (!trySubstitution(node, entry)) {
+    RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+    Buffer << TypeOp;
+    addSubstitution(entry);
+  }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAnyNominalType(Node *node, unsigned depth) {
+ManglingError Remangler::mangleAnyNominalType(Node *node, unsigned depth) {
   if (depth > Remangler::MaxDepth) {
-    // FIXME: error handling needs doing properly (rdar://79725187)
-    unreachable("too complex to remangle");
+    return MANGLING_ERROR(ManglingError::TooComplex, node);
   }
 
   if (isSpecialized(node)) {
     SubstitutionEntry entry;
     if (trySubstitution(node, entry))
-      return;
+      return ManglingError::Success;
 
-    NodePointer unboundType = getUnspecialized(node, Factory);
-    mangleAnyNominalType(unboundType, depth + 1);
+    auto unspec = getUnspecialized(node, Factory);
+    if (!unspec.isSuccess())
+      return unspec.error();
+    NodePointer unboundType = unspec.result();
+    RETURN_IF_ERROR(mangleAnyNominalType(unboundType, depth + 1));
     char Separator = 'y';
-    mangleGenericArgs(node, Separator, depth + 1);
+    RETURN_IF_ERROR(mangleGenericArgs(node, Separator, depth + 1));
 
     if (node->getNumChildren() == 3) {
       // Retroactive conformances.
       auto listNode = node->getChild(2);
       for (size_t Idx = 0, Num = listNode->getNumChildren(); Idx < Num; ++Idx) {
-        mangle(listNode->getChild(Idx), depth + 1);
+        RETURN_IF_ERROR(mangle(listNode->getChild(Idx), depth + 1));
       }
     }
 
     Buffer << 'G';
     addSubstitution(entry);
-    return;
+    return ManglingError::Success;
   }
   switch (node->getKind()) {
   case Node::Kind::Structure:
@@ -508,12 +527,13 @@ void Remangler::mangleAnyNominalType(Node *node, unsigned depth) {
   case Node::Kind::TypeAlias:
     return mangleAnyGenericType(node, "a", depth);
   default:
-    unreachable("bad nominal type kind");
+    return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
   }
 }
 
-void Remangler::mangleGenericArgs(Node *node, char &Separator, unsigned depth,
-                                  bool fullSubstitutionMap) {
+ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
+                                           unsigned depth,
+                                           bool fullSubstitutionMap) {
   switch (node->getKind()) {
     case Node::Kind::Protocol:
       // A protocol cannot be the parent of a nominal type, so this case should
@@ -528,8 +548,8 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator, unsigned depth,
       if (node->getKind() == Node::Kind::TypeAlias)
         fullSubstitutionMap = true;
 
-      mangleGenericArgs(node->getChild(0), Separator, depth + 1,
-                        fullSubstitutionMap);
+      RETURN_IF_ERROR(mangleGenericArgs(node->getChild(0), Separator, depth + 1,
+                                        fullSubstitutionMap));
       Buffer << Separator;
       Separator = '_';
       break;
@@ -554,11 +574,12 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator, unsigned depth,
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
+    case Node::Kind::Static:
       if (!fullSubstitutionMap)
         break;
 
-      mangleGenericArgs(node->getChild(0), Separator, depth + 1,
-                        fullSubstitutionMap);
+      RETURN_IF_ERROR(mangleGenericArgs(node->getChild(0), Separator, depth + 1,
+                                        fullSubstitutionMap));
       if (Demangle::nodeConsumesGenericArgs(node)) {
         Buffer << Separator;
         Separator = '_';
@@ -575,196 +596,247 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator, unsigned depth,
         fullSubstitutionMap = true;
 
       NodePointer unboundType = node->getChild(0);
-      assert(unboundType->getKind() == Node::Kind::Type);
+      DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, node);
       NodePointer nominalType = unboundType->getChild(0);
       NodePointer parentOrModule = nominalType->getChild(0);
-      mangleGenericArgs(parentOrModule, Separator, depth + 1,
-                        fullSubstitutionMap);
+      RETURN_IF_ERROR(mangleGenericArgs(parentOrModule, Separator, depth + 1,
+                                        fullSubstitutionMap));
       Buffer << Separator;
       Separator = '_';
-      mangleChildNodes(node->getChild(1), depth + 1);
+      RETURN_IF_ERROR(mangleChildNodes(node->getChild(1), depth + 1));
       break;
     }
-      
+
+    case Node::Kind::ConstrainedExistential: {
+      Buffer << Separator;
+      Separator = '_';
+      RETURN_IF_ERROR(mangleChildNodes(node->getChild(1), depth + 1));
+      break;
+    }
+
     case Node::Kind::BoundGenericFunction: {
       fullSubstitutionMap = true;
 
       NodePointer unboundFunction = node->getChild(0);
-      assert(unboundFunction->getKind() == Node::Kind::Function ||
-             unboundFunction->getKind() == Node::Kind::Constructor);
+      DEMANGLER_ASSERT(unboundFunction->getKind() == Node::Kind::Function ||
+                           unboundFunction->getKind() ==
+                               Node::Kind::Constructor,
+                       node);
       NodePointer parentOrModule = unboundFunction->getChild(0);
-      mangleGenericArgs(parentOrModule, Separator, depth + 1,
-                        fullSubstitutionMap);
+      RETURN_IF_ERROR(mangleGenericArgs(parentOrModule, Separator, depth + 1,
+                                        fullSubstitutionMap));
       Buffer << Separator;
       Separator = '_';
-      mangleChildNodes(node->getChild(1), depth + 1);
+      RETURN_IF_ERROR(mangleChildNodes(node->getChild(1), depth + 1));
       break;
     }
 
     case Node::Kind::Extension:
-      mangleGenericArgs(node->getChild(1), Separator, depth + 1,
-                        fullSubstitutionMap);
+      RETURN_IF_ERROR(mangleGenericArgs(node->getChild(1), Separator, depth + 1,
+                                        fullSubstitutionMap));
       break;
 
     default:
       break;
   }
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAbstractStorage(Node *node, StringRef accessorCode,
-                                      unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleAbstractStorage(Node *node,
+                                               StringRef accessorCode,
+                                               unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   switch (node->getKind()) {
     case Node::Kind::Subscript: Buffer << "i"; break;
     case Node::Kind::Variable: Buffer << "v"; break;
-    default: unreachable("Not a storage node");
+    default:
+      return MANGLING_ERROR(ManglingError::NotAStorageNode, node);
   }
   Buffer << accessorCode;
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAllocator(Node *node, unsigned depth) {
-  mangleAnyConstructor(node, 'C', depth + 1);
+ManglingError Remangler::mangleAllocator(Node *node, unsigned depth) {
+  return mangleAnyConstructor(node, 'C', depth + 1);
 }
 
-void Remangler::mangleArgumentTuple(Node *node, unsigned depth) {
+ManglingError Remangler::mangleArgumentTuple(Node *node, unsigned depth) {
   Node *Child = skipType(getSingleChild(node));
   if (Child->getKind() == Node::Kind::Tuple &&
       Child->getNumChildren() == 0) {
     Buffer << 'y';
-    return;
+    return ManglingError::Success;
   }
-  mangle(Child, depth + 1);
+  return mangle(Child, depth + 1);
 }
 
-void Remangler::mangleAssociatedType(Node *node, unsigned depth) {
-  unreachable("unsupported node");
+ManglingError Remangler::mangleAssociatedType(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleAssociatedTypeRef(Node *node, unsigned depth) {
+ManglingError Remangler::mangleAssociatedTypeRef(Node *node, unsigned depth) {
   SubstitutionEntry entry;
-  if (trySubstitution(node, entry)) return;
-  mangleChildNodes(node, depth + 1);
+  if (trySubstitution(node, entry))
+    return ManglingError::Success;
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "Qa";
   addSubstitution(entry);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAssociatedTypeDescriptor(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleAssociatedTypeDescriptor(Node *node,
+                                                        unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "Tl";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAssociatedConformanceDescriptor(Node *node,
-                                                      unsigned depth) {
-  mangle(node->getChild(0), depth + 1);
-  mangle(node->getChild(1), depth + 1);
-  manglePureProtocol(node->getChild(2), depth + 1);
+ManglingError Remangler::mangleAssociatedConformanceDescriptor(Node *node,
+                                                               unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangle(node->getChild(1), depth + 1));
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(2), depth + 1));
   Buffer << "Tn";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDefaultAssociatedConformanceAccessor(Node *node,
-                                                           unsigned depth) {
-  mangle(node->getChild(0), depth + 1);
-  mangle(node->getChild(1), depth + 1);
-  manglePureProtocol(node->getChild(2), depth + 1);
+ManglingError
+Remangler::mangleDefaultAssociatedConformanceAccessor(Node *node,
+                                                      unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangle(node->getChild(1), depth + 1));
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(2), depth + 1));
   Buffer << "TN";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleBaseConformanceDescriptor(Node *node, unsigned depth) {
-  mangle(node->getChild(0), depth + 1);
-  manglePureProtocol(node->getChild(1), depth + 1);
-  Buffer << "Tb";
-}
-
-void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node,
-                                                     unsigned depth) {
-  mangleChildNodes(node, depth + 1); // protocol conformance, identifier
-  Buffer << "Wt";
-}
-
-void Remangler::mangleDefaultAssociatedTypeMetadataAccessor(Node *node,
-                                                            unsigned depth) {
-  mangleChildNodes(node, depth + 1); // protocol conformance, identifier
-  Buffer << "TM";
-}
-
-void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node,
+ManglingError Remangler::mangleBaseConformanceDescriptor(Node *node,
                                                          unsigned depth) {
-  mangleChildNodes(node, depth + 1); // protocol conformance, type, protocol
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(1), depth + 1));
+  Buffer << "Tb";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleAssociatedTypeMetadataAccessor(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodes(node, depth + 1)); // protocol conformance, identifier
+  Buffer << "Wt";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDefaultAssociatedTypeMetadataAccessor(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodes(node, depth + 1)); // protocol conformance, identifier
+  Buffer << "TM";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(
+      node, depth + 1)); // protocol conformance, type, protocol
   Buffer << "WT";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleBaseWitnessTableAccessor(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1); // protocol conformance, protocol
+ManglingError Remangler::mangleBaseWitnessTableAccessor(Node *node,
+                                                        unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodes(node, depth + 1)); // protocol conformance, protocol
   Buffer << "Wb";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAutoClosureType(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1); // argument tuple, result type
+ManglingError Remangler::mangleAutoClosureType(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
   Buffer << "XK";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleEscapingAutoClosureType(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1); // argument tuple, result type
+ManglingError Remangler::mangleEscapingAutoClosureType(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
   Buffer << "XA";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleNoEscapeFunctionType(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1); // argument tuple, result type
+ManglingError Remangler::mangleNoEscapeFunctionType(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
   Buffer << "XE";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleBoundGenericClass(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleBoundGenericClass(Node *node, unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleBoundGenericEnum(Node *node, unsigned depth) {
+ManglingError Remangler::mangleBoundGenericEnum(Node *node, unsigned depth) {
   Node *Enum = node->getChild(0)->getChild(0);
-  assert(Enum->getKind() == Node::Kind::Enum);
+  DEMANGLER_ASSERT(Enum->getKind() == Node::Kind::Enum, node);
   Node *Mod = Enum->getChild(0);
   Node *Id = Enum->getChild(1);
   if (Mod->getKind() == Node::Kind::Module && Mod->getText() == STDLIB_NAME &&
       Id->getKind() == Node::Kind::Identifier && Id->getText() == "Optional") {
     SubstitutionEntry entry;
     if (trySubstitution(node, entry))
-      return;
-    mangleSingleChildNode(node->getChild(1), depth + 1);
+      return ManglingError::Success;
+    RETURN_IF_ERROR(mangleSingleChildNode(node->getChild(1), depth + 1));
     Buffer << "Sg";
     addSubstitution(entry);
-    return;
+    return ManglingError::Success;
   }
-  mangleAnyNominalType(node, depth + 1);
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleBoundGenericStructure(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleBoundGenericStructure(Node *node,
+                                                     unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleBoundGenericOtherNominalType(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleBoundGenericOtherNominalType(Node *node,
+                                                            unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleBoundGenericProtocol(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleBoundGenericProtocol(Node *node,
+                                                    unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleBoundGenericTypeAlias(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleBoundGenericTypeAlias(Node *node,
+                                                     unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleBoundGenericFunction(Node *node, unsigned depth) {
+ManglingError Remangler::mangleBoundGenericFunction(Node *node,
+                                                    unsigned depth) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry))
-    return;
+    return ManglingError::Success;
 
-  NodePointer unboundFunction = getUnspecialized(node, Factory);
-  mangleFunction(unboundFunction, depth + 1);
+  auto unspec = getUnspecialized(node, Factory);
+  if (!unspec.isSuccess())
+    return unspec.error();
+  NodePointer unboundFunction = unspec.result();
+  RETURN_IF_ERROR(mangleFunction(unboundFunction, depth + 1));
   char Separator = 'y';
-  mangleGenericArgs(node, Separator, depth + 1);
+  RETURN_IF_ERROR(mangleGenericArgs(node, Separator, depth + 1));
   Buffer << 'G';
   addSubstitution(entry);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
+ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   Buffer << 'B';
   StringRef text = node->getText();
 
@@ -808,153 +880,210 @@ void Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
     } else if (element.consume_front("Int")) {
       Buffer << 'i' << element << '_';
     } else {
-      unreachable("unexpected builtin vector type");
+      return MANGLING_ERROR(ManglingError::UnexpectedBuiltinVectorType, node);
     }
     Buffer << "Bv" << text.substr(0, splitIdx) << '_';
   } else {
-    unreachable("unexpected builtin type");
+    return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleCFunctionPointer(Node *node, unsigned depth) {
+ManglingError Remangler::mangleCFunctionPointer(Node *node, unsigned depth) {
   if (node->getNumChildren() > 0 &&
       node->getFirstChild()->getKind() == Node::Kind::ClangType) {
     for (size_t Idx = node->getNumChildren() - 1; Idx >= 1; --Idx) {
-      mangleChildNode(node, Idx, depth + 1);
+      RETURN_IF_ERROR(mangleChildNode(node, Idx, depth + 1));
     }
     Buffer << "XzC";
-    mangleClangType(node->getFirstChild(), depth + 1);
-    return;
+    return mangleClangType(node->getFirstChild(), depth + 1);
   }
-  mangleChildNodesReversed(node, depth + 1); // argument tuple, result type
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
   Buffer << "XC";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleClass(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleClass(Node *node, unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleAnyConstructor(Node *node, char kindOp, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleAnyConstructor(Node *node, char kindOp,
+                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "f" << kindOp;
+  return ManglingError::Success;
 }
 
-void Remangler::mangleConstructor(Node *node, unsigned depth) {
-  mangleAnyConstructor(node, 'c', depth);
+ManglingError Remangler::mangleConstructor(Node *node, unsigned depth) {
+  return mangleAnyConstructor(node, 'c', depth);
 }
 
-void Remangler::mangleCoroutineContinuationPrototype(Node *node,
-                                                     unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleCoroutineContinuationPrototype(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "TC";
+  return ManglingError::Success;
 }
 
-void Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node,
-                                                               unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError
+Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "TZ";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node,
-                                                     unsigned depth) {
-  mangleChildNode(node, 0, depth + 1);
-  mangleChildNode(node, 1, depth + 1);
+ManglingError Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
   if (node->getNumChildren() == 4)
-    mangleChildNode(node, 3, depth + 1);
+    RETURN_IF_ERROR(mangleChildNode(node, 3, depth + 1));
   Buffer << "Tz";
-  mangleChildNode(node, 2, depth + 1);
+  return mangleChildNode(node, 2, depth + 1);
 }
 
-void Remangler::mangleDeallocator(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleDeallocator(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "fD";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDeclContext(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleDeclContext(Node *node, unsigned depth) {
+  return mangleSingleChildNode(node, depth + 1);
 }
 
-void Remangler::mangleDefaultArgumentInitializer(Node *node, unsigned depth) {
-  mangleChildNode(node, 0, depth + 1);
+ManglingError Remangler::mangleDefaultArgumentInitializer(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   Buffer << "fA";
-  mangleChildNode(node, 1, depth + 1);
+  return mangleChildNode(node, 1, depth + 1);
 }
 
-void Remangler::mangleAsyncFunctionPointer(Node *node, unsigned depth) {
+ManglingError Remangler::mangleAsyncFunctionPointer(Node *node,
+                                                    unsigned depth) {
   Buffer << "Tu";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentAssociatedTypeRef(Node *node, unsigned depth) {
-  mangleIdentifier(node->getFirstChild(), depth);
+ManglingError Remangler::mangleDependentAssociatedTypeRef(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleIdentifier(node->getFirstChild(), depth));
   if (node->getNumChildren() > 1)
-    mangleChildNode(node, 1, depth + 1);
+    return mangleChildNode(node, 1, depth + 1);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentGenericConformanceRequirement(Node *node,
-                                                             unsigned depth) {
+ManglingError
+Remangler::mangleDependentGenericConformanceRequirement(Node *node,
+                                                        unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   Node *ProtoOrClass = node->getChild(1);
   if (ProtoOrClass->getFirstChild()->getKind() == Node::Kind::Protocol) {
-    manglePureProtocol(ProtoOrClass, depth + 1);
-    auto NumMembersAndParamIdx =
-        mangleConstrainedType(node->getChild(0), depth + 1);
-    assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
+    RETURN_IF_ERROR(manglePureProtocol(ProtoOrClass, depth + 1));
+    auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
+    if (!Mangling.isSuccess())
+      return Mangling.error();
+    auto NumMembersAndParamIdx = Mangling.result();
+    DEMANGLER_ASSERT(
+        NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
     switch (NumMembersAndParamIdx.first) {
-      case -1: Buffer << "RQ"; return; // substitution
-      case 0: Buffer << "R"; break;
-      case 1: Buffer << "Rp"; break;
-      default: Buffer << "RP"; break;
+    case -1:
+      Buffer << "RQ";
+      return ManglingError::Success; // substitution
+    case 0:
+      Buffer << "R";
+      break;
+    case 1:
+      Buffer << "Rp";
+      break;
+    default:
+      Buffer << "RP";
+      break;
     }
     mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
-    return;
+    return ManglingError::Success;
   }
-  mangle(ProtoOrClass, depth + 1);
-  auto NumMembersAndParamIdx =
-      mangleConstrainedType(node->getChild(0), depth + 1);
-  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
+  RETURN_IF_ERROR(mangle(ProtoOrClass, depth + 1));
+  auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
+  if (!Mangling.isSuccess())
+    return Mangling.error();
+  auto NumMembersAndParamIdx = Mangling.result();
+  DEMANGLER_ASSERT(
+      NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
   switch (NumMembersAndParamIdx.first) {
-    case -1: Buffer << "RB"; return; // substitution
-    case 0: Buffer << "Rb"; break;
-    case 1: Buffer << "Rc"; break;
-    default: Buffer << "RC"; break;
+  case -1:
+    Buffer << "RB";
+    return ManglingError::Success; // substitution
+  case 0:
+    Buffer << "Rb";
+    break;
+  case 1:
+    Buffer << "Rc";
+    break;
+  default:
+    Buffer << "RC";
+    break;
   }
   mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
-  return;
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentGenericParamCount(Node *node, unsigned depth) {
-  unreachable("handled inline in DependentGenericSignature");
+ManglingError Remangler::mangleDependentGenericParamCount(Node *node,
+                                                          unsigned depth) {
+  // handled inline in DependentGenericSignature
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleDependentGenericParamType(Node *node, unsigned depth) {
+ManglingError Remangler::mangleDependentGenericParamType(Node *node,
+                                                         unsigned depth) {
   if (node->getChild(0)->getIndex() == 0
       && node->getChild(1)->getIndex() == 0) {
     Buffer << 'x';
-    return;
+    return ManglingError::Success;
   }
   Buffer << 'q';
   mangleDependentGenericParamIndex(node);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentGenericSameTypeRequirement(Node *node,
-                                                          unsigned depth) {
-  mangleChildNode(node, 1, depth + 1);
-  auto NumMembersAndParamIdx =
-      mangleConstrainedType(node->getChild(0), depth + 1);
-  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
+ManglingError
+Remangler::mangleDependentGenericSameTypeRequirement(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
+  if (!Mangling.isSuccess())
+    return Mangling.error();
+  auto NumMembersAndParamIdx = Mangling.result();
+  DEMANGLER_ASSERT(
+      NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
   switch (NumMembersAndParamIdx.first) {
-    case -1: Buffer << "RS"; return; // substitution
-    case 0: Buffer << "Rs"; break;
-    case 1: Buffer << "Rt"; break;
-    default: Buffer << "RT"; break;
+  case -1:
+    Buffer << "RS";
+    return ManglingError::Success; // substitution
+  case 0:
+    Buffer << "Rs";
+    break;
+  case 1:
+    Buffer << "Rt";
+    break;
+  default:
+    Buffer << "RT";
+    break;
   }
   mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentGenericLayoutRequirement(Node *node,
-                                                        unsigned depth) {
-  auto NumMembersAndParamIdx =
-      mangleConstrainedType(node->getChild(0), depth + 1);
-  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
+ManglingError
+Remangler::mangleDependentGenericLayoutRequirement(Node *node, unsigned depth) {
+  auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
+  if (!Mangling.isSuccess())
+    return Mangling.error();
+  auto NumMembersAndParamIdx = Mangling.result();
+  DEMANGLER_ASSERT(
+      NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
   switch (NumMembersAndParamIdx.first) {
     case -1: Buffer << "RL"; break; // substitution
     case 0: Buffer << "Rl"; break;
@@ -964,16 +1093,19 @@ void Remangler::mangleDependentGenericLayoutRequirement(Node *node,
   // If not a substitution, mangle the dependent generic param index.
   if (NumMembersAndParamIdx.first != -1)
     mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
-  assert(node->getChild(1)->getKind() == Node::Kind::Identifier);
-  assert(node->getChild(1)->getText().size() == 1);
+  DEMANGLER_ASSERT(node->getChild(1)->getKind() == Node::Kind::Identifier,
+                   node);
+  DEMANGLER_ASSERT(node->getChild(1)->getText().size() == 1, node);
   Buffer << node->getChild(1)->getText()[0];
   if (node->getNumChildren() >=3)
-    mangleChildNode(node, 2, depth + 1);
+    RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
   if (node->getNumChildren() >=4)
-    mangleChildNode(node, 3, depth + 1);
+    RETURN_IF_ERROR(mangleChildNode(node, 3, depth + 1));
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentGenericSignature(Node *node, unsigned depth) {
+ManglingError Remangler::mangleDependentGenericSignature(Node *node,
+                                                         unsigned depth) {
   size_t ParamCountEnd = 0;
   for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; ++Idx) {
     Node *Child = node->getChild(Idx);
@@ -981,13 +1113,13 @@ void Remangler::mangleDependentGenericSignature(Node *node, unsigned depth) {
       ParamCountEnd = Idx + 1;
     } else {
       // requirement
-      mangleChildNode(node, Idx, depth + 1);
+      RETURN_IF_ERROR(mangleChildNode(node, Idx, depth + 1));
     }
   }
   // If there's only one generic param, mangle nothing.
   if (ParamCountEnd == 1 && node->getChild(0)->getIndex() == 1) {
     Buffer << 'l';
-    return;
+    return ManglingError::Success;
   }
 
   // Remangle generic params.
@@ -1001,20 +1133,27 @@ void Remangler::mangleDependentGenericSignature(Node *node, unsigned depth) {
     }
   }
   Buffer << 'l';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentGenericType(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1); // type, generic signature
+ManglingError Remangler::mangleDependentGenericType(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // type, generic signature
   Buffer << 'u';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentMemberType(Node *node, unsigned depth) {
-  auto NumMembersAndParamIdx = mangleConstrainedType(node, depth + 1);
+ManglingError Remangler::mangleDependentMemberType(Node *node, unsigned depth) {
+  auto Mangling = mangleConstrainedType(node, depth + 1);
+  if (!Mangling.isSuccess())
+    return Mangling.error();
+  auto NumMembersAndParamIdx = Mangling.result();
   switch (NumMembersAndParamIdx.first) {
     case -1:
       break; // substitution
     case 0:
-      unreachable("wrong dependent member type");
+      return MANGLING_ERROR(ManglingError::WrongDependentMemberType, node);
     case 1:
       Buffer << 'Q';
       if (auto dependentBase = NumMembersAndParamIdx.second) {
@@ -1032,125 +1171,175 @@ void Remangler::mangleDependentMemberType(Node *node, unsigned depth) {
       }
       break;
   }
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDependentPseudogenericSignature(Node *node,
-                                                      unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleDependentPseudogenericSignature(Node *node,
+                                                               unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleDestructor(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleDestructor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "fd";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDidSet(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "W", depth + 1);
+ManglingError Remangler::mangleDidSet(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "W", depth + 1);
 }
 
-void Remangler::mangleDirectness(Node *node, unsigned depth) {
-  if (node->getIndex() == unsigned(Directness::Direct)) {
+ManglingError Remangler::mangleDirectness(Node *node, unsigned depth) {
+  switch (node->getIndex()) {
+  case unsigned(Directness::Direct):
     Buffer << 'd';
-  } else {
-    assert(node->getIndex() == unsigned(Directness::Indirect));
+    break;
+  case unsigned(Directness::Indirect):
     Buffer << 'i';
+    break;
+  default:
+    return MANGLING_ERROR(ManglingError::BadDirectness, node);
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDynamicAttribute(Node *node, unsigned depth) {
+ManglingError Remangler::mangleDynamicAttribute(Node *node, unsigned depth) {
   Buffer << "TD";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDirectMethodReferenceAttribute(Node *node,
-                                                     unsigned depth) {
+ManglingError Remangler::mangleDirectMethodReferenceAttribute(Node *node,
+                                                              unsigned depth) {
   Buffer << "Td";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDynamicSelf(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1); // type
+ManglingError Remangler::mangleDynamicSelf(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // type
   Buffer << "XD";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleEnum(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleEnum(Node *node, unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleErrorType(Node *node, unsigned depth) { Buffer << "Xe"; }
+ManglingError Remangler::mangleErrorType(Node *node, unsigned depth) {
+  Buffer << "Xe";
+  return ManglingError::Success;
+}
 
-void Remangler::mangleExistentialMetatype(Node *node, unsigned depth) {
+ManglingError Remangler::mangleConstrainedExistential(Node *node,
+                                                      unsigned int depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "XP";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleConstrainedExistentialRequirementList(Node *node,
+                                                       unsigned int depth) {
+  assert(node->getNumChildren() > 0);
+  bool FirstElem = true;
+  for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; ++Idx) {
+    RETURN_IF_ERROR(mangleChildNode(node, Idx, depth + 1));
+    mangleListSeparator(FirstElem);
+  }
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleConstrainedExistentialSelf(Node *node,
+                                                          unsigned int depth) {
+  Buffer << "s";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleExistentialMetatype(Node *node, unsigned depth) {
   if (node->getFirstChild()->getKind() == Node::Kind::MetatypeRepresentation) {
-    mangleChildNode(node, 1, depth + 1);
+    RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
     Buffer << "Xm";
-    mangleChildNode(node, 0, depth + 1);
+    return mangleChildNode(node, 0, depth + 1);
   } else {
-    mangleSingleChildNode(node, depth + 1);
+    RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
     Buffer << "Xp";
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleExplicitClosure(Node *node, unsigned depth) {
-  mangleChildNode(node, 0, depth + 1); // context
-  mangleChildNode(node, 2, depth + 1); // type
+ManglingError Remangler::mangleExplicitClosure(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1)); // context
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1)); // type
   Buffer << "fU";
-  mangleChildNode(node, 1, depth + 1); // index
+  return mangleChildNode(node, 1, depth + 1); // index
 }
 
-void Remangler::mangleExtension(Node *node, unsigned depth) {
-  mangleChildNode(node, 1, depth + 1);
-  mangleChildNode(node, 0, depth + 1);
+ManglingError Remangler::mangleExtension(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   if (node->getNumChildren() == 3)
-    mangleChildNode(node, 2, depth + 1); // generic signature
+    RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1)); // generic signature
   Buffer << 'E';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAnonymousContext(Node *node, unsigned depth) {
-  mangleChildNode(node, 1, depth + 1);
-  mangleChildNode(node, 0, depth + 1);
+ManglingError Remangler::mangleAnonymousContext(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   if (node->getNumChildren() >= 3)
-    mangleTypeList(node->getChild(2), depth + 1);
+    RETURN_IF_ERROR(mangleTypeList(node->getChild(2), depth + 1));
   else
     Buffer << 'y';
   Buffer << "XZ";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleFieldOffset(Node *node, unsigned depth) {
-  mangleChildNode(node, 1, depth + 1); // variable
+ManglingError Remangler::mangleFieldOffset(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // variable
   Buffer << "Wv";
-  mangleChildNode(node, 0, depth + 1); // directness
+  return mangleChildNode(node, 0, depth + 1); // directness
 }
 
-void Remangler::mangleEnumCase(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1); // enum case
+ManglingError Remangler::mangleEnumCase(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // enum case
   Buffer << "WC";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleFullTypeMetadata(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleFullTypeMetadata(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mf";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleFunction(Node *node, unsigned depth) {
-  mangleChildNode(node, 0, depth + 1); // context
-  mangleChildNode(node, 1, depth + 1); // name
+ManglingError Remangler::mangleFunction(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1)); // context
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // name
 
   bool hasLabels = node->getChild(2)->getKind() == Node::Kind::LabelList;
   Node *FuncType = getSingleChild(node->getChild(hasLabels ? 3 : 2));
 
   if (hasLabels)
-    mangleChildNode(node, 2, depth + 1); // parameter labels
+    RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1)); // parameter labels
 
   if (FuncType->getKind() == Node::Kind::DependentGenericType) {
-    mangleFunctionSignature(getSingleChild(FuncType->getChild(1)), depth + 1);
-    mangleChildNode(FuncType, 0, depth + 1); // generic signature
+    RETURN_IF_ERROR(mangleFunctionSignature(
+        getSingleChild(FuncType->getChild(1)), depth + 1));
+    RETURN_IF_ERROR(
+        mangleChildNode(FuncType, 0, depth + 1)); // generic signature
   } else {
-    mangleFunctionSignature(FuncType, depth + 1);
+    RETURN_IF_ERROR(mangleFunctionSignature(FuncType, depth + 1));
   }
 
   Buffer << "F";
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleFunctionSignatureSpecialization(Node *node,
-                                                      unsigned depth) {
+ManglingError Remangler::mangleFunctionSignatureSpecialization(Node *node,
+                                                               unsigned depth) {
   for (NodePointer Param : *node) {
     if (Param->getKind() == Node::Kind::FunctionSignatureSpecializationParam &&
         Param->getNumChildren() > 0) {
@@ -1158,7 +1347,7 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node,
       switch (FunctionSigSpecializationParamKind(KindNd->getIndex())) {
         case FunctionSigSpecializationParamKind::ConstantPropFunction:
         case FunctionSigSpecializationParamKind::ConstantPropGlobal:
-          mangleIdentifier(Param->getChild(1), depth + 1);
+          RETURN_IF_ERROR(mangleIdentifier(Param->getChild(1), depth + 1));
           break;
         case FunctionSigSpecializationParamKind::ConstantPropString: {
           NodePointer TextNd = Param->getChild(2);
@@ -1168,13 +1357,14 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node,
             Buffer.append(Text.data(), Text.size());
             TextNd = Factory.createNode(Node::Kind::Identifier, Buffer);
           }
-          mangleIdentifier(TextNd, depth + 1);
+          RETURN_IF_ERROR(mangleIdentifier(TextNd, depth + 1));
           break;
         }
         case FunctionSigSpecializationParamKind::ClosureProp:
-          mangleIdentifier(Param->getChild(1), depth + 1);
+        case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+          RETURN_IF_ERROR(mangleIdentifier(Param->getChild(1), depth + 1));
           for (unsigned i = 2, e = Param->getNumChildren(); i != e; ++i) {
-            mangleType(Param->getChild(i), depth + 1);
+            RETURN_IF_ERROR(mangleType(Param->getChild(i), depth + 1));
           }
           break;
         default:
@@ -1189,7 +1379,7 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node,
       Buffer << '_';
       returnValMangled = true;
     }
-    mangle(Child, depth + 1);
+    RETURN_IF_ERROR(mangle(Child, depth + 1));
 
     if (Child->getKind() == Node::Kind::SpecializationPassID &&
         node->hasIndex()) {
@@ -1198,18 +1388,22 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node,
   }
   if (!returnValMangled)
     Buffer << "_n";
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleFunctionSignatureSpecializationReturn(Node *node,
-                                                            unsigned depth) {
-  mangleFunctionSignatureSpecializationParam(node, depth + 1);
+ManglingError
+Remangler::mangleFunctionSignatureSpecializationReturn(Node *node,
+                                                       unsigned depth) {
+  return mangleFunctionSignatureSpecializationParam(node, depth + 1);
 }
 
-void Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
-                                                           unsigned depth) {
+ManglingError
+Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
+                                                      unsigned depth) {
   if (!node->hasChildren()) {
     Buffer << 'n';
-    return;
+    return ManglingError::Success;
   }
 
   // The first child is always a kind that specifies the type of param that we
@@ -1221,16 +1415,16 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
   switch (kind) {
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
       Buffer << "pf";
-      return;
+      break;
     case FunctionSigSpecializationParamKind::ConstantPropGlobal:
       Buffer << "pg";
-      return;
+      break;
     case FunctionSigSpecializationParamKind::ConstantPropInteger:
       Buffer << "pi" << node->getChild(1)->getText();
-      return;
+      break;
     case FunctionSigSpecializationParamKind::ConstantPropFloat:
       Buffer << "pd" << node->getChild(1)->getText();
-      return;
+      break;
     case FunctionSigSpecializationParamKind::ConstantPropString: {
       Buffer << "ps";
       StringRef encodingStr = node->getChild(1)->getText();
@@ -1241,22 +1435,28 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       } else if (encodingStr == "objc") {
         Buffer << 'c';
       } else {
-        unreachable("Unknown encoding");
+        return MANGLING_ERROR(ManglingError::UnknownEncoding, node);
       }
-      return;
+      break;
     }
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Buffer << "pk";
+      break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Buffer << 'c';
-      return;
+      break;
     case FunctionSigSpecializationParamKind::BoxToValue:
       Buffer << 'i';
-      return;
+      break;
     case FunctionSigSpecializationParamKind::BoxToStack:
       Buffer << 's';
-      return;
+      break;
+    case FunctionSigSpecializationParamKind::InOutToOut:
+      Buffer << 'r';
+      break;
     case FunctionSigSpecializationParamKind::SROA:
       Buffer << 'x';
-      return;
+      break;
     default:
       if (kindValue &
           unsigned(
@@ -1289,46 +1489,58 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       }
       if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
         Buffer << 'X';
-      return;
+      break;
   }
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleFunctionSignatureSpecializationParamKind(Node *node,
-                                                               unsigned depth) {
-  unreachable("handled inline");
+ManglingError
+Remangler::mangleFunctionSignatureSpecializationParamKind(Node *node,
+                                                          unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleFunctionSignatureSpecializationParamPayload(
-    Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError
+Remangler::mangleFunctionSignatureSpecializationParamPayload(Node *node,
+                                                             unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleFunctionType(Node *node, unsigned depth) {
-  mangleFunctionSignature(node, depth + 1);
+ManglingError Remangler::mangleFunctionType(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleFunctionSignature(node, depth + 1));
   Buffer << 'c';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGenericProtocolWitnessTable(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleGenericProtocolWitnessTable(Node *node,
+                                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "WG";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(
+ManglingError Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(
     Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "WI";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleResilientProtocolWitnessTable(Node *node,
-                                                    unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleResilientProtocolWitnessTable(Node *node,
+                                                             unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Wr";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGenericPartialSpecialization(Node *node, unsigned depth) {
+ManglingError Remangler::mangleGenericPartialSpecialization(Node *node,
+                                                            unsigned depth) {
   for (NodePointer Child : *node) {
     if (Child->getKind() == Node::Kind::GenericSpecializationParam) {
-      mangleChildNode(Child, 0, depth + 1);
+      RETURN_IF_ERROR(mangleChildNode(Child, 0, depth + 1));
       break;
     }
   }
@@ -1336,77 +1548,94 @@ void Remangler::mangleGenericPartialSpecialization(Node *node, unsigned depth) {
         Node::Kind::GenericPartialSpecializationNotReAbstracted ? "TP" : "Tp");
   for (NodePointer Child : *node) {
     if (Child->getKind() != Node::Kind::GenericSpecializationParam)
-      mangle(Child, depth + 1);
+      RETURN_IF_ERROR(mangle(Child, depth + 1));
   }
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGenericPartialSpecializationNotReAbstracted(
-    Node *node, unsigned depth) {
-  mangleGenericPartialSpecialization(node, depth + 1);
+ManglingError
+Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node,
+                                                             unsigned depth) {
+  return mangleGenericPartialSpecialization(node, depth + 1);
 }
 
-void Remangler::mangleGenericSpecializationNode(Node *node,
-                                                const char *operatorStr,
-                                                unsigned depth) {
+ManglingError
+Remangler::mangleGenericSpecializationNode(Node *node, const char *operatorStr,
+                                           unsigned depth) {
   bool FirstParam = true;
   for (NodePointer Child : *node) {
     if (Child->getKind() == Node::Kind::GenericSpecializationParam) {
-      mangleChildNode(Child, 0, depth + 1);
+      RETURN_IF_ERROR(mangleChildNode(Child, 0, depth + 1));
       mangleListSeparator(FirstParam);
     }
   }
-  assert(!FirstParam && "generic specialization with no substitutions");
+  DEMANGLER_ASSERT(
+      !FirstParam && "generic specialization with no substitutions", node);
 
   Buffer << operatorStr;
 
   for (NodePointer Child : *node) {
     if (Child->getKind() != Node::Kind::GenericSpecializationParam)
-      mangle(Child, depth + 1);
+      RETURN_IF_ERROR(mangle(Child, depth + 1));
   }
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGenericSpecialization(Node *node, unsigned depth) {
-  mangleGenericSpecializationNode(node, "Tg", depth + 1);
+ManglingError Remangler::mangleGenericSpecialization(Node *node,
+                                                     unsigned depth) {
+  return mangleGenericSpecializationNode(node, "Tg", depth + 1);
 }
 
-void Remangler::mangleGenericSpecializationPrespecialized(Node *node,
+ManglingError
+Remangler::mangleGenericSpecializationPrespecialized(Node *node,
+                                                     unsigned depth) {
+  return mangleGenericSpecializationNode(node, "Ts", depth + 1);
+}
+
+ManglingError
+Remangler::mangleGenericSpecializationNotReAbstracted(Node *node,
+                                                      unsigned depth) {
+  return mangleGenericSpecializationNode(node, "TG", depth + 1);
+}
+
+ManglingError
+Remangler::mangleGenericSpecializationInResilienceDomain(Node *node,
+                                                         unsigned depth) {
+  return mangleGenericSpecializationNode(node, "TB", depth + 1);
+}
+
+ManglingError Remangler::mangleInlinedGenericFunction(Node *node,
+                                                      unsigned depth) {
+  return mangleGenericSpecializationNode(node, "Ti", depth + 1);
+}
+
+ManglingError Remangler::mangleGenericSpecializationParam(Node *node,
                                                           unsigned depth) {
-  mangleGenericSpecializationNode(node, "Ts", depth + 1);
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node,
-                                                           unsigned depth) {
-  mangleGenericSpecializationNode(node, "TG", depth + 1);
-}
-
-void Remangler::mangleGenericSpecializationInResilienceDomain(Node *node,
-                                                              unsigned depth) {
-  mangleGenericSpecializationNode(node, "TB", depth + 1);
-}
-
-void Remangler::mangleInlinedGenericFunction(Node *node, unsigned depth) {
-  mangleGenericSpecializationNode(node, "Ti", depth + 1);
-}
-
-void Remangler::mangleGenericSpecializationParam(Node *node, unsigned depth) {
-  unreachable("handled inline");
-}
-
-void Remangler::mangleGenericTypeMetadataPattern(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleGenericTypeMetadataPattern(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MP";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGenericTypeParamDecl(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleGenericTypeParamDecl(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "fp";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGetter(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "g", depth + 1);
+ManglingError Remangler::mangleGetter(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "g", depth + 1);
 }
 
-void Remangler::mangleGlobal(Node *node, unsigned depth) {
+ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
   Buffer << MANGLING_PREFIX_STR;
   bool mangleInReverseOrder = false;
   for (auto Iter = node->begin(), End = node->end(); Iter != End; ++Iter) {
@@ -1422,97 +1651,121 @@ void Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::GenericPartialSpecializationNotReAbstracted:
       case Node::Kind::OutlinedBridgedMethod:
       case Node::Kind::OutlinedVariable:
+      case Node::Kind::OutlinedReadOnlyObject:
       case Node::Kind::ObjCAttribute:
       case Node::Kind::NonObjCAttribute:
       case Node::Kind::DynamicAttribute:
       case Node::Kind::VTableAttribute:
       case Node::Kind::DirectMethodReferenceAttribute:
       case Node::Kind::MergedFunction:
+      case Node::Kind::DistributedThunk:
+      case Node::Kind::DistributedAccessor:
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
       case Node::Kind::AsyncFunctionPointer:
       case Node::Kind::AsyncAwaitResumePartialFunction:
       case Node::Kind::AsyncSuspendResumePartialFunction:
+      case Node::Kind::AccessibleFunctionRecord:
+      case Node::Kind::BackDeploymentThunk:
+      case Node::Kind::BackDeploymentFallback:
         mangleInReverseOrder = true;
         break;
       default:
-        mangle(Child, depth + 1);
+        RETURN_IF_ERROR(mangle(Child, depth + 1));
         if (mangleInReverseOrder) {
           auto ReverseIter = Iter;
           while (ReverseIter != node->begin()) {
             --ReverseIter;
-            mangle(*ReverseIter, depth + 1);
+            RETURN_IF_ERROR(mangle(*ReverseIter, depth + 1));
           }
           mangleInReverseOrder = false;
         }
         break;
     }
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGlobalGetter(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "G", depth + 1);
+ManglingError Remangler::mangleGlobalGetter(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "G", depth + 1);
 }
 
-void Remangler::mangleIdentifier(Node *node, unsigned depth) {
+ManglingError Remangler::mangleIdentifier(Node *node, unsigned depth) {
   mangleIdentifierImpl(node, /*isOperator*/ false);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleIndex(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleIndex(Node *node, unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleUnknownIndex(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleUnknownIndex(Node *node, unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleIVarInitializer(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleIVarInitializer(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "fe";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleIVarDestroyer(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleIVarDestroyer(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "fE";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleImplDifferentiabilityKind(Node *node, unsigned depth) {
+ManglingError Remangler::mangleImplDifferentiabilityKind(Node *node,
+                                                         unsigned depth) {
   Buffer << (char)node->getIndex();
+  return ManglingError::Success;
 }
 
-void Remangler::mangleImplEscaping(Node *node, unsigned depth) {
+ManglingError Remangler::mangleImplEscaping(Node *node, unsigned depth) {
   Buffer << 'e';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleImplConvention(Node *node, unsigned depth) {
+ManglingError Remangler::mangleImplConvention(Node *node, unsigned depth) {
   char ConvCh = llvm::StringSwitch<char>(node->getText())
                   .Case("@callee_unowned", 'y')
                   .Case("@callee_guaranteed", 'g')
                   .Case("@callee_owned", 'x')
                   .Default(0);
-  assert(ConvCh && "invalid impl callee convention");
+  if (!ConvCh)
+    return MANGLING_ERROR(ManglingError::InvalidImplCalleeConvention, node);
   Buffer << ConvCh;
+  return ManglingError::Success;
 }
 
-void Remangler::mangleImplParameterResultDifferentiability(Node *node,
-                                                           unsigned depth) {
-  assert(node->hasText());
+ManglingError
+Remangler::mangleImplParameterResultDifferentiability(Node *node,
+                                                      unsigned depth) {
+  DEMANGLER_ASSERT(node->hasText(), node);
   // Empty string represents default differentiability.
   if (node->getText().empty())
-    return;
+    return ManglingError::Success;
   char diffChar = llvm::StringSwitch<char>(node->getText())
                       .Case("@noDerivative", 'w')
                       .Default(0);
-  assert(diffChar && "Invalid impl differentiability");
+  if (!diffChar)
+    return MANGLING_ERROR(ManglingError::InvalidImplDifferentiability, node);
   Buffer << diffChar;
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleImplFunctionAttribute(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleImplFunctionAttribute(Node *node,
+                                                     unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleImplFunctionConvention(Node *node, unsigned depth) {
+ManglingError Remangler::mangleImplFunctionConvention(Node *node,
+                                                      unsigned depth) {
   StringRef text =
       (node->getNumChildren() > 0 && node->getFirstChild()->hasText())
           ? node->getFirstChild()->getText()
@@ -1525,33 +1778,40 @@ void Remangler::mangleImplFunctionConvention(Node *node, unsigned depth) {
                       .Case("closure", 'K')
                       .Case("witness_method", 'W')
                       .Default(0);
-  assert(FuncAttr && "invalid impl function convention");
+  DEMANGLER_ASSERT(FuncAttr && "invalid impl function convention", node);
   if ((FuncAttr == 'B' || FuncAttr == 'C') && node->getNumChildren() > 1 &&
       node->getChild(1)->getKind() == Node::Kind::ClangType) {
     Buffer << 'z' << FuncAttr;
-    mangleClangType(node->getChild(1), depth + 1);
-    return;
+    return mangleClangType(node->getChild(1), depth + 1);
   }
   Buffer << FuncAttr;
+  return ManglingError::Success;
 }
 
-void Remangler::mangleImplFunctionConventionName(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleImplFunctionConventionName(Node *node,
+                                                          unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleClangType(Node *node, unsigned depth) {
+ManglingError Remangler::mangleClangType(Node *node, unsigned depth) {
   Buffer << node->getText().size() << node->getText();
+  return ManglingError::Success;
 }
 
-void Remangler::mangleImplInvocationSubstitutions(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleImplInvocationSubstitutions(Node *node,
+                                                           unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleImplPatternSubstitutions(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleImplPatternSubstitutions(Node *node,
+                                                        unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
+ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
   const char *PseudoGeneric = "";
   Node *GenSig = nullptr;
   Node *PatternSubs = nullptr;
@@ -1563,8 +1823,9 @@ void Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
     case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
       // Mangle type. Type should be the last child.
-      assert(Child->getNumChildren() == 2 || Child->getNumChildren() == 3);
-      mangle(Child->getLastChild(), depth + 1);
+      DEMANGLER_ASSERT(
+          Child->getNumChildren() == 2 || Child->getNumChildren() == 3, node);
+      RETURN_IF_ERROR(mangle(Child->getLastChild(), depth + 1));
       break;
     case Node::Kind::DependentPseudogenericSignature:
       PseudoGeneric = "P";
@@ -1583,23 +1844,26 @@ void Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
     }
   }
   if (GenSig)
-    mangle(GenSig, depth + 1);
+    RETURN_IF_ERROR(mangle(GenSig, depth + 1));
   if (InvocationSubs) {
     Buffer << 'y';
-    mangleChildNodes(InvocationSubs->getChild(0), depth + 1);
-    if (InvocationSubs->getNumChildren() >= 2)
-      mangleRetroactiveConformance(InvocationSubs->getChild(1), depth + 1);
+    RETURN_IF_ERROR(mangleChildNodes(InvocationSubs->getChild(0), depth + 1));
+    if (InvocationSubs->getNumChildren() >= 2) {
+      RETURN_IF_ERROR(
+          mangleRetroactiveConformance(InvocationSubs->getChild(1), depth + 1));
+    }
   }
   if (PatternSubs) {
-    mangle(PatternSubs->getChild(0), depth + 1);
+    RETURN_IF_ERROR(mangle(PatternSubs->getChild(0), depth + 1));
     Buffer << 'y';
-    mangleChildNodes(PatternSubs->getChild(1), depth + 1);
+    RETURN_IF_ERROR(mangleChildNodes(PatternSubs->getChild(1), depth + 1));
     if (PatternSubs->getNumChildren() >= 3) {
       NodePointer retroactiveConf = PatternSubs->getChild(2);
       if (retroactiveConf->getKind() == Node::Kind::TypeList) {
-        mangleChildNodes(retroactiveConf, depth + 1);
+        RETURN_IF_ERROR(mangleChildNodes(retroactiveConf, depth + 1));
       } else {
-        mangleRetroactiveConformance(retroactiveConf, depth + 1);
+        RETURN_IF_ERROR(
+            mangleRetroactiveConformance(retroactiveConf, depth + 1));
       }
     }
   }
@@ -1627,12 +1891,14 @@ void Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                         .Case("@callee_owned", 'x')
                         .Case("@convention(thin)", 't')
                         .Default(0);
-        assert(ConvCh && "invalid impl callee convention");
+        if (!ConvCh)
+          return MANGLING_ERROR(ManglingError::InvalidImplCalleeConvention,
+                               Child);
         Buffer << ConvCh;
         break;
       }
       case Node::Kind::ImplFunctionConvention: {
-        mangleImplFunctionConvention(Child, depth + 1);
+        RETURN_IF_ERROR(mangleImplFunctionConvention(Child, depth + 1));
         break;
       }
       case Node::Kind::ImplFunctionAttribute: {
@@ -1642,7 +1908,10 @@ void Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                         .Case("@Sendable", 'h')
                         .Case("@async", 'H')
                         .Default(0);
-        assert(FuncAttr && "invalid impl function attribute");
+        if (!FuncAttr) {
+          return MANGLING_ERROR(ManglingError::InvalidImplFunctionAttribute,
+                               Child);
+        }
         Buffer << FuncAttr;
         break;
       }
@@ -1663,12 +1932,16 @@ void Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                 .Case("@deallocating", 'e')
                 .Case("@unowned", 'y')
                 .Default(0);
-        assert(ConvCh && "invalid impl parameter convention");
+        if (!ConvCh) {
+          return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention,
+                               Child->getFirstChild());
+        }
         Buffer << ConvCh;
         // Mangle parameter differentiability, if it exists.
-        if (Child->getNumChildren() == 3)
-          mangleImplParameterResultDifferentiability(Child->getChild(1),
-                                                     depth + 1);
+        if (Child->getNumChildren() == 3) {
+          RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
+              Child->getChild(1), depth + 1));
+        }
         break;
       }
       case Node::Kind::ImplErrorResult:
@@ -1682,12 +1955,16 @@ void Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                         .Case("@unowned_inner_pointer", 'u')
                         .Case("@autoreleased", 'a')
                         .Default(0);
-        assert(ConvCh && "invalid impl parameter convention");
+        if (!ConvCh) {
+          return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention,
+                               Child->getFirstChild());
+        }
         Buffer << ConvCh;
         // Mangle result differentiability, if it exists.
-        if (Child->getNumChildren() == 3)
-          mangleImplParameterResultDifferentiability(Child->getChild(1),
-                                                     depth + 1);
+        if (Child->getNumChildren() == 3) {
+          RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
+              Child->getChild(1), depth + 1));
+        }
         break;
       }
       default:
@@ -1695,396 +1972,507 @@ void Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
     }
   }
   Buffer << '_';
+
+  return ManglingError::Success;
 }
 
-void Remangler::mangleImplicitClosure(Node *node, unsigned depth) {
-  mangleChildNode(node, 0, depth + 1); // context
-  mangleChildNode(node, 2, depth + 1); // type
+ManglingError Remangler::mangleImplicitClosure(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1)); // context
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1)); // type
   Buffer << "fu";
-  mangleChildNode(node, 1, depth + 1); // index
+  return mangleChildNode(node, 1, depth + 1); // index
 }
 
-void Remangler::mangleImplParameter(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleImplParameter(Node *node, unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleImplResult(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleImplResult(Node *node, unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleImplYield(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleImplYield(Node *node, unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleImplErrorResult(Node *node, unsigned depth) {
-  unreachable("handled inline");
+ManglingError Remangler::mangleImplErrorResult(Node *node, unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleInOut(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleInOut(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << 'z';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleIsolated(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleIsolated(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Yi";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleShared(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Yt";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleShared(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << 'h';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOwned(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleOwned(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << 'n';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleNoDerivative(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Yk";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleInfixOperator(Node *node, unsigned depth) {
+ManglingError Remangler::mangleInfixOperator(Node *node, unsigned depth) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oi";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleInitializer(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleInitializer(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "fi";
+  return ManglingError::Success;
 }
 
-void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
-                                                        unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError
+Remangler::manglePropertyWrapperBackingInitializer(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "fP";
+  return ManglingError::Success;
 }
 
-void Remangler::manglePropertyWrapperInitFromProjectedValue(Node *node,
-                                                            unsigned depth) {
-  mangleChildNodes(node, depth + 1);
-  Buffer << "fW";
-}
-
-void Remangler::mangleLazyProtocolWitnessTableAccessor(Node *node,
+ManglingError
+Remangler::manglePropertyWrapperInitFromProjectedValue(Node *node,
                                                        unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "fW";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleLazyProtocolWitnessTableAccessor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "Wl";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleLazyProtocolWitnessTableCacheVariable(Node *node,
-                                                            unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError
+Remangler::mangleLazyProtocolWitnessTableCacheVariable(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WL";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleLocalDeclName(Node *node, unsigned depth) {
-  mangleChildNode(node, 1, depth + 1); // identifier
+ManglingError Remangler::mangleLocalDeclName(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // identifier
   Buffer << 'L';
-  mangleChildNode(node, 0, depth + 1); // index
+  return mangleChildNode(node, 0, depth + 1); // index
 }
 
-void Remangler::mangleMaterializeForSet(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "m", depth + 1);
+ManglingError Remangler::mangleMaterializeForSet(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "m", depth + 1);
 }
 
-void Remangler::mangleMetatype(Node *node, unsigned depth) {
+ManglingError Remangler::mangleMetatype(Node *node, unsigned depth) {
   if (node->getFirstChild()->getKind() == Node::Kind::MetatypeRepresentation) {
-    mangleChildNode(node, 1, depth + 1);
+    RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
     Buffer << "XM";
-    mangleChildNode(node, 0, depth + 1);
+    RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   } else {
-    mangleSingleChildNode(node, depth + 1);
+    RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
     Buffer << 'm';
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleMetatypeRepresentation(Node *node, unsigned depth) {
-  if (node->getText() == "@thin") {
+ManglingError Remangler::mangleMetatypeRepresentation(Node *node,
+                                                      unsigned depth) {
+  auto text = node->getText();
+  if (text == "@thin") {
     Buffer << 't';
-  } else if (node->getText() == "@thick") {
+  } else if (text == "@thick") {
     Buffer << 'T';
-  } else if (node->getText() == "@objc_metatype") {
+  } else if (text == "@objc_metatype") {
     Buffer << 'o';
   } else {
-    unreachable("wrong metatype representation");
+    return MANGLING_ERROR(ManglingError::InvalidMetatypeRepresentation, node);
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleMetaclass(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleMetaclass(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "Mm";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
+ManglingError Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
 }
 
-void Remangler::mangleModule(Node *node, unsigned depth) {
-  if (node->getText() == STDLIB_NAME) {
+ManglingError Remangler::mangleModule(Node *node, unsigned depth) {
+  auto text = node->getText();
+  if (text == STDLIB_NAME) {
     Buffer << 's';
-  } else if (node->getText() == MANGLING_MODULE_OBJC) {
+  } else if (text == MANGLING_MODULE_OBJC) {
     Buffer << "So";
-  } else if (node->getText() == MANGLING_MODULE_CLANG_IMPORTER) {
+  } else if (text == MANGLING_MODULE_CLANG_IMPORTER) {
     Buffer << "SC";
   } else {
-    mangleIdentifier(node, depth);
+    return mangleIdentifier(node, depth);
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleNativeOwningAddressor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "lo", depth + 1);
+ManglingError Remangler::mangleNativeOwningAddressor(Node *node,
+                                                     unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "lo", depth + 1);
 }
 
-void Remangler::mangleNativeOwningMutableAddressor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "ao", depth + 1);
+ManglingError Remangler::mangleNativeOwningMutableAddressor(Node *node,
+                                                            unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "ao", depth + 1);
 }
 
-void Remangler::mangleNativePinningAddressor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "lp", depth + 1);
+ManglingError Remangler::mangleNativePinningAddressor(Node *node,
+                                                      unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "lp", depth + 1);
 }
 
-void Remangler::mangleNativePinningMutableAddressor(Node *node,
-                                                    unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "aP", depth + 1);
+ManglingError Remangler::mangleNativePinningMutableAddressor(Node *node,
+                                                             unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "aP", depth + 1);
 }
 
-void Remangler::mangleClassMetadataBaseOffset(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
-  Buffer << "Mo";
-}
-
-void Remangler::mangleNominalTypeDescriptor(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
-  Buffer << "Mn";
-}
-
-void Remangler::mangleOpaqueTypeDescriptor(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
-  Buffer << "MQ";
-}
-
-void Remangler::mangleOpaqueTypeDescriptorAccessor(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
-  Buffer << "Mg";
-}
-
-void Remangler::mangleOpaqueTypeDescriptorAccessorImpl(Node *node,
+ManglingError Remangler::mangleClassMetadataBaseOffset(Node *node,
                                                        unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Mo";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleNominalTypeDescriptor(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Mn";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleNominalTypeDescriptorRecord(Node *node,
+                                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Hn";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOpaqueTypeDescriptor(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "MQ";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOpaqueTypeDescriptorRecord(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Ho";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOpaqueTypeDescriptorAccessor(Node *node,
+                                                            unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Mg";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleOpaqueTypeDescriptorAccessorImpl(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mh";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOpaqueTypeDescriptorAccessorKey(Node *node,
-                                                      unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleOpaqueTypeDescriptorAccessorKey(Node *node,
+                                                               unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mj";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node,
-                                                      unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node,
+                                                               unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mk";
+  return ManglingError::Success;
 }
 
-void Remangler::manglePropertyDescriptor(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::manglePropertyDescriptor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MV";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleNonObjCAttribute(Node *node, unsigned depth) {
+ManglingError Remangler::mangleNonObjCAttribute(Node *node, unsigned depth) {
   Buffer << "TO";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTuple(Node *node, unsigned depth) {
-  mangleTypeList(node, depth + 1);
+ManglingError Remangler::mangleTuple(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleTypeList(node, depth + 1));
   Buffer << 't';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleNumber(Node *node, unsigned depth) {
+ManglingError Remangler::mangleNumber(Node *node, unsigned depth) {
   mangleIndex(node->getIndex());
+  return ManglingError::Success;
 }
 
-void Remangler::mangleObjCAttribute(Node *node, unsigned depth) {
+ManglingError Remangler::mangleObjCAttribute(Node *node, unsigned depth) {
   Buffer << "To";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleObjCBlock(Node *node, unsigned depth) {
+ManglingError Remangler::mangleObjCBlock(Node *node, unsigned depth) {
   if (node->getNumChildren() > 0 &&
       node->getFirstChild()->getKind() == Node::Kind::ClangType) {
     for (size_t Idx = node->getNumChildren() - 1; Idx >= 1; --Idx) {
-      mangleChildNode(node, Idx, depth + 1);
+      RETURN_IF_ERROR(mangleChildNode(node, Idx, depth + 1));
     }
     Buffer << "XzB";
-    mangleClangType(node->getFirstChild(), depth + 1);
-    return;
+    return mangleClangType(node->getFirstChild(), depth + 1);
   }
-  mangleChildNodesReversed(node, depth + 1);
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
   Buffer << "XB";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleEscapingObjCBlock(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1);
+ManglingError Remangler::mangleEscapingObjCBlock(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
   Buffer << "XL";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOwningAddressor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "lO", depth + 1);
+ManglingError Remangler::mangleOwningAddressor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "lO", depth + 1);
 }
 
-void Remangler::mangleOwningMutableAddressor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "aO", depth + 1);
-}
-
-void Remangler::manglePartialApplyForwarder(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1);
-  Buffer << "TA";
-}
-
-void Remangler::manglePartialApplyObjCForwarder(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1);
-  Buffer << "Ta";
-}
-
-void Remangler::mangleMergedFunction(Node *node, unsigned depth) {
-  Buffer << "Tm";
-}
-
-void Remangler::mangleDynamicallyReplaceableFunctionImpl(Node *node,
-                                                         unsigned depth) {
-  Buffer << "TI";
-}
-
-void Remangler::mangleDynamicallyReplaceableFunctionKey(Node *node,
-                                                        unsigned depth) {
-  Buffer << "Tx";
-}
-
-void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node,
-                                                        unsigned depth) {
-  Buffer << "TX";
-}
-
-void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node,
+ManglingError Remangler::mangleOwningMutableAddressor(Node *node,
                                                       unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "aO", depth + 1);
+}
+
+ManglingError Remangler::manglePartialApplyForwarder(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
+  Buffer << "TA";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::manglePartialApplyObjCForwarder(Node *node,
+                                                         unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
+  Buffer << "Ta";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleMergedFunction(Node *node, unsigned depth) {
+  Buffer << "Tm";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDistributedThunk(Node *node, unsigned depth) {
+  Buffer << "TE";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDistributedAccessor(Node *node, unsigned depth) {
+  Buffer << "TF";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDynamicallyReplaceableFunctionImpl(Node *node,
+                                                    unsigned depth) {
+  Buffer << "TI";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDynamicallyReplaceableFunctionKey(Node *node, unsigned depth) {
+  Buffer << "Tx";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node, unsigned depth) {
+  Buffer << "TX";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleAsyncAwaitResumePartialFunction(Node *node,
+                                                               unsigned depth) {
   Buffer << "TQ";
-  mangleChildNode(node, 0, depth + 1);
+  return mangleChildNode(node, 0, depth + 1);
 }
 
-void Remangler::mangleAsyncSuspendResumePartialFunction(Node *node,
-                                                        unsigned depth) {
+ManglingError
+Remangler::mangleAsyncSuspendResumePartialFunction(Node *node, unsigned depth) {
   Buffer << "TY";
-  mangleChildNode(node, 0, depth + 1);
+  return mangleChildNode(node, 0, depth + 1);
 }
 
-void Remangler::manglePostfixOperator(Node *node, unsigned depth) {
+ManglingError Remangler::manglePostfixOperator(Node *node, unsigned depth) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oP";
+  return ManglingError::Success;
 }
 
-void Remangler::manglePrefixOperator(Node *node, unsigned depth) {
+ManglingError Remangler::manglePrefixOperator(Node *node, unsigned depth) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "op";
+  return ManglingError::Success;
 }
 
-void Remangler::manglePrivateDeclName(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1);
+ManglingError Remangler::manglePrivateDeclName(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
   Buffer << (node->getNumChildren() == 1 ? "Ll" : "LL");
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocol(Node *node, unsigned depth) {
-  mangleAnyGenericType(node, "P", depth + 1);
+ManglingError Remangler::mangleProtocol(Node *node, unsigned depth) {
+  return mangleAnyGenericType(node, "P", depth + 1);
 }
 
-void Remangler::mangleRetroactiveConformance(Node *node, unsigned depth) {
-  mangleAnyProtocolConformance(node->getChild(1), depth + 1);
+ManglingError Remangler::mangleRetroactiveConformance(Node *node,
+                                                      unsigned depth) {
+  RETURN_IF_ERROR(mangleAnyProtocolConformance(node->getChild(1), depth + 1));
   Buffer << 'g';
   mangleIndex(node->getChild(0)->getIndex());
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolConformance(Node *node, unsigned depth) {
+ManglingError Remangler::mangleProtocolConformance(Node *node, unsigned depth) {
   Node *Ty = getChildOfType(node->getChild(0));
   Node *GenSig = nullptr;
   if (Ty->getKind() == Node::Kind::DependentGenericType) {
     GenSig = Ty->getFirstChild();
     Ty = Ty->getChild(1);
   }
-  mangle(Ty, depth + 1);
+  RETURN_IF_ERROR(mangle(Ty, depth + 1));
   if (node->getNumChildren() == 4)
-    mangleChildNode(node, 3, depth + 1);
-  manglePureProtocol(node->getChild(1), depth + 1);
-  mangleChildNode(node, 2, depth + 1);
+    RETURN_IF_ERROR(mangleChildNode(node, 3, depth + 1));
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(1), depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
   if (GenSig)
-    mangle(GenSig, depth + 1);
+    RETURN_IF_ERROR(mangle(GenSig, depth + 1));
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolConformanceRefInTypeModule(Node *node,
-                                                         unsigned depth) {
-  manglePureProtocol(node->getChild(0), depth + 1);
+ManglingError
+Remangler::mangleProtocolConformanceRefInTypeModule(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(0), depth + 1));
   Buffer << "HP";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolConformanceRefInProtocolModule(Node *node,
-                                                             unsigned depth) {
-  manglePureProtocol(node->getChild(0), depth + 1);
+ManglingError
+Remangler::mangleProtocolConformanceRefInProtocolModule(Node *node,
+                                                        unsigned depth) {
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(0), depth + 1));
   Buffer << "Hp";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolConformanceRefInOtherModule(Node *node,
-                                                          unsigned depth) {
-  manglePureProtocol(node->getChild(0), depth + 1);
-  mangleChildNode(node, 1, depth + 1);
-}
-
-void Remangler::mangleConcreteProtocolConformance(Node *node, unsigned depth) {
-  mangleType(node->getChild(0), depth + 1);
-  mangle(node->getChild(1), depth + 1);
-  if (node->getNumChildren() > 2)
-    mangleAnyProtocolConformanceList(node->getChild(2), depth + 1);
-  else
-    Buffer << "y";
-  Buffer << "HC";
-}
-
-void Remangler::mangleDependentProtocolConformanceRoot(Node *node,
-                                                       unsigned depth) {
-  mangleType(node->getChild(0), depth + 1);
-  manglePureProtocol(node->getChild(1), depth + 1);
-  Buffer << "HD";
-  mangleDependentConformanceIndex(node->getChild(2), depth + 1);
-}
-
-void Remangler::mangleDependentProtocolConformanceInherited(Node *node,
-                                                            unsigned depth) {
-  mangleAnyProtocolConformance(node->getChild(0), depth + 1);
-  manglePureProtocol(node->getChild(1), depth + 1);
-  Buffer << "HI";
-  mangleDependentConformanceIndex(node->getChild(2), depth + 1);
-}
-
-void Remangler::mangleDependentAssociatedConformance(Node *node,
+ManglingError
+Remangler::mangleProtocolConformanceRefInOtherModule(Node *node,
                                                      unsigned depth) {
-  mangleType(node->getChild(0), depth + 1);
-  manglePureProtocol(node->getChild(1), depth + 1);
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(0), depth + 1));
+  return mangleChildNode(node, 1, depth + 1);
 }
 
-void Remangler::mangleDependentProtocolConformanceAssociated(Node *node,
-                                                             unsigned depth) {
-  mangleAnyProtocolConformance(node->getChild(0), depth + 1);
-  mangleDependentAssociatedConformance(node->getChild(1), depth + 1);
+ManglingError Remangler::mangleConcreteProtocolConformance(Node *node,
+                                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangle(node->getChild(1), depth + 1));
+  if (node->getNumChildren() > 2) {
+    RETURN_IF_ERROR(
+        mangleAnyProtocolConformanceList(node->getChild(2), depth + 1));
+  } else {
+    Buffer << "y";
+  }
+  Buffer << "HC";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDependentProtocolConformanceRoot(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(1), depth + 1));
+  Buffer << "HD";
+  return mangleDependentConformanceIndex(node->getChild(2), depth + 1);
+}
+
+ManglingError
+Remangler::mangleDependentProtocolConformanceInherited(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(mangleAnyProtocolConformance(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(1), depth + 1));
+  Buffer << "HI";
+  return mangleDependentConformanceIndex(node->getChild(2), depth + 1);
+}
+
+ManglingError Remangler::mangleDependentAssociatedConformance(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  return manglePureProtocol(node->getChild(1), depth + 1);
+}
+
+ManglingError
+Remangler::mangleDependentProtocolConformanceAssociated(Node *node,
+                                                        unsigned depth) {
+  RETURN_IF_ERROR(mangleAnyProtocolConformance(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(
+      mangleDependentAssociatedConformance(node->getChild(1), depth + 1));
   Buffer << "HA";
-  mangleDependentConformanceIndex(node->getChild(2), depth + 1);
+  return mangleDependentConformanceIndex(node->getChild(2), depth + 1);
 }
 
-void Remangler::mangleDependentConformanceIndex(Node *node, unsigned depth) {
-  assert(node->getKind() == Node::Kind::Index ||
-         node->getKind() == Node::Kind::UnknownIndex);
-  assert(node->hasIndex() == (node->getKind() == Node::Kind::Index));
+ManglingError Remangler::mangleDependentConformanceIndex(Node *node,
+                                                         unsigned depth) {
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::Index ||
+                       node->getKind() == Node::Kind::UnknownIndex,
+                   node);
+  DEMANGLER_ASSERT(node->hasIndex() == (node->getKind() == Node::Kind::Index),
+                   node);
   mangleIndex(node->hasIndex() ? node->getIndex() + 2 : 1);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAnyProtocolConformance(Node *node, unsigned depth) {
+ManglingError Remangler::mangleAnyProtocolConformance(Node *node,
+                                                      unsigned depth) {
   switch (node->getKind()) {
   case Node::Kind::ConcreteProtocolConformance:
     return mangleConcreteProtocolConformance(node, depth + 1);
@@ -2095,385 +2483,475 @@ void Remangler::mangleAnyProtocolConformance(Node *node, unsigned depth) {
   case Node::Kind::DependentProtocolConformanceAssociated:
     return mangleDependentProtocolConformanceAssociated(node, depth + 1);
   default:
-    break;
+    // Should this really succeed?!
+    return ManglingError::Success;
   }
 }
 
-void Remangler::mangleAnyProtocolConformanceList(Node *node, unsigned depth) {
+ManglingError Remangler::mangleAnyProtocolConformanceList(Node *node,
+                                                          unsigned depth) {
   bool firstElem = true;
   for (NodePointer child : *node) {
-    mangleAnyProtocolConformance(child, depth + 1);
+    RETURN_IF_ERROR(mangleAnyProtocolConformance(child, depth + 1));
     mangleListSeparator(firstElem);
   }
   mangleEndOfList(firstElem);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolDescriptor(Node *node, unsigned depth) {
-  manglePureProtocol(getSingleChild(node), depth + 1);
+ManglingError Remangler::mangleProtocolDescriptor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(manglePureProtocol(getSingleChild(node), depth + 1));
   Buffer << "Mp";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node,
-                                                         unsigned depth) {
-  manglePureProtocol(getSingleChild(node), depth + 1);
-  Buffer << "TL";
-}
-
-void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node,
+ManglingError Remangler::mangleProtocolDescriptorRecord(Node *node,
                                                         unsigned depth) {
-  manglePureProtocol(node->getChild(0), depth + 1);
-  Buffer << "MS";
+  RETURN_IF_ERROR(manglePureProtocol(getSingleChild(node), depth + 1));
+  Buffer << "Hr";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolConformanceDescriptor(Node *node,
+ManglingError
+Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node,
                                                     unsigned depth) {
-  mangleProtocolConformance(node->getChild(0), depth + 1);
-  Buffer << "Mc";
+  RETURN_IF_ERROR(manglePureProtocol(getSingleChild(node), depth + 1));
+  Buffer << "TL";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolList(Node *node, Node *superclass,
-                                   bool hasExplicitAnyObject, unsigned depth) {
+ManglingError
+Remangler::mangleProtocolSelfConformanceDescriptor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(0), depth + 1));
+  Buffer << "MS";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleProtocolConformanceDescriptor(Node *node,
+                                                             unsigned depth) {
+  RETURN_IF_ERROR(mangleProtocolConformance(node->getChild(0), depth + 1));
+  Buffer << "Mc";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleProtocolConformanceDescriptorRecord(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleProtocolConformance(node->getChild(0), depth + 1));
+  Buffer << "Hc";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleProtocolList(Node *node, Node *superclass,
+                                            bool hasExplicitAnyObject,
+                                            unsigned depth) {
   auto *protocols = getSingleChild(node, Node::Kind::TypeList);
   bool FirstElem = true;
   for (NodePointer Child : *protocols) {
-    manglePureProtocol(Child, depth + 1);
+    RETURN_IF_ERROR(manglePureProtocol(Child, depth + 1));
     mangleListSeparator(FirstElem);
   }
   mangleEndOfList(FirstElem);
   if (superclass) {
-    mangleType(superclass, depth + 1);
+    RETURN_IF_ERROR(mangleType(superclass, depth + 1));
     Buffer << "Xc";
-    return;
+    return ManglingError::Success;
   } else if (hasExplicitAnyObject) {
     Buffer << "Xl";
-    return;
+    return ManglingError::Success;
   }
   Buffer << 'p';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleProtocolList(Node *node, unsigned depth) {
-  mangleProtocolList(node, nullptr, false, depth + 1);
+ManglingError Remangler::mangleProtocolList(Node *node, unsigned depth) {
+  return mangleProtocolList(node, nullptr, false, depth + 1);
 }
 
-void Remangler::mangleProtocolListWithClass(Node *node, unsigned depth) {
-  mangleProtocolList(node->getChild(0), node->getChild(1), false, depth + 1);
-}
-
-void Remangler::mangleProtocolListWithAnyObject(Node *node, unsigned depth) {
-  mangleProtocolList(node->getChild(0), nullptr, true, depth + 1);
-}
-
-void Remangler::mangleProtocolSelfConformanceWitness(Node *node,
+ManglingError Remangler::mangleProtocolListWithClass(Node *node,
                                                      unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
-  Buffer << "TS";
+  return mangleProtocolList(node->getChild(0), node->getChild(1), false,
+                            depth + 1);
 }
 
-void Remangler::mangleProtocolWitness(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
-  Buffer << "TW";
+ManglingError Remangler::mangleProtocolListWithAnyObject(Node *node,
+                                                         unsigned depth) {
+  return mangleProtocolList(node->getChild(0), nullptr, true, depth + 1);
 }
 
-void Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node,
-                                                          unsigned depth) {
-  manglePureProtocol(node->getChild(0), depth + 1);
-  Buffer << "WS";
-}
-
-void Remangler::mangleProtocolWitnessTable(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
-  Buffer << "WP";
-}
-
-void Remangler::mangleProtocolWitnessTablePattern(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
-  Buffer << "Wp";
-}
-
-void Remangler::mangleProtocolWitnessTableAccessor(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
-  Buffer << "Wa";
-}
-
-void Remangler::mangleReabstractionThunk(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1);
-  Buffer << "Tr";
-}
-
-void Remangler::mangleReabstractionThunkHelper(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1);
-  Buffer << "TR";
-}
-
-void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node,
-                                                       unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1);
-  Buffer << "Ty";
-}
-
-void Remangler::mangleReabstractionThunkHelperWithGlobalActor(Node *node,
+ManglingError Remangler::mangleProtocolSelfConformanceWitness(Node *node,
                                                               unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "TS";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleProtocolWitness(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "TW";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(manglePureProtocol(node->getChild(0), depth + 1));
+  Buffer << "WS";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleProtocolWitnessTable(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "WP";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleProtocolWitnessTablePattern(Node *node,
+                                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Wp";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleProtocolWitnessTableAccessor(Node *node,
+                                                            unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Wa";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleReabstractionThunk(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
+  Buffer << "Tr";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleReabstractionThunkHelper(Node *node,
+                                                        unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
+  Buffer << "TR";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleReabstractionThunkHelperWithSelf(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
+  Buffer << "Ty";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleReabstractionThunkHelperWithGlobalActor(Node *node,
+                                                         unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "TU";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op,
-                                                    unsigned depth) {
+ManglingError Remangler::mangleAutoDiffFunctionOrSimpleThunk(Node *node,
+                                                             StringRef op,
+                                                             unsigned depth) {
   auto childIt = node->begin();
   while (childIt != node->end() &&
          (*childIt)->getKind() != Node::Kind::AutoDiffFunctionKind)
-    mangle(*childIt++, depth + 1);
+    RETURN_IF_ERROR(mangle(*childIt++, depth + 1));
   Buffer << op;
-  mangle(*childIt++, depth + 1); // kind
-  mangle(*childIt++, depth + 1); // parameter indices
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // kind
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // parameter indices
   Buffer << 'p';
-  mangle(*childIt++, depth + 1); // result indices
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // result indices
   Buffer << 'r';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAutoDiffFunction(Node *node, unsigned depth) {
-  mangleAutoDiffFunctionOrSimpleThunk(node, "TJ", depth + 1);
+ManglingError Remangler::mangleAutoDiffFunction(Node *node, unsigned depth) {
+  return mangleAutoDiffFunctionOrSimpleThunk(node, "TJ", depth + 1);
 }
 
-void Remangler::mangleAutoDiffDerivativeVTableThunk(Node *node,
-                                                    unsigned depth) {
-  mangleAutoDiffFunctionOrSimpleThunk(node, "TJV", depth + 1);
+ManglingError Remangler::mangleAutoDiffDerivativeVTableThunk(Node *node,
+                                                             unsigned depth) {
+  return mangleAutoDiffFunctionOrSimpleThunk(node, "TJV", depth + 1);
 }
 
-void Remangler::mangleAutoDiffSelfReorderingReabstractionThunk(Node *node,
-                                                               unsigned depth) {
+ManglingError
+Remangler::mangleAutoDiffSelfReorderingReabstractionThunk(Node *node,
+                                                          unsigned depth) {
   auto childIt = node->begin();
-  mangle(*childIt++, depth + 1); // from type
-  mangle(*childIt++, depth + 1); // to type
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // from type
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // to type
   if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
-    mangleDependentGenericSignature(*childIt++, depth + 1);
+    RETURN_IF_ERROR(mangleDependentGenericSignature(*childIt++, depth + 1));
   Buffer << "TJO";
-  mangle(*childIt++, depth + 1); // kind
+  return mangle(*childIt++, depth + 1); // kind
 }
 
-void Remangler::mangleAutoDiffSubsetParametersThunk(Node *node,
-                                                    unsigned depth) {
+ManglingError Remangler::mangleAutoDiffSubsetParametersThunk(Node *node,
+                                                             unsigned depth) {
   auto childIt = node->begin();
   while (childIt != node->end() &&
          (*childIt)->getKind() != Node::Kind::AutoDiffFunctionKind)
-    mangle(*childIt++, depth + 1);
+    RETURN_IF_ERROR(mangle(*childIt++, depth + 1));
   Buffer << "TJS";
-  mangle(*childIt++, depth + 1); // kind
-  mangle(*childIt++, depth + 1); // parameter indices
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // kind
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // parameter indices
   Buffer << 'p';
-  mangle(*childIt++, depth + 1); // result indices
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // result indices
   Buffer << 'r';
-  mangle(*childIt++, depth + 1); // to parameter indices
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // to parameter indices
   Buffer << 'P';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAutoDiffFunctionKind(Node *node, unsigned depth) {
+ManglingError Remangler::mangleAutoDiffFunctionKind(Node *node,
+                                                    unsigned depth) {
   Buffer << (char)node->getIndex();
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDifferentiabilityWitness(Node *node, unsigned depth) {
+ManglingError Remangler::mangleDifferentiabilityWitness(Node *node,
+                                                        unsigned depth) {
   auto childIt = node->begin();
   while (childIt != node->end() && (*childIt)->getKind() != Node::Kind::Index)
-    mangle(*childIt++, depth + 1);
+    RETURN_IF_ERROR(mangle(*childIt++, depth + 1));
   if (node->getLastChild()->getKind() ==
           Node::Kind::DependentGenericSignature)
-    mangle(node->getLastChild(), depth + 1);
+    RETURN_IF_ERROR(mangle(node->getLastChild(), depth + 1));
   Buffer << "WJ" << (char)(*childIt++)->getIndex();
-  mangle(*childIt++, depth + 1); // parameter indices
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // parameter indices
   Buffer << 'p';
-  mangle(*childIt++, depth + 1); // result indices
+  RETURN_IF_ERROR(mangle(*childIt++, depth + 1)); // result indices
   Buffer << 'r';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleIndexSubset(Node *node, unsigned depth) {
+ManglingError Remangler::mangleIndexSubset(Node *node, unsigned depth) {
   Buffer << node->getText();
+  return ManglingError::Success;
 }
 
-void Remangler::mangleReadAccessor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "r", depth + 1);
+ManglingError Remangler::mangleReadAccessor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "r", depth + 1);
 }
 
-void Remangler::mangleKeyPathThunkHelper(Node *node, StringRef op,
-                                         unsigned depth) {
+ManglingError Remangler::mangleKeyPathThunkHelper(Node *node, StringRef op,
+                                                  unsigned depth) {
   for (NodePointer Child : *node)
     if (Child->getKind() != Node::Kind::IsSerialized)
-      mangle(Child, depth + 1);
+      RETURN_IF_ERROR(mangle(Child, depth + 1));
   Buffer << op;
   for (NodePointer Child : *node)
     if (Child->getKind() == Node::Kind::IsSerialized)
-      mangle(Child, depth + 1);
+      RETURN_IF_ERROR(mangle(Child, depth + 1));
+  return ManglingError::Success;
 }
 
-void Remangler::mangleKeyPathGetterThunkHelper(Node *node, unsigned depth) {
-  mangleKeyPathThunkHelper(node, "TK", depth + 1);
+ManglingError Remangler::mangleKeyPathGetterThunkHelper(Node *node,
+                                                        unsigned depth) {
+  return mangleKeyPathThunkHelper(node, "TK", depth + 1);
 }
 
-void Remangler::mangleKeyPathSetterThunkHelper(Node *node, unsigned depth) {
-  mangleKeyPathThunkHelper(node, "Tk", depth + 1);
+ManglingError Remangler::mangleKeyPathSetterThunkHelper(Node *node,
+                                                        unsigned depth) {
+  return mangleKeyPathThunkHelper(node, "Tk", depth + 1);
 }
 
-void Remangler::mangleKeyPathEqualsThunkHelper(Node *node, unsigned depth) {
-  mangleKeyPathThunkHelper(node, "TH", depth + 1);
+ManglingError Remangler::mangleKeyPathEqualsThunkHelper(Node *node,
+                                                        unsigned depth) {
+  return mangleKeyPathThunkHelper(node, "TH", depth + 1);
 }
 
-void Remangler::mangleKeyPathHashThunkHelper(Node *node, unsigned depth) {
-  mangleKeyPathThunkHelper(node, "Th", depth + 1);
+ManglingError Remangler::mangleKeyPathHashThunkHelper(Node *node,
+                                                      unsigned depth) {
+  return mangleKeyPathThunkHelper(node, "Th", depth + 1);
 }
 
-void Remangler::mangleReturnType(Node *node, unsigned depth) {
-  mangleArgumentTuple(node, depth + 1);
+ManglingError Remangler::mangleReturnType(Node *node, unsigned depth) {
+  return mangleArgumentTuple(node, depth + 1);
 }
 
-void Remangler::mangleRelatedEntityDeclName(Node *node, unsigned depth) {
-  mangleChildNode(node, 1, depth + 1);
+ManglingError Remangler::mangleRelatedEntityDeclName(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
   NodePointer kindNode = node->getFirstChild();
   if (kindNode->getText().size() != 1)
-    unreachable("cannot handle multi-byte related entities");
+    return MANGLING_ERROR(ManglingError::MultiByteRelatedEntity, kindNode);
   Buffer << "L" << kindNode->getText();
+  return ManglingError::Success;
 }
 
-void Remangler::mangleSILBoxType(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleSILBoxType(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Xb";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleSetter(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "s", depth + 1);
+ManglingError Remangler::mangleSetter(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "s", depth + 1);
 }
 
-void Remangler::mangleSpecializationPassID(Node *node, unsigned depth) {
+ManglingError Remangler::mangleSpecializationPassID(Node *node,
+                                                    unsigned depth) {
   Buffer << node->getIndex();
+  return ManglingError::Success;
 }
 
-void Remangler::mangleIsSerialized(Node *node, unsigned depth) {
+ManglingError Remangler::mangleIsSerialized(Node *node, unsigned depth) {
   Buffer << 'q';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleStatic(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleMetatypeParamsRemoved(Node *node, unsigned depth) {
+  Buffer << 'm';
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleStatic(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << 'Z';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOtherNominalType(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleOtherNominalType(Node *node, unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleStructure(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleStructure(Node *node, unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleSubscript(Node *node, unsigned depth) {
-  mangleAbstractStorage(node, "p", depth + 1);
+ManglingError Remangler::mangleSubscript(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node, "p", depth + 1);
 }
 
-void Remangler::mangleSuffix(Node *node, unsigned depth) {
+ManglingError Remangler::mangleSuffix(Node *node, unsigned depth) {
   // Just add the suffix back on.
   Buffer << node->getText();
+  return ManglingError::Success;
 }
 
-void Remangler::mangleThinFunctionType(Node *node, unsigned depth) {
-  mangleFunctionSignature(node, depth + 1);
+ManglingError Remangler::mangleThinFunctionType(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleFunctionSignature(node, depth + 1));
   Buffer << "Xf";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTupleElement(Node *node, unsigned depth) {
-  mangleChildNodesReversed(node, depth + 1); // tuple type, element name?
+ManglingError Remangler::mangleTupleElement(Node *node, unsigned depth) {
+  return mangleChildNodesReversed(node, depth + 1); // tuple type, element name?
 }
 
-void Remangler::mangleTupleElementName(Node *node, unsigned depth) {
-  mangleIdentifier(node, depth + 1);
+ManglingError Remangler::mangleTupleElementName(Node *node, unsigned depth) {
+  return mangleIdentifier(node, depth + 1);
 }
 
-void Remangler::mangleType(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleType(Node *node, unsigned depth) {
+  return mangleSingleChildNode(node, depth + 1);
 }
 
-void Remangler::mangleTypeAlias(Node *node, unsigned depth) {
-  mangleAnyNominalType(node, depth + 1);
+ManglingError Remangler::mangleTypeAlias(Node *node, unsigned depth) {
+  return mangleAnyNominalType(node, depth + 1);
 }
 
-void Remangler::mangleTypeList(Node *node, unsigned depth) {
+ManglingError Remangler::mangleTypeList(Node *node, unsigned depth) {
   bool FirstElem = true;
   for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; ++Idx) {
-    mangleChildNode(node, Idx, depth + 1);
+    RETURN_IF_ERROR(mangleChildNode(node, Idx, depth + 1));
     mangleListSeparator(FirstElem);
   }
   mangleEndOfList(FirstElem);
+  return ManglingError::Success;
 }
 
-void Remangler::mangleLabelList(Node *node, unsigned depth) {
+ManglingError Remangler::mangleLabelList(Node *node, unsigned depth) {
   if (node->getNumChildren() == 0)
     Buffer << 'y';
   else
-    mangleChildNodes(node, depth + 1);
+    RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMangling(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleTypeMangling(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << 'D';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMetadata(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleTypeMetadata(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "N";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMetadataAccessFunction(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleTypeMetadataAccessFunction(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Ma";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMetadataInstantiationCache(Node *node,
-                                                     unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleTypeMetadataInstantiationCache(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MI";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMetadataInstantiationFunction(Node *node,
-                                                        unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError
+Remangler::mangleTypeMetadataInstantiationFunction(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mi";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMetadataSingletonInitializationCache(Node *node,
-                                                               unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError
+Remangler::mangleTypeMetadataSingletonInitializationCache(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Ml";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMetadataCompletionFunction(Node *node,
-                                                     unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleTypeMetadataCompletionFunction(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mr";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMetadataDemanglingCache(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleTypeMetadataDemanglingCache(Node *node,
+                                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "MD";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeMetadataLazyCache(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleTypeMetadataLazyCache(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "ML";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleUncurriedFunctionType(Node *node, unsigned depth) {
-  mangleFunctionSignature(node, depth + 1);
+ManglingError Remangler::mangleUncurriedFunctionType(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleFunctionSignature(node, depth + 1));
   // Mangle as regular function type (there is no "uncurried function type"
   // in the new mangling scheme).
   Buffer << 'c';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleUnsafeAddressor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "lu", depth + 1);
+ManglingError Remangler::mangleUnsafeAddressor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "lu", depth + 1);
 }
 
-void Remangler::mangleUnsafeMutableAddressor(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "au", depth + 1);
+ManglingError Remangler::mangleUnsafeMutableAddressor(Node *node,
+                                                      unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "au", depth + 1);
 }
 
-void Remangler::mangleValueWitness(Node *node, unsigned depth) {
-  mangleChildNode(node, 1, depth + 1); // type
+ManglingError Remangler::mangleValueWitness(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // type
   const char *Code = nullptr;
   switch (ValueWitnessKind(node->getFirstChild()->getIndex())) {
 #define VALUE_WITNESS(MANGLING, NAME) \
@@ -2481,194 +2959,261 @@ void Remangler::mangleValueWitness(Node *node, unsigned depth) {
 #include "swift/Demangling/ValueWitnessMangling.def"
   }
   Buffer << 'w' << Code;
+  return ManglingError::Success;
 }
 
-void Remangler::mangleValueWitnessTable(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleValueWitnessTable(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "WV";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleVariable(Node *node, unsigned depth) {
-  mangleAbstractStorage(node, "p", depth + 1);
+ManglingError Remangler::mangleVariable(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node, "p", depth + 1);
 }
 
-void Remangler::mangleVTableAttribute(Node *node, unsigned depth) {
-  unreachable("Old-fashioned vtable thunk in new mangling format");
+ManglingError Remangler::mangleVTableAttribute(Node *node, unsigned depth) {
+  // Old-fashioned vtable thunk in new mangling format
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleVTableThunk(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleVTableThunk(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "TV";
+  return ManglingError::Success;
 }
 
 #define REF_STORAGE(Name, ...)                                                 \
-  void Remangler::mangle##Name(Node *node, unsigned depth) {                   \
-    mangleSingleChildNode(node, depth + 1);                                    \
+  ManglingError Remangler::mangle##Name(Node *node, unsigned depth) {          \
+    RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));                   \
     Buffer << manglingOf(ReferenceOwnership::Name);                            \
+    return ManglingError::Success;                                             \
   }
 #include "swift/AST/ReferenceStorage.def"
 
-void Remangler::mangleWillSet(Node *node, unsigned depth) {
-  mangleAbstractStorage(node->getFirstChild(), "w", depth + 1);
+ManglingError Remangler::mangleWillSet(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "w", depth + 1);
 }
 
-void Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node,
-                                                          unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError
+Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MB";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleReflectionMetadataFieldDescriptor(Node *node,
-                                                        unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError
+Remangler::mangleReflectionMetadataFieldDescriptor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MF";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleReflectionMetadataAssocTypeDescriptor(Node *node,
-                                                            unsigned depth) {
-  mangleSingleChildNode(node, depth + 1); // protocol-conformance
+ManglingError
+Remangler::mangleReflectionMetadataAssocTypeDescriptor(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleSingleChildNode(node, depth + 1)); // protocol-conformance
   Buffer << "MA";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleReflectionMetadataSuperclassDescriptor(Node *node,
-                                                             unsigned depth) {
-  mangleSingleChildNode(node, depth + 1); // protocol-conformance
+ManglingError
+Remangler::mangleReflectionMetadataSuperclassDescriptor(Node *node,
+                                                        unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleSingleChildNode(node, depth + 1)); // protocol-conformance
   Buffer << "MC";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleCurryThunk(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleCurryThunk(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Tc";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDispatchThunk(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleDispatchThunk(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Tj";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleMethodDescriptor(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleMethodDescriptor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Tq";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleMethodLookupFunction(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleMethodLookupFunction(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mu";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleObjCMetadataUpdateFunction(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleObjCMetadataUpdateFunction(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MU";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleObjCResilientClassStub(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleObjCResilientClassStub(Node *node,
+                                                      unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Ms";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleFullObjCResilientClassStub(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleFullObjCResilientClassStub(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mt";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleConcurrentFunctionType(Node *node, unsigned depth) {
+ManglingError Remangler::mangleConcurrentFunctionType(Node *node,
+                                                      unsigned depth) {
   Buffer << "Yb";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAsyncAnnotation(Node *node, unsigned depth) {
+ManglingError Remangler::mangleAsyncAnnotation(Node *node, unsigned depth) {
   Buffer << "Ya";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleDifferentiableFunctionType(Node *node, unsigned depth) {
+ManglingError Remangler::mangleDifferentiableFunctionType(Node *node,
+                                                          unsigned depth) {
   Buffer << "Yj" << (char)node->getIndex(); // differentiability kind
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGlobalActorFunctionType(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "Yc";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleThrowsAnnotation(Node *node, unsigned depth) {
+ManglingError Remangler::mangleThrowsAnnotation(Node *node, unsigned depth) {
   Buffer << 'K';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleEmptyList(Node *node, unsigned depth) { Buffer << 'y'; }
+ManglingError Remangler::mangleEmptyList(Node *node, unsigned depth) {
+  Buffer << 'y';
+  return ManglingError::Success;
+}
 
-void Remangler::mangleFirstElementMarker(Node *node, unsigned depth) {
+ManglingError Remangler::mangleFirstElementMarker(Node *node, unsigned depth) {
   Buffer << '_';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleVariadicMarker(Node *node, unsigned depth) {
+ManglingError Remangler::mangleVariadicMarker(Node *node, unsigned depth) {
   Buffer << 'd';
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedCopy(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedCopy(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOy";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedConsume(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedConsume(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOe";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedRetain(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedRetain(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOr";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedRelease(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedRelease(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOs";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedInitializeWithTake(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedInitializeWithTake(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOb";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedInitializeWithCopy(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedInitializeWithCopy(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOc";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedAssignWithTake(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedAssignWithTake(Node *node,
+                                                      unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOd";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedAssignWithCopy(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedAssignWithCopy(Node *node,
+                                                      unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOf";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedDestroy(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleOutlinedDestroy(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOh";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedVariable(Node *node, unsigned depth) {
+ManglingError Remangler::mangleOutlinedVariable(Node *node, unsigned depth) {
   Buffer << "Tv";
   mangleIndex(node->getIndex());
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOutlinedBridgedMethod(Node *node, unsigned depth) {
+ManglingError Remangler::mangleOutlinedReadOnlyObject(Node *node, unsigned depth) {
+  Buffer << "Tv";
+  mangleIndex(node->getIndex());
+  Buffer << 'r';
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOutlinedBridgedMethod(Node *node,
+                                                     unsigned depth) {
   Buffer << "Te";
   Buffer << node->getText();
   Buffer << "_";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleSILBoxTypeWithLayout(Node *node, unsigned depth) {
-  assert(node->getNumChildren() == 1 || node->getNumChildren() == 3);
-  assert(node->getChild(0)->getKind() == Node::Kind::SILBoxLayout);
+ManglingError Remangler::mangleSILBoxTypeWithLayout(Node *node,
+                                                    unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 1 || node->getNumChildren() == 3,
+                   node);
+  DEMANGLER_ASSERT(node->getChild(0)->getKind() == Node::Kind::SILBoxLayout,
+                   node);
   auto layout = node->getChild(0);
   auto layoutTypeList = Factory.createNode(Node::Kind::TypeList);
   for (unsigned i = 0, e = layout->getNumChildren(); i < e; ++i) {
-    assert(layout->getChild(i)->getKind() == Node::Kind::SILBoxImmutableField
-           || layout->getChild(i)->getKind() == Node::Kind::SILBoxMutableField);
+    DEMANGLER_ASSERT(
+        layout->getChild(i)->getKind() == Node::Kind::SILBoxImmutableField ||
+            layout->getChild(i)->getKind() == Node::Kind::SILBoxMutableField,
+        layout->getChild(i));
     auto field = layout->getChild(i);
-    assert(field->getNumChildren() == 1
-           && field->getChild(0)->getKind() == Node::Kind::Type);
+    DEMANGLER_ASSERT(field->getNumChildren() == 1 &&
+                         field->getChild(0)->getKind() == Node::Kind::Type,
+                     field);
     auto fieldType = field->getChild(0);
     // 'inout' mangling is used to represent mutable fields.
     if (field->getKind() == Node::Kind::SILBoxMutableField) {
@@ -2679,221 +3224,342 @@ void Remangler::mangleSILBoxTypeWithLayout(Node *node, unsigned depth) {
     }
     layoutTypeList->addChild(fieldType, Factory);
   }
-  mangleTypeList(layoutTypeList, depth + 1);
+  RETURN_IF_ERROR(mangleTypeList(layoutTypeList, depth + 1));
 
   if (node->getNumChildren() == 3) {
     auto signature = node->getChild(1);
     auto genericArgs = node->getChild(2);
-    assert(signature->getKind() == Node::Kind::DependentGenericSignature);
-    assert(genericArgs->getKind() == Node::Kind::TypeList);
-    mangleTypeList(genericArgs, depth + 1);
-    mangleDependentGenericSignature(signature, depth + 1);
+    DEMANGLER_ASSERT(
+        signature->getKind() == Node::Kind::DependentGenericSignature, node);
+    DEMANGLER_ASSERT(genericArgs->getKind() == Node::Kind::TypeList, node);
+    RETURN_IF_ERROR(mangleTypeList(genericArgs, depth + 1));
+    RETURN_IF_ERROR(mangleDependentGenericSignature(signature, depth + 1));
     Buffer << "XX";
   } else {
     Buffer << "Xx";
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleSILBoxLayout(Node *node, unsigned depth) {
-  unreachable("should be part of SILBoxTypeWithLayout");
+ManglingError Remangler::mangleSILBoxLayout(Node *node, unsigned depth) {
+  // should be part of SILBoxTypeWithLayout
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleSILBoxMutableField(Node *node, unsigned depth) {
-  unreachable("should be part of SILBoxTypeWithLayout");
+ManglingError Remangler::mangleSILBoxMutableField(Node *node, unsigned depth) {
+  // should be part of SILBoxTypeWithLayout
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleSILBoxImmutableField(Node *node, unsigned depth) {
-  unreachable("should be part of SILBoxTypeWithLayout");
+ManglingError Remangler::mangleSILBoxImmutableField(Node *node,
+                                                    unsigned depth) {
+  // should be part of SILBoxTypeWithLayout
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleAssocTypePath(Node *node, unsigned depth) {
+ManglingError Remangler::mangleAssocTypePath(Node *node, unsigned depth) {
   bool FirstElem = true;
   for (NodePointer Child : *node) {
-    mangle(Child, depth + 1);
+    RETURN_IF_ERROR(mangle(Child, depth + 1));
     mangleListSeparator(FirstElem);
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleModuleDescriptor(Node *node, unsigned depth) {
-  mangle(node->getChild(0), depth + 1);
+ManglingError Remangler::mangleModuleDescriptor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
   Buffer << "MXM";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleExtensionDescriptor(Node *node, unsigned depth) {
-  mangle(node->getChild(0), depth + 1);
+ManglingError Remangler::mangleExtensionDescriptor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
   Buffer << "MXE";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAnonymousDescriptor(Node *node, unsigned depth) {
-  mangle(node->getChild(0), depth + 1);
+ManglingError Remangler::mangleAnonymousDescriptor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
   if (node->getNumChildren() == 1) {
     Buffer << "MXX";
   } else {
-    mangleIdentifier(node->getChild(1), depth + 1);
+    RETURN_IF_ERROR(mangleIdentifier(node->getChild(1), depth + 1));
     Buffer << "MXY";
   }
+  return ManglingError::Success;
 }
 
-void Remangler::mangleAssociatedTypeGenericParamRef(Node *node,
-                                                    unsigned depth) {
-  mangleType(node->getChild(0), depth + 1);
-  mangleAssocTypePath(node->getChild(1), depth + 1);
+ManglingError Remangler::mangleAssociatedTypeGenericParamRef(Node *node,
+                                                             unsigned depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangleAssocTypePath(node->getChild(1), depth + 1));
   Buffer << "MXA";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleTypeSymbolicReference(Node *node, unsigned depth) {
+ManglingError Remangler::mangleTypeSymbolicReference(Node *node,
+                                                     unsigned depth) {
   return mangle(
       Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
       depth + 1);
 }
 
-void Remangler::mangleProtocolSymbolicReference(Node *node, unsigned depth) {
+ManglingError Remangler::mangleProtocolSymbolicReference(Node *node,
+                                                         unsigned depth) {
   return mangle(
       Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
       depth + 1);
 }
 
-void Remangler::mangleOpaqueTypeDescriptorSymbolicReference(Node *node,
-                                                            unsigned depth) {
+ManglingError
+Remangler::mangleOpaqueTypeDescriptorSymbolicReference(Node *node,
+                                                       unsigned depth) {
   return mangle(
       Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
       depth + 1);
 }
 
-void Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
-  mangleType(node->getChild(0), depth + 1);
+ManglingError Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
   Buffer << "XSq";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleSugaredArray(Node *node, unsigned depth) {
-  mangleType(node->getChild(0), depth + 1);
+ManglingError Remangler::mangleSugaredArray(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
   Buffer << "XSa";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleSugaredDictionary(Node *node, unsigned depth) {
-  mangleType(node->getChild(0), depth + 1);
-  mangleType(node->getChild(1), depth + 1);
+ManglingError Remangler::mangleSugaredDictionary(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));
   Buffer << "XSD";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleSugaredParen(Node *node, unsigned depth) {
-  mangleType(node->getChild(0), depth + 1);
+ManglingError Remangler::mangleSugaredParen(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
   Buffer << "XSp";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleOpaqueReturnType(Node *node, unsigned depth) {
+ManglingError Remangler::mangleOpaqueReturnType(Node *node, unsigned depth) {
   Buffer << "Qr";
+  return ManglingError::Success;
 }
-void Remangler::mangleOpaqueReturnTypeOf(Node *node, unsigned depth) {
-  mangle(node->getChild(0), depth + 1);
+ManglingError Remangler::mangleOpaqueReturnTypeIndexed(Node *node, unsigned depth) {
+  Buffer << "QR";
+  mangleIndex(node->getIndex());
+  return ManglingError::Success;
+}
+ManglingError Remangler::mangleOpaqueReturnTypeOf(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
   Buffer << "QO";
+  return ManglingError::Success;
 }
-void Remangler::mangleOpaqueType(Node *node, unsigned depth) {
+ManglingError Remangler::mangleOpaqueType(Node *node, unsigned depth) {
   SubstitutionEntry entry;
-  if (trySubstitution(node, entry)) return;
+  if (trySubstitution(node, entry))
+    return ManglingError::Success;
 
-  mangle(node->getChild(0), depth + 1);
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
   auto boundGenerics = node->getChild(2);
   for (unsigned i = 0; i < boundGenerics->getNumChildren(); ++i) {
     Buffer << (i == 0 ? 'y' : '_');
-    mangleChildNodes(boundGenerics->getChild(i), depth + 1);
+    RETURN_IF_ERROR(mangleChildNodes(boundGenerics->getChild(i), depth + 1));
   }
   if (node->getNumChildren() >= 4) {
     auto retroactiveConformances = node->getChild(3);
     for (unsigned i = 0; i < retroactiveConformances->getNumChildren(); ++i) {
-      mangle(retroactiveConformances->getChild(i), depth + 1);
+      RETURN_IF_ERROR(mangle(retroactiveConformances->getChild(i), depth + 1));
     }
   }
   Buffer << "Qo";
   mangleIndex(node->getChild(1)->getIndex());
 
   addSubstitution(entry);
+  return ManglingError::Success;
 }
-void Remangler::mangleAccessorFunctionReference(Node *node, unsigned depth) {
-  unreachable("can't remangle");
+ManglingError Remangler::mangleAccessorFunctionReference(Node *node,
+                                                         unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
-void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node,
-                                                           unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError
+Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node,
+                                                      unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "MM";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
+ManglingError
+Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
     Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mb";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleMetadataInstantiationCache(Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError Remangler::mangleMetadataInstantiationCache(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MK";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(
-    Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+ManglingError
+Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node,
+                                                            unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MN";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(
+ManglingError Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(
     Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MJ";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+ManglingError
+Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
     Node *node, unsigned depth) {
-  mangleSingleChildNode(node, depth + 1);
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Mz";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGlobalVariableOnceToken(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleGlobalVariableOnceToken(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "Wz";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGlobalVariableOnceFunction(Node *node, unsigned depth) {
-  mangleChildNodes(node, depth + 1);
+ManglingError Remangler::mangleGlobalVariableOnceFunction(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WZ";
+  return ManglingError::Success;
 }
 
-void Remangler::mangleGlobalVariableOnceDeclList(Node *node, unsigned depth) {
+ManglingError Remangler::mangleGlobalVariableOnceDeclList(Node *node,
+                                                          unsigned depth) {
   for (unsigned i = 0, e = node->getNumChildren(); i < e; ++i) {
-    mangle(node->getChild(i), depth + 1);
+    RETURN_IF_ERROR(mangle(node->getChild(i), depth + 1));
     Buffer << '_';
   }
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
+                                                        unsigned depth) {
+  Buffer << "HF";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentThunk(Node *node,
+                                                   unsigned depth) {
+  Buffer << "Twb";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
+                                                      unsigned depth) {
+  Buffer << "TwB";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleUniquable(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
+  Buffer << "Mq";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
+                                                            unsigned depth) {
+  NodePointer genSig, type;
+  if (node->getNumChildren() == 1) {
+    genSig = nullptr;
+    type = node->getChild(0);
+  } else {
+    genSig = node->getChild(0);
+    type = node->getChild(1);
+  }
+
+  if (genSig) {
+    RETURN_IF_ERROR(mangle(genSig, depth + 1));  
+  }
+  RETURN_IF_ERROR(mangle(type, depth + 1));
+
+  if (genSig)
+    Buffer << "XG";
+  else
+    Buffer << "Xg";
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSymbolicExtendedExistentialType(Node *node,
+                                                     unsigned int depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth+1));
+  for (auto arg: *node->getChild(1))
+    RETURN_IF_ERROR(mangle(arg, depth+1));
+  if (node->getNumChildren() > 2)
+    for (auto conf: *node->getChild(2))
+      RETURN_IF_ERROR(mangle(conf, depth+1));
+  return ManglingError::Success;
+}
+ManglingError Remangler::
+mangleUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  // We don't support absolute references in the mangling of these
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+ManglingError Remangler::
+mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  // We don't support absolute references in the mangling of these
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNode(NodePointer node) {
+ManglingErrorOr<std::string> Demangle::mangleNode(NodePointer node) {
   return mangleNode(node, [](SymbolicReferenceKind, const void *) -> NodePointer {
-    unreachable("should not try to mangle a symbolic reference; "
-                "resolve it to a non-symbolic demangling tree instead");
-  });
+                            return nullptr;
+                          });
+  //  unreachable("should not try to mangle a symbolic reference; "
+  //              "resolve it to a non-symbolic demangling tree instead");
 }
 
-std::string
+ManglingErrorOr<std::string>
 Demangle::mangleNode(NodePointer node, SymbolicResolver resolver) {
-  if (!node) return "";
+  if (!node) return std::string();
 
   NodeFactory Factory;
   Remangler remangler(resolver, Factory);
-  remangler.mangle(node, 0);
+  ManglingError err = remangler.mangle(node, 0);
+  if (!err.isSuccess())
+    return err;
 
   return remangler.str();
 }
 
-llvm::StringRef
+ManglingErrorOr<llvm::StringRef>
 Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
                      NodeFactory &Factory) {
   if (!node)
     return StringRef();
 
   Remangler remangler(resolver, Factory);
-  remangler.mangle(node, 0);
+  ManglingError err = remangler.mangle(node, 0);
+  if (!err.isSuccess())
+    return err;
 
   return remangler.getBufferStr();
 }
@@ -2914,6 +3580,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericFunction:
+    case Node::Kind::ConstrainedExistential:
       return true;
 
     case Node::Kind::Structure:
@@ -2942,6 +3609,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::ModifyAccessor:
     case Node::Kind::UnsafeAddressor:
     case Node::Kind::UnsafeMutableAddressor:
+    case Node::Kind::Static:
       assert(node->getNumChildren() > 0);
       return node->getNumChildren() > 0 && isSpecialized(node->getChild(0));
 
@@ -2954,7 +3622,8 @@ bool Demangle::isSpecialized(Node *node) {
   }
 }
 
-NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
+ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
+                                                        NodeFactory &Factory) {
   unsigned NumToCopy = 2;
   switch (node->getKind()) {
     case Node::Kind::Function:
@@ -2977,6 +3646,7 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::Static:
       NumToCopy = node->getNumChildren();
       LLVM_FALLTHROUGH;
     case Node::Kind::Structure:
@@ -2986,8 +3656,12 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::OtherNominalType: {
       NodePointer result = Factory.createNode(node->getKind());
       NodePointer parentOrModule = node->getChild(0);
-      if (isSpecialized(parentOrModule))
-        parentOrModule = getUnspecialized(parentOrModule, Factory);
+      if (isSpecialized(parentOrModule)) {
+        auto unspec = getUnspecialized(parentOrModule, Factory);
+        if (!unspec.isSuccess())
+          return unspec;
+        parentOrModule = unspec.result();
+      }
       result->addChild(parentOrModule, Factory);
       for (unsigned Idx = 1; Idx < NumToCopy; ++Idx) {
         result->addChild(node->getChild(Idx), Factory);
@@ -3002,17 +3676,25 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias: {
       NodePointer unboundType = node->getChild(0);
-      assert(unboundType->getKind() == Node::Kind::Type);
+      DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
       NodePointer nominalType = unboundType->getChild(0);
       if (isSpecialized(nominalType))
         return getUnspecialized(nominalType, Factory);
       return nominalType;
     }
 
+    case Node::Kind::ConstrainedExistential: {
+      NodePointer unboundType = node->getChild(0);
+      DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
+      return unboundType;
+    }
+
     case Node::Kind::BoundGenericFunction: {
       NodePointer unboundFunction = node->getChild(0);
-      assert(unboundFunction->getKind() == Node::Kind::Function ||
-             unboundFunction->getKind() == Node::Kind::Constructor);
+      DEMANGLER_ASSERT(unboundFunction->getKind() == Node::Kind::Function ||
+                           unboundFunction->getKind() ==
+                               Node::Kind::Constructor,
+                       unboundFunction);
       if (isSpecialized(unboundFunction))
         return getUnspecialized(unboundFunction, Factory);
       return unboundFunction;
@@ -3022,9 +3704,12 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
       NodePointer parent = node->getChild(1);
       if (!isSpecialized(parent))
         return node;
+      auto unspec = getUnspecialized(parent, Factory);
+      if (!unspec.isSuccess())
+        return unspec.error();
       NodePointer result = Factory.createNode(Node::Kind::Extension);
       result->addChild(node->getFirstChild(), Factory);
-      result->addChild(getUnspecialized(parent, Factory), Factory);
+      result->addChild(unspec.result(), Factory);
       if (node->getNumChildren() == 3) {
         // Add the generic signature of the extension.
         result->addChild(node->getChild(2), Factory);
@@ -3032,6 +3717,6 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
       return result;
     }
     default:
-      unreachable("bad nominal type kind");
+      return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
   }
 }

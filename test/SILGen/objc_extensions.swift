@@ -17,7 +17,7 @@ extension Sub {
 
     // Make sure that we are generating the @objc thunk and are calling the actual method.
     //
-    // CHECK-LABEL: sil hidden [thunk] [ossa] @$s15objc_extensions3SubC4propSSSgvgTo : $@convention(objc_method) (Sub) -> @autoreleased Optional<NSString> {
+    // CHECK-LABEL: sil private [thunk] [ossa] @$s15objc_extensions3SubC4propSSSgvgTo : $@convention(objc_method) (Sub) -> @autoreleased Optional<NSString> {
     // CHECK: bb0([[SELF:%.*]] : @unowned $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -43,7 +43,7 @@ extension Sub {
 
     // Then check the setter @objc thunk.
     //
-    // CHECK-LABEL: sil hidden [thunk] [ossa] @$s15objc_extensions3SubC4propSSSgvsTo : $@convention(objc_method) (Optional<NSString>, Sub) -> () {
+    // CHECK-LABEL: sil private [thunk] [ossa] @$s15objc_extensions3SubC4propSSSgvsTo : $@convention(objc_method) (Optional<NSString>, Sub) -> () {
     // CHECK: bb0([[NEW_VALUE:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $Sub):
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[NEW_VALUE]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Sub
@@ -64,6 +64,7 @@ extension Sub {
 
     // First we get the old value.
     // CHECK: bb0([[NEW_VALUE:%.*]] : @owned $Optional<String>, [[SELF:%.*]] : @guaranteed $Sub):
+    // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [lexical] [[NEW_VALUE]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
     // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
@@ -72,24 +73,22 @@ extension Sub {
     // CHECK:   [[OLD_NSSTRING:%.*]] = apply [[GET_SUPER_METHOD]]([[BORROWED_UPCAST_SELF_COPY]])
 
     // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : @owned $Optional<String>):
+    // CHECK:   [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [lexical] [[OLD_NSSTRING_BRIDGED]]
     // This next line is completely not needed. But we are emitting it now.
     // CHECK:   destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
-    // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [[NEW_VALUE]]
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[BORROWED_NEW_VALUE]]
     // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<String>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
     //
     // CHECK: bb4([[OLD_STRING:%.*]] : @owned $String):
     // CHECK: bb6([[BRIDGED_NEW_STRING:%.*]] : @owned $Optional<NSString>):
-    // CHECK:    end_borrow [[BORROWED_NEW_VALUE]]
     // CHECK:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF_COPY]] : $Base
     // CHECK:   [[SUPERREF_DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Base to $Sub
     // CHECK:   [[SET_SUPER_METHOD:%.*]] = objc_super_method [[SUPERREF_DOWNCAST]] : $Sub, #Base.prop!setter.foreign : (Base) -> (String?) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
     // CHECK:    apply [[SET_SUPER_METHOD]]([[BRIDGED_NEW_STRING]], [[UPCAST_SELF_COPY]])
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[UPCAST_SELF_COPY]]
-    // CHECK:    [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [[OLD_NSSTRING_BRIDGED]]
     // This is an identity cast that should be eliminated by SILGen peepholes.
     // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @$s15objc_extensions3SubC4propSSSgvW : $@convention(method) (@guaranteed Optional<String>, @guaranteed Sub) -> ()
     // CHECK:    apply [[DIDSET_NOTIFIER]]([[BORROWED_OLD_NSSTRING_BRIDGED]], [[SELF]])

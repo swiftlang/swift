@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library  -Xfrontend -disable-availability-checking %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -6,7 +6,7 @@
 // REQUIRES: rdar78576626
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 // for sleep
@@ -16,7 +16,7 @@
     import Glibc
 #endif
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class Runner {
     func run() async {
         while !Task.isCancelled {
@@ -25,7 +25,7 @@ class Runner {
     }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Container {
     var generation = 0
     var runners = [Int : Task<Void, Never>]()
@@ -67,7 +67,7 @@ actor Container {
 // FIXME: this doesn't work until we have https://github.com/apple/swift/pull/36298
 // COM: deinit Container with {{[0-9]+}} runners
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct RunIt {
     static func startTest() async {
         let c = Container()
@@ -76,7 +76,7 @@ actor Container {
         await c.cancelAll()
     }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 static func main() async {
         print("starting")
         await RunIt.startTest()

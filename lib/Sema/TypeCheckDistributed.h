@@ -1,4 +1,4 @@
-//===--- TypeCheckDistributed.h - Distributed -------------------*- C++ -*-===//
+//===-- TypeCheckDistributed.h - Distributed actor typechecking -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,43 +20,53 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Type.h"
-#include <cassert>
 
 namespace swift {
 
-class AbstractFunctionDecl;
-class ConstructorDecl;
-class ActorIsolation;
-class AnyFunctionType;
-class ASTContext;
 class ClassDecl;
-class ClosureExpr;
-class ConcreteDeclRef;
-class CustomAttr;
+class ConstructorDecl;
 class Decl;
 class DeclContext;
-class EnumElementDecl;
-class Expr;
 class FuncDecl;
-class Initializer;
-class PatternBindingDecl;
-class ProtocolConformance;
-class TopLevelCodeDecl;
-class TypeBase;
-class ValueDecl;
+class NominalTypeDecl;
 
-/// Check distributed actor isolation rules.
+/******************************************************************************/
+/********************* Distributed Actor Type Checking ************************/
+/******************************************************************************/
 
-/// The local and resolve distributed actor constructors have special rules to check.
-void checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *ctor);
+// Diagnose an error if the Distributed module is not loaded.
+bool ensureDistributedModuleLoaded(Decl *decl);
 
-bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
+/// Check for illegal property declarations (e.g. re-declaring transport or id)
+void checkDistributedActorProperties(const NominalTypeDecl *decl);
 
-/// Synthesis of members which are not directly driven filling in protocol requirements,
-/// such as the default local and resolve constructors, and `_remote_` function stubs.
-void addImplicitDistributedActorMembersToClass(ClassDecl *decl);
+/// Type-check additional ad-hoc protocol requirements.
+/// Ad-hoc requirements are protocol requirements currently not expressible
+/// in the Swift type-system.
+bool checkDistributedActorSystemAdHocProtocolRequirements(
+    ASTContext &Context,
+    ProtocolDecl *Proto,
+    NormalProtocolConformance *Conformance,
+    Type Adoptee,
+    bool diagnose);
+
+/// Check 'DistributedActorSystem' implementations for additional restrictions.
+bool checkDistributedActorSystem(const NominalTypeDecl *system);
+
+/// Typecheck a distributed method declaration
+bool checkDistributedFunction(AbstractFunctionDecl *decl);
+
+/// Typecheck a distributed computed (get-only) property declaration.
+/// They are effectively checked the same way as argument-less methods.
+bool checkDistributedActorProperty(VarDecl *decl, bool diagnose);
+
+/// Diagnose a distributed func declaration in a not-distributed actor protocol.
+void diagnoseDistributedFunctionInNonDistributedActorProtocol(
+  const ProtocolDecl *proto, InFlightDiagnostic &diag);
+
+/// Emit a FixIt suggesting to add Codable to the nominal type.
+void addCodableFixIt(const NominalTypeDecl *nominal, InFlightDiagnostic &diag);
 
 }
-
 
 #endif /* SWIFT_SEMA_TYPECHECKDISTRIBUTED_H */

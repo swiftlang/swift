@@ -106,7 +106,7 @@ static bool hasOnlyNoneOwnershipIncomingValues(SILPhiArgument *phi) {
       if (incomingValue.getOwnershipKind() == OwnershipKind::None)
         continue;
       if (auto *incomingPhi = dyn_cast<SILPhiArgument>(incomingValue)) {
-        if (incomingPhi->isPhiArgument()) {
+        if (incomingPhi->isPhi()) {
           worklist.insert(incomingPhi);
           continue;
         }
@@ -153,7 +153,7 @@ bool RedundantPhiEliminationPass::optimizeArgs(SILBasicBlock *block) {
 
       SILArgument *arg1 = block->getArgument(arg1Idx);
       SILArgument *arg2 = block->getArgument(arg2Idx);
-      if (!arg1->isPhiArgument() || !arg2->isPhiArgument())
+      if (!arg1->isPhi() || !arg2->isPhi())
         continue;
 
       if (valuesAreEqual(arg1, arg2)) {
@@ -343,7 +343,7 @@ void PhiExpansionPass::run() {
   bool changed = false;
   for (SILBasicBlock &block : *getFunction()) {
     for (auto argAndIdx : enumerate(block.getArguments())) {
-      if (!argAndIdx.value()->isPhiArgument())
+      if (!argAndIdx.value()->isPhi())
         continue;
       
       unsigned idx = argAndIdx.index();

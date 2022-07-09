@@ -68,16 +68,18 @@
 // RUN: %target-swift-frontend -typecheck -sdk '' -module-cache-path %t/MCP.default -parse-stdlib -I %t %t/test.default.remark.swift -Rmodule-interface-rebuild -verify
 // RUN: ls %t/MCP.default | count 3
 // RUN: %target-swift-frontend -typecheck -sdk '' -module-cache-path %t/MCP.default -parse-stdlib -I %t %t/test.default.swift -Rmodule-interface-rebuild -verify
-// RUN: %target-sil-opt -module-name SwiftModuleDefault %t/MCP.default/*.swiftmodule | grep '@$s18SwiftModuleDefault3fooAA5KlassCyF' | grep '[[]ossa[]]'
+// RUN: %target-sil-opt -module-name SwiftModuleDefault %t/MCP.default/*.swiftmodule > %t/MCP.default/old/first.sil
+// RUN: cat %t/MCP.default/old/first.sil | grep '@$s18SwiftModuleDefault3fooAA5KlassCyF' | grep '[[]ossa[]]'
 // RUN: mv %t/MCP.default/*.swiftmodule %t/MCP.default/old
 // RUN: ls %t/MCP.default | count 2
 // RUN: %target-swift-frontend -typecheck -sdk '' -enable-ossa-modules -module-cache-path %t/MCP.default -parse-stdlib -I %t %t/test.default.remark.swift -Rmodule-interface-rebuild -verify
 // RUN: ls %t/MCP.default | count 3
 // RUN: %target-swift-frontend -typecheck -sdk '' -enable-ossa-modules -module-cache-path %t/MCP.default -parse-stdlib -I %t %t/test.default.swift -Rmodule-interface-rebuild -verify
 // RUN: ls %t/MCP.default | count 3
+// RUN: %target-sil-opt -module-name SwiftModuleDefault %t/MCP.default/*.swiftmodule > %t/MCP.default/second.sil
 //
 // These should be the same.
-// RUN: diff -u %t/MCP.default/*.swiftmodule %t/MCP.default/old/*.swiftmodule
+// RUN: diff -u %t/MCP.default/old/first.sil %t/MCP.default/second.sil
 //
 // But their actual names should be different since the hash is in the file name.
 // RUN: cd %t/MCP.default && ls *.swiftmodule > %t/MCP.default/firstFile
@@ -103,7 +105,6 @@
 // RUN: ls %t/MCP.Onone | count 3
 //
 // These should be the same.
-// RUN: diff -u %t/MCP.Onone/*.swiftmodule %t/MCP.Onone/old/*.swiftmodule
 //
 // But their name should be different
 // RUN: cd %t/MCP.Onone && ls *.swiftmodule > %t/MCP.Onone/firstFile

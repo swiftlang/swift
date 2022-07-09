@@ -78,10 +78,10 @@ ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
 static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
                                               CharSourceRange range,
                                               SourceLoc loc) {
-  if (const auto &replacedRange = sourceMgr.getReplacedRange()) {
-    if (sourceMgr.rangeContainsTokenLoc(replacedRange.New, loc) &&
-        !sourceMgr.rangeContainsTokenLoc(replacedRange.New, range.getStart())) {
-      return replacedRange.Original.Start;
+  for (const auto &pair : sourceMgr.getReplacedRanges()) {
+    if (sourceMgr.rangeContainsTokenLoc(pair.second, loc) &&
+        !sourceMgr.rangeContainsTokenLoc(pair.second, range.getStart())) {
+      return pair.first.Start;
     }
   }
   return loc;
@@ -241,10 +241,9 @@ bool Portion::lookupMembersOf(const GenericTypeOrExtensionScope *,
 bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
     const GenericTypeOrExtensionScope *scope,
     ASTScopeImpl::DeclConsumer consumer) const {
-  auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
-  if (!nt)
+  if (scope->getCorrespondingNominalTypeDecl().isNull())
     return false;
-  return consumer.lookInMembers(scope->getGenericContext(), nt);
+  return consumer.lookInMembers(scope->getGenericContext());
 }
 
 bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
@@ -267,6 +266,14 @@ bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
 NullablePtr<const ASTScopeImpl>
 PatternEntryInitializerScope::getLookupParent() const {
   auto parent = getParent().get();
+
+  // Skip generic parameter scopes, which occur here due to named opaque
+  // result types.
+  // FIXME: Proper isa/dyn_cast support would be better than a string
+  // comparison here.
+  while (parent->getClassName() == "GenericParamScope")
+    parent = parent->getLookupParent().get();
+
   ASTScopeAssert(parent->getClassName() == "PatternEntryDeclScope",
                  "PatternEntryInitializerScope in unexpected place");
 

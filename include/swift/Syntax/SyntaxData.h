@@ -76,7 +76,7 @@ protected:
   /// RawSyntax's \c SyntaxArena outlives this \c SyntaxDataRef.
   ///
   /// In \c SyntaxData, the backing \c SyntaxArena is retained via the \c Arena
-  /// property, lifiting the responsibility to guarantee the \c RawSyntax node
+  /// property, lifting the responsibility to guarantee the \c RawSyntax node
   /// stays alive from the user.
   AbsoluteRawSyntax AbsoluteRaw;
 
@@ -409,19 +409,18 @@ public:
   OptionalStorage(OptionalStorage &&other) = default;
 
   template <class... ArgTypes>
-  explicit OptionalStorage(llvm::optional_detail::in_place_t,
-                           ArgTypes &&...Args)
+  explicit OptionalStorage(llvm::in_place_t, ArgTypes &&...Args)
       : Storage(std::forward<ArgTypes>(Args)...) {}
 
   void reset() { Storage = SyntaxDataRef(AbsoluteRawSyntax(nullptr), nullptr); }
 
   bool hasValue() const { return !Storage.getAbsoluteRaw().isNull(); }
 
-  SyntaxDataRef &getValue() LLVM_LVALUE_FUNCTION {
+  SyntaxDataRef &getValue() & {
     assert(hasValue());
     return Storage;
   }
-  SyntaxDataRef const &getValue() const LLVM_LVALUE_FUNCTION {
+  SyntaxDataRef const &getValue() const & {
     assert(hasValue());
     return Storage;
   }

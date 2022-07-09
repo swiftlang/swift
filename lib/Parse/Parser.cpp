@@ -405,12 +405,15 @@ namespace {
 /// underlying corrected token stream.
 class TokenRecorder: public ConsumeTokenReceiver {
   ASTContext &Ctx;
+  /// The lexer that is being used to lex the source file. Used to query whether
+  /// lexing has been cut off.
+  Lexer &BaseLexer;
   unsigned BufferID;
 
   // Token list ordered by their appearance in the source file.
   std::vector<Token> Tokens;
 
-  // Registered token kind change. These changes are regiestered before the
+  // Registered token kind change. These changes are registered before the
   // token is consumed, so we need to keep track of them here.
   llvm::DenseMap<const void*, tok> TokenKindChangeMap;
 
@@ -425,11 +428,19 @@ class TokenRecorder: public ConsumeTokenReceiver {
   void relexComment(CharSourceRange CommentRange,
                     llvm::SmallVectorImpl<Token> &Scratch) {
     auto &SM = Ctx.SourceMgr;
+    auto EndOffset = SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID);
+    if (auto LexerCutOffOffset = BaseLexer.lexingCutOffOffset()) {
+      if (*LexerCutOffOffset < EndOffset) {
+        // If lexing was cut off due to a too deep nesting level, adjust the end
+        // offset to not point past the cut off point.
+        EndOffset = *LexerCutOffOffset;
+      }
+    }
     Lexer L(Ctx.LangOpts, SM, BufferID, nullptr, LexerMode::Swift,
             HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
             TriviaRetentionMode::WithoutTrivia,
             SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
-            SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID));
+            EndOffset);
     while(true) {
       Token Result;
       L.lex(Result);
@@ -441,8 +452,8 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
 public:
-  TokenRecorder(ASTContext &ctx, unsigned BufferID)
-      : Ctx(ctx), BufferID(BufferID) {}
+  TokenRecorder(ASTContext &ctx, Lexer &BaseLexer)
+      : Ctx(ctx), BaseLexer(BaseLexer), BufferID(BaseLexer.getBufferID()) {}
 
   Optional<std::vector<Token>> finalize() override {
     auto &SM = Ctx.SourceMgr;
@@ -493,7 +504,7 @@ public:
       return;
     }
 
-    // Update Token kind if a kind update was regiestered before.
+    // Update Token kind if a kind update was registered before.
     auto Found = TokenKindChangeMap.find(Tok.getLoc().
                                          getOpaquePointerValue());
     if (Found != TokenKindChangeMap.end()) {
@@ -516,19 +527,14 @@ public:
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserStateBase *SIL, PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions)
-  : SourceMgr(SF.getASTContext().SourceMgr),
-    Diags(SF.getASTContext().Diags),
-    SF(SF),
-    L(Lex.release()),
-    SIL(SIL),
-    CurDeclContext(&SF),
-    Context(SF.getASTContext()),
-    TokReceiver(SF.shouldCollectTokens() ?
-                new TokenRecorder(SF.getASTContext(), L->getBufferID()) :
-                new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
-                                           L->getBufferID(),
-                                           std::move(SPActions))) {
+    : SourceMgr(SF.getASTContext().SourceMgr), Diags(SF.getASTContext().Diags),
+      SF(SF), L(Lex.release()), SIL(SIL), CurDeclContext(&SF),
+      Context(SF.getASTContext()),
+      TokReceiver(SF.shouldCollectTokens()
+                      ? new TokenRecorder(SF.getASTContext(), *L)
+                      : new ConsumeTokenReceiver()),
+      SyntaxContext(new SyntaxParsingContext(
+          SyntaxContext, SF, L->getBufferID(), std::move(SPActions))) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());
@@ -573,13 +579,16 @@ const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
-SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
-  SourceLoc Loc = Tok.getLoc();
+SourceLoc Parser::discardToken() {
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
-
-  recordTokenHash(Tok);
-
+  SourceLoc Loc = Tok.getLoc();
   L->lex(Tok, LeadingTrivia, TrailingTrivia);
+  return Loc;
+}
+
+SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
+  recordTokenHash(Tok);
+  auto Loc = discardToken();
   PreviousLoc = Loc;
   return Loc;
 }
@@ -761,24 +770,6 @@ void Parser::skipUntilDeclRBrace() {
     skipSingle();
 }
 
-void Parser::skipUntilDeclStmtRBrace(tok T1) {
-  while (Tok.isNot(T1, tok::eof, tok::r_brace, tok::pound_endif,
-                   tok::pound_else, tok::pound_elseif,
-                   tok::code_complete) &&
-         !isStartOfStmt() && !isStartOfSwiftDecl()) {
-    skipSingle();
-  }
-}
-
-void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
-  while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
-                   tok::pound_else, tok::pound_elseif,
-                   tok::code_complete) &&
-         !isStartOfStmt() && !isStartOfSwiftDecl()) {
-    skipSingle();
-  }
-}
-
 void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif)) {
@@ -799,7 +790,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
         consumeToken();
         
         // If the following token is either <identifier> or :, it means that
-        // this `var` or `let` shoud be interpreted as a label
+        // this `var` or `let` should be interpreted as a label
         if ((Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) ||
              peekToken().is(tok::colon)) {
           backtrack.cancelBacktrack();
@@ -880,28 +871,25 @@ getStructureMarkerKindForToken(const Token &tok) {
   }
 }
 
-Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
-                                                 const Token &tok)
-    : StructureMarkerRAII(parser, tok.getLoc(),
-                          getStructureMarkerKindForToken(tok)) {}
-
-bool Parser::StructureMarkerRAII::pushStructureMarker(
-                                      Parser &parser, SourceLoc loc,    
-                                      StructureMarkerKind kind) {
-  
-  if (parser.StructureMarkers.size() < MaxDepth) {
-    parser.StructureMarkers.push_back({loc, kind, None});
-    return true;
-  } else {
+Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser, SourceLoc loc,
+                                                 StructureMarkerKind kind)
+    : StructureMarkerRAII(parser) {
+  parser.StructureMarkers.push_back({loc, kind, None});
+  if (parser.StructureMarkers.size() > MaxDepth) {
     parser.diagnose(loc, diag::structure_overflow, MaxDepth);
     // We need to cut off parsing or we will stack-overflow.
     // But `cutOffParsing` changes the current token to eof, and we may be in
     // a place where `consumeToken()` will be expecting e.g. '[',
     // since we need that to get to the callsite, so this can cause an assert.
-    parser.cutOffParsing();
-    return false;
+    parser.L->cutOffLexing();
   }
 }
+
+Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
+                                                 const Token &tok)
+    : StructureMarkerRAII(parser, tok.getLoc(),
+                          getStructureMarkerKindForToken(tok)) {}
+
 //===----------------------------------------------------------------------===//
 // Primitive Parsing
 //===----------------------------------------------------------------------===//
@@ -1058,14 +1046,72 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   }
 }
 
+static bool tokIsStringInterpolationEOF(Token &Tok, tok RightK) {
+  return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
+}
+
+Parser::ParseListItemResult
+Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
+                      SourceLoc &RightLoc, bool AllowSepAfterLast,
+                      SyntaxKind ElementKind,
+                      llvm::function_ref<ParserStatus()> callback) {
+  while (Tok.is(tok::comma)) {
+    diagnose(Tok, diag::unexpected_separator, ",").fixItRemove(Tok.getLoc());
+    consumeToken();
+  }
+  SourceLoc StartLoc = Tok.getLoc();
+
+  SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
+  if (ElementKind == SyntaxKind::Unknown)
+    ElementContext.setTransparent();
+  Status |= callback();
+  if (Tok.is(RightK))
+    return ParseListItemResult::Finished;
+
+  // If the lexer stopped with an EOF token whose spelling is ")", then this
+  // is actually the tuple that is a string literal interpolation context.
+  // Just accept the ")" and build the tuple as we usually do.
+  if (tokIsStringInterpolationEOF(Tok, RightK)) {
+    RightLoc = Tok.getLoc();
+    return ParseListItemResult::FinishedInStringInterpolation;
+  }
+  // If we haven't made progress, or seeing any error, skip ahead.
+  if (Tok.getLoc() == StartLoc || Status.isErrorOrHasCompletion()) {
+    assert(Status.isErrorOrHasCompletion() && "no progress without error");
+    skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
+    if (Tok.is(RightK) || Tok.isNot(tok::comma))
+      return ParseListItemResult::Finished;
+  }
+  if (consumeIf(tok::comma)) {
+    if (Tok.isNot(RightK))
+      return ParseListItemResult::Continue;
+    if (!AllowSepAfterLast) {
+      diagnose(Tok, diag::unexpected_separator, ",").fixItRemove(PreviousLoc);
+    }
+    return ParseListItemResult::Finished;
+  }
+  // If we're in a comma-separated list, the next token is at the
+  // beginning of a new line and can never start an element, break.
+  if (Tok.isAtStartOfLine() &&
+      (Tok.is(tok::r_brace) || isStartOfSwiftDecl() || isStartOfStmt())) {
+    return ParseListItemResult::Finished;
+  }
+  // If we found EOF or such, bailout.
+  if (Tok.isAny(tok::eof, tok::pound_endif)) {
+    IsInputIncomplete = true;
+    return ParseListItemResult::Finished;
+  }
+
+  diagnose(Tok, diag::expected_separator, ",")
+      .fixItInsertAfter(PreviousLoc, ",");
+  Status.setIsParseError();
+  return ParseListItemResult::Continue;
+}
+
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
                   llvm::function_ref<ParserStatus()> callback) {
-  auto TokIsStringInterpolationEOF = [&]() -> bool {
-    return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
-  };
-  
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
   if (Kind == SyntaxKind::Unknown)
@@ -1078,64 +1124,20 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     RightLoc = consumeToken(RightK);
     return makeParserSuccess();
   }
-  if (TokIsStringInterpolationEOF()) {
+  if (tokIsStringInterpolationEOF(Tok, RightK)) {
     RightLoc = Tok.getLoc();
     return makeParserSuccess();
   }
 
   ParserStatus Status;
-  while (true) {
-    while (Tok.is(tok::comma)) {
-      diagnose(Tok, diag::unexpected_separator, ",")
-        .fixItRemove(Tok.getLoc());
-      consumeToken();
-    }
-    SourceLoc StartLoc = Tok.getLoc();
+  ParseListItemResult Result;
+  do {
+    Result = parseListItem(Status, RightK, LeftLoc, RightLoc, AllowSepAfterLast,
+                           ElementKind, callback);
+  } while (Result == ParseListItemResult::Continue);
 
-    SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
-    if (ElementKind == SyntaxKind::Unknown)
-      ElementContext.setTransparent();
-    Status |= callback();
-    if (Tok.is(RightK))
-      break;
-    // If the lexer stopped with an EOF token whose spelling is ")", then this
-    // is actually the tuple that is a string literal interpolation context.
-    // Just accept the ")" and build the tuple as we usually do.
-    if (TokIsStringInterpolationEOF()) {
-      RightLoc = Tok.getLoc();
-      return Status;
-    }
-    // If we haven't made progress, or seeing any error, skip ahead.
-    if (Tok.getLoc() == StartLoc || Status.isErrorOrHasCompletion()) {
-      assert(Status.isErrorOrHasCompletion() && "no progress without error");
-      skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
-      if (Tok.is(RightK) || Tok.isNot(tok::comma))
-        break;
-    }
-    if (consumeIf(tok::comma)) {
-      if (Tok.isNot(RightK))
-        continue;
-      if (!AllowSepAfterLast) {
-        diagnose(Tok, diag::unexpected_separator, ",")
-          .fixItRemove(PreviousLoc);
-      }
-      break;
-    }
-    // If we're in a comma-separated list, the next token is at the
-    // beginning of a new line and can never start an element, break.
-    if (Tok.isAtStartOfLine() &&
-        (Tok.is(tok::r_brace) || isStartOfSwiftDecl() || isStartOfStmt())) {
-      break;
-    }
-    // If we found EOF or such, bailout.
-    if (Tok.isAny(tok::eof, tok::pound_endif)) {
-      IsInputIncomplete = true;
-      break;
-    }
-
-    diagnose(Tok, diag::expected_separator, ",")
-      .fixItInsertAfter(PreviousLoc, ",");
-    Status.setIsParseError();
+  if (Result == ParseListItemResult::FinishedInStringInterpolation) {
+    return Status;
   }
 
   ListContext.reset();
@@ -1155,15 +1157,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   }
 
   return Status;
-}
-
-/// diagnoseRedefinition - Diagnose a redefinition error, with a note
-/// referring back to the original definition.
-
-void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
-  assert(New != Prev && "Cannot conflict with self");
-  diagnose(New->getLoc(), diag::decl_redefinition);
-  diagnose(Prev->getLoc(), diag::previous_decldef, Prev->getBaseName());
 }
 
 Optional<StringRef>
@@ -1218,6 +1211,7 @@ struct ParserUnit::Implementation {
   std::shared_ptr<SyntaxParseActions> SPActions;
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
+  SILOptions SILOpts;
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions clangImporterOpts;
   symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
@@ -1228,11 +1222,11 @@ struct ParserUnit::Implementation {
 
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                  const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
-                 StringRef ModuleName,
+                 const SILOptions &silOpts, StringRef ModuleName,
                  std::shared_ptr<SyntaxParseActions> spActions)
       : SPActions(std::move(spActions)), LangOpts(Opts),
-        TypeCheckerOpts(TyOpts), Diags(SM),
-        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
+        TypeCheckerOpts(TyOpts), SILOpts(silOpts), Diags(SM),
+        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                              clangImporterOpts, symbolGraphOpts, SM, Diags)) {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
     parsingOpts |= ParsingFlags::DisableDelayedBodies;
@@ -1250,29 +1244,30 @@ struct ParserUnit::Implementation {
   }
 };
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID)
-  : ParserUnit(SM, SFKind, BufferID,
-               LangOptions(), TypeCheckerOptions(), "input") {
-}
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
+                       unsigned BufferID)
+    : ParserUnit(SM, SFKind, BufferID, LangOptions(), TypeCheckerOptions(),
+                 SILOptions(), "input") {}
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                       const LangOptions &LangOpts,
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
+                       unsigned BufferID, const LangOptions &LangOpts,
                        const TypeCheckerOptions &TypeCheckOpts,
-                       StringRef ModuleName,
+                       const SILOptions &SILOpts, StringRef ModuleName,
                        std::shared_ptr<SyntaxParseActions> spActions,
                        SyntaxParsingCache *SyntaxCache)
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
-                               ModuleName, std::move(spActions))) {
+                               SILOpts, ModuleName, std::move(spActions))) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
                                   /*PersistentState=*/nullptr, Impl.SPActions));
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                       unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
-                             TypeCheckerOptions(), "input", nullptr)) {
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
+                       unsigned BufferID, unsigned Offset, unsigned EndOffset)
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
+                               TypeCheckerOptions(), SILOptions(), "input",
+                               nullptr)) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
@@ -1405,6 +1400,11 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
     baseName = baseName.substr(7);
   }
 
+  // If the base name is prefixed by "subscript", it's an subscript.
+  if (baseName == "subscript") {
+    result.IsSubscript = true;
+  }
+
   // Parse the base name.
   if (parseBaseName(baseName)) return ParsedDeclName();
 
@@ -1496,10 +1496,6 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
 
   // Build the result.
   return DeclNameRef({ ctx, baseNameId, argumentLabelIds });
-}
-
-DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {
-  return parseDeclName(name).formDeclName(ctx);
 }
 
 void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {

@@ -1,12 +1,15 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// Disable on cooperative executor because it can't dispatch jobs before the end of main function
+// UNSUPPORTED: single_threaded_concurrency
+// REQUIRES: rdar80824152
 
 import Dispatch
 
@@ -17,7 +20,6 @@ import Darwin
 import Glibc
 #endif
 
-@available(SwiftStdlib 5.5, *)
 enum TL {
   @TaskLocal
   static var number: Int = 0
@@ -25,7 +27,6 @@ enum TL {
   static var other: Int = 0
 }
 
-@available(SwiftStdlib 5.5, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -43,9 +44,10 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
 func copyTo_sync_noWait() {
   print(#function)
+  let sem = DispatchSemaphore(value: 0)
+
   TL.$number.withValue(1111) {
     TL.$number.withValue(2222) {
       TL.$other.withValue(9999) {
@@ -55,26 +57,29 @@ func copyTo_sync_noWait() {
           TL.$number.withValue(3333) {
             printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (3333)
             printTaskLocal(TL.$other) // CHECK: TaskLocal<Int>(defaultValue: 0) (9999)
+            sem.signal()
           }
         }
       }
     }
   }
 
-  sleep(1)
+  sem.wait()
 }
 
-@available(SwiftStdlib 5.5, *)
 func copyTo_sync_noValues() {
+  print(#function)
+  let sem = DispatchSemaphore(value: 0)
+
   Task {
     printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
+    sem.signal()
   }
 
-  sleep(1)
+  sem.wait()
 }
 
 /// Similar to tests in `async_task_locals_copy_to_async_ but without any task involved at the top level.
-@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() {
     copyTo_sync_noWait()

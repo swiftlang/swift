@@ -63,11 +63,10 @@ public:
 };
 
 /// Parse the body of a function, initializer, or deinitializer.
-class ParseAbstractFunctionBodyRequest :
-    public SimpleRequest<ParseAbstractFunctionBodyRequest,
-                         BraceStmt *(AbstractFunctionDecl *),
-                         RequestFlags::SeparatelyCached>
-{
+class ParseAbstractFunctionBodyRequest
+    : public SimpleRequest<ParseAbstractFunctionBodyRequest,
+                           BodyAndFingerprint(AbstractFunctionDecl *),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -75,13 +74,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  BraceStmt *evaluate(Evaluator &evaluator, AbstractFunctionDecl *afd) const;
+  BodyAndFingerprint evaluate(Evaluator &evaluator,
+                              AbstractFunctionDecl *afd) const;
 
 public:
   // Caching
   bool isCached() const { return true; }
-  Optional<BraceStmt *> getCachedResult() const;
-  void cacheResult(BraceStmt *value) const;
+  Optional<BodyAndFingerprint> getCachedResult() const;
+  void cacheResult(BodyAndFingerprint value) const;
 };
 
 struct SourceFileParsingResult {

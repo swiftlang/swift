@@ -61,6 +61,15 @@ struct BenchResults {
 
 public var registeredBenchmarks: [BenchmarkInfo] = []
 
+public func register(_ benchmark: BenchmarkInfo) {
+  registeredBenchmarks.append(benchmark)
+}
+
+public func register<S: Sequence>(_ benchmarks: S)
+where S.Element == BenchmarkInfo {
+  registeredBenchmarks.append(contentsOf: benchmarks)
+}
+
 enum TestAction {
   case run
   case listTests
@@ -104,6 +113,9 @@ struct TestConfig {
   // Should we log the measurement metadata?
   let logMeta: Bool
 
+  // Allow running with nondeterministic hashing?
+  var allowNondeterministicHashing: Bool
+
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
   let afterRunSleep: UInt32?
@@ -128,6 +140,7 @@ struct TestConfig {
       var verbose: Bool?
       var logMemory: Bool?
       var logMeta: Bool?
+      var allowNondeterministicHashing: Bool?
       var action: TestAction?
       var tests: [String]?
     }
@@ -191,6 +204,10 @@ struct TestConfig {
     p.addArgument("--list", \.action, defaultValue: .listTests,
                   help: "don't run the tests, just log the list of test \n" +
                         "numbers, names and tags (respects specified filters)")
+    p.addArgument("--allow-nondeterministic-hashing",
+                  \.allowNondeterministicHashing, defaultValue: true,
+                  help: "Don't trap when running without the \n" +
+                        "SWIFT_DETERMINISTIC_HASHING=1 environment variable")
     p.addArgument(nil, \.tests) // positional arguments
 
     let c = p.parse()
@@ -208,6 +225,7 @@ struct TestConfig {
     logMeta = c.logMeta ?? false
     afterRunSleep = c.afterRunSleep
     action = c.action ?? .run
+    allowNondeterministicHashing = c.allowNondeterministicHashing ?? false
     tests = TestConfig.filterTests(registeredBenchmarks,
                                     tests: c.tests ?? [],
                                     tags: c.tags ?? [],
@@ -304,9 +322,9 @@ extension String {
 
 struct Stats {
     var n: Int = 0
-    var S: Double = 0.0
+    var s: Double = 0.0
     var mean: Double = 0.0
-    var variance: Double { return n < 2 ? 0.0 : S / Double(n - 1) }
+    var variance: Double { return n < 2 ? 0.0 : s / Double(n - 1) }
     var standardDeviation: Double { return variance.squareRoot() }
 
     static func collect(_ s: inout Stats, _ x: Int){
@@ -317,12 +335,12 @@ struct Stats {
     ///
     /// See Knuth TAOCP vol 2, 3rd edition, page 232, or
     /// https://www.johndcook.com/blog/standard_deviation/
-    static func runningMeanVariance(_ s: inout Stats, _ x: Double){
-        let n = s.n + 1
-        let (k, M_, S_) = (Double(n), s.mean, s.S)
-        let M = M_ + (x - M_) / k
-        let S = S_ + (x - M_) * (x - M)
-        (s.n, s.mean, s.S) = (n, M, S)
+    static func runningMeanVariance(_ stats: inout Stats, _ x: Double){
+        let n = stats.n + 1
+        let (k, m_, s_) = (Double(n), stats.mean, stats.s)
+        let m = m_ + (x - m_) / k
+        let s = s_ + (x - m_) * (x - m)
+        (stats.n, stats.mean, stats.s) = (n, m, s)
     }
 }
 
@@ -616,7 +634,8 @@ final class TestRunner {
       let index: (Int) -> String =
         { q == 2 ? "" : q <= 20 ?  base20[$0] : String($0) }
       let tail = (1..<q).map { prefix + index($0) } + ["MAX"]
-      return [withUnit("MIN")] + tail.map(c.delta ? withDelta : withUnit)
+      // QMIN identifies the quantile format, distinct from formats using "MIN"
+      return [withUnit("QMIN")] + tail.map(c.delta ? withDelta : withUnit)
     }
     return (
       ["#", "TEST", "SAMPLES"] +
@@ -671,6 +690,17 @@ final class TestRunner {
   }
 }
 
+extension Hasher {
+  static var isDeterministic: Bool {
+    // This is a quick test for deterministic hashing.
+    // When hashing uses a random seed, each `Set` value
+    // contains its members in some unique, random order.
+    let set1 = Set(0 ..< 100)
+    let set2 = Set(0 ..< 100)
+    return set1.elementsEqual(set2)
+  }
+}
+
 public func main() {
   let config = TestConfig(registeredBenchmarks)
   switch (config.action) {
@@ -682,6 +712,18 @@ public func main() {
       print(testDescription)
     }
   case .run:
+    if !config.allowNondeterministicHashing && !Hasher.isDeterministic {
+      fatalError("""
+        Benchmark runs require deterministic hashing to be enabled.
+
+        This prevents spurious regressions in hashed collection performance.
+        You can do this by setting the SWIFT_DETERMINISTIC_HASHING environment
+        variable to 1.
+
+        If you know what you're doing, you can disable this check by passing
+        the option '--allow-nondeterministic-hashing to the benchmarking executable.
+        """)
+    }
     TestRunner(config).runBenchmarks()
     if let x = config.afterRunSleep {
       sleep(x)

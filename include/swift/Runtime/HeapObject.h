@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Heap.h"
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/objc.h>
@@ -27,6 +28,7 @@
 
 // Bring in the definition of HeapObject 
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
+#include "../../../stdlib/public/SwiftShims/Visibility.h"
 
 namespace swift {
   
@@ -59,7 +61,7 @@ struct OpaqueValue;
 ///
 /// POSSIBILITIES: The argument order is fair game.  It may be useful
 /// to have a variant which guarantees zero-initialized memory.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
 HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredSize,
                               size_t requiredAlignmentMask);
@@ -115,21 +117,8 @@ BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
                                     size_t alignMask);
 
 /// Returns the address of a heap object representing all empty box types.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
 HeapObject* swift_allocEmptyBox();
-
-// Allocate plain old memory. This is the generalized entry point
-// Never returns nil. The returned memory is uninitialized. 
-//
-// An "alignment mask" is just the alignment (a power of 2) minus 1.
-
-SWIFT_RUNTIME_EXPORT
-void *swift_slowAlloc(size_t bytes, size_t alignMask);
-
-// If the caller cannot promise to zero the object during destruction,
-// then call these corresponding APIs:
-SWIFT_RUNTIME_EXPORT
-void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 
 /// Atomically increments the retain count of an object.
 ///
@@ -211,6 +200,18 @@ size_t swift_unownedRetainCount(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 size_t swift_weakRetainCount(HeapObject *object);
 
+/// Is this pointer a non-null unique reference to an object?
+SWIFT_RUNTIME_EXPORT
+bool swift_isUniquelyReferenced(const void *);
+
+/// Is this non-null pointer a unique reference to an object?
+SWIFT_RUNTIME_EXPORT
+bool swift_isUniquelyReferenced_nonNull(const void *);
+
+/// Is this non-null BridgeObject a unique reference to an object?
+SWIFT_RUNTIME_EXPORT
+bool swift_isUniquelyReferenced_nonNull_bridgeObject(uintptr_t bits);
+
 /// Is this pointer a non-null unique reference to an object
 /// that uses Swift reference counting?
 SWIFT_RUNTIME_EXPORT
@@ -245,7 +246,7 @@ bool swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
 /// \p type: 0 - withoutActuallyEscaping verification
 ///              Was the closure passed to a withoutActuallyEscaping block
 ///              escaped in the block?
-///          1 - @objc closure sentinel verfication
+///          1 - @objc closure sentinel verification
 ///              Was the closure passed to Objective-C escaped?
 SWIFT_RUNTIME_EXPORT
 bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,
@@ -1086,6 +1087,15 @@ swift_getTypeName(const Metadata *type, bool qualified);
 
 /// Return the mangled name of a Swift type represented by a metadata object.
 /// func _getMangledTypeName(_ type: Any.Type)
+///   -> (UnsafePointer<UInt8>, Int)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+TypeNamePair
+swift_getFunctionFullNameFromMangledName(
+        const char *mangledNameStart, uintptr_t mangledNameLength);
+
+/// Return the human-readable full name of the mangled function name passed in.
+/// func _getMangledTypeName(_ mangledName: UnsafePointer<UInt8>,
+///                          mangledNameLength: UInt)
 ///   -> (UnsafePointer<UInt8>, Int)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 TypeNamePair

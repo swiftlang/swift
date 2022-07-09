@@ -5,18 +5,20 @@
 
 import TestsUtils
 
-public let LuhnAlgoLazy = BenchmarkInfo(
-  name: "LuhnAlgoLazy",
-  runFunction: run_LuhnAlgoLazy,
-  tags: [.algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "LuhnAlgoLazy",
+    runFunction: run_LuhnAlgoLazy,
+    tags: [.algorithm]
+  ),
+]
 
 @inline(never)
-public func run_LuhnAlgoLazy(_ N: Int) {
+public func run_LuhnAlgoLazy(_ n: Int) {
     let resultRef = true
     var result = false
 
-    for _ in 1...100*N {
+    for _ in 1...100*n {
         result = lazychecksum(ccnum)
 
         if result != resultRef {
@@ -24,7 +26,7 @@ public func run_LuhnAlgoLazy(_ N: Int) {
         }
     }
 
-    CheckResults(result == resultRef)
+    check(result == resultRef)
 }
 
 // Another version of the Luhn algorithm, similar to the one found here:
@@ -70,7 +72,7 @@ extension MapSomeSequenceView: Sequence {
 }
 
 // now extend a lazy collection to return that view
-// from a call to mapSome.  In pracice, when doing this,
+// from a call to mapSome.  In practice, when doing this,
 // you should do it for all the lazy wrappers
 // (i.e. random-access, forward and sequence)
 extension LazyCollectionProtocol {
@@ -217,7 +219,7 @@ let combineDoubleDigits = {
     (10...18).contains($0) ? $0-9 : $0
 }
 
-// first, the lazy version of checksum calcuation
+// first, the lazy version of checksum calculation
 let lazychecksum = { (ccnum: String) -> Bool in
     ccnum.lazy
     |> reverse

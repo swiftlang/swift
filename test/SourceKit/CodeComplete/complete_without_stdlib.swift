@@ -9,12 +9,11 @@ class Str {
 // RUN: %empty-directory(%t/rsrc)
 // RUN: %empty-directory(%t/sdk)
 
-// RUN: %sourcekitd-test \
+// RUN: not %sourcekitd-test \
 // RUN:   -req=global-config -req-opts=completion_max_astcontext_reuse_count=0 \
-// RUN:   -req=complete -pos=4:1 %s -- %s -resource-dir %t/rsrc -sdk %t/sdk | %FileCheck %s
-// RUN: %sourcekitd-test \
+// RUN:   -req=complete -pos=4:1 %s -- %s -resource-dir %t/rsrc -sdk %t/sdk 2>&1 | %FileCheck %s
+// RUN: not %sourcekitd-test \
 // RUN:   -req=complete -pos=4:1 %s -- %s -resource-dir %t/rsrc -sdk %t/sdk == \
-// RUN:   -req=complete -pos=4:1 %s -- %s -resource-dir %t/rsrc -sdk %t/sdk | %FileCheck %s
+// RUN:   -req=complete -pos=4:1 %s -- %s -resource-dir %t/rsrc -sdk %t/sdk 2>&1 | %FileCheck %s
 
-// CHECK: key.results: [
-// CHECK-NOT: key.description:
+// CHECK: error response (Request Failed): Loading the standard library failed

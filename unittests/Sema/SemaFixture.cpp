@@ -29,13 +29,14 @@ using namespace swift::unittest;
 using namespace swift::constraints::inference;
 
 SemaTest::SemaTest()
-    : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
-                               ClangImporterOpts, SymbolGraphOpts,
-                               SourceMgr, Diags)) {
+    : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts,
+                               SearchPathOpts, ClangImporterOpts,
+                               SymbolGraphOpts, SourceMgr, Diags)) {
   INITIALIZE_LLVM();
 
   registerParseRequestFunctions(Context.evaluator);
   registerTypeCheckerRequestFunctions(Context.evaluator);
+  registerClangImporterRequestFunctions(Context.evaluator);
 
   Context.addModuleLoader(ImplicitSerializedModuleLoader::create(Context));
   Context.addModuleLoader(ClangImporter::create(Context), /*isClang=*/true);
@@ -115,7 +116,9 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
                                        Type parent) {
   auto *PD = new (Context)
       ProtocolDecl(DC, SourceLoc(), SourceLoc(),
-                   Context.getIdentifier(protocolName), /*Inherited=*/{},
+                   Context.getIdentifier(protocolName),
+                   /*PrimaryAssociatedTypeNames=*/{},
+                   /*Inherited=*/{},
                    /*trailingWhere=*/nullptr);
   PD->setImplicit();
 

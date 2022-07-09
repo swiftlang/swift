@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-concurrency -import-objc-header %S/Inputs/DoubleMainActor.h -emit-module -module-name use %s 2> %t/stderr.txt
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -import-objc-header %S/Inputs/DoubleMainActor.h -emit-module -module-name use %s 2> %t/stderr.txt
 // RUN: %FileCheck -input-file %t/stderr.txt %s
 
 // REQUIRES: concurrency

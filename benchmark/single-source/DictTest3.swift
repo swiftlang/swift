@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,13 +12,13 @@
 
 import TestsUtils
 
-public let Dictionary3 = [
+public let benchmarks = [
   BenchmarkInfo(name: "Dictionary3", runFunction: run_Dictionary3, tags: [.validation, .api, .Dictionary]),
   BenchmarkInfo(name: "Dictionary3OfObjects", runFunction: run_Dictionary3OfObjects, tags: [.validation, .api, .Dictionary]),
 ]
 
 @inline(never)
-public func run_Dictionary3(_ N: Int) {
+public func run_Dictionary3(_ n: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 20 1980"
@@ -26,7 +26,7 @@ public func run_Dictionary3(_ N: Int) {
   var hash2 = [String: Int]()
   var res = ""
 
-  for _ in 1...N {
+  for _ in 1...n {
     hash1 = [:]
     for i in 0..<size1 {
       hash1["foo_" + String(i)] = i
@@ -46,7 +46,7 @@ public func run_Dictionary3(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -66,7 +66,7 @@ class Box<T : Hashable> : Hashable {
 }
 
 @inline(never)
-public func run_Dictionary3OfObjects(_ N: Int) {
+public func run_Dictionary3OfObjects(_ n: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 20 1980"
@@ -74,7 +74,7 @@ public func run_Dictionary3OfObjects(_ N: Int) {
   var hash2 : [ Box<String> : Box<Int> ] = [:]
   var res = ""
 
-  for _ in 1...N {
+  for _ in 1...n {
     hash1 = [:]
     for i in 0..<size1 {
       hash1[Box("foo_" + String(i))] = Box(i)
@@ -94,5 +94,5 @@ public func run_Dictionary3OfObjects(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }

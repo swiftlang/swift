@@ -2768,8 +2768,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
           case TermKind::DynamicMethodBranchInst:
           case TermKind::AwaitAsyncContinuationInst:
           case TermKind::CheckedCastBranchInst:
-          case TermKind::CheckedCastAddrBranchInst:
-          case TermKind::CheckedCastValueBranchInst: {
+          case TermKind::CheckedCastAddrBranchInst: {
             // Otherwise, we insert the destroy_addr /after/ the
             // terminator. All of these are guaranteed to have each successor
             // to have the block as its only predecessor block.
@@ -2846,7 +2845,7 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
   return alloc;
 }
 
-static bool optimizeMemoryAccesses(SILFunction &fn) {
+bool swift::optimizeMemoryAccesses(SILFunction &fn) {
   bool changed = false;
   DeadEndBlocks deadEndBlocks(&fn);
 
@@ -2887,7 +2886,10 @@ static bool optimizeMemoryAccesses(SILFunction &fn) {
   return changed;
 }
 
-static bool eliminateDeadAllocations(SILFunction &fn) {
+bool swift::eliminateDeadAllocations(SILFunction &fn) {
+  if (!fn.hasOwnership())
+    return false;
+
   bool changed = false;
   DeadEndBlocks deadEndBlocks(&fn);
 

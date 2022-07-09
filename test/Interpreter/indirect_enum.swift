@@ -5,9 +5,6 @@
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 
-// rdar://problem/47367694 tracks re-enabling this test for backward deployment.
-// UNSUPPORTED: remote_run
-
 // Make sure that we do not use-after-free here.
 
 class Box<T> {

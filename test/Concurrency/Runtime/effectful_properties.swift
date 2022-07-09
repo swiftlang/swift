@@ -1,11 +1,10 @@
-// RUN: %target-run-simple-swift(-parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -disable-availability-checking) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 enum GeneralError : Error {
@@ -20,7 +19,7 @@ enum BallKind {
   case KirksandLignature
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class Specs {
   // obtains the number of dimples
   subscript(_ bk : BallKind) -> Int {
@@ -37,7 +36,7 @@ class Specs {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Database {
   var currentData : Specs {
     get async {
@@ -52,21 +51,21 @@ actor Database {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 protocol SphericalObject {
   var name : String { get async throws }
   var dimples : Int { get async throws }
   var description : String { get async throws }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class Ball : SphericalObject {
   var name : String { get async throws { throw GeneralError.Todo } }
   var dimples : Int { get async throws { throw GeneralError.Todo } }
   var description : String { get async throws { throw GeneralError.Todo } }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class GolfBall : Ball {
   private static let db : Database = Database()
 
@@ -110,17 +109,17 @@ class GolfBall : Ball {
 // CHECK: obtaining specs...
 // CHECK: this golf ball has 0 dimples
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func printAsBall(_ b : Ball) async {
   print(try! await b.description)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func printAsAsSphericalObject(_ b : SphericalObject) async {
   print(try! await b.description)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct RunIt {
   static func main() async {
     let balls : [(Bool, Ball)] = [

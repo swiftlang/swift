@@ -12,8 +12,11 @@
 
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/Basic/Cache.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -39,7 +42,7 @@ namespace swift {
     struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
       static size_t
       getCost(const swift::ide::CodeCompletionCacheImpl::Value &V) {
-        return V.Sink.Allocator->getTotalMemory();
+        return V.Allocator->getTotalMemory();
       }
     };
   } // namespace sys
@@ -100,7 +103,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 1;
+static constexpr uint32_t onDiskCompletionCacheVersion = 7; // Store whether a type can be used as attribute
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -148,18 +151,53 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
   const char *chunks = resultEnd;
   auto chunkSize = read32le(chunks);
   const char *strings = chunks + chunkSize;
-  auto stringCount = read32le(strings);
-  assert(strings + stringCount == end && "incorrect file size");
-  (void)stringCount; // so it is not seen as "unused" in release builds.
-  
+  auto stringsSize = read32le(strings);
+  const char *types = strings + stringsSize;
+  auto typesSize = read32le(types);
+  assert(types + typesSize == end && "incorrect file size");
+  (void)typesSize; // so it is not seen as "unused" in release builds.
+
   // STRINGS
-  auto getString = [&](uint32_t index) -> StringRef {
+  llvm::DenseMap<uint32_t, NullTerminatedStringRef> knownStrings;
+  auto getString = [&](uint32_t index) -> NullTerminatedStringRef {
     if (index == ~0u)
       return "";
+    auto found = knownStrings.find(index);
+    if (found != knownStrings.end()) {
+      return found->second;
+    }
 
     const char *p = strings + index;
-    auto size = read32le(p);
-    return copyString(*V.Sink.Allocator, StringRef(p, size));
+    size_t size = read32le(p);
+    auto str = NullTerminatedStringRef(StringRef(p, size), *V.Allocator);
+    knownStrings[index] = str;
+    return str;
+  };
+
+  // TYPES
+  llvm::DenseMap<uint32_t, const USRBasedType *> knownTypes;
+  std::function<const USRBasedType *(uint32_t)> getType =
+      [&](uint32_t index) -> const USRBasedType * {
+    auto found = knownTypes.find(index);
+    if (found != knownTypes.end()) {
+      return found->second;
+    }
+    const char *p = types + index;
+    auto usrLength = read32le(p);
+    auto usr = StringRef(p, usrLength);
+    p += usrLength;
+    auto supertypesCount = read32le(p);
+    std::vector<const USRBasedType *> supertypes;
+    supertypes.reserve(supertypesCount);
+    for (unsigned i = 0; i < supertypesCount; i++) {
+      auto supertypeIndex = read32le(p);
+      supertypes.push_back(getType(supertypeIndex));
+    }
+    auto customAttributeKinds = OptionSet<CustomAttributeKind, uint8_t>(*p++);
+    const USRBasedType *res = USRBasedType::fromUSR(
+        usr, supertypes, customAttributeKinds, V.USRTypeArena);
+    knownTypes[index] = res;
+    return res;
   };
 
   // CHUNKS
@@ -183,65 +221,52 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       }
     }
 
-    return CodeCompletionString::create(*V.Sink.Allocator, chunkList);
+    return CodeCompletionString::create(*V.Allocator, chunkList);
   };
 
   // RESULTS
   while (cursor != resultEnd) {
-    auto kind = static_cast<CodeCompletionResult::ResultKind>(*cursor++);
-    auto declKind = static_cast<CodeCompletionDeclKind>(*cursor++);
+    auto kind = static_cast<CodeCompletionResultKind>(*cursor++);
+    auto associatedKind = static_cast<uint8_t>(*cursor++);
     auto opKind = static_cast<CodeCompletionOperatorKind>(*cursor++);
-    auto context = static_cast<SemanticContextKind>(*cursor++);
     auto notRecommended =
-        static_cast<CodeCompletionResult::NotRecommendedReason>(*cursor++);
+        static_cast<ContextFreeNotRecommendedReason>(*cursor++);
+    auto diagSeverity =
+        static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
-    auto numBytesToErase = static_cast<unsigned>(*cursor++);
-    auto oldCursor = cursor;
     auto chunkIndex = read32le(cursor);
-    auto IntLength = cursor - oldCursor;
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
+    auto diagMessageIndex = read32le(cursor);
+    auto filterNameIndex = read32le(cursor);
+
     auto assocUSRCount = read32le(cursor);
-    auto assocUSRsIndex = read32le(cursor);
-    auto declKeywordCount = read32le(cursor);
-    auto declKeywordIndex = read32le(cursor);
+    SmallVector<NullTerminatedStringRef, 4> assocUSRs;
+    for (unsigned i = 0; i < assocUSRCount; ++i) {
+      assocUSRs.push_back(getString(read32le(cursor)));
+    }
+
+    auto resultTypesCount = read32le(cursor);
+    SmallVector<const USRBasedType *, 1> resultTypes;
+    resultTypes.reserve(resultTypesCount);
+    for (size_t i = 0; i < resultTypesCount; i++) {
+      resultTypes.push_back(getType(read32le(cursor)));
+    }
 
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
     auto briefDocComment = getString(briefDocIndex);
-    SmallVector<StringRef, 4> assocUSRs;
-    for (unsigned i = 0; i < assocUSRCount; ++i) {
-      auto usr = getString(assocUSRsIndex);
-      assocUSRs.push_back(usr);
-      assocUSRsIndex += usr.size() + IntLength;
-    }
+    auto diagMessage = getString(diagMessageIndex);
+    auto filterName = getString(filterNameIndex);
 
-    SmallVector<std::pair<StringRef, StringRef>, 4> declKeywords;
-    for (unsigned i = 0; i < declKeywordCount; ++i) {
-      auto first = getString(declKeywordIndex);
-      declKeywordIndex += first.size() + IntLength;
-      auto second = getString(declKeywordIndex);
-      declKeywordIndex += second.size() + IntLength;
-      declKeywords.push_back(std::make_pair(first, second));
-    }
+    ContextFreeCodeCompletionResult *result =
+        new (*V.Allocator) ContextFreeCodeCompletionResult(
+            kind, associatedKind, opKind, isSystem, string, moduleName,
+            briefDocComment, makeArrayRef(assocUSRs).copy(*V.Allocator),
+            CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
+            diagMessage, filterName);
 
-    CodeCompletionResult *result = nullptr;
-    if (kind == CodeCompletionResult::Declaration) {
-      result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, CodeCompletionFlair(), numBytesToErase, string,
-          declKind, isSystem, moduleName, notRecommended, briefDocComment,
-          copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
-          copyArray(*V.Sink.Allocator,
-                    ArrayRef<std::pair<StringRef, StringRef>>(declKeywords)),
-          CodeCompletionResult::Unknown, opKind);
-    } else {
-      result = new (*V.Sink.Allocator)
-          CodeCompletionResult(kind, context,  CodeCompletionFlair(),
-                               numBytesToErase, string,
-                               CodeCompletionResult::NotApplicable, opKind);
-    }
-
-    V.Sink.Results.push_back(result);
+    V.Results.push_back(result);
   }
 
   return true;
@@ -296,7 +321,8 @@ static void writeCachedModule(llvm::raw_ostream &out,
     OSSLE.write(K.ResultsHaveLeadingDot);
     OSSLE.write(K.ForTestableLookup);
     OSSLE.write(K.ForPrivateImportLookup);
-    OSSLE.write(K.CodeCompleteInitsInPostfixExpr);
+    OSSLE.write(K.AddInitsInToplevel);
+    OSSLE.write(K.AddCallWithNoDefaultArgs);
     OSSLE.write(K.Annotated);
     LE.write(static_cast<uint32_t>(OSS.tell()));   // Size of debug info
     out.write(OSS.str().data(), OSS.str().size()); // Debug info blob
@@ -310,14 +336,56 @@ static void writeCachedModule(llvm::raw_ostream &out,
   endian::Writer chunksLE(chunks, little);
   std::string strings_;
   llvm::raw_string_ostream strings(strings_);
+  llvm::StringMap<uint32_t> knownStrings;
+  std::string types_;
+  llvm::raw_string_ostream types(types_);
+  llvm::DenseMap<const USRBasedType *, uint32_t> knownTypes;
 
-  auto addString = [&strings](StringRef str) {
+  auto addString = [&strings, &knownStrings](StringRef str) {
     if (str.empty())
       return ~0u;
+    auto found = knownStrings.find(str);
+    if (found != knownStrings.end()) {
+      return found->second;
+    }
     auto size = strings.tell();
     endian::Writer LE(strings, little);
     LE.write(static_cast<uint32_t>(str.size()));
     strings << str;
+    knownStrings[str] = size;
+    return static_cast<uint32_t>(size);
+  };
+
+  std::function<uint32_t(const USRBasedType *)> addType =
+      [&types, &knownTypes, &addType](const USRBasedType *type) -> uint32_t {
+    auto found = knownTypes.find(type);
+    if (found != knownTypes.end()) {
+      return found->second;
+    }
+    std::vector<uint32_t> supertypeIndicies;
+    // IMPORTANT: To compute the supertype indicies, we might need to add
+    // entries to the type table by calling addType recursively. Thus, we must
+    // perform this calculation before writing any bytes of this type to the
+    // types table.
+    auto supertypes = type->getSupertypes();
+    supertypeIndicies.reserve(supertypes.size());
+    for (auto supertype : supertypes) {
+      supertypeIndicies.push_back(addType(supertype));
+    }
+
+    auto size = types.tell();
+    endian::Writer LE(types, little);
+    StringRef USR = type->getUSR();
+    LE.write(static_cast<uint32_t>(USR.size()));
+    types << USR;
+    LE.write(static_cast<uint32_t>(supertypeIndicies.size()));
+    for (auto supertypeIndex : supertypeIndicies) {
+      LE.write(static_cast<uint32_t>(supertypeIndex));
+    }
+    OptionSet<CustomAttributeKind, uint8_t> customAttributeKinds =
+        type->getCustomAttributeKinds();
+    LE.write(static_cast<uint8_t>(customAttributeKinds.toRaw()));
+    knownTypes[type] = size;
     return static_cast<uint32_t>(size);
   };
 
@@ -340,50 +408,35 @@ static void writeCachedModule(llvm::raw_ostream &out,
   // RESULTS
   {
     endian::Writer LE(results, little);
-    for (CodeCompletionResult *R : V.Sink.Results) {
-      assert(!R->getFlair().toRaw() && "Any flairs should not be cached");
-      assert(R->getNotRecommendedReason() !=
-             CodeCompletionResult::NotRecommendedReason::InvalidAsyncContext &&
-             "InvalidAsyncContext is decl context specific, cannot be cached");
-
+    for (const ContextFreeCodeCompletionResult *R : V.Results) {
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));
-      if (R->getKind() == CodeCompletionResult::Declaration)
-        LE.write(static_cast<uint8_t>(R->getAssociatedDeclKind()));
-      else
-        LE.write(static_cast<uint8_t>(~0u));
-      if (R->isOperator())
-        LE.write(static_cast<uint8_t>(R->getOperatorKind()));
-      else
+      LE.write(static_cast<uint8_t>(R->getOpaqueAssociatedKind()));
+      if (R->isOperator()) {
+        LE.write(static_cast<uint8_t>(R->getKnownOperatorKind()));
+      } else {
         LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
-      LE.write(static_cast<uint8_t>(R->getSemanticContext()));
+      }
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
+      LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
-      LE.write(static_cast<uint8_t>(R->getNumBytesToErase()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
+      LE.write(addString(R->getDiagnosticMessage())); // index into strings
+      LE.write(addString(R->getFilterName())); // index into strings
+
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
-      if (R->getAssociatedUSRs().empty()) {
-        LE.write(static_cast<uint32_t>(~0u));
-      } else {
-        LE.write(addString(R->getAssociatedUSRs()[0]));
-        for (unsigned i = 1; i < R->getAssociatedUSRs().size(); ++i) {
-          addString(R->getAssociatedUSRs()[i]); // ignore result
-        }
+      for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {
+        LE.write(addString(R->getAssociatedUSRs()[i]));
       }
-      auto AllKeywords = R->getDeclKeywords();
-      LE.write(static_cast<uint32_t>(AllKeywords.size()));
-      if (AllKeywords.empty()) {
-        LE.write(static_cast<uint32_t>(~0u));
-      } else {
-        LE.write(addString(AllKeywords[0].first));
-        addString(AllKeywords[0].second);
-        for (unsigned i = 1; i < AllKeywords.size(); ++i) {
-          addString(AllKeywords[i].first);
-          addString(AllKeywords[i].second);
-        }
+
+      auto resultTypes =
+          R->getResultType().getUSRBasedResultTypes(V.USRTypeArena);
+      LE.write(static_cast<uint32_t>(resultTypes.size()));
+      for (auto resultType : resultTypes) {
+        LE.write(addType(resultType)); // index into types
       }
     }
   }
@@ -397,6 +450,10 @@ static void writeCachedModule(llvm::raw_ostream &out,
   // STRINGS
   LE.write(static_cast<uint32_t>(strings.tell()));
   out << strings.str();
+
+  // TYPES
+  LE.write(static_cast<uint32_t>(types.tell()));
+  out << types.str();
 }
 
 /// Get the name for the cached code completion results for a given key \p K in
@@ -411,11 +468,12 @@ static std::string getName(StringRef cacheDirectory,
   llvm::sys::path::append(name, K.ModuleName);
   llvm::raw_svector_ostream OSS(name);
 
-  // name[-dot][-testable][-inits]
+  // name[-with-enabled-options]
   OSS << (K.ResultsHaveLeadingDot ? "-dot" : "")
       << (K.ForTestableLookup ? "-testable" : "")
       << (K.ForPrivateImportLookup ? "-private" : "")
-      << (K.CodeCompleteInitsInPostfixExpr ? "-inits" : "")
+      << (K.AddInitsInToplevel ? "-inits" : "")
+      << (K.AddCallWithNoDefaultArgs ? "-nodefaults" : "")
       << (K.Annotated ? "-annotated" : "");
 
   // name[-access-path-components]
@@ -481,8 +539,9 @@ OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
     return None;
 
   // Make up a key for readCachedModule.
-  CodeCompletionCache::Key K{filename.str(), "<module-name>", {},   false,
-                             false,          false,           false, false};
+  CodeCompletionCache::Key K{filename.str(), "<module-name>", {},
+                             false,          false,           false,
+                             false,          false,           false};
 
   // Read the cached results.
   auto V = CodeCompletionCache::createValue();

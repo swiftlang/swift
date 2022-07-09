@@ -98,6 +98,8 @@ public:
       return {getTrailingObjects<ImportedModule>(),
               NumTopLevelImports + NumTransitiveImports};
   }
+
+  SWIFT_DEBUG_DUMP;
 };
 
 class alignas(ImportedModule) ImportCache {
@@ -126,7 +128,7 @@ class alignas(ImportedModule) ImportCache {
 public:
   ImportCache() {}
 
-  /// Returns an object descripting all modules transtiively imported
+  /// Returns an object descripting all modules transitively imported
   /// from 'dc'.
   ImportSet &getImportSet(const DeclContext *dc);
 

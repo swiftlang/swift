@@ -154,4 +154,5 @@ func sr13639() -> Int {
     // CHECK: sil private @$s16unreachable_code7sr13639SiyF3FooL_V7fooFuncyyF : $@convention(method) (Foo) -> ()
     func fooFunc() {}
   }
+  func appendix() {} // no-warning
 }

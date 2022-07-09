@@ -155,10 +155,6 @@ public:
     SGM.useConformancesFromType(ASI->getType().getASTType());
   }
 
-  void visitAllocValueBufferInst(AllocValueBufferInst *AVBI) {
-    SGM.useConformancesFromType(AVBI->getType().getASTType());
-  }
-
   void visitApplyInst(ApplyInst *AI) {
     SGM.useConformancesFromObjectiveCType(AI->getSubstCalleeType());
     SGM.useConformancesFromSubstitutions(AI->getSubstitutionMap());
@@ -187,16 +183,14 @@ public:
     SGM.useConformancesFromObjectiveCType(CCABI->getTargetFormalType());
   }
 
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CCVBI) {
-    SGM.useConformancesFromType(CCVBI->getSourceFormalType());
-    SGM.useConformancesFromType(CCVBI->getTargetFormalType());
-    SGM.useConformancesFromObjectiveCType(CCVBI->getSourceFormalType());
-    SGM.useConformancesFromObjectiveCType(CCVBI->getTargetFormalType());
-  }
-
   void visitCopyAddrInst(CopyAddrInst *CAI) {
     SGM.useConformancesFromType(CAI->getSrc()->getType().getASTType());
     SGM.useConformancesFromType(CAI->getDest()->getType().getASTType());
+  }
+
+  void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *MAI) {
+    SGM.useConformancesFromType(MAI->getSrc()->getType().getASTType());
+    SGM.useConformancesFromType(MAI->getDest()->getType().getASTType());
   }
 
   void visitCopyValueInst(CopyValueInst *CVI) {
@@ -324,11 +318,9 @@ void SILGenModule::emitLazyConformancesForFunction(SILFunction *F) {
 void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
   auto genericSig = NTD->getGenericSignature();
 
-  if (genericSig) {
-    for (auto reqt : genericSig->getRequirements()) {
-      if (reqt.getKind() != RequirementKind::Layout)
-        useConformancesFromType(reqt.getSecondType()->getCanonicalType());
-    }
+  for (auto reqt : genericSig.getRequirements()) {
+    if (reqt.getKind() != RequirementKind::Layout)
+      useConformancesFromType(reqt.getSecondType()->getCanonicalType());
   }
 
   if (auto *ED = dyn_cast<EnumDecl>(NTD)) {
@@ -352,7 +344,7 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
       useConformancesFromType(superclass->getCanonicalType(genericSig));
 
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-    for (auto reqt : PD->getRequirementSignature()) {
+    for (auto reqt : PD->getRequirementSignature().getRequirements()) {
       if (reqt.getKind() != RequirementKind::Layout)
         useConformancesFromType(reqt.getSecondType()->getCanonicalType());
     }

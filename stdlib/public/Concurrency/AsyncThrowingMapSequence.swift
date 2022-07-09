@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that maps the given error-throwing
   /// closure over the asynchronous sequence’s elements.
@@ -31,7 +31,7 @@ extension AsyncSequence {
   /// receiving this value from `Counter` ends the modified sequence with an
   /// error.
   ///
-  ///     let romanNumeralDict: [Int : String] =
+  ///     let romanNumeralDict: [Int: String] =
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
   ///
   ///     do {
@@ -43,12 +43,12 @@ extension AsyncSequence {
   ///                 return roman
   ///             }
   ///         for try await numeral in stream {
-  ///             print("\(numeral) ", terminator: " ")
+  ///             print(numeral, terminator: " ")
   ///         }
   ///     } catch {
-  ///         print ("Error: \(error)")
+  ///         print("Error: \(error)")
   ///     }
-  ///     // Prints: I  II  III  Error: MyError()
+  ///     // Prints "I II III Error: MyError()"
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns a transformed value of the
@@ -56,9 +56,10 @@ extension AsyncSequence {
   ///   ends the transformed sequence.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
   ///   produced by the `transform` closure.
+  @preconcurrency
   @inlinable
   public __consuming func map<Transformed>(
-    _ transform: @escaping (Element) async throws -> Transformed
+    _ transform: @Sendable @escaping (Element) async throws -> Transformed
   ) -> AsyncThrowingMapSequence<Self, Transformed> {
     return AsyncThrowingMapSequence(self, transform: transform)
   }
@@ -66,8 +67,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that maps the given error-throwing closure over the
 /// asynchronous sequence’s elements.
-@available(SwiftStdlib 5.5, *)
-@frozen
+@available(SwiftStdlib 5.1, *)
 public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
@@ -75,7 +75,7 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let transform: (Base.Element) async throws -> Transformed
 
-  @inlinable
+  @usableFromInline
   init(
     _ base: Base, 
     transform: @escaping (Base.Element) async throws -> Transformed
@@ -85,7 +85,7 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingMapSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///
@@ -96,7 +96,6 @@ extension AsyncThrowingMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -107,7 +106,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @inlinable
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async throws -> Transformed
@@ -142,3 +141,15 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingMapSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        Transformed: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingMapSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        Transformed: Sendable { }

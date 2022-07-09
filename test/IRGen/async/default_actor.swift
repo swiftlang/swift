@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-experimental-concurrency -enable-library-evolution %s | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-ir  -disable-availability-checking -enable-library-evolution %s | %IRGenFileCheck %s
 // REQUIRES: concurrency
 
 // CHECK: @"$s13default_actor1ACMn" = hidden constant

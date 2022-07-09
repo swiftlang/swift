@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -Xfrontend -parse-as-library %s -o %t/main
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -Xfrontend -parse-as-library %s -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main  > %t/log 2>&1 || true
 // RUN: %FileCheck %s < %t/log
@@ -9,7 +9,7 @@
 // REQUIRES: OS=macosx || OS=ios
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 enum Err : Error { case noGood }

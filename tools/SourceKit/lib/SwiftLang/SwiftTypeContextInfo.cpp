@@ -30,49 +30,13 @@ static void translateTypeContextInfoOptions(OptionsDictionary &from,
   // TypeContextInfo doesn't receive any options at this point.
 }
 
-static bool swiftTypeContextInfoImpl(
-    SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
-    unsigned Offset, ide::TypeContextInfoConsumer &Consumer,
-    ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error) {
-  return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, Error,
-      [&](CompilerInstance &CI, bool reusingASTContext) {
-        // Create a factory for code completion callbacks that will feed the
-        // Consumer.
-        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-            ide::makeTypeContextInfoCallbacksFactory(Consumer));
+static void deliverResults(SourceKit::TypeContextInfoConsumer &SKConsumer,
+                           CancellableResult<TypeContextInfoResult> Result) {
+  switch (Result.getKind()) {
+  case CancellableResultKind::Success: {
+    SKConsumer.setReusingASTContext(Result->DidReuseAST);
 
-        auto *SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF, *callbacksFactory);
-        Consumer.setReusingASTContext(reusingASTContext);
-      });
-}
-
-void SwiftLangSupport::getExpressionContextInfo(
-    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
-    SourceKit::TypeContextInfoConsumer &SKConsumer,
-    Optional<VFSOptions> vfsOptions) {
-  std::string error;
-
-  TypeContextInfo::Options options;
-  if (optionsDict) {
-    translateTypeContextInfoOptions(*optionsDict, options);
-  }
-
-  // FIXME: the use of None as primary file is to match the fact we do not read
-  // the document contents using the editor documents infrastructure.
-  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
-  if (!fileSystem)
-    return SKConsumer.failed(error);
-
-  class Consumer : public ide::TypeContextInfoConsumer {
-    SourceKit::TypeContextInfoConsumer &SKConsumer;
-
-    /// Convert an IDE result to a SK result and send it to \c SKConsumer.
-    void handleSingleResult(const ide::TypeContextInfoItem &Item) {
+    for (auto &Item : Result->Results) {
       SmallString<512> SS;
       llvm::raw_svector_ostream OS(SS);
 
@@ -150,23 +114,47 @@ void SwiftLangSupport::getExpressionContextInfo(
 
       SKConsumer.handleResult(Info);
     }
-
-  public:
-    Consumer(SourceKit::TypeContextInfoConsumer &SKConsumer)
-        : SKConsumer(SKConsumer){};
-
-    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) override {
-      for (auto &Item : Results)
-        handleSingleResult(Item);
-    }
-
-    void setReusingASTContext(bool flag) override {
-      SKConsumer.setReusingASTContext(flag);
-    }
-  } Consumer(SKConsumer);
-
-  if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Consumer,
-                                Args, fileSystem, error)) {
-    SKConsumer.failed(error);
+    break;
   }
+  case CancellableResultKind::Failure:
+    SKConsumer.failed(Result.getError());
+    break;
+  case CancellableResultKind::Cancelled:
+    SKConsumer.cancelled();
+    break;
+  }
+}
+
+void SwiftLangSupport::getExpressionContextInfo(
+    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken,
+    SourceKit::TypeContextInfoConsumer &SKConsumer,
+    Optional<VFSOptions> vfsOptions) {
+  std::string error;
+
+  TypeContextInfo::Options options;
+  if (optionsDict) {
+    translateTypeContextInfoOptions(*optionsDict, options);
+  }
+
+  // FIXME: the use of None as primary file is to match the fact we do not read
+  // the document contents using the editor documents infrastructure.
+  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  if (!fileSystem) {
+    return SKConsumer.failed(error);
+  }
+
+  performWithParamsToCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, fileSystem, CancellationToken,
+      [&](CancellableResult<CompletionLikeOperationParams> ParamsResult) {
+        ParamsResult.mapAsync<TypeContextInfoResult>(
+            [&](auto &CIParams, auto DeliverTransformed) {
+              getCompletionInstance()->typeContextInfo(
+                  CIParams.Invocation, Args, fileSystem,
+                  CIParams.completionBuffer, Offset, CIParams.DiagC,
+                  CIParams.CancellationFlag, DeliverTransformed);
+            },
+            [&](auto Result) { deliverResults(SKConsumer, Result); });
+      });
 }

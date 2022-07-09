@@ -31,7 +31,6 @@ class ParserPosition {
       : LS(LS), PreviousLoc(PreviousLoc) {}
 public:
   ParserPosition() = default;
-  ParserPosition &operator=(const ParserPosition &) = default;
 
   bool isValid() const { return LS.isValid(); }
 };

@@ -123,13 +123,11 @@ findDeallocStackInst(AllocStackInst *ASI) {
 /// Return the deallocate ref instructions corresponding to the given
 /// AllocRefInst.
 static llvm::SmallVector<SILInstruction *, 1>
-findDeallocRefInst(AllocRefInst *ARI) {
+findDeallocStackRefInst(AllocRefInstBase *ARI) {
   llvm::SmallVector<SILInstruction *, 1> DSIs;
   for (auto UI = ARI->use_begin(), E = ARI->use_end(); UI != E; ++UI) {
-    if (auto *D = dyn_cast<DeallocRefInst>(UI->getUser())) {
-      if (D->isDeallocatingStack())
-        DSIs.push_back(D);
-    }
+    if (auto *D = dyn_cast<DeallocStackRefInst>(UI->getUser()))
+      DSIs.push_back(D);
   }
   return DSIs;
 }
@@ -160,6 +158,7 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::FixLifetimeInst:
@@ -400,9 +399,10 @@ private:
   /// Process instructions. Extract locations from SIL StoreInst.
   void processStoreInst(SILInstruction *Inst, DSEKind Kind);
 
-  /// Process instructions. Extract locations from SIL DebugValueAddrInst.
-  /// DebugValueAddrInst maybe promoted to DebugValue, when this is done,
-  /// DebugValueAddrInst is effectively a read on the location.
+  /// Process instructions. Extract locations from SIL DebugValueInst.
+  /// DebugValueInst w/ address value maybe promoted to DebugValueInst w/
+  /// scalar value when this is done,
+  /// DebugValueInst is effectively a read on the location.
   void processDebugValueAddrInst(SILInstruction *I, DSEKind Kind);
   void processDebugValueAddrInstForGenKillSet(SILInstruction *I);
   void processDebugValueAddrInstForDSE(SILInstruction *I);
@@ -701,10 +701,10 @@ void BlockState::initStoreSetAtEndOfBlock(DSEContext &Ctx) {
         startTrackingLocation(BBDeallocateLocation, i);
       }
     }
-    if (auto *ARI = dyn_cast<AllocRefInst>(LocationVault[i].getBase())) {
+    if (auto *ARI = dyn_cast<AllocRefInstBase>(LocationVault[i].getBase())) {
       if (!ARI->isAllocatingStack())
         continue;
-      for (auto X : findDeallocRefInst(ARI)) {
+      for (auto X : findDeallocStackRefInst(ARI)) {
         SILBasicBlock *DSIBB = X->getParent();
         if (DSIBB != BB)
           continue;
@@ -1045,7 +1045,7 @@ void DSEContext::processStoreInst(SILInstruction *I, DSEKind Kind) {
 
 void DSEContext::processDebugValueAddrInstForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
-  SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  SILValue Mem = cast<DebugValueInst>(I)->getOperand();
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->BBMaxStoreSet.test(i))
       continue;
@@ -1058,7 +1058,7 @@ void DSEContext::processDebugValueAddrInstForGenKillSet(SILInstruction *I) {
 
 void DSEContext::processDebugValueAddrInstForDSE(SILInstruction *I) {
   BlockState *S = getBlockState(I);
-  SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  SILValue Mem = cast<DebugValueInst>(I)->getOperand();
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->isTrackingLocation(S->BBWriteSetMid, i))
       continue;
@@ -1140,11 +1140,11 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
     processLoadInst(I, Kind);
   } else if (isa<StoreInst>(I)) {
     processStoreInst(I, Kind);
-  } else if (isa<DebugValueAddrInst>(I)) {
+  } else if (DebugValueInst::hasAddrVal(I)) {
     processDebugValueAddrInst(I, Kind);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadInst(I, Kind);
-  }  
+  }
 
   // Check whether this instruction will invalidate any other locations.
   for (auto result : I->getResults())
@@ -1181,14 +1181,17 @@ void DSEContext::runIterativeDSE() {
 }
 
 bool DSEContext::run() {
-  std::pair<int, int> LSCount = std::make_pair(0, 0);
+  int numLoads = 0, numStores = 0;
+  bool immutableLoadsFound = false;
   // Walk over the function and find all the locations accessed by
   // this function.
   LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex,
-                                   BaseToLocIndex, TE, LSCount);
+                                   BaseToLocIndex, TE,
+                                   /*stopAtImmutable*/ false,
+                                   numLoads, numStores, immutableLoadsFound);
 
   // Check how to optimize this function.
-  ProcessKind Kind = getProcessFunctionKind(LSCount.second);
+  ProcessKind Kind = getProcessFunctionKind(numStores);
   
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)

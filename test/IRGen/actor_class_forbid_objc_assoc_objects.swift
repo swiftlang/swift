@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend  -disable-availability-checking -emit-ir %s | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop

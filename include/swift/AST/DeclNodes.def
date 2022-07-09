@@ -140,7 +140,7 @@
 #define LAST_DECL(Id)
 #endif
 
-// NOTE: For performance, maximize the numer of [important] abstract Decls
+// NOTE: For performance, maximize the number of [important] abstract Decls
 // where "First_XYZDecl" == 0 to improve isa/dyn_cast code gen.
 
 ABSTRACT_DECL(Value, Decl)

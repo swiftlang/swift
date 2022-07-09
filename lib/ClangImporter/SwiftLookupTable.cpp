@@ -1239,11 +1239,11 @@ namespace {
       // # of entries
       uint32_t dataLength =
         sizeof(uint16_t) + sizeof(uint64_t) * data.size();
-      assert(dataLength == static_cast<uint16_t>(dataLength));
+      assert(dataLength == static_cast<uint32_t>(dataLength));
 
       endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -1513,7 +1513,7 @@ namespace {
     static std::pair<unsigned, unsigned>
     ReadKeyDataLength(const uint8_t *&data) {
       unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
       return { keyLength, dataLength };
     }
 
@@ -1849,18 +1849,22 @@ SwiftNameLookupExtension::getExtensionMetadata() const {
   return metadata;
 }
 
-llvm::hash_code
-SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
-  return llvm::hash_combine(code, StringRef("swift.lookup"),
-                            SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
-                            SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            swiftCtx.LangOpts.EnableExperimentalConcurrency,
-                            version::getSwiftFullVersion());
+void
+SwiftNameLookupExtension::hashExtension(ExtensionHashBuilder &HBuilder) const {
+  HBuilder.add(StringRef("swift.lookup"));
+  HBuilder.add(SWIFT_LOOKUP_TABLE_VERSION_MAJOR);
+  HBuilder.add(SWIFT_LOOKUP_TABLE_VERSION_MINOR);
+  HBuilder.add(version::getSwiftFullVersion());
 }
 
 void importer::addEntryToLookupTable(SwiftLookupTable &table,
                                      clang::NamedDecl *named,
                                      NameImporter &nameImporter) {
+  clang::PrettyStackTraceDecl trace(
+      named, named->getLocation(),
+      nameImporter.getClangContext().getSourceManager(),
+      "while adding SwiftName lookup table entries for clang declaration");
+
   // Determine whether this declaration is suppressed in Swift.
   if (shouldSuppressDeclImport(named))
     return;
@@ -1918,14 +1922,60 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     }
   }
 
+  // Class template instantiations are imported lazily, however, the lookup
+  // table must include their mangled name (__CxxTemplateInst...) to make it
+  // possible to find these decls during deserialization. For any C++ typedef
+  // that defines a name for a class template instantiation (e.g. std::string),
+  // import the mangled name of this instantiation, and add it to the table.
+  if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
+    auto underlyingDecl = typedefNameDecl->getUnderlyingType()->getAsTagDecl();
+
+    if (auto specializationDecl =
+            dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                underlyingDecl)) {
+      auto name = nameImporter.importName(specializationDecl, currentVersion);
+
+      // Avoid adding duplicate entries into the table.
+      auto existingEntries =
+          table.lookup(DeclBaseName(name.getDeclName().getBaseName()),
+                       name.getEffectiveContext());
+      if (existingEntries.empty()) {
+        table.addEntry(name.getDeclName(), specializationDecl,
+                       name.getEffectiveContext());
+      }
+    }
+  }
+
   // Walk the members of any context that can have nested members.
   if (isa<clang::TagDecl>(named) || isa<clang::ObjCInterfaceDecl>(named) ||
       isa<clang::ObjCProtocolDecl>(named) ||
-      isa<clang::ObjCCategoryDecl>(named) || isa<clang::NamespaceDecl>(named)) {
+      isa<clang::ObjCCategoryDecl>(named)) {
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
         addEntryToLookupTable(table, namedMember, nameImporter);
+    }
+  }
+  if (isa<clang::NamespaceDecl>(named)) {
+    llvm::SmallPtrSet<clang::Decl *, 8> alreadyAdded;
+    alreadyAdded.insert(named->getCanonicalDecl());
+
+    for (auto redecl : named->redecls()) {
+      auto dc = cast<clang::DeclContext>(redecl);
+      for (auto member : dc->decls()) {
+        auto canonicalMember = member->getCanonicalDecl();
+        if (!alreadyAdded.insert(canonicalMember).second)
+          continue;
+
+        if (auto namedMember = dyn_cast<clang::NamedDecl>(canonicalMember)) {
+          // Make sure we're looking at the definition, otherwise, there won't
+          // be any members to add.
+          if (auto recordDecl = dyn_cast<clang::RecordDecl>(namedMember))
+            if (auto def = recordDecl->getDefinition())
+              namedMember = def;
+          addEntryToLookupTable(table, namedMember, nameImporter);
+        }
+      }
     }
   }
 }
@@ -1965,12 +2015,6 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
 
       // If we're in a module, we really need moduleMacro to be valid.
       if (isModule && !moduleMacro) {
-#ifndef NDEBUG
-        // Refetch this just for the assertion.
-        clang::MacroDirective *MD = pp.getLocalMacroDirective(macro.first);
-        assert(isa<clang::VisibilityMacroDirective>(MD));
-#endif
-
         // FIXME: "public" visibility macros should actually be added to the 
         // table.
         return;
@@ -2113,7 +2157,7 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
 
   // Finalize the lookup table, which may fail.
   finalizeLookupTable(table, nameImporter, buffersForDiagnostics);
-};
+}
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {

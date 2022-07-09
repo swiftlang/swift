@@ -126,16 +126,10 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
   std::string srcTypeName = nameForMetadata(srcType);
   std::string destTypeName = nameForMetadata(destType);
-  const char *msg = "Found unexpected null pointer value"
+  const char * const msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
                     " to '%s' (%p)%s\n";
-  if (runtime::bincompat::unexpectedObjCNullWhileCastingIsFatal()) {
-    // By default, Swift 5.4 and later issue a fatal error.
-    swift::fatalError(/* flags = */ 0, msg,
-                      srcTypeName.c_str(), srcType,
-                      destTypeName.c_str(), destType,
-                      "");
-  } else {
+  if (runtime::bincompat::useLegacyPermissiveObjCNullSemanticsInCasting()) {
     // In backwards compatibility mode, this code will warn and return the null
     // reference anyway: If you examine the calls to the function, you'll see
     // that most callers fail the cast in that case, but a few casts (e.g., with
@@ -145,6 +139,12 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
                    srcTypeName.c_str(), srcType,
                    destTypeName.c_str(), destType,
                    ": Continuing with null object, but expect problems later.");
+  } else {
+    // By default, Swift 5.4 and later issue a fatal error.
+    swift::fatalError(/* flags = */ 0, msg,
+                      srcTypeName.c_str(), srcType,
+                      destTypeName.c_str(), destType,
+                      "");
   }
   return object;
 }
@@ -274,7 +274,7 @@ _tryCastFromClassToObjCBridgeable(
 
   // The extra byte is for the tag on the T?
   const std::size_t inlineValueSize = 3 * sizeof(void*);
-  alignas(std::max_align_t) char inlineBuffer[inlineValueSize + 1];
+  alignas(MaximumAlignment) char inlineBuffer[inlineValueSize + 1];
   void *optDestBuffer;
   if (destType->getValueWitnesses()->getStride() <= inlineValueSize) {
     // Use the inline buffer.
@@ -673,7 +673,7 @@ bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
 #if SWIFT_OBJC_INTEROP
 // Helper to memoize bridging conformance data for a particular
 // Swift struct type.  This is used to speed up the most common
-// ObjC->Swift bridging conversions by eliminating repeeated
+// ObjC->Swift bridging conversions by eliminating repeated
 // protocol conformance lookups.
 
 // Currently used only for String, which may be the only
@@ -764,14 +764,21 @@ tryCastToAnyHashable(
   assert(cast<StructMetadata>(destType)->Description
          == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
+  const HashableWitnessTable *hashableConformance = nullptr;
+  
   switch (srcType->getKind()) {
   case MetadataKind::ForeignClass: // CF -> String
   case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
 #if SWIFT_OBJC_INTEROP
-    // TODO: Implement a fast path for NSString->AnyHashable casts.
-    // These are incredibly common because an NSDictionary with
-    // NSString keys is bridged by default to [AnyHashable:Any].
-    // Until this is implemented, fall through to the general case
+    auto cls = srcType;
+    auto nsString = getNSStringMetadata();
+    do {
+      if (cls == nsString) {
+        hashableConformance = getNSStringHashableConformance();
+        break;
+      }
+      cls = _swift_class_getSuperclass(cls);
+    } while (cls != nullptr);
     break;
 #else
     // If no Obj-C interop, just fall through to the general case.
@@ -805,8 +812,11 @@ tryCastToAnyHashable(
 
 
   // General case: If it conforms to Hashable, we cast it
-  auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-    swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
+  if (hashableConformance == nullptr) {
+    hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor)
+    );
+  }
   if (hashableConformance) {
     _swift_convertToAnyHashableIndirect(srcValue, destLocation,
                                         srcType, hashableConformance);
@@ -1082,7 +1092,7 @@ tryCastUnwrappingOptionalBoth(
     srcValue, /*emptyCases=*/1);
   auto sourceIsNil = (sourceEnumCase != 0);
   if (sourceIsNil) {
-    if (runtime::bincompat::useLegacyOptionalNilInjection()) {
+    if (runtime::bincompat::useLegacyOptionalNilInjectionInCasting()) {
       auto destInnerType = cast<EnumMetadata>(destType)->getGenericArgs()[0];
       // Set .none at the outer level
       destInnerType->vw_storeEnumTagSinglePayload(destLocation, 1, 1);
@@ -1224,6 +1234,7 @@ tryCastToTuple(
   for (unsigned i = 0; typesMatch && i != numElements; ++i) {
     if (srcTupleType->getElement(i).Type != destTupleType->getElement(i).Type) {
       typesMatch = false;
+      break;
     }
   }
 
@@ -1544,30 +1555,47 @@ tryCastToClassExistentialViaSwiftValue(
   }
 
   default: {
+    // We can always box when the destination is a simple
+    // (unconstrained) `AnyObject`.
     if (destExistentialType->NumProtocols != 0) {
-      // The destination is a class-constrained protocol type
-      // and the source is not a class, so....
-      return DynamicCastResult::Failure;
-    } else {
-      // This is a simple (unconstrained) `AnyObject` so we can populate
-      // it by stuffing a non-class instance into a __SwiftValue box
-#if SWIFT_OBJC_INTEROP
-      auto object = bridgeAnythingToSwiftValueObject(
-        srcValue, srcType, takeOnSuccess);
-      destExistentialLocation->Value = object;
-      if (takeOnSuccess) {
-        return DynamicCastResult::SuccessViaTake;
-      } else {
-        return DynamicCastResult::SuccessViaCopy;
+      // But if there are constraints...
+      if (!runtime::bincompat::useLegacyObjCBoxingInCasting()) {
+        // ... never box if we're not supporting legacy semantics.
+        return DynamicCastResult::Failure;
       }
-# else
-      // Note: Code below works correctly on both Obj-C and non-Obj-C platforms,
-      // but the code above is slightly faster on Obj-C platforms.
-      auto object = _bridgeAnythingToObjectiveC(srcValue, srcType);
-      destExistentialLocation->Value = object;
-      return DynamicCastResult::SuccessViaCopy;
+      // Legacy behavior: We used to permit casts to a constrained (existential)
+      // type if the resulting `__SwiftValue` box conformed to the target type.
+      // This is no longer supported, since it caused `x is NSCopying` to be
+      // true even when x does not in fact implement the requirements of
+      // `NSCopying`.
+#if SWIFT_OBJC_INTEROP
+      if (!findSwiftValueConformances(
+            destExistentialType, destExistentialLocation->getWitnessTables())) {
+        return DynamicCastResult::Failure;
+      }
+#else
+      if (!swift_swiftValueConformsTo(destType, destType)) {
+        return DynamicCastResult::Failure;
+      }
 #endif
     }
+
+#if SWIFT_OBJC_INTEROP
+    auto object = bridgeAnythingToSwiftValueObject(
+      srcValue, srcType, takeOnSuccess);
+    destExistentialLocation->Value = object;
+    if (takeOnSuccess) {
+      return DynamicCastResult::SuccessViaTake;
+    } else {
+      return DynamicCastResult::SuccessViaCopy;
+    }
+# else
+    // Note: Code below works correctly on both Obj-C and non-Obj-C platforms,
+    // but the code above is slightly faster on Obj-C platforms.
+    auto object = _bridgeAnythingToObjectiveC(srcValue, srcType);
+    destExistentialLocation->Value = object;
+    return DynamicCastResult::SuccessViaCopy;
+#endif
   }
   }
 }
@@ -1668,8 +1696,54 @@ tryCastUnwrappingExistentialSource(
   return tryCast(destLocation, destType,
                  srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
-                 takeOnSuccess & (srcInnerValue == srcValue),
+                 takeOnSuccess && (srcInnerValue == srcValue),
                  mayDeferChecks);
+}
+
+static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks) {
+  assert(srcType != destType);
+  assert(srcType->getKind() == MetadataKind::ExtendedExistential);
+
+  auto srcExistentialType = cast<ExtendedExistentialTypeMetadata>(srcType);
+
+  // Unpack the existential content
+  const Metadata *srcInnerType = nullptr;
+  OpaqueValue *srcInnerValue = nullptr;
+  switch (srcExistentialType->Shape->Flags.getSpecialKind()) {
+  case ExtendedExistentialTypeShape::SpecialKind::None: {
+    auto opaqueContainer =
+        reinterpret_cast<OpaqueExistentialContainer *>(srcValue);
+    srcInnerType = opaqueContainer->Type;
+    srcInnerValue = const_cast<OpaqueValue *>(opaqueContainer->projectValue());
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::Class: {
+    auto classContainer =
+        reinterpret_cast<ClassExistentialContainer *>(srcValue);
+    srcInnerType = swift_getObjectType((HeapObject *)classContainer->Value);
+    srcInnerValue = reinterpret_cast<OpaqueValue *>(&classContainer->Value);
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
+    auto srcExistentialContainer =
+        reinterpret_cast<ExistentialMetatypeContainer *>(srcValue);
+    srcInnerType = swift_getMetatypeMetadata(srcExistentialContainer->Value);
+    srcInnerValue = reinterpret_cast<OpaqueValue *>(&srcExistentialContainer->Value);
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::ExplicitLayout: {
+    swift_unreachable("Explicit layout not yet implemented");
+    break;
+  }
+  }
+
+  srcFailureType = srcInnerType;
+  return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
+                 destFailureType, srcFailureType,
+                 takeOnSuccess && (srcInnerValue == srcValue), mayDeferChecks);
 }
 
 static DynamicCastResult
@@ -1691,8 +1765,136 @@ tryCastUnwrappingExistentialMetatypeSource(
   return tryCast(destLocation, destType,
                  srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
-                 takeOnSuccess & (srcInnerValue == srcValue),
+                 takeOnSuccess && (srcInnerValue == srcValue),
                  mayDeferChecks);
+}
+
+
+static DynamicCastResult tryCastToExtendedExistential(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks) {
+  assert(srcType != destType);
+  assert(destType->getKind() == MetadataKind::ExtendedExistential);
+
+  auto destExistentialType = cast<ExtendedExistentialTypeMetadata>(destType);
+  auto *destExistentialShape = destExistentialType->Shape;
+  const unsigned shapeArgumentCount =
+      destExistentialShape->getGenSigArgumentLayoutSizeInWords();
+  const Metadata *selfType = srcType;
+
+  // If we have a type expression to look into, unwrap as much metatype
+  // structure as possible so we can reach the type metadata for the 'Self'
+  // parameter.
+  if (destExistentialShape->Flags.hasTypeExpression()) {
+    Demangler dem;
+    auto *node = dem.demangleType(destExistentialShape->getTypeExpression()->name.get());
+    if (!node)
+      return DynamicCastResult::Failure;
+
+    while (node->getKind() == Demangle::Node::Kind::Type &&
+           node->getNumChildren() &&
+           node->getChild(0)->getKind() == Demangle::Node::Kind::Metatype &&
+           node->getChild(0)->getNumChildren()) {
+      auto *metatypeMetadata = dyn_cast<MetatypeMetadata>(selfType);
+      if (!metatypeMetadata)
+        return DynamicCastResult::Failure;
+
+      selfType = metatypeMetadata->InstanceType;
+      node = node->getChild(0)->getChild(0);
+    }
+
+    // Make sure the thing we've pulled out at the end is a dependent
+    // generic parameter.
+    if (!(node->getKind() == Demangle::Node::Kind::Type &&
+          node->getNumChildren() &&
+          node->getChild(0)->getKind() ==
+              Demangle::Node::Kind::DependentGenericParamType))
+      return DynamicCastResult::Failure;
+  }
+
+  llvm::SmallVector<const void *, 8> allGenericArgsVec;
+  unsigned witnessesMark = 0;
+  {
+    // Line up the arguments to the requirement signature.
+    auto genArgs = destExistentialType->getGeneralizationArguments();
+    allGenericArgsVec.append(genArgs, genArgs + shapeArgumentCount);
+    // Tack on the `Self` argument.
+    allGenericArgsVec.push_back((const void *)selfType);
+    // Mark the point where the generic arguments end.
+    // _checkGenericRequirements is going to fill in a set of witness tables
+    // after that.
+    witnessesMark = allGenericArgsVec.size();
+
+    SubstGenericParametersFromMetadata substitutions(destExistentialShape,
+                                                     allGenericArgsVec.data());
+    // Verify the requirements in the requirement signature against the
+    // arguments from the source value.
+    auto error = swift::_checkGenericRequirements(
+        destExistentialShape->getRequirementSignature().getRequirements(),
+        allGenericArgsVec,
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [](const Metadata *type, unsigned index) -> const WitnessTable * {
+          swift_unreachable("Resolution of witness tables is not supported");
+        });
+    if (error)
+      return DynamicCastResult::Failure;
+  }
+
+  OpaqueValue *destBox = nullptr;
+  const WitnessTable **destWitnesses = nullptr;
+  switch (destExistentialShape->Flags.getSpecialKind()) {
+  case ExtendedExistentialTypeShape::SpecialKind::None: {
+    auto destExistential =
+        reinterpret_cast<OpaqueExistentialContainer *>(destLocation);
+
+    // Allocate a box and fill in the type information.
+    destExistential->Type = srcType;
+    destBox = srcType->allocateBoxForExistentialIn(&destExistential->Buffer);
+    destWitnesses = destExistential->getWitnessTables();
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::Class: {
+    auto destExistential =
+        reinterpret_cast<ClassExistentialContainer *>(destLocation);
+    destBox = reinterpret_cast<OpaqueValue *>(&destExistential->Value);
+    destWitnesses = destExistential->getWitnessTables();
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
+    auto destExistential =
+        reinterpret_cast<ExistentialMetatypeContainer *>(destLocation);
+    destBox = reinterpret_cast<OpaqueValue *>(&destExistential->Value);
+    destWitnesses = destExistential->getWitnessTables();
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::ExplicitLayout:
+    swift_unreachable("Witnesses for explicit layout not yet implemented");
+  }
+
+  // Fill in the trailing set of witness tables.
+  const unsigned numWitnessTables = allGenericArgsVec.size() - witnessesMark;
+  assert(numWitnessTables ==
+         llvm::count_if(destExistentialShape->getRequirementSignature().getRequirements(),
+                        [](const auto &req) -> bool {
+                          return req.getKind() ==
+                                 GenericRequirementKind::Protocol;
+                        }));
+  for (unsigned i = 0; i < numWitnessTables; ++i) {
+    const auto witness = i + witnessesMark;
+    destWitnesses[i] =
+        reinterpret_cast<const WitnessTable *>(allGenericArgsVec[witness]);
+  }
+
+  if (takeOnSuccess) {
+    srcType->vw_initializeWithTake(destBox, srcValue);
+    return DynamicCastResult::SuccessViaTake;
+  } else {
+    srcType->vw_initializeWithCopy(destBox, srcValue);
+    return DynamicCastResult::SuccessViaCopy;
+  }
 }
 
 /******************************************************************************/
@@ -1979,12 +2181,14 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
     swift_unreachable(
       "Unknown existential type representation in dynamic cast dispatch");
   }
+  case MetadataKind::ExtendedExistential:
+    return tryCastToExtendedExistential;
   case MetadataKind::Metatype:
-   return tryCastToMetatype;
- case MetadataKind::ObjCClassWrapper:
+    return tryCastToMetatype;
+  case MetadataKind::ObjCClassWrapper:
     return tryCastToObjectiveCClass;
   case MetadataKind::ExistentialMetatype:
-   return tryCastToExistentialMetatype;
+    return tryCastToExistentialMetatype;
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
@@ -2052,7 +2256,7 @@ tryCast(
       || srcKind == MetadataKind::ObjCClassWrapper
       || srcKind == MetadataKind::ForeignClass) {
     auto srcObject = getNonNullSrcObject(srcValue, srcType, destType);
-    // If srcObject is null, we're in compability mode.
+    // If srcObject is null, we're in compatibility mode.
     // But we can't lookup dynamic type for a null class reference, so
     // just skip this in that case.
     if (srcObject != nullptr) {
@@ -2142,6 +2346,15 @@ tryCast(
     break;
   }
 
+  case MetadataKind::ExtendedExistential: {
+    auto subcastResult = tryCastUnwrappingExtendedExistentialSource(
+        destLocation, destType, srcValue, srcType, destFailureType,
+        srcFailureType, takeOnSuccess, mayDeferChecks);
+    if (isSuccess(subcastResult)) {
+      return subcastResult;
+    }
+    break;
+  }
   default:
     break;
   }

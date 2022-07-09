@@ -1,16 +1,19 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// Temporarily disabled to unblock PR testing:
+// REQUIRES: rdar80745964
+
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_detach_cancel_child_early() async {
   print(#function) // CHECK: test_detach_cancel_child_early
   let h: Task<Bool, Error> = Task.detached {
@@ -21,13 +24,10 @@ func test_detach_cancel_child_early() async {
 
     let xx = await childCancelled
     print("child, cancelled: \(xx)") // CHECK: child, cancelled: true
-    let cancelled =  Task.isCancelled
-    print("self, cancelled: \(cancelled )") // CHECK: self, cancelled: true
+    let cancelled = Task.isCancelled
+    print("self, cancelled: \(cancelled)") // CHECK: self, cancelled: true
     return cancelled
   }
-
-  // no sleep here -- this confirms that the child task `x`
-  // carries the cancelled flag, as it is started from a cancelled task.
 
   h.cancel()
   print("handle cancel")
@@ -35,7 +35,7 @@ func test_detach_cancel_child_early() async {
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_detach_cancel_child_early()

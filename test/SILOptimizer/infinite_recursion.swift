@@ -103,6 +103,18 @@ func multipleArgsNoWarning(_ x : Int, _ y : Int) {
   }
 }
 
+struct A {}
+struct B {}
+
+func deadEndBlockInElseBranch(_ x : Int) {
+  if x != 0 {
+    deadEndBlockInElseBranch(x - 1) // no warning
+  } else {
+    _ = unsafeBitCast(A(), to: B.self)
+  }
+}
+
+
 struct Str {
   var x = 27
 
@@ -230,11 +242,11 @@ class S {
     return a() // expected-warning {{function call causes an infinite recursion}}
   }
 
-  func b() { // No warning - has a known override.
+  func b() {
     var i = 0
     repeat {
       i += 1
-      b()
+      b() // expected-warning {{function call causes an infinite recursion}}
     } while (i > 5)
   }
 
@@ -258,6 +270,12 @@ class T: S {
     set {
       self.bar = newValue // expected-warning {{function call causes an infinite recursion}}
     }
+  }
+}
+
+public class U {
+  required convenience init(x: Int) {
+    self.init(x: x) // expected-warning {{function call causes an infinite recursion}}
   }
 }
 

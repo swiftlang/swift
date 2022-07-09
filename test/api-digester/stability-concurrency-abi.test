@@ -1,0 +1,69 @@
+// RUN: %empty-directory(%t.tmp)
+// mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk
+// RUN: %api-digester -diagnose-sdk -module _Concurrency -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location
+// RUN: %clang -E -P -x c %S/stability-concurrency-abi.test -o - > %t.tmp/stability-concurrency-abi.swift.expected
+// RUN: %clang -E -P -x c %t.tmp/stability-concurrency-abi.swift.expected -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-concurrency-abi.swift.expected.sorted
+// RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed -E -e '/^\s*$/d' -e 's/ in _[0-9A-F]{32}/ in #UNSTABLE ID#/g' | sort > %t.tmp/changes.txt.tmp
+// RUN: diff -u %t.tmp/stability-concurrency-abi.swift.expected.sorted %t.tmp/changes.txt.tmp
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
+
+// Welcome, Build Wrangler!
+//
+// This file lists APIs that are unique to stdlib builds with assertions.
+// (It is combined with the stability-stdlib-abi-without-asserts.test file
+// to generate a full list of potentially breaking API changes. In most cases
+// you'll want to edit that file instead of this one.)
+//
+// A failure in this test indicates that there is a potential breaking change in
+// the Standard Library. If you observe a failure outside of a PR test, please
+// reach out to the Standard Library team directly to make sure this gets
+// resolved quickly! If your own PR fails in this test, you probably have an
+// ABI- or source-breaking change in your commits. Please go and fix it.
+//
+// Please DO NOT DISABLE THIS TEST. In addition to ignoring the current set of
+// ABI breaks, XFAILing this test also silences any future ABI breaks that may
+// land on this branch, which simply generates extra work for the next person
+// that picks up the mess.
+//
+// Instead of disabling this test, consider extending the list of expected
+// changes at the bottom. (You'll also need to do this if your own PR triggers
+// false positives, or if you have special permission to break things.) You can
+// find a diff of what needs to be added in the output of the failed test run.
+// The order of lines doesn't matter, and you can also include comments to refer
+// to any bugs you filed. Remember that in almost all cases you'll want to edit
+// the stability-stdlib-abi-without-asserts.test file instead of this one.
+//
+// Thank you for your help ensuring the stdlib remains compatible with its past!
+//                                            -- Your friendly stdlib engineers
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+
+// SR-13362
+// We currently only have a baseline for Intel CPUs on macOS.
+// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
+// REQUIRES: concurrency
+
+// The digester can incorrectly register a generic signature change when
+// declarations are shuffled. rdar://problem/46618883
+// UNSUPPORTED: swift_evolve
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+Func AsyncSequence.compactMap(_:) is now with @preconcurrency
+Func AsyncSequence.drop(while:) is now with @preconcurrency
+Func AsyncSequence.filter(_:) is now with @preconcurrency
+Func AsyncSequence.flatMap(_:) is now with @preconcurrency
+Func AsyncSequence.map(_:) is now with @preconcurrency
+Func AsyncSequence.prefix(while:) is now with @preconcurrency
+Func MainActor.run(resultType:body:) has generic signature change from <T where T : Swift.Sendable> to <T>
+Func MainActor.run(resultType:body:) has mangled name changing from 'static Swift.MainActor.run<A where A: Swift.Sendable>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A' to 'static Swift.MainActor.run<A>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A'
+Func _runAsyncMain(_:) is now with @preconcurrency
+Func _asyncLet_get(_:_:) has mangled name changing from '_Concurrency._asyncLet_get(Builtin.RawPointer, Builtin.RawPointer) async -> Builtin.RawPointer' to '_Concurrency._asyncLet_get(Builtin.RawPointer, Builtin.RawPointer) async -> ()'
+Func _asyncLet_get(_:_:) has return type change from Builtin.RawPointer to ()
+Func _asyncLet_get_throwing(_:_:) has mangled name changing from '_Concurrency._asyncLet_get_throwing(Builtin.RawPointer, Builtin.RawPointer) async throws -> Builtin.RawPointer' to '_Concurrency._asyncLet_get_throwing(Builtin.RawPointer, Builtin.RawPointer) async throws -> ()'
+Func _asyncLet_get_throwing(_:_:) has return type change from Builtin.RawPointer to ()
+Protocol Actor has added inherited protocol AnyActor
+Protocol Actor has generic signature change from <Self : AnyObject, Self : Swift.Sendable> to <Self : _Concurrency.AnyActor>
+Struct CheckedContinuation has removed conformance to UnsafeSendable
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

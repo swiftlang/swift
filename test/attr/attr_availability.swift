@@ -149,7 +149,7 @@ let _: Int
 @available(*, renamed: "a(:b:)") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
 let _: Int
 
-@available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
+@available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both 'unavailable' and 'deprecated'}}
 struct BadUnconditionalAvailability { };
 
 @available(*, unavailable, message="oh no you don't") // expected-error {{'=' has been replaced with ':' in attribute arguments}} {{35-36=: }}
@@ -1127,4 +1127,107 @@ class UnavailableNoArgsSubclassInit: UnavailableNoArgsSuperclassInit {
   init(marker: ()) {}
   // expected-error@-1 {{'init()' is unavailable}}
   // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'UnavailableNoArgsSuperclassInit' occurs implicitly at the end of this initializer}}
+}
+
+struct TypeWithTrailingClosures {
+  func twoTrailingClosures(a: () -> Void, b: () -> Void) {}
+  func threeTrailingClosures(a: () -> Void, b: () -> Void, c: () -> Void) {}
+  func threeUnlabeledTrailingClosures(_ a: () -> Void, _ b: () -> Void, _ c: () -> Void) {}
+  func variadicTrailingClosures(a: (() -> Void)..., b: Int = 0, c: Int = 0) {}
+}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.twoTrailingClosures(self:a:b:)")
+func twoTrailingClosures(_ x: TypeWithTrailingClosures, a: () -> Void, b: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.twoTrailingClosures(self:a:b:)")
+func twoTrailingClosuresWithDefaults(x: TypeWithTrailingClosures, y: Int = 0, z: Int = 0, a: () -> Void, b: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.threeTrailingClosures(self:a:b:c:)")
+func threeTrailingClosures(_ x: TypeWithTrailingClosures, a: () -> Void, b: () -> Void, c: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.threeTrailingClosures(self:a:b:c:)")
+func threeTrailingClosuresDiffLabels(_: TypeWithTrailingClosures, x: () -> Void, y: () -> Void, z: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.threeUnlabeledTrailingClosures(self:_:_:_:)")
+func threeTrailingClosuresRemoveLabels(_ x: TypeWithTrailingClosures, a: () -> Void, b: () -> Void, c: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.variadicTrailingClosures(self:a:b:c:)")
+func variadicTrailingClosures(_ x: TypeWithTrailingClosures, a: (() -> Void)...) {}
+
+func testMultipleTrailingClosures(_ x: TypeWithTrailingClosures) {
+  twoTrailingClosures(x) {} b: {} // expected-warning {{'twoTrailingClosures(_:a:b:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.twoTrailingClosures(a:b:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.twoTrailingClosures(a:b:)' instead}} {{3-22=x.twoTrailingClosures}} {{23-24=}} {{none}}
+  x.twoTrailingClosures() {} b: {}
+
+  twoTrailingClosuresWithDefaults(x: x) {} b: {} // expected-warning {{'twoTrailingClosuresWithDefaults(x:y:z:a:b:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.twoTrailingClosures(a:b:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.twoTrailingClosures(a:b:)' instead}} {{3-34=x.twoTrailingClosures}} {{35-39=}} {{none}}
+  x.twoTrailingClosures() {} b: {}
+
+  threeTrailingClosures(x, a: {}) {} c: {} // expected-warning {{'threeTrailingClosures(_:a:b:c:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.threeTrailingClosures(a:b:c:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.threeTrailingClosures(a:b:c:)' instead}} {{3-24=x.threeTrailingClosures}} {{25-28=}} {{none}}
+  x.threeTrailingClosures(a: {}) {} c: {}
+
+  threeTrailingClosuresDiffLabels(x, x: {}) {} z: {} // expected-warning {{'threeTrailingClosuresDiffLabels(_:x:y:z:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.threeTrailingClosures(a:b:c:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.threeTrailingClosures(a:b:c:)' instead}} {{3-34=x.threeTrailingClosures}} {{35-38=}} {{38-39=a}} {{48-49=c}} {{none}}
+  x.threeTrailingClosures(a: {}) {} c: {}
+
+  threeTrailingClosuresRemoveLabels(x, a: {}) {} c: {} // expected-warning {{'threeTrailingClosuresRemoveLabels(_:a:b:c:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.threeUnlabeledTrailingClosures(_:_:_:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.threeUnlabeledTrailingClosures(_:_:_:)' instead}} {{3-36=x.threeUnlabeledTrailingClosures}} {{37-40=}} {{40-43=}} {{50-51=_}} {{none}}
+  x.threeUnlabeledTrailingClosures({}) {} _: {}
+
+  variadicTrailingClosures(x) {} _: {} _: {} // expected-warning {{'variadicTrailingClosures(_:a:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.variadicTrailingClosures(a:b:c:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.variadicTrailingClosures(a:b:c:)' instead}} {{3-27=x.variadicTrailingClosures}} {{28-29=}} {{none}}
+  x.variadicTrailingClosures() {} _: {} _: {}
+}
+
+struct UnavailableSubscripts { 
+  @available(*, unavailable, renamed: "subscript(new:)")
+  subscript(old index: Int) -> Int { 3 } // expected-note * {{'subscript(old:)' has been explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "subscript(new:)")
+  func getValue(old: Int) -> Int { 3 } // expected-note * {{'getValue(old:)' has been explicitly marked unavailable here}}
+
+  subscript(new index: Int) -> Int { 3 }
+
+  @available(*, unavailable, renamed: "getAValue(new:)")
+  subscript(getAValue index: Int) -> Int { 3 } // expected-note * {{'subscript(getAValue:)' has been explicitly marked unavailable here}}
+  func getAValue(new: Int) -> Int { 3 }
+
+  @available(*, unavailable, renamed: "subscript(arg1:arg2:arg3:)")
+  subscript(_ argg1: Int, _ argg2: Int, _ argg3: Int) -> Int { 3 } // expected-note * {{'subscript(_:_:_:)' has been explicitly marked unavailable here}}
+
+  @available(*, deprecated, renamed: "subscript(arg1:arg2:arg3:)")
+  subscript(argg1 argg1: Int, argg2 argg2: Int, argg3 argg3: Int) -> Int { 3 }
+
+  @available(*, deprecated, renamed: "subscript(arg1:arg2:arg3:)")
+  subscript(only1 only1: Int, only2 only2: Int) -> Int { 3 }
+
+  subscript(arg1 arg1: Int, arg2 arg2: Int, arg3 arg3: Int) -> Int { 3 }
+
+  @available(*, deprecated, renamed: "subscriptTo(_:)")
+  subscript(to to: Int) -> Int { 3 }
+  func subscriptTo(_ index: Int) -> Int { 3 }
+
+  func testUnavailableSubscripts(_ x: UnavailableSubscripts) { 
+    _ = self[old: 3] // expected-error {{'subscript(old:)' has been renamed to 'subscript(new:)'}} {{14-17=new}}
+    _ = x[old: 3] // expected-error {{'subscript(old:)' has been renamed to 'subscript(new:)'}} {{11-14=new}}
+
+    _ = self.getValue(old: 3) // expected-error {{'getValue(old:)' has been renamed to 'subscript(new:)'}} {{14-22=[}} {{29-30=]}} {{23-26=new}}
+    _ = getValue(old: 3) // expected-error {{'getValue(old:)' has been renamed to 'subscript(new:)'}} {{9-9=self}} {{9-17=[}} {{24-25=]}} {{18-21=new}}
+    _ = x.getValue(old: 3) // expected-error {{'getValue(old:)' has been renamed to 'subscript(new:)'}} {{11-19=[}} {{26-27=]}} {{20-23=new}}
+
+    _ = self[getAValue: 3] // expected-error {{'subscript(getAValue:)' has been renamed to 'getAValue(new:)'}} {{13-14=.getAValue(}} {{26-27=)}} {{14-23=new}}
+    _ = x[getAValue: 3] // expected-error {{'subscript(getAValue:)' has been renamed to 'getAValue(new:)'}} {{10-11=.getAValue(}} {{23-24=)}} {{11-20=new}}
+
+    _ = self[argg1: 3, argg2: 3, argg3: 3] // expected-warning {{'subscript(argg1:argg2:argg3:)' is deprecated: renamed to 'subscript(arg1:arg2:arg3:)'}} // expected-note {{use 'subscript(arg1:arg2:arg3:)' instead}} {{14-19=arg1}} {{24-29=arg2}} {{34-39=arg3}}
+    _ = x[argg1: 3, argg2: 3, argg3: 3] // expected-warning {{'subscript(argg1:argg2:argg3:)' is deprecated: renamed to 'subscript(arg1:arg2:arg3:)'}} // expected-note {{use 'subscript(arg1:arg2:arg3:)' instead}} {{11-16=arg1}} {{21-26=arg2}} {{31-36=arg3}}
+
+    // Different number of parameters emit no fixit
+    _ = self[only1: 3, only2: 3] // expected-warning {{'subscript(only1:only2:)' is deprecated: renamed to 'subscript(arg1:arg2:arg3:)'}} // expected-note {{use 'subscript(arg1:arg2:arg3:)' instead}} {{none}}
+
+    _ = self[3, 3, 3] // expected-error {{'subscript(_:_:_:)' has been renamed to 'subscript(arg1:arg2:arg3:)'}} {{14-14=arg1: }} {{17-17=arg2: }} {{20-20=arg3: }}
+    _ = x[3, 3, 3] // expected-error {{'subscript(_:_:_:)' has been renamed to 'subscript(arg1:arg2:arg3:)'}} {{11-11=arg1: }} {{14-14=arg2: }} {{17-17=arg3: }}
+
+    _ = self[to: 3] // expected-warning {{'subscript(to:)' is deprecated: renamed to 'subscriptTo(_:)'}} // expected-note {{use 'subscriptTo(_:)' instead}} {{13-14=.subscriptTo(}} {{19-20=)}} {{14-18=}}
+    _ = x[to: 3] // expected-warning {{'subscript(to:)' is deprecated: renamed to 'subscriptTo(_:)'}} // expected-note {{use 'subscriptTo(_:)' instead}} {{10-11=.subscriptTo(}} {{16-17=)}} {{11-15=}}
+  }
 }

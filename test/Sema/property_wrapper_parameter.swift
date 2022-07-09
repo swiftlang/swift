@@ -27,7 +27,7 @@ func globalFunc(@Wrapper arg: Int) {
   let _: Wrapper<Int> = _arg
 }
 
-func testGloablFunc(value: Int, projection: Projection<Int>) {
+func testGlobalFunc(value: Int, projection: Projection<Int>) {
   globalFunc(arg: value)
   globalFunc($arg: projection)
 
@@ -88,6 +88,12 @@ func testClosures() {
   }
 }
 
+func projectionPlaceholder<T>(@Wrapper _ value: T) {}
+
+func testOmittedProjectionLabel(value: Int) {
+    projectionPlaceholder($_: Projection(value: value))
+}
+
 @propertyWrapper
 struct ProjectionWrapper<Value> {
   var wrappedValue: Value
@@ -124,4 +130,10 @@ func testResultBuilderWithImplicitWrapper(@ProjectionWrapper value: String) {
     value
     $value
   }
+}
+
+func takesWrapperClosure<T>(_: ProjectionWrapper<[S<T>]>, closure: (ProjectionWrapper<S<T>>) -> Void) {}
+
+func testGenericPropertyWrapper<U>(@ProjectionWrapper wrappers: [S<U>]) {
+  takesWrapperClosure($wrappers) { $wrapper in }
 }

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc,CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native,CHECK-%target-ptrsize
+// RUN: %target-swift-frontend  -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc,CHECK-%target-ptrsize
+// RUN: %target-swift-frontend  -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native,CHECK-%target-ptrsize
 
 // REQUIRES: concurrency
 // XFAIL: CPU=arm64e
@@ -89,7 +89,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
   // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 8
   // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load %swift.context*, %swift.context** [[CONTEXT_SLOT]], align
   // CHECK-NEXT: [[CONTEXT:%.*]] = bitcast %swift.context* [[CONTEXT_OPAQUE]] to %swift.continuation_context*
-  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 3
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 4
   // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load %swift.opaque*, %swift.opaque** [[RESULT_ADDR_SLOT]], align
   // CHECK-NEXT: [[RESULT_ADDR:%.*]] = bitcast %swift.opaque* [[RESULT_ADDR_OPAQUE]] to %swift.refcounted**
   // CHECK-NEXT: [[VALUE:%.*]] = load %swift.refcounted*, %swift.refcounted** %0, align
@@ -108,7 +108,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
   // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 8
   // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load %swift.context*, %swift.context** [[CONTEXT_SLOT]], align
   // CHECK-NEXT: [[CONTEXT:%.*]] = bitcast %swift.context* [[CONTEXT_OPAQUE]] to %swift.continuation_context*
-  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 3
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 4
   // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load %swift.opaque*, %swift.opaque** [[RESULT_ADDR_SLOT]], align
   // CHECK-NEXT: [[RESULT_ADDR:%.*]] = bitcast %swift.opaque* [[RESULT_ADDR_OPAQUE]] to %swift.refcounted**
   // CHECK-NEXT: [[VALUE:%.*]] = load %swift.refcounted*, %swift.refcounted** %0, align

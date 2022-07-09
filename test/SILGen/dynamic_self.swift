@@ -246,8 +246,9 @@ class Z {
     // so that IRGen can recover metadata.
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
+    // CHECK:      [[WEAK_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[WEAK_SELF]]
     // CHECK:      [[FN:%.*]] = function_ref @$s12dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU1_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
-    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : ${ var @sil_weak Optional<Z> }
+    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF_LIFETIME]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
     // CHECK:      partial_apply [callee_guaranteed] [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     let fn3 = {
@@ -516,6 +517,17 @@ public class CaptureTwoValuesTest {
 
     // CHECK-LABEL: sil private [ossa] @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZyycfU_ : $@convention(thin) (@guaranteed CaptureTwoValuesTest, @guaranteed CaptureTwoValuesTest) -> () {
   }
+}
+
+
+final class Final {
+  static func useSelf(_ body: (Self) -> ()) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self13testNoErasureyyyAA5FinalCXEF : $@convention(thin) (@noescape @callee_guaranteed (@guaranteed Final) -> ()) -> () {
+func testNoErasure(_ body: (Final) -> ()) {
+  // CHECK: function_ref @$s12dynamic_self5FinalC7useSelfyyyACXDXEFZ : $@convention(method) (@noescape @callee_guaranteed (@guaranteed Final) -> (), @thick Final.Type) -> ()
+  return Final.useSelf(body)
 }
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {

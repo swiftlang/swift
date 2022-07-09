@@ -78,10 +78,6 @@ OVERRIDE_ACTOR(job_run, void,
                swift::, (class Job *job, ExecutorRef executor),
                (job, executor))
 
-OVERRIDE_ACTOR(task_getCurrent, AsyncTask *,
-               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, ,)
-
 OVERRIDE_ACTOR(task_getCurrentExecutor, ExecutorRef,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, ,)
@@ -101,7 +97,7 @@ OVERRIDE_TASK(task_create_common, AsyncTaskAndContext,
               (size_t taskCreateFlags,
                TaskOptionRecord *options,
                const Metadata *futureResultType,
-               FutureAsyncSignature::FunctionType *function,
+               TaskContinuationFunction *function,
                void *closureContext,
                size_t initialContextSize),
               (taskCreateFlags, options, futureResultType, function,
@@ -159,6 +155,25 @@ OVERRIDE_TASK(task_asyncMainDrainQueue, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               , )
 
+OVERRIDE_TASK(task_suspend, AsyncTask *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+              swift::, ,)
+
+OVERRIDE_TASK(task_enqueueTaskOnExecutor, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (AsyncTask *task, ExecutorRef newExecutor), (task, newExecutor))
+
+OVERRIDE_TASK(continuation_init, AsyncTask *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+              swift::, (ContinuationAsyncContext *context,
+                        AsyncContinuationFlags flags),
+              (context, flags))
+
+OVERRIDE_TASK(continuation_await, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+              swift::, (ContinuationAsyncContext *context),
+              (context))
+
 OVERRIDE_ASYNC_LET(asyncLet_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                    SWIFT_CC(swiftasync), swift::,
                    (OpaqueValue *result,
@@ -181,11 +196,56 @@ OVERRIDE_ASYNC_LET(asyncLet_end, void,
                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                    swift::, (AsyncLet *alet), (alet))
 
+OVERRIDE_ASYNC_LET(asyncLet_get, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                   swift::,
+                   (SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                    AsyncLet *alet, void *resultBuffer,
+                    TaskContinuationFunction *resumeFn,
+                    AsyncContext *callContext),
+                   (callerContext, alet, resultBuffer, resumeFn, callContext))
+
+OVERRIDE_ASYNC_LET(asyncLet_get_throwing, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                   swift::,
+                   (SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                    AsyncLet *alet, void *resultBuffer,
+                    ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+                    AsyncContext *callContext),
+                   (callerContext, alet, resultBuffer, resumeFn, callContext))
+
+OVERRIDE_ASYNC_LET(asyncLet_consume, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                   swift::,
+                   (SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                    AsyncLet *alet, void *resultBuffer,
+                    TaskContinuationFunction *resumeFn,
+                    AsyncContext *callContext),
+                   (callerContext, alet, resultBuffer, resumeFn, callContext))
+
+OVERRIDE_ASYNC_LET(asyncLet_consume_throwing, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                   swift::,
+                   (SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                    AsyncLet *alet, void *resultBuffer,
+                    ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+                    AsyncContext *callContext),
+                   (callerContext, alet, resultBuffer, resumeFn, callContext))
+
+OVERRIDE_ASYNC_LET(asyncLet_finish, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                   swift::,
+                   (SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                    AsyncLet *alet, void *resultBuffer,
+                    TaskContinuationFunction *resumeFn,
+                    AsyncContext *callContext),
+                   (callerContext, alet, resultBuffer, resumeFn, callContext))
+
 OVERRIDE_TASK_GROUP(taskGroup_initialize, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, const Metadata *T), (group, T))
 
-OVERRIDE_TASK_GROUP(taskGroup_attachChild, void,
+OVERRIDE_TASK_STATUS(taskGroup_attachChild, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, AsyncTask *child),
                     (group, child))
@@ -252,29 +312,9 @@ OVERRIDE_TASK_LOCAL(task_localsCopyTo, void,
                     (AsyncTask *target),
                     (target))
 
-OVERRIDE_TASK_STATUS(task_addStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *newRecord), (newRecord))
-
-OVERRIDE_TASK_STATUS(task_tryAddStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *newRecord), (newRecord))
-
-OVERRIDE_TASK_STATUS(task_removeStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *record), (record))
-
 OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, , )
-
-OVERRIDE_TASK_STATUS(task_attachChild, ChildTaskStatusRecord *,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (AsyncTask *child), (child))
-
-OVERRIDE_TASK_STATUS(task_detachChild, void,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (ChildTaskStatusRecord *record), (record))
 
 OVERRIDE_TASK_STATUS(task_cancel, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                      SWIFT_CC(swift), swift::, (AsyncTask *task), (task))

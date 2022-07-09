@@ -268,7 +268,7 @@ where
   func _vjpAddingProduct(
     _ lhs: Self, _ rhs: Self
   ) -> (value: Self, pullback: (Self) -> (Self, Self, Self)) {
-    return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
+    return (addingProduct(lhs, rhs), { v in (v, v * rhs, v * lhs) })
   }
 
   @inlinable // FIXME(sil-serialize-all)

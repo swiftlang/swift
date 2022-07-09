@@ -8,8 +8,11 @@
 // RUN: %swift_driver -print-target-info -target x86_64-unknown-linux -static-stdlib | %FileCheck -check-prefix CHECK-LINUX-STATIC %s
 // RUN: %swift_frontend_plain -print-target-info -target x86_64-unknown-linux -use-static-resource-dir | %FileCheck -check-prefix CHECK-LINUX-STATIC %s
 
-// RUN: %swift_driver -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
-// RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
+// RUN: %swift_driver -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck -check-prefix CHECK-PRE-CONCURRENCY-ZIPPERED %s
+// RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck -check-prefix CHECK-PRE-CONCURRENCY-ZIPPERED %s
+
+// RUN: %swift_driver -print-target-info -target x86_64-apple-macosx12.0 -target-variant x86_64-apple-ios15-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
+// RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx12.0 -target-variant x86_64-apple-ios15-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 
 // RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
 
@@ -25,6 +28,8 @@
 // CHECK-IOS:       "libraryName": "swiftCompatibility51",
 // CHECK-IOS:       "libraryName": "swiftCompatibilityDynamicReplacements"
 // CHECK-IOS:       "filter": "executable"
+// CHECK-IOS:       "libraryName": "swiftCompatibilityConcurrency"
+// CHECK-IOS:       "filter": "all"
 // CHECK-IOS:     ],
 // CHECK-IOS:     "librariesRequireRPath": true
 // CHECK-IOS:   }
@@ -65,20 +70,33 @@
 
 // CHECK-LINUX-STATIC-NOT: "targetVariant":
 
+// CHECK-PRE-CONCURRENCY-ZIPPERED: "target": {
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "triple": "x86_64-apple-macosx10.15"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "unversionedTriple": "x86_64-apple-macosx"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "moduleTriple": "x86_64-apple-macos"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "swiftRuntimeCompatibilityVersion": "5.1"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "librariesRequireRPath": true
+// CHECK-PRE-CONCURRENCY-ZIPPERED: }
+
+// CHECK-PRE-CONCURRENCY-ZIPPERED: "targetVariant": {
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "triple": "x86_64-apple-ios13.1-macabi"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "unversionedTriple": "x86_64-apple-ios-macabi"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "moduleTriple": "x86_64-apple-ios-macabi"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "swiftRuntimeCompatibilityVersion": "5.1"
+// CHECK-PRE-CONCURRENCY-ZIPPERED:   "librariesRequireRPath": true
+// CHECK-PRE-CONCURRENCY-ZIPPERED: }
 
 // CHECK-ZIPPERED: "target": {
-// CHECK-ZIPPERED:   "triple": "x86_64-apple-macosx10.15"
+// CHECK-ZIPPERED:   "triple": "x86_64-apple-macosx12.0"
 // CHECK-ZIPPERED:   "unversionedTriple": "x86_64-apple-macosx"
 // CHECK-ZIPPERED:   "moduleTriple": "x86_64-apple-macos"
-// CHECK-ZIPPERED:   "swiftRuntimeCompatibilityVersion": "5.1"
 // CHECK-ZIPPERED:   "librariesRequireRPath": false
 // CHECK-ZIPPERED: }
 
 // CHECK-ZIPPERED: "targetVariant": {
-// CHECK-ZIPPERED:   "triple": "x86_64-apple-ios13-macabi"
+// CHECK-ZIPPERED:   "triple": "x86_64-apple-ios15-macabi"
 // CHECK-ZIPPERED:   "unversionedTriple": "x86_64-apple-ios-macabi"
 // CHECK-ZIPPERED:   "moduleTriple": "x86_64-apple-ios-macabi"
-// CHECK-ZIPPERED:   "swiftRuntimeCompatibilityVersion": "5.1"
 // CHECK-ZIPPERED:   "librariesRequireRPath": false
 // CHECK-ZIPPERED: }
 

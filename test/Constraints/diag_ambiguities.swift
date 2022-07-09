@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 func f0(_ i: Int, _ d: Double) {} // expected-note{{found this candidate}}
 func f0(_ d: Double, _ i: Int) {} // expected-note{{found this candidate}}
@@ -43,7 +43,7 @@ func rdar29907555(_ value: Any!) -> String {
 }
 
 struct SR3715 {
-  var overloaded: Int!
+  var overloaded: Int! // expected-note {{implicitly unwrapped property 'overloaded' declared here}}
 
   func overloaded(_ x: Int) {}
   func overloaded(_ x: Float) {}
@@ -52,6 +52,10 @@ struct SR3715 {
 
   func test() {
     take([overloaded])
+    // expected-warning@-1 {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+    // expected-note@-2 {{provide a default value to avoid this warning}}
+    // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+    // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   }
 }
 
@@ -66,5 +70,46 @@ class MoviesViewController {
 
   func loadData() {
     _ = itemType // expected-error {{ambiguous use of 'itemType'}}
+  }
+}
+
+// SR-15053
+func SR15053<T : Numeric>(_ a: T, _ b: T) -> T {
+  (a + b) / 2 // expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int)}}
+  // expected-error@-1 {{binary operator '/' cannot be applied to operands of type 'T' and 'Int'}}
+}
+
+infix operator %%
+
+func %% (_ lhs: Int, _ rhs: Int) -> Int {
+  lhs / rhs
+}
+
+func %% (_ lhs: Float, _ rhs: Float) -> Float {
+  lhs / rhs
+}
+
+func SR15053<T : Numeric>(_ a: T, _ b: T) {
+  (a + b) %% 2 // expected-error {{cannot convert value of type 'T' to expected argument type 'Int'}}
+}
+
+// rdar://94360230 - diagnosing 'filter' instead of ambiguity in its body
+func test_diagnose_deepest_ambiguity() {
+  struct S {
+    func ambiguous(_: Int = 0) -> Bool { true }     // expected-note 2 {{found this candidate}}
+    func ambiguous(_: String = "") -> Bool { true } // expected-note 2 {{found this candidate}}
+  }
+
+  func test_single(arr: [S]) {
+    arr.filter { $0.ambiguous() } // expected-error {{ambiguous use of 'ambiguous'}}
+  }
+
+  func test_multi(arr: [S]) {
+    arr.filter {
+      if true {
+        print($0.ambiguous()) // expected-error {{ambiguous use of 'ambiguous'}}
+      }
+      return true
+    }
   }
 }

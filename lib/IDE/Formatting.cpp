@@ -366,7 +366,7 @@ static Expr *getContextExprOf(SourceManager &SM, Expr *E) {
     if (auto *B = OBE->getSubExpr())
       return getContextExprOf(SM, B);
   } else if (auto *PUE = dyn_cast<PostfixUnaryExpr>(E)) {
-    if (auto *B = PUE->getArg())
+    if (auto *B = PUE->getOperand())
       return getContextExprOf(SM, B);
   }
   return E;
@@ -387,7 +387,7 @@ static Expr *getContextExprOf(SourceManager &SM, Expr *E) {
 ///   .count
 /// \endcode
 static SourceLoc getContextLocForArgs(SourceManager &SM, Expr *E) {
-  assert(isa<SubscriptExpr>(E) || isa<CallExpr>(E) || isa<UnresolvedSpecializeExpr>(E));
+  assert(E->getArgs() || isa<UnresolvedSpecializeExpr>(E));
   Expr *Base = getContextExprOf(SM, E);
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(Base))
     return UDE->getDotLoc();
@@ -467,8 +467,8 @@ private:
         if (!Repr->walk(*this))
           return false;
       }
-      if (auto *Arg = customAttr->getArg()) {
-        if (!Arg->walk(*this))
+      if (auto *Args = customAttr->getArgs()) {
+        if (!Args->walk(*this))
           return false;
       }
     }
@@ -646,38 +646,28 @@ private:
         return Stop;
     } else if (isa<CallExpr>(E) || isa<SubscriptExpr>(E)) {
       SourceLoc ContextLoc = getContextLocForArgs(SM, E);
-      Expr *Arg;
-      if (auto *CE = dyn_cast<CallExpr>(E)) {
-        Arg = CE->getArg();
+      auto *Args = E->getArgs();
+
+      auto lParenLoc = Args->getLParenLoc();
+      auto rParenLoc = Args->getRParenLoc();
+
+      if (isa<SubscriptExpr>(E)) {
+        if (!handleSquares(lParenLoc, rParenLoc, ContextLoc))
+          return Stop;
       } else {
-        Arg = cast<SubscriptExpr>(E)->getIndex();
+        if (!handleParens(lParenLoc, rParenLoc, ContextLoc))
+          return Stop;
       }
 
-      if (auto *PE = dyn_cast_or_null<ParenExpr>(Arg)) {
-        if (isa<SubscriptExpr>(E)) {
-          if (!handleSquares(PE->getLParenLoc(), PE->getRParenLoc(), ContextLoc))
-            return Stop;
-        } else {
-          if (!handleParens(PE->getLParenLoc(), PE->getRParenLoc(), ContextLoc))
-            return Stop;
-        }
-        if (PE->hasTrailingClosure()) {
-          if (auto CE = findTrailingClosureFromArgument(PE->getSubExpr()))
+      if (Args->hasAnyTrailingClosures()) {
+        if (auto *unaryArg = Args->getUnaryExpr()) {
+          if (auto CE = findTrailingClosureFromArgument(unaryArg)) {
             if (!handleBraceStmt(CE->getBody(), ContextLoc))
               return Stop;
-        }
-      } else if (auto *TE = dyn_cast_or_null<TupleExpr>(Arg)) {
-        if (isa<SubscriptExpr>(E)) {
-          if (!handleSquares(TE->getLParenLoc(), TE->getRParenLoc(), ContextLoc))
-            return Stop;
+          }
         } else {
-          if (!handleParens(TE->getLParenLoc(), TE->getRParenLoc(), ContextLoc))
-            return Stop;
-        }
-        if (TE->hasAnyTrailingClosures()) {
-          SourceRange Range(TE->getTrailingElements().front()->getStartLoc(),
-                            TE->getEndLoc());
-          handleImplicitRange(Range, ContextLoc);
+          handleImplicitRange(Args->getOriginalArgs()->getTrailingSourceRange(),
+                              ContextLoc);
         }
       }
     }
@@ -1364,8 +1354,8 @@ private:
         if (!Repr->walk(*this))
           return false;
       }
-      if (auto *Arg = customAttr->getArg()) {
-        if (!Arg->walk(*this))
+      if (auto *Args = customAttr->getArgs()) {
+        if (!Args->walk(*this))
           return false;
       }
     }
@@ -1429,6 +1419,25 @@ private:
     return {Action.shouldVisitChildren(), S};
   }
 
+  std::pair<bool, ArgumentList *>
+  walkToArgumentListPre(ArgumentList *Args) override {
+    SourceLoc ContextLoc;
+    if (auto *E = Parent.getAsExpr()) {
+      // Retrieve the context loc from the parent call. Note that we don't
+      // perform this if we're walking the ArgumentList directly for e.g an
+      // interpolated string literal.
+      if (E->getArgs() == Args)
+        ContextLoc = getContextLocForArgs(SM, E);
+    }
+
+    auto Action = HandlePre(Args, Args->isImplicit());
+    if (Action.shouldGenerateIndentContext()) {
+      if (auto Ctx = getIndentContextFrom(Args, Action.Trailing, ContextLoc))
+        InnermostCtx = Ctx;
+    }
+    return {Action.shouldVisitChildren(), Args};
+  }
+
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
     if (E->getKind() == ExprKind::StringLiteral &&
         SM.isBeforeInBuffer(E->getStartLoc(), TargetLocation) &&
@@ -1463,20 +1472,18 @@ private:
         SourceLoc PrevStringStart = ISL->getStartLoc();
         ISL->forEachSegment(SF.getASTContext(),
                             [&](bool IsInterpolation, CallExpr *CE) {
-          if (auto *Arg = CE->getArg()) {
-            if (IsInterpolation) {
-              // Handle the preceeding string segment.
-              CharSourceRange StringRange(SM, PrevStringStart, CE->getStartLoc());
-              if (StringRange.contains(TargetLocation)) {
-                StringLiteralRange =
-                    Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
-                return;
-              }
-              // Walk into the interpolation segment.
-              Arg->walk(*this);
-            } else {
-              PrevStringStart = CE->getStartLoc();
+          if (IsInterpolation) {
+            // Handle the preceeding string segment.
+            CharSourceRange StringRange(SM, PrevStringStart, CE->getStartLoc());
+            if (StringRange.contains(TargetLocation)) {
+              StringLiteralRange =
+                  Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
+              return;
             }
+            // Walk into the interpolation segment.
+            CE->getArgs()->walk(*this);
+          } else {
+            PrevStringStart = CE->getStartLoc();
           }
         });
         // Handle the trailing string segment.
@@ -2239,7 +2246,7 @@ private:
         if (Range.isValid() && overlapsTarget(Range))
           return IndentContext {ForLoc, !OutdentChecker::hasOutdent(SM, P)};
       }
-      if (auto *E = FS->getSequence()) {
+      if (auto *E = FS->getParsedSequence()) {
         SourceRange Range = FS->getInLoc();
         widenOrSet(Range, E->getSourceRange());
         if (Range.isValid() && isTargetContext(Range)) {
@@ -2410,17 +2417,11 @@ private:
 
     // All handled expressions may claim a trailing target.
 
-    if (auto *TE = dyn_cast<TupleExpr>(E)) {
-      if (TrailingTarget && TE->hasTrailingClosure())
-        return None;
+    if (auto *TE = dyn_cast<TupleExpr>(E))
       return getIndentContextFrom(TE);
-    }
 
-    if (auto *PE = dyn_cast<ParenExpr>(E)) {
-      if (TrailingTarget && PE->hasTrailingClosure())
-        return None;
+    if (auto *PE = dyn_cast<ParenExpr>(E))
       return getIndentContextFrom(PE);
-    }
 
     if (auto *DE = dyn_cast<DictionaryExpr>(E)) {
       SourceLoc L = DE->getLBracketLoc();
@@ -2480,60 +2481,6 @@ private:
 
     if (auto *CE = dyn_cast<ClosureExpr>(E))
       return getIndentContextFrom(CE);
-
-    if (isa<CallExpr>(E) || isa<SubscriptExpr>(E)) {
-      SourceLoc ContextLoc = getContextLocForArgs(SM, E);
-      Expr *Arg;
-      if (auto *CE = dyn_cast<CallExpr>(E)) {
-        Arg = CE->getArg();
-      } else {
-        Arg = cast<SubscriptExpr>(E)->getIndex();
-      }
-
-      auto getIndentContextFromTrailingClosure =
-          [&](Expr *arg) -> Optional<IndentContext> {
-        if (auto CE = findTrailingClosureFromArgument(arg)) {
-          SourceRange Range = CE->getSourceRange();
-          if (Range.isValid() && (TrailingTarget || overlapsTarget(Range))) {
-            if (auto CLE = dyn_cast<CaptureListExpr>(arg))
-              return getIndentContextFrom(CLE, ContextLoc);
-            return getIndentContextFrom(CE, ContextLoc);
-          }
-        }
-        return None;
-      };
-
-      if (auto *PE = dyn_cast_or_null<ParenExpr>(Arg)) {
-        if (auto Ctx = getIndentContextFrom(PE, ContextLoc))
-          return Ctx;
-        if (PE->hasTrailingClosure()) {
-          if (auto Ctx = getIndentContextFromTrailingClosure(PE->getSubExpr()))
-            return Ctx;
-        }
-      } else if (auto *TE = dyn_cast_or_null<TupleExpr>(Arg)) {
-        if (auto Ctx = getIndentContextFrom(TE, ContextLoc))
-          return Ctx;
-
-        if (TE->hasAnyTrailingClosures()) {
-          Expr *Unlabeled = TE->getTrailingElements().front();
-          SourceRange ClosuresRange(Unlabeled->getStartLoc(), TE->getEndLoc());
-
-          if (overlapsTarget(ClosuresRange) || TrailingTarget) {
-            SourceRange ContextToEnd(ContextLoc, ClosuresRange.End);
-            ContextLoc = CtxOverride.propagateContext(SM, ContextLoc,
-                                                      IndentContext::LineStart,
-                                                      ClosuresRange.Start,
-                                                      SourceLoc());
-            if (!TrailingTarget) {
-              return IndentContext {
-                ContextLoc,
-                !OutdentChecker::hasOutdent(SM, ContextToEnd, E)
-              };
-            }
-          }
-        }
-      }
-    }
 
     return None;
   }
@@ -2671,7 +2618,7 @@ private:
     }
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
-    auto NumElems = TE->getNumElements() - TE->getNumTrailingElements();
+    auto NumElems = TE->getNumElements();
     for (auto I : range(NumElems)) {
       SourceRange ElemRange = TE->getElementNameLoc(I);
       if (Expr *Elem = TE->getElement(I))
@@ -2709,17 +2656,92 @@ private:
     }
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
-    if (!PE->hasTrailingClosure()) {
-      Expr *Elem = PE->getSubExpr();
-      SourceRange Range = Elem->getSourceRange();
-      Aligner.updateAlignment(Range, Elem);
+    Expr *Elem = PE->getSubExpr();
+    SourceRange Range = Elem->getSourceRange();
+    Aligner.updateAlignment(Range, Elem);
 
-      if (isTargetContext(Range)) {
+    if (isTargetContext(Range)) {
+      Aligner.setAlignmentIfNeeded(CtxOverride);
+      return IndentContext {
+        Range.Start,
+        !OutdentChecker::hasOutdent(SM, Elem)
+      };
+    }
+    return Aligner.getContextAndSetAlignment(CtxOverride);
+  }
+
+  Optional<IndentContext>
+  getIndentContextFromTrailingClosure(ArgumentList *Args,
+                                      Optional<TrailingInfo> TrailingTarget,
+                                      SourceLoc ContextLoc) {
+    if (!Args->hasAnyTrailingClosures())
+      return None;
+
+    if (auto *arg = Args->getUnaryExpr()) {
+      auto *CE = findTrailingClosureFromArgument(arg);
+      if (!CE)
+        return None;
+
+      auto Range = CE->getSourceRange();
+      if (Range.isInvalid() || (!TrailingTarget && !overlapsTarget(Range)))
+        return None;
+
+      if (auto *CLE = dyn_cast<CaptureListExpr>(arg))
+        return getIndentContextFrom(CLE, ContextLoc);
+
+      return getIndentContextFrom(CE, ContextLoc);
+    }
+    auto ClosuresRange = Args->getOriginalArgs()->getTrailingSourceRange();
+    if (!overlapsTarget(ClosuresRange) && !TrailingTarget)
+      return None;
+
+    SourceRange ContextToEnd(ContextLoc, ClosuresRange.End);
+    ContextLoc =
+        CtxOverride.propagateContext(SM, ContextLoc, IndentContext::LineStart,
+                                     ClosuresRange.Start, SourceLoc());
+    if (TrailingTarget)
+      return None;
+
+    auto *ParentE = Parent.getAsExpr();
+    assert(ParentE && "Trailing closures can only occur in expr contexts");
+    return IndentContext{
+        ContextLoc, !OutdentChecker::hasOutdent(SM, ContextToEnd, ParentE)};
+  }
+
+  Optional<IndentContext>
+  getIndentContextFrom(ArgumentList *Args,
+                       Optional<TrailingInfo> TrailingTarget,
+                       SourceLoc ContextLoc = SourceLoc()) {
+    if (ContextLoc.isValid())
+      NodesToSkip.insert(static_cast<ArgumentList *>(Args));
+    SourceLoc L = Args->getLParenLoc();
+    SourceLoc R = getLocIfKind(SM, Args->getRParenLoc(),
+                               {tok::r_paren, tok::r_square});
+    if (L.isInvalid() || !overlapsTarget(L, R)) {
+      return getIndentContextFromTrailingClosure(Args, TrailingTarget,
+                                                 ContextLoc);
+    }
+
+    if (ContextLoc.isValid()) {
+      ContextLoc = CtxOverride.propagateContext(SM, ContextLoc,
+                                                IndentContext::LineStart, L, R);
+    } else {
+      ContextLoc = L;
+    }
+
+    ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
+    for (auto Arg : Args->getOriginalArgs()->getNonTrailingArgs()) {
+      SourceRange ElemRange = Arg.getLabelLoc();
+      auto *Elem = Arg.getExpr();
+      assert(Elem);
+      widenOrSet(ElemRange, Elem->getSourceRange());
+      assert(ElemRange.isValid());
+
+      Aligner.updateAlignment(ElemRange, Args);
+      if (isTargetContext(ElemRange)) {
         Aligner.setAlignmentIfNeeded(CtxOverride);
-        return IndentContext {
-          Range.Start,
-          !OutdentChecker::hasOutdent(SM, Elem)
-        };
+        return IndentContext{ElemRange.Start,
+                             !OutdentChecker::hasOutdent(SM, ElemRange, Args)};
       }
     }
     return Aligner.getContextAndSetAlignment(CtxOverride);

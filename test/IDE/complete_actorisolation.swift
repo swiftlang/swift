@@ -1,5 +1,5 @@
 // REQUIRES: concurrency
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -enable-experimental-concurrency
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -warn-concurrency
 
 class MyNonSendable {}
 struct MySendable {}
@@ -110,6 +110,13 @@ extension MyActor {
 // IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .asyncFunc()[' async'][#Int#];
 // IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(idx): Int#}][' async'][#Int#];
 // IN_ASYNCFUNC_OTHER_NODOT: End completions
+    }
+
+    func testActorKind() {
+        let _ = #^GLOBAL^#
+// GLOBAL: Begin completions
+// GLOBAL: Decl[Actor]/CurrModule:             MyActor[#MyActor#]; name=MyActor
+// GLOBAL: End completions
     }
 }
 

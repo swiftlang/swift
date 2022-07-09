@@ -39,6 +39,33 @@ bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
   return true;
 }
 
+ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
+    : worklist(function) {
+  for (SILBasicBlock &block : *function) {
+    if (isa<ReturnInst>(block.getTerminator()))
+      worklist.push(&block);
+  }
+  
+  while (SILBasicBlock *block = worklist.pop()) {
+    for (SILBasicBlock *pred : block->getPredecessorBlocks()) {
+      worklist.pushIfNotVisited(pred);
+    }
+  }
+}
+
+NonErrorHandlingBlocks::NonErrorHandlingBlocks(SILFunction *function)
+    : worklist(function->getEntryBlock()) {
+  while (SILBasicBlock *block = worklist.pop()) {
+    if (auto ta = dyn_cast<TryApplyInst>(block->getTerminator())) {
+      worklist.pushIfNotVisited(ta->getNormalBB());
+    } else {
+      for (SILBasicBlock *succ : block->getSuccessorBlocks()) {
+        worklist.pushIfNotVisited(succ);
+      }
+    }
+  }
+}
+
 /// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
 void swift::clearBlockBody(SILBasicBlock *bb) {
@@ -100,8 +127,7 @@ static bool canBorrowGuaranteedResult(SILValue guaranteedResult) {
     // conversion to a non-guaranteed value. Either way, not interesting.
     return true;
   }
-  SmallVector<Operand *, 16> usePoints;
-  return findInnerTransitiveGuaranteedUses(guaranteedResult, usePoints);
+  return findInnerTransitiveGuaranteedUses(guaranteedResult);
 }
 
 bool swift::canCloneTerminator(TermInst *termInst) {

@@ -16,6 +16,7 @@
 
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
@@ -32,12 +33,6 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 // Stmt methods.
 //===----------------------------------------------------------------------===//
-
-// Only allow allocation of Stmts using the allocator in ASTContext.
-void *Stmt::operator new(size_t Bytes, ASTContext &C,
-                         unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
 
 StringRef Stmt::getKindName(StmtKind K) {
   switch (K) {
@@ -161,6 +156,65 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
 
+ASTNode BraceStmt::findAsyncNode() {
+  // TODO: Statements don't track their ASTContext/evaluator, so I am not making
+  // this a request. It probably should be a request at some point.
+  //
+  // While we're at it, it would be very nice if this could be a const
+  // operation, but the AST-walking is not a const operation.
+
+  // A walker that looks for 'async' and 'await' expressions
+  // that aren't nested within closures or nested declarations.
+  class FindInnerAsync : public ASTWalker {
+    ASTNode AsyncNode;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // If we've found an 'await', record it and terminate the traversal.
+      if (isa<AwaitExpr>(expr)) {
+        AsyncNode = expr;
+        return {false, nullptr};
+      }
+
+      // Do not recurse into other closures.
+      if (isa<ClosureExpr>(expr))
+        return {false, expr};
+
+      return {true, expr};
+    }
+
+    bool walkToDeclPre(Decl *decl) override {
+      // Do not walk into function or type declarations.
+      if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+        if (patternBinding->isAsyncLet())
+          AsyncNode = patternBinding;
+
+        return true;
+      }
+
+      return false;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
+        if (forEach->getAwaitLoc().isValid()) {
+          AsyncNode = forEach;
+          return {false, nullptr};
+        }
+      }
+
+      return {true, stmt};
+    }
+
+  public:
+    ASTNode getAsyncNode() { return AsyncNode; }
+  };
+
+  FindInnerAsync asyncFinder;
+  walk(asyncFinder);
+
+  return asyncFinder.getAsyncNode();
+}
+
 SourceLoc ReturnStmt::getStartLoc() const {
   if (ReturnLoc.isInvalid() && Result)
     return Result->getStartLoc();
@@ -245,6 +299,10 @@ bool LabeledStmt::requiresLabelOnJump() const {
 void ForEachStmt::setPattern(Pattern *p) {
   Pat = p;
   Pat->markOwnedByStatement(this);
+}
+
+Expr *ForEachStmt::getTypeCheckedSequence() const {
+  return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
 }
 
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,

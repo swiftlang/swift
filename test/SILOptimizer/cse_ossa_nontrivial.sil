@@ -25,6 +25,11 @@ public enum FakeOptional2 {
   case some2(Klass)
 }
 
+public enum FakeOptional3 {
+  case none
+  case some(WrapperStruct)
+}
+
 struct StructWithEnum {
   var val:FakeOptional
 }
@@ -35,6 +40,7 @@ struct StructWithEnum2 {
 
 sil @use_nontrivialstruct1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
 sil @use_nontrivialstruct2 : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
 sil @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
 
 // CHECK-LABEL: sil [ossa] @structliteral1 :
@@ -603,10 +609,15 @@ struct RecurStruct {
 }
 
 // Test to make sure we do not crash on a use after free when the branch instructions in bb1 and bb2 are deleted
+//
+// FIXME: Fix OwnershipRAUW to handle guaranteed uses of the old CSE'd
+// value that are reborrows. The reborrowed uses are not dominated by
+// the old value, but they are still within the new values borrow scope.
+//
 // CHECK-LABEL: sil [ossa] @test_useafterfreeinrauw :
 // CHECK: bb0
 // CHECK: struct_extract
-// CHECK-NOT: struct_extract
+// FIXME-CHECK-NOT: struct_extract
 // CHECK: cond_br
 // CHECK-LABEL: } // end sil function 'test_useafterfreeinrauw'
 sil [ossa] @test_useafterfreeinrauw : $@convention(thin) (@guaranteed RecurStruct) -> @owned NonTrivialStruct {
@@ -829,4 +840,131 @@ bb0(%0 : @guaranteed $Klass):
   %6 = tuple()
   return %6 : $()
 }
+
+class TestKlass {
+  var testStruct: NonTrivialStruct
+}
+
+sil [ossa] @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// An interior pointer, struct_element_addr, can be reused during an
+// OSSA/RAUW because its new uses are within the borrowed value
+// (function argument %0).
+//
+// CHECK-LABEL: sil [ossa] @cse_ossa_interioruseswithinarg :
+// CHECK: struct_element_addr
+// CHECK-NOT: struct_element_addr
+// CHECK-LABEL: } // end sil function 'cse_ossa_interioruseswithinarg'
+sil [ossa] @cse_ossa_interioruseswithinarg : $@convention(thin) (@guaranteed TestKlass) -> () {
+bb0(%0 : @guaranteed $TestKlass):
+  %1 = ref_element_addr %0 : $TestKlass, #TestKlass.testStruct
+  %2 = begin_access [modify] [dynamic] %1 : $*NonTrivialStruct
+  %3 = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %4 = load_borrow %3 : $*Klass
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %c = apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %4 : $Klass
+  %3a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %4a = load_borrow %3a : $*Klass
+  %ca = apply %f(%4a) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %4a : $Klass
+  end_access %2 : $*NonTrivialStruct
+  %139 = tuple ()
+  return %139 : $()
+}
+
+// An interior pointer, struct_element_addr, cannot be reused without
+// cloning the access scope, which we don't do. The two
+// struct_element_addr's are not currently considered equivalent.
+//
+// CHECK-LABEL: sil [ossa] @cse_ossa_outsideaccessscope :
+// CHECK: struct_element_addr
+// CHECK: struct_element_addr
+// CHECK-LABEL: } // end sil function 'cse_ossa_outsideaccessscope'
+sil [ossa] @cse_ossa_outsideaccessscope : $@convention(thin) (@guaranteed TestKlass) -> () {
+bb0(%0 : @guaranteed $TestKlass):
+  %1 = ref_element_addr %0 : $TestKlass, #TestKlass.testStruct
+  %a1 = begin_access [modify] [dynamic] %1 : $*NonTrivialStruct
+  %e1 = struct_element_addr %a1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %l1 = load_borrow %e1 : $*Klass
+  end_access %a1 : $*NonTrivialStruct
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %c1 = apply %f(%l1) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %l1 : $Klass
+  %a2 = begin_access [modify] [dynamic] %1 : $*NonTrivialStruct
+  %e2 = struct_element_addr %a2 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %l2 = load_borrow %e2 : $*Klass
+  end_access %a2 : $*NonTrivialStruct
+  %c2 = apply %f(%l2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %l2 : $Klass
+  %139 = tuple ()
+  return %139 : $()
+}
+
+struct X {
+  var i: Int64
+}
+
+sil_global hidden @globalX : $X
+
+sil [ossa] @use_address : $@convention(thin) (@in_guaranteed X) -> ()
+
+// CHECK-LABEL: sil [ossa] @cse_ossa_validrauwfollowinvalidrauw :
+// CHECK: global_addr
+// CHECK-NOT: global_addr
+// CHECK-LABEL: } // end sil function 'cse_ossa_validrauwfollowinvalidrauw'
+sil [ossa] @cse_ossa_validrauwfollowinvalidrauw : $@convention(thin) (@guaranteed TestKlass) -> () {
+bb0(%0 : @guaranteed $TestKlass):
+  %1 = function_ref @use_address : $@convention(thin) (@in_guaranteed X) -> ()
+  %2 = ref_element_addr %0 : $TestKlass, #TestKlass.testStruct
+  %3 = begin_access [modify] [dynamic] %2 : $*NonTrivialStruct
+  %4 = struct_element_addr %3 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %5 = load_borrow %4 : $*Klass
+  %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %5 : $Klass
+  %9 = global_addr @globalX : $*X
+  %10 = apply %1(%9) : $@convention(thin) (@in_guaranteed X) -> ()
+  %11 = struct_element_addr %3 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %12 = load_borrow %11 : $*Klass
+  %13 = apply %6(%12) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %12 : $Klass
+  %15 = global_addr @globalX : $*X
+  %16 = apply %1(%15) : $@convention(thin) (@in_guaranteed X) -> ()
+  end_access %3 : $*NonTrivialStruct
+  %18 = tuple ()
+  return %18 : $()
+}
+
+
+struct WrapperStruct {
+  var val: TestKlass
+}
+
+// CHECK-LABEL: sil [ossa] @cse_ossa_utilstest :
+// CHECK: ref_element_addr
+// CHECK: ref_element_addr
+// CHECK-LABEL: } // end sil function 'cse_ossa_utilstest'
+sil [ossa] @cse_ossa_utilstest : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct):
+%f = function_ref @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+%none = enum $FakeOptional3, #FakeOptional3.none
+switch_enum %none : $FakeOptional3, case #FakeOptional3.some!enumelt:bb1, case #FakeOptional3.none!enumelt:bb2, forwarding: @guaranteed
+
+bb1(%arg : @guaranteed $WrapperStruct):
+%ex = struct_extract %arg : $WrapperStruct, #WrapperStruct.val
+%1 = ref_element_addr %ex : $TestKlass, #TestKlass.testStruct
+apply %f (%1) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+%2 = ref_element_addr %ex : $TestKlass, #TestKlass.testStruct
+apply %f (%2) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+br bb3
+
+bb2:
+br bb3
+
+bb3:
+%res = tuple ()
+return %res : $()
+}
+
 

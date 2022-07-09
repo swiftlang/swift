@@ -68,6 +68,9 @@ public:
 #endif
     {}
 
+  /// Defined below.
+  class SavedInsertionPointRAII;
+
   /// Determines if the current location is apparently reachable.  The
   /// invariant we maintain is that the insertion point of the builder
   /// always points within a block unless the current location is
@@ -124,7 +127,8 @@ public:
 
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
-    llvm::LoadInst *load = IRBuilderBase::CreateLoad(addr, name);
+    llvm::LoadInst *load = IRBuilderBase::CreateLoad(
+        addr->getType()->getPointerElementType(), addr, name);
     load->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
     return load;
   }
@@ -343,6 +347,72 @@ public:
       result = CreateInsertValue(result, values[i], i);
     }
     return result;
+  }
+
+  bool insertingAtEndOfBlock() const {
+    assert(hasValidIP() && "Must have insertion point to ask about it");
+    return InsertPt == BB->end();
+  }
+};
+
+/// Given a Builder as input to its constructor, this class resets the Builder
+/// so it has the same insertion point at end of scope.
+class IRBuilder::SavedInsertionPointRAII {
+  IRBuilder &builder;
+  PointerUnion<llvm::Instruction *, llvm::BasicBlock *> savedInsertionPoint;
+
+public:
+  /// Constructor that saves a Builder's insertion point without changing the
+  /// builder's underlying insertion point.
+  SavedInsertionPointRAII(IRBuilder &inputBuilder)
+      : builder(inputBuilder), savedInsertionPoint() {
+    // If our builder does not have a valid insertion point, just put nullptr
+    // into SavedIP.
+    if (!builder.hasValidIP()) {
+      savedInsertionPoint = static_cast<llvm::BasicBlock *>(nullptr);
+      return;
+    }
+
+    // If we are inserting into the end of the block, stash the insertion block.
+    if (builder.insertingAtEndOfBlock()) {
+      savedInsertionPoint = builder.GetInsertBlock();
+      return;
+    }
+
+    // Otherwise, stash the instruction.
+    auto *i = &*builder.GetInsertPoint();
+    savedInsertionPoint = i;
+  }
+
+  SavedInsertionPointRAII(IRBuilder &b, llvm::Instruction *newInsertionPoint)
+      : SavedInsertionPointRAII(b) {
+    builder.SetInsertPoint(newInsertionPoint);
+  }
+
+  SavedInsertionPointRAII(IRBuilder &b, llvm::BasicBlock *block,
+                          llvm::BasicBlock::iterator iter)
+      : SavedInsertionPointRAII(b) {
+    builder.SetInsertPoint(block, iter);
+  }
+
+  SavedInsertionPointRAII(IRBuilder &b, llvm::BasicBlock *insertionBlock)
+      : SavedInsertionPointRAII(b) {
+    builder.SetInsertPoint(insertionBlock);
+  }
+
+  SavedInsertionPointRAII(const SavedInsertionPointRAII &) = delete;
+  SavedInsertionPointRAII &operator=(const SavedInsertionPointRAII &) = delete;
+  SavedInsertionPointRAII(SavedInsertionPointRAII &&) = delete;
+  SavedInsertionPointRAII &operator=(SavedInsertionPointRAII &&) = delete;
+
+  ~SavedInsertionPointRAII() {
+    if (savedInsertionPoint.isNull()) {
+      builder.ClearInsertionPoint();
+    } else if (savedInsertionPoint.is<llvm::Instruction *>()) {
+      builder.SetInsertPoint(savedInsertionPoint.get<llvm::Instruction *>());
+    } else {
+      builder.SetInsertPoint(savedInsertionPoint.get<llvm::BasicBlock *>());
+    }
   }
 };
 

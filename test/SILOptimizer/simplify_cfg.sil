@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
-// FIXME: Update for select_enum change.
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -1288,7 +1287,7 @@ bb5:
   br bb6
 
 bb6:
-  dealloc_ref [stack] %a : $Base
+  dealloc_stack_ref %a : $Base
   %r = tuple()
   return %r : $()
 }

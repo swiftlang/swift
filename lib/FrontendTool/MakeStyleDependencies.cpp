@@ -29,7 +29,7 @@ swift::frontend::utils::escapeForMake(StringRef raw,
   buffer.clear();
 
   // The escaping rules for GNU make are complicated due to the various
-  // subsitutions and use of the tab in the leading position for recipes.
+  // substitutions and use of the tab in the leading position for recipes.
   // Various symbols have significance in different contexts.  It is not
   // possible to correctly quote all characters in Make (as of 3.7).  Match
   // gcc and clang's behaviour for the escaping which covers only a subset of
@@ -97,7 +97,7 @@ bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     return false;
 
   std::error_code EC;
-  llvm::raw_fd_ostream out(dependenciesFilePath, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(dependenciesFilePath, EC, llvm::sys::fs::OF_None);
 
   if (out.has_error() || EC) {
     diags.diagnose(SourceLoc(), diag::error_opening_output,

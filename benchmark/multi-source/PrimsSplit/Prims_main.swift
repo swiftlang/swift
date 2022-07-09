@@ -12,15 +12,17 @@
 
 import TestsUtils
 
-public let PrimsSplit = BenchmarkInfo(
-  name: "PrimsSplit",
-  runFunction: run_PrimsSplit,
-  tags: [.validation, .algorithm],
-  legacyFactor: 5)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "PrimsSplit",
+    runFunction: run_PrimsSplit,
+    tags: [.validation, .algorithm],
+    legacyFactor: 5)
+]
 
 @inline(never)
-public func run_PrimsSplit(_ N: Int) {
-  for _ in 1...N {
+public func run_PrimsSplit(_ n: Int) {
+  for _ in 1...n {
     let nodes : [Int] = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
       13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
       29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
@@ -547,7 +549,7 @@ public func run_PrimsSplit(_ N: Int) {
     }
 
     // Find spanning tree
-    let treeEdges = Prims(graph, { (start: Int, end: Int) in
+    let treeEdges = prims(graph, { (start: Int, end: Int) in
         return map[Edge(start: start, end: end)]!
     })
 
@@ -556,6 +558,6 @@ public func run_PrimsSplit(_ N: Int) {
     for i in 1..<treeEdges.count {
       if let n = treeEdges[i] { cost += map[Edge(start: n, end: i)]! }
     }
-    CheckResults(Int(cost) == 49324)
+    check(Int(cost) == 49324)
   }
 }

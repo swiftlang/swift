@@ -1,0 +1,61 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name temp
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name temp
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name temp | %FileCheck %s
+
+import Builtin
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+class Klass {
+}
+class SubKlass : Klass {
+}
+
+// Test checked_cast_br ownership forwarding.
+//
+// Also test unchecked_ownership_conversion @none serialization (@none
+// is the highest value ownership encoding).
+//
+// CHECK-LABEL: sil [ossa] @checked_cast_test : $@convention(thin) (@owned Klass) -> () {
+// CHECK: checked_cast_br {{.*}}, forwarding: @guaranteed
+// CHECK-LABEL: } // end sil function 'checked_cast_test'
+sil [ossa] @checked_cast_test : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %trivial = unchecked_ownership_conversion %0 : $Klass, @owned to @none
+  checked_cast_br %trivial : $Klass to SubKlass, bb1, bb2, forwarding: @guaranteed
+
+bb1(%arg1 : @guaranteed $SubKlass):
+  br bb3
+
+bb2(%arg2: @guaranteed $Klass):
+  br bb3
+
+bb3:
+  destroy_value %0 : $Klass
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @switch_test : $@convention(thin) () -> () {
+// CHECK: switch_enum {{.*}}, forwarding: @guaranteed
+// CHECK-LABEL: } // end sil function 'switch_test'
+sil [ossa] @switch_test : $@convention(thin) () -> () {
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none
+  switch_enum %none : $FakeOptional<Klass>, case #FakeOptional.some!enumelt:bb1, case #FakeOptional.none!enumelt:bb2, forwarding: @guaranteed
+
+bb1(%arg : @guaranteed $Klass):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
+

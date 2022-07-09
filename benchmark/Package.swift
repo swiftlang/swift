@@ -118,7 +118,7 @@ targets.append(
     path: "utils",
     sources: ["main.swift"],
     swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                  "-enable-cxx-interop",
+                                  "-enable-experimental-cxx-interop",
                                   "-I",
                                   "utils/CxxTests"])]))
 
@@ -157,7 +157,7 @@ targets += cxxSingleSourceLibraries.map { name in
     path: "cxx-source",
     sources: ["\(name).swift"],
     swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                  "-enable-cxx-interop",
+                                  "-enable-experimental-cxx-interop",
                                   "-I",
                                   "utils/CxxTests"])])
 }

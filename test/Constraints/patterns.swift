@@ -118,11 +118,11 @@ case iPadHair<S>.HairForceOne:
   ()
 case iPadHair<E>.HairForceOne:
   ()
-case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'HairType'}}
+case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'any HairType'}}
   ()
-case Watch.Edition: // expected-warning {{cast from 'HairType' to unrelated type 'Watch' always fails}}
+case Watch.Edition: // expected-warning {{cast from 'any HairType' to unrelated type 'Watch' always fails}}
   ()
-case .HairForceOne: // expected-error{{type 'HairType' has no member 'HairForceOne'}}
+case .HairForceOne: // expected-error{{type 'any HairType' has no member 'HairForceOne'}}
   ()
 default:
   break
@@ -230,14 +230,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
+  let _ = a.map {
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
+  let _ = a.map {
     switch $0 {
     case .A:
       return 1
@@ -512,5 +512,11 @@ func rdar64157451() {
 
   func test(e: E) {
     if case .foo(let v as DoeNotExist) = e {} // expected-error {{cannot find type 'DoeNotExist' in scope}}
+  }
+}
+
+// rdar://80797176 - circular reference incorrectly diagnosed while reaching for a type of a pattern.
+func rdar80797176 () {
+  for x: Int in [1, 2] where x.bitWidth == 32 { // Ok
   }
 }

@@ -487,8 +487,8 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : 
 
 // CHECK: sil @test_capture_propagation2_caller_on_stack
 // CHECK:  [[F:%.*]] = function_ref @test_capture_propagation2_callee_on_stack : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK:  [[F2:%.*]] = function_ref @$s40test_capture_propagation2_thunk_on_stack4_12353globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token808_TFtest_b1_C8_closureTf3pi0pd0psbpgpf_n : $@convention(thin) @noescape () -> ()
-// CHECK:  [[CL:%.*]] = thin_to_thick_function [[F2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK:  [[F2:%.*]] = function_ref @$s40test_capture_propagation2_thunk_on_stack4_12353globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token808_TFtest_b1_C8_closureTf3pi0pd0psbpgpf_n : $@convention(thin) () -> ()
+// CHECK:  [[CL:%.*]] = thin_to_thick_function [[F2]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK:  apply [[F]]([[CL]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 // CHECK:  return
 
@@ -507,3 +507,102 @@ sil @test_capture_propagation2_caller_on_stack : $@convention(thin) () -> () {
   %9999 = tuple()
   return %9999 : $()
 }
+
+struct Str {
+  @_hasStorage var a: Int { get set }
+}
+
+sil @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+
+// CHECK-LABEL: sil @testKeypath
+// CHECK-NOT:     keypath
+// CHECK:       } // end sil function 'testKeypath'
+sil @testKeypath : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $KeyPath<Str, Int>, (root $Str; stored_property #Str.a : $Int)
+  %1 = function_ref @closureWithKeypath : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int
+  %3 = convert_escape_to_noescape %2 : $@callee_guaranteed (Str) -> Int to $@noescape @callee_guaranteed (Str) -> Int
+  %4 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  strong_release %2 : $@callee_guaranteed (Str) -> Int
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil shared @$s18closureWithKeypath{{.*}}main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int {
+// CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
+// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[K]]
+// CHECK:         strong_release [[K]]
+// CHECK:       } // end sil function '$s18closureWithKeypath{{.*}}main3StrVSiTf3npk_n'
+sil @closureWithKeypath : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int {
+bb0(%0 : $Str, %1 : $KeyPath<Str, Int>):
+  %4 = alloc_stack $Str
+  store %0 to %4 : $*Str
+  %6 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %7 = alloc_stack $Int
+  %8 = apply %6<Str, Int>(%7, %4, %1) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %9 = load %7 : $*Int
+  dealloc_stack %7 : $*Int
+  dealloc_stack %4 : $*Str
+  return %9 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @testKeypathOSSA
+// CHECK-NOT:     keypath
+// CHECK:       } // end sil function 'testKeypathOSSA'
+sil [ossa] @testKeypathOSSA : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $KeyPath<Str, Int>, (root $Str; stored_property #Str.a : $Int)
+  %1 = function_ref @closureWithKeypathOSSA : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int
+  %3 = convert_escape_to_noescape %2 : $@callee_guaranteed (Str) -> Int to $@noescape @callee_guaranteed (Str) -> Int
+  %4 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  destroy_value %2 : $@callee_guaranteed (Str) -> Int
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testKeypathNoescapeOSSA
+// CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[C:%[0-9]+]] = function_ref @$s22closureWithKeypathOSSA{{.*}}main3StrVSiTf3npk_n
+// CHECK:         [[T:%[0-9]+]] = thin_to_thick_function [[C]]
+// CHECK:         [[F:%[0-9]+]] = function_ref @calleeWithKeypath
+// CHECK:         apply [[F]]([[T]])
+// CHECK:         destroy_value [[K]]
+// CHECK:       } // end sil function 'testKeypathNoescapeOSSA'
+sil [ossa] @testKeypathNoescapeOSSA : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $KeyPath<Str, Int>, (root $Str; stored_property #Str.a : $Int)
+  %1 = function_ref @closureWithKeypathOSSA : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int
+  %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int
+  %4 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  dealloc_stack %2 : $@noescape @callee_guaranteed (Str) -> Int
+  destroy_value %0 : $KeyPath<Str, Int>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s22closureWithKeypathOSSA{{.*}}main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int {
+// CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
+// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[K]]
+// CHECK:         destroy_value [[K]]
+// CHECK:       } // end sil function '$s22closureWithKeypathOSSA{{.*}}main3StrVSiTf3npk_n'
+sil [ossa] @closureWithKeypathOSSA : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int {
+bb0(%0 : $Str, %1 : @guaranteed $KeyPath<Str, Int>):
+  %4 = alloc_stack $Str
+  store %0 to [trivial] %4 : $*Str
+  %6 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %7 = alloc_stack $Int
+  %8 = apply %6<Str, Int>(%7, %4, %1) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %9 = load [trivial] %7 : $*Int
+  dealloc_stack %7 : $*Int
+  dealloc_stack %4 : $*Str
+  return %9 : $Int
+}
+
+sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1

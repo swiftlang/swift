@@ -1,25 +1,25 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncFunc() async -> Int { 42 }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncThrowsFunc() async throws -> Int { 42 }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncThrowsOnCancel() async throws -> Int {
   // terrible suspend-spin-loop -- do not do this
   // only for purposes of demonstration
   while Task.isCancelled {
-    await Task.sleep(1_000_000_000)
+    try? await Task.sleep(nanoseconds: 1_000_000_000)
   }
 
   throw CancellationError()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_add() async throws -> Int {
   try await withThrowingTaskGroup(of: Int.self) { group in
     group.addTask {
@@ -42,12 +42,12 @@ func test_taskGroup_add() async throws -> Int {
 // MARK: Example group Usages
 
 struct Boom: Error {}
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func work() async -> Int { 42 }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func boom() async throws -> Int { throw Boom() }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func first_allMustSucceed() async throws {
 
   let first: Int = try await withThrowingTaskGroup(of: Int.self) { group in
@@ -66,7 +66,7 @@ func first_allMustSucceed() async throws {
   // Expected: re-thrown Boom
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func first_ignoreFailures() async throws {
   @Sendable func work() async -> Int { 42 }
   @Sendable func boom() async throws -> Int { throw Boom() }
@@ -100,7 +100,7 @@ func first_ignoreFailures() async throws {
 // ==== ------------------------------------------------------------------------
 // MARK: Advanced Custom Task Group Usage
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_quorum_thenCancel() async {
   // imitates a typical "gather quorum" routine that is typical in distributed systems programming
   enum Vote {
@@ -156,7 +156,7 @@ func test_taskGroup_quorum_thenCancel() async {
 
 // FIXME: this is a workaround since (A, B) today isn't inferred to be Sendable
 //        and causes an error, but should be a warning (this year at least)
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
   let first: A
   let second: B
@@ -167,7 +167,7 @@ struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendable {
 
   /// Just another example of how one might use task groups.

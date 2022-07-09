@@ -124,6 +124,9 @@ public:
   /// Is this executor the main executor?
   bool isMainExecutor() const;
 
+  /// Get the raw value of the Implementation field, for tracing.
+  uintptr_t getRawImplementation() { return Implementation; }
+
   bool operator==(ExecutorRef other) const {
     return Identity == other.Identity;
   }
@@ -149,6 +152,8 @@ template <class AsyncSignature>
 class AsyncFunctionPointer;
 template <class AsyncSignature>
 struct AsyncFunctionTypeImpl;
+template <class AsyncSignature>
+struct AsyncContinuationTypeImpl;
 
 /// The abstract signature for an asynchronous function.
 template <class Sig, bool HasErrorResult>
@@ -163,6 +168,7 @@ struct AsyncSignature<DirectResultTy(ArgTys...), HasErrorResult> {
 
   using FunctionPointer = AsyncFunctionPointer<AsyncSignature>;
   using FunctionType = typename AsyncFunctionTypeImpl<AsyncSignature>::type;
+  using ContinuationType = typename AsyncContinuationTypeImpl<AsyncSignature>::type;
 };
 
 /// A signature for a thin async function that takes no arguments
@@ -175,29 +181,57 @@ using ThinNullaryAsyncSignature =
 using ThickNullaryAsyncSignature =
   AsyncSignature<void(HeapObject*), false>;
 
-/// A class which can be used to statically query whether a type
-/// is a specialization of AsyncSignature.
-template <class T>
-struct IsAsyncSignature {
-  static const bool value = false;
-};
+template <class Signature>
+struct AsyncFunctionTypeImpl;
+
 template <class DirectResultTy, class... ArgTys, bool HasErrorResult>
-struct IsAsyncSignature<AsyncSignature<DirectResultTy(ArgTys...),
-                                       HasErrorResult>> {
-  static const bool value = true;
+struct AsyncFunctionTypeImpl<
+    AsyncSignature<DirectResultTy(ArgTys...), HasErrorResult>> {
+
+  using type = SWIFT_CC(swiftasync) void(SWIFT_ASYNC_CONTEXT AsyncContext *,
+                                         ArgTys...);
 };
 
 template <class Signature>
-struct AsyncFunctionTypeImpl {
-  static_assert(IsAsyncSignature<Signature>::value,
-                "template argument is not an AsyncSignature");
+struct AsyncContinuationTypeImpl;
 
-  // TODO: expand and include the arguments in the parameters.
-  using type = TaskContinuationFunction;
+template <class DirectResultTy, class... ArgTys>
+struct AsyncContinuationTypeImpl<
+  AsyncSignature<DirectResultTy(ArgTys...), /*throws=*/true>> {
+
+  using type = SWIFT_CC(swiftasync) void(SWIFT_ASYNC_CONTEXT AsyncContext *,
+                                         DirectResultTy,
+                                         SWIFT_CONTEXT void *);
+};
+
+template <class DirectResultTy, class... ArgTys>
+struct AsyncContinuationTypeImpl<
+  AsyncSignature<DirectResultTy(ArgTys...), /*throws=*/false>> {
+
+  using type = SWIFT_CC(swiftasync) void(SWIFT_ASYNC_CONTEXT AsyncContext *,
+                                         DirectResultTy);
+};
+
+template <class... ArgTys>
+struct AsyncContinuationTypeImpl<
+  AsyncSignature<void(ArgTys...), /*throws=*/true>> {
+
+  using type = SWIFT_CC(swiftasync) void(SWIFT_ASYNC_CONTEXT AsyncContext *,
+                                         SWIFT_CONTEXT SwiftError *);
+};
+
+template <class... ArgTys>
+struct AsyncContinuationTypeImpl<
+  AsyncSignature<void(ArgTys...), /*throws=*/false>> {
+
+  using type = SWIFT_CC(swiftasync) void(SWIFT_ASYNC_CONTEXT AsyncContext *);
 };
 
 template <class Fn>
 using AsyncFunctionType = typename AsyncFunctionTypeImpl<Fn>::type;
+
+template <class Fn>
+using AsyncContinuationType = typename AsyncContinuationTypeImpl<Fn>::type;
 
 /// A "function pointer" for an async function.
 ///
@@ -207,7 +241,7 @@ template <class AsyncSignature>
 class AsyncFunctionPointer {
 public:
   /// The function to run.
-  RelativeDirectPointer<AsyncFunctionType<AsyncSignature>,
+  TargetCompactFunctionPointer<InProcess, AsyncFunctionType<AsyncSignature>,
                         /*nullable*/ false,
                         int32_t> Function;
 

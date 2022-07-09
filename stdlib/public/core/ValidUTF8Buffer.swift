@@ -41,6 +41,9 @@ extension _ValidUTF8Buffer: Sequence {
 
   @frozen
   public struct Iterator: IteratorProtocol, Sequence {
+    @usableFromInline
+    internal var _biasedBits: UInt32
+
     @inlinable
     public init(_ x: _ValidUTF8Buffer) { _biasedBits = x._biasedBits }
 
@@ -50,8 +53,6 @@ extension _ValidUTF8Buffer: Sequence {
       defer { _biasedBits >>= 8 }
       return Element(truncatingIfNeeded: _biasedBits) &- 1
     }
-    @usableFromInline
-    internal var _biasedBits: UInt32
   }
 
   @inlinable

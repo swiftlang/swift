@@ -23,7 +23,10 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/LockFileManager.h"
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
 #include <unistd.h>
@@ -151,8 +154,8 @@ class ABIDependencyEvaluator {
   llvm::DenseSet<ModuleDecl *> visited;
 
   /// Helper function to handle invariant violations as crashes in debug mode.
-  void crashOnInvariantViolation(
-      llvm::function_ref<void(llvm::raw_string_ostream &)> f) const;
+  void
+  crashOnInvariantViolation(llvm::function_ref<void(raw_ostream &)> f) const;
 
   /// Computes the ABI exports for \p importedModule and adds them to
   /// \p module's ABI exports.
@@ -220,13 +223,13 @@ public:
 // See [NOTE: Bailing-vs-crashing-in-trace-emission].
 // TODO: Use PrettyStackTrace instead?
 void ABIDependencyEvaluator::crashOnInvariantViolation(
-    llvm::function_ref<void(llvm::raw_string_ostream &)> f) const {
+    llvm::function_ref<void(raw_ostream &)> f) const {
 #ifndef NDEBUG
-  std::string msg;
-  llvm::raw_string_ostream os(msg);
+  SmallVector<char, 0> msg;
+  llvm::raw_svector_ostream os(msg);
   os << "error: invariant violation: ";
   f(os);
-  llvm::report_fatal_error(os.str());
+  llvm::report_fatal_error(msg);
 #endif
 }
 
@@ -253,7 +256,7 @@ void ABIDependencyEvaluator::reexposeImportedABI(ModuleDecl *module,
                                                  ModuleDecl *importedModule,
                                                  bool includeImportedModule) {
   if (module == importedModule) {
-    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
+    crashOnInvariantViolation([&](raw_ostream &os) {
       os << "module ";
       printModule(module, os);
       os << " imports itself!\n";
@@ -263,7 +266,7 @@ void ABIDependencyEvaluator::reexposeImportedABI(ModuleDecl *module,
 
   auto addToABIExportMap = [this](ModuleDecl *module, ModuleDecl *reexport) {
     if (module == reexport) {
-      crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
+      crashOnInvariantViolation([&](raw_ostream &os) {
         os << "expected module ";
         printModule(reexport, os);
         os << "  to not re-export itself\n";
@@ -406,7 +409,7 @@ void ABIDependencyEvaluator::computeABIDependenciesForModule(
   if (moduleIter != searchStack.end()) {
     if (isFakeCycleThroughOverlay(moduleIter))
       return;
-    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
+    crashOnInvariantViolation([&](raw_ostream &os) {
       os << "unexpected cycle in import graph!\n";
       for (auto m : searchStack) {
         printModule(m, os);
@@ -554,21 +557,6 @@ static void computeSwiftModuleTraceInfo(
     const llvm::DenseMap<StringRef, ModuleDecl *> &pathToModuleDecl,
     const DependencyTracker &depTracker, StringRef prebuiltCachePath,
     std::vector<SwiftModuleTraceInfo> &traceInfo) {
-
-  SmallString<256> buffer;
-
-  std::string errMsg;
-  llvm::raw_string_ostream err(errMsg);
-
-  // FIXME: Use PrettyStackTrace instead.
-  auto errorUnexpectedPath =
-      [&pathToModuleDecl](llvm::raw_string_ostream &errStream) {
-        errStream << "The module <-> path mapping we have is:\n";
-        for (auto &m : pathToModuleDecl)
-          errStream << m.second->getName() << " <-> " << m.first << '\n';
-        llvm::report_fatal_error(errStream.str());
-      };
-
   using namespace llvm::sys;
 
   auto computeAdjacentInterfacePath = [](SmallVectorImpl<char> &modPath) {
@@ -577,6 +565,7 @@ static void computeSwiftModuleTraceInfo(
     path::replace_extension(modPath, swiftInterfaceExt);
   };
 
+  SmallString<256> buffer;
   auto deps = depTracker.getDependencies();
   SmallVector<std::string, 16> dependencies{deps.begin(), deps.end()};
   auto incrDeps = depTracker.getIncrementalDependencyPaths();
@@ -640,8 +629,14 @@ static void computeSwiftModuleTraceInfo(
     // built a swiftmodule from that interface, so we should have that
     // filename available.
     if (isSwiftinterface) {
+      // FIXME: Use PrettyStackTrace instead.
+      SmallVector<char, 0> errMsg;
+      llvm::raw_svector_ostream err(errMsg);
       err << "Unexpected path for swiftinterface file:\n" << depPath << "\n";
-      errorUnexpectedPath(err);
+      err << "The module <-> path mapping we have is:\n";
+      for (auto &m : pathToModuleDecl)
+        err << m.second->getName() << " <-> " << m.first << '\n';
+      llvm::report_fatal_error(errMsg);
     }
 
     // Skip cached modules in the prebuilt cache. We will add the corresponding
@@ -706,15 +701,6 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   auto loadedModuleTracePath = input.getLoadedModuleTracePath();
   if (loadedModuleTracePath.empty())
     return false;
-  std::error_code EC;
-  llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
-
-  if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        loadedModuleTracePath, EC.message());
-    out.clear_error();
-    return true;
-  }
 
   SmallPtrSet<ModuleDecl *, 32> abiDependencies;
   {
@@ -762,7 +748,71 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     json::jsonize(jsonOutput, trace, /*Required=*/true);
   }
   stringBuffer += "\n";
-  out << stringBuffer;
 
+  // If writing to stdout, just perform a normal write.
+  // If writing to a file, ensure the write is atomic by creating a filesystem lock
+  // on the output file path.
+  std::error_code EC;
+  if (loadedModuleTracePath == "-") {
+    llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::OF_Append);
+    if (out.has_error() || EC) {
+      ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                          loadedModuleTracePath, EC.message());
+      out.clear_error();
+      return true;
+    }
+    out << stringBuffer;
+  } else {
+    while (1) {
+      // Attempt to lock the output file.
+      // Only one process is allowed to append to this file at a time.
+      llvm::LockFileManager Locked(loadedModuleTracePath);
+      switch (Locked) {
+        case llvm::LockFileManager::LFS_Error:{
+          // If we error acquiring a lock, we cannot ensure appends
+          // to the trace file are atomic - cannot ensure output correctness.
+          ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                              loadedModuleTracePath,
+                              "Failed to acquire filesystem lock");
+          Locked.unsafeRemoveLockFile();
+          return true;
+        }
+        case llvm::LockFileManager::LFS_Owned: {
+          // Lock acquired, perform the write and release the lock.
+          llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::OF_Append);
+          if (out.has_error() || EC) {
+            ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                loadedModuleTracePath, EC.message());
+            out.clear_error();
+            return true;
+          }
+          out << stringBuffer;
+          out.close();
+          Locked.unsafeRemoveLockFile();
+          return false;
+        }
+        case llvm::LockFileManager::LFS_Shared: {
+          // Someone else owns the lock on this file, wait.
+          switch (Locked.waitForUnlock(256)) {
+            case llvm::LockFileManager::Res_Success:
+              LLVM_FALLTHROUGH;
+            case llvm::LockFileManager::Res_OwnerDied: {
+              continue; // try again to get the lock.
+            }
+            case llvm::LockFileManager::Res_Timeout: {
+              // We could error on timeout to avoid potentially hanging forever, but
+              // it may be more likely that an interrupted process failed to clear the lock,
+              // causing other waiting processes to time-out. Let's clear the lock and try
+              // again right away. If we do start seeing compiler hangs in this location,
+              // we will need to re-consider.
+              Locked.unsafeRemoveLockFile();
+              continue;
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
   return true;
 }

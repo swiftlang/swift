@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// REQUIRES: radar82364236
+
 import StdlibUnittest
 import SwiftPrivateThreadExtras
 
@@ -1042,7 +1044,7 @@ class Super<T>: P {
 class Sub: Super<Int> {}
 
 ConcurrentTypeByNameTests.test("concurrent _typeByName") {
-  if #available(SwiftStdlib 5.5, *) {
+  if #available(SwiftStdlib 5.1, *) {
     func printTypeByName() {
       print(_typeByName("4main14GenericWrapperCyAA3SubCG")! as Any)
     }

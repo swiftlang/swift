@@ -15,11 +15,12 @@
 #if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ObjCBridge.h"
-#include <vector>
-#import <Foundation/Foundation.h>
+#include "swift/Runtime/Portability.h"
+#include "swift/Threading/Mutex.h"
 #import <CoreFoundation/CoreFoundation.h>
+#import <Foundation/Foundation.h>
+#include <vector>
 
 using namespace swift;
 
@@ -39,13 +40,10 @@ using namespace swift;
 
 @implementation __SwiftNull : NSObject
 
-//   int
- // asprintf(char **ret, const char *format, ...);
-
 - (id)description {
   char *str = NULL;
   const char *clsName = class_getName([self class]);
-  int fmtResult = asprintf(&str, "<%s %p depth = %u>", clsName,
+  int fmtResult = swift_asprintf(&str, "<%s %p depth = %u>", clsName,
                                                        (void*)self,
                                                        self->depth);
   (void)fmtResult;
@@ -61,7 +59,7 @@ namespace {
 
 struct SwiftNullSentinelCache {
   std::vector<id> Cache;
-  StaticReadWriteLock Lock;
+  Mutex Lock;
 };
 
 static Lazy<SwiftNullSentinelCache> Sentinels;
@@ -75,7 +73,7 @@ static id getSentinelForDepth(unsigned depth) {
   auto &theSentinels = Sentinels.get();
   unsigned depthIndex = depth - 2;
   {
-    StaticScopedReadLock lock(theSentinels.Lock);
+    Mutex::ScopedLock lock(theSentinels.Lock);
     const auto &cache = theSentinels.Cache;
     if (depthIndex < cache.size()) {
       id cached = cache[depthIndex];
@@ -85,7 +83,7 @@ static id getSentinelForDepth(unsigned depth) {
   }
   // Make one if we need to.
   {
-    StaticScopedWriteLock lock(theSentinels.Lock);
+    Mutex::ScopedLock lock(theSentinels.Lock);
     if (depthIndex >= theSentinels.Cache.size())
       theSentinels.Cache.resize(depthIndex + 1);
     auto &cached = theSentinels.Cache[depthIndex];

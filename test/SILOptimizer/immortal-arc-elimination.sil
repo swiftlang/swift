@@ -1,0 +1,63 @@
+// RUN: %sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// Note: Intentionally not using %target-sil-opt, because we need at least a
+//       swift 5.1 deployment target.
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil_global public_external @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
+
+
+// CHECK-LABEL: sil @testEmptyArraySingleton
+// CHECK:       global_addr
+// CHECK-NOT:   retain
+// CHECK: } // end sil function 'testEmptyArraySingleton'
+sil @testEmptyArraySingleton : $@convention(thin) () -> @owned Builtin.BridgeObject {
+bb0:
+  %0 = global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
+  %1 = address_to_pointer %0 : $*_SwiftEmptyArrayStorage to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $__EmptyArrayStorage
+  %3 = unchecked_ref_cast %2 : $__EmptyArrayStorage to $Builtin.BridgeObject
+  strong_retain %3 : $Builtin.BridgeObject
+  return %3 : $Builtin.BridgeObject
+}
+
+
+sil_global @staticArray : $_ContiguousArrayStorage<Int> = {
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = struct $UInt (%0 : $Builtin.Int64)
+  %2 = struct $Int (%0 : $Builtin.Int64)
+  %3 = struct $_SwiftArrayBodyStorage (%2 : $Int, %1 : $UInt)
+  %4 = struct $_ArrayBody (%3 : $_SwiftArrayBodyStorage)
+  %initval = object $_ContiguousArrayStorage<Int> (%4 : $_ArrayBody)
+}
+
+// CHECK-LABEL: sil @testGlobalValue
+// CHECK:       global_value
+// CHECK-NOT:   retain
+// CHECK: } // end sil function 'testGlobalValue'
+sil @testGlobalValue : $@convention(thin) () -> @owned Builtin.BridgeObject {
+bb0:
+  %0 = global_value @staticArray : $_ContiguousArrayStorage<Int>
+  %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<Int> to $Builtin.BridgeObject
+  strong_retain %1 : $Builtin.BridgeObject
+  return %1 : $Builtin.BridgeObject
+}
+
+// CHECK-LABEL: sil [serialized] @testGlobalValueSerialized
+// CHECK:       global_value
+// CHECK:       retain
+// CHECK: } // end sil function 'testGlobalValueSerialized'
+sil [serialized] @testGlobalValueSerialized : $@convention(thin) () -> @owned Builtin.BridgeObject {
+bb0:
+  %0 = global_value @staticArray : $_ContiguousArrayStorage<Int>
+  %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<Int> to $Builtin.BridgeObject
+  strong_retain %1 : $Builtin.BridgeObject
+  return %1 : $Builtin.BridgeObject
+}
+

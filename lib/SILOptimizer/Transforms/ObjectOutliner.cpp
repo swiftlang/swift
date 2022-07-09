@@ -48,7 +48,7 @@ class ObjectOutliner {
                       llvm::SmallVectorImpl<StoreInst *> &TailStores,
                       EndCOWMutationInst *toIgnore);
 
-  bool optimizeObjectAllocation(AllocRefInst *ARI);
+  bool optimizeObjectAllocation(AllocRefInstBase *ARI);
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
 public:
@@ -68,7 +68,14 @@ bool ObjectOutliner::run(SILFunction *F) {
     while (Iter != BB.end()) {
       SILInstruction *I = &*Iter;
       ++Iter;
-      if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
+      if (auto *ARI = dyn_cast<AllocRefInstBase>(I)) {
+
+        auto *allocDynamic = dyn_cast<AllocRefDynamicInst>(ARI);
+        assert(allocDynamic || isa<AllocRefInst>(ARI));
+        if (allocDynamic &&
+            !allocDynamic->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType())
+          continue;
+
         unsigned GarbageSize = ToRemove.size();
 
         // Try to replace the alloc_ref with a static object.
@@ -123,10 +130,10 @@ bool ObjectOutliner::isValidUseOfObject(SILInstruction *I,
     return true;
 
   switch (I->getKind()) {
-  case SILInstructionKind::DebugValueAddrInst:
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::DeallocRefInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::FixLifetimeInst:
@@ -325,7 +332,7 @@ static EndCOWMutationInst *getEndCOWMutation(SILValue object) {
 ///     func getarray() -> [Int] {
 ///       return [1, 2, 3]
 ///     }
-bool ObjectOutliner::optimizeObjectAllocation(AllocRefInst *ARI) {
+bool ObjectOutliner::optimizeObjectAllocation(AllocRefInstBase *ARI) {
   if (ARI->isObjC())
     return false;
 
@@ -492,6 +499,7 @@ bool ObjectOutliner::optimizeObjectAllocation(AllocRefInst *ARI) {
         B.createStrongRelease(User->getLoc(), GVI, B.getDefaultAtomicity());
         LLVM_FALLTHROUGH;
       case SILInstructionKind::DeallocRefInst:
+      case SILInstructionKind::DeallocStackRefInst:
         ToRemove.push_back(User);
         break;
       default:

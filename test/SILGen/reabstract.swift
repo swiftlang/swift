@@ -48,7 +48,7 @@ func test0() {
 // MANDATORY-NEXT: return
 // MANDATORY-NEXT: } // end sil function '$s10reabstract5test0yyF'
 
-// CHECK:    sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] [[THUNK]] : $@convention(thin) (@in_guaranteed Int, @noescape @callee_guaranteed (Int) -> Optional<Int>) -> @out Optional<Int> {
+// CHECK:    sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [[THUNK]] : $@convention(thin) (@in_guaranteed Int, @noescape @callee_guaranteed (Int) -> Optional<Int>) -> @out Optional<Int> {
 // CHECK:      [[T0:%.*]] = load [trivial] %1 : $*Int
 // CHECK-NEXT: [[T1:%.*]] = apply %2([[T0]])
 // CHECK-NEXT: store [[T1]] to [trivial] %0
@@ -85,19 +85,18 @@ func testInoutOpaque(_ c: C, i: Int) {
 // CHECK:         function_ref @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR
 // CHECK:         partial_apply
 // CHECK:         store
-// CHECK:         load
-// CHECK:         function_ref @$s10reabstract1CCSiytIeglnr_ACSiIegly_TR
-// CHECK:         partial_apply
-// CHECK:         apply
+// CHECK:         [[CLOSURE:%.*]] = struct_extract {{.*}}, #Box.t
+// CHECK:         [[CLOSURE1:%.*]] = copy_value [[CLOSURE]]
+// CHECK:         [[CLOSURE2:%.*]] = begin_borrow [[CLOSURE1]]
+// CHECK:         apply [[CLOSURE2]]
 // CHECK: } // end sil function '$s10reabstract15testInoutOpaque_1iyAA1CC_SitF'
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR : $@convention(thin) (@inout C, @in_guaranteed Int, @guaranteed @callee_guaranteed (@inout C, Int) -> ()) -> @out () {
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCSiytIeglnr_ACSiIegly_TR : $@convention(thin) (@inout C, Int, @guaranteed @callee_guaranteed (@inout C, @in_guaranteed Int) -> @out ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR : $@convention(thin) (@inout C, @in_guaranteed Int, @guaranteed @callee_guaranteed (@inout C, Int) -> ()) -> @out () {
 
 func closureTakingOptional(_ fn: (Int?) -> ()) {}
 closureTakingOptional({ (_: Any) -> () in })
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sypIgn_SiSgIegy_TR : $@convention(thin) (Optional<Int>, @noescape @callee_guaranteed (@in_guaranteed Any) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sypIgn_SiSgIegy_TR : $@convention(thin) (Optional<Int>, @noescape @callee_guaranteed (@in_guaranteed Any) -> ()) -> ()
 // CHECK:   [[ANYADDR:%.*]] = alloc_stack $Any
 // CHECK:   [[OPTADDR:%.*]] = init_existential_addr [[ANYADDR]] : $*Any, $Optional<Int>
 // CHECK:   store %0 to [trivial] [[OPTADDR]] : $*Optional<Int>
@@ -106,8 +105,7 @@ closureTakingOptional({ (_: Any) -> () in })
 // Same behavior as above with other ownership qualifiers.
 func evenLessFun(_ s: __shared C, _ o: __owned C) {}
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCACIeggx_A2CytIegnir_TR : $@convention(thin) (@in_guaranteed C, @in C, @guaranteed @callee_guaranteed (@guaranteed C, @owned C) -> ()) -> @out ()
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCACytIegnir_A2CIeggx_TR : $@convention(thin) (@guaranteed C, @owned C, @guaranteed @callee_guaranteed (@in_guaranteed C, @in C) -> @out ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s10reabstract1CCACIeggx_A2CytIegnir_TR : $@convention(thin) (@in_guaranteed C, @in C, @guaranteed @callee_guaranteed (@guaranteed C, @owned C) -> ()) -> @out ()
 func testSharedOwnedOpaque(_ s: C, o: C) {
   let box = Box(t: evenLessFun)
   box.t(s, o)
@@ -115,7 +113,7 @@ func testSharedOwnedOpaque(_ s: C, o: C) {
 
 // Make sure that when we generate the reabstraction thunk from Klass -> P, we
 // pass off the value at +1.
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1P_pIegg_xIegg_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0, @guaranteed @callee_guaranteed (@guaranteed P) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s10reabstract1P_pIegg_xIegg_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0, @guaranteed @callee_guaranteed (@guaranteed P) -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $τ_0_0,
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[EXISTENTIAL:%.*]] = init_existential_ref [[ARG_COPY]]

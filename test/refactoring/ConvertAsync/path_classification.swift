@@ -1,6 +1,8 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
-func simpleWithError(completion: (String?, Error?) -> Void) {}
+func simpleWithError(completion: @escaping (String?, Error?) -> Void) {}
 func simpleWithError() async throws -> String {}
 
 func testPathClassification() async throws {
@@ -60,7 +62,7 @@ func testPathClassification() async throws {
   // ELSE-IF-CLASSIFICATION-NEXT:   print("d")
   // ELSE-IF-CLASSIFICATION-NEXT: }
 
-  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=ELSE-IF-CLASSIFICATION2 %s
+  // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=ELSE-IF-CLASSIFICATION2 %s
   simpleWithError { str, err in
     if err == nil {
       print("a")
@@ -170,6 +172,8 @@ func testPathClassification() async throws {
   // ELSE-IF-CLASSIFICATION5-NEXT:   }
   // ELSE-IF-CLASSIFICATION5-NEXT: }
 
+  // Cannot use refactor-check-compiles, as 'err' cannot have its type inferred
+  // from placeholder.
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=IF-LET-RETURN-CLASSIFICATION %s
   simpleWithError { str, err in
     if let str = str {
@@ -194,7 +198,7 @@ func testPathClassification() async throws {
   // IF-LET-RETURN-CLASSIFICATION-NEXT:   }
   // IF-LET-RETURN-CLASSIFICATION-NEXT: }
 
-  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=GUARD-CLASSIFICATION %s
+  // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=GUARD-CLASSIFICATION %s
   simpleWithError { str, err in
     guard let str = str else {
       print("a")

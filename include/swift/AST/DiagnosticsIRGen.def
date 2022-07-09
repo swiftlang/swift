@@ -50,5 +50,19 @@ ERROR(alignment_more_than_maximum,none,
       "@_alignment cannot increase alignment above maximum alignment of %0",
       (unsigned))
 
+ERROR(temporary_allocation_size_negative,none,
+      "allocation capacity must be greater than or equal to zero", ())
+ERROR(temporary_allocation_size_overflow,none,
+      "allocation byte count too large", ())
+ERROR(temporary_allocation_alignment_not_positive,none,
+      "alignment value must be greater than zero", ())
+ERROR(temporary_allocation_alignment_not_power_of_2,none,
+      "alignment value must be a power of two", ())
+
+ERROR(foreign_reference_types_unsupported,none,
+      "attempt to use a foreign reference type in a generic context. "
+      "Foreign reference types are currently not supported. Using foreign "
+      "reference types in a generic context is not yet implemented.", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
 
 // REQUIRES: concurrency
 
@@ -47,4 +47,18 @@ func thereIsNoEscape(_ body: () async -> Void) async {
   await withoutActuallyEscaping(body) { escapingBody in
     await takeEscaping(escapingBody)
   }
+}
+
+func testAsyncExistentialOpen(_ v: P1) async {
+  func syncUnderlyingType<T>(u: T) {}
+  func syncThrowsUnderlyingType<T>(u: T) throws {}
+
+  func asyncUnderlyingType<T>(u: T) async {}
+  func asyncThrowsUnderlyingType<T>(u: T) async throws {}
+
+  _openExistential(v, do: syncUnderlyingType)
+  await _openExistential(v, do: asyncUnderlyingType)
+
+  try! _openExistential(v, do: syncThrowsUnderlyingType)
+  try! await _openExistential(v, do: asyncThrowsUnderlyingType)
 }

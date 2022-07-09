@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt %s -compute-effects | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: objc_interop
+// REQUIRES: PTRSIZE=64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class Y {
+  @_hasStorage var i: Int
+}
+
+// CHECK-LABEL: sil [escapes %0 => %r.0.s0.s0.s0, %0.c*.v** -> %r.**] @array_adopt_storage
+sil @array_adopt_storage : $@convention(thin) (@owned _ContiguousArrayStorage<Y>) -> (@owned Array<Y>, UnsafeMutablePointer<Y>) {
+bb0(%0 : $_ContiguousArrayStorage<Y>):
+  %3 = upcast %0 : $_ContiguousArrayStorage<Y> to $__ContiguousArrayStorageBase
+  %12 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<Y> to $Builtin.BridgeObject
+  %13 = struct $_BridgeStorage<__ContiguousArrayStorageBase> (%12 : $Builtin.BridgeObject)
+  %14 = struct $_ArrayBuffer<Y> (%13 : $_BridgeStorage<__ContiguousArrayStorageBase>)
+  %15 = struct $Array<Y> (%14 : $_ArrayBuffer<Y>)
+  %16 = ref_tail_addr %3 : $__ContiguousArrayStorageBase, $Y
+  %17 = address_to_pointer %16 : $*Y to $Builtin.RawPointer
+  %18 = struct $UnsafeMutablePointer<Y> (%17 : $Builtin.RawPointer)
+  %19 = tuple (%15 : $Array<Y>, %18 : $UnsafeMutablePointer<Y>)
+  return %19 : $(Array<Y>, UnsafeMutablePointer<Y>)
+}
+
+// CHECK-LABEL: sil [escapes !%0, !%0.c*.v**] @array_destructor
+sil @array_destructor : $@convention(method) <Element> (@owned _ContiguousArrayStorage<Element>) -> () {
+bb0(%0 : $_ContiguousArrayStorage<Element>):
+  %1 = ref_tail_addr %0 : $_ContiguousArrayStorage<Element>, $Element
+  %2 = address_to_pointer %1 : $*Element to $Builtin.RawPointer
+  %3 = upcast %0 : $_ContiguousArrayStorage<Element> to $__ContiguousArrayStorageBase
+  %4 = ref_element_addr %3 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %5 = struct_element_addr %4 : $*_ArrayBody, #_ArrayBody._storage
+  %6 = struct_element_addr %5 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %7 = struct_element_addr %6 : $*Int, #Int._value
+  %8 = load %7 : $*Builtin.Int64
+  %9 = builtin "assumeNonNegative_Int64"(%8 : $Builtin.Int64) : $Builtin.Int64
+  %10 = metatype $@thick Element.Type
+  %11 = builtin "truncOrBitCast_Int64_Word"(%9 : $Builtin.Int64) : $Builtin.Word
+  %12 = builtin "destroyArray"<Element>(%10 : $@thick Element.Type, %2 : $Builtin.RawPointer, %11 : $Builtin.Word) : $()
+  fix_lifetime %0 : $_ContiguousArrayStorage<Element>
+  dealloc_ref %0 : $_ContiguousArrayStorage<Element>
+  %15 = tuple ()
+  return %15 : $()
+}
+

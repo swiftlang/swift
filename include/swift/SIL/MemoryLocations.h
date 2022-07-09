@@ -43,9 +43,9 @@ void dumpBits(const SmallBitVector &bits);
 ///
 /// Memory locations are limited to addresses which are guaranteed to
 /// be not aliased, like @in/inout parameters and alloc_stack.
-/// Currently only a certain set of address instructions are supported:
-/// Specifically those instructions which are going to be included when SIL
-/// supports opaque values.
+/// Currently only a certain set of address instructions are supported, for
+/// details see `MemoryLocations::analyzeLocationUsesRecursively` and
+/// `MemoryLocations::analyzeAddrProjection`.
 class MemoryLocations {
 public:
 
@@ -113,7 +113,7 @@ public:
     ///    location 4 (Inner.b):     [           4]
     /// \endcode
     ///
-    /// Bit 2 is never set because Inner is completly represented by its
+    /// Bit 2 is never set because Inner is completely represented by its
     /// sub-locations 3 and 4. But bit 0 is set in location 0 (the "self" bit),
     /// because it represents the untracked field ``Outer.z``.
     ///
@@ -238,14 +238,14 @@ public:
     addr2LocIdx[projection] = locIdx;
   }
 
-  /// Sets the location bits os \p addr in \p bits, if \p addr is associated
+  /// Sets the location bits of \p addr in \p bits, if \p addr is associated
   /// with a location.
   void setBits(Bits &bits, SILValue addr) const {
     if (auto *loc = getLocation(addr))
       bits |= loc->subLocations;
   }
 
-  /// Clears the location bits os \p addr in \p bits, if \p addr is associated
+  /// Clears the location bits of \p addr in \p bits, if \p addr is associated
   /// with a location.
   void clearBits(Bits &bits, SILValue addr) const {
     if (auto *loc = getLocation(addr))
@@ -288,7 +288,7 @@ public:
   /// not covered by sub-fields.
   const Bits &getNonTrivialLocations();
 
-  /// Debug dump the MemoryLifetime internals.
+  /// Debug dump the MemoryLocations internals.
   void dump() const;
 
 private:
@@ -307,7 +307,7 @@ private:
                                       SubLocationMap &subLocationMap);
 
   /// Helper function called by analyzeLocation to create a sub-location for
-  /// and address projection and check all of its uses.
+  /// an address projection and check all of its uses.
   bool analyzeAddrProjection(
     SingleValueInstruction *projection, unsigned parentLocIdx,unsigned fieldNr,
     SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap);

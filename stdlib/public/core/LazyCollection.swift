@@ -10,23 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol LazyCollectionProtocol: Collection, LazySequenceProtocol 
-where Elements: Collection {	}
+public protocol LazyCollectionProtocol: Collection, LazySequenceProtocol
+where Elements: Collection {}
 
-extension LazyCollectionProtocol {		
-   // Lazy things are already lazy		
-   @inlinable // protocol-only		
-   public var lazy: LazyCollection<Elements> {		
-     return elements.lazy		
-   }		
- }		
-		
- extension LazyCollectionProtocol where Elements: LazyCollectionProtocol {		
-   // Lazy things are already lazy		
-   @inlinable // protocol-only		
-   public var lazy: Elements {		
-     return elements		
-   }		
+extension LazyCollectionProtocol {
+   // Lazy things are already lazy
+   @inlinable // protocol-only
+   public var lazy: LazyCollection<Elements> {
+     return elements.lazy
+   }
+ }
+
+ extension LazyCollectionProtocol where Elements: LazyCollectionProtocol {
+   // Lazy things are already lazy
+   @inlinable // protocol-only
+   public var lazy: Elements {
+     return elements
+   }
  }
 
 /// A collection containing the same elements as a `Base` collection,

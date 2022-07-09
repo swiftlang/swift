@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,83 +11,43 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// rdar://77798215
-// UNSUPPORTED: OS=windows-msvc
+import Distributed
+import FakeDistributedActorSystems
 
-// REQUIRES: radar78290608
-
-import _Distributed
-
-@available(SwiftStdlib 5.5, *)
 distributed actor SomeSpecificDistributedActor {
   distributed func hello() async throws -> String {
     "local impl"
   }
 }
 
-@available(SwiftStdlib 5.5, *)
-extension SomeSpecificDistributedActor {
-
-  @_dynamicReplacement(for: hello())
-  nonisolated func _remote_hello() async throws -> String {
-    return "remote impl (address: \(actor.actorAddress))"
-  }
-}
-
-// ==== Fake Transport ---------------------------------------------------------
-
-@available(SwiftStdlib 5.5, *)
-struct FakeTransport: ActorTransport {
-  func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
-    throws -> ActorResolved<Act> where Act: DistributedActor {
-    return .makeProxy
-  }
-
-  func assignAddress<Act>(
-    _ actorType: Act.Type
-  ) -> ActorAddress where Act : DistributedActor {
-    ActorAddress(parse: "")
-  }
-
-  public func actorReady<Act>(
-    _ actor: Act
-  ) where Act: DistributedActor {}
-
-  public func resignAddress(
-    _ address: ActorAddress
-  ) {}
-}
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
-@_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
-
-func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
-}
-
-// ==== Execute ----------------------------------------------------------------
-
-@available(SwiftStdlib 5.5, *)
 func test_remote() async {
-  let address = ActorAddress(parse: "")
-  let transport = FakeTransport()
+  let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
+  let system = DefaultDistributedActorSystem()
 
-  let local = SomeSpecificDistributedActor(transport: transport)
-  _ = local.actorAddress
+  let local = SomeSpecificDistributedActor(actorSystem: system)
   assert(__isLocalActor(local) == true, "should be local")
   assert(__isRemoteActor(local) == false, "should be local")
+  print("isRemote(local) = \(__isRemoteActor(local))") // CHECK: isRemote(local) = false
+  print("local.id = \(local.id)") // CHECK: local.id = ActorAddress(address: "xxx")
+  print("local.system = \(local.actorSystem)") // CHECK: local.system = FakeActorSystem()
 
   // assume it always makes a remote one
-  let remote = try! SomeSpecificDistributedActor(resolve: address, using: transport)
+  let remote = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
   assert(__isLocalActor(remote) == false, "should be remote")
   assert(__isRemoteActor(remote) == true, "should be remote")
+  print("isRemote(remote) = \(__isRemoteActor(remote))") // CHECK: isRemote(remote) = true
+
+  // Check the id and system are the right values, and not trash memory
+  print("remote.id = \(remote.id)") // CHECK: remote.id = ActorAddress(address: "sact://127.0.0.1/example#1234")
+  print("remote.system = \(remote.actorSystem)") // CHECK: remote.system = FakeActorSystem()
 
   print("done") // CHECK: done
 }
 
-@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_remote()

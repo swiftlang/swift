@@ -85,6 +85,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
 #include "clang/Basic/PPCTypes.def"
+#define RVV_TYPE(Name, Id, SingletonId)                                        \
+  case clang::BuiltinType::Id:                                                 \
+    return context.Id##Ty;
+#include "clang/Basic/RISCVVTypes.def"
   }
 
   // Not a valid BuiltinType.
@@ -208,6 +212,7 @@ const clang::Type *ClangTypeConverter::getFunctionType(
     return nullptr;
 
   switch (repr) {
+  case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::CFunctionPointer:
     return ClangASTContext.getPointerType(fn).getTypePtr();
   case SILFunctionType::Representation::Block:
@@ -444,6 +449,11 @@ clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
   auto proto = type->getDecl();
   auto &clangCtx = ClangASTContext;
 
+  // Strip 'Sendable'.
+  auto strippedType = type->stripConcurrency(false, false);
+  if (strippedType.getPointer() != type)
+    return convert(strippedType);
+
   if (!proto->isObjC())
     return clang::QualType();
 
@@ -541,7 +551,8 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
     auto args = type->getGenericArgs();
     assert((args.size() == 1) && "Optional should have 1 generic argument.");
     clang::QualType innerTy = convert(args[0]);
-    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()))
+    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
+        args[0]->isForeignReferenceType())
       return innerTy;
     return clang::QualType();
   }
@@ -696,6 +707,11 @@ ClangTypeConverter::visitSILBlockStorageType(SILBlockStorageType *type) {
 
 clang::QualType
 ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) {
+  // Strip 'Sendable'.
+  auto strippedType = type->stripConcurrency(false, false);
+  if (strippedType.getPointer() != type)
+    return convert(strippedType);
+
   // Any will be lowered to AnyObject, so we return the same result.
   if (type->isAny())
     return getClangIdType(ClangASTContext);
@@ -722,8 +738,8 @@ ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) 
       clangTy->getAs<clang::ObjCObjectPointerType>()->getPointeeType());
   }
 
-  for (Type t : layout.getProtocols()) {
-    auto clangTy = convert(t);
+  for (ProtocolDecl *proto : layout.getProtocols()) {
+    auto clangTy = convert(proto->getDeclaredInterfaceType());
     if (clangTy.isNull())
       return clang::QualType();
     for (auto p : clangTy->getAs<clang::ObjCObjectPointerType>()->quals())
@@ -742,6 +758,11 @@ ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) 
                                               ProtoQuals,
                                               Protocols.size());
   return clangCtx.getObjCObjectPointerType(clangType);
+}
+
+clang::QualType
+ClangTypeConverter::visitExistentialType(ExistentialType *type) {
+  return visit(type->getConstraintType());
 }
 
 clang::QualType
@@ -784,6 +805,10 @@ clang::QualType ClangTypeConverter::visitArchetypeType(ArchetypeType *type) {
   return getClangIdType(ClangASTContext);
 }
 
+clang::QualType ClangTypeConverter::visitDependentMemberType(DependentMemberType *type) {
+  return convert(type->getBase());
+}
+
 clang::QualType ClangTypeConverter::visitDynamicSelfType(DynamicSelfType *type) {
   // Dynamic Self is equivalent to 'instancetype', which is treated as
   // 'id' within the Objective-C type system.
@@ -818,6 +843,9 @@ clang::QualType ClangTypeConverter::convert(Type type) {
     return it->second;
 
   // Try to do this without making cache entries for obvious cases.
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+
   if (auto nominal = type->getAs<NominalType>()) {
     auto decl = nominal->getDecl();
     if (auto clangDecl = decl->getClangDecl()) {
@@ -865,7 +893,6 @@ ClangTypeConverter::getClangTemplateArguments(
     ArrayRef<Type> genericArgs,
     SmallVectorImpl<clang::TemplateArgument> &templateArgs) {
   assert(templateArgs.size() == 0);
-  assert(genericArgs.size() == templateParams->size());
 
   // Keep track of the types we failed to convert so we can return a useful
   // error.
@@ -874,6 +901,13 @@ ClangTypeConverter::getClangTemplateArguments(
     // Note: all template parameters must be template type parameters. This is
     // verified when we import the Clang decl.
     auto templateParam = cast<clang::TemplateTypeParmDecl>(param);
+    // We must have found a defaulted parameter at the end of the list.
+    if (templateParam->getIndex() >= genericArgs.size()) {
+      templateArgs.push_back(
+          clang::TemplateArgument(templateParam->getDefaultArgument()));
+      continue;
+    }
+
     auto replacement = genericArgs[templateParam->getIndex()];
     auto qualType = convert(replacement);
     if (qualType.isNull()) {

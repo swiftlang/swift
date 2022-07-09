@@ -1,6 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -typecheck -module-name Test -emit-module-interface-path %t/Test.swiftinterface %s -define-availability "_iOS8Aligned:macOS 10.10, iOS 8.0" -define-availability "_iOS9Aligned:macOS 10.11, iOS 9.0" -define-availability "_iOS9:iOS 9.0" -define-availability "_macOS10_11:macOS 10.11" -define-availability "_myProject 1.0:macOS 10.11" -define-availability "_myProject 2.5:macOS 10.12"
+// RUN: %target-swift-emit-module-interface(%t/Test.swiftinterface) %s \
+// RUN:   -define-availability "_iOS8Aligned:macOS 10.10, iOS 8.0" \
+// RUN:   -define-availability "_iOS9Aligned:macOS 10.11, iOS 9.0" \
+// RUN:   -define-availability "_iOS9:iOS 9.0" \
+// RUN:   -define-availability "_macOS10_11:macOS 10.11" \
+// RUN:   -define-availability "_myProject 1.0:macOS 10.11" \
+// RUN:   -define-availability "_myProject 2.5:macOS 10.12"
+// RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface)
 // RUN: %FileCheck %s < %t/Test.swiftinterface
 
 @available(_iOS8Aligned, *)
@@ -27,3 +34,8 @@ public func onMyProjectV1() {}
 public func onMyProjectV2_5() {}
 // CHECK: @available(macOS 10.12, *)
 // CHECK-NEXT: public func onMyProjectV2_5
+
+@_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
+public func testSemanticsAvailability<T>(_ t: T) {}
+// CHECK: @_specialize(exported: true, kind: full, availability: macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *; where T == Swift.Int)
+// CHECK-NEXT: public func testSemanticsAvailability

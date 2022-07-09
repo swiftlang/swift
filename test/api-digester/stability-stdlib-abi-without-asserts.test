@@ -2,7 +2,7 @@
 // mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk
 // RUN: %api-digester -diagnose-sdk -module Swift -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location -v
 // RUN: %clang -E -P -x c %S/stability-stdlib-abi-without-asserts.test -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-stdlib-abi.swift.expected
-// RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
+// RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed -E -e '/^\s*$/d' -e 's/ in _[0-9A-F]{32}/ in #UNSTABLE ID#/g' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected %t.tmp/changes.txt.tmp
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
@@ -50,11 +50,6 @@
 Func _prespecialize() is a new API without @available attribute
 Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
 
-// These reflection APIs are exposed to facilitate building SwiftReflectionTest.swift when testing Release builds.
-Func _getMetadataSection(_:) is a new API without @available attribute
-Func _getMetadataSectionCount() is a new API without @available attribute
-Func _getMetadataSectionName(_:) is a new API without @available attribute
-
 Func Collection.removingSubranges(_:) has been removed
 Func Collection.subranges(of:) has been removed
 Func Collection.subranges(where:) has been removed
@@ -71,5 +66,32 @@ Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugSt
 Protocol Error has added inherited protocol Sendable
 Protocol Error has generic signature change from to <Self : Swift.Sendable>
 Enum Never has added a conformance to an existing protocol Identifiable
+
+// These haven't actually been removed; they are simply marked unavailable.
+// This seems to be a false positive in the ABI checker. This is not an ABI
+// break because the symbols are still present, and is not a source break
+// because FixedWidthInteger still has these operations.
+Func SignedInteger.&+(_:_:) has been removed
+Func SignedInteger.&-(_:_:) has been removed
+
+// The GenericSignatureBuilder would produce redundant same-type requirements in the minimized signature; these are now gone.
+
+Protocol Collection has generic signature change from <Self : Swift.Sequence, Self.Element == Self.SubSequence.Element, Self.Index : Swift.Comparable, Self.Index == Self.Indices.Element, Self.Indices : Swift.Collection, Self.Indices == Self.Indices.SubSequence, Self.SubSequence : Swift.Collection, Self.SubSequence == Self.SubSequence.SubSequence, Self.Indices.Element == Self.Indices.Index, Self.Indices.Index == Self.SubSequence.Index, Self.SubSequence.Index == Self.Indices.Indices.Element, Self.Indices.Indices.Element == Self.Indices.Indices.Index, Self.Indices.Indices.Index == Self.SubSequence.Indices.Element, Self.SubSequence.Indices.Element == Self.SubSequence.Indices.Index, Self.SubSequence.Indices.Index == Self.SubSequence.Indices.Indices.Element, Self.SubSequence.Indices.Indices.Element == Self.SubSequence.Indices.Indices.Index> to <Self : Swift.Sequence, Self.Element == Self.SubSequence.Element, Self.Index : Swift.Comparable, Self.Index == Self.Indices.Element, Self.Indices : Swift.Collection, Self.Indices == Self.Indices.SubSequence, Self.SubSequence : Swift.Collection, Self.SubSequence == Self.SubSequence.SubSequence, Self.Indices.Element == Self.Indices.Index, Self.Indices.Index == Self.SubSequence.Index>
+
+Protocol StringProtocol has generic signature change from <Self : Swift.BidirectionalCollection, Self : Swift.Comparable, Self : Swift.ExpressibleByStringInterpolation, Self : Swift.Hashable, Self : Swift.LosslessStringConvertible, Self : Swift.TextOutputStream, Self : Swift.TextOutputStreamable, Self.Element == Swift.Character, Self.Index == Swift.String.Index, Self.StringInterpolation == Swift.DefaultStringInterpolation, Self.SubSequence : Swift.StringProtocol, Self.UTF16View : Swift.BidirectionalCollection, Self.UTF8View : Swift.Collection, Self.UnicodeScalarView : Swift.BidirectionalCollection, Self.UTF16View.Element == Swift.UInt16, Self.UTF16View.Index == Swift.String.Index, Self.UTF8View.Element == Swift.UInt8, Self.UTF8View.Index == Swift.String.Index, Self.UnicodeScalarView.Element == Swift.Unicode.Scalar, Self.UnicodeScalarView.Index == Swift.String.Index, Self.SubSequence.UTF16View.Index == Swift.String.Index, Self.SubSequence.UTF8View.Index == Swift.String.Index, Self.SubSequence.UnicodeScalarView.Index == Swift.String.Index> to <Self : Swift.BidirectionalCollection, Self : Swift.Comparable, Self : Swift.ExpressibleByStringInterpolation, Self : Swift.Hashable, Self : Swift.LosslessStringConvertible, Self : Swift.TextOutputStream, Self : Swift.TextOutputStreamable, Self.Element == Swift.Character, Self.Index == Swift.String.Index, Self.StringInterpolation == Swift.DefaultStringInterpolation, Self.SubSequence : Swift.StringProtocol, Self.UTF16View : Swift.BidirectionalCollection, Self.UTF8View : Swift.Collection, Self.UnicodeScalarView : Swift.BidirectionalCollection, Self.UTF16View.Element == Swift.UInt16, Self.UTF16View.Index == Swift.String.Index, Self.UTF8View.Element == Swift.UInt8, Self.UTF8View.Index == Swift.String.Index, Self.UnicodeScalarView.Element == Swift.Unicode.Scalar, Self.UnicodeScalarView.Index == Swift.String.Index>
+
+Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
+
+// These haven't actually been removed; they were replaced with @_alwaysEmitIntoClient
+// alternatives. The old silgen-name entry point was preserved under an alternative
+// source-level name. This causes a false positive with the ABI checker.
+// The symbols are still present at the ABI level. The symbols are also still present
+// at the source level. The association between them is simply no longer straightforward.
+Func UnsafeBufferPointer.withMemoryRebound(to:_:) has been removed
+Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has been removed
+Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
+Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
+Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
+Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

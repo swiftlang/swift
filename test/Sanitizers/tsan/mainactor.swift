@@ -1,10 +1,11 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency %import-libdispatch -sanitize=thread) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library  -Xfrontend -disable-availability-checking %import-libdispatch -sanitize=thread) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: threading_none
 
 // XFAIL: freebsd
 

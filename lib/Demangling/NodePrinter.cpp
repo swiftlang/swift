@@ -26,12 +26,6 @@ using namespace swift;
 using namespace Demangle;
 using llvm::StringRef;
 
-[[noreturn]]
-static void printer_unreachable(const char *Message) {
-  fprintf(stderr, "fatal error: %s\n", Message);
-  std::abort();
-}
-
 DemanglerPrinter &DemanglerPrinter::operator<<(unsigned long long n) & {
   char buffer[32];
   snprintf(buffer, sizeof(buffer), "%llu", n);
@@ -49,6 +43,14 @@ DemanglerPrinter &DemanglerPrinter::operator<<(long long n) & {
   snprintf(buffer, sizeof(buffer), "%lld",n);
   Stream.append(buffer);
   return *this;
+}
+
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
+[[noreturn]]
+static void printer_unreachable(const char *Message) {
+  fprintf(stderr, "fatal error: %s\n", Message);
+  std::abort();
 }
 
 std::string Demangle::genericParameterName(uint64_t depth, uint64_t index) {
@@ -183,7 +185,7 @@ public:
   }
 
 private:
-  static const unsigned MaxDepth = 1024;
+  static const unsigned MaxDepth = 768;
 
   /// Called when the node tree in valid.
   ///
@@ -304,6 +306,9 @@ private:
     case Node::Kind::MetatypeRepresentation:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
+    case Node::Kind::ConstrainedExistential:
+    case Node::Kind::ConstrainedExistentialRequirementList:
+    case Node::Kind::ConstrainedExistentialSelf:
     case Node::Kind::Protocol:
     case Node::Kind::ProtocolSymbolicReference:
     case Node::Kind::ReturnType:
@@ -419,6 +424,7 @@ private:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
+    case Node::Kind::CompileTimeConst:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -439,6 +445,7 @@ private:
     case Node::Kind::NativePinningAddressor:
     case Node::Kind::NativePinningMutableAddressor:
     case Node::Kind::NominalTypeDescriptor:
+    case Node::Kind::NominalTypeDescriptorRecord:
     case Node::Kind::NonObjCAttribute:
     case Node::Kind::Number:
     case Node::Kind::ObjCAsyncCompletionHandlerImpl:
@@ -447,6 +454,7 @@ private:
     case Node::Kind::ObjCMetadataUpdateFunction:
     case Node::Kind::ObjCResilientClassStub:
     case Node::Kind::OpaqueTypeDescriptor:
+    case Node::Kind::OpaqueTypeDescriptorRecord:
     case Node::Kind::OpaqueTypeDescriptorAccessor:
     case Node::Kind::OpaqueTypeDescriptorAccessorImpl:
     case Node::Kind::OpaqueTypeDescriptorAccessorKey:
@@ -463,8 +471,10 @@ private:
     case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
+    case Node::Kind::ProtocolConformanceDescriptorRecord:
     case Node::Kind::MetadataInstantiationCache:
     case Node::Kind::ProtocolDescriptor:
+    case Node::Kind::ProtocolDescriptorRecord:
     case Node::Kind::ProtocolRequirementsBaseDescriptor:
     case Node::Kind::ProtocolSelfConformanceDescriptor:
     case Node::Kind::ProtocolSelfConformanceWitness:
@@ -486,6 +496,7 @@ private:
     case Node::Kind::SILBoxMutableField:
     case Node::Kind::SILBoxImmutableField:
     case Node::Kind::IsSerialized:
+    case Node::Kind::MetatypeParamsRemoved:
     case Node::Kind::SpecializationPassID:
     case Node::Kind::Static:
     case Node::Kind::Subscript:
@@ -539,6 +550,7 @@ private:
     case Node::Kind::OutlinedAssignWithCopy:
     case Node::Kind::OutlinedDestroy:
     case Node::Kind::OutlinedVariable:
+    case Node::Kind::OutlinedReadOnlyObject:
     case Node::Kind::AssocTypePath:
     case Node::Kind::ModuleDescriptor:
     case Node::Kind::AnonymousDescriptor:
@@ -554,12 +566,15 @@ private:
     case Node::Kind::ProtocolConformanceRefInTypeModule:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
+    case Node::Kind::DistributedThunk:
+    case Node::Kind::DistributedAccessor:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
     case Node::Kind::OpaqueType:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
+    case Node::Kind::OpaqueReturnTypeIndexed:
     case Node::Kind::OpaqueReturnTypeOf:
     case Node::Kind::CanonicalSpecializedGenericMetaclass:
     case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
@@ -580,6 +595,14 @@ private:
     case Node::Kind::IndexSubset:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
+    case Node::Kind::AccessibleFunctionRecord:
+    case Node::Kind::BackDeploymentThunk:
+    case Node::Kind::BackDeploymentFallback:
+    case Node::Kind::ExtendedExistentialTypeShape:
+    case Node::Kind::Uniquable:
+    case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
+    case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
+    case Node::Kind::SymbolicExtendedExistentialType:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -775,7 +798,7 @@ private:
 
   void printFunctionType(NodePointer LabelList, NodePointer node,
                          unsigned depth) {
-    if (node->getNumChildren() < 2 || node->getNumChildren() > 6) {
+    if (node->getNumChildren() < 2) {
       setInvalid();
       return;
     }
@@ -814,9 +837,14 @@ private:
       assert(false && "Unhandled function type in printFunctionType!");
     }
 
+    unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
     bool isSendable = false, isAsync = false, isThrows = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
+      // handled earlier
+      ++startIndex;
+    }
     if (node->getChild(startIndex)->getKind() ==
           Node::Kind::GlobalActorFunctionType) {
       print(node->getChild(startIndex), depth + 1);
@@ -826,10 +854,6 @@ private:
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
-      ++startIndex;
-    }
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
-      // handled earlier
       ++startIndex;
     }
     if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
@@ -866,7 +890,7 @@ private:
     if (isSendable)
       Printer << "@Sendable ";
 
-    printFunctionParameters(LabelList, node->getChild(startIndex), depth,
+    printFunctionParameters(LabelList, node->getChild(argIndex), depth,
                             Options.ShowFunctionArgumentTypes);
 
     if (!Options.ShowFunctionArgumentTypes)
@@ -878,7 +902,7 @@ private:
     if (isThrows)
       Printer << " throws";
 
-    print(node->getChild(startIndex + 1), depth + 1);
+    print(node->getChild(argIndex + 1), depth + 1);
   }
 
   void printImplFunctionType(NodePointer fn, unsigned depth) {
@@ -1006,6 +1030,7 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
     switch (K) {
     case FunctionSigSpecializationParamKind::BoxToValue:
     case FunctionSigSpecializationParamKind::BoxToStack:
+    case FunctionSigSpecializationParamKind::InOutToOut:
       print(Node->getChild(Idx++), depth + 1);
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
@@ -1040,6 +1065,17 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       print(Node->getChild(Idx++), depth + 1);
       Printer << "'";
       Printer << "]";
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Printer << "[";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << " : ";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << "<";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ",";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ">]";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "[";
@@ -1092,7 +1128,8 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
   for (NodePointer child : *node) {
     switch (child->getKind()) {
       case Node::Kind::SpecializationPassID:
-        // We skip the SpecializationPassID since it does not contain any
+      case Node::Kind::MetatypeParamsRemoved:
+        // We skip those nodes since it does not contain any
         // information that is useful to our users.
         break;
 
@@ -1149,6 +1186,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                                bool asPrefixContext) {
   if (depth > NodePrinter::MaxDepth) {
     Printer << "<<too complex>>";
+    return nullptr;
+  }
+
+  if (!Node) {
+    Printer << "<null node pointer>";
     return nullptr;
   }
 
@@ -1230,6 +1272,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::OutlinedVariable:
     Printer << "outlined variable #" << Node->getIndex() << " of ";
+    return nullptr;
+  case Node::Kind::OutlinedReadOnlyObject:
+    Printer << "outlined read-only object #" << Node->getIndex() << " of ";
     return nullptr;
   case Node::Kind::Directness:
     Printer << toString(Directness(Node->getIndex())) << " ";
@@ -1446,6 +1491,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "isolated ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::CompileTimeConst:
+    Printer << "_const ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::Shared:
     Printer << "__shared ";
     print(Node->getChild(0), depth + 1);
@@ -1501,6 +1550,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::IsSerialized:
     Printer << "serialized";
+    return nullptr;
+  case Node::Kind::MetatypeParamsRemoved:
+    Printer << "metatypes-removed";
     return nullptr;
   case Node::Kind::GenericSpecializationParam:
     print(Node->getChild(0), depth + 1);
@@ -1571,6 +1623,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     case FunctionSigSpecializationParamKind::BoxToStack:
       Printer << "Stack Promoted from Box";
       return nullptr;
+    case FunctionSigSpecializationParamKind::InOutToOut:
+      Printer << "InOut Converted to Out";
+      return nullptr;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
       Printer << "Constant Propagated Function";
       return nullptr;
@@ -1585,6 +1640,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::ConstantPropString:
       Printer << "Constant Propagated String";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Printer << "Constant Propagated KeyPath";
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
@@ -1981,6 +2039,21 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "opaque type symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
+  case Node::Kind::DistributedThunk:
+    if (!Options.ShortenThunk) {
+      Printer << "distributed thunk ";
+    }
+    return nullptr;
+  case Node::Kind::DistributedAccessor:
+    if (!Options.ShortenThunk) {
+      Printer << "distributed accessor for ";
+    }
+    return nullptr;
+  case Node::Kind::AccessibleFunctionRecord:
+    if (!Options.ShortenThunk) {
+      Printer << "accessible function runtime record for ";
+    }
+    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -1995,6 +2068,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable variable for ";
     }
+    return nullptr;
+  case Node::Kind::BackDeploymentThunk:
+    if (!Options.ShortenThunk) {
+      Printer << "back deployment thunk for ";
+    }
+    return nullptr;
+  case Node::Kind::BackDeploymentFallback:
+    Printer << "back deployment fallback for ";
     return nullptr;
   case Node::Kind::ProtocolSymbolicReference:
     Printer << "protocol symbolic reference 0x";
@@ -2016,8 +2097,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "protocol conformance descriptor for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::ProtocolConformanceDescriptorRecord:
+    Printer << "protocol conformance descriptor runtime record for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::ProtocolDescriptor:
     Printer << "protocol descriptor for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::ProtocolDescriptorRecord:
+    Printer << "protocol descriptor runtime record for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::ProtocolRequirementsBaseDescriptor:
@@ -2122,8 +2211,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "nominal type descriptor for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::NominalTypeDescriptorRecord:
+    Printer << "nominal type descriptor runtime record for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::OpaqueTypeDescriptor:
     Printer << "opaque type descriptor for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorRecord:
+    Printer << "opaque type descriptor runtime record for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OpaqueTypeDescriptorAccessor:
@@ -2190,6 +2287,18 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     }
     return nullptr;
   }
+  case Node::Kind::ConstrainedExistential: {
+    Printer << "any ";
+    print(Node->getChild(0), depth + 1);
+    Printer << "<";
+    print(Node->getChild(1), depth + 1);
+    Printer << ">";
+    return nullptr;
+  }
+  case Node::Kind::ConstrainedExistentialRequirementList: {
+    printChildren(Node, depth, ", ");
+    return nullptr;
+  }
   case Node::Kind::ExistentialMetatype: {
     unsigned Idx = 0;
     if (Node->getNumChildren() == 2) {
@@ -2204,6 +2313,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << ".Type";
     return nullptr;
   }
+  case Node::Kind::ConstrainedExistentialSelf:
+    Printer << "Self";
+    return nullptr;
   case Node::Kind::MetatypeRepresentation: {
     Printer << Node->getText();
     return nullptr;
@@ -2464,7 +2576,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
         if (index != 0)
           Printer << ", ";
         // Limit the number of printed generic parameters. In practice this
-        // it will never be exceeded. The limit is only imporant for malformed
+        // it will never be exceeded. The limit is only important for malformed
         // symbols where count can be really huge.
         if (index >= 128) {
           Printer << "...";
@@ -2771,6 +2883,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << ")";
     return nullptr;
   case Node::Kind::OpaqueReturnType:
+  case Node::Kind::OpaqueReturnTypeIndexed:
     Printer << "some";
     return nullptr;
   case Node::Kind::OpaqueReturnTypeOf:
@@ -2876,6 +2989,62 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << " suspend resume partial function for ";
     }
     return nullptr;
+  case Node::Kind::Uniquable:
+    Printer << "uniquable ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::ExtendedExistentialTypeShape: {
+    // Printing the requirement signature is pretty useless if we
+    // don't print `where` clauses.
+    auto savedDisplayWhereClauses = Options.DisplayWhereClauses;
+    Options.DisplayWhereClauses = true;
+
+    NodePointer genSig = nullptr, type = nullptr;
+    if (Node->getNumChildren() == 2) {
+      genSig = Node->getChild(1);
+      type = Node->getChild(2);
+    } else {
+      type = Node->getChild(1);
+    }
+
+    Printer << "existential shape for ";
+    if (genSig) {
+      print(genSig, depth + 1);
+      Printer << " ";
+    }
+    Printer << "any ";
+    print(type, depth + 1);
+
+    Options.DisplayWhereClauses = savedDisplayWhereClauses;
+    return nullptr;
+  }
+  case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
+    Printer << "unique existential shape symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
+    Printer << "non-unique existential shape symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::SymbolicExtendedExistentialType: {
+    auto shape = Node->getChild(0);
+    bool isUnique =
+      (shape->getKind() ==
+         Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference);
+    Printer << "symbolic existential type ("
+            << (isUnique ? "" : "non-")
+            << "unique) 0x";
+    Printer.writeHex(shape->getIndex());
+    Printer << " <";
+    print(Node->getChild(1), depth + 1);
+    if (Node->getNumChildren() > 2) {
+      Printer << ", ";
+      print(Node->getChild(2), depth + 1);
+    }
+    Printer << ">";
+
+    return nullptr;
+  }
   }
 
   printer_unreachable("bad node kind!");
@@ -3015,7 +3184,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     PostfixContext = nullptr;
   }
   return PostfixContext;
-};
+}
 
 void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
                                   NodePointer genericFunctionTypeList,
@@ -3049,3 +3218,5 @@ std::string Demangle::nodeToString(NodePointer root,
 
   return NodePrinter(options).printRoot(root);
 }
+
+#endif

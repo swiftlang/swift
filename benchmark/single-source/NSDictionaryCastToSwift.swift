@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,23 +18,24 @@
 import Foundation
 import TestsUtils
 
-public let NSDictionaryCastToSwift = BenchmarkInfo(
-  name: "NSDictionaryCastToSwift",
-  runFunction: run_NSDictionaryCastToSwift,
-  tags: [.validation, .api, .Dictionary, .bridging],
-  legacyFactor: 10)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "NSDictionaryCastToSwift",
+    runFunction: run_NSDictionaryCastToSwift,
+    tags: [.validation, .api, .Dictionary, .bridging],
+    legacyFactor: 10)
 
 @inline(never)
-public func run_NSDictionaryCastToSwift(_ N: Int) {
+public func run_NSDictionaryCastToSwift(_ n: Int) {
 #if _runtime(_ObjC)
-    let NSDict = NSDictionary()
+    let nsdict = NSDictionary()
     var swiftDict = [String: NSObject]()
-    for _ in 1...1_000*N {
-        swiftDict = NSDict as! [String: NSObject]
+    for _ in 1...1_000*n {
+        swiftDict = nsdict as! [String: NSObject]
         if !swiftDict.isEmpty {
             break
         }
     }
-    CheckResults(swiftDict.isEmpty)
+    check(swiftDict.isEmpty)
 #endif
 }

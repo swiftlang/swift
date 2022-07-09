@@ -1,11 +1,11 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -strict-concurrency=targeted -disable-availability-checking
 // REQUIRES: concurrency
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func someAsyncFunc() async -> String { "" }
 
 struct MyError: Error {}
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func someThrowingAsyncFunc() async throws -> String { throw MyError() }
 
 // ==== Unsafe Continuations ---------------------------------------------------
@@ -27,7 +27,7 @@ func buyVegetables(
 ) {}
 
 // returns 1 or more vegetables or throws an error
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
   try await withUnsafeThrowingContinuation { continuation in
     var veggies: [Vegetable] = []
@@ -43,7 +43,7 @@ func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_unsafeContinuations() async {
   // the closure should not allow async operations;
   // after all: if you have async code, just call it directly, without the unsafe continuation
@@ -64,7 +64,7 @@ func test_unsafeContinuations() async {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_unsafeThrowingContinuations() async throws {
   let _: String = try await withUnsafeThrowingContinuation { continuation in
     continuation.resume(returning: "")
@@ -87,9 +87,26 @@ func test_unsafeThrowingContinuations() async throws {
   // TODO: Potentially could offer some warnings if we know that a continuation was resumed or escaped at all in a closure?
 }
 
+// ==== Sendability ------------------------------------------------------------
+class NotSendable { }
+// expected-note@-1{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+@available(SwiftStdlib 5.1, *)
+func test_nonsendableContinuation() async throws {
+  let _: NotSendable = try await withUnsafeThrowingContinuation { continuation in
+    continuation.resume(returning: NotSendable())
+  }
+
+  let _: NotSendable = try await withUnsafeThrowingContinuation { continuation in
+    Task {
+      continuation.resume(returning: NotSendable()) // expected-warning{{capture of 'continuation' with non-sendable type 'UnsafeContinuation<NotSendable, any Error>' in a `@Sendable` closure}}
+    }
+  }
+}
+
 // ==== Detached Tasks ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_detached() async throws {
   let handle = Task.detached {
     await someAsyncFunc() // able to call async functions
@@ -99,7 +116,7 @@ func test_detached() async throws {
   _ = result
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_detached_throwing() async -> String {
   let handle: Task<String, Error> = Task.detached {
     try await someThrowingAsyncFunc() // able to call async functions
@@ -109,5 +126,14 @@ func test_detached_throwing() async -> String {
     return try await handle.value
   } catch {
     print("caught: \(error)")
+  }
+}
+
+// ==== Detached Tasks with inout Params---------------------------------------
+@available(SwiftStdlib 5.1, *)
+func printOrderNumber(n: inout Int) async {
+  Task.detached {
+      n+=1 //expected-error {{mutable capture of 'inout' parameter 'n' is not allowed in concurrently-executing code}}
+      print(n) //expected-error {{mutable capture of 'inout' parameter 'n' is not allowed in concurrently-executing code}}
   }
 }

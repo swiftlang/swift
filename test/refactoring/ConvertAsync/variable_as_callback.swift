@@ -1,3 +1,5 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
 enum CustomError: Error {
@@ -7,64 +9,64 @@ enum CustomError: Error {
 
 typealias SomeCallback = (String) -> Void
 
-func simple(completion: (String) -> Void) { }
+func simple(completion: @escaping (String) -> Void) { }
 func simple() async -> String { }
 
-func simpleWithArg(a: Int, completion: (String) -> Void) { }
+func simpleWithArg(a: Int, completion: @escaping (String) -> Void) { }
 func simpleWithArg(a: Int) async -> String { }
 
-func multipleResults(completion: (String, Int) -> Void) { }
+func multipleResults(completion: @escaping (String, Int) -> Void) { }
 func multipleResults() async -> (String, Int) { }
 
-func nonOptionalError(completion: (String, Error) -> Void) { }
+func nonOptionalError(completion: @escaping (String, Error) -> Void) { }
 func nonOptionalError() async -> (String, Error) { }
 
-func noParams(completion: () -> Void) { }
+func noParams(completion: @escaping () -> Void) { }
 func noParams() async { }
 
-func error(completion: (String?, Error?) -> Void) { }
+func error(completion: @escaping (String?, Error?) -> Void) { }
 func error() async throws -> String { }
 
-func errorOnly(completion: (Error?) -> Void) { }
+func errorOnly(completion: @escaping (Error?) -> Void) { }
 func errorOnly() async throws { }
 
-func errorNonOptionalResult(completion: (String, Error?) -> Void) { }
+func errorNonOptionalResult(completion: @escaping (String, Error?) -> Void) { }
 func errorNonOptionalResult() async throws -> String { }
 
-func alias(completion: SomeCallback) { }
+func alias(completion: @escaping SomeCallback) { }
 func alias() async -> String { }
 
-func simpleResult(completion: (Result<String, Never>) -> Void) { }
+func simpleResult(completion: @escaping (Result<String, Never>) -> Void) { }
 func simpleResult() async -> String { }
 
-func errorResult(completion: (Result<String, Error>) -> Void) { }
+func errorResult(completion: @escaping (Result<String, Error>) -> Void) { }
 func errorResult() async throws -> String { }
 
-func customErrorResult(completion: (Result<String, CustomError>) -> Void) { }
+func customErrorResult(completion: @escaping (Result<String, CustomError>) -> Void) { }
 func customErrorResult() async throws -> String { }
 
-func optionalSingle(completion: (String?) -> Void) { }
+func optionalSingle(completion: @escaping (String?) -> Void) { }
 func optionalSingle() async -> String? { }
 
-func manyOptional(_ completion: (String?, Int?) -> Void) { }
+func manyOptional(_ completion: @escaping (String?, Int?) -> Void) { }
 func manyOptional() async -> (String?, Int?) { }
 
-func generic<T, R>(completion: (T, R) -> Void) { }
+func generic<T, R>(completion: @escaping (T, R) -> Void) { }
 func generic<T, R>() async -> (T, R) { }
 
-func genericResult<T>(completion: (T?, Error?) -> Void) where T: Numeric { }
+func genericResult<T>(completion: @escaping (T?, Error?) -> Void) where T: Numeric { }
 func genericResult<T>() async throws -> T where T: Numeric { }
 
-func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
+func genericError<E>(completion: @escaping (String?, E?) -> Void) where E: Error { }
 func genericError() async throws -> String { }
 
-func defaultArgs(a: Int, b: Int = 10, completion: (String) -> Void) { }
+func defaultArgs(a: Int, b: Int = 10, completion: @escaping (String) -> Void) { }
 func defaultArgs(a: Int, b: Int = 10) async -> String { }
 
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SIMPLE-WITH %s
-func testSimpleWithVariableCompletionHandler(completionHandler: (String) -> Void) {
+func testSimpleWithVariableCompletionHandler(completionHandler: @escaping (String) -> Void) {
   simple(completion: completionHandler)
 }
 // SIMPLE-WITH-FUNC: func testSimpleWithVariableCompletionHandler() async -> String {
@@ -76,7 +78,7 @@ func testSimpleWithVariableCompletionHandler(completionHandler: (String) -> Void
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-ARG-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SIMPLE-WITH-ARG %s
-func testSimpleWithArgVariableCompletionHandler(b: Int, completionHandler: (String) -> Void) {
+func testSimpleWithArgVariableCompletionHandler(b: Int, completionHandler: @escaping (String) -> Void) {
   simpleWithArg(a: b, completion: completionHandler)
 }
 // SIMPLE-WITH-ARG-FUNC: func testSimpleWithArgVariableCompletionHandler(b: Int) async -> String {
@@ -88,7 +90,7 @@ func testSimpleWithArgVariableCompletionHandler(b: Int, completionHandler: (Stri
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-CONSTANT-ARG-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SIMPLE-WITH-CONSTANT-ARG %s
-func testSimpleWithConstantArgVariableCompletionHandler(completionHandler: (String) -> Void) {
+func testSimpleWithConstantArgVariableCompletionHandler(completionHandler: @escaping (String) -> Void) {
   simpleWithArg(a: 1, completion: completionHandler)
 }
 // SIMPLE-WITH-CONSTANT-ARG-FUNC: func testSimpleWithConstantArgVariableCompletionHandler() async -> String {
@@ -100,7 +102,7 @@ func testSimpleWithConstantArgVariableCompletionHandler(completionHandler: (Stri
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=MULTIPLE-RESULTS-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MULTIPLE-RESULTS %s
-func testMultipleResultsVariableCompletionHandler(completionHandler: (String, Int) -> Void) {
+func testMultipleResultsVariableCompletionHandler(completionHandler: @escaping (String, Int) -> Void) {
   multipleResults(completion: completionHandler)
 }
 // MULTIPLE-RESULTS-FUNC: func testMultipleResultsVariableCompletionHandler() async -> (String, Int) {
@@ -112,7 +114,7 @@ func testMultipleResultsVariableCompletionHandler(completionHandler: (String, In
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NON-OPTIONAL-ERROR-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=NON-OPTIONAL-ERROR %s
-func testNonOptionalErrorVariableCompletionHandler(completionHandler: (String, Error) -> Void) {
+func testNonOptionalErrorVariableCompletionHandler(completionHandler: @escaping (String, Error) -> Void) {
   nonOptionalError(completion: completionHandler)
 }
 // NON-OPTIONAL-ERROR-FUNC: func testNonOptionalErrorVariableCompletionHandler() async -> (String, Error) {
@@ -124,7 +126,7 @@ func testNonOptionalErrorVariableCompletionHandler(completionHandler: (String, E
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NO-PARAMS-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=NO-PARAMS %s
-func testNoParamsVariableCompletionHandler(completionHandler: () -> Void) {
+func testNoParamsVariableCompletionHandler(completionHandler: @escaping () -> Void) {
   noParams(completion: completionHandler)
 }
 // NO-PARAMS-FUNC: func testNoParamsVariableCompletionHandler() async {
@@ -137,7 +139,7 @@ func testNoParamsVariableCompletionHandler(completionHandler: () -> Void) {
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ERROR %s
-func testErrorWithVariableCompletionHandler(completionHandler: (String?, Error?) -> Void) {
+func testErrorWithVariableCompletionHandler(completionHandler: @escaping (String?, Error?) -> Void) {
   error(completion: completionHandler)
 }
 // ERROR-FUNC: func testErrorWithVariableCompletionHandler() async throws -> String {
@@ -153,7 +155,7 @@ func testErrorWithVariableCompletionHandler(completionHandler: (String?, Error?)
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-ONLY-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ERROR-ONLY %s
-func testErrorOnlyWithVariableCompletionHandler(completionHandler: (Error?) -> Void) {
+func testErrorOnlyWithVariableCompletionHandler(completionHandler: @escaping (Error?) -> Void) {
   errorOnly(completion: completionHandler)
 }
 // ERROR-ONLY-FUNC: func testErrorOnlyWithVariableCompletionHandler() async throws {
@@ -170,7 +172,7 @@ func testErrorOnlyWithVariableCompletionHandler(completionHandler: (Error?) -> V
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1  | %FileCheck -check-prefix=ERROR-NON-OPTIONAL-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3  | %FileCheck -check-prefix=ERROR-NON-OPTIONAL-RESULT %s
-func testErrorNonOptionalResultWithVariableCompletionHandler(completionHandler: (String, Error?) -> Void) {
+func testErrorNonOptionalResultWithVariableCompletionHandler(completionHandler: @escaping (String, Error?) -> Void) {
   errorNonOptionalResult(completion: completionHandler)
 }
 // ERROR-NON-OPTIONAL-RESULT-FUNC: func testErrorNonOptionalResultWithVariableCompletionHandler() async throws -> String {
@@ -186,7 +188,7 @@ func testErrorNonOptionalResultWithVariableCompletionHandler(completionHandler: 
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ALIAS-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ALIAS %s
-func testAliasWithVariableCompletionHandler(completionHandler: SomeCallback) {
+func testAliasWithVariableCompletionHandler(completionHandler: @escaping SomeCallback) {
   alias(completion: completionHandler)
 }
 // ALIAS-FUNC: func testAliasWithVariableCompletionHandler() async -> String {
@@ -198,7 +200,7 @@ func testAliasWithVariableCompletionHandler(completionHandler: SomeCallback) {
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SIMPLE-RESULT %s
-func testSimpleResultVariableCompletionHandler(completionHandler: (Result<String, Never>) -> Void) {
+func testSimpleResultVariableCompletionHandler(completionHandler: @escaping (Result<String, Never>) -> Void) {
   simpleResult(completion: completionHandler)
 }
 // SIMPLE-RESULT-FUNC: func testSimpleResultVariableCompletionHandler() async -> String {
@@ -210,7 +212,7 @@ func testSimpleResultVariableCompletionHandler(completionHandler: (Result<String
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ERROR-RESULT %s
-func testErrorResultVariableCompletionHandler(completionHandler: (Result<String, Error>) -> Void) {
+func testErrorResultVariableCompletionHandler(completionHandler: @escaping (Result<String, Error>) -> Void) {
   errorResult(completion: completionHandler)
 }
 // ERROR-RESULT-FUNC: func testErrorResultVariableCompletionHandler() async throws -> String {
@@ -226,7 +228,7 @@ func testErrorResultVariableCompletionHandler(completionHandler: (Result<String,
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=CUSTOM-ERROR-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=CUSTOM-ERROR-RESULT %s
-func testErrorResultVariableCompletionHandler(completionHandler: (Result<String, CustomError>) -> Void) {
+func testErrorResultVariableCompletionHandler(completionHandler: @escaping (Result<String, CustomError>) -> Void) {
   customErrorResult(completion: completionHandler)
 }
 // CUSTOM-ERROR-RESULT-FUNC: func testErrorResultVariableCompletionHandler() async throws -> String {
@@ -242,7 +244,7 @@ func testErrorResultVariableCompletionHandler(completionHandler: (Result<String,
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=OPTIONAL-SINGLE-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=OPTIONAL-SINGLE %s
-func testOptionalSingleVariableCompletionHandler(completionHandler: (String?) -> Void) {
+func testOptionalSingleVariableCompletionHandler(completionHandler: @escaping (String?) -> Void) {
   optionalSingle(completion: completionHandler)
 }
 // OPTIONAL-SINGLE-FUNC: func testOptionalSingleVariableCompletionHandler() async -> String? {
@@ -254,7 +256,7 @@ func testOptionalSingleVariableCompletionHandler(completionHandler: (String?) ->
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=MANY-OPTIONAL-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MANY-OPTIONAL %s
-func testManyOptionalVariableCompletionHandler(completionHandler: (String?, Int?) -> Void) {
+func testManyOptionalVariableCompletionHandler(completionHandler: @escaping (String?, Int?) -> Void) {
   manyOptional(completionHandler)
 }
 // MANY-OPTIONAL-FUNC: func testManyOptionalVariableCompletionHandler() async -> (String?, Int?) {
@@ -266,7 +268,7 @@ func testManyOptionalVariableCompletionHandler(completionHandler: (String?, Int?
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GENERIC-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=GENERIC %s
-func testGenericVariableCompletionHandler<T, R>(completionHandler: (T, R) -> Void) {
+func testGenericVariableCompletionHandler<T, R>(completionHandler: @escaping (T, R) -> Void) {
   generic(completion: completionHandler)
 }
 // GENERIC-FUNC: func testGenericVariableCompletionHandler<T, R>() async -> (T, R) {
@@ -278,7 +280,7 @@ func testGenericVariableCompletionHandler<T, R>(completionHandler: (T, R) -> Voi
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SPECIALIZE-GENERIC-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SPECIALIZE-GENERIC %s
-func testSpecializeGenericsVariableCompletionHandler(completionHandler: (String, Int) -> Void) {
+func testSpecializeGenericsVariableCompletionHandler(completionHandler: @escaping (String, Int) -> Void) {
   generic(completion: completionHandler)
 }
 // SPECIALIZE-GENERIC-FUNC: func testSpecializeGenericsVariableCompletionHandler() async -> (String, Int) {
@@ -290,7 +292,7 @@ func testSpecializeGenericsVariableCompletionHandler(completionHandler: (String,
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GENERIC-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=GENERIC-RESULT %s
-func testGenericResultVariableCompletionHandler<T>(completionHandler: (T?, Error?) -> Void) where T: Numeric {
+func testGenericResultVariableCompletionHandler<T>(completionHandler: @escaping (T?, Error?) -> Void) where T: Numeric {
   genericResult(completion: completionHandler)
 }
 // GENERIC-RESULT-FUNC: func testGenericResultVariableCompletionHandler<T>() async throws -> T where T: Numeric {
@@ -306,7 +308,7 @@ func testGenericResultVariableCompletionHandler<T>(completionHandler: (T?, Error
 
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GENERIC-ERROR-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=GENERIC-ERROR %s
-func testGenericErrorVariableCompletionHandler<MyGenericError>(completionHandler: (String?, MyGenericError?) -> Void) where MyGenericError: Error {
+func testGenericErrorVariableCompletionHandler<MyGenericError>(completionHandler: @escaping (String?, MyGenericError?) -> Void) where MyGenericError: Error {
   genericError(completion: completionHandler)
 }
 // GENERIC-ERROR-FUNC: func testGenericErrorVariableCompletionHandler<MyGenericError>() async throws -> String where MyGenericError: Error {
@@ -317,12 +319,12 @@ func testGenericErrorVariableCompletionHandler<MyGenericError>(completionHandler
 // GENERIC-ERROR-NEXT:   let result: String = try await genericError()
 // GENERIC-ERROR-NEXT:   completionHandler(result, nil)
 // GENERIC-ERROR-NEXT: } catch {
-// GENERIC-ERROR-NEXT:   completionHandler(nil, error as! MyGenericError)
+// GENERIC-ERROR-NEXT:   completionHandler(nil, (error as! MyGenericError))
 // GENERIC-ERROR-NEXT: }
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=DEFAULT-ARGS-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=DEFAULT-ARGS %s
-func testDefaultArgsVariableCompletionHandler(completionHandler: (String) -> Void) {
+func testDefaultArgsVariableCompletionHandler(completionHandler: @escaping (String) -> Void) {
   defaultArgs(a: 5, completion: completionHandler)
 }
 // DEFAULT-ARGS-FUNC: func testDefaultArgsVariableCompletionHandler() async -> String {
@@ -365,7 +367,7 @@ func testVariableAsCompletionHandler() {
 // VARIABLE-AS-COMPLETION-HANDLER-NEXT: complete(result)
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=PRINTING-WRAPPER-FUNC %s
-func testPrintingWrapper(completionHandler: (String) -> Void) {
+func testPrintingWrapper(completionHandler: @escaping (String) -> Void) {
   print("Starting")
   simple(completion: completionHandler)
   print("Operation scheduled")

@@ -78,9 +78,9 @@ func testVariadicKeypathAsFunc() {
   takesVariadicFnWithGenericRet(\Array.i)
 
   // These are not okay, the KeyPath should have a base that matches the
-  // internal parameter type of the function, i.e [S].
-  let _: (S...) -> Int = \S.i // expected-error {{key path value type 'S' cannot be converted to contextual type '[S]'}}
-  takesVariadicFnWithGenericRet(\S.i) // expected-error {{key path value type 'S' cannot be converted to contextual type '[S]'}}
+  // internal parameter type of the function, i.e (S...).
+  let _: (S...) -> Int = \S.i // expected-error {{key path value type 'S' cannot be converted to contextual type 'S...'}}
+  takesVariadicFnWithGenericRet(\S.i) // expected-error {{key path value type 'S' cannot be converted to contextual type 'S...'}}
 }
 
 // rdar://problem/54322807
@@ -187,4 +187,22 @@ func testSR13442() {
   _ = SR13442(\.!.count) // OK
   _ = SR13442(\String?.!.count) // OK
   let _: KeyPath<Int?, Int> = \Optional.!
+}
+
+// rdar://85458997 - failed to produce a diagnostic about key path root type
+func rdar85458997() {
+  struct S<R> {
+    init(_: KeyPath<R, String>) {
+    }
+
+    init(_: KeyPath<R, Int>) {
+    }
+  }
+
+  struct V {
+    var name: String
+  }
+
+  _ = S(\.name)
+  // expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}} {{10-10=<#Root#>}}
 }

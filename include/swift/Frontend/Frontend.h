@@ -53,6 +53,7 @@
 
 namespace swift {
 
+class FrontendObserver;
 class SerializedModuleLoaderBase;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
@@ -170,20 +171,25 @@ public:
   }
 
   void setImportSearchPaths(const std::vector<std::string> &Paths) {
-    SearchPathOpts.ImportSearchPaths = Paths;
+    SearchPathOpts.setImportSearchPaths(Paths);
+  }
+
+  void setSerializedPathObfuscator(const PathObfuscator &obfuscator) {
+    FrontendOpts.serializedPathObfuscator = obfuscator;
+    SearchPathOpts.DeserializedPathRecoverer = obfuscator;
   }
 
   ArrayRef<std::string> getImportSearchPaths() const {
-    return SearchPathOpts.ImportSearchPaths;
+    return SearchPathOpts.getImportSearchPaths();
   }
 
   void setFrameworkSearchPaths(
              const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
-    SearchPathOpts.FrameworkSearchPaths = Paths;
+    SearchPathOpts.setFrameworkSearchPaths(Paths);
   }
 
   ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
-    return SearchPathOpts.FrameworkSearchPaths;
+    return SearchPathOpts.getFrameworkSearchPaths();
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {
@@ -229,9 +235,7 @@ public:
 
   void setSDKPath(const std::string &Path);
 
-  StringRef getSDKPath() const {
-    return SearchPathOpts.SDKPath;
-  }
+  StringRef getSDKPath() const { return SearchPathOpts.getSDKPath(); }
 
   LangOptions &getLangOptions() {
     return LangOpts;
@@ -309,6 +313,16 @@ public:
     return FrontendOpts.ModuleName;
   }
 
+  /// Sets the module alias map with string args passed in via `-module-alias`.
+  /// \param args The arguments to `-module-alias`. If input has `-module-alias Foo=Bar
+  ///             -module-alias Baz=Qux`, the args are ['Foo=Bar', 'Baz=Qux'].  The name
+  ///             Foo is the name that appears in source files, while it maps to Bar, the name
+  ///             of the binary on disk, /path/to/Bar.swiftmodule(interface), under the hood.
+  /// \param diags Used to print diagnostics in case validation of the string args fails.
+  ///        See \c ModuleAliasesConverter::computeModuleAliases on validation details.
+  /// \return Whether setting module alias map succeeded; false if args validation fails.
+  bool setModuleAliasMap(std::vector<std::string> args, DiagnosticEngine &diags);
+
   std::string getOutputFilename() const {
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
@@ -341,6 +355,9 @@ public:
     if (FrontendOpts.InputMode == FrontendOptions::ParseInputMode::SIL) {
       return ImplicitStdlibKind::None;
     }
+    if (FrontendOpts.InputsAndOutputs.shouldTreatAsLLVM()) {
+      return ImplicitStdlibKind::None;
+    }
     if (getParseStdlib()) {
       return ImplicitStdlibKind::Builtin;
     }
@@ -354,8 +371,9 @@ public:
   /// imported.
   bool shouldImportSwiftConcurrency() const;
 
-  /// Whether the Distributed support library should be implicitly imported.
-  bool shouldImportSwiftDistributed() const;
+  /// Whether the Swift String Processing support library should be implicitly
+  /// imported.
+  bool shouldImportSwiftStringProcessing() const;
 
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
@@ -374,7 +392,7 @@ public:
 
   std::string getOutputFilenameForAtMostOnePrimary() const;
   std::string getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
-  std::string getObjCHeaderOutputPathForAtMostOnePrimary() const;
+  std::string getClangHeaderOutputPathForAtMostOnePrimary() const;
   std::string getModuleOutputPathForAtMostOnePrimary() const;
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
@@ -391,8 +409,6 @@ public:
   std::string getModuleInterfaceOutputPathForWholeModule() const;
   std::string getPrivateModuleInterfaceOutputPathForWholeModule() const;
 
-  std::string getLdAddCFileOutputPathForWholeModule() const;
-
 public:
   /// Given the current configuration of this frontend invocation, a set of
   /// supplementary output paths, and a module, compute the appropriate set of
@@ -403,15 +419,6 @@ public:
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
                               const ModuleDecl *module) const;
-
-  /// Returns an approximation of whether the given module could be
-  /// redistributed and consumed by external clients.
-  ///
-  /// FIXME: The scope of this computation should be limited entirely to
-  /// PrintAsObjC. Unfortunately, it has been co-opted to support the
-  /// \c SerializeOptionsForDebugging hack. Once this information can be
-  /// transferred from module files to the dSYMs, remove this.
-  bool isModuleExternallyConsumed(const ModuleDecl *mod) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -547,6 +554,14 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftConcurrency() const;
 
+  /// Verify that if an implicit import of the `StringProcessing` module if
+  /// expected, it can actually be imported. Emit a warning, otherwise.
+  void verifyImplicitStringProcessingImport();
+
+  /// Whether the Swift String Processing support library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftStringProcessing() const;
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.
@@ -564,7 +579,7 @@ public:
   }
 
   /// Returns true if there was an error during setup.
-  bool setup(const CompilerInvocation &Invocation);
+  bool setup(const CompilerInvocation &Invocation, std::string &Error);
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
@@ -586,7 +601,7 @@ private:
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
 
-  /// \return false if successsful, true on error.
+  /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();
 
   Optional<unsigned> setUpCodeCompletionBuffer();
@@ -652,6 +667,12 @@ public:
   /// library, returning \c false if we should continue, i.e. no error.
   bool loadStdlibIfNeeded();
 
+  /// If \p fn returns true, exits early and returns true.
+  bool forEachFileToTypeCheck(llvm::function_ref<bool(SourceFile &)> fn);
+
+  /// Whether the cancellation of the current operation has been requested.
+  bool isCancellationRequested() const;
+
 private:
   /// Compute the parsing options for a source file in the main module.
   SourceFile::ParsingOptions getSourceFileParsingOptions(bool forPrimary) const;
@@ -664,8 +685,6 @@ private:
   /// \c true.
   bool loadPartialModulesAndImplicitImports(
       ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const;
-
-  void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void finishTypeChecking();
 

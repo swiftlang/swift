@@ -213,7 +213,7 @@ bool FrontendInputsAndOutputs::shouldTreatAsObjCHeader() const {
   if (hasSingleInput()) {
     StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
     switch (file_types::lookupTypeForExtension(InputExt)) {
-    case file_types::TY_ObjCHeader:
+    case file_types::TY_ClangHeader:
       return true;
     default:
       return false;
@@ -461,10 +461,10 @@ bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
         return outs.ReferenceDependenciesFilePath;
       });
 }
-bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
+bool FrontendInputsAndOutputs::hasClangHeaderOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ObjCHeaderOutputPath;
+        return outs.ClangHeaderOutputPath;
       });
 }
 bool FrontendInputsAndOutputs::hasLoadedModuleTracePath() const {
@@ -503,6 +503,18 @@ bool FrontendInputsAndOutputs::hasPrivateModuleInterfaceOutputPath() const {
         return outs.PrivateModuleInterfaceOutputPath;
       });
 }
+bool FrontendInputsAndOutputs::hasABIDescriptorOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ABIDescriptorOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleSemanticInfoOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleSemanticInfoOutputPath;
+      });
+}
 bool FrontendInputsAndOutputs::hasModuleSummaryOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
@@ -513,6 +525,18 @@ bool FrontendInputsAndOutputs::hasTBDPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
         return outs.TBDPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasYAMLOptRecordPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.YAMLOptRecordPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasBitstreamOptRecordPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.BitstreamOptRecordPath;
       });
 }
 
@@ -546,6 +570,6 @@ FrontendInputsAndOutputs::primaryInputNamed(StringRef name) const {
   if (iterator == PrimaryInputsByName.end())
     return nullptr;
   const InputFile *f = &AllInputs[iterator->second];
-  assert(f->isPrimary() && "PrimaryInputsByName should only include primries");
+  assert(f->isPrimary() && "PrimaryInputsByName should only include primaries");
   return f;
 }

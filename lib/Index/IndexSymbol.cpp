@@ -30,7 +30,7 @@ static bool isUnitTestCase(const ClassDecl *D) {
     return false;
 
   return D->walkSuperclasses([D](ClassDecl *SuperD) {
-    if (SuperD != D && // Do not treate XCTestCase itself as a test.
+    if (SuperD != D && // Do not treat XCTestCase itself as a test.
         SuperD->getNameStr() == "XCTestCase")
       return TypeWalker::Action::Stop; // Found test; stop and return true.
     return TypeWalker::Action::Continue;
@@ -247,6 +247,11 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
 
   if (isLocalSymbol(D)) {
     info.Properties |= SymbolProperty::Local;
+  }
+
+  if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (FD->hasAsync())
+      info.Properties |= SymbolProperty::SwiftAsync;
   }
 
   return info;

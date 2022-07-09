@@ -37,7 +37,14 @@ using namespace constraints;
 ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
 
 ConstraintGraph::~ConstraintGraph() {
-  assert(Changes.empty() && "Scope stack corrupted");
+#ifndef NDEBUG
+  // If constraint system is in an invalid state, it's
+  // possible that constraint graph is corrupted as well
+  // so let's not attempt to check change log.
+  if (!CS.inInvalidState())
+    assert(Changes.empty() && "Scope stack corrupted");
+#endif
+
   for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
     auto &impl = TypeVariables[i]->getImpl();
     delete impl.getGraphNode();
@@ -281,7 +288,7 @@ void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
     // Re-infer bindings for the current representative.
     resetBindingSet();
 
-    // Re-infer bindings all all of the newly made representatives.
+    // Re-infer bindings all of the newly made representatives.
     for (auto *typeVar : disconnectedVars)
       CG[typeVar].notifyReferencingVars();
   }
@@ -383,7 +390,7 @@ void ConstraintGraphNode::retractFromInference(
   notifyReferencingVars();
 
   // TODO: This might be an overkill but it's (currently)
-  // the simpliest way to reliably ensure that all of the
+  // the simplest way to reliably ensure that all of the
   // no longer related constraints have been retracted.
   for (auto *referencedVar : referencedVars) {
     auto &node = CG[referencedVar];
@@ -412,6 +419,11 @@ ConstraintGraphScope::ConstraintGraphScope(ConstraintGraph &CG)
 }
 
 ConstraintGraphScope::~ConstraintGraphScope() {
+  // Don't attempt to rollback if constraint system ended up
+  // in an invalid state.
+  if (CG.CS.inInvalidState())
+    return;
+
   // Pop changes off the stack until we hit the change could we had prior to
   // introducing this scope.
   assert(CG.Changes.size() >= NumChanges && "Scope stack corrupted");

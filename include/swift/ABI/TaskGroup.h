@@ -18,6 +18,7 @@
 #define SWIFT_ABI_TASK_GROUP_H
 
 #include "swift/ABI/Task.h"
+#include "swift/ABI/TaskStatus.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
@@ -42,6 +43,13 @@ public:
 
   /// Checks the cancellation status of the group.
   bool isCancelled();
+
+  // Add a child task to the group. Always called with the status record lock of
+  // the parent task held
+  void addChildTask(AsyncTask *task);
+
+  // Provide accessor for task group's status record
+  TaskGroupTaskStatusRecord *getTaskRecord();
 };
 
 } // end namespace swift

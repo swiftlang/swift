@@ -256,8 +256,7 @@ bb4(%3 : @owned $Klass):
   destroy_value %3 : $Klass
   br bb6
 
-bb5(%4 : @owned $FakeOptional<Klass>):
-  destroy_value %4 : $FakeOptional<Klass>
+bb5:
   br bb6
 
 bb6:
@@ -284,7 +283,6 @@ bb6:
 // CHECK:   release_value [[PAYLOAD]]
 //
 // CHECK: [[DEFAULT]]:
-// CHECK:   release_value [[ARG1]]
 // CHECK: } // end sil function 'term_non_ossa_caller'
 sil @term_non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $FakeOptional<Klass>):

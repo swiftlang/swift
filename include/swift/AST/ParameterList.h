@@ -27,14 +27,10 @@ namespace swift {
 /// This describes a list of parameters.  Each parameter descriptor is tail
 /// allocated onto this list.
 class alignas(ParamDecl *) ParameterList final :
+    // FIXME: Do we really just want to allocate these pointer-aligned?
+    public ASTAllocated<std::aligned_storage<8, 8>::type>,
     private llvm::TrailingObjects<ParameterList, ParamDecl *> {
   friend TrailingObjects;
-
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8);
 
   SourceLoc LParenLoc, RParenLoc;
   size_t numParameters;

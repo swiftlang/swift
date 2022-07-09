@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=linux-gnu
 // REQUIRES: lldb
+// REQUIRES: rdar87867848
 // XFAIL: CPU=s390x
 
 // NOTE: not.py is used above instead of "not --crash" because %target-run

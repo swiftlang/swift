@@ -14,14 +14,13 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[SELF_RECURSIVE_REF:%.*]] = function_ref [[SELF_RECURSIVE]]
   // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SELF_RECURSIVE_REF]]([[X]])
-  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
+  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [lexical] [[CLOSURE]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
   let sr = self_recursive
   // CHECK: [[B:%.*]] = begin_borrow [[CLOSURE_COPY]]
   // CHECK: apply [[B]]([[Y]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   sr(y)
 
   func mutually_recursive_1(_ a: Int) {
@@ -51,14 +50,13 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE]]
   // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[TRANS_CAPTURE_REF]]([[X]], [[Y]])
-  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
+  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [lexical] [[CLOSURE]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
   let tc = transitive_capture_2
   // CHECK: [[B:%.*]] = begin_borrow [[CLOSURE_COPY]]
   // CHECK: apply [[B]]([[X]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   tc(x)
 
   // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$s15local_recursionAA_1yySi_SitFySiXEfU_
@@ -70,13 +68,12 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$s15local_recursionAA_1yySi_SitFySicfU0_
   // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_REF]]([[X]], [[Y]])
-  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
+  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [lexical] [[CLOSURE]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
   // CHECK: [[B:%.*]] = begin_borrow [[CLOSURE_COPY]]
   // CHECK: apply [[B]]([[X]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   let f: (Int) -> () = {
     self_recursive($0)
     transitive_capture_2($0)

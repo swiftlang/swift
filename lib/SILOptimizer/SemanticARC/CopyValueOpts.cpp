@@ -153,6 +153,10 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // dead end blocks that use the value in a non-consuming way.
   //
   // TODO: There may be some way of sinking this into the loop below.
+  //
+  // FIXME: The haveAnyLocalScopes and destroy.empty() checks are relics of
+  // attempts to handle dead end blocks during areUsesWithinTransitiveScope. If
+  // we don't use dead end blocks at all, they should not be relevant.
   bool haveAnyLocalScopes =
       llvm::any_of(borrowScopeIntroducers, [](BorrowedValue borrowScope) {
         return borrowScope.isLocalScope();
@@ -177,18 +181,16 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   //    anyways, we want to be conservative here and optimize only if we do not
   //    need to insert an end_borrow since all of our borrow introducers are
   //    non-local scopes.
+  //
+  // The call to areUsesWithinTransitiveScope cannot consider dead-end blocks. A
+  // local borrow scope requires all its inner uses to be inside the borrow
+  // scope, regardless of whether the end of the scope is inside a dead-end
+  // block.
   {
-    bool foundNonDeadEnd = false;
-    for (auto *d : destroys) {
-      foundNonDeadEnd |= !getDeadEndBlocks().isDeadEnd(d->getParentBlock());
-    }
-    if (!foundNonDeadEnd && haveAnyLocalScopes)
-      return false;
     SmallVector<Operand *, 8> scratchSpace;
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-          return !borrowScope.areUsesWithinScope(lr.getAllConsumingUses(),
-                                                 scratchSpace,
-                                                 getDeadEndBlocks());
+          return !borrowScope.areUsesWithinTransitiveScope(
+              lr.getAllConsumingUses(), nullptr);
         })) {
       return false;
     }
@@ -216,9 +218,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       }
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-            return !borrowScope.areUsesWithinScope(
-                phiArgLR.getAllConsumingUses(), scratchSpace,
-                getDeadEndBlocks());
+            return !borrowScope.areUsesWithinTransitiveScope(
+                phiArgLR.getAllConsumingUses(), nullptr);
           })) {
         return false;
       }

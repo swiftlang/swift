@@ -2,7 +2,7 @@
 ::
 :: This source file is part of the Swift.org open source project
 ::
-:: Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+:: Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 :: Licensed under Apache License v2.0 with Runtime Library Exception
 ::
 :: See https://swift.org/LICENSE.txt for license information
@@ -64,6 +64,9 @@ set CUSTOM_CLANG_MODULE_CACHE=%build_root%\tmp\org.llvm.clang.9999
 md %build_root%\tmp\org.swift.package-manager
 set SWIFTPM_MODULECACHE_OVERRIDE=%build_root%\tmp\org.swift.package-manager
 
+set RunTest=1
+if "%1"=="-notest" set RunTest=0
+
 call :clone_repositories %exitOnError%
 call :download_icu %exitOnError%
 :: TODO: Disabled until we need LLBuild/SwiftPM in this build script.
@@ -79,11 +82,15 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
+path %PATH%;C:\Program Files\Git\usr\bin
 call :build_libdispatch %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;C:\Program Files\Git\usr\bin
-call :test_swift %exitOnError%
-call :test_libdispatch %exitOnError%
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
+
+if %RunTest%==1 (
+  call :test_swift %exitOnError%
+  call :test_libdispatch %exitOnError%
+)
 
 goto :end
 endlocal
@@ -120,7 +127,7 @@ git -C "%source_root%\swift" checkout-index --force --all
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository tensorflow-swift-apis"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository yams"
 
-call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --github-comment "%ghprbCommentBody%" >NUL 2>NUL
+call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --skip-tags --github-comment "%ghprbCommentBody%" >NUL 2>NUL
 
 goto :eof
 endlocal
@@ -163,8 +170,8 @@ setlocal enableextensions enabledelayedexpansion
 
 copy /y "%source_root%\swift\stdlib\public\Platform\ucrt.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" %exitOnError%
 copy /y "%source_root%\swift\stdlib\public\Platform\winsdk.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" %exitOnError%
-copy /y "%source_root%\swift\stdlib\public\Platform\visualc.modulemap" "%VCToolsInstallDir%\include\module.modulemap" %exitOnError%
-copy /y "%source_root%\swift\stdlib\public\Platform\visualc.apinotes" "%VCToolsInstallDir%\include\visualc.apinotes" %exitOnError%
+copy /y "%source_root%\swift\stdlib\public\Platform\vcruntime.modulemap" "%VCToolsInstallDir%\include\module.modulemap" %exitOnError%
+copy /y "%source_root%\swift\stdlib\public\Platform\vcruntime.apinotes" "%VCToolsInstallDir%\include\vcruntime.apinotes" %exitOnError%
 
 goto :eof
 endlocal
@@ -256,10 +263,6 @@ cmake^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DSWIFT_INCLUDE_DOCS:BOOL=NO^
-    -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE:PATH=%source_root%\icu-%icu_version%\include\unicode^
-    -DSWIFT_WINDOWS_x86_64_ICU_UC:PATH=%source_root%\icu-%icu_version%\lib64\icuuc.lib^
-    -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE:PATH=%source_root%\icu-%icu_version%\include^
-    -DSWIFT_WINDOWS_x86_64_ICU_I18N:PATH=%source_root%\icu-%icu_version%\lib64\icuin.lib^
     -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=YES^
     -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=YES^
     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=NO^
@@ -270,7 +273,9 @@ cmake^
     -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES^
-    -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
+    -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES^
+    -DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%source_root%\swift-experimental-string-processing^
+    -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;testsuite-tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
     -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
@@ -333,6 +338,8 @@ endlocal
 :: Configures, builds, and installs Dispatch
 setlocal enableextensions enabledelayedexpansion
 
+for /f "delims=" %%O in ('cygpath -m %install_directory%\lib\swift') do set RESOURCE_DIR=%%O
+
 cmake^
     -B "%build_root%\swift-corelibs-libdispatch"^
     -G Ninja^
@@ -352,8 +359,8 @@ cmake^
     -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_Swift_COMPILER_TARGET:STRING=x86_64-unknown-windows-msvc^
-    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
-    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
+    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\""^
+    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\""^
     -S "%source_root%\swift-corelibs-libdispatch" %exitOnError%
 
 cmake --build "%build_root%\swift-corelibs-libdispatch" %exitOnError%

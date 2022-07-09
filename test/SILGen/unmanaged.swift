@@ -35,7 +35,7 @@ func get(holder holder: inout Holder) -> C {
 }
 // CHECK-LABEL:sil hidden @$s9unmanaged3get6holderAA1CCAA6HolderVz_tF : $@convention(thin) (@inout Holder) -> @owned C
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
-// CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
+// CHECK-NEXT:   debug_value %0 : $*Holder, var, name "holder", argno 1, expr op_deref
 // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [static] [[ADDR]] : $*Holder
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[READ]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = load [[T0]] : $*@sil_unmanaged C

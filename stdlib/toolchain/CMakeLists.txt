@@ -1,6 +1,7 @@
 # Toolchain-only build products
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake/modules)
+include(StdlibOptions)
 include(AddSwiftStdlib)
 
 set(CXX_COMPILE_FLAGS)
@@ -50,7 +51,10 @@ set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS "7.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_TVOS "9.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
 
-add_subdirectory(legacy_layouts)
-add_subdirectory(Compatibility50)
-add_subdirectory(Compatibility51)
-add_subdirectory(CompatibilityDynamicReplacements)
+if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+  add_subdirectory(legacy_layouts)
+  add_subdirectory(Compatibility50)
+  add_subdirectory(Compatibility51)
+  add_subdirectory(CompatibilityDynamicReplacements)
+  add_subdirectory(CompatibilityConcurrency)
+endif()

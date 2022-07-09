@@ -11,8 +11,9 @@
 
 // HEADER: class Trunk {
 // HEADER:   init!()
-// HEADER:   class func addLimb(_ limb: Branch!)
-// HEADER:   func addLimb(_ limb: Branch!)
+// HEADER:   class func addLimb(_ limb: Trunk.Branch!)
+// HEADER:   func addLimb(_ limb: Trunk.Branch!)
+// HEADER:   func addLimbs(_ limbs: [Trunk.Branch]!)
 // HEADER: }
 // HEADER: // NS_SWIFT_NAME(Trunk.Branch)
 // HEADER: protocol Branch {
@@ -22,6 +23,11 @@
 func grow(_ branch: Trunk.Branch, from trunk: Trunk) {
   branch.flower()
   trunk.addLimb(branch)
+}
+
+// rdar://95084142 - crash while matching existential types
+func grow_multiple(_ branches: [Trunk.Branch], from trunk: Trunk) {
+  trunk.addLimbs(branches) // ok
 }
 
 class SturdyBranch: Trunk.Branch {

@@ -24,6 +24,10 @@
 
 // REQUIRES: executable_test
 // REQUIRES: shell
+// REQUIRES: reflection
+
+// rdar://96439408
+// UNSUPPORTED: use_os_stdlib
 
 import StdlibUnittest
 
@@ -557,14 +561,12 @@ func verifyWeakUnownedReflection
     expectEqual(child.label, name)
     expectNotNil(child.value)
 
-    // FIXME: These casts are currently broken (Dec 2019)
-    // Once they are fixed, enable additional checks:
-    //let vp1 = child.value as? WeakUnownedTestsP1
-    //expectNotNil(vp1)
-    //expectEqual(vp1!.f1(), 2)
-    //let vp2 = child.value as? WeakUnownedTestsP2
-    //expectNotNil(vp2)
-    //expectEqual(vp2!.f2(), "b")
+    let vp1 = child.value as? WeakUnownedTestsP1
+    expectNotNil(vp1)
+    expectEqual(vp1!.f1(), 2)
+    let vp2 = child.value as? WeakUnownedTestsP2
+    expectNotNil(vp2)
+    expectEqual(vp2!.f2(), "b")
 
     let v = child.value as? ExpectedClass
     expectNotNil(v)
@@ -622,7 +624,7 @@ mirrors.test("Weak and Unowned Obj-C refs in class (SR-5289)") {
     }
   }
 
-	if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+	if #available(SwiftStdlib 5.3, *) {
 		let objc = WeakUnownedObjCClass()
 		let classWithReferences = SwiftClassWithWeakAndUnowned(objc)
 		let m = Mirror(reflecting: classWithReferences)
@@ -656,7 +658,7 @@ mirrors.test("Weak and Unowned Obj-C refs in struct") {
     }
   }
 
-	if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+	if #available(SwiftStdlib 5.3, *) {
 		let objc = WeakUnownedObjCClass()
 		let structWithReferences = SwiftStructWithWeakAndUnowned(objc)
 		let m = Mirror(reflecting: structWithReferences)
@@ -692,7 +694,7 @@ mirrors.test("Weak and Unowned Swift refs in class") {
     }
   }
 
-	if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+	if #available(SwiftStdlib 5.3, *) {
 		let swift = WeakUnownedSwiftClass()
 		let classWithReferences = SwiftClassWithWeakAndUnowned(swift)
 		let m = Mirror(reflecting: classWithReferences)
@@ -726,7 +728,7 @@ mirrors.test("Weak and Unowned Swift refs in struct") {
     }
   }
 
-	if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+	if #available(SwiftStdlib 5.3, *) {
 		let swift = WeakUnownedSwiftClass()
 		let structWithReferences = SwiftStructWithWeakAndUnowned(swift)
 		let m = Mirror(reflecting: structWithReferences)
@@ -957,6 +959,8 @@ mirrors.test("Addressing") {
   expectNil(m.descendant(1, 1, "bork"))
 }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 mirrors.test("Invalid Path Type")
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -968,6 +972,7 @@ mirrors.test("Invalid Path Type")
   expectCrashLater()
   _ = m.descendant(X())
 }
+#endif
 
 mirrors.test("PlaygroundQuickLook") {
   // Customization works.
@@ -1550,6 +1555,7 @@ mirrors.test("CustomMirrorIsInherited") {
 //===----------------------------------------------------------------------===//
 
 protocol SomeNativeProto {}
+protocol SomeOtherNativeProto {}
 extension Int: SomeNativeProto {}
 
 class SomeClass {}
@@ -1584,6 +1590,14 @@ mirrors.test("MetatypeMirror") {
     output = ""
     dump(nativeProtocolConcreteMetatype, to: &output)
     expectEqual(expectedNativeProtocolConcrete, output)
+
+    let nativeProtocolCompositionMetatype =
+        (SomeNativeProto & SomeOtherNativeProto).self
+    output = ""
+    dump(nativeProtocolCompositionMetatype, to: &output)
+    expectEqual(
+      "- Mirror.SomeNativeProto & Mirror.SomeOtherNativeProto #0\n",
+      output)
   }
 }
 

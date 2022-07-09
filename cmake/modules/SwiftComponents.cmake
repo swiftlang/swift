@@ -46,6 +46,7 @@
 # The set of "defined" swift components are as follows:
 #
 # * autolink-driver -- the Swift driver support tools
+# * back-deployment -- Swift back-deployment libraries
 # * compiler -- the Swift compiler and (on supported platforms) the REPL.
 # * clang-builtin-headers -- install a copy of Clang builtin headers under
 #   'lib/swift/clang'.  This is useful when Swift compiler is installed in
@@ -63,10 +64,13 @@
 #   Swift code.
 # * toolchain-tools -- a subset of tools that we will install to the OSS toolchain.
 # * testsuite-tools -- extra tools required to run the Swift testsuite.
+# * parser-lib -- Build the syntax parser library used by SwiftSyntax.
+# * static-mirror-lib -- Build the static mirror library used by SwiftStaticMirror.
 # * toolchain-dev-tools -- install development tools useful in a shared toolchain
+# * llvm-toolchain-dev-tools -- install LLVM development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 set(_SWIFT_DEFINED_COMPONENTS
-  "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+  "autolink-driver;back-deployment;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;parser-lib;static-mirror-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # The default install components include all of the defined components, except
 # for the following exceptions.
@@ -77,7 +81,7 @@ list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "dev")
 list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "clang-resource-dir-symlink")
 list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "clang-builtin-headers-in-clang-resource-dir")
 # This conflicts with LLVM itself when doing unified builds.
-list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "toolchain-dev-tools")
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "llvm-toolchain-dev-tools")
 # The sourcekit install variants are currently mutually exclusive.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-inproc")
@@ -85,6 +89,8 @@ else()
   list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-xpc-service")
 endif()
 list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "stdlib-experimental")
+# back-deployment libraries are opt-in
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "back-deployment")
 
 macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D

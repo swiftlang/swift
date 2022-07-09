@@ -16,7 +16,12 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Unicode.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/Basic/SourceManager.h"
 #include "AvailabilityMixin.h"
 #include "JSON.h"
 #include "Symbol.h"
@@ -192,7 +197,79 @@ const ValueDecl *Symbol::getDeclInheritingDocs() const {
   }
 }
 
+namespace {
+
+StringRef getFileNameForDecl(const ValueDecl *VD) {
+  if (!VD) return StringRef{};
+
+  SourceLoc Loc = VD->getLoc(/*SerializedOK=*/true);
+  if (Loc.isInvalid()) return StringRef{};
+
+  SourceManager &SourceM = VD->getASTContext().SourceMgr;
+  return SourceM.getDisplayNameForLoc(Loc);
+}
+
+StringRef getFileNameForDecl(const clang::Decl *ClangD) {
+  if (!ClangD) return StringRef{};
+
+  const clang::SourceManager &ClangSourceMgr = ClangD->getASTContext().getSourceManager();
+  clang::PresumedLoc Loc = ClangSourceMgr.getPresumedLoc(ClangD->getLocation());
+  if (Loc.isInvalid()) return StringRef{};
+
+  return StringRef(Loc.getFilename());
+}
+
+void serializeFileURI(llvm::json::OStream &OS, StringRef FileName) {
+  // FIXME: This can emit invalid URIs if the file name has a space in it (rdar://69242070)
+  SmallString<1024> FileURI("file://");
+  FileURI.append(FileName);
+  OS.attribute("uri", FileURI.str());
+}
+
+}
+
 void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
+  if (ClangNode ClangN = VD->getClangNode()) {
+    if (!Graph->Walker.Options.IncludeClangDocs)
+      return;
+
+    if (auto *ClangD = ClangN.getAsDecl()) {
+      const clang::ASTContext &ClangContext = ClangD->getASTContext();
+      const clang::RawComment *RC =
+          ClangContext.getRawCommentForAnyRedecl(ClangD);
+      if (!RC || !RC->isDocumentation())
+        return;
+
+      // TODO: Replace this with `getFormattedLines` when it's in and add the
+      // line and column ranges. Also consider handling cross-language
+      // hierarchies, ie. if there's no comment on the ObjC decl we should
+      // look up the hierarchy (and vice versa).
+      std::string Text = RC->getFormattedText(ClangContext.getSourceManager(),
+                                              ClangContext.getDiagnostics());
+      Text = unicode::sanitizeUTF8(Text);
+
+      SmallVector<StringRef, 8> Lines;
+      splitIntoLines(Text, Lines);
+
+      OS.attributeObject("docComment", [&]() {
+        StringRef FileName = getFileNameForDecl(ClangD);
+        if (!FileName.empty())
+          serializeFileURI(OS, FileName);
+        if (const auto *ModuleD = VD->getModuleContext()) {
+          OS.attribute("module", ModuleD->getNameStr());
+        }
+        OS.attributeArray("lines", [&]() {
+          for (StringRef Line : Lines) {
+            OS.object([&](){
+              OS.attribute("text", Line);
+            });
+          }
+        });
+      });
+    }
+    return;
+  }
+
   const auto *DocCommentProvidingDecl = VD;
   if (!Graph->Walker.Options.SkipInheritedDocs) {
     DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
@@ -207,6 +284,12 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
   }
 
   OS.attributeObject("docComment", [&](){
+    StringRef FileName = getFileNameForDecl(DocCommentProvidingDecl);
+    if (!FileName.empty())
+      serializeFileURI(OS, FileName);
+    if (const auto *ModuleD = DocCommentProvidingDecl->getModuleContext()) {
+      OS.attribute("module", ModuleD->getNameStr());
+    }
     auto LL = Graph->Ctx.getLineList(RC);
     StringRef FirstNonBlankLine;
     for (const auto &Line : LL.getLines()) {
@@ -318,7 +401,7 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
 
       SmallVector<const GenericTypeParamType *, 4> FilteredParams;
       SmallVector<Requirement, 4> FilteredRequirements;
-      filterGenericParams(Generics->getGenericParams(), FilteredParams,
+      filterGenericParams(Generics.getGenericParams(), FilteredParams,
                           SubMap);
 
       const auto *Self = dyn_cast<NominalTypeDecl>(VD);
@@ -326,7 +409,7 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
         Self = VD->getDeclContext()->getSelfNominalTypeDecl();
       }
 
-      filterGenericRequirements(Generics->getRequirements(), Self,
+      filterGenericRequirements(Generics.getRequirements(), Self,
                                 FilteredRequirements, SubMap, FilteredParams);
 
       if (FilteredParams.empty() && FilteredRequirements.empty()) {
@@ -370,18 +453,36 @@ void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
+  if (ClangNode ClangN = VD->getClangNode()) {
+    if (!Graph->Walker.Options.IncludeClangDocs)
+      return;
+
+    if (auto *ClangD = ClangN.getAsDecl()) {
+      StringRef FileName = getFileNameForDecl(ClangD);
+      if (!FileName.empty()) {
+        OS.attributeObject("location", [&](){
+          // TODO: We should use a common function to fill in the location
+          // information for both cursor info and symbol graph gen, then also
+          // include position here.
+          serializeFileURI(OS, FileName);
+        });
+      }
+    }
+
+    return;
+  }
+
+  auto FileName = getFileNameForDecl(VD);
+  if (FileName.empty()) {
+    return;
+  }
+  // TODO: Fold serializePosition into serializeFileURI so we don't need to load Loc twice?
   auto Loc = VD->getLoc(/*SerializedOK=*/true);
   if (Loc.isInvalid()) {
     return;
   }
-  auto FileName = VD->getASTContext().SourceMgr.getDisplayNameForLoc(Loc);
-  if (FileName.empty()) {
-    return;
-  }
   OS.attributeObject("location", [&](){
-    SmallString<1024> FileURI("file://");
-    FileURI.append(FileName);
-    OS.attribute("uri", FileURI.str());
+    serializeFileURI(OS, FileName);
     serializePosition("position", Loc, Graph->M.getASTContext().SourceMgr, OS);
   });
 }

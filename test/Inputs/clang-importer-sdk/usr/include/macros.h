@@ -35,6 +35,7 @@
 #define UTF8_STRING u8"Swift 🏃"
 #define OBJC_STRING @"Unicode! ✨"
 #define CF_STRING CFSTR("Swift")
+#define INVALID_UTF8_STRING "\xFF\xFF\xFF\xFF\xFF\xFF"
 
 #define INVALID_INTEGER_LITERAL_1 10_9
 #define INVALID_INTEGER_LITERAL_2 10abc
@@ -163,3 +164,30 @@ typedef unsigned unavailable_t __attribute__((unavailable));
 typedef unsigned deprecated_t __attribute__((deprecated));
 #define OKAY_TYPED_ONE ((okay_t)1)
 typedef unsigned okay_t;
+
+#define FUNC_LIKE_MACRO() 0
+#define FUNC_LIKE_MACRO_2(PARAM) PARAM
+
+// Unsupported binary arithmetic
+#define INVALID_ARITHMETIC_1 5 + INVALID_INTEGER_LITERAL_1
+#define INVALID_ARITHMETIC_2 INVALID_INTEGER_LITERAL_1 + ADD_TWO
+#define INVALID_ARITHMETIC_3 ADD_TWO + INVALID_INTEGER_LITERAL_1
+#define INVALID_ARITHMETIC_4                                                   \
+  INVALID_INTEGER_LITERAL_1 - INVALID_INTEGER_LITERAL_1
+#define INVALID_ARITHMETIC_5 1 + VERSION_STRING
+#define INVALID_ARITHMETIC_6 1 + 'c'
+#define INVALID_ARITHMETIC_7 3 % 2
+
+// Unsupported literals
+#define CHAR_LITERAL 'a'
+
+// Unsupported macro structures
+#define UNSUPPORTED_1 FUNC_LIKE_MACRO()
+#define UNSUPPORTED_2 FUNC_LIKE_MACRO_2(1)
+#define UNSUPPORTED_3 1 + FUNC_LIKE_MACRO_2(1)
+#define UNSUPPORTED_4                                                          \
+  extern bool globalFlag;                                                      \
+  if (globalFlag) {                                                            \
+    /* do something */                                                         \
+  }
+#define UNSUPPORTED_5 1 + 1 + 1

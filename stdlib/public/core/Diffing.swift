@@ -12,7 +12,7 @@
 
 // MARK: Diff application to RangeReplaceableCollection
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference {
   fileprivate func _fastEnumeratedApply(
     _ consume: (Change) throws -> Void
@@ -67,7 +67,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n* + *c*), where *n* is `self.count` and *c* is the
   ///   number of changes contained by the parameter.
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @available(SwiftStdlib 5.1, *)
   public func applying(_ difference: CollectionDifference<Element>) -> Self? {
 
     func append(
@@ -142,7 +142,7 @@ extension BidirectionalCollection {
   /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the
   ///   count of this collection and *m* is `other.count`. You can expect
   ///   faster execution when the collections share many common elements.
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @available(SwiftStdlib 5.1, *)
   public func difference<C: BidirectionalCollection>(
     from other: C,
     by areEquivalent: (C.Element, Element) -> Bool
@@ -169,7 +169,7 @@ extension BidirectionalCollection where Element: Equatable {
   ///   count of this collection and *m* is `other.count`. You can expect
   ///   faster execution when the collections share many common elements, or
   ///   if `Element` conforms to `Hashable`.
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @available(SwiftStdlib 5.1, *)
   public func difference<C: BidirectionalCollection>(
     from other: C
   ) -> CollectionDifference<Element> where C.Element == Self.Element {
@@ -193,19 +193,19 @@ private struct _V {
   private let isOdd: Bool
 #endif
 
-  // The way negative indexes are implemented is by interleaving them in the empty slots between the valid positive indexes
-  @inline(__always) private static func transform(_ index: Int) -> Int {
-    // -3, -1, 1, 3 -> 3, 1, 0, 2 -> 0...3
-    // -2, 0, 2 -> 2, 0, 1 -> 0...2
-    return (index <= 0 ? -index : index &- 1)
-  }
-
   init(maxIndex largest: Int) {
 #if INTERNAL_CHECKS_ENABLED
     _internalInvariant(largest >= 0)
     isOdd = largest % 2 == 1
 #endif
     a = [Int](repeating: 0, count: largest + 1)
+  }
+
+  // The way negative indexes are implemented is by interleaving them in the empty slots between the valid positive indexes
+  @inline(__always) private static func transform(_ index: Int) -> Int {
+    // -3, -1, 1, 3 -> 3, 1, 0, 2 -> 0...3
+    // -2, 0, 2 -> 2, 0, 1 -> 0...2
+    return (index <= 0 ? -index : index &- 1)
   }
 
   subscript(index: Int) -> Int {
@@ -224,7 +224,7 @@ private struct _V {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 private func _myers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool

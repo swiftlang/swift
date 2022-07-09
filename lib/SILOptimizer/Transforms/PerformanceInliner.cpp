@@ -49,6 +49,59 @@ llvm::cl::opt<bool> EnableVerifyAfterInlining(
     llvm::cl::desc("Run sil verification after inlining all found callee apply "
                    "sites into a caller."));
 
+llvm::cl::opt<bool> SILPrintInliningCallee(
+    "sil-print-inlining-callee", llvm::cl::init(false),
+    llvm::cl::desc("Print functions that are inlined into other functions."));
+
+llvm::cl::opt<bool> SILPrintInliningCallerBefore(
+    "sil-print-inlining-caller-before", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Print functions into which another function is about to be inlined."));
+
+llvm::cl::opt<bool> SILPrintInliningCallerAfter(
+    "sil-print-inlining-caller-after", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Print functions into which another function has been inlined."));
+
+//===----------------------------------------------------------------------===//
+//                           Printing Helpers
+//===----------------------------------------------------------------------===//
+
+extern bool isFunctionSelectedForPrinting(SILFunction *F);
+
+static void printInliningDetails(StringRef passName, SILFunction *caller,
+                                 SILFunction *callee, bool isCaller,
+                                 bool alreadyInlined) {
+  if (!isFunctionSelectedForPrinting(caller))
+    return;
+  llvm::dbgs() << "  " << passName
+               << (alreadyInlined ? " has inlined " : " will inline ")
+               << callee->getName() << " into " << caller->getName() << ".\n";
+  auto *printee = isCaller ? caller : callee;
+  printee->dump(caller->getModule().getOptions().EmitVerboseSIL);
+  llvm::dbgs() << '\n';
+}
+
+static void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
+                                       SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/false,
+                       /*alreadyInlined=*/false);
+}
+
+static void printInliningDetailsCallerBefore(StringRef passName,
+                                             SILFunction *caller,
+                                             SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/true,
+                       /*alreadyInlined=*/false);
+}
+
+static void printInliningDetailsCallerAfter(StringRef passName,
+                                            SILFunction *caller,
+                                            SILFunction *callee) {
+  printInliningDetails(passName, caller, callee, /*isCaller=*/true,
+                       /*alreadyInlined=*/true);
+}
+
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
 //===----------------------------------------------------------------------===//
@@ -58,6 +111,7 @@ namespace {
 using Weight = ShortestPathAnalysis::Weight;
 
 class SILPerformanceInliner {
+  StringRef PassName;
   SILOptFunctionBuilder &FuncBuilder;
 
   /// Specifies which functions not to inline, based on @_semantics and
@@ -190,12 +244,13 @@ class SILPerformanceInliner {
                               SmallVectorImpl<FullApplySite> &Applies);
 
 public:
-  SILPerformanceInliner(SILOptFunctionBuilder &FuncBuilder,
-			InlineSelection WhatToInline, DominanceAnalysis *DA,
+  SILPerformanceInliner(StringRef PassName, SILOptFunctionBuilder &FuncBuilder,
+                        InlineSelection WhatToInline, DominanceAnalysis *DA,
                         SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
                         OptimizationMode OptMode, OptRemark::Emitter &ORE)
-      : FuncBuilder(FuncBuilder), WhatToInline(WhatToInline), DA(DA), LA(LA),
-	SEA(SEA), CBI(DA), ORE(ORE), OptMode(OptMode) {}
+      : PassName(PassName), FuncBuilder(FuncBuilder),
+        WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA), ORE(ORE),
+        OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
 };
@@ -447,7 +502,7 @@ bool SILPerformanceInliner::isProfitableToInline(
           // The access is dynamic and has no nested conflict
           // See if the storage location is considered by
           // access enforcement optimizations
-          auto storage = AccessedStorage::compute(BAI->getSource());
+          auto storage = AccessStorage::compute(BAI->getSource());
           if (BAI->hasNoNestedConflict() && (storage.isFormalAccessBase())) {
             BlockW.updateBenefit(ExclusivityBenefitWeight,
                                  ExclusivityBenefitBase);
@@ -946,6 +1001,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (AppliesToInline.empty())
     return false;
 
+  InstructionDeleter deleter;
+
   // Second step: do the actual inlining.
   // We inline in reverse order, because for very large blocks with many applies
   // to inline, splitting the block at every apply would be quadratic.
@@ -973,15 +1030,26 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // will be deleted after inlining.
     invalidatedStackNesting |= SILInliner::invalidatesStackNesting(AI);
 
+    if (SILPrintInliningCallee) {
+      printInliningDetailsCallee(PassName, Caller, Callee);
+    }
+    if (SILPrintInliningCallerBefore) {
+      printInliningDetailsCallerBefore(PassName, Caller, Callee);
+    }
     // We've already determined we should be able to inline this, so
     // unconditionally inline the function.
     //
     // If for whatever reason we can not inline this function, inlineFullApply
     // will assert, so we are safe making this assumption.
     SILInliner::inlineFullApply(AI, SILInliner::InlineKind::PerformanceInline,
-                                FuncBuilder);
+                                FuncBuilder, deleter);
     ++NumFunctionsInlined;
+    if (SILPrintInliningCallerAfter) {
+      printInliningDetailsCallerAfter(PassName, Caller, Callee);
+    }
   }
+  deleter.cleanupDeadInstructions();
+  
   // The inliner splits blocks at call sites. Re-merge trivial branches to
   // reestablish a canonical CFG.
   mergeBasicBlocks(Caller);
@@ -1052,8 +1120,9 @@ public:
     auto OptMode = getFunction()->getEffectiveOptimizationMode();
 
     SILOptFunctionBuilder FuncBuilder(*this);
-    SILPerformanceInliner Inliner(FuncBuilder, WhatToInline, DA, LA, SEA,
-				  OptMode, ORE);
+
+    SILPerformanceInliner Inliner(getID(), FuncBuilder, WhatToInline, DA, LA,
+                                  SEA, OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

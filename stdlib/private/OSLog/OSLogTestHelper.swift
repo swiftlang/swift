@@ -121,7 +121,7 @@ internal func _os_log_impl_test(
 /// on the special case of animation begin signposts.
 @_transparent
 public func _osSignpostAnimationBeginTestHelper(
-  _ format: AnimationFormatString.OSLogMessage,
+  _ format: AnimationFormatString.MyLogMessage,
   _ arguments: CVarArg...
 ) {
   _animationBeginSignpostHelper(formatStringPointer: format.formatStringPointer,
@@ -149,7 +149,8 @@ public enum AnimationFormatString {
   }
 
   @frozen
-  public struct OSLogMessage : ExpressibleByStringLiteral {
+  @_semantics("oslog.message.type")
+  public struct MyLogMessage : ExpressibleByStringLiteral {
     @usableFromInline
     var formatStringPointer: UnsafePointer<CChar>
 

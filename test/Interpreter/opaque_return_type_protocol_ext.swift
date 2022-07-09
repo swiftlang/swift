@@ -4,9 +4,6 @@
 
 // REQUIRES: executable_test
 
-// FIXME: Disabled because compilation is crashing in arm64e
-// REQUIRES: rdar60734429
-
 @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 protocol P {
   associatedtype AT

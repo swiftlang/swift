@@ -54,3 +54,7 @@ public func hasMagicDefaultArgs(_ f: String = #file, _ fu: String = #function, _
 // CHECK: func hasSimpleDefaultArgs(_ x: Swift.Int = 0, b: Swift.Int = 1)
 public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
 }
+
+// rdar://83202870 (SR-15181): Make sure we can extract the textual representation here.
+// CHECK: func hasTupleConstructionDefaultArgs(_ x: Any = (), y: (Swift.String, Swift.Int) = ("", 0))
+public func hasTupleConstructionDefaultArgs(_ x: Any = Void(), y: (String, Int) = (String, Int)("", 0)) {}

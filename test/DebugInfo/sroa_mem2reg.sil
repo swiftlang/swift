@@ -1,0 +1,90 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa %s | %FileCheck --check-prefix=CHECK-SROA %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s -o %t.sil
+// RUN: %FileCheck --check-prefix=CHECK-MEM2REG %s --input-file=%t.sil
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -c %t.sil -o %t.o
+// RUN: %llvm-dwarfdump --debug-info %t.o | %FileCheck --check-prefix=CHECK-DWARF %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
+sil_scope 1 { loc "sroa.swift":2:8 parent @MyStructInit : $@convention(method) (Int64, Int64, @thin MyStruct.Type) -> MyStruct }
+
+// MyStruct.init(x:y:)
+sil hidden @MyStructInit : $@convention(method) (Int64, Int64, @thin MyStruct.Type) -> MyStruct {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $@thin MyStruct.Type):
+  %3 = struct $MyStruct (%0 : $Int64, %1 : $Int64), loc "sroa.swift":2:8, scope 1
+  return %3 : $MyStruct, loc "sroa.swift":2:8, scope 1
+} // end sil function 'MyStructInit'
+
+sil_scope 2 { loc "sroa.swift":7:6 parent @foo : $@convention(thin) (Int64, Int64) -> Int64 }
+
+// foo(in_x:in_y:)
+sil hidden @foo : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  debug_value %0 : $Int64, let, name "in_x", argno 1, loc "sroa.swift":7:10, scope 2
+  debug_value %1 : $Int64, let, name "in_y", argno 2, loc "sroa.swift":7:21, scope 2
+  %4 = alloc_stack $MyStruct, var, name "my_struct", loc "sroa.swift":8:9, scope 2
+  // Make sure SROA propagate the debug info to the splitted alloc_stack instructions
+  // CHECK-SROA: alloc_stack $Int64, var
+  // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
+  // CHECK-SROA-SAME:        type $*MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-SROA-SAME:        loc "<compiler-generated>":0:0
+  // CHECK-SROA: alloc_stack $Int64, var
+  // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
+  // CHECK-SROA-SAME:        type $*MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-SROA-SAME:        loc "<compiler-generated>":0:0
+  %5 = metatype $@thin MyStruct.Type, loc "sroa.swift":8:21, scope 2
+  %6 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":8:33, scope 2
+  %7 = struct $Int64 (%6 : $Builtin.Int64), loc "sroa.swift":8:33, scope 2
+  %8 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":8:39, scope 2
+  %9 = struct $Int64 (%8 : $Builtin.Int64), loc "sroa.swift":8:39, scope 2
+  // function_ref MyStruct.init(x:y:)
+  %10 = function_ref @MyStructInit : $@convention(method) (Int64, Int64, @thin MyStruct.Type) -> MyStruct, loc "sroa.swift":8:21, scope 2
+  %11 = apply %10(%7, %9, %5) : $@convention(method) (Int64, Int64, @thin MyStruct.Type) -> MyStruct, loc "sroa.swift":8:21, scope 2
+  store %11 to %4 : $*MyStruct, loc "sroa.swift":8:21, scope 2
+  %13 = struct_element_addr %4 : $*MyStruct, #MyStruct.x, loc "sroa.swift":9:17, scope 2
+  // CHECK-MEM2REG: %[[FIELD_X:[0-9]+]] = struct_extract %[[STRUCT:[0-9]+]] : $MyStruct, #MyStruct.x, loc "sroa.swift":8:21
+  store %0 to %13 : $*Int64, loc "sroa.swift":9:17, scope 2
+  %15 = struct_element_addr %4 : $*MyStruct, #MyStruct.y, loc "sroa.swift":10:17, scope 2
+  // CHECK-MEM2REG: %[[FIELD_Y:[0-9]+]] = struct_extract %[[STRUCT]] : $MyStruct, #MyStruct.y, loc "sroa.swift":8:21
+  store %1 to %15 : $*Int64, loc "sroa.swift":10:17, scope 2
+  // Make sure the struct fields' SSA values are properly connected to the source variables via op_fragment
+  // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Int64, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Int64, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %0
+  // CHECK-IR-SAME:                      metadata ![[STRUCT_MD:[0-9]+]]
+  // CHECK-IR-SAME:                      !DIExpression(DW_OP_LLVM_fragment, 0, 64)
+  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %1
+  // CHECK-IR-SAME:                      metadata ![[STRUCT_MD]]
+  // CHECK-IR-SAME:                      !DIExpression(DW_OP_LLVM_fragment, 64, 64)
+  // Make sure function arguments' SSA values are also properly connected to the source variables
+  // CHECK-MEM2REG: debug_value %0 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-MEM2REG: debug_value %1 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %0, metadata ![[ARG1_MD:[0-9]+]]
+  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %1, metadata ![[ARG2_MD:[0-9]+]]
+  dealloc_stack %4 : $*MyStruct, loc "sroa.swift":8:9, scope 2
+  return %0 : $Int64, loc "sroa.swift":11:5, scope 2
+} // end sil function 'foo'
+
+// CHECK-IR: ![[ARG1_MD]] = !DILocalVariable(name: "in_x", arg: 1
+// CHECK-IR-SAME:                            line: 7
+// CHECK-IR: ![[ARG2_MD]] = !DILocalVariable(name: "in_y", arg: 2
+// CHECK-IR-SAME:                            line: 7
+
+// CHECK-IR: ![[STRUCT_MD]] = !DILocalVariable(name: "my_struct"
+// CHECK-IR-SAME:                              line: 8
+
+// CHECK-DWARF-LABEL:   DW_AT_name    ("foo")
+// CHECK-DWARF:       DW_TAG_variable
+// CHECK-DWARF:         DW_AT_name  ("my_struct")
+// Shouldn't be marked artificial
+// CHECK-DWARF-NOT:     DW_AT_artificial      (true)
+// CHECK-DWARF:       DW_TAG_{{.*}}

@@ -26,6 +26,7 @@
 namespace swift {
 
 class SILOptFunctionBuilder;
+class InstructionDeleter;
 
 // For now Free is 0 and Expensive is 1. This can be changed in the future by
 // adding more categories.
@@ -46,15 +47,16 @@ public:
 
 private:
   SILOptFunctionBuilder &FuncBuilder;
+  InstructionDeleter &deleter;
+
   InlineKind IKind;
   SubstitutionMap ApplySubs;
 
-  DeletionFuncTy DeletionCallback;
-
 public:
-  SILInliner(SILOptFunctionBuilder &FuncBuilder, InlineKind IKind,
-             SubstitutionMap ApplySubs)
-      : FuncBuilder(FuncBuilder), IKind(IKind), ApplySubs(ApplySubs) {}
+  SILInliner(SILOptFunctionBuilder &FuncBuilder, InstructionDeleter &deleter,
+             InlineKind IKind, SubstitutionMap ApplySubs)
+      : FuncBuilder(FuncBuilder), deleter(deleter), IKind(IKind),
+        ApplySubs(ApplySubs) {}
 
   /// Returns true if we are able to inline \arg AI.
   ///
@@ -72,14 +74,6 @@ public:
     // allocations.
     return isa<BeginApplyInst>(apply);
   }
-
-  /// Allow the client to track instructions before they are deleted. The
-  /// registered callback is called from
-  /// recursivelyDeleteTriviallyDeadInstructions.
-  ///
-  /// (This is safer than the SILModule deletion callback because the
-  /// instruction is still in a valid form and its operands can be inspected.)
-  void setDeletionCallback(DeletionFuncTy f) { DeletionCallback = f; }
 
   /// Inline a callee function at the given apply site with the given
   /// arguments. Delete the apply and any dead arguments. Return a valid
@@ -108,11 +102,9 @@ public:
   /// *NOTE*: Inlining can result in improperly nested stack allocations, which
   /// must be corrected after inlining. See invalidatesStackNesting().
   ///
-  /// Returns an iterator to the first inlined instruction (or the end of the
-  /// caller block for empty functions) and the last block in function order
-  /// containing inlined instructions (the original caller block for
-  /// single-block functions).
-  std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+  /// Returns the last block in function order containing inlined instructions
+  /// (the original caller block for single-block functions).
+  SILBasicBlock *
   inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                  ArrayRef<SILValue> appliedArgs);
 
@@ -131,13 +123,12 @@ public:
   /// *NOTE*: Inlining can result in improperly nested stack allocations, which
   /// must be corrected after inlining. See invalidatesStackNesting().
   ///
-  /// Returns an iterator to the first inlined instruction (or the end of the
-  /// caller block for empty functions) and the last block in function order
-  /// containing inlined instructions (the original caller block for
-  /// single-block functions).
-  static std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+  /// Returns the last block in function order containing inlined instructions
+  /// (the original caller block for single-block functions).
+  static SILBasicBlock *
   inlineFullApply(FullApplySite apply, SILInliner::InlineKind inlineKind,
-                  SILOptFunctionBuilder &funcBuilder);
+                  SILOptFunctionBuilder &funcBuilder,
+                  InstructionDeleter &deleter);
 };
 
 } // end namespace swift

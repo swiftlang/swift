@@ -68,6 +68,10 @@ SingleRawComment::SingleRawComment(StringRef RawText, unsigned ColumnIndent)
     : RawText(RawText), Kind(static_cast<unsigned>(getCommentKind(RawText))),
       ColumnIndent(ColumnIndent) {}
 
+/// Converts a range of comments (ordinary or doc) to a \c RawComment with
+/// only the last range of doc comments. Gyb comments, ie. "// ###" are skipped
+/// entirely as if they did not exist (so two doc comments would still be
+/// merged if there was a gyb comment inbetween).
 static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   if (Range.isInvalid())
     return RawComment();
@@ -91,25 +95,34 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
     assert(Tok.is(tok::comment));
 
     auto SRC = SingleRawComment(Tok.getRange(), SM);
+    unsigned Start =
+        SM.getLineAndColumnInBuffer(Tok.getRange().getStart()).first;
+    unsigned End = SM.getLineAndColumnInBuffer(Tok.getRange().getEnd()).first;
+    if (SRC.RawText.back() == '\n')
+      End--;
+
     if (SRC.isOrdinary()) {
-      // Skip gyb comments that are line number markers.
-      if (!SRC.RawText.startswith("// ###")) {
+      // If there's a normal comment then reset the current group, unless it's
+      // a gyb comment in which case we should just skip it.
+      if (SRC.isGyb())
+        LastEnd = End;
+      else
         Comments.clear();
-        LastEnd = 0;
-      }
       continue;
     }
 
-    // Merge comments if they are on same or consecutive lines.
-    unsigned Start =
-        SM.getLineAndColumnInBuffer(Tok.getRange().getStart()).first;
-    if (LastEnd > 0 && LastEnd + 1 < Start) {
+    // Merge and keep the *last* group, ie. if there's:
+    //   <comment1>
+    //   <whitespace>
+    //   <comment2>
+    //   <comment3>
+    // Only keep <comment2/3> and group into the one RawComment.
+
+    if (!Comments.empty() && Start > LastEnd + 1)
       Comments.clear();
-      LastEnd = 0;
-    } else {
-      Comments.push_back(SRC);
-      LastEnd = SM.getLineAndColumnInBuffer(Tok.getRange().getEnd()).first;
-    }
+    Comments.push_back(SRC);
+
+    LastEnd = End;
   }
 
   RawComment Result;
@@ -184,27 +197,13 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
   llvm_unreachable("invalid file kind");
 }
 
-static const Decl* getGroupDecl(const Decl *D) {
-  auto GroupD = D;
-
-  // Extensions always exist in the same group with the nominal.
-  if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
-                                                getInnermostTypeContext())) {
-    if (auto ExtNominal = ED->getExtendedNominal())
-      GroupD = ExtNominal;
-  }
-  return GroupD;
-}
-
 Optional<StringRef> Decl::getGroupName() const {
   if (hasClangNode())
     return None;
-  if (auto GroupD = getGroupDecl(this)) {
+  if (auto *Unit =
+          dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
-    if (auto *Unit =
-        dyn_cast<FileUnit>(GroupD->getDeclContext()->getModuleScopeContext())) {
-      return Unit->getGroupNameForDecl(GroupD);
-    }
+    return Unit->getGroupNameForDecl(this);
   }
   return None;
 }
@@ -212,12 +211,10 @@ Optional<StringRef> Decl::getGroupName() const {
 Optional<StringRef> Decl::getSourceFileName() const {
   if (hasClangNode())
     return None;
-  if (auto GroupD = getGroupDecl(this)) {
+  if (auto *Unit =
+          dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
-    if (auto *Unit =
-        dyn_cast<FileUnit>(GroupD->getDeclContext()->getModuleScopeContext())) {
-      return Unit->getSourceFileNameForDecl(GroupD);
-    }
+    return Unit->getSourceFileNameForDecl(this);
   }
   return None;
 }
@@ -225,9 +222,9 @@ Optional<StringRef> Decl::getSourceFileName() const {
 Optional<unsigned> Decl::getSourceOrder() const {
   if (hasClangNode())
     return None;
-  // We can only get source orders from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    // We can only get source orders from deserialized module files.
     return Unit->getSourceOrderForDecl(this);
   }
   return None;

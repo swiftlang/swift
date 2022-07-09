@@ -218,7 +218,7 @@ func testGetInitFromMetatype4() {
   type(of: a).#^INIT_FROM_METATYPE4^#
 }
 
-// INIT_FROM_METATYPE4: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ExplicitConstructorsDerived2#]; name=init(a: Int)
+// INIT_FROM_METATYPE4: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ExplicitConstructorsDerived2#]{{; name=.+$}}
 // INIT_FROM_METATYPE4-NOT: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsDerived2#]{{; name=.+$}}
 
 struct ExplicitConstructorsDerived3 {
@@ -284,7 +284,7 @@ struct ClosureInInit1 {
   var prop1: S = {
     return S(#^CLOSURE_IN_INIT_1^#
   }
-// CLOSURE_IN_INIT_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]{{(/TypeRelation\[Identical\])?}}:      ['(']{#Int#}[')'][#S#];
+// CLOSURE_IN_INIT_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]{{(/TypeRelation\[Convertible\])?}}:      ['(']{#Int#}[')'][#S#];
   var prop2: S = {
     return S(#^CLOSURE_IN_INIT_2?check=CLOSURE_IN_INIT_1^#
   }()
@@ -312,9 +312,9 @@ public class AvailableTest {
 func testAvailable() {
   let _ = AvailableTest(#^AVAILABLE_1^#
 // AVAILABLE_1: Begin completions, 3 items
-// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#opt: Int#}[')'][#AvailableTest?#]; name=opt: Int
-// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#normal1: Int#}[')'][#AvailableTest#]; name=normal1: Int
-// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2: Int
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#opt: Int#}[')'][#AvailableTest?#]; name=opt:
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#normal1: Int#}[')'][#AvailableTest#]; name=normal1:
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2:
 // AVAILABLE_1: End completions
 
   let _ = AvailableTest.init(#^AVAILABLE_2?check=AVAILABLE_1^#
@@ -330,8 +330,8 @@ class DependentTypeInClosure<Data: DataType> {
 func testDependentTypeInClosure() {
   let _: DependentTypeInClosure = .#^DEPENDENT_IN_CLOSURE_3^#
 // DEPENDENT_IN_CLOSURE_3: Begin completions, 2 items
-// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#(arg): DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
-// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#arg: DataType#}, {#fn: () -> Data.Content##() -> Data.Content#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#(arg): DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#arg: DataType#}, {#fn: () -> Data.Content##() -> Data.Content#})[#DependentTypeInClosure<DataType>#];
 // DEPENDENT_IN_CLOSURE_3: End completions
 
   let _ = DependentTypeInClosure(#^DEPENDENT_IN_CLOSURE_1^#)
@@ -344,8 +344,8 @@ func testDependentTypeInClosure() {
 // DEPENDENT_IN_CLOSURE_2: Begin completions, 4 items
 // DEPENDENT_IN_CLOSURE_2-DAG: Keyword[self]/CurrNominal:          self[#DependentTypeInClosure<_>.Type#]; name=self
 // DEPENDENT_IN_CLOSURE_2-DAG: Keyword/CurrNominal:                Type[#DependentTypeInClosure<_>.Type#]; name=Type
-// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#(arg): _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#})[#DependentTypeInClosure<_>#]; name=init(arg: _, fn: (_.Content) -> Void)
-// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#arg: _#}, {#fn: () -> _.Content##() -> _.Content#})[#DependentTypeInClosure<_>#]; name=init(arg: _, fn: () -> _.Content)
+// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#(arg): _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#})[#DependentTypeInClosure<_>#]; name=init(:fn:)
+// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#arg: _#}, {#fn: () -> _.Content##() -> _.Content#})[#DependentTypeInClosure<_>#]; name=init(arg:fn:)
 // DEPENDENT_IN_CLOSURE_2: End completions
 }
 struct InitWithUnresolved<Data: DataType> where Data.Content: Comparable {
@@ -360,4 +360,20 @@ func testInitWithUnresolved() {
 // INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg: _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#}[')'][#InitWithUnresolved<_>#];
 // INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg2: _#}[')'][#InitWithUnresolved<_>#];
 // INIT_WITH_UNRESOLVEDTYPE_1: End completions
+}
+
+func testIgnoreGenericArgsAfterCompletionToken() {
+  struct IPv4 {}
+
+  public struct HostRecord<IPType> {
+    init(position: inout Int) throws {}
+  }
+
+  func deserializeRecord() throws -> HostRecord<IPv4> {
+    var position = 42
+    return try #^IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN^#HostRecord<IPv4>(position: &position)
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN: Begin completions
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN-DAG: Decl[Struct]/Local: HostRecord[#HostRecord#];
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN: End completions
+  }
 }

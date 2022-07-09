@@ -1,0 +1,39 @@
+# This file defines availability macros mapping Swift releases to ABI stable
+# OS releases that include the corresponding Swift Standard Library version.
+#
+# The macros defined here are available for use in all Swift libraries and swift
+# lit tests defined in this repository. They can be used in place of a full
+# version constraint list in `@available` attributes. That is to say, instead of
+#
+#     @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
+#
+# we can write
+#
+#     @available(SwiftStdlib 5.2, *)
+#
+# Comments in this file start with `#`. Comments and empty lines are ignored.
+# Each of the remaining lines must define an availability macro in the same
+# format used by the `-define-availability` frontend command line option.
+
+# 9999 is the generic unknown future Swift release. It always needs to resolve
+# to the special placeholder version numbers 9999.
+
+SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
+
+# The last entry in this list corresponds to the Swift version currently under
+# development. This usually resolves to placeholder version numbers (9999) until
+# the corresponding operating systems get announced.
+
+SwiftStdlib 5.0:macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2
+SwiftStdlib 5.1:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0
+SwiftStdlib 5.2:macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4
+SwiftStdlib 5.3:macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0
+SwiftStdlib 5.4:macOS 11.3, iOS 14.5, watchOS 7.4, tvOS 14.5
+SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0
+SwiftStdlib 5.6:macOS 12.3, iOS 15.4, watchOS 8.5, tvOS 15.4
+SwiftStdlib 5.7:macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0
+SwiftStdlib 5.8:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
+
+# Local Variables:
+# mode: conf-unix
+# End:

@@ -82,7 +82,7 @@ func test_multiple_trailing_syntax_without_labels() {
 
   fn {} g: {} // Ok
 
-  fn {} _: {} // expected-error {{missing argument labels 'f:g:' in call}}
+  fn {} _: {} // expected-error {{missing argument label 'g:' in call}} {{9-10=g}} {{none}}
 
   fn {} g: <#T##() -> Void#> // expected-error {{editor placeholder in source file}}
 
@@ -93,43 +93,30 @@ func test_multiple_trailing_syntax_without_labels() {
   func mixed_args_1(a: () -> Void, _: () -> Void) {}
   func mixed_args_2(_: () -> Void, a: () -> Void, _: () -> Void) {} // expected-note {{'mixed_args_2(_:a:_:)' declared here}}
 
-  mixed_args_1
-    {}
-    _: {}
+  mixed_args_1 {} _: {}
 
-  mixed_args_1
-    {}  // expected-error {{incorrect argument labels in call (have '_:a:', expected 'a:_:')}}
-    a: {}
+  mixed_args_1 {} a: {}  // expected-error@:16 {{extraneous argument label 'a:' in call}} {{19-20=_}} {{none}}
 
-  mixed_args_2
-    {}
-    a: {}
-    _: {}
+  mixed_args_2 {} a: {} _: {}
 
-  mixed_args_2
-    {} // expected-error {{missing argument for parameter 'a' in call}}
-    _: {}
+  mixed_args_2 {} _: {} // expected-error@:18 {{missing argument for parameter 'a' in call}} {{18-18= a: <#() -> Void#>}} {{none}}
 
-  // FIXME: not a good diagnostic
-  mixed_args_2
-    {}  // expected-error {{missing argument label 'a:' in call}}
-    _: {}
-    _: {}
+  mixed_args_2 {} _: {} _: {} // expected-error@:16 {{missing argument label 'a:' in call}} {{19-20=a}} {{none}}
 }
 
 func produce(fn: () -> Int?, default d: () -> Int) -> Int { // expected-note {{declared here}}
   return fn() ?? d()
 }
 // TODO: The diagnostics here are perhaps a little overboard.
-_ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'default' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}} expected-error {{top-level statement cannot begin with a closure expression}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
-_ = produce { 2 } `default`: { 3 }
+_ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'default' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}}
+_ = produce { 2 } `default`: { 3 } // expected-error {{labeled block needs 'do'}} expected-warning {{integer literal is unused}}
 
 func f() -> Int { 42 }
 
 // This should be interpreted as a trailing closure, instead of being 
 // interpreted as a computed property with undesired initial value.
 struct TrickyTest {
-    var x : Int = f () { // expected-error {{argument passed to call that takes no arguments}}
+    var x : Int = f () { // expected-error {{extra trailing closure passed in call}}
         3
     }
 }

@@ -13,6 +13,7 @@
 #ifndef SWIFT_IRGEN_TYPE_LAYOUT_H
 #define SWIFT_IRGEN_TYPE_LAYOUT_H
 
+#include "FixedTypeInfo.h"
 #include "TypeInfo.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -62,6 +63,24 @@ public:
 
   virtual llvm::Value *alignmentMask(IRGenFunction &IGF) const;
   virtual llvm::Value *size(IRGenFunction &IGF) const;
+
+  /// Return the size of the type if known statically
+  virtual llvm::Optional<Size> fixedSize(IRGenModule &IGM) const;
+
+  /// Return if the type and its subtypes are POD.
+  virtual bool isPOD() const;
+  virtual bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                                   unsigned index) const;
+  virtual bool isSingleRetainablePointer() const;
+
+  /// Return if the size of the type is known statically
+  virtual bool isFixedSize(IRGenModule &IGM) const;
+
+  /// Return the alignment of the type if known statically
+  virtual llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const;
+
+  /// Return the number of extra inhabitants if known statically
+  virtual llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const;
   virtual llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const;
   virtual llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const;
 
@@ -122,10 +141,10 @@ protected:
 class ScalarTypeLayoutEntry : public TypeLayoutEntry,
                               public llvm::FoldingSetNode {
 public:
-  const TypeInfo &typeInfo;
+  const FixedTypeInfo &typeInfo;
   SILType representative;
 
-  ScalarTypeLayoutEntry(const TypeInfo &ti, SILType representative)
+  ScalarTypeLayoutEntry(const FixedTypeInfo &ti, SILType representative)
       : TypeLayoutEntry(TypeLayoutEntryKind::Scalar), typeInfo(ti),
         representative(representative) {}
 
@@ -140,6 +159,14 @@ public:
 
   llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *size(IRGenFunction &IGF) const override;
+  llvm::Optional<Size> fixedSize(IRGenModule &IGM) const override;
+  bool isFixedSize(IRGenModule &IGM) const override;
+  llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
+  llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -187,6 +214,14 @@ public:
 
   llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *size(IRGenFunction &IGF) const override;
+  llvm::Optional<Size> fixedSize(IRGenModule &IGM) const override;
+  bool isFixedSize(IRGenModule &IGM) const override;
+  llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
+  llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -233,6 +268,14 @@ public:
 
   llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *size(IRGenFunction &IGF) const override;
+  llvm::Optional<Size> fixedSize(IRGenModule &IGM) const override;
+  bool isFixedSize(IRGenModule &IGM) const override;
+  llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
+  llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -264,13 +307,12 @@ public:
 class AlignedGroupEntry : public TypeLayoutEntry, public llvm::FoldingSetNode {
   std::vector<TypeLayoutEntry *> entries;
   Alignment::int_type minimumAlignment;
-  bool isFixedSize;
 
 public:
   AlignedGroupEntry(std::vector<TypeLayoutEntry *> &entries,
-                    Alignment::int_type minimumAlignment, bool isFixedSize)
+                    Alignment::int_type minimumAlignment)
       : TypeLayoutEntry(TypeLayoutEntryKind::AlignedGroup), entries(entries),
-        minimumAlignment(minimumAlignment), isFixedSize(isFixedSize) {}
+        minimumAlignment(minimumAlignment) {}
 
   ~AlignedGroupEntry();
 
@@ -280,10 +322,18 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
   static void Profile(llvm::FoldingSetNodeID &ID,
                       const std::vector<TypeLayoutEntry *> &entries,
-                      Alignment::int_type minimumAlignment, bool isFixedSize);
+                      Alignment::int_type minimumAlignment);
 
   llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *size(IRGenFunction &IGF) const override;
+  llvm::Optional<Size> fixedSize(IRGenModule &IGM) const override;
+  bool isFixedSize(IRGenModule &IGM) const override;
+  llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
+  llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -312,6 +362,26 @@ public:
 #endif
 
 private:
+  /// Memoize the value of fixedSize()
+  /// None -> Not yet computed
+  /// Optional(None) -> Not fixed size
+  /// Optional(Size) -> Fixed Size
+  mutable llvm::Optional<llvm::Optional<Size>> _fixedSize =
+      llvm::NoneType::None;
+  /// Memoize the value of fixedAlignment()
+  /// None -> Not yet computed
+  /// Optional(None) -> Not fixed Alignment
+  /// Optional(Alignment) -> Fixed Alignment
+  mutable llvm::Optional<llvm::Optional<Alignment>> _fixedAlignment =
+      llvm::NoneType::None;
+
+  /// Memoize the value of fixedXICount()
+  /// None -> Not yet computed
+  /// Optional(None) -> Not fixed xi count
+  /// Optional(Count) -> Fixed XICount
+  mutable llvm::Optional<llvm::Optional<uint32_t>> _fixedXICount =
+      llvm::NoneType::None;
+
   llvm::Value *withExtraInhabitantProvidingEntry(
       IRGenFunction &IGF, Address addr, llvm::Type *returnType,
       llvm::function_ref<llvm::Value *(TypeLayoutEntry *,
@@ -328,6 +398,22 @@ private:
 class EnumTypeLayoutEntry : public TypeLayoutEntry,
                             public llvm::FoldingSetNode {
 public:
+  /// More efficient value semantics implementations for certain enum layouts.
+  enum CopyDestroyStrategy {
+    /// No special behavior.
+    Normal,
+    /// The payload is POD, so copying is bitwise, and destruction is a noop.
+    POD,
+    /// The payload is a single reference-counted value, and we have
+    /// a single no-payload case which uses the null extra inhabitant, so
+    /// copy and destroy can pass through to retain and release entry
+    /// points.
+    NullableRefcounted,
+    /// The payload's value witnesses can handle the extra inhabitants we use
+    /// for no-payload tags, so we can forward all our calls to them.
+    ForwardToPayload,
+  };
+
   unsigned numEmptyCases;
   unsigned minimumAlignment;
   std::vector<TypeLayoutEntry *> cases;
@@ -348,6 +434,15 @@ public:
 
   llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *size(IRGenFunction &IGF) const override;
+  llvm::Optional<Size> fixedSize(IRGenModule &IGM) const override;
+  bool isFixedSize(IRGenModule &IGM) const override;
+  llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
+  llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
+  CopyDestroyStrategy copyDestroyKind(IRGenFunction &IGF) const;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -385,6 +480,26 @@ public:
 #endif
 
 private:
+  /// Memoize the value of fixedSize()
+  /// None -> Not yet computed
+  /// Optional(None) -> Not fixed size
+  /// Optional(Size) -> Fixed Size
+  mutable llvm::Optional<llvm::Optional<Size>> _fixedSize =
+      llvm::NoneType::None;
+  /// Memoize the value of fixedAlignment()
+  /// None -> Not yet computed
+  /// Optional(None) -> Not fixed Alignment
+  /// Optional(Alignment) -> Fixed Alignment
+  mutable llvm::Optional<llvm::Optional<Alignment>> _fixedAlignment =
+      llvm::NoneType::None;
+
+  /// Memoize the value of fixedXICount()
+  /// None -> Not yet computed
+  /// Optional(None) -> Not fixed xi count
+  /// Optional(Count) -> Fixed XICount
+  mutable llvm::Optional<llvm::Optional<uint32_t>> _fixedXICount =
+      llvm::NoneType::None;
+
   llvm::Value *maxPayloadSize(IRGenFunction &IGF) const;
   llvm::BasicBlock *testSinglePayloadEnumContainsPayload(IRGenFunction &IGF,
                                                          Address addr) const;
@@ -400,7 +515,7 @@ private:
                               IsTake_t isTake) const;
 
   std::pair<Address, llvm::Value *>
-  getMultiPalyloadEnumTagByteAddrAndNumBytes(IRGenFunction &IGF,
+  getMultiPayloadEnumTagByteAddrAndNumBytes(IRGenFunction &IGF,
                                              Address addr) const;
 
   llvm::Value *
@@ -459,8 +574,7 @@ public:
 
   AlignedGroupEntry *
   getOrCreateAlignedGroupEntry(std::vector<TypeLayoutEntry *> &entries,
-                               Alignment::int_type minimumAlignment,
-                               bool isFixedSize);
+                               Alignment::int_type minimumAlignment);
 
   EnumTypeLayoutEntry *
   getOrCreateEnumEntry(unsigned numEmptyCase,

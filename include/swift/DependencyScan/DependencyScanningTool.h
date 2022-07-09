@@ -24,6 +24,10 @@
 namespace swift {
 namespace dependencies {
 
+/// Given a set of arguments to a print-target-info frontend tool query, produce the
+/// JSON target info.
+llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command);
+
 /// The high-level implementation of the dependency scanner that runs on
 /// an individual worker thread.
 class DependencyScanningTool {
@@ -59,13 +63,18 @@ public:
 
   /// Writes the current `SharedCache` instance to a specified FileSystem path.
   void serializeCache(llvm::StringRef path);
-  /// Loads an instance of a `ModuleDependenciesCache` to serve as the `SharedCache`
+  /// Loads an instance of a `GlobalModuleDependenciesCache` to serve as the `SharedCache`
   /// from a specified FileSystem path.
   bool loadCache(llvm::StringRef path);
   /// Discard the tool's current `SharedCache` and start anew.
   void resetCache();
 
 private:
+  /// Using the specified invocation command, initialize the scanner instance
+  /// for this scan. Returns the `CompilerInstance` that will be used.
+  llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
+  initScannerForAction(ArrayRef<const char *> Command);
+
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
   llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
@@ -73,7 +82,7 @@ private:
 
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.
-  std::unique_ptr<ModuleDependenciesCache> SharedCache;
+  std::unique_ptr<GlobalModuleDependenciesCache> SharedCache;
 
   /// Shared cache of compiler instances created during batch scanning, corresponding to
   /// command-line options specified in the batch scan input entry.

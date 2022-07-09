@@ -9,7 +9,7 @@
 // RUN: %FileCheck %s < %t/linker_directives.tbd
 // RUN: %FileCheck -check-prefix=CHECK-NO-NEW-SYMBOL %s < %t/linker_directives.tbd
 
-// RUN: %target-swift-frontend -target-variant x86_64-apple-ios13.0-macabi -typecheck %S/Inputs/linker-directive.swift -emit-tbd -emit-tbd-path %t/linker_directives.tbd -previous-module-installname-map-file %S/Inputs/install-name-map-toasterkit.json
+// RUN: %target-swift-frontend -target-variant x86_64-apple-ios13.1-macabi -typecheck %S/Inputs/linker-directive.swift -emit-tbd -emit-tbd-path %t/linker_directives.tbd -previous-module-installname-map-file %S/Inputs/install-name-map-toasterkit.json
 // RUN: %FileCheck -check-prefix=CHECK-ZIPPERED %s < %t/linker_directives.tbd
 // RUN: %FileCheck -check-prefix=CHECK-NO-NEW-SYMBOL %s < %t/linker_directives.tbd
 

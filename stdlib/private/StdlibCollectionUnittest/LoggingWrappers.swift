@@ -195,7 +195,7 @@ public struct LoggingSequence<Base : Sequence> {
 
 extension LoggingSequence: LoggingType {
   // I know, I know. It doesn't matter though. The benefit of the whole logging
-  // class hiearchy is unclear...
+  // class hierarchy is unclear...
   public typealias Log = SequenceLog
 
   public init(wrapping base: Base) {
@@ -387,6 +387,7 @@ extension LoggingMutableCollection: MutableCollection {
      return try base.partition(by: belongsInSecondPartition)
    }
    
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -601,6 +602,7 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     return base.distance(from: start, to: end)
   }
 
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

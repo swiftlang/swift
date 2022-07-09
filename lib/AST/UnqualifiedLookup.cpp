@@ -199,12 +199,20 @@ namespace {
   /// Used to gather lookup results
 class ASTScopeDeclConsumerForUnqualifiedLookup
     : public AbstractASTScopeDeclConsumer {
+private:
   UnqualifiedLookupFactory &factory;
 
   /// The 'self' parameter from the innermost scope containing the lookup
   /// location to be used when an instance member of a type is accessed,
-  /// or nullptr if instance members should not be 'self' qualified.
-  DeclContext *candidateSelfDC;
+  /// or \c nullptr if instance members should not be 'self' qualified.
+  ///
+  // FIXME: This field is currently reset to \c nullptr by `lookInMembers` as
+  // part of the lookup traversal of scopes. If, instead, consumers were
+  // created at each point in the traversal, this field would no longer need
+  // to be marked \c mutable.
+  mutable const DeclContext *candidateSelfDC;
+
+  void maybeUpdateSelfDC(VarDecl *var);
 
 public:
   ASTScopeDeclConsumerForUnqualifiedLookup(UnqualifiedLookupFactory &factory)
@@ -212,16 +220,12 @@ public:
 
   virtual ~ASTScopeDeclConsumerForUnqualifiedLookup() = default;
 
-  void maybeUpdateSelfDC(VarDecl *var);
-
   bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   bool consumePossiblyNotInScope(ArrayRef<VarDecl *> vars) override;
 
-  /// returns true if finished
-  bool lookInMembers(DeclContext *const scopeDC,
-                     NominalTypeDecl *const nominal) override;
+  bool lookInMembers(const DeclContext *) const override;
 
 #ifndef NDEBUG
   void startingNextLookupStep() override {
@@ -270,7 +274,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   (void)localCounter; // for debugging
 #endif
   FrontendStatsTracer StatsTracer(Ctx.Stats,
-                                  "performUnqualifedLookup",
+                                  "performUnqualifiedLookup",
                                   DC->getParentSourceFile());
 
   if (Loc.isValid() && DC->getParentSourceFile()) {
@@ -431,7 +435,21 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 #endif
     return;
   }
-  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
+
+  ModuleDecl *desiredModule = nullptr;
+  auto givenName = Name.getBaseIdentifier();
+  // Check if the given name appearing in the source file is a module
+  // real name or alias; for example, if `-module-alias Foo=Bar` was
+  // passed, the alias 'Foo' should appear in source files, not 'Bar'.
+  // If the real name 'Bar' was used, looking up getRealModuleName with
+  // the real name 'Bar' and realNameFromAlias option should return
+  // an empty Identifier.
+  if (!Ctx.getRealModuleName(givenName, ASTContext::ModuleAliasLookupOption::realNameFromAlias).empty()) {
+    // Only load the module if the lookup value is not empty, i.e. given
+    // name is a module alias, not a real module name.
+    desiredModule = Ctx.getLoadedModule(givenName);
+  }
+
   if (!desiredModule && Name.getFullName() == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
@@ -526,8 +544,7 @@ void UnqualifiedLookupFactory::lookInASTScopes() {
   ASTScope::unqualifiedLookup(DC->getParentSourceFile(), Loc, consumer);
 }
 
-void ASTScopeDeclConsumerForUnqualifiedLookup::maybeUpdateSelfDC(
-    VarDecl *var) {
+void ASTScopeDeclConsumerForUnqualifiedLookup::maybeUpdateSelfDC(VarDecl *var) {
   // We have a binding named 'self'.
   //
   // There are three possibilities:
@@ -636,8 +653,7 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
 
 // TODO: in future, migrate this functionality into ASTScopes
 bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
-    DeclContext *const scopeDC,
-    NominalTypeDecl *const nominal) {
+    const DeclContext *scopeDC) const {
   if (candidateSelfDC) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(candidateSelfDC)) {
       assert(factory.isInsideBodyOfFunction(afd) && "Should be inside");
@@ -659,7 +675,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
   // We're done looking inside a nominal type declaration. It is possible
   // that this nominal type is nested inside of another type, in which case
   // we will visit the outer type next. Make sure to clear out the known
-  // 'self' parameeter context, since any members of the outer type are
+  // 'self' parameter context, since any members of the outer type are
   // not accessed via the innermost 'self' parameter.
   candidateSelfDC = nullptr;
 
@@ -807,8 +823,7 @@ public:
     return (!stopAfterInnermostBraceStmt && !results.empty());
   }
 
-  bool lookInMembers(DeclContext *const,
-                     NominalTypeDecl *const) override {
+  bool lookInMembers(const DeclContext *) const override {
     return true;
   }
 

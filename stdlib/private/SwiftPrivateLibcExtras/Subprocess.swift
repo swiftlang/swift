@@ -15,6 +15,8 @@ import SwiftPrivate
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif os(WASI)
+import WASILibc
 #elseif os(Windows)
 import CRT
 import WinSDK
@@ -57,6 +59,18 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
   }
 }
 
+#if !SWIFT_STDLIB_HAS_COMMANDLINE
+@_silgen_name("_swift_stdlib_getUnsafeArgvArgc")
+internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
+
+public enum CommandLine {
+  public static var arguments: [String] = {
+    var argc: Int32 = 0
+    var unsafeArgv = _swift_stdlib_getUnsafeArgvArgc(&argc)
+    return (0 ..< Int(argc)).map { String(cString: unsafeArgv[$0]!) }
+  }()
+}
+#endif // !SWIFT_STDLIB_HAS_COMMANDLINE
 
 #if os(Windows)
 public func spawnChild(_ args: [String])
@@ -212,6 +226,30 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
   }
   return (fds[0], fds[1])
 }
+
+#if !SWIFT_STDLIB_HAS_ENVIRON
+@_silgen_name("_NSGetEnviron")
+func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>
+
+var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
+  #if os(macOS)
+  return _NSGetEnviron().pointee
+  #elseif os(Windows)
+  return __p_environ().pointee
+  #elseif os(Linux)
+  return __environ
+  #else
+  #error("unsupported platform")
+  #endif
+}
+#endif
+
+#if SWIFT_STDLIB_STATIC_PRINT
+func print(_ s: String) {
+  let data = Array("\(s)\n".utf8)
+  write(STDOUT_FILENO, data, data.count)
+}
+#endif
 
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.

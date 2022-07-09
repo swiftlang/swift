@@ -39,7 +39,8 @@
 // CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>
 
-// CHECK-DIRECT: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @"$s8subclass1ACN" {{.*}}, i8* {{.*}} @"$s8subclass1BCN" {{.*}}]
+// CHECK-DIRECT: @"objc_classes_$s8subclass1ACN" = internal global i8* {{.*}} @"$s8subclass1ACN" {{.*}}
+// CHECK-DIRECT: @"objc_classes_$s8subclass1BCN" = internal global i8* {{.*}} @"$s8subclass1BCN" {{.*}}
 
 class A {
   var x = 0

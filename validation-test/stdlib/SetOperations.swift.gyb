@@ -1,0 +1,515 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/SetOperations.swift
+// RUN: %line-directive %t/SetOperations.swift -- %target-build-swift %t/SetOperations.swift -o %t/SetOperations -Xfrontend -disable-access-control -swift-version 5
+// RUN: %target-codesign %t/SetOperations && %line-directive %t/SetOperations.swift -- %target-run %t/SetOperations
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+import SwiftPrivate
+
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
+#if _runtime(_ObjC)
+class Value: NSObject {
+  let value: Int
+  let identity: Int
+
+  init(_ value: Int, identity: Int = 0) {
+    self.value = value
+    self.identity = identity
+  }
+
+  override func isEqual(_ other: Any?) -> Bool {
+    guard let other = other as? Value else { return false }
+    return self.value == other.value
+  }
+
+  override var hash: Int {
+    value.hashValue
+  }
+}
+#else
+class Value: Hashable {
+  let value: Int
+  let identity: Int
+
+  init(_ value: Int, identity: Int = 0) {
+    self.value = value
+    self.identity = identity
+  }
+
+  static func ==(left: Value, right: Value) -> Bool {
+    left.value == right.value
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
+}
+#endif
+
+func makeNativeSet<S: Sequence>(
+  _ values: S,
+  identity: Int
+) -> Set<Value>
+where S.Element == Int {
+  let result = Set(values.map { Value($0, identity: identity) })
+  precondition(isNativeSet(result))
+  return result
+}
+
+func makeArray<S: Sequence>(
+  _ values: S,
+  identity: Int
+) -> Array<Value>
+where S.Element == Int {
+  return values.map { Value($0, identity: identity) }
+}
+
+func makeMinimalSequence<S: Sequence>(
+  _ values: S,
+  identity: Int
+) -> MinimalSequence<Value>
+where S.Element == Int {
+  return MinimalSequence(elements: values.map { Value($0, identity: identity) })
+}
+
+#if _runtime(_ObjC)
+func makeCocoaSet<S: Sequence>(
+  _ values: S,
+  identity: Int
+) -> Set<Value>
+where S.Element == Int {
+  let result = (NSSet(array: values.map { Value($0, identity: identity) })
+    as! Set<Value>)
+  precondition(!isNativeSet(result))
+  return result
+}
+#endif
+
+func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
+#if _runtime(_ObjC)
+  return s._variant.isNative
+#else
+  return true
+#endif
+}
+
+var suite = TestSuite("SetOperations")
+defer { runAllTests() }
+
+% inputKinds = {"native": "makeNativeSet", "cocoa": "makeCocoaSet"}
+% argumentKinds = {"native": "makeNativeSet", "cocoa": "makeCocoaSet", "array": "makeArray", "sequence": "makeMinimalSequence"}
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("union.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
+  let c = a.union(b)
+  expectTrue(isNativeSet(c))
+  expectEqual(c.count, 15)
+  // Check the resulting items and that they come from the correct input set.
+  for v in 0 ..< 15 {
+    guard let i = c.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v)")
+      continue
+    }
+    expectEqual(c[i].identity, v < 10 ? 1 : 2)
+  }
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("formUnion.${inputKind}.${argumentKind}") {
+  var a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
+  a.formUnion(b)
+  expectTrue(isNativeSet(a))
+  expectEqual(a.count, 15)
+  // Check the resulting items and that they come from the correct input set.
+  for v in 0 ..< 15 {
+    guard let i = a.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v)")
+      continue
+    }
+    expectEqual(a[i].identity, v < 10 ? 1 : 2)
+  }
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("intersection.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
+  let c = a.intersection(b)
+  expectTrue(isNativeSet(c))
+  expectEqual(c.count, 5)
+  // Check the resulting items and that they come from the correct input set.
+  for v in Array(0 ..< 5) + Array(10 ..< 15) {
+    expectFalse(c.contains(Value(v)), "Found \(v) in result")
+  }
+  for v in 5 ..< 10 {
+    guard let i = c.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v) in result")
+      continue
+    }
+    expectEqual(c[i].identity, 1)
+  }
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("intersection.same-number-of-duplicates-as-missing-items") {
+  let a = ${inputGenerator}([3, 6, 0, 1, 5, 2, 4], identity: 1)
+  let b = ${argumentGenerator}([0, 1, 1, 2, 3, 4, 5], identity: 2)
+  let c = a.intersection(b)
+  expectEqual(c.count, 6)
+  expectEqual(c, makeNativeSet(0 ..< 6, identity: 1))
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("formIntersection.${inputKind}.${argumentKind}") {
+  var a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
+  a.formIntersection(b)
+  expectTrue(isNativeSet(a))
+  expectEqual(a.count, 5)
+  // Check the resulting items and that they come from the correct input set.
+  for v in Array(0 ..< 5) + Array(10 ..< 15) {
+    expectFalse(a.contains(Value(v)), "Found \(v) in result")
+  }
+  for v in 5 ..< 10 {
+    guard let i = a.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v) in result")
+      continue
+    }
+    expectEqual(a[i].identity, 1)
+  }
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("symmetricDifference.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
+  let c = a.symmetricDifference(b)
+  expectTrue(isNativeSet(c))
+  expectEqual(c.count, 10)
+  // Check the resulting items and that they come from the correct input set.
+  for v in 5 ..< 10 {
+    expectFalse(c.contains(Value(v)), "Found \(v) in result")
+  }
+  for v in Array(0 ..< 5) + Array(10 ..< 15) {
+    guard let i = c.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v) in result")
+      continue
+    }
+    expectEqual(c[i].identity, v < 5 ? 1 : 2)
+  }
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("formSymmetricDifference.${inputKind}.${argumentKind}") {
+  var a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
+  a.formSymmetricDifference(b)
+  expectTrue(isNativeSet(a))
+  expectEqual(a.count, 10)
+  // Check the resulting items and that they come from the correct input set.
+  for v in 5 ..< 10 {
+    expectFalse(a.contains(Value(v)), "Found \(v) in result")
+  }
+  for v in Array(0 ..< 5) + Array(10 ..< 15) {
+    guard let i = a.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v) in result")
+      continue
+    }
+    expectEqual(a[i].identity, v < 5 ? 1 : 2)
+  }
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("subtracting.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
+  let c = a.subtracting(b)
+  expectTrue(isNativeSet(c))
+  expectEqual(c.count, 5)
+  // Check the resulting items and that they come from the correct input set.
+  for v in 5 ..< 10 {
+    expectFalse(c.contains(Value(v)), "Found \(v) in result")
+  }
+  for v in 0 ..< 5 {
+    guard let i = c.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v) in result")
+      continue
+    }
+    expectEqual(c[i].identity, 1)
+  }
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("subtract.${inputKind}.${argumentKind}") {
+  var a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
+  a.subtract(b)
+  expectTrue(isNativeSet(a))
+  expectEqual(a.count, 5)
+  // Check the resulting items and that they come from the correct input set.
+  for v in 5 ..< 10 {
+    expectFalse(a.contains(Value(v)), "Found \(v) in result")
+  }
+  for v in 0 ..< 5 {
+    guard let i = a.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v) in result")
+      continue
+    }
+    expectEqual(a[i].identity, 1)
+  }
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   needsCocoa = inputKind == "cocoa"
+%   if needsCocoa:
+#if _runtime(_ObjC)
+%   end
+suite.test("filter.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b = a.filter { $0.value % 2 == 0 }
+  expectTrue(isNativeSet(b))
+  expectEqual(b.count, 5)
+  for v in [1, 3, 5, 7, 9] {
+    expectFalse(b.contains(Value(v)), "Found \(v) in result")
+  }
+  for v in [0, 2, 4, 6, 8] {
+    guard let i = b.firstIndex(of: Value(v)) else {
+      expectTrue(false, "Could not find \(v) in result")
+      continue
+    }
+    expectEqual(b[i].identity, 1)
+  }
+}
+%   if needsCocoa:
+#endif
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("isSubset.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b0 = ${argumentGenerator}(0 ..< 0, identity: 2)
+  let b1 = ${argumentGenerator}(0 ..< 10, identity: 2)
+  let b2 = ${argumentGenerator}(0 ..< 15, identity: 2)
+  let b3 = ${argumentGenerator}(1 ..< 11, identity: 2)
+  let b4 = ${argumentGenerator}(10 ..< 15, identity: 2)
+  expectFalse(a.isSubset(of: b0))
+  expectTrue(a.isSubset(of: b1))
+  expectTrue(a.isSubset(of: b2))
+  expectFalse(a.isSubset(of: b3))
+  expectFalse(a.isSubset(of: b4))
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("isStrictSubset.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b0 = ${argumentGenerator}(0 ..< 0, identity: 2)
+  let b1 = ${argumentGenerator}(0 ..< 10, identity: 2)
+  let b2 = ${argumentGenerator}(0 ..< 15, identity: 2)
+  let b3 = ${argumentGenerator}(1 ..< 11, identity: 2)
+  let b4 = ${argumentGenerator}(10 ..< 15, identity: 2)
+  expectFalse(a.isStrictSubset(of: b0))
+  expectFalse(a.isStrictSubset(of: b1))
+  expectTrue(a.isStrictSubset(of: b2))
+  expectFalse(a.isStrictSubset(of: b3))
+  expectFalse(a.isStrictSubset(of: b4))
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("isSuperset.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b0 = ${argumentGenerator}(0 ..< 0, identity: 2)
+  let b1 = ${argumentGenerator}(0 ..< 10, identity: 2)
+  let b2 = ${argumentGenerator}(0 ..< 15, identity: 2)
+  let b3 = ${argumentGenerator}(1 ..< 11, identity: 2)
+  let b4 = ${argumentGenerator}(0 ..< 5, identity: 2)
+  let b5 = ${argumentGenerator}(10 ..< 15, identity: 2)
+  expectTrue(a.isSuperset(of: b0))
+  expectTrue(a.isSuperset(of: b1))
+  expectFalse(a.isSuperset(of: b2))
+  expectFalse(a.isSuperset(of: b3))
+  expectTrue(a.isSuperset(of: b4))
+  expectFalse(a.isSuperset(of: b5))
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("isStrictSuperset.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b0 = ${argumentGenerator}(0 ..< 0, identity: 2)
+  let b1 = ${argumentGenerator}(0 ..< 10, identity: 2)
+  let b2 = ${argumentGenerator}(0 ..< 15, identity: 2)
+  let b3 = ${argumentGenerator}(1 ..< 11, identity: 2)
+  let b4 = ${argumentGenerator}(0 ..< 5, identity: 2)
+  let b5 = ${argumentGenerator}(10 ..< 15, identity: 2)
+  expectTrue(a.isStrictSuperset(of: b0))
+  expectFalse(a.isStrictSuperset(of: b1))
+  expectFalse(a.isStrictSuperset(of: b2))
+  expectFalse(a.isStrictSuperset(of: b3))
+  expectTrue(a.isStrictSuperset(of: b4))
+  expectFalse(a.isStrictSuperset(of: b5))
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
+suite.test("isStrictSuperset.${inputKind}.${argumentKind}") {
+  let a = ${inputGenerator}(0 ..< 10, identity: 1)
+  let b0 = ${argumentGenerator}(0 ..< 0, identity: 2)
+  let b1 = ${argumentGenerator}(0 ..< 10, identity: 2)
+  let b2 = ${argumentGenerator}(0 ..< 15, identity: 2)
+  let b3 = ${argumentGenerator}(5 ..< 15, identity: 2)
+  let b4 = ${argumentGenerator}(0 ..< 5, identity: 2)
+  let b5 = ${argumentGenerator}(10 ..< 15, identity: 2)
+  expectTrue(a.isDisjoint(with: b0))
+  expectFalse(a.isDisjoint(with: b1))
+  expectFalse(a.isDisjoint(with: b2))
+  expectFalse(a.isDisjoint(with: b3))
+  expectFalse(a.isDisjoint(with: b4))
+  expectTrue(a.isDisjoint(with: b5))
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end

@@ -111,6 +111,27 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
   return None;
 }
 
+static bool isReadOnlyFunction(WellKnownFunction function) {
+  switch (function) {
+  case WellKnownFunction::ArrayInitEmpty:
+  case WellKnownFunction::AllocateUninitializedArray:
+  case WellKnownFunction::StringInitEmpty:
+  case WellKnownFunction::StringMakeUTF8:
+  case WellKnownFunction::StringEquals:
+  case WellKnownFunction::StringEscapePercent:
+  case WellKnownFunction::BinaryIntegerDescription:
+    return true;
+
+  case WellKnownFunction::EndArrayMutation:
+  case WellKnownFunction::FinalizeUninitializedArray:
+  case WellKnownFunction::ArrayAppendElement:
+  case WellKnownFunction::StringAppend:
+  case WellKnownFunction::AssertionFailure:
+  case WellKnownFunction::DebugPrint:
+    return false;
+  }
+}
+
 /// Helper function for creating UnknownReason without a payload.
 static SymbolicValue getUnknown(ConstExprEvaluator &evaluator, SILNode *node,
                                 UnknownReason::UnknownKind kind) {
@@ -409,7 +430,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
                         UnknownReason::UnknownWitnessMethodConformance);
     auto &module = wmi->getModule();
     SILFunction *fn =
-        module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
+        module.lookUpFunctionInWitnessTable(conf, wmi->getMember(),
+            SILModule::LinkingMode::LinkAll).first;
     // If we were able to resolve it, then we can proceed.
     if (fn)
       return SymbolicValue::getFunction(fn);
@@ -1422,7 +1444,7 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
     // Ignore markers, loads, and other things that aren't stores to this stack
     // value.
     if (isa<LoadInst>(user) || isa<DeallocStackInst>(user) ||
-        isa<DestroyAddrInst>(user) || isa<DebugValueAddrInst>(user))
+        isa<DestroyAddrInst>(user) || DebugValueInst::hasAddrVal(user))
       continue;
 
     // TODO: Allow BeginAccess/EndAccess users.
@@ -1737,8 +1759,7 @@ llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
 llvm::Optional<SymbolicValue>
 ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // These are just markers.
-  if (isa<DebugValueInst>(inst) || isa<DebugValueAddrInst>(inst) ||
-      isa<EndAccessInst>(inst) ||
+  if (isa<DebugValueInst>(inst) || isa<EndAccessInst>(inst) ||
       // The interpreter doesn't model these memory management instructions, so
       // skip them.
       isa<DestroyAddrInst>(inst) || isa<RetainValueInst>(inst) ||
@@ -1929,13 +1950,13 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     // tuple-typed argument.
     assert(caseBB->getNumArguments() == 1);
 
-    if (caseBB->getParent()->hasOwnership() &&
-        switchInst.getDefaultBBOrNull() == caseBB) {
-      // If we are visiting the default block and we are in ossa, then we may
-      // have uses of the failure parameter. That means we need to map the
-      // original value to the argument.
-      setValue(caseBB->getArgument(0), value);
-      return {caseBB->begin(), None};
+    if (caseBB == switchInst.getDefaultBBOrNull().getPtrOrNull()) {
+      if (!switchInst.getUniqueCaseForDefault()) {
+        // In OSSA, the default block forward the original enum value whenever
+        // it does not correspond to a unique case.
+        setValue(caseBB->getArgument(0), value);
+        return {caseBB->begin(), None};
+      }
     }
 
     assert(value.getKind() == SymbolicValue::EnumWithPayload);
@@ -2291,4 +2312,40 @@ bool swift::hasConstantEvaluableAnnotation(SILFunction *fun) {
 bool swift::isConstantEvaluable(SILFunction *fun) {
   return hasConstantEvaluableAnnotation(fun) ||
          isKnownConstantEvaluableFunction(fun);
+}
+
+/// Return true iff the \p applySite is constant-evaluable and read-only.
+///
+/// Functions annotated as "constant_evaluable" are assumed to be "side-effect
+/// free", unless their signature and substitution map indicates otherwise. A
+/// constant_evaluable function call is read only unless it:
+///   (1) has generic parameters
+///   (2) has inout parameters
+///   (3) has indirect results
+///
+/// Read-only constant evaluable functions can do only the following and
+/// nothing else:
+///   (1) The call may read any memory location.
+///   (2) The call may destroy owned parameters i.e., consume them.
+///   (3) The call may write into memory locations newly created by the call.
+///   (4) The call may use assertions, which traps at runtime on failure.
+///   (5) The call may return a non-generic value.
+///
+/// Essentially, these are calls whose "effect" is visible only in their return
+/// value or through the parameters that are destroyed. The return value
+/// is also guaranteed to have value semantics as it is non-generic and
+/// reference semantics is not constant evaluable.
+bool swift::isReadOnlyConstantEvaluableCall(FullApplySite applySite) {
+  SILFunction *callee = applySite.getCalleeFunction();
+  if (!callee)
+    return false;
+
+  if (auto knownFunction = classifyFunction(callee)) {
+    return isReadOnlyFunction(knownFunction.getValue());
+  }
+  if (!hasConstantEvaluableAnnotation(callee))
+    return false;
+
+  return !applySite.hasSubstitutions() && !getNumInOutArguments(applySite)
+         && !applySite.getNumIndirectSILResults();
 }

@@ -1,8 +1,10 @@
 // RUN: %target-run-simple-swift %t
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=wasi
 
 import StdlibUnittest
+import SwiftPrivateLibcExtras
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
@@ -251,13 +253,7 @@ POSIXTests.test("fcntl(CInt, CInt, UnsafeMutableRawPointer): locking and unlocki
   // Lock for reading...
   var flck = flock()
   flck.l_type = Int16(F_RDLCK)
-  #if os(Android)
-  // In Android l_len is __kernel_off_t which is not the same size as off_t in
-  // 64 bits.
-  flck.l_len = __kernel_off_t(data.utf8.count)
-  #else
   flck.l_len = off_t(data.utf8.count)
-  #endif
   rc = fcntl(fd, F_SETLK, &flck)
   expectEqual(0, rc)
 

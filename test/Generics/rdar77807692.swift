@@ -16,6 +16,6 @@ protocol P2 {
 }
 
 struct S2<X, Y: P2> where Y.Value == X {
-  // CHECK-LABEL: Generic signature: <X, Y, T where X == S1<T>, Y : P2, T : P1, Y.Value == S1<T>>
+  // CHECK-LABEL: Generic signature: <X, Y, T where X == S1<T>, Y : P2, T : P1, Y.[P2]Value == S1<T>>
   init<T>(_: T) where X == S1<T> { }
 }

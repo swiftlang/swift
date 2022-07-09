@@ -539,22 +539,11 @@ bb0:
 // CHECK-NEXT: return %4 : $Builtin.Int64
 }
 
-// Fold x < 0 into false, if x is known to be a result of an unsigned
-// operation with overflow checks enabled.
-// At the same time x >= 0 is always true under the same conditions.
-//
-// CHECK-LABEL: sil [ossa] @fold_unsigned_op_with_overflow_lt_zero :
+// CHECK-LABEL: sil [ossa] @dont_fold_unsigned_op_with_overflow_lt_zero :
 // CHECK: builtin "uadd_with_overflow_Int64"
-// CHECK: integer_literal $Builtin.Int1, 0
-// CHECK: integer_literal $Builtin.Int1, -1
-// CHECK: builtin "usub_with_overflow_Int64"
-// CHECK: integer_literal $Builtin.Int1, 0
-// CHECK: integer_literal $Builtin.Int1, -1
-// CHECK: builtin "umul_with_overflow_Int64"
-// CHECK: integer_literal $Builtin.Int1, 0
-// CHECK: integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: return {{.*}}$Builtin.Int64
-sil [ossa] @fold_unsigned_op_with_overflow_lt_zero : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+// CHECK-NOT: integer_literal
+// CHECK: } // end sil function 'dont_fold_unsigned_op_with_overflow_lt_zero'
+sil [ossa] @dont_fold_unsigned_op_with_overflow_lt_zero : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
  %zero  = integer_literal $Builtin.Int64, 0
  %2 = integer_literal $Builtin.Int1, -1
@@ -585,18 +574,11 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
  return %uadd_with_overflow_result : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil [ossa] @fold_unsigned_op_with_overflow_lt_zero_destructure :
+// CHECK-LABEL: sil [ossa] @dont_fold_unsigned_op_with_overflow_lt_zero_destructure :
 // CHECK: builtin "uadd_with_overflow_Int64"
-// CHECK: integer_literal $Builtin.Int1, 0
-// CHECK: integer_literal $Builtin.Int1, -1
-// CHECK: builtin "usub_with_overflow_Int64"
-// CHECK: integer_literal $Builtin.Int1, 0
-// CHECK: integer_literal $Builtin.Int1, -1
-// CHECK: builtin "umul_with_overflow_Int64"
-// CHECK: integer_literal $Builtin.Int1, 0
-// CHECK: integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: return {{.*}}$Builtin.Int64
-sil [ossa] @fold_unsigned_op_with_overflow_lt_zero_destructure : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+// CHECK-NOT: integer_literal
+// CHECK: } // end sil function 'dont_fold_unsigned_op_with_overflow_lt_zero_destructure'
+sil [ossa] @dont_fold_unsigned_op_with_overflow_lt_zero_destructure : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
  %zero  = integer_literal $Builtin.Int64, 0
  %2 = integer_literal $Builtin.Int1, -1

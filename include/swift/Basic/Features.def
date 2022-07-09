@@ -28,13 +28,38 @@
 //     Option: either a reference to a language option in the form
 //       "langOpts.<option name>" or "true" to indicate that it's always
 //       enabled.
+//
+// Suppressible language features can be suppressed when printing
+// an interface without having to suppress the entire declaration they're
+// contained within.  The declaration will be emitted multiple times,
+// each with a subset of the suppressible features.  To avoid combinatoric
+// re-emission, we assume a linear history: later features in this file
+// imply the existence of earlier features.  (This only needs to apply to
+// suppressible features.)
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LANGUAGE_FEATURE
 #  error define LANGUAGE_FEATURE before including Features.def
 #endif
 
-LANGUAGE_FEATURE(StaticAssert, 0, "#assert", langOpts.EnableExperimentalStaticAssert)
+#ifndef SUPPRESSIBLE_LANGUAGE_FEATURE
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
+  LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
+#endif
+
+#ifndef FUTURE_FEATURE
+#  define FUTURE_FEATURE(FeatureName, SENumber, Version)   \
+     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName, \
+                      langOpts.hasFeature(#FeatureName))
+#endif
+
+#ifndef EXPERIMENTAL_FEATURE
+#  define EXPERIMENTAL_FEATURE(FeatureName)  \
+     LANGUAGE_FEATURE(FeatureName, 0, #FeatureName, \
+                      langOpts.hasFeature(#FeatureName))
+#endif
+
 LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
 LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties", true)
 LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
@@ -47,11 +72,47 @@ LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type", true)
 LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable", true)
 LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type", true)
 LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins", true)
+LANGUAGE_FEATURE(BuiltinHopToActor, 0, "Builtin.HopToActor", true)
 LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins", true)
 LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute", true)
 LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true)
 LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
 LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin", true)
 LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
+LANGUAGE_FEATURE(BuiltinMove, 0, "Builtin.move()", true)
+LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
+LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
+LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 
+FUTURE_FEATURE(ConciseMagicFile, 274, 6)
+FUTURE_FEATURE(ForwardTrailingClosures, 286, 6)
+FUTURE_FEATURE(BareSlashRegexLiterals, 354, 6)
+
+EXPERIMENTAL_FEATURE(StaticAssert)
+EXPERIMENTAL_FEATURE(VariadicGenerics)
+EXPERIMENTAL_FEATURE(NamedOpaqueTypes)
+EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures)
+EXPERIMENTAL_FEATURE(MoveOnly)
+EXPERIMENTAL_FEATURE(OneWayClosureParameters)
+EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
+
+/// Whether to enable experimental differentiable programming features:
+/// `@differentiable` declaration attribute, etc.
+EXPERIMENTAL_FEATURE(DifferentiableProgramming)
+
+/// Whether to enable forward mode differentiation.
+EXPERIMENTAL_FEATURE(ForwardModeDifferentiation)
+
+/// Whether to enable experimental `AdditiveArithmetic` derived
+/// conformances.
+EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances)
+
+#undef EXPERIMENTAL_FEATURE
+#undef FUTURE_FEATURE
+#undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE

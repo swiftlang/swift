@@ -507,7 +507,7 @@ extension __CocoaDictionary: _DictionaryBuffer {
       }
     }
     _internalInvariantFailure(
-      "An NSDictionary key wassn't listed amongst its enumerated contents")
+      "An NSDictionary key wasn't listed amongst its enumerated contents")
   }
 
   @usableFromInline

@@ -69,6 +69,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_bridging_header_directory_for_print)) {
     Opts.BridgingHeaderDirForPrint = A->getValue();
   }
+  Opts.IndexIgnoreClangModules |= Args.hasArg(OPT_index_ignore_clang_modules);
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
 
@@ -120,7 +121,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.SerializeDependencyScannerCache |= Args.hasArg(OPT_serialize_dependency_scan_cache);
   Opts.ReuseDependencyScannerCache |= Args.hasArg(OPT_reuse_dependency_scan_cache);
   Opts.EmitDependencyScannerCacheRemarks |= Args.hasArg(OPT_dependency_scan_cache_remarks);
-  Opts.TestDependencyScannerCacheSerialization |= Args.hasArg(OPT_debug_test_dependency_scan_cache_serialization);
   if (const Arg *A = Args.getLastArg(OPT_dependency_scan_cache_path)) {
     Opts.SerializedDependencyScannerCachePath = A->getValue();
   }
@@ -142,6 +142,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
+  Opts.DowngradeInterfaceVerificationError |=
+    Args.hasArg(OPT_downgrade_typecheck_interface_error);
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();
@@ -168,7 +170,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
-  // None here means error, not just "no inputs". Propagage unconditionally.
+  // None here means error, not just "no inputs". Propagate unconditionally.
   if (!inputsAndOutputs)
     return true;
 
@@ -230,13 +232,19 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (checkUnusedSupplementaryOutputPaths())
     return true;
 
-  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction) &&
-      (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
-       Args.hasArg(OPT_experimental_skip_all_function_bodies) ||
-       Args.hasArg(
-         OPT_experimental_skip_non_inlinable_function_bodies_without_types))) {
-    Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
-    return true;
+  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
+    if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
+        Args.hasArg(OPT_experimental_skip_all_function_bodies) ||
+        Args.hasArg(
+         OPT_experimental_skip_non_inlinable_function_bodies_without_types)) {
+      Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
+      return true;
+    }
+
+    if (Args.hasArg(OPT_check_api_availability_only)) {
+      Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_checking_api_availability_only);
+      return true;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_module_abi_name))
@@ -244,6 +252,12 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
+
+  // This must be called after computing module name, module abi name,
+  // and module link name. If computing module aliases is unsuccessful,
+  // return early.
+  if (!computeModuleAliases())
+    return true;
 
   if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
     Opts.AccessNotesPath = A->getValue();
@@ -254,11 +268,15 @@ bool ArgsToFrontendOptionsConverter::convert(
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 
+  Opts.DebugPrefixSerializedDebuggingOptions |=
+      Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
+  Opts.ExposePublicDeclsInClangHeader =
+      Args.hasArg(OPT_clang_header_expose_public_decls);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
@@ -276,6 +294,13 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.Static = Args.hasArg(OPT_static);
 
+  Opts.HermeticSealAtLink = Args.hasArg(OPT_experimental_hermetic_seal_at_link);
+
+  for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
+  }
+  Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
   return false;
 }
 
@@ -457,6 +482,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpTypeInfo;
   if (Opt.matches(OPT_print_ast))
     return FrontendOptions::ActionType::PrintAST;
+  if (Opt.matches(OPT_print_ast_decl))
+    return FrontendOptions::ActionType::PrintASTDecl;
   if (Opt.matches(OPT_emit_pcm))
     return FrontendOptions::ActionType::EmitPCM;
   if (Opt.matches(OPT_dump_pcm))
@@ -499,7 +526,17 @@ bool ArgsToFrontendOptionsConverter::setUpImmediateArgs() {
   return false;
 }
 
+bool ArgsToFrontendOptionsConverter::computeModuleAliases() {
+  auto list = Args.getAllArgValues(options::OPT_module_alias);
+  return ModuleAliasesConverter::computeModuleAliases(list, Opts, Diags);
+}
+
 bool ArgsToFrontendOptionsConverter::computeModuleName() {
+  // Module name must be computed before computing module
+  // aliases. Instead of asserting, clearing ModuleAliasMap
+  // here since it can be called redundantly in batch-mode
+  Opts.ModuleAliasMap.clear();
+
   const Arg *A = Args.getLastArg(options::OPT_module_name);
   if (A) {
     Opts.ModuleName = A->getValue();
@@ -590,8 +627,8 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
                    diag::error_mode_cannot_emit_reference_dependencies);
     return true;
   }
-  if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+  if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return true;
   }
@@ -609,6 +646,16 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasModuleDocOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitABIDescriptor(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasABIDescriptorOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_abi_descriptor);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitModuleSemanticInfo(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleSemanticInfoOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_semantic_info);
     return true;
   }
   // If we cannot emit module doc, we cannot emit source information file either.
@@ -661,4 +708,65 @@ void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
   for (const Arg *A : Args.filtered(OPT_Xllvm)) {
     Opts.LLVMArgs.push_back(A->getValue());
   }
+}
+
+bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
+                                                  FrontendOptions &options,
+                                                  DiagnosticEngine &diags) {
+  if (!args.empty()) {
+    // ModuleAliasMap should initially be empty as setting
+    // it should be called only once
+    options.ModuleAliasMap.clear();
+    
+    auto validate = [&options, &diags](StringRef value, bool allowModuleName) -> bool
+    {
+      if (!allowModuleName) {
+        if (value == options.ModuleName ||
+            value == options.ModuleABIName ||
+            value == options.ModuleLinkName) {
+          diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
+          return false;
+        }
+      }
+      if (value == STDLIB_NAME) {
+        diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
+        return false;
+      }
+      if (!Lexer::isIdentifier(value)) {
+        diags.diagnose(SourceLoc(), diag::error_bad_module_name, value, false);
+        return false;
+      }
+      return true;
+    };
+    
+    for (auto item: args) {
+      auto str = StringRef(item);
+      // splits to an alias and the underlying name
+      auto pair = str.split('=');
+      auto lhs = pair.first;
+      auto rhs = pair.second;
+      
+      if (rhs.empty()) { // '=' is missing
+        diags.diagnose(SourceLoc(), diag::error_module_alias_invalid_format, str);
+        return false;
+      }
+      if (!validate(lhs, false) || !validate(rhs, true)) {
+        return false;
+      }
+      
+      // First, add the underlying name as a key to prevent it from being
+      // used as an alias
+      if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {
+        diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, rhs);
+        return false;
+      }
+      // Next, add the alias as a key and the underlying name as a value to the map
+      auto underlyingName = options.ModuleAliasMap.find(rhs)->first();
+      if (!options.ModuleAliasMap.insert({lhs, underlyingName}).second) {
+        diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, lhs);
+        return false;
+      }
+    }
+  }
+  return true;
 }

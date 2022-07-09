@@ -1,0 +1,9 @@
+module ExportedCore [system] [extern_c] {
+  header "ExportedCore.h"
+
+  export_as Exported
+}
+
+module Exported [system] [extern_c] {
+  header "Exported.h"
+}

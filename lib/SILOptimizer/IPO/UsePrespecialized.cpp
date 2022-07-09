@@ -115,12 +115,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (PrevF) {
       LLVM_DEBUG(llvm::dbgs() << "Found a specialization: " << ClonedName
                               << "\n");
-      if (PrevF->getLinkage() != SILLinkage::SharedExternal)
-        NewF = PrevF;
-      else {
-        LLVM_DEBUG(llvm::dbgs() << "Wrong linkage: " << (int)PrevF->getLinkage()
-                                << "\n");
-      }
+      NewF = PrevF;
     }
 
     if (!PrevF || !NewF) {

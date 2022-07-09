@@ -20,6 +20,7 @@
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -119,6 +120,10 @@ public:
   bool isStandardComparisonOperator() const {
     return is("==") || is("!=") || is("===") || is("!==") || is("<") ||
            is(">") || is("<=") || is(">=");
+  }
+
+  bool isNilCoalescingOperator() const {
+    return is("??");
   }
 
   /// isOperatorStartCodePoint - Return true if the specified code point is a
@@ -831,7 +836,7 @@ public:
   /// Split \p string into selector pieces on colons to create an ObjCSelector.
   ///
   /// This should not be used to parse selectors written directly in Swift
-  /// source source code (e.g. the argument of an @objc attribute). Use the
+  /// source code (e.g. the argument of an @objc attribute). Use the
   /// parser for that.
   static llvm::Optional<ObjCSelector> parse(ASTContext &ctx, StringRef string);
 

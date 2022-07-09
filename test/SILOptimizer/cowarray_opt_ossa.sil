@@ -70,7 +70,7 @@ sil [ossa] @unknown : $@convention(thin) () -> ()
 // CHECK: } // end sil function 'simple_hoist'
 sil [ossa] @simple_hoist : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
-  debug_value_addr %0 : $*MyArray<MyStruct>
+  debug_value %0 : $*MyArray<MyStruct>, expr op_deref
   %2 = load [copy] %0 : $*MyArray<MyStruct>
   br bb1
 
@@ -283,7 +283,7 @@ bb2:
 // CHECK-LABEL: } // end sil function 'dont_hoist_if_executed_conditionally'
 sil [ossa] @dont_hoist_if_executed_conditionally : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> @owned MyArray<MyStruct> {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
-  debug_value_addr %0 : $*MyArray<MyStruct>
+  debug_value %0 : $*MyArray<MyStruct>, expr op_deref
   %2 = load [copy] %0 : $*MyArray<MyStruct>
   br bb1(%2 : $MyArray<MyStruct>)
 

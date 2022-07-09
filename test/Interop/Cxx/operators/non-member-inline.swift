@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
 
@@ -41,6 +41,15 @@ OperatorsTestSuite.test("slash (/)") {
   let result = lhs / rhs
 
   expectEqual(1, result.value)
+}
+
+OperatorsTestSuite.test("caret (^)") {
+  let lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 23)
+
+  let result = lhs ^ rhs
+
+  expectEqual(61, result.value)
 }
 
 OperatorsTestSuite.test("percent (%)") {

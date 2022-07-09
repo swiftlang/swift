@@ -261,7 +261,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// The magnitude of a floating-point value `x` of type `F` can be calculated
   /// by using the following formula, where `**` is exponentiation:
   ///
-  ///     let magnitude = x.significand * F.radix ** x.exponent
+  ///     x.significand * (F.radix ** x.exponent)
   ///
   /// A conforming type may use any integer radix, but values other than 2 (for
   /// binary floating-point types) or 10 (for decimal floating-point types)
@@ -328,15 +328,19 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// `infinity` is greater than this value.
   static var greatestFiniteMagnitude: Self { get }
 
-  /// The mathematical constant pi.
+  /// The [mathematical constant π][wiki], approximately equal to 3.14159.
+  /// 
+  /// When measuring an angle in radians, π is equivalent to a half-turn.
   ///
-  /// This value should be rounded toward zero to keep user computations with
-  /// angles from inadvertently ending up in the wrong quadrant. A type that
-  /// conforms to the `FloatingPoint` protocol provides the value for `pi` at
-  /// its best possible precision.
+  /// This value is rounded toward zero to keep user computations with angles
+  /// from inadvertently ending up in the wrong quadrant. A type that conforms
+  /// to the `FloatingPoint` protocol provides the value for `pi` at its best
+  /// possible precision.
   ///
   ///     print(Double.pi)
   ///     // Prints "3.14159265358979"
+  ///
+  /// [wiki]: https://en.wikipedia.org/wiki/Pi
   static var pi: Self { get }
 
   // NOTE: Rationale for "ulp" instead of "epsilon":
@@ -1895,7 +1899,8 @@ extension BinaryFloatingPoint {
     switch (Source.exponentBitCount, Source.significandBitCount) {
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
     case (5, 10):
-      guard #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+      guard #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) //SwiftStdlib 5.3
+      else {
         // Convert signaling NaN to quiet NaN by multiplying by 1.
         self = Self._convert(from: value).value * 1
         break

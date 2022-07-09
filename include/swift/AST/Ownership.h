@@ -23,9 +23,9 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
-#include <stdint.h>
 #include <assert.h>
+#include <limits.h>
+#include <stdint.h>
 
 namespace swift {
 
@@ -75,7 +75,7 @@ static inline bool isLessStrongThan(ReferenceOwnership left,
   auto strengthOf = [] (ReferenceOwnership ownership) -> int {
     // A reference can be optimized away if outlived by a stronger reference.
     // NOTES:
-    // 1) Different reference kinds of the same strength are NOT interchangable.
+    // 1) Different reference kinds of the same strength are NOT interchangeable.
     // 2) Stronger than "strong" might include locking, for example.
     // 3) Unchecked references must be last to preserve identity comparisons
     //     until the last checked reference is dead.
@@ -116,9 +116,6 @@ optionalityOf(ReferenceOwnership ownership) {
   }
   llvm_unreachable("impossible");
 }
-
-/// Diagnostic printing of \c StaticSpellingKind.
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ReferenceOwnership RO);
 
 /// Different kinds of value ownership supported by Swift.
 enum class ValueOwnership : uint8_t {

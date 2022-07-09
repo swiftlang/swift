@@ -452,8 +452,17 @@ BUILTIN_SIL_OPERATION(BeginCOWMutation_native, "beginCOWMutation_native", Specia
 /// inout argument. After calling this builtin, the buffer must not be mutated.
 BUILTIN_SIL_OPERATION(EndCOWMutation, "endCOWMutation", Special)
 
-/// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
+/// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.Word
+///
+/// Binds memory to a statically known type. Returns an opaque token
+/// representing the memory region's previously bound types.
 BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
+
+/// rebindMemory : (Builtin.RawPointer, Builtin.Word) -> Builtin.Word
+///
+/// Binds memory to the types represented by an opaque token operand. Returns an
+/// opaque token representing the memory region's previously bound types.
+BUILTIN_SIL_OPERATION(RebindMemory, "rebindMemory", Special)
 
 /// allocWithTailElems_<n>(C.Type,
 ///                    Builtin.Word, E1.Type, ... , Builtin.Word, En.Type) -> C\
@@ -600,6 +609,29 @@ BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
 /// was allocated.
 BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 
+/// StackAlloc has type (Int, Int, Int) -> Builtin.RawPointer
+///
+/// Parameters: capacity, stride, alignment
+///
+/// The resulting pointer comes from the stack (as in the non-standard C
+/// extension `alloca()`.) It is at least as aligned as specified and is valid
+/// until the end of the calling scope.
+///
+/// The count and stride are multiplied together to get the byte count to use
+/// for the allocation.
+///
+/// The passed alignment must be a positive power of two. If the alignment value
+/// is not known at compile time, MaximumAlignment is assumed.
+BUILTIN_MISC_OPERATION(StackAlloc, "stackAlloc", "", Special)
+
+/// StackDealloc has type (Builtin.RawPointer) -> ()
+///
+/// Parameters: address.
+///
+/// The range starting at `address`, previously allocated with
+/// Builtin.stackAlloc(), is deallocated from the stack.
+BUILTIN_MISC_OPERATION(StackDealloc, "stackDealloc", "", Special)
+
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", "", None)
 
@@ -639,6 +671,9 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 /// Returns the selected assertion configuration.
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
+/// Ifdef has type () -> Bool.
+BUILTIN_MISC_OPERATION(Ifdef, "ifdef", "n", Special)
+
 /// StringObjectOr has type (T,T) -> T.
 /// Sets bits in a string object. The first operand is bit-cast string literal
 /// pointer to an integer. The second operand is the bit mask to be or'd into
@@ -664,7 +699,7 @@ BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 /// zeroInitializer has type <T> () -> T
 BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
-/// once has type (Builtin.RawPointer, () -> ())
+/// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 /// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
 BUILTIN_MISC_OPERATION(OnceWithContext, "onceWithContext", "", Special)
@@ -727,17 +762,16 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
-/// Initialize a "proxy" for a distributed remote actor.
+/// Allocate a "proxy" for a distributed remote actor.  TODO(distributed) change the name of this to create throughout.
 BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
                        "initializeDistributedRemoteActor", "", Special)
-
-/// Destroy the distributed-actor instance in a "proxy" actor object.
-BUILTIN_MISC_OPERATION(DestroyDistributedActor,
-                       "destroyDistributedActor", "", Special)
 
 /// Resume a non-throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
                        "resumeNonThrowingContinuationReturning", "", Special)
+
+/// targetOSVersionAtLeast has type (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+BUILTIN_MISC_OPERATION(TargetOSVersionAtLeast, "targetOSVersionAtLeast", "n", Special)
 
 /// Resume a throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
@@ -754,6 +788,55 @@ BUILTIN_MISC_OPERATION(CreateTaskGroup,
 /// Destroy a task group.
 BUILTIN_MISC_OPERATION(DestroyTaskGroup,
                        "destroyTaskGroup", "", Special)
+
+
+/// A builtin that can only be called from a transparent generic function. Takes
+/// two operands, the first operand the result address, the second operand the
+/// input address. Transforms into load [take] + move_value + store [init] when
+/// transparently inlined into a caller that has the generic of the callee
+/// specialized into a loadable type. If the transparent inlining does not
+/// specialize the type (due to being inlined into a non-generic context, the
+/// SILVerifier will abort).
+///
+/// Illegal to call except for in Swift._move in the stdlib. This is enforced by
+/// the SILVerifier.
+BUILTIN_MISC_OPERATION(Move, "move", "", Special)
+
+/// A builtin that can only be called from a transparent generic function. Takes
+/// two operands, the first operand the result address, the second operand the
+/// input address. Transforms into
+///
+///   %input = load [take] %inputAddr
+///   %result = explicit_copy_value %input
+///   store %result to [init] %resultAddr
+///   store %input to [init] %inputAddr
+///
+/// transparently inlined into a caller that has the generic of the callee
+/// specialized into a loadable type. If the transparent inlining does not
+/// specialize the type (due to being inlined into a non-generic context, the
+/// SILVerifier will abort).
+///
+/// Illegal to call except for in Swift._copy in the stdlib. This is enforced by
+/// the SILVerifier.
+BUILTIN_MISC_OPERATION(Copy, "copy", "", Special)
+
+/// Unchecked pointer alignment assertion. Allows the compiler to assume
+/// alignment of the pointer to emit more efficient code.
+///
+///   %alignedPtr = builtin "assumeAlignment" (%ptr : $Builtin.RawPointer,
+///                                            %alignment : $Builtin.Int)
+///                                           : $Builtin.RawPointer
+///   %address = pointer_to_address %alignedPtr
+///              : $Builtin.RawPointer to [align=1] $*Int
+///   %val = load %address : $*Int
+///
+/// With compile-time knowledge of the value of `%alignment` the compiler can
+/// optimize any downstream 'pointer_to_address' instruction by refining its
+/// '[align=]' flag . That `[align=]` flag can be used by IRGen to refine the
+/// alignment on LLVM load instructions that use the resulting address.
+///
+/// (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION(AssumeAlignment, "assumeAlignment", "n", Special)
 
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
@@ -793,17 +876,42 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Speci
 ///     __owned @Sendable @escaping () async throws -> T
 /// ) -> Builtin.RawPointer
 ///
+/// DEPRECATED. startAsyncLetWithLocalBuffer is used instead.
+///
 /// Create, initialize and start a new async-let and associated task.
 /// Returns an AsyncLet* that must be passed to endAsyncLet for destruction.
 BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 
-/// asyncLetEnd(): (Builtin.RawPointer) -> Void
+/// startAsyncLetWithLocalBuffer()<T>: (
+///     __owned @Sendable @escaping () async throws -> T,
+///     _ resultBuf: Builtin.RawPointer
+/// ) -> Builtin.RawPointer
+///
+/// Create, initialize and start a new async-let and associated task, with a
+/// locally-allocated buffer assigned to receive the result if the task
+/// completes.
+/// Returns an AsyncLet* that must be passed to endAsyncLetLifetime for
+/// destruction.
+BUILTIN_MISC_OPERATION(StartAsyncLetWithLocalBuffer, "startAsyncLetWithLocalBuffer", "", Special)
+
+/// endAsyncLet(): (Builtin.RawPointer) -> Void
+///
+/// DEPRECATED. The swift_asyncLet_finish intrinsic and endAsyncLetLifetime
+/// builtin are used instead.
 ///
 /// Ends and destroys an async-let.
 /// The ClosureLifetimeFixup pass adds a second operand to the builtin to
 /// ensure that optimizations keep the stack-allocated closure arguments alive
 /// until the endAsyncLet.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
+
+/// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
+///
+/// Marks the end of an async-let's lifetime.
+/// The ClosureLifetimeFixup pass adds a second operand to the builtin to
+/// ensure that optimizations keep the stack-allocated closure arguments alive
+/// until the endAsyncLet.
+BUILTIN_MISC_OPERATION(EndAsyncLetLifetime, "endAsyncLetLifetime", "", Special)
 
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags

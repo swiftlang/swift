@@ -50,12 +50,6 @@ bool ArgsToFrontendOutputsConverter::convert(
   Optional<std::vector<std::string>> indexMains;
   if (Args.hasArg(options::OPT_index_unit_output_path,
                   options::OPT_index_unit_output_path_filelist)) {
-
-    if (!Args.hasArg(options::OPT_index_store_path)) {
-      Diags.diagnose(SourceLoc(),
-                     diag::warn_index_unit_output_path_without_index_store);
-    }
-
     Optional<OutputFilesComputer> iuofc =
         OutputFilesComputer::create(Args, Diags, InputsAndOutputs, {
           "index unit output path", options::OPT_index_unit_output_path,
@@ -314,7 +308,7 @@ Optional<std::vector<SupplementaryOutputPaths>>
 SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     const {
 
-  auto objCHeaderOutput = getSupplementaryFilenamesFromArguments(
+  auto clangHeaderOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_objc_header_path);
   auto moduleOutput =
       getSupplementaryFilenamesFromArguments(options::OPT_emit_module_path);
@@ -337,15 +331,20 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_private_module_interface_path);
   auto moduleSourceInfoOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_source_info_path);
-  auto ldAddCFileOutput  = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_ldadd_cfile_path);
   auto moduleSummaryOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_summary_path);
-  if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
+  auto abiDescriptorOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_abi_descriptor_path);
+  auto moduleSemanticInfoOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_module_semantic_info_path);
+  auto optRecordOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_save_optimization_record_path);
+  if (!clangHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
-      !moduleSourceInfoOutput || !ldAddCFileOutput || !moduleSummaryOutput) {
+      !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
+      !moduleSemanticInfoOutput || !optRecordOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -354,7 +353,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       InputsAndOutputs.countOfFilesProducingSupplementaryOutput();
   for (unsigned i = 0; i < N; ++i) {
     SupplementaryOutputPaths sop;
-    sop.ObjCHeaderOutputPath = (*objCHeaderOutput)[i];
+    sop.ClangHeaderOutputPath = (*clangHeaderOutput)[i];
     sop.ModuleOutputPath = (*moduleOutput)[i];
     sop.ModuleDocOutputPath = (*moduleDocOutput)[i];
     sop.DependenciesFilePath = (*dependenciesFile)[i];
@@ -366,8 +365,11 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
     sop.PrivateModuleInterfaceOutputPath = (*privateModuleInterfaceOutput)[i];
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
-    sop.LdAddCFilePath = (*ldAddCFileOutput)[i];
     sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
+    sop.ABIDescriptorOutputPath = (*abiDescriptorOutput)[i];
+    sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[i];
+    sop.YAMLOptRecordPath = (*optRecordOutput)[i];
+    sop.BitstreamOptRecordPath = (*optRecordOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -432,9 +434,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   // There is no non-path form of -emit-fixits-path
   auto fixItsOutputPath = pathsFromArguments.FixItsOutputPath;
 
-  auto objcHeaderOutputPath = determineSupplementaryOutputFilename(
-      OPT_emit_objc_header, pathsFromArguments.ObjCHeaderOutputPath,
-      file_types::TY_ObjCHeader, "",
+  auto clangHeaderOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_objc_header, pathsFromArguments.ClangHeaderOutputPath,
+      file_types::TY_ClangHeader, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto loadedModuleTracePath = determineSupplementaryOutputFilename(
@@ -466,6 +468,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   auto PrivateModuleInterfaceOutputPath =
       pathsFromArguments.PrivateModuleInterfaceOutputPath;
 
+  // There is no non-path form of -emit-abi-descriptor-path
+  auto ABIDescriptorOutputPath = pathsFromArguments.ABIDescriptorOutputPath;
+  auto ModuleSemanticInfoOutputPath = pathsFromArguments.ModuleSemanticInfoOutputPath;
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
@@ -477,8 +482,17 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       file_types::TY_SwiftModuleFile, mainOutputIfUsableForModule,
       defaultSupplementaryOutputPathExcludingExtension);
 
+  auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
+      OPT_save_optimization_record_path, pathsFromArguments.YAMLOptRecordPath,
+      file_types::TY_YAMLOptRecord, "",
+      defaultSupplementaryOutputPathExcludingExtension);
+  auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
+      OPT_save_optimization_record_path, pathsFromArguments.BitstreamOptRecordPath,
+      file_types::TY_BitstreamOptRecord, "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
   SupplementaryOutputPaths sop;
-  sop.ObjCHeaderOutputPath = objcHeaderOutputPath;
+  sop.ClangHeaderOutputPath = clangHeaderOutputPath;
   sop.ModuleOutputPath = moduleOutputPath;
   sop.ModuleDocOutputPath = moduleDocOutputPath;
   sop.DependenciesFilePath = dependenciesFilePath;
@@ -490,8 +504,11 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
   sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
-  sop.LdAddCFilePath = pathsFromArguments.LdAddCFilePath;
   sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
+  sop.ABIDescriptorOutputPath = ABIDescriptorOutputPath;
+  sop.ModuleSemanticInfoOutputPath = ModuleSemanticInfoOutputPath;
+  sop.YAMLOptRecordPath = YAMLOptRecordPath;
+  sop.BitstreamOptRecordPath = bitstreamOptRecordPath;
   return sop;
 }
 
@@ -527,7 +544,7 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
   llvm::SmallString<128> path(defaultSupplementaryOutputPathExcludingExtension);
   llvm::sys::path::replace_extension(path, file_types::getExtension(type));
   return path.str().str();
-};
+}
 
 void SupplementaryOutputPathsComputer::deriveModulePathParameters(
     StringRef mainOutputFile, options::ID &emitOption, std::string &extension,
@@ -560,7 +577,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
   if (!map)
     return paths;
   const std::pair<file_types::ID, std::string &> typesAndStrings[] = {
-      {file_types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
+      {file_types::TY_ClangHeader, paths.ClangHeaderOutputPath},
       {file_types::TY_SwiftModuleFile, paths.ModuleOutputPath},
       {file_types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
       {file_types::TY_SwiftSourceInfoFile, paths.ModuleSourceInfoOutputPath},
@@ -574,6 +591,9 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_SwiftModuleSummaryFile, paths.ModuleSummaryOutputPath},
       {file_types::TY_PrivateSwiftModuleInterfaceFile,
        paths.PrivateModuleInterfaceOutputPath},
+      {file_types::TY_YAMLOptRecord, paths.YAMLOptRecordPath},
+      {file_types::TY_BitstreamOptRecord, paths.BitstreamOptRecordPath},
+      {file_types::TY_SwiftABIDescriptor, paths.ABIDescriptorOutputPath},
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
@@ -585,19 +605,17 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
 
 Optional<std::vector<SupplementaryOutputPaths>>
 SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
-  if (Arg *A = Args.getLastArg(
-        options::OPT_emit_objc_header_path,
-        options::OPT_emit_module_path,
-        options::OPT_emit_module_doc_path,
-        options::OPT_emit_dependencies_path,
-        options::OPT_emit_reference_dependencies_path,
-        options::OPT_serialize_diagnostics_path,
-        options::OPT_emit_loaded_module_trace_path,
-        options::OPT_emit_module_interface_path,
-        options::OPT_emit_private_module_interface_path,
-        options::OPT_emit_module_source_info_path,
-        options::OPT_emit_tbd_path,
-        options::OPT_emit_ldadd_cfile_path)) {
+  if (Arg *A = Args.getLastArg(options::OPT_emit_objc_header_path,
+                               options::OPT_emit_module_path,
+                               options::OPT_emit_module_doc_path,
+                               options::OPT_emit_dependencies_path,
+                               options::OPT_emit_reference_dependencies_path,
+                               options::OPT_serialize_diagnostics_path,
+                               options::OPT_emit_loaded_module_trace_path,
+                               options::OPT_emit_module_interface_path,
+                               options::OPT_emit_private_module_interface_path,
+                               options::OPT_emit_module_source_info_path,
+                               options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");

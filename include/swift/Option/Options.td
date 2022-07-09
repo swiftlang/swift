@@ -413,10 +413,23 @@ def require_explicit_availability_target : Separate<["-"], "require-explicit-ava
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
   MetaVarName<"<target>">;
 
+def require_explicit_sendable : Flag<["-"], "require-explicit-sendable">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Require explicit Sendable annotations on public declarations">;
+
 def define_availability : Separate<["-"], "define-availability">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
   MetaVarName<"<macro>">;
+
+def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
+  HelpText<"Only check the availability of the APIs, ignore function bodies">;
+
+def library_level : Separate<["-"], "library-level">,
+  MetaVarName<"<level>">,
+  Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Library distribution level 'api', 'spi' or 'other' (the default)">;
 
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption,
@@ -424,6 +437,11 @@ def module_name : Separate<["-"], "module-name">,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
+
+def module_alias : Separate<["-"], "module-alias">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  MetaVarName<"<alias_name=underlying_name>">,
+  HelpText<"If a source file imports or references module <alias_name>, the <underlying_name> is used for the contents of the file">;
 
 def module_link_name : Separate<["-"], "module-link-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -514,6 +532,12 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
+def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
+  HelpText<"Emit an Objective-C and C++ header file to <path>">,
+  Alias<emit_objc_header_path>;
+
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
   HelpText<"Make this module statically linkable and make the output of -emit-library a static library.">;
@@ -550,6 +574,10 @@ def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
 
+def lto_library : Separate<["-"], "lto-library">,
+  Flags<[FrontendOption, ArgumentIsPath, NoInteractiveOption]>,
+  HelpText<"Perform LTO with <lto-library>">, MetaVarName<"<lto-library>">;
+
 def access_notes_path : Separate<["-"], "access-notes-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Specify YAML file to override attributes on Swift declarations in this module">;
@@ -576,24 +604,24 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
-def disable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
-    "disable-fuzzy-forward-scan-trailing-closure-matching">,
-  Flags<[FrontendOption]>,
-  HelpText<"Disable fuzzy forward-scan trailing closure matching">;
-
-def enable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
-    "enable-fuzzy-forward-scan-trailing-closure-matching">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable fuzzy forward-scan trailing closure matching">;
-
-def enable_experimental_cxx_interop :
-  Flag<["-"], "enable-experimental-cxx-interop">,
-  HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
-
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
+def experimental_emit_module_separately:
+  Flag<["-"], "experimental-emit-module-separately">,
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Emit module files as a distinct job (new Driver only)">;
+
+def no_emit_module_separately:
+  Flag<["-"], "no-emit-module-separately">,
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Force using merge-module as the incremental build mode (new Driver only)">;
+
+def experimental_hermetic_seal_at_link:
+  Flag<["-"], "experimental-hermetic-seal-at-link">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Library code can assume that all clients are visible at linktime, and aggressively strip unused code">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -632,6 +660,10 @@ def disable_actor_data_race_checks :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable runtime checks for actor data races">;
 
+def enable_bare_slash_regex : Flag<["-"], "enable-bare-slash-regex">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Enable the use of forward slash regular-expression literal syntax">;
+
 def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -650,6 +682,19 @@ def warn_concurrency : Flag<["-"], "warn-concurrency">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about code that is unsafe according to the Swift Concurrency "
            "model and will become ill-formed in a future language version">;
+
+def strict_concurrency : Joined<["-"], "strict-concurrency=">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Specify the how strict concurrency checking will be. The value may "
+           "be 'explicit' (most 'Sendable' checking is disabled), "
+           "'targeted' ('Sendable' checking is enabled in code that uses the "
+           "concurrency model, or 'complete' ('Sendable' and other checking is "
+           "enabled for all code in the module)">;
+
+def enable_experimental_feature :
+  Separate<["-"], "enable-experimental-feature">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable an experimental feature">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
@@ -674,7 +719,7 @@ def save_optimization_record_path :
 def save_optimization_record_passes :
   Separate<["-"], "save-optimization-record-passes">,
   Flags<[FrontendOption]>,
-  HelpText<"Only include passes which match a specified regular expression in"
+  HelpText<"Only include passes which match a specified regular expression in "
            "the generated optimization record "
            "(by default, include all passes)">, MetaVarName<"<regex>">;
 
@@ -689,7 +734,7 @@ def libc : Separate<["-"], "libc">, HelpText<"libc runtime library to use">;
 
 def linker_option_Group : OptionGroup<"<linker-specific options>">;
 
-def l : Joined<["-"], "l">, Group<linker_option_Group>,
+def l : JoinedOrSeparate<["-"], "l">, Group<linker_option_Group>,
     Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
     HelpText<"Specifies a library which should be linked against">;
 def framework : Separate<["-"], "framework">, Group<linker_option_Group>,
@@ -760,9 +805,21 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def EnbaleDefaultCMO : Flag<["-"], "enable-default-cmo">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Perform conservative cross-module optimization">;
+
 def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform cross-module optimization">;
+
+def disableCrossModuleOptimization : Flag<["-"], "disable-cmo">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Disable cross-module optimization">;
+
+def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Enable experimental performance annotations">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
@@ -793,10 +850,21 @@ def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
   HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
+def file_prefix_map : Separate<["-"], "file-prefix-map">,
+  Flags<[FrontendOption]>,
+  HelpText<"Remap source paths in debug, coverage, and index info">, MetaVarName<"<prefix=replacement>">;
+
+def file_compilation_dir : Separate<["-"], "file-compilation-dir">,
+  Flags<[FrontendOption]>, MetaVarName<"<path>">,
+  HelpText<"The compilation directory to embed in the debug info. Coverage mapping is not supported yet.">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
+
+def prefix_serialized_debugging_options : Flag<["-"], "prefix-serialized-debugging-options">,
+  Flags<[FrontendOption]>,
+  HelpText<"Apply debug prefix mappings to serialized debug info in Swiftmodule files">;
 
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
@@ -1001,6 +1069,10 @@ def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def print_ast_decl : Flag<["-"], "print-ast-decl">,
+  HelpText<"Parse and type-check input file(s) and pretty print declarations from AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_pcm : Flag<["-"], "dump-pcm">,
   HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
@@ -1089,6 +1161,11 @@ def clang_target : Separate<["-"], "clang-target">,
 def disable_clang_target : Flag<["-"], "disable-clang-target">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Disable a separately specified target triple for Clang instance to use">;
+
+def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Require inlinable code with no '@available' attribute to back-deploy "
+           "to this version of the '-target' OS">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -1181,6 +1258,10 @@ def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
   Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
   HelpText<"Use <path> as the output path in the produced index data.">;
 
+def index_ignore_clang_modules : Flag<["-"], "index-ignore-clang-modules">,
+  Flags<[FrontendOption]>,
+  HelpText<"Avoid indexing clang modules (pcms)">;
+
 def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   Flags<[NoInteractiveOption]>,
   HelpText<"Avoid indexing system modules">;
@@ -1224,6 +1305,12 @@ def disable_autolinking_runtime_compatibility_dynamic_replacements
       HelpText<"Do not use autolinking for the dynamic replacement runtime "
                "compatibility library">;
 
+def disable_autolinking_runtime_compatibility_concurrency
+    : Flag<[ "-" ], "disable-autolinking-runtime-compatibility-concurrency">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Do not use autolinking for the concurrency runtime "
+               "compatibility library">;
+
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;
@@ -1233,6 +1320,11 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
          SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
+
+def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
+  MetaVarName<"<level>">;
 
 def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
@@ -1307,6 +1399,10 @@ def ignored_usrs: Separate<["-", "--"], "ignored-usrs">,
   HelpText<"the file containing USRs of removed decls that the digester should ignore">,
   MetaVarName<"<path>">;
 
+def ignore_spi_groups : Separate<["-", "--"], "ignore-spi-group">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"SPI group name to not diagnose about">;
+
 def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement-allow-list">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"File containing a new-line separated list of protocol names">,
@@ -1349,6 +1445,10 @@ def swift_only: Flag<["-", "--"], "swift-only">,
 def disable_os_checks: Flag<["-", "--"], "disable-os-checks">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Skip OS related diagnostics">;
+
+def disable_remove_deprecated_check: Flag<["-", "--"], "disable-remove-deprecated-check">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Skip diagnosing removal of deprecated symbols">;
 
 def print_module: Flag<["-", "--"], "print-module">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,

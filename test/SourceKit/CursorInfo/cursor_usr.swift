@@ -22,6 +22,7 @@ func foo(x: FooStruct1) -> S1 {}
 // CHECK_SANITY1-NEXT: source.lang.swift
 // CHECK_SANITY1-NEXT: S1.Type
 // CHECK_SANITY1-NEXT: $s10cursor_usr2S1VmD
+// CHECK_SANITY1-NEXT: cursor_usr{{$}}
 // CHECK_SANITY1-NEXT: <Declaration>struct S1</Declaration>
 // CHECK_SANITY1-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 
@@ -39,4 +40,3 @@ func foo(x: FooStruct1) -> S1 {}
 // CHECK1: source.lang.swift.decl.struct (5:8-5:10)
 // CHECK1: s1
 // CHECK1: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
-

@@ -46,7 +46,7 @@ namespace swift {
 /// These refinement contexts form a lexical tree parallel to the AST but much
 /// more sparse: we only introduce refinement contexts when there is something
 /// to refine.
-class TypeRefinementContext {
+class TypeRefinementContext : public ASTAllocated<TypeRefinementContext> {
 
 public:
   /// Describes the reason a type refinement context was introduced.
@@ -54,9 +54,19 @@ public:
     /// The root refinement context.
     Root,
 
-    /// The context was introduced by a declaration (e.g., the body of a
-    /// function declaration or the contents of a class declaration).
+    /// The context was introduced by a declaration with an explicit
+    /// availability attribute. The context contains both the signature and the
+    /// body of the declaration.
     Decl,
+
+    /// The context was introduced implicitly by a declaration. The context may
+    /// cover the entire declaration or it may cover a subset of it. For
+    /// example, a public, non-inlinable function declaration in an API module
+    /// will have at least two associated contexts: one for the entire
+    /// declaration at the declared availability of the API and a nested
+    /// implicit context for the body of the function, which will always run at
+    /// the deployment target of the library.
+    DeclImplicit,
 
     /// The context was introduced for the Then branch of an IfStmt.
     IfStmtThenBranch,
@@ -102,7 +112,10 @@ private:
 
   public:
     IntroNode(SourceFile *SF) : IntroReason(Reason::Root), SF(SF) {}
-    IntroNode(Decl *D) : IntroReason(Reason::Decl), D(D) {}
+    IntroNode(Decl *D, Reason introReason = Reason::Decl)
+        : IntroReason(introReason), D(D) {
+      (void)getAsDecl();    // check that assertion succeeds
+    }
     IntroNode(IfStmt *IS, bool IsThen) :
     IntroReason(IsThen ? Reason::IfStmtThenBranch : Reason::IfStmtElseBranch),
                 IS(IS) {}
@@ -122,7 +135,8 @@ private:
     }
 
     Decl *getAsDecl() const {
-      assert(IntroReason == Reason::Decl);
+      assert(IntroReason == Reason::Decl ||
+             IntroReason == Reason::DeclImplicit);
       return D;
     }
 
@@ -154,8 +168,8 @@ private:
 
   SourceRange SrcRange;
 
-  /// A canonical availiability info for this context, computed top-down from the root
-  /// context (compilation deployment target).
+  /// A canonical availability info for this context, computed top-down from the
+  /// root context.
   AvailabilityContext AvailabilityInfo;
 
   /// If this context was annotated with an availability attribute, this property captures that.
@@ -182,7 +196,12 @@ public:
                                               const AvailabilityContext &Info,
                                               const AvailabilityContext &ExplicitInfo,
                                               SourceRange SrcRange);
-  
+
+  /// Create a refinement context for the given declaration.
+  static TypeRefinementContext *
+  createForDeclImplicit(ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
+                        const AvailabilityContext &Info, SourceRange SrcRange);
+
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
@@ -276,11 +295,6 @@ public:
   void print(raw_ostream &OS, SourceManager &SrcMgr, unsigned Indent = 0) const;
   
   static StringRef getReasonName(Reason R);
-  
-  // Only allow allocation of TypeRefinementContext using the allocator in
-  // ASTContext.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(TypeRefinementContext));
 };
 
 } // end namespace swift

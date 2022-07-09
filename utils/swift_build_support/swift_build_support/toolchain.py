@@ -14,8 +14,7 @@ Represent toolchain - the versioned executables.
 """
 # ----------------------------------------------------------------------------
 
-from __future__ import absolute_import
-
+import os
 import platform
 
 from build_swift.build_swift import cache_utils
@@ -62,7 +61,12 @@ _register("llvm_profdata", "llvm-profdata")
 _register("llvm_cov", "llvm-cov")
 _register("lipo", "lipo")
 _register("libtool", "libtool")
-_register("ar", "ar")
+if 'ANDROID_DATA' in os.environ:
+    _register("ranlib", "llvm-ranlib")
+    _register("ar", "llvm-ar")
+else:
+    _register("ranlib", "ranlib")
+    _register("ar", "ar")
 _register("sccache", "sccache")
 _register("swiftc", "swiftc")
 

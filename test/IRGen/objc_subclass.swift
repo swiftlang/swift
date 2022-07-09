@@ -95,19 +95,19 @@
 // CHECK-32:     i8* bitcast {{.*}}* @"$s13objc_subclass10SwiftGizmoCfDTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(isEnabled)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* {{@.str.[0-9]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoC7enabledSbvgTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(setIsEnabled:)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@.str.[0-9]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoC7enabledSbvsTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@.str.[0-9]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoC7bellsOnACSgSi_tcfcTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([15 x i8], [15 x i8]* @"\01L_selector_data(.cxx_construct)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@.str.[0-9]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoCfeTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:   }]
 // CHECK-32: }, section "__DATA, {{.*}}", align 4
@@ -145,19 +145,19 @@
 // CHECK-64:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoCfDTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(isEnabled)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* {{@.str.[0-9]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoC7enabledSbvgTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(setIsEnabled:)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@.str.[0-9]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoC7enabledSbvsTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@.str.[0-9]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoC7bellsOnACSgSi_tcfcTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([15 x i8], [15 x i8]* @"\01L_selector_data(.cxx_construct)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@.str.[0-9]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoCfeTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:   }]
 // CHECK-64: }, section "__DATA, {{.*}}", align 8
@@ -239,11 +239,11 @@
 // CHECK-32:       i8* bitcast ({{.*}}* @"$s13objc_subclass11SwiftGizmo2CACycfcTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:     }, {
 // CHECK-32:       i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i32 0, i32 0),
-// CHECK-32:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@.str.[0-9]+}}, i32 0, i32 0),
 // CHECK-32:       i8* bitcast ({{.*}}* @"$s13objc_subclass11SwiftGizmo2C7bellsOnACSgSi_tcfcTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:     }, {
 // CHECK-32:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i32 0, i32 0),
-// CHECK-32:       i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:       i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@.str.[0-9]+}}, i32 0, i32 0),
 // CHECK-32:       i8* bitcast ({{.*}}* @"$s13objc_subclass11SwiftGizmo2CfETo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:     }
 // CHECK-32:   ]
@@ -267,17 +267,18 @@
 // CHECK-64:       i8* bitcast ({{.*}}* @"$s13objc_subclass11SwiftGizmo2CACycfcTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:     }, {
 // CHECK-64:       i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i64 0, i64 0),
-// CHECK-64:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@.str.[0-9]+}}, i64 0, i64 0),
 // CHECK-64:       i8* bitcast ({{.*}}* @"$s13objc_subclass11SwiftGizmo2C7bellsOnACSgSi_tcfcTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:     }, {
 // CHECK-64:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0),
-// CHECK-64:       i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@[0-9]+}}, i64 0, i64 0)
+// CHECK-64:       i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@.str.[0-9]+}}, i64 0, i64 0)
 // CHECK-64:       i8* bitcast ({{.*}}* @"$s13objc_subclass11SwiftGizmo2CfETo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:     }
 // CHECK-64: ] }
 
 
-// CHECK: @objc_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* @"$s13objc_subclass10SwiftGizmoCN" to i8*), i8* bitcast (%swift.type* @"$s13objc_subclass11SwiftGizmo2CN" to i8*)], section "__DATA,__objc_classlist,regular,no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
+// CHECK: @"objc_classes_$s13objc_subclass10SwiftGizmoCN" = internal global i8* bitcast (%swift.type* @"$s13objc_subclass10SwiftGizmoCN" to i8*), section "__DATA,__objc_classlist,regular,no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
+// CHECK: @"objc_classes_$s13objc_subclass11SwiftGizmo2CN" = internal global i8* bitcast (%swift.type* @"$s13objc_subclass11SwiftGizmo2CN" to i8*), section "__DATA,__objc_classlist,regular,no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
 
 // CHECK: @objc_non_lazy_classes = internal global [1 x i8*] [i8* bitcast (%swift.type* @"$s13objc_subclass11SwiftGizmo2CN" to i8*)], section "__DATA,__objc_nlclslist,regular,no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
 

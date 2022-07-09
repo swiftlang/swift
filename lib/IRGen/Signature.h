@@ -40,6 +40,7 @@ namespace swift {
 
 namespace irgen {
 
+class FunctionPointerKind;
 class IRGenModule;
 
 /// An encapsulation of different foreign calling-convention lowering
@@ -125,7 +126,7 @@ public:
   /// IRGenModule::getSignature(CanSILFunctionType), which is what
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
-                               bool useSpecialConvention);
+                               FunctionPointerKind kind);
 
   /// Compute the signature of a coroutine's continuation function.
   static Signature forCoroutineContinuation(IRGenModule &IGM,
@@ -134,9 +135,9 @@ public:
   static Signature forAsyncReturn(IRGenModule &IGM,
                                   CanSILFunctionType asyncType);
   static Signature forAsyncAwait(IRGenModule &IGM, CanSILFunctionType asyncType,
-                                 bool useSpecialConvention);
+                                 FunctionPointerKind kind);
   static Signature forAsyncEntry(IRGenModule &IGM, CanSILFunctionType asyncType,
-                                 bool useSpecialConvention);
+                                 FunctionPointerKind kind);
 
   llvm::FunctionType *getType() const {
     assert(isValid());

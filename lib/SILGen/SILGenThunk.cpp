@@ -28,8 +28,9 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
-#include "swift/SIL/FormalLinkage.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -59,7 +60,8 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateFunction(
       constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
-      IsTransparent, IsSerializable, IsNotDynamic, ProfileCounter(), IsThunk);
+      IsTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
+      ProfileCounter(), IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -107,6 +109,12 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
 void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isDistributedThunk() && "distributed thunks only");
+  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
+}
+
+void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {
+  // Thunks are always emitted by need, so don't need delayed emission.
+  assert(thunk.isBackDeploymentThunk() && "back deployment thunks only");
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
@@ -188,14 +196,39 @@ static const clang::Type *prependParameterType(
   return clangCtx.getPointerType(newFnTy).getTypePtr();
 }
 
-SILFunction *
-SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
-                                         CanSILFunctionType blockType,
-                                         CanType continuationTy,
-                                         CanGenericSignature sig,
-                                         ForeignAsyncConvention convention) {
+SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
+    CanSILFunctionType blockType, CanType continuationTy,
+    AbstractionPattern origFormalType, CanGenericSignature sig,
+    ForeignAsyncConvention convention,
+    Optional<ForeignErrorConvention> foreignError) {
   // Extract the result and error types from the continuation type.
   auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
+
+  CanAnyFunctionType completionHandlerOrigTy = [&]() {
+    auto completionHandlerOrigTy =
+        origFormalType.getObjCMethodAsyncCompletionHandlerForeignType(convention, Types);
+    Optional<CanAnyFunctionType> maybeCompletionHandlerOrigTy;
+    if (auto fnTy =
+            dyn_cast<AnyFunctionType>(completionHandlerOrigTy)) {
+      maybeCompletionHandlerOrigTy = fnTy;
+    } else {
+      maybeCompletionHandlerOrigTy = cast<AnyFunctionType>(
+          completionHandlerOrigTy.getOptionalObjectType());
+    }
+    return maybeCompletionHandlerOrigTy.getValue();
+  }();
+  
+  // Bridge the block type, so that if it is formally expressed in terms of
+  // bridged Swift types, we still lower the parameters to their ultimate
+  // ObjC types.
+  completionHandlerOrigTy = Types
+    .getBridgedFunctionType(AbstractionPattern(origFormalType.getGenericSignatureOrNull(),
+                                               completionHandlerOrigTy),
+                            completionHandlerOrigTy,
+                            Bridgeability::Full,
+                            SILFunctionTypeRepresentation::Block);
+
+  auto blockParams = completionHandlerOrigTy.getParams();
 
   // Build up the implementation function type, which matches the
   // block signature with an added block storage argument that points at the
@@ -214,7 +247,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       getASTContext(),
       blockType->getClangTypeInfo().getType(),
       getASTContext().getClangTypeForIRGen(blockStorageTy));
-  
+
   auto implTy = SILFunctionType::get(sig,
          blockType->getExtInfo().intoBuilder()
            .withRepresentation(SILFunctionTypeRepresentation::CFunctionPointer)
@@ -239,15 +272,15 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateSharedFunction(loc, name, implTy,
-                                           IsBare, IsTransparent, IsSerializable,
+                                           IsBare, IsTransparent, IsSerialized,
                                            ProfileCounter(),
                                            IsThunk,
-                                           IsNotDynamic);
+                                           IsNotDynamic,
+                                           IsNotDistributed);
   
   if (F->empty()) {
     // Emit the implementation.
-    if (sig)
-      F->setGenericEnvironment(sig->getGenericEnvironment());
+    F->setGenericEnvironment(sig.getGenericEnvironment());
 
     SILGenFunction SGF(*this, *F, SwiftModule);
     {
@@ -261,10 +294,14 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       auto continuationVal = SGF.B.createLoad(loc, continuationAddr,
                                            LoadOwnershipQualifier::Trivial);
       auto continuation = ManagedValue::forUnmanaged(continuationVal);
-      
+
       // Check for an error if the convention includes one.
-      auto errorIndex = convention.completionHandlerErrorParamIndex();
-      auto flagIndex = convention.completionHandlerFlagParamIndex();
+      // Increment the error and flag indices if present.  They do not account
+      // for the fact that they are preceded by the block_storage arguments.
+      auto errorIndex = convention.completionHandlerErrorParamIndex().map(
+          [](auto original) { return original + 1; });
+      auto flagIndex = convention.completionHandlerFlagParamIndex().map(
+          [](auto original) { return original + 1; });
 
       FuncDecl *resumeIntrinsic;
 
@@ -272,18 +309,19 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       if (errorIndex) {
         resumeIntrinsic = getResumeUnsafeThrowingContinuation();
         auto errorIntrinsic = getResumeUnsafeThrowingContinuationWithError();
-        
-        auto errorArgument = params[*errorIndex + 1];
+
+        auto errorArgument = params[*errorIndex];
         auto someErrorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
         auto noneErrorBB = SGF.createBasicBlock();
         returnBB = SGF.createBasicBlockAfter(noneErrorBB);
         auto &C = SGF.getASTContext();
-        
+        SwitchEnumInst *switchEnum = nullptr;
+
         // Check whether there's an error, based on the presence of a flag
         // parameter. If there is a flag parameter, test it against zero.
         if (flagIndex) {
-          auto flagArgument = params[*flagIndex + 1];
-          
+          auto flagArgument = params[*flagIndex];
+
           // The flag must be an integer type. Get the underlying builtin
           // integer field from it.
           auto builtinFlagArg = SGF.emitUnwrapIntegerResult(loc, flagArgument.getValue());
@@ -308,17 +346,16 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
             {C.getOptionalSomeDecl(), someErrorBB},
             {C.getOptionalNoneDecl(), noneErrorBB}
           };
-          
-          SGF.B.createSwitchEnum(loc, errorArgument.borrow(SGF, loc).getValue(),
-                                 /*default*/ nullptr,
-                                 switchErrorBBs);
+
+          switchEnum = SGF.B.createSwitchEnum(
+              loc, errorArgument.borrow(SGF, loc).getValue(),
+              /*default*/ nullptr, switchErrorBBs);
         }
         
         SGF.B.emitBlock(someErrorBB);
         
-        auto matchedErrorTy = errorArgument.getType().getOptionalObjectType();
-        ManagedValue matchedError;
         Scope errorScope(SGF, loc);
+        ManagedValue matchedError;
         if (flagIndex) {
           // Force-unwrap the error argument, since the flag condition should
           // guarantee that an error did occur.
@@ -326,8 +363,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                                  errorArgument.borrow(SGF, loc),
                                                  /*implicit*/ true);
         } else {
-          matchedError = SGF.B
-            .createGuaranteedTransformingTerminatorArgument(matchedErrorTy);
+          matchedError = SGF.B.createOptionalSomeResult(switchEnum);
         }
         
         // Resume the continuation as throwing the given error, bridged to a
@@ -344,10 +380,12 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         errorScope.pop();
         SGF.B.createBranch(loc, returnBB);
         SGF.B.emitBlock(noneErrorBB);
+      } else if (foreignError) {
+        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
       } else {
         resumeIntrinsic = getResumeUnsafeContinuation();
       }
-            
+
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
                                             F->mapTypeIntoContext(resumeType));
       
@@ -358,15 +396,13 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         auto resumeArgBuf = SGF.emitTemporaryAllocation(loc,
                                               loweredResumeTy.getAddressType());
 
-        auto prepareArgument = [&](SILValue destBuf, ManagedValue arg) {
+        auto prepareArgument = [&](SILValue destBuf, CanType destFormalType,
+                                   ManagedValue arg, CanType argFormalType) {
           // Convert the ObjC argument to the bridged Swift representation we
           // want.
-          ManagedValue bridgedArg = SGF.emitBridgedToNativeValue(loc,
-                                       arg.copy(SGF, loc),
-                                       arg.getType().getASTType(),
-                                       // FIXME: pass down formal type
-                                       destBuf->getType().getASTType(),
-                                       destBuf->getType().getObjectType());
+          ManagedValue bridgedArg = SGF.emitBridgedToNativeValue(
+              loc, arg.copy(SGF, loc), argFormalType, destFormalType,
+              destBuf->getType().getObjectType());
           // Force-unwrap an argument that comes to us as Optional if it's
           // formally non-optional in the return.
           if (bridgedArg.getType().getOptionalObjectType()
@@ -378,31 +414,52 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           bridgedArg.forwardInto(SGF, loc, destBuf);
         };
 
+        // Collect the indices which correspond to the values to be returned.
+        SmallVector<unsigned long, 4> paramIndices;
+        for (auto index : indices(params)) {
+          // The first index is the block_storage parameter.
+          if (index == 0)
+            continue;
+          if (errorIndex && index == *errorIndex)
+            continue;
+          if (flagIndex && index == *flagIndex)
+            continue;
+          paramIndices.push_back(index);
+        }
+        auto blockParamIndex = [paramIndices](unsigned long i) {
+          // The non-error, non-flag block parameter (formal types of the
+          // completion handler's arguments) indices are the same as the the
+          // parameter (lowered types of the completion handler's arguments)
+          // indices but shifted by 1 corresponding to the fact that the lowered
+          // completion handler has a block_storage argument but the formal type
+          // does not.
+          return paramIndices[i] - 1;
+        };
         if (auto resumeTuple = dyn_cast<TupleType>(resumeType)) {
+          assert(paramIndices.size() == resumeTuple->getNumElements());
           assert(params.size() == resumeTuple->getNumElements()
                                    + 1 + (bool)errorIndex + (bool)flagIndex);
           for (unsigned i : indices(resumeTuple.getElementTypes())) {
-            unsigned paramI = i;
-            if (errorIndex && paramI >= *errorIndex) {
-              ++paramI;
-            }
-            if (flagIndex && paramI >= *flagIndex) {
-              ++paramI;
-            }
             auto resumeEltBuf = SGF.B.createTupleElementAddr(loc,
                                                              resumeArgBuf, i);
-            prepareArgument(resumeEltBuf, params[paramI + 1]);
+            prepareArgument(
+                /*destBuf*/ resumeEltBuf,
+                /*destFormalType*/
+                F->mapTypeIntoContext(resumeTuple.getElementTypes()[i])
+                    ->getCanonicalType(),
+                /*arg*/ params[paramIndices[i]],
+                /*argFormalType*/
+                blockParams[blockParamIndex(i)].getParameterType());
           }
         } else {
+          assert(paramIndices.size() == 1);
           assert(params.size() == 2 + (bool)errorIndex + (bool)flagIndex);
-          unsigned paramI = 0;
-          if (errorIndex && paramI >= *errorIndex) {
-            ++paramI;
-          }
-          if (flagIndex && paramI >= *flagIndex) {
-            ++paramI;
-          }
-          prepareArgument(resumeArgBuf, params[paramI + 1]);
+          prepareArgument(/*destBuf*/ resumeArgBuf,
+                          /*destFormalType*/
+                          F->mapTypeIntoContext(resumeType)->getCanonicalType(),
+                          /*arg*/ params[paramIndices[0]],
+                          /*argFormalType*/
+                          blockParams[blockParamIndex(0)].getParameterType());
         }
         
         // Resume the continuation with the composed bridged result.
@@ -468,17 +525,17 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   
   // The thunk that converts an actor-constrained, non-async function to an
   // async function is not serializable if the actor's visibility precludes it.
-  auto serializable = IsSerializable;
+  auto serializable = IsSerialized;
   if (fromGlobalActorBound) {
     auto globalActorLinkage = getTypeLinkage(fromGlobalActorBound);
     serializable = globalActorLinkage >= FormalLinkage::PublicNonUnique
-      ? IsSerializable : IsNotSerialized;
+      ? IsSerialized : IsNotSerialized;
   }
 
   SILGenFunctionBuilder builder(*this);
   return builder.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, serializable,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed);
 }
 
 SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
@@ -500,12 +557,11 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, SILLinkage::Private, constantTy, IsBare,
       IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
-      ProfileCounter(), IsThunk);
+      IsNotDistributed, ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
 
-  if (auto genSig = constantTy->getSubstGenericSignature())
-    thunk->setGenericEnvironment(genSig->getGenericEnvironment());
+  thunk->setGenericEnvironment(constantTy->getSubstGenericSignature().getGenericEnvironment());
   SILGenFunction SGF(*this, *thunk, SwiftModule);
   SmallVector<ManagedValue, 4> params;
   auto loc = derivativeFnDeclRef.getAsRegularLocation();

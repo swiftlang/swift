@@ -119,9 +119,7 @@ namespace irgen {
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
-                                           SubstitutionMap substitutionMap,
-                                           bool useSpecialConvention,
-                                           FunctionPointer::Kind kind);
+                                           SubstitutionMap substitutionMap);
 
   /// Given an async function, get the pointer to the function to be called and
   /// the size of the context to be allocated.
@@ -135,8 +133,7 @@ namespace irgen {
   std::pair<llvm::Value *, llvm::Value *> getAsyncFunctionAndSize(
       IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
       FunctionPointer functionPointer, llvm::Value *thickContext,
-      std::pair<bool, bool> values = {true, true},
-      Size initialContextSize = Size(0));
+      std::pair<bool, bool> values = {true, true});
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention,
                                      bool isAsync);
@@ -155,11 +152,6 @@ namespace irgen {
                                   unsigned argIndex,
                                   Alignment align,
                                   llvm::Type *storageType);
-
-  /// Add signext or zeroext attribute set for an argument that needs
-  /// extending.
-  void addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
-                          unsigned index, bool signExtend);
 
   /// Can a series of values be simply pairwise coerced to (or from) an
   /// explosion schema, or do they need to traffic through memory?

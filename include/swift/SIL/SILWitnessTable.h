@@ -48,7 +48,8 @@ public:
     /// The method required.
     SILDeclRef Requirement;
     /// The witness for the method.
-    /// This can be null in case dead function elimination has removed the method.
+    /// This can be null in case dead function elimination has removed the method
+    /// or if the method was not serialized (for de-serialized witness tables).
     SILFunction *Witness;
   };
   
@@ -259,7 +260,6 @@ public:
 
   /// Sets the serialized flag.
   void setSerialized(IsSerialized_t serialized) {
-    assert(serialized != IsSerializable);
     Serialized = (serialized ? 1 : 0);
   }
 

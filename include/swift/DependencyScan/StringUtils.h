@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift-c/DependencyScan/DependencyScan.h"
+#include "swift-c/CommonString/CommonString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include <string>
@@ -18,7 +18,7 @@
 
 //=== Private Utility Functions--------------------------------------------===//
 namespace swift {
-namespace dependencies {
+namespace c_string_utils {
 
 /// Create null string
 swiftscan_string_ref_t create_null();
@@ -34,6 +34,9 @@ swiftscan_string_set_t *create_set(const std::vector<std::string> &strings);
 /// Create an array of swiftscan_string_ref_t objects from an array of C strings using the
 /// create_clone routine.
 swiftscan_string_set_t *create_set(int count, const char **strings);
+
+/// Create an empty array of swiftscan_string_ref_t objects
+swiftscan_string_set_t *create_empty_set();
 
 /// Retrieve the character data associated with the given string.
 const char *get_C_string(swiftscan_string_ref_t string);

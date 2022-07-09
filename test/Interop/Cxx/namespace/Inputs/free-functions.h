@@ -7,6 +7,9 @@ inline const char *basicFunctionTopLevel() {
 }
 inline const char *forwardDeclared();
 inline const char *definedOutOfLine();
+
+struct X {};
+inline const char *operator+(X, X) { return "FunctionsNS1::operator+(X, X)"; }
 } // namespace FunctionsNS1
 
 namespace FunctionsNS1 {

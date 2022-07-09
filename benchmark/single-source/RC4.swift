@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,96 +14,98 @@
 // for performance measuring.
 import TestsUtils
 
-public let RC4Test = BenchmarkInfo(
-  name: "RC4",
-  runFunction: run_RC4,
-  tags: [.validation, .algorithm])
+public let benchmarks =
+  BenchmarkInfo(
+    name: "RC4",
+    runFunction: run_RC4,
+    tags: [.validation, .algorithm])
 
 struct RC4 {
-  var State : [UInt8]
-  var I: UInt8 = 0
-  var J: UInt8 = 0
+  var state: [UInt8]
+  var i: UInt8 = 0
+  var j: UInt8 = 0
 
   init() {
-    State = [UInt8](repeating: 0, count: 256)
+    state = [UInt8](repeating: 0, count: 256)
   }
 
   mutating
-  func initialize(_ Key: [UInt8]) {
+  func initialize(_ key: [UInt8]) {
     for i in 0..<256 {
-      State[i] = UInt8(i)
+      state[i] = UInt8(i)
     }
 
     var j: UInt8 = 0
     for i in 0..<256 {
-      let K : UInt8 = Key[i % Key.count]
-      let S : UInt8 = State[i]
-      j = j &+ S &+ K
+      let k: UInt8 = key[i % key.count]
+      let s: UInt8 = state[i]
+      j = j &+ s &+ k
       swapByIndex(i, y: Int(j))
     }
   }
 
   mutating
   func swapByIndex(_ x: Int, y: Int) {
-    let T1 : UInt8 = State[x]
-    let T2 : UInt8 = State[y]
-    State[x] = T2
-    State[y] = T1
+    let t1: UInt8 = state[x]
+    let t2: UInt8 = state[y]
+    state[x] = t2
+    state[y] = t1
   }
 
   mutating
   func next() -> UInt8 {
-    I = I &+ 1
-    J = J &+ State[Int(I)]
-    swapByIndex(Int(I), y: Int(J))
-    return State[Int(State[Int(I)] &+ State[Int(J)]) & 0xFF]
+    i = i &+ 1
+    j = j &+ state[Int(i)]
+    swapByIndex(Int(i), y: Int(j))
+    return state[Int(state[Int(i)] &+ state[Int(j)]) & 0xFF]
   }
 
   mutating
-  func encrypt(_ Data: inout [UInt8]) {
-    let cnt = Data.count
+  func encrypt(_ data: inout [UInt8]) {
+    let cnt = data.count
     for i in 0..<cnt {
-      Data[i] = Data[i] ^ next()
+      data[i] = data[i] ^ next()
     }
   }
 }
 
-let RefResults : [UInt8] = [245, 62, 245, 202, 138, 120, 186, 107, 255, 189,
-                            184, 223, 65, 77, 112, 201, 238, 161, 74, 192, 145,
-                            21, 43, 41, 91, 136, 182, 176, 237, 155, 208, 16,
-                            17, 139, 33, 195, 24, 136, 79, 183, 211, 21, 56,
-                            202, 235, 65, 201, 184, 68, 29, 110, 218, 112, 122,
-                            194, 77, 41, 230, 147, 84, 0, 233, 168, 6, 55, 131,
-                            70, 119, 41, 119, 234, 131, 87, 24, 51, 130, 28,
-                            66, 172, 105, 33, 97, 179, 48, 81, 229, 114, 216,
-                            208, 119, 39, 31, 47, 109, 172, 215, 246, 210, 48,
-                            203]
+let refResults: [UInt8] = [
+  245, 62, 245, 202, 138, 120, 186, 107, 255, 189,
+  184, 223, 65, 77, 112, 201, 238, 161, 74, 192, 145,
+  21, 43, 41, 91, 136, 182, 176, 237, 155, 208, 16,
+  17, 139, 33, 195, 24, 136, 79, 183, 211, 21, 56,
+  202, 235, 65, 201, 184, 68, 29, 110, 218, 112, 122,
+  194, 77, 41, 230, 147, 84, 0, 233, 168, 6, 55, 131,
+  70, 119, 41, 119, 234, 131, 87, 24, 51, 130, 28,
+  66, 172, 105, 33, 97, 179, 48, 81, 229, 114, 216,
+  208, 119, 39, 31, 47, 109, 172, 215, 246, 210, 48,
+  203]
 
 
 @inline(never)
-public func run_RC4(_ N: Int) {
+public func run_RC4(_ n: Int) {
   let messageLen = 100
   let iterations = 500
-  let Secret = "This is my secret message"
-  let Key    = "This is my key"
-  let SecretData : [UInt8] = Array(Secret.utf8)
-  let KeyData    : [UInt8] = Array(Key.utf8)
+  let secret = "This is my secret message"
+  let key    = "This is my key"
+  let secretData : [UInt8] = Array(secret.utf8)
+  let keyData    : [UInt8] = Array(key.utf8)
 
-  var LongData : [UInt8] = [UInt8](repeating: 0, count: messageLen)
+  var longData : [UInt8] = [UInt8](repeating: 0, count: messageLen)
 
-  for _ in 1...N {
+  for _ in 1...n {
     // Generate a long message.
     for i in 0..<messageLen {
-      LongData[i] = SecretData[i % SecretData.count]
+      longData[i] = secretData[i % secretData.count]
     }
 
-    var Enc = RC4()
-    Enc.initialize(KeyData)
+    var enc = RC4()
+    enc.initialize(keyData)
 
     for _ in 1...iterations {
-      Enc.encrypt(&LongData)
+      enc.encrypt(&longData)
     }
 
-    CheckResults(LongData == RefResults)
+    check(longData == refResults)
   }
 }

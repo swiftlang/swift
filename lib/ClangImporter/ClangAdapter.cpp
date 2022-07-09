@@ -396,6 +396,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::Float16:
     case clang::BuiltinType::Float128:
     case clang::BuiltinType::NullPtr:
+    case clang::BuiltinType::Ibm128:
       return OmissionTypeName();
 
     // Objective-C types that aren't mapped directly; rather, pointers to
@@ -468,15 +469,18 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
       return OmissionTypeName();
 
     // ARM SVE builtin types that don't have Swift equivalents.
-#define SVE_TYPE(Name, Id, ...) \
-    case clang::BuiltinType::Id:
+#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
       return OmissionTypeName();
 
     // PPC MMA builtin types that don't have Swift equivalents.
-#define PPC_VECTOR_TYPE(Name, Id, Size) \
-    case clang::BuiltinType::Id:
+#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
+      return OmissionTypeName();
+
+    // RISC-V V builtin types that don't have Swift equivalents.
+#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/RISCVVTypes.def"
       return OmissionTypeName();
     }
   }
@@ -707,7 +711,8 @@ bool importer::isObjCId(const clang::Decl *decl) {
 }
 
 bool importer::isUnavailableInSwift(
-    const clang::Decl *decl, const PlatformAvailability &platformAvailability,
+    const clang::Decl *decl,
+    const PlatformAvailability *platformAvailability,
     bool enableObjCInterop) {
   // 'id' is always unavailable in Swift.
   if (enableObjCInterop && isObjCId(decl))
@@ -720,7 +725,10 @@ bool importer::isUnavailableInSwift(
     if (attr->getPlatform()->getName() == "swift")
       return true;
 
-    if (!platformAvailability.isPlatformRelevant(
+    if (!platformAvailability)
+      continue;
+
+    if (!platformAvailability->isPlatformRelevant(
             attr->getPlatform()->getName())) {
       continue;
     }
@@ -729,7 +737,7 @@ bool importer::isUnavailableInSwift(
     llvm::VersionTuple version = attr->getDeprecated();
     if (version.empty())
       continue;
-    if (platformAvailability.treatDeprecatedAsUnavailable(
+    if (platformAvailability->treatDeprecatedAsUnavailable(
             decl, version, /*isAsync=*/false)) {
       return true;
     }

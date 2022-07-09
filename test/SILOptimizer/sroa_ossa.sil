@@ -526,3 +526,63 @@ bb0(%0 : @owned $NotTrivial, %1 : @owned $NotTrivial):
   %6 = tuple ()
   return %6 : $()
 }
+
+class Klass {
+}
+
+struct NonTrivialStruct {
+  var x : Klass
+  var y : Klass
+  var z : Klass
+}
+
+sil @get_klasstriple : $@convention(thin) () -> (@owned Klass, @owned Klass, @owned Klass)
+
+// CHECK-LABEL: sil [ossa] @test_dynamiclifetime :
+// CHECK: alloc_stack [dynamic_lifetime] $Klass
+// CHECK: alloc_stack [dynamic_lifetime] $Klass
+// CHECK: alloc_stack [dynamic_lifetime] $Klass
+// CHECK-LABEL: } // end sil function 'test_dynamiclifetime'
+sil [ossa] @test_dynamiclifetime : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Builtin.Int1
+  %3 = alloc_stack [dynamic_lifetime] $NonTrivialStruct
+  %4 = integer_literal $Builtin.Int1, 0
+  store %4 to [trivial] %2 : $*Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %func = function_ref @get_klasstriple : $@convention(thin) () -> (@owned Klass, @owned Klass, @owned Klass)
+  %r = apply %func() : $@convention(thin) () -> (@owned Klass, @owned Klass, @owned Klass)
+  (%v1, %v2, %v3) = destructure_tuple %r : $(Klass, Klass, Klass)
+  %27 = integer_literal $Builtin.Int1, -1
+  store %27 to [trivial] %2 : $*Builtin.Int1
+  %f1 = struct_element_addr %3 : $*NonTrivialStruct, #NonTrivialStruct.x
+  store %v1 to [init] %f1 : $*Klass
+  %f2 = struct_element_addr %3 : $*NonTrivialStruct, #NonTrivialStruct.y
+  store %v2 to [init] %f2 : $*Klass
+  %f3 = struct_element_addr %3 : $*NonTrivialStruct, #NonTrivialStruct.z
+  store %v3 to [init] %f3 : $*Klass
+  br bb3
+
+bb3:
+  %32 = load [trivial] %2 : $*Builtin.Int1
+  cond_br %32, bb4, bb5
+
+bb4:
+  %34 = load [take] %3 : $*NonTrivialStruct
+  destroy_value %34 : $NonTrivialStruct
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  dealloc_stack %3 : $*NonTrivialStruct
+  dealloc_stack %2 : $*Builtin.Int1
+  %res = tuple ()
+  return %res : $()
+}

@@ -142,7 +142,7 @@ public:
   assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeChecksHaveBeenBypassed()
       const;
 
-  // Count-dependend readers:
+  // Count-dependent readers:
 
   /// \return the unique primary input, if one exists.
   const InputFile *getUniquePrimaryInput() const;
@@ -249,15 +249,19 @@ public:
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
-  bool hasObjCHeaderOutputPath() const;
+  bool hasClangHeaderOutputPath() const;
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
   bool hasModuleSourceInfoOutputPath() const;
   bool hasModuleInterfaceOutputPath() const;
   bool hasPrivateModuleInterfaceOutputPath() const;
+  bool hasABIDescriptorOutputPath() const;
+  bool hasModuleSemanticInfoOutputPath() const;
   bool hasModuleSummaryOutputPath() const;
   bool hasTBDPath() const;
+  bool hasYAMLOptRecordPath() const;
+  bool hasBitstreamOptRecordPath() const;
 
   bool hasDependencyTrackerPath() const;
 };

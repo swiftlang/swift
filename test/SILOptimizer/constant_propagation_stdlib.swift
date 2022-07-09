@@ -12,7 +12,7 @@ public struct MyInt {
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF'
 // CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1 {
 // CHECK-O:           bb0(
-// CHECK-O-NEXT:        [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-O:             [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-O-NEXT:        return [[RESULT]]
 // CHECK-O-NEXT:      } // end sil function '$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF'
 public func isConcrete_true(_ x: MyInt) -> Builtin.Int1 {
@@ -25,7 +25,7 @@ public func isConcrete_true(_ x: MyInt) -> Builtin.Int1 {
 // CHECK-ONONE:         [[RESULT:%.*]] = builtin "isConcrete"<T>([[METATYPE]] : $@thick T.Type) : $Builtin.Int1
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF'
-// CHECK-O-LABEL:     sil [signature_optimized_thunk] [always_inline] @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
+// CHECK-O-LABEL:     sil [signature_optimized_thunk] [always_inline] {{.*}}@$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
 // CHECK-O:           bb0(
 // CHECK-O:             [[GEN_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlFTf4d_n : $@convention(thin) <τ_0_0> () -> Builtin.Int1
 // CHECK-O:             [[RESULT:%.*]] = apply [[GEN_FUNC]]<T>() : $@convention(thin) <τ_0_0> () -> Builtin.Int1
@@ -41,7 +41,7 @@ public func isConcrete_false<T>(_ x: T) -> Builtin.Int1 {
 // CHECK-ONONE:         [[RESULT:%.*]] = apply [[GEN_FUNC]]<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF'
-// CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
+// CHECK-O-LABEL:     sil {{.*}}@$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
 // CHECK-O:           bb0(
 // CHECK-O:             [[GEN_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlFTf4d_n : $@convention(thin) <τ_0_0> () -> Builtin.Int1
 // CHECK-O:             [[RESULT:%.*]] = apply [[GEN_FUNC]]<T>() : $@convention(thin) <τ_0_0> () -> Builtin.Int1
@@ -85,8 +85,8 @@ public func isConcrete_concrete_caller(_ x: MyInt) -> Builtin.Int1 {
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF'
 // CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF : $@convention(thin) (MyInt) -> (Builtin.Int1, Builtin.Int1, Builtin.Int1) {
 // CHECK-O:           bb0(
-// CHECK-O-NEXT:        [[VALUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK-O-NEXT:        [[RESULT:%.*]] = tuple ([[VALUE]] : $Builtin.Int1, [[VALUE]] : $Builtin.Int1, [[VALUE]] : $Builtin.Int1)
+// CHECK-O:             [[VALUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-O:             [[RESULT:%.*]] = tuple ([[VALUE]] : $Builtin.Int1, [[VALUE]] : $Builtin.Int1, [[VALUE]] : $Builtin.Int1)
 // CHECK-O-NEXT:        return [[RESULT]]
 // CHECK-O-NEXT:      } // end sil function '$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF'
 public func main(x: MyInt) -> (Builtin.Int1, Builtin.Int1, Builtin.Int1) {

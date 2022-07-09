@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -allocbox-to-stack | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only -enable-lexical-borrow-scopes=false | %FileCheck %s
+
+sil_stage raw
 
 import Builtin
 
@@ -502,8 +504,8 @@ bb0(%0 : $@callee_guaranteed () -> @out U):
 sil @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T):
-  // CHECK: debug_value_addr
-  debug_value_addr %0 : $*T
+  // CHECK: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*T, expr op_deref
   // CHECK: function_ref @mightApply
   %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -530,8 +532,8 @@ bb0(%0 : $*T):
 sil @callWithAutoclosure_2 : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T):
-  // CHECK: debug_value_addr
-  debug_value_addr %0 : $*T
+  // CHECK: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*T, expr op_deref
   // CHECK: function_ref @mightApply
   %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -618,7 +620,7 @@ sil shared @specialized : $@convention(method) (Int, @in S<Q>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $*S<Q>):
   debug_value %0 : $Int
-  debug_value_addr %1 : $*S<Q>
+  debug_value %1 : $*S<Q>, expr op_deref
   %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   %5 = function_ref @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool
   %6 = alloc_box $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <Q>
@@ -636,7 +638,7 @@ sil @unspecialized : $@convention(method) <T where T : Count> (Int, @in S<T>) ->
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $*S<T>):
   debug_value %0 : $Int
-  debug_value_addr %1 : $*S<T>
+  debug_value %1 : $*S<T>, expr op_deref
   %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   %5 = function_ref @closure1 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <τ_0_0>) -> Bool
   %6 = alloc_box $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
@@ -735,7 +737,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <T>):
 
 sil hidden [noinline] @consume : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   destroy_addr %0 : $*T
   %3 = tuple ()
   return %3 : $()
@@ -841,7 +843,7 @@ bb3:
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:        store
 // CHECK:        dealloc_stack [[BOX]]
-// CHECK-NEXT:   dealloc_ref [stack] [[REF]]
+// CHECK-NEXT:   dealloc_stack_ref [[REF]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 sil @wrong_nesting_with_alloc_ref : $(Int) -> () {
@@ -850,7 +852,7 @@ bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   store %0 to %1a : $*Int
-  dealloc_ref [stack] %as1 : $SomeClass
+  dealloc_stack_ref %as1 : $SomeClass
   %3 = load %1a : $*Int
   strong_release %1 : ${ var Int }
   %r = tuple ()

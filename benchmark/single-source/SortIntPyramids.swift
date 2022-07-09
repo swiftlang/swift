@@ -1,10 +1,10 @@
 import TestsUtils
 
-// This benchmark aims to measuare heapSort path of stdlib sorting function.
+// This benchmark aims to measure heapSort path of stdlib sorting function.
 // Datasets in this benchmark are influenced by stdlib partition function,
-// therefore if stdlib partion implementation changes we should correct these
+// therefore if stdlib partition implementation changes we should correct these
 // datasets or disable/skip this benchmark
-public let SortIntPyramids = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "SortIntPyramid",
     runFunction: run_SortIntPyramid,
@@ -52,25 +52,25 @@ let adjacentPyramidsTemplate: [Int] = (1...aPH) + (1...aPH).reversed()
                                     + (1...aPH) + (1...aPH).reversed()
 
 @inline(never)
-public func run_SortIntPyramid(_ N: Int) {
-  for _ in 1...5*N {
+public func run_SortIntPyramid(_ n: Int) {
+  for _ in 1...5*n {
     var pyramid = pyramidTemplate
 
     // sort pyramid in place.
     pyramid.sort()
 
     // Check whether pyramid is sorted.
-    CheckResults(pyramid[0] <= pyramid[pyramid.count/2])
+    check(pyramid[0] <= pyramid[pyramid.count/2])
   }
 }
 
 @inline(never)
-public func run_SortAdjacentIntPyramids(_ N: Int) {
-  for _ in 1...5*N {
+public func run_SortAdjacentIntPyramids(_ n: Int) {
+  for _ in 1...5*n {
     var adjacentPyramids = adjacentPyramidsTemplate
     adjacentPyramids.sort()
     // Check whether pyramid is sorted.
-    CheckResults(
+    check(
       adjacentPyramids[0] <= adjacentPyramids[adjacentPyramids.count/2])
   }
 }

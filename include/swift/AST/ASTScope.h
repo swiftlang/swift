@@ -119,7 +119,7 @@ SourceLoc extractNearestSourceLoc(std::tuple<ASTScopeImpl *, ScopeCreator *>);
 /// \code
 /// -dump-scope-maps expanded
 /// \endcode
-class ASTScopeImpl {
+class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class NodeAdder;
   friend class Portion;
   friend class GenericTypeOrExtensionWholePortion;
@@ -159,19 +159,8 @@ public:
   ASTScopeImpl(const ASTScopeImpl &) = delete;
   ASTScopeImpl &operator=(const ASTScopeImpl &) = delete;
 
-  // Make vanilla new illegal for ASTScopes.
-  void *operator new(size_t bytes) = delete;
   // Need this because have virtual destructors
   void operator delete(void *data) {}
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScopeImpl));
-  void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem, "Allocation failed");
-    return Mem;
-  }
 
 #pragma mark - tree declarations
 protected:
@@ -353,7 +342,7 @@ protected:
 
 public:
   /// The tree is organized by source location and for most nodes this is also
-  /// what obtaines for scoping. However, guards are different. The scope after
+  /// what obtains for scoping. However, guards are different. The scope after
   /// the guard else must hop into the innermoset scope of the guard condition.
   virtual NullablePtr<const ASTScopeImpl> getLookupParent() const {
     return getParent();
@@ -425,25 +414,14 @@ private:
   expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 };
 
-class Portion {
+class Portion : public ASTAllocated<ASTScopeImpl> {
 public:
   const char *portionName;
   Portion(const char *n) : portionName(n) {}
   virtual ~Portion() {}
 
-  // Make vanilla new illegal for ASTScopes.
-  void *operator new(size_t bytes) = delete;
   // Need this because have virtual destructors
   void operator delete(void *data) {}
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScopeImpl));
-  void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem, "Allocation failed");
-    return Mem;
-  }
 
   /// Return the new insertion point
   virtual ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
@@ -566,7 +544,7 @@ public:
   /// \c tryBindExtension needs to get the extended nominal, and the DeclContext
   /// is the parent of the \c ExtensionDecl. If the \c SourceRange of an \c
   /// ExtensionScope were to start where the \c ExtensionDecl says, the lookup
-  /// source locaiton would fall within the \c ExtensionScope. This inclusion
+  /// source location would fall within the \c ExtensionScope. This inclusion
   /// would cause the lazy \c ExtensionScope to be expanded which would ask for
   /// its generic parameters in order to create those sub-scopes. That request
   /// would cause a cycle because it would ask for the extended nominal. So,

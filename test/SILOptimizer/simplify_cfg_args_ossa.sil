@@ -1,9 +1,11 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 sil_stage raw
 
 import Builtin
 import Swift
+
+class A {}
 
 sil_global private @globalinit_token11 : $Builtin.Word
 
@@ -552,7 +554,7 @@ bb16:                                             // Preds: bb15
   %26 = integer_literal $Builtin.Int32, 100       // user: %27
   br bb20(%26 : $Builtin.Int32)                   // id: %28
 
-bb17(%default2 : $Numbers):                                             // Preds: bb9
+bb17:                                             // Preds: bb9
   br bb18                                         // id: %29
 
 bb18:                                             // Preds: bb17
@@ -600,7 +602,7 @@ bb7:                                              // Preds: bb6
   %13 = integer_literal $Builtin.Int32, 100       // user: %14
   br bb11(%13 : $Builtin.Int32)                   // id: %15
 
-bb8(%default1 : $Numbers):                                              // Preds: bb0
+bb8:                                              // Preds: bb0
   br bb9                                          // id: %16
 
 bb9:                                              // Preds: bb8

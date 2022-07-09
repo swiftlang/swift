@@ -232,7 +232,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'NamedAttributeStringArgument': 227,
     'DeclName': 228,
     'PoundAssertStmt': 229,
-    'SomeType': 230,
+    'ConstrainedSugarType': 230,
     'CustomAttribute': 231,
     'GenericRequirement': 232,
     'DifferentiableAttributeArguments': 233,
@@ -253,6 +253,14 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'TargetFunctionEntry': 248,
     'PostfixIfConfigExpr': 250,
     'UnavailabilityCondition': 251,
+    'AvailabilityEntry' : 252,
+    'RegexLiteralExpr': 253,
+    'PrimaryAssociatedTypeList' : 254,
+    'PrimaryAssociatedType' : 255,
+    'PrimaryAssociatedTypeClause' : 256,
+    'BackDeployAttributeSpecList' : 257,
+    'BackDeployVersionList' : 258,
+    'BackDeployVersionArgument' : 259,
 }
 
 

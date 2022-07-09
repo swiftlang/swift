@@ -44,8 +44,8 @@ func acceptColorTagged<Result>(@TaggedBuilder<Color> body: () -> Result) {
 
 struct Context {
     @TaggedBuilder<Color>
-    // CHECK: [[@LINE-1]]:6 | struct/Swift | TaggedBuilder | s:14swift_ide_test13TaggedBuilderV | Ref | rel: 0
-    // CHECK: [[@LINE-2]]:20 | enum/Swift | Color | s:14swift_ide_test5ColorO | Ref | rel: 0
+    // CHECK: [[@LINE-1]]:6 | struct/Swift | TaggedBuilder | s:14swift_ide_test13TaggedBuilderV | Ref,RelCont | rel: 1
+    // CHECK: [[@LINE-2]]:20 | enum/Swift | Color | s:14swift_ide_test5ColorO | Ref,RelCont | rel: 1
     func foo() -> () {}
     // CHECK: [[@LINE-1]]:10 | instance-method/Swift | foo() | s:14swift_ide_test7ContextV3fooyyF | Def,RelChild | rel: 1
 }

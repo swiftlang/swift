@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # ===--- test_Benchmark_Driver.py ----------------------------------------===//
@@ -18,13 +18,7 @@ import os
 import sys
 import time
 import unittest
-
-try:
-    # for Python 2
-    from StringIO import StringIO
-except ImportError:
-    # for Python 3
-    from io import StringIO
+from io import StringIO
 
 from compare_perf_tests import PerformanceTestResult
 
@@ -141,12 +135,12 @@ class Test_parse_args(unittest.TestCase):
         self.assertIsNone(parse_args(["run"]).output_dir)
         self.assertEqual(parse_args(["run", "--output-dir", "/log"]).output_dir, "/log")
 
-    def test_check_supports_vebose_output(self):
+    def test_check_supports_verbose_output(self):
         self.assertFalse(parse_args(["check"]).verbose)
         self.assertTrue(parse_args(["check", "-v"]).verbose)
         self.assertTrue(parse_args(["check", "--verbose"]).verbose)
 
-    def test_check_supports_mardown_output(self):
+    def test_check_supports_markdown_output(self):
         self.assertFalse(parse_args(["check"]).markdown)
         self.assertTrue(parse_args(["check", "-md"]).markdown)
         self.assertTrue(parse_args(["check", "--markdown"]).markdown)
@@ -492,7 +486,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
 
             shutil.rmtree(temp_dir)
 
-    def test_deterministing_hashing(self):
+    def test_deterministic_hashing(self):
         cmd = ["printenv", "SWIFT_DETERMINISTIC_HASHING"]
         driver = BenchmarkDriver(["no args"], tests=["ignored"])
         self.assertEqual(driver._invoke(cmd).strip(), "1")
@@ -845,7 +839,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
         quantum used by macos scheduler. Linux scheduler's quantum is 6ms.
         Driver yielding the process before the 10ms quantum elapses helped
         a lot, but benchmarks with runtimes under 1ms usually exhibit a strong
-        mode which is best for accurate performance charaterization.
+        mode which is best for accurate performance characterization.
         To minimize the number of involuntary context switches that corrupt our
         measurements, we should strive to stay in the microbenchmark range.
 
@@ -1005,7 +999,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
             doctor.analyze(
                 {
                     # The threshold of 15 pages was estimated from previous
-                    # measurements. The normal range should be probably aproximated
+                    # measurements. The normal range should be probably approximate
                     # by a function instead of a simple constant.
                     # TODO: re-evaluate normal range from whole SBS
                     "name": "ConstantMemory",

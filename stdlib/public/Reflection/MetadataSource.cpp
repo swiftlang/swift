@@ -10,39 +10,40 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Reflection/MetadataSource.h"
+#if SWIFT_ENABLE_REFLECTION
 
-#include <sstream>
+#include "swift/Reflection/MetadataSource.h"
+#include <iostream>
 
 using namespace swift;
 using namespace reflection;
 
 class PrintMetadataSource
   : public MetadataSourceVisitor<PrintMetadataSource, void> {
-  FILE *file;
+  std::ostream &stream;
   unsigned Indent;
 
-  FILE * indent(unsigned Amount) {
+  std::ostream &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
-      fprintf(file, " ");
-    return file;
+      stream << " ";
+    return stream;
   }
 
-  FILE * printHeader(std::string Name) {
-    fprintf(indent(Indent), "(%s", Name.c_str());
-    return file;
+  std::ostream &printHeader(std::string Name) {
+    indent(Indent) << "(" << Name;
+    return stream;
   }
 
-  FILE * printField(std::string name, std::string value) {
+  std::ostream &printField(std::string name, std::string value) {
     if (!name.empty())
-      fprintf(file, " %s=%s", name.c_str(), value.c_str());
+      stream << " " << name << "=" << value;
     else
-      fprintf(file, " %s", value.c_str());
-    return file;
+      stream << " " << value;
+    return stream;
   }
 
   void printRec(const MetadataSource *MS) {
-    fprintf(file, "\n");
+    stream << "\n";
 
     Indent += 2;
     visit(MS);
@@ -50,12 +51,12 @@ class PrintMetadataSource
   }
 
   void closeForm() {
-    fprintf(file, ")");
+    stream << ")";
   }
 
 public:
-  PrintMetadataSource(FILE *file, unsigned Indent)
-    : file(file), Indent(Indent) {}
+  PrintMetadataSource(std::ostream &stream, unsigned Indent)
+      : stream(stream), Indent(Indent) {}
 
   void
   visitClosureBindingMetadataSource(const ClosureBindingMetadataSource *CB) {
@@ -98,11 +99,11 @@ public:
   }
 };
 
-void MetadataSource::dump() const {
-  dump(stderr, 0);
+void MetadataSource::dump() const { dump(std::cerr, 0); }
+
+void MetadataSource::dump(std::ostream &stream, unsigned Indent) const {
+  PrintMetadataSource(stream, Indent).visit(this);
+  stream << "\n";
 }
 
-void MetadataSource::dump(FILE *file, unsigned Indent) const {
-  PrintMetadataSource(file, Indent).visit(this);
-  fprintf(file, "\n");
-}
+#endif

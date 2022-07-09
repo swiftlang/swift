@@ -8,27 +8,27 @@
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
-// RUN: %{python} %S/../gen-output-file-map.py -o %t %S
-// RUN: cd %t && %target-swiftc_driver -typecheck -output-file-map %t/output.json -incremental -module-name main -verify-incremental-dependencies %s
-
-// This test is overly sensitive to the evolving contents of the Foundation
-// overlay in the SDK.
-// REQUIRES: rdar78797454
+// RUN: cd %t && %target-swift-frontend(mock-sdk: %clang-importer-sdk) -c -module-name main -verify-incremental-dependencies -primary-file %s -o /dev/null
 
 import Foundation
 
 // expected-provides {{LookupFactory}}
 // expected-provides {{NSObject}}
+// expected-provides {{Selector}}
+// expected-provides {{Bool}}
+// expected-provides {{ObjCBool}}
+// expected-provides {{==}}
+// expected-provides {{Equatable}}
+// expected-provides {{Hasher}}
+// expected-provides {{_ObjectiveCBridgeable}}
+// expected-provides{{Hashable}}
+// expected-member {{ObjectiveC.NSObject.NSObject}}
 // expected-superclass {{ObjectiveC.NSObject}}
 // expected-conformance {{ObjectiveC.NSObjectProtocol}}
-// expected-conformance {{Foundation._KeyValueCodingAndObserving}}
-// expected-conformance {{Foundation._KeyValueCodingAndObservingPublishing}}
-// expected-conformance {{Foundation._KeyValueCodingAndObservingSequence}}
+// expected-member {{ObjectiveC.NSObjectProtocol.NSObject}}
+// expected-member {{ObjectiveC.NSObject.Bool}}
 // expected-conformance {{Swift.Hashable}}
 // expected-conformance {{Swift.Equatable}}
-// expected-conformance {{Swift.CustomDebugStringConvertible}}
-// expected-conformance {{Swift.CVarArg}}
-// expected-conformance {{Swift.CustomStringConvertible}}
 // expected-member {{Swift._ExpressibleByBuiltinIntegerLiteral.init}}
 @objc private class LookupFactory: NSObject {
   // expected-provides {{AssignmentPrecedence}}
@@ -46,7 +46,9 @@ import Foundation
   @objc func someMethod() {}
 
   // expected-member {{ObjectiveC.NSObject.init}}
+  // expected-member {{ObjectiveC.NSObject.deinit}}
   // expected-member {{ObjectiveC.NSObjectProtocol.init}}
+  // expected-member {{ObjectiveC.NSObjectProtocol.deinit}}
   // expected-member {{main.LookupFactory.init}}
   // expected-member {{main.LookupFactory.deinit}}
   // expected-member {{main.LookupFactory.someMember}}
@@ -63,6 +65,32 @@ import Foundation
 // expected-member {{Swift.Encodable.callAsFunction}}
 // expected-member {{Swift.Decodable.callAsFunction}}
 
+// expected-member {{Swift.Hashable._rawHashValue}}
+// expected-member {{ObjectiveC.NSObject.hash}}
+// expected-member {{Swift.Equatable.hashValue}}
+// expected-member{{Swift.Hashable.hashValue}}
+// expected-member{{Swift.Hashable.hash}}
+// expected-member{{ObjectiveC.NSObjectProtocol.==}}
+// expected-member {{ObjectiveC.NSObjectProtocol.hashValue}}
+// expected-member {{ObjectiveC.NSObjectProtocol.Hasher}}
+// expected-member {{Swift.Equatable._rawHashValue}}
+// expected-member {{ObjectiveC.NSObject.hashValue}}
+// expected-member {{ObjectiveC.NSObjectProtocol.Bool}}
+// expected-member {{ObjectiveC.NSObject.==}}
+// expected-member {{Swift.Equatable.==}}
+// expected-member {{ObjectiveC.NSObject.Hasher}}
+// expected-member {{ObjectiveC.NSObjectProtocol.hash}}
+
+// expected-member {{Swift.Hashable.init}}
+// expected-member {{Swift.Hashable.deinit}}
+// expected-member {{Swift.Equatable.init}}
+// expected-member {{Swift.Equatable.deinit}}
+
+// expected-member {{Swift.Hashable.==}}
+// expected-member {{Swift.Equatable.hash}}
+// expected-member {{ObjectiveC.NSObject._rawHashValue}}
+// expected-member {{ObjectiveC.NSObjectProtocol._rawHashValue}}
+
 // expected-provides {{AnyObject}}
 func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyObject}}
   _ = object.someMember // expected-dynamic-member {{someMember}}
@@ -70,21 +98,13 @@ func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyOb
 }
 
 // expected-member {{Swift.Hashable.someMethod}}
-// expected-member {{Foundation._KeyValueCodingAndObserving.someMethod}}
-// expected-member {{Foundation._KeyValueCodingAndObservingPublishing.someMethod}}
 // expected-member {{Swift.Equatable.someMethod}}
-// expected-member {{Swift.CVarArg.someMethod}}
-// expected-member {{Swift.CustomStringConvertible.someMethod}}
-// expected-member {{Swift.CustomDebugStringConvertible.someMethod}}
 // expected-member {{Swift.Equatable.someMember}}
-// expected-member{{Swift.CVarArg.someMember}}
-// expected-member{{Foundation._KeyValueCodingAndObservingPublishing.someMember}}
-// expected-member{{Foundation._KeyValueCodingAndObserving.someMember}}
-// expected-member{{Swift.CustomDebugStringConvertible.someMember}}
-// expected-member{{Swift.CustomStringConvertible.someMember}}
-// expected-member{{Swift.Hashable.someMember}}
-// expected-member{{Swift.Sendable.callAsFunction}}
-// expected-member{{Foundation._KeyValueCodingAndObservingSequence.someMethod}}
-// expected-member{{Foundation._KeyValueCodingAndObservingSequence.someMember}}
-// expected-member{{Foundation.EncodableWithConfiguration.callAsFunction}}
-// expected-member{{Foundation.DecodableWithConfiguration.callAsFunction}}
+// expected-member {{Swift.Hashable.someMember}}
+// expected-member {{Swift.Sendable.callAsFunction}}
+// expected-member {{ObjectiveC.NSObject.someMethodWithDeprecatedOptions}}
+// expected-member {{ObjectiveC.NSObject.someMethodWithPotentiallyUnavailableOptions}}
+// expected-member {{ObjectiveC.NSObject.someMethodWithUnavailableOptions}}
+// expected-member {{ObjectiveC.NSObjectProtocol.someMethodWithUnavailableOptions}}
+// expected-member {{ObjectiveC.NSObjectProtocol.someMethodWithPotentiallyUnavailableOptions}}
+// expected-member {{ObjectiveC.NSObjectProtocol.someMethodWithDeprecatedOptions}}

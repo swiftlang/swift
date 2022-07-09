@@ -1,8 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # GYB: Generate Your Boilerplate (improved names welcome; at least
 # this one's short).  See -h output for instructions
-
-from __future__ import print_function
 
 import io
 import os
@@ -11,18 +9,7 @@ import sys
 import textwrap
 import tokenize
 from bisect import bisect
-
-
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-
-
-try:
-    basestring
-except NameError:
-    basestring = str
+from io import StringIO
 
 
 def get_line_starts(s):
@@ -732,7 +719,7 @@ class Code(ASTNode):
         # If we got a result, the code was an expression, so append
         # its value
         if result is not None \
-                or (isinstance(result, basestring) and result != ''):
+                or (isinstance(result, str) and result != ''):
             from numbers import Number, Integral
             result_string = None
             if isinstance(result, Number) and not isinstance(result, Integral):
@@ -740,7 +727,7 @@ class Code(ASTNode):
             elif isinstance(result, Integral) or isinstance(result, list):
                 result_string = str(result)
             else:
-                result_string = StringIO(result).read()
+                result_string = result
             context.append_text(
                 result_string, self.filename, self.start_line_number)
 

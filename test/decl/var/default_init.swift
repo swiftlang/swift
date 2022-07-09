@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify -swift-version 5
+// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify -swift-version 5 -disable-availability-checking
 
 // Default initialization of variables.
 

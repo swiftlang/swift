@@ -14,7 +14,7 @@ public protocol FutureConvertible {
 func takesFuture<T : FutureProtocol>(_: T.Type) {}
 
 public struct FutureHolder<T : FutureProtocol> {
-  // CHECK-LABEL: Generic signature: <T, U where T == U.FutureType, U : FutureConvertible>
+  // CHECK-LABEL: Generic signature: <T, U where T == U.[FutureConvertible]FutureType, U : FutureConvertible>
   init<U : FutureConvertible>(_: U) where U.FutureType == T {
     takesFuture(T.self)
   }

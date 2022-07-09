@@ -67,7 +67,8 @@ template <typename AllocatorT = MallocAllocator, size_t SlabSize = 4096,
           size_t SizeThreshold = SlabSize, size_t GrowthDelay = 128>
 class BumpPtrAllocatorImpl
     : public AllocatorBase<BumpPtrAllocatorImpl<AllocatorT, SlabSize,
-                                                SizeThreshold, GrowthDelay>> {
+                                                SizeThreshold, GrowthDelay>>,
+      private AllocatorT {
 public:
   static_assert(SizeThreshold <= SlabSize,
                 "The SizeThreshold must be at most the SlabSize to ensure "
@@ -81,15 +82,15 @@ public:
 
   template <typename T>
   BumpPtrAllocatorImpl(T &&Allocator)
-      : Allocator(std::forward<T &&>(Allocator)) {}
+      : AllocatorT(std::forward<T &&>(Allocator)) {}
 
   // Manually implement a move constructor as we must clear the old allocator's
   // slabs as a matter of correctness.
   BumpPtrAllocatorImpl(BumpPtrAllocatorImpl &&Old)
-      : CurPtr(Old.CurPtr), End(Old.End), Slabs(std::move(Old.Slabs)),
+      : AllocatorT(static_cast<AllocatorT &&>(Old)), CurPtr(Old.CurPtr),
+        End(Old.End), Slabs(std::move(Old.Slabs)),
         CustomSizedSlabs(std::move(Old.CustomSizedSlabs)),
-        BytesAllocated(Old.BytesAllocated), RedZoneSize(Old.RedZoneSize),
-        Allocator(std::move(Old.Allocator)) {
+        BytesAllocated(Old.BytesAllocated), RedZoneSize(Old.RedZoneSize) {
     Old.CurPtr = Old.End = nullptr;
     Old.BytesAllocated = 0;
     Old.Slabs.clear();
@@ -111,7 +112,7 @@ public:
     RedZoneSize = RHS.RedZoneSize;
     Slabs = std::move(RHS.Slabs);
     CustomSizedSlabs = std::move(RHS.CustomSizedSlabs);
-    Allocator = std::move(RHS.Allocator);
+    AllocatorT::operator=(static_cast<AllocatorT &&>(RHS));
 
     RHS.CurPtr = RHS.End = nullptr;
     RHS.BytesAllocated = 0;
@@ -171,8 +172,9 @@ public:
     // If Size is really big, allocate a separate slab for it.
     size_t PaddedSize = SizeToAllocate + Alignment.value() - 1;
     if (PaddedSize > SizeThreshold) {
-      void *NewSlab = Allocator.Allocate(PaddedSize, alignof(std::max_align_t));
-      // We own the new slab and don't want anyone reading anyting other than
+      void *NewSlab =
+          AllocatorT::Allocate(PaddedSize, alignof(std::max_align_t));
+      // We own the new slab and don't want anyone reading anything other than
       // pieces returned from this method.  So poison the whole slab.
       __asan_poison_memory_region(NewSlab, PaddedSize);
       CustomSizedSlabs.push_back(std::make_pair(NewSlab, PaddedSize));
@@ -316,9 +318,6 @@ private:
   /// a sanitizer.
   size_t RedZoneSize = 1;
 
-  /// The allocator instance we use to get slabs of memory.
-  AllocatorT Allocator;
-
   static size_t computeSlabSize(unsigned SlabIdx) {
     // Scale the actual allocated slab size based on the number of slabs
     // allocated. Every GrowthDelay slabs allocated, we double
@@ -334,7 +333,7 @@ private:
     size_t AllocatedSlabSize = computeSlabSize(Slabs.size());
 
     void *NewSlab =
-        Allocator.Allocate(AllocatedSlabSize, alignof(std::max_align_t));
+        AllocatorT::Allocate(AllocatedSlabSize, alignof(std::max_align_t));
     // We own the new slab and don't want anyone reading anything other than
     // pieces returned from this method.  So poison the whole slab.
     __asan_poison_memory_region(NewSlab, AllocatedSlabSize);
@@ -350,7 +349,7 @@ private:
     for (; I != E; ++I) {
       size_t AllocatedSlabSize =
           computeSlabSize(std::distance(Slabs.begin(), I));
-      Allocator.Deallocate(*I, AllocatedSlabSize, alignof(std::max_align_t));
+      AllocatorT::Deallocate(*I, AllocatedSlabSize, alignof(std::max_align_t));
     }
   }
 
@@ -359,7 +358,7 @@ private:
     for (auto &PtrAndSize : CustomSizedSlabs) {
       void *Ptr = PtrAndSize.first;
       size_t Size = PtrAndSize.second;
-      Allocator.Deallocate(Ptr, Size, alignof(std::max_align_t));
+      AllocatorT::Deallocate(Ptr, Size, alignof(std::max_align_t));
     }
   }
 

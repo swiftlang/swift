@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -O -wmo -enable-sil-verify-all %s | %FileCheck %s
 
-// REQUIRES: objc_interop
-
 sil_stage canonical
 
 import Builtin
@@ -9,7 +7,7 @@ import Swift
 import SwiftShims
 
 public class A {
-  @objc deinit
+  deinit
   init()
 }
 
@@ -19,13 +17,13 @@ public protocol P {
 
 public class B : A, P {
   public func foo() -> Int64
-  @objc deinit
+  deinit
   override init()
 }
 
 public class C : A, P {
   public func foo() -> Int64
-  @objc deinit
+  deinit
   override init()
 }
 

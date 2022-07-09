@@ -62,32 +62,6 @@ SILValue swift::getUnderlyingObject(SILValue v) {
   }
 }
 
-SILValue
-swift::getUnderlyingObjectStoppingAtObjectToAddrProjections(SILValue v) {
-  if (!v->getType().isAddress())
-    return SILValue();
-
-  while (true) {
-    auto v2 = lookThroughAddressToAddressProjections(v);
-    v2 = stripIndexingInsts(v2);
-    if (v2 == v)
-      return v2;
-    v = v2;
-  }
-}
-
-SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
-  while (true) {
-    SILValue v2 = stripCastsWithoutMarkDependence(v);
-    v2 = stripAddressProjections(v2);
-    v2 = stripIndexingInsts(v2);
-    v2 = lookThroughOwnershipInsts(v2);
-    if (v2 == v)
-      return v2;
-    v = v2;
-  }
-}
-
 /// Return the underlying SILValue after stripping off identity SILArguments if
 /// we belong to a BB with one predecessor.
 SILValue swift::stripSinglePredecessorArgs(SILValue V) {
@@ -135,11 +109,13 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
 SILValue swift::stripCastsWithoutMarkDependence(SILValue v) {
   while (true) {
     v = stripSinglePredecessorArgs(v);
+    if (isa<MarkDependenceInst>(v))
+      return v;
+
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
-      if (isRCIdentityPreservingCast(svi)
-          || isa<UncheckedTrivialBitCastInst>(v)
-          || isa<BeginAccessInst>(v)
-          || isa<EndCOWMutationInst>(v)) {
+      if (isIdentityPreservingRefCast(svi) ||
+          isa<UncheckedTrivialBitCastInst>(v) || isa<BeginAccessInst>(v) ||
+          isa<EndCOWMutationInst>(v)) {
         v = svi->getOperand(0);
         continue;
       }
@@ -152,10 +128,9 @@ SILValue swift::stripCasts(SILValue v) {
   while (true) {
     v = stripSinglePredecessorArgs(v);
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
-      if (isRCIdentityPreservingCast(svi)
-          || isa<UncheckedTrivialBitCastInst>(v)
-          || isa<MarkDependenceInst>(v)
-          || isa<BeginAccessInst>(v)) {
+      if (isIdentityPreservingRefCast(svi) ||
+          isa<UncheckedTrivialBitCastInst>(v) || isa<MarkDependenceInst>(v) ||
+          isa<BeginAccessInst>(v)) {
         v = cast<SingleValueInstruction>(v)->getOperand(0);
         continue;
       }
@@ -265,7 +240,7 @@ SILValue swift::stripBorrow(SILValue V) {
 // All instructions handled here must propagate their first operand into their
 // single result.
 //
-// This is guaranteed to handle all function-type converstions: ThinToThick,
+// This is guaranteed to handle all function-type conversions: ThinToThick,
 // ConvertFunction, and ConvertEscapeToNoEscapeInst.
 SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   if (auto *convert = dyn_cast<ConversionInst>(I))
@@ -291,14 +266,13 @@ bool swift::isEndOfScopeMarker(SILInstruction *user) {
     return false;
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndBorrowInst:
-  case SILInstructionKind::EndLifetimeInst:
     return true;
   }
 }
 
 bool swift::isIncidentalUse(SILInstruction *user) {
   return isEndOfScopeMarker(user) || user->isDebugInstruction() ||
-         isa<FixLifetimeInst>(user);
+         isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user);
 }
 
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
@@ -397,6 +371,491 @@ bool swift::onlyUsedByAssignByWrapper(PartialApplyInst *PAI) {
     return false;
   }
   return usedByAssignByWrapper;
+}
+
+static RuntimeEffect metadataEffect(SILType ty) {
+  ClassDecl *cl = ty.getClassOrBoundGenericClass();
+  if (cl && !cl->hasKnownSwiftImplementation())
+    return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
+  return RuntimeEffect::MetaData;
+}
+
+RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType) {
+  switch (inst->getKind()) {
+  case SILInstructionKind::TailAddrInst:
+  case SILInstructionKind::IndexRawPointerInst:
+  case SILInstructionKind::FunctionRefInst:
+  case SILInstructionKind::DynamicFunctionRefInst:
+  case SILInstructionKind::PreviousDynamicFunctionRefInst:
+  case SILInstructionKind::GlobalAddrInst:
+  case SILInstructionKind::BaseAddrForOffsetInst:
+  case SILInstructionKind::IntegerLiteralInst:
+  case SILInstructionKind::FloatLiteralInst:
+  case SILInstructionKind::StringLiteralInst:
+  case SILInstructionKind::ClassMethodInst:
+  case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::ObjCSuperMethodInst:
+  case SILInstructionKind::UpcastInst:
+  case SILInstructionKind::AddressToPointerInst:
+  case SILInstructionKind::PointerToAddressInst:
+  case SILInstructionKind::UncheckedRefCastInst:
+  case SILInstructionKind::UncheckedAddrCastInst:
+  case SILInstructionKind::UncheckedTrivialBitCastInst:
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedValueCastInst:
+  case SILInstructionKind::RefToRawPointerInst:
+  case SILInstructionKind::RawPointerToRefInst:
+#define LOADABLE_REF_STORAGE(Name, ...)                                        \
+  case SILInstructionKind::RefTo##Name##Inst:                                  \
+  case SILInstructionKind::Name##ToRefInst:
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
+  case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+  case SILInstructionKind::RefToBridgeObjectInst:
+  case SILInstructionKind::BridgeObjectToRefInst:
+  case SILInstructionKind::BridgeObjectToWordInst:
+  case SILInstructionKind::ThinToThickFunctionInst:
+  case SILInstructionKind::ThickToObjCMetatypeInst:
+  case SILInstructionKind::ObjCMetatypeToObjectInst:
+  case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
+  case SILInstructionKind::ClassifyBridgeObjectInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::UncheckedOwnershipConversionInst:
+  case SILInstructionKind::LoadInst:
+  case SILInstructionKind::LoadBorrowInst:
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::StoreBorrowInst:
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::ProjectExistentialBoxInst:
+  case SILInstructionKind::ObjCProtocolInst:
+  case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::TupleInst:
+  case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::StructInst:
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::RefElementAddrInst:
+  case SILInstructionKind::EnumInst:
+  case SILInstructionKind::UncheckedEnumDataInst:
+  case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::SelectEnumInst:
+  case SILInstructionKind::SelectEnumAddrInst:
+  case SILInstructionKind::SelectValueInst:
+  case SILInstructionKind::OpenExistentialMetatypeInst:
+  case SILInstructionKind::OpenExistentialBoxInst:
+  case SILInstructionKind::OpenExistentialValueInst:
+  case SILInstructionKind::OpenExistentialBoxValueInst:
+  case SILInstructionKind::ProjectBlockStorageInst:
+  case SILInstructionKind::UnreachableInst:
+  case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::YieldInst:
+  case SILInstructionKind::UnwindInst:
+  case SILInstructionKind::BranchInst:
+  case SILInstructionKind::CondBranchInst:
+  case SILInstructionKind::SwitchValueInst:
+  case SILInstructionKind::SwitchEnumInst:
+  case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
+  case SILInstructionKind::AutoreleaseValueInst:
+  case SILInstructionKind::BindMemoryInst:
+  case SILInstructionKind::RebindMemoryInst:
+  case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::EndBorrowInst:
+  case SILInstructionKind::AssignInst:
+  case SILInstructionKind::AssignByWrapperInst:
+  case SILInstructionKind::MarkFunctionEscapeInst:
+  case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::EndApplyInst:
+  case SILInstructionKind::AbortApplyInst:
+  case SILInstructionKind::CondFailInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst:
+  case SILInstructionKind::DifferentiableFunctionInst:
+  case SILInstructionKind::DifferentiableFunctionExtractInst:
+  case SILInstructionKind::LinearFunctionInst:
+  case SILInstructionKind::LinearFunctionExtractInst:
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
+  case SILInstructionKind::EndCOWMutationInst:
+    return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::DebugValueInst:
+    // Ignore runtime calls of debug_value
+    return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::GetAsyncContinuationInst:
+  case SILInstructionKind::GetAsyncContinuationAddrInst:
+  case SILInstructionKind::AwaitAsyncContinuationInst:
+  case SILInstructionKind::HopToExecutorInst:
+  case SILInstructionKind::ExtractExecutorInst:
+    return RuntimeEffect::Concurrency;
+
+  case SILInstructionKind::KeyPathInst:
+    return RuntimeEffect::Allocating | RuntimeEffect::Releasing |
+           RuntimeEffect::MetaData;
+
+  case SILInstructionKind::SwitchEnumAddrInst:
+  case SILInstructionKind::InjectEnumAddrInst:
+  case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::IndexAddrInst:
+    // TODO: hasArchetype() ?
+    if (!inst->getOperand(0)->getType().isLoadable(*inst->getFunction())) {
+      impactType = inst->getOperand(0)->getType();
+      return RuntimeEffect::MetaData;
+    }
+    return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::RefTailAddrInst:
+    if (!cast<RefTailAddrInst>(inst)->getTailType().isLoadable(*inst->getFunction())) {
+      impactType = cast<RefTailAddrInst>(inst)->getTailType();
+      return RuntimeEffect::MetaData;
+    }
+    return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::BeginAccessInst:
+    if (cast<BeginAccessInst>(inst)->getEnforcement() ==
+        SILAccessEnforcement::Dynamic)
+      return RuntimeEffect::ExclusivityChecking;
+    return RuntimeEffect::NoEffect;
+  case SILInstructionKind::EndAccessInst:
+    if (cast<EndAccessInst>(inst)->getBeginAccess()->getEnforcement() ==
+        SILAccessEnforcement::Dynamic)
+      return RuntimeEffect::ExclusivityChecking;
+    return RuntimeEffect::NoEffect;
+  case SILInstructionKind::BeginUnpairedAccessInst:
+    if (cast<BeginUnpairedAccessInst>(inst)->getEnforcement() ==
+        SILAccessEnforcement::Dynamic)
+      return RuntimeEffect::ExclusivityChecking;
+    return RuntimeEffect::NoEffect;
+  case SILInstructionKind::EndUnpairedAccessInst:
+    if (cast<EndUnpairedAccessInst>(inst)->getEnforcement() ==
+        SILAccessEnforcement::Dynamic)
+      return RuntimeEffect::ExclusivityChecking;
+    return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::InitExistentialAddrInst:
+  case SILInstructionKind::InitExistentialValueInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Allocating | RuntimeEffect::Releasing |
+           RuntimeEffect::MetaData;
+
+  case SILInstructionKind::InitExistentialRefInst:
+  case SILInstructionKind::InitExistentialMetatypeInst:
+  case SILInstructionKind::ObjCToThickMetatypeInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData;
+
+  case SILInstructionKind::OpenExistentialAddrInst:
+    if (cast<OpenExistentialAddrInst>(inst)->getAccessKind() ==
+        OpenedExistentialAccess::Mutable)
+      return RuntimeEffect::Allocating;
+    return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::OpenExistentialRefInst: {
+    SILType opType = cast<OpenExistentialRefInst>(inst)->getOperand()->getType();
+    impactType = opType;
+    if (opType.getASTType()->isObjCExistentialType()) {
+      return RuntimeEffect::MetaData;
+    }
+    return RuntimeEffect::MetaData;
+    // TODO: should be NoEffect
+    //return RuntimeEffect::NoEffect;
+  }
+
+  case SILInstructionKind::UnconditionalCheckedCastInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Casting | metadataEffect(impactType) |
+           metadataEffect(cast<SingleValueInstruction>(inst)->getType());
+  case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+  case SILInstructionKind::CheckedCastAddrBranchInst:
+  case SILInstructionKind::UncheckedRefCastAddrInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Casting | metadataEffect(impactType) |
+           metadataEffect(inst->getOperand(1)->getType());
+  case SILInstructionKind::CheckedCastBranchInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Casting | metadataEffect(impactType) |
+      metadataEffect(cast<CheckedCastBranchInst>(inst)->getTargetLoweredType());
+
+  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::ProjectBoxInst:
+    if (!cast<SingleValueInstruction>(inst)->getType().
+          isLoadable(*inst->getFunction())) {
+      impactType = cast<SingleValueInstruction>(inst)->getType();
+      return RuntimeEffect::MetaData;
+    }
+    return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::AllocGlobalInst: {
+    SILType glTy = cast<AllocGlobalInst>(inst)->getReferencedGlobal()->
+                      getLoweredType();
+    if (glTy.isLoadable(*inst->getFunction()))
+      return RuntimeEffect::NoEffect;
+    if (glTy.hasOpaqueArchetype()) {
+      impactType = glTy;
+      return RuntimeEffect::Allocating | RuntimeEffect::MetaData;
+    }
+    return RuntimeEffect::Allocating;
+  }
+  case SILInstructionKind::AllocBoxInst:
+  case SILInstructionKind::AllocExistentialBoxInst:
+  case SILInstructionKind::AllocRefInst:
+  case SILInstructionKind::AllocRefDynamicInst:
+    impactType = cast<SingleValueInstruction>(inst)->getType();
+    return RuntimeEffect::Allocating | RuntimeEffect::MetaData |
+           // TODO: why Releasing?
+           RuntimeEffect::Releasing;
+
+  case SILInstructionKind::DeallocRefInst:
+  case SILInstructionKind::DeallocPartialRefInst:
+  case SILInstructionKind::DeallocBoxInst:
+  case SILInstructionKind::DeallocExistentialBoxInst:
+  case SILInstructionKind::DeinitExistentialAddrInst:
+  case SILInstructionKind::DeinitExistentialValueInst:
+    return RuntimeEffect::Deallocating;
+
+  case SILInstructionKind::CopyAddrInst: {
+    auto *ca = cast<CopyAddrInst>(inst);
+    impactType = ca->getSrc()->getType();
+    if (!ca->isInitializationOfDest())
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
+    if (!ca->isTakeOfSrc())
+      return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
+    return RuntimeEffect::MetaData;
+  }
+  // Equivalent to a copy_addr [init]
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
+    return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
+  }
+
+  case SILInstructionKind::StoreInst:
+    switch (cast<StoreInst>(inst)->getOwnershipQualifier()) {
+      case StoreOwnershipQualifier::Unqualified:
+      case StoreOwnershipQualifier::Trivial:
+        return RuntimeEffect::NoEffect;
+      case StoreOwnershipQualifier::Init:
+        return RuntimeEffect::RefCounting;
+      case StoreOwnershipQualifier::Assign:
+        return RuntimeEffect::Releasing;
+    }
+
+  case SILInstructionKind::DestroyAddrInst:
+    impactType = inst->getOperand(0)->getType();
+    if (impactType.isTrivial(*inst->getFunction()))
+      return RuntimeEffect::NoEffect;
+    if (!impactType.isLoadable(*inst->getFunction()))
+      return RuntimeEffect::Releasing | RuntimeEffect::MetaData;
+    return RuntimeEffect::Releasing;
+
+  case SILInstructionKind::ValueMetatypeInst:
+  case SILInstructionKind::MetatypeInst: {
+    auto metaTy = cast<SingleValueInstruction>(inst)->getType().castTo<MetatypeType>();
+    if (metaTy->getRepresentation() != MetatypeRepresentation::Thin) {
+      Type instTy = metaTy->getInstanceType();
+      if (instTy->isLegalSILType())
+        impactType = SILType::getPrimitiveObjectType(CanType(instTy));
+      if (auto selfType = instTy->getAs<DynamicSelfType>())
+        instTy = selfType->getSelfType();
+      auto *cl = instTy->getClassOrBoundGenericClass();
+      bool isForeign = cl && (cl->getObjectModel() == ReferenceCounting::ObjC ||
+                              cl->isForeign());
+      if (isForeign || instTy->isAnyObject())
+        return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
+      return RuntimeEffect::MetaData;
+    }
+    return RuntimeEffect::NoEffect;
+  }
+
+  case SILInstructionKind::ExistentialMetatypeInst: {
+    SILType opType = cast<ExistentialMetatypeInst>(inst)->getOperand()->getType();
+    impactType = opType;
+    switch (opType.getPreferredExistentialRepresentation()) {
+    case ExistentialRepresentation::Metatype:
+    case ExistentialRepresentation::Boxed:
+    case ExistentialRepresentation::Opaque:
+      return RuntimeEffect::MetaData;
+    case ExistentialRepresentation::Class: {
+      auto *cl = opType.getClassOrBoundGenericClass();
+      bool usesObjCModel = cl->getObjectModel() == ReferenceCounting::ObjC;
+      if ((cl && usesObjCModel) || opType.isAnyObject())
+        return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
+      return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
+    }
+    case ExistentialRepresentation::None:
+      return RuntimeEffect::NoEffect;
+    }
+    llvm_unreachable("Bad existential representation");
+  }
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::UnmanagedRetainValueInst:
+  case SILInstructionKind::RetainValueAddrInst:
+  case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::BeginCOWMutationInst:
+  case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::ExplicitCopyValueInst:
+  case SILInstructionKind::SetDeallocatingInst:
+  case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
+    return RuntimeEffect::RefCounting;
+
+  case SILInstructionKind::InitBlockStorageHeaderInst:
+    return RuntimeEffect::Releasing;
+
+  case SILInstructionKind::StrongReleaseInst:
+  case SILInstructionKind::UnmanagedReleaseValueInst:
+  case SILInstructionKind::UnmanagedAutoreleaseValueInst:
+  case SILInstructionKind::ReleaseValueInst:
+  case SILInstructionKind::ReleaseValueAddrInst:
+  case SILInstructionKind::DestroyValueInst:
+    impactType = inst->getOperand(0)->getType();
+    if (impactType.isBlockPointerCompatible())
+      return RuntimeEffect::ObjectiveC | RuntimeEffect::Releasing;
+    return RuntimeEffect::Releasing;
+
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::Name##RetainInst:                                   \
+    return RuntimeEffect::RefCounting;                                        \
+  case SILInstructionKind::Name##ReleaseInst:                                  \
+    return RuntimeEffect::Releasing;
+#include "swift/AST/ReferenceStorage.def"
+#undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:                        \
+    return RuntimeEffect::RefCounting;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:                        \
+    return RuntimeEffect::RefCounting;
+#include "swift/AST/ReferenceStorage.def"
+#undef UNCHECKED_REF_STORAGE
+#undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
+  case SILInstructionKind::Store##Name##Inst:                                  \
+    return RuntimeEffect::Releasing;
+#include "swift/AST/ReferenceStorage.def"
+#undef NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)       \
+  case SILInstructionKind::Load##Name##Inst:                                   \
+    return RuntimeEffect::RefCounting;
+#include "swift/AST/ReferenceStorage.def"
+#undef NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+
+  case SILInstructionKind::GlobalValueInst:
+    return RuntimeEffect::Locking | RuntimeEffect::MetaData;
+
+  case SILInstructionKind::DynamicMethodBranchInst:
+    return RuntimeEffect::ObjectiveC;
+
+  case SILInstructionKind::PartialApplyInst:
+  case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::TryApplyInst:
+  case SILInstructionKind::BeginApplyInst: {
+    RuntimeEffect rt = RuntimeEffect::NoEffect;
+    auto as = ApplySite(inst);
+
+    switch (as.getSubstCalleeType()->getRepresentation()) {
+    case SILFunctionTypeRepresentation::ObjCMethod:
+    case SILFunctionTypeRepresentation::Block:
+      rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
+      break;
+    case SILFunctionTypeRepresentation::WitnessMethod:
+      rt |= RuntimeEffect::MetaData;
+      break;
+    case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::CXXMethod:
+    case SILFunctionTypeRepresentation::Thin:
+    case SILFunctionTypeRepresentation::Method:
+    case SILFunctionTypeRepresentation::Closure:
+    case SILFunctionTypeRepresentation::Thick:
+      break;
+    }
+
+    if (isa<BeginApplyInst>(inst))
+      rt |= RuntimeEffect::Allocating;      
+
+    if (auto *pa = dyn_cast<PartialApplyInst>(inst)) {
+      if (pa->isOnStack()) {
+        for (SILValue arg : pa->getArguments()) {
+          if (!arg->getType().isTrivial(*pa->getFunction()))
+            rt |= RuntimeEffect::RefCounting;
+        }
+      } else {
+        rt |= RuntimeEffect::Allocating | RuntimeEffect::Releasing;
+      }
+    }
+
+    if (!as.getSubstitutionMap().empty())
+      rt |= RuntimeEffect::MetaData;
+    if (auto *pa = dyn_cast<PartialApplyInst>(inst)) {
+      if (!pa->isOnStack())
+        rt |= RuntimeEffect::MetaData;
+    }
+    return rt;
+  }
+  case SILInstructionKind::WitnessMethodInst: {
+    return RuntimeEffect::MetaData;
+  }
+  case SILInstructionKind::SuperMethodInst: {
+    auto method = cast<SuperMethodInst>(inst)->getMember().getOverriddenVTableEntry();
+    auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
+    if (classDecl->hasResilientMetadata())
+      return RuntimeEffect::MetaData;
+    return RuntimeEffect::NoEffect;
+  }
+
+  case SILInstructionKind::BuiltinInst:
+    switch (cast<BuiltinInst>(inst)->getBuiltinInfo().ID) {
+    case BuiltinValueKind::Once:
+    case BuiltinValueKind::OnceWithContext:
+      return RuntimeEffect::Locking;
+    case BuiltinValueKind::IsUnique:
+      return RuntimeEffect::RefCounting;
+    case BuiltinValueKind::IsOptionalType:
+      return RuntimeEffect::Casting;
+    case BuiltinValueKind::AllocRaw:
+      return RuntimeEffect::Allocating;
+    case BuiltinValueKind::DeallocRaw:
+      return RuntimeEffect::Deallocating;
+    case BuiltinValueKind::Fence:
+    case BuiltinValueKind::CmpXChg:
+    case BuiltinValueKind::AtomicLoad:
+    case BuiltinValueKind::AtomicStore:
+    case BuiltinValueKind::AtomicRMW:
+      return RuntimeEffect::Locking;
+    case BuiltinValueKind::DestroyArray:
+      return RuntimeEffect::Releasing;
+    case BuiltinValueKind::CopyArray:
+      return RuntimeEffect::RefCounting;
+    case BuiltinValueKind::AssignCopyArrayNoAlias:
+    case BuiltinValueKind::AssignCopyArrayFrontToBack:
+    case BuiltinValueKind::AssignCopyArrayBackToFront:
+    case BuiltinValueKind::AssignTakeArray:
+      return RuntimeEffect::RefCounting | RuntimeEffect::Deallocating;
+    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
+      return RuntimeEffect::ObjectiveC | RuntimeEffect::Allocating;
+    case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+    case BuiltinValueKind::BuildDefaultActorExecutorRef:
+    case BuiltinValueKind::BuildMainActorExecutorRef:
+    case BuiltinValueKind::StartAsyncLet:
+    case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+      return RuntimeEffect::MetaData;
+    default:
+      break;
+    }
+    return RuntimeEffect::NoEffect;
+  }
 }
 
 /// Given a block used as a noescape function argument, attempt to find all

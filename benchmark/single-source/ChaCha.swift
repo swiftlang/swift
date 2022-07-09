@@ -343,26 +343,27 @@ extension UInt32 {
 }
 
 
-public let ChaCha = BenchmarkInfo(
-  name: "ChaCha",
-  runFunction: run_ChaCha,
-  tags: [.runtime, .cpubench])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "ChaCha",
+    runFunction: run_ChaCha,
+    tags: [.runtime, .cpubench]),
+]
 
 @inline(never)
 func checkResult(_ plaintext: [UInt8]) {
-    CheckResults(plaintext.first! == 6 && plaintext.last! == 254)
+    check(plaintext.first! == 6 && plaintext.last! == 254)
     var hash: UInt64 = 0
     for byte in plaintext {
         // rotate
         hash = (hash &<< 8) | (hash &>> (64 - 8))
         hash ^= UInt64(byte)
     }
-    CheckResults(hash == 0xa1bcdb217d8d14e4)
+    check(hash == 0xa1bcdb217d8d14e4)
 }
 
 @inline(never)
-@_assemblyVision
-public func run_ChaCha(_ N: Int) {
+public func run_ChaCha(_ n: Int) {
   let key = Array(repeating: UInt8(1), count: 32)
   let nonce = Array(repeating: UInt8(2), count: 12)
 
@@ -371,7 +372,7 @@ public func run_ChaCha(_ N: Int) {
   checkResult(checkedtext)
 
   var plaintext = Array(repeating: UInt8(0), count: 30720)  // Chosen for CI runtime
-  for _ in 1...N {
+  for _ in 1...n {
     ChaCha20.encrypt(bytes: &plaintext, key: key, nonce: nonce)
     blackHole(plaintext.first!)
   }

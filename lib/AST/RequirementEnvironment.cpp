@@ -56,11 +56,13 @@ RequirementEnvironment::RequirementEnvironment(
   auto conformanceToSyntheticTypeFn = [&](SubstitutableType *type) {
     auto *genericParam = cast<GenericTypeParamType>(type);
     if (covariantSelf) {
-      return GenericTypeParamType::get(genericParam->getDepth() + 1,
+      return GenericTypeParamType::get(genericParam->isTypeSequence(),
+                                       genericParam->getDepth() + 1,
                                        genericParam->getIndex(), ctx);
     }
 
-    return GenericTypeParamType::get(genericParam->getDepth(),
+    return GenericTypeParamType::get(genericParam->isTypeSequence(),
+                                     genericParam->getDepth(),
                                      genericParam->getIndex(), ctx);
   };
   auto conformanceToSyntheticConformanceFn =
@@ -76,7 +78,7 @@ RequirementEnvironment::RequirementEnvironment(
     ++depth;
   }
   if (conformanceSig) {
-    depth += conformanceSig->getGenericParams().back()->getDepth() + 1;
+    depth += conformanceSig.getGenericParams().back()->getDepth() + 1;
   }
 
   // Build a substitution map to replace the protocol's \c Self and the type
@@ -94,7 +96,8 @@ RequirementEnvironment::RequirementEnvironment(
       // type.
       if (type->isEqual(selfType)) {
         if (covariantSelf)
-          return GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
+          return GenericTypeParamType::get(/*type sequence=*/false,
+                                           /*depth=*/0, /*index=*/0, ctx);
         return substConcreteType;
       }
       // Other requirement generic parameters map 1:1 with their depth
@@ -105,8 +108,8 @@ RequirementEnvironment::RequirementEnvironment(
       // invalid code.
       if (genericParam->getDepth() != 1)
         return Type();
-      auto substGenericParam =
-        GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
+      auto substGenericParam = GenericTypeParamType::get(
+          genericParam->isTypeSequence(), depth, genericParam->getIndex(), ctx);
       return substGenericParam;
     },
     [selfType, substConcreteType, conformance, conformanceDC, &ctx](
@@ -136,14 +139,11 @@ RequirementEnvironment::RequirementEnvironment(
   // If the requirement itself is non-generic, the synthetic signature
   // is that of the conformance context.
   if (!covariantSelf &&
-      reqSig->getGenericParams().size() == 1 &&
-      reqSig->getRequirements().size() == 1) {
-    syntheticSignature = conformanceDC->getGenericSignatureOfContext();
-    if (syntheticSignature) {
-      syntheticSignature = syntheticSignature.getCanonicalSignature();
-      syntheticEnvironment =
-        syntheticSignature->getGenericEnvironment();
-    }
+      reqSig.getGenericParams().size() == 1 &&
+      reqSig.getRequirements().size() == 1) {
+    syntheticSignature = conformanceDC->getGenericSignatureOfContext().getCanonicalSignature();
+    syntheticEnvironment =
+      syntheticSignature.getGenericEnvironment();
 
     return;
   }
@@ -156,13 +156,14 @@ RequirementEnvironment::RequirementEnvironment(
   // If the conforming type is a class, add a class-constrained 'Self'
   // parameter.
   if (covariantSelf) {
-    auto paramTy = GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
+    auto paramTy = GenericTypeParamType::get(/*type sequence=*/false,
+                                             /*depth=*/0, /*index=*/0, ctx);
     genericParamTypes.push_back(paramTy);
   }
 
   // Now, add all generic parameters from the conforming type.
   if (conformanceSig) {
-    for (auto param : conformanceSig->getGenericParams()) {
+    for (auto param : conformanceSig.getGenericParams()) {
       auto substParam = Type(param).subst(conformanceToSyntheticTypeFn,
                                           conformanceToSyntheticConformanceFn);
       genericParamTypes.push_back(substParam->castTo<GenericTypeParamType>());
@@ -172,13 +173,14 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add requirements.
   SmallVector<Requirement, 2> requirements;
   if (covariantSelf) {
-    auto paramTy = GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
+    auto paramTy = GenericTypeParamType::get(/*type sequence=*/false,
+                                             /*depth=*/0, /*index=*/0, ctx);
     Requirement reqt(RequirementKind::Superclass, paramTy, substConcreteType);
     requirements.push_back(reqt);
   }
 
   if (conformanceSig) {
-    for (auto &rawReq : conformanceSig->getRequirements()) {
+    for (auto &rawReq : conformanceSig.getRequirements()) {
       if (auto req = rawReq.subst(conformanceToSyntheticTypeFn,
                                   conformanceToSyntheticConformanceFn))
         requirements.push_back(*req);
@@ -186,7 +188,7 @@ RequirementEnvironment::RequirementEnvironment(
   }
 
   // Finally, add the generic parameters from the requirement.
-  for (auto genericParam : reqSig->getGenericParams().slice(1)) {
+  for (auto genericParam : reqSig.getGenericParams().slice(1)) {
     // The only depth that makes sense is depth == 1, the generic parameters
     // of the requirement itself. Anything else is from invalid code.
     if (genericParam->getDepth() != 1) {
@@ -194,8 +196,8 @@ RequirementEnvironment::RequirementEnvironment(
     }
 
     // Create an equivalent generic parameter at the next depth.
-    auto substGenericParam =
-      GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
+    auto substGenericParam = GenericTypeParamType::get(
+        genericParam->isTypeSequence(), depth, genericParam->getIndex(), ctx);
 
     genericParamTypes.push_back(substGenericParam);
   }
@@ -204,18 +206,14 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
-  for (auto &rawReq : reqSig->getRequirements()) {
+  for (auto &rawReq : reqSig.getRequirements()) {
     if (auto req = rawReq.subst(reqToSyntheticEnvMap))
       requirements.push_back(*req);
   }
 
   // Produce the generic signature and environment.
-  // FIXME: Pass in a source location for the conformance, perhaps? It seems
-  // like this could fail.
-  syntheticSignature = evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        nullptr, std::move(genericParamTypes), std::move(requirements)},
-      GenericSignature());
-  syntheticEnvironment = syntheticSignature->getGenericEnvironment();
+  syntheticSignature = buildGenericSignature(ctx, GenericSignature(),
+                                             std::move(genericParamTypes),
+                                             std::move(requirements));
+  syntheticEnvironment = syntheticSignature.getGenericEnvironment();
 }

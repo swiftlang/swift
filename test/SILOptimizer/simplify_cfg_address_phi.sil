@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 //
 // Test SimplifyCFG's handling of address-type phis. In other words, makes sure it doesn't create them at all!
 
@@ -10,7 +10,7 @@ import SwiftShims
 
 class C {
   @_hasStorage @_hasInitialValue var field: Int { get set }
-  @objc deinit
+  deinit
     init()
 }
 
@@ -135,7 +135,7 @@ bb5:
   return %val : $Builtin.Int32
 }
 
-// Test that debug_value_addr is not unnecessarilly lost during address projection sinking.
+// Test that debug_value is not unnecessarilly lost during address projection sinking.
 public class CC<R> {
   let r : R
   init(_ _r: R) { r = _r }
@@ -144,10 +144,10 @@ public class CC<R> {
 sil @useAny : $@convention(thin) <V> (@in_guaranteed V) -> ()
 
 // CHECK-LABEL: sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
-// CHECK: debug_value_addr %0 : $*S, let, name "u"
+// CHECK: debug_value %0 : $*S, let, name "u", expr op_deref
 // CHECK: apply %{{.*}}<S>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // CHECK: [[FIELD:%.*]] = ref_element_addr %1 : $CC<R>, #CC.r
-// CHECK: debug_value_addr [[FIELD]] : $*R, let, name "u"
+// CHECK: debug_value [[FIELD]] : $*R, let, name "u", expr op_deref
 // CHECK: apply %{{.*}}<R>([[FIELD]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // CHECK-LABEL: } // end sil function 'testDebugValue'
 sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
@@ -156,18 +156,18 @@ bb0(%0 : $*S, %1 : $CC<R>, %2 : $Bool):
   cond_br %bool, bb1, bb2
 
 bb1:
-  debug_value_addr %0 : $*S, let, name "u"
+  debug_value %0 : $*S, let, name "u", expr op_deref
   %f1 = function_ref @useAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   %call1 = apply %f1<S>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   br bb2
 
 bb2:
   %field = ref_element_addr %1 : $CC<R>, #CC.r
-  debug_value_addr %field : $*R, let, name "t"
+  debug_value %field : $*R, let, name "t", expr op_deref
   cond_br %bool, bb3, bb4
 
 bb3:
-  debug_value_addr %field : $*R, let, name "u"
+  debug_value %field : $*R, let, name "u", expr op_deref
   %f2 = function_ref @useAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   %call2 = apply %f2<R>(%field) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   br bb4

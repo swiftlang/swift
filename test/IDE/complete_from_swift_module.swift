@@ -53,6 +53,9 @@
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
 // FIXME: %FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=AMBIGOUS_RESULT_BUILER > %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=AMBIGOUS_RESULT_BUILER < %t.compl.txt
+
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
 
@@ -103,16 +106,16 @@ func testCompleteModuleQualified3() {
   foo_swift_module.BarGenericSwiftStruct1#^MODULE_QUALIFIED_3^#
 }
 // MODULE_QUALIFIED_3: Begin completions
-// MODULE_QUALIFIED_3-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#t: _#})[#BarGenericSwiftStruct1<_>#]; name=(t: _)
-// MODULE_QUALIFIED_3-NEXT: Decl[InstanceMethod]/CurrNominal: .bar1InstanceFunc({#(self): BarGenericSwiftStruct1<_>#})[#() -> Void#]; name=bar1InstanceFunc(self: BarGenericSwiftStruct1<_>)
+// MODULE_QUALIFIED_3-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#t: _#})[#BarGenericSwiftStruct1<_>#]; name=(t:)
+// MODULE_QUALIFIED_3-NEXT: Decl[InstanceMethod]/CurrNominal: .bar1InstanceFunc({#(self): BarGenericSwiftStruct1<_>#})[#() -> Void#]; name=bar1InstanceFunc(:)
 // MODULE_QUALIFIED_3: End completions
 
 func testCompleteModuleQualified4() {
   foo_swift_module.BarGenericSwiftStruct2#^MODULE_QUALIFIED_4^#
 }
 // MODULE_QUALIFIED_4: Begin completions
-// MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#t: _#}, {#u: _#})[#BarGenericSwiftStruct2<_, _>#]; name=(t: _, u: _)
-// MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#(self): BarGenericSwiftStruct2<_, _>#})[#() -> Void#]; name=bar2InstanceFunc(self: BarGenericSwiftStruct2<_, _>)
+// MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#t: _#}, {#u: _#})[#BarGenericSwiftStruct2<_, _>#]; name=(t:u:)
+// MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#(self): BarGenericSwiftStruct2<_, _>#})[#() -> Void#]; name=bar2InstanceFunc(:)
 // MODULE_QUALIFIED_4-NEXT: Keyword[self]/CurrNominal: .self[#BarGenericSwiftStruct2<_, _>.Type#]; name=self
 // MODULE_QUALIFIED_4-NEXT: Keyword/CurrNominal: .Type[#BarGenericSwiftStruct2<_, _>.Type#]; name=Type
 // MODULE_QUALIFIED_4-NEXT: End completions
@@ -161,3 +164,28 @@ func foo() -> foo_swift_module.#^MODULE_TYPE_QUALIFIED^# {}
 // MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: FooSwiftStruct[#FooSwiftStruct#]; name=FooSwiftStruct
 // MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: BarGenericSwiftStruct2[#BarGenericSwiftStruct2#]; name=BarGenericSwiftStruct2
 // MODULE_TYPE_QUALIFIED: End completions
+
+// rdar://92048610
+func testAmbiguousResultBuilder() {
+  @resultBuilder
+  struct MyBuilder {
+    static func buildBlock(_ x: Int) -> Int {}
+  }
+
+  struct Foo {
+    init(arg: Int = 1, @MyBuilder content: () -> Int) {}
+    init(arg: Int = 1) {}
+  }
+
+  func test() {
+    Foo {
+      #^AMBIGOUS_RESULT_BUILER^#
+    }
+    // Results should only contain globalVar once
+    // AMBIGOUS_RESULT_BUILER: Begin completions
+    // AMBIGOUS_RESULT_BUILER-NOT: globalVar
+    // AMBIGOUS_RESULT_BUILER-DAG: Decl[GlobalVar]/OtherModule[foo_swift_module]: globalVar[#Int#]; name=globalVar
+    // AMBIGOUS_RESULT_BUILER-NOT: globalVar
+    // AMBIGOUS_RESULT_BUILER: End completions
+  }
+}

@@ -118,9 +118,7 @@ IRGenThunk::IRGenThunk(IRGenFunction &IGF, SILDeclRef declRef)
 
   if (isAsync) {
     asyncLayout.emplace(irgen::getAsyncContextLayout(
-        IGF.IGM, origTy, substTy, subMap, /*suppress generics*/ false,
-        FunctionPointer::Kind(
-            FunctionPointer::BasicKind::AsyncFunctionPointer)));
+        IGF.IGM, origTy, substTy, subMap));
   }
 }
 
@@ -164,8 +162,6 @@ void IRGenThunk::prepareArguments() {
 
   // Chop off the async context parameters.
   if (isAsync) {
-    // FIXME: Once we remove async task and executor this should be one not
-    // three.
     unsigned numAsyncContextParams =
         (unsigned)AsyncFunctionArgumentIndex::Context + 1;
     (void)original.claim(numAsyncContextParams);
@@ -235,8 +231,11 @@ Callee IRGenThunk::lookupMethod() {
   if (selfTy.is<MetatypeType>()) {
     metadata = selfValue;
   } else {
+    auto &Types = IGF.IGM.getSILModule().Types;
+    auto *env = Types.getConstantGenericEnvironment(declRef);
+    auto sig = env ? env->getGenericSignature() : GenericSignature();
     metadata = emitHeapMetadataRefForHeapObject(IGF, selfValue, selfTy,
-                                                /*suppress cast*/ true);
+                                                sig, /*suppress cast*/ true);
   }
 
   // Find the method we're interested in.
@@ -253,9 +252,9 @@ void IRGenThunk::emit() {
 
   if (isAsync) {
     auto asyncContextIdx = Signature::forAsyncEntry(
-                               IGF.IGM, origTy, /*useSpecialConvention*/ false)
+                               IGF.IGM, origTy,
+                               FunctionPointerKind::defaultAsync())
                                .getAsyncContextIndex();
-    IGF.setupAsync(asyncContextIdx);
 
     auto entity = LinkEntity::forDispatchThunk(declRef);
     emitAsyncFunctionEntry(IGF, *asyncLayout, entity, asyncContextIdx);
@@ -345,9 +344,34 @@ void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
 
 llvm::Constant *
 IRGenModule::getAddrOfAsyncFunctionPointer(LinkEntity entity) {
-  return getAddrOfLLVMVariable(
-    LinkEntity::forAsyncFunctionPointer(entity),
-    NotForDefinition, DebugTypeInfo());
+  llvm::Constant *Pointer =
+      getAddrOfLLVMVariable(LinkEntity::forAsyncFunctionPointer(entity),
+                            NotForDefinition, DebugTypeInfo());
+  if (!getOptions().IndirectAsyncFunctionPointer)
+    return Pointer;
+
+  // When the symbol does not have DLL Import storage, we must directly address
+  // it. Otherwise, we will form an invalid reference.
+  if (!Pointer->isDLLImportDependent())
+    return Pointer;
+
+  llvm::Constant *PointerPointer =
+      getOrCreateGOTEquivalent(Pointer,
+                               LinkEntity::forAsyncFunctionPointer(entity));
+  llvm::Constant *PointerPointerConstant =
+      llvm::ConstantExpr::getPtrToInt(PointerPointer, IntPtrTy);
+  llvm::Constant *Marker =
+      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
+                                                      1));
+  // TODO(compnerd) ensure that the pointer alignment guarantees that bit-0 is
+  // cleared. We cannot use an `getOr` here as it does not form a relocatable
+  // expression.
+  llvm::Constant *Address =
+      llvm::ConstantExpr::getAdd(PointerPointerConstant, Marker);
+
+  IndirectAsyncFunctionPointers[entity] = Address;
+  return llvm::ConstantExpr::getIntToPtr(Address,
+                                         AsyncFunctionPointerTy->getPointerTo());
 }
 
 llvm::Constant *
@@ -362,7 +386,6 @@ llvm::Constant *IRGenModule::defineAsyncFunctionPointer(LinkEntity entity,
   auto asyncEntity = LinkEntity::forAsyncFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(asyncEntity, init, DebugTypeInfo()));
-  setTrueConstGlobal(var);
   return var;
 }
 
@@ -371,6 +394,15 @@ IRGenModule::getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp) {
   for (auto &entry : GlobalVars) {
     if (entry.getSecond() == afp) {
       auto entity = entry.getFirst();
+      return entity.getSILFunction();
+    }
+  }
+  for (auto &entry : IndirectAsyncFunctionPointers) {
+    if (entry.getSecond() == afp) {
+      auto entity = entry.getFirst();
+      assert(getOptions().IndirectAsyncFunctionPointer &&
+             "indirect async function found for non-indirect async function"
+             " target?");
       return entity.getSILFunction();
     }
   }
@@ -491,7 +523,7 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
     }
       
     void noteResilientSuperclass() {}
-    void noteStartOfImmediateMembers(ClassDecl *clas) {}
+    void noteStartOfImmediateMembers(ClassDecl *clazz) {}
   };
   
   LookUpNonoverriddenMethods(IGF, classDecl, method).layout();

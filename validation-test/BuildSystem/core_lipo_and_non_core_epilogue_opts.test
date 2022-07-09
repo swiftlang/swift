@@ -1,0 +1,16 @@
+# REQUIRES: standalone_build
+# REQUIRES: OS=macosx
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake --infer --swiftpm --verbose-build 2>&1 | %FileCheck %s
+
+# Make sure we build swift, llvm, llbuild, then do core lipo, then build
+# swiftpm, and finally finish by running the rest of the epilogue operations.
+
+# CHECK: cmake -G Ninja {{.*}}llvm-project/llvm
+# CHECK: cmake -G Ninja {{.*}}swift
+# CHECK: --only-execute {{.*}}-llbuild-build
+# CHECK: --only-execute merged-hosts-lipo-core
+# CHECK: --- Building swiftpm ---
+# CHECK: --only-execute merged-hosts-lipo
