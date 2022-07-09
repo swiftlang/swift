@@ -8483,7 +8483,7 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
         auto diagnosed =
             primaryFix->coalesceAndDiagnose(solution, secondaryFixes);
-        if (primaryFix->canApplySolution()) {
+        if (!primaryFix->isFatal()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;
         } else {
@@ -9143,9 +9143,9 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     bool diagnosedErrorsViaFixes = applySolutionFixes(solution);
     bool canApplySolution = true;
     for (const auto fix : solution.Fixes) {
-      if (!fix->canApplySolution())
+      if (fix->isFatal())
         canApplySolution = false;
-      if (fix->affectsSolutionScore() == SK_Fix && fix->canApplySolution())
+      if (fix->impact() == SK_Fix && !fix->isFatal())
         ++numResolvableFixes;
     }
 

@@ -411,10 +411,10 @@ class ConstraintFix {
   FixKind Kind;
   ConstraintLocator *Locator;
 
-  /// The behavior limit to apply to the diagnostics emitted.
-  FixBehavior fixBehavior;
-
 public:
+  /// The behavior limit to apply to the diagnostics emitted.
+  const FixBehavior fixBehavior;
+
   ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator,
                 FixBehavior fixBehavior = FixBehavior::Error)
       : CS(cs), Kind(kind), Locator(locator), fixBehavior(fixBehavior) {}
@@ -428,27 +428,22 @@ public:
 
   FixKind getKind() const { return Kind; }
 
-  /// Whether it is still possible to "apply" a solution containing this kind
-  /// of fix to get a usable AST.
-  bool canApplySolution() const {
+  /// Whether this fix fatal for the constraint solver, meaning that it cannot
+  /// produce a usable type-checked AST.
+  bool isFatal() const {
     switch (fixBehavior) {
     case FixBehavior::AlwaysWarning:
     case FixBehavior::DowngradeToWarning:
     case FixBehavior::Suppress:
-      return true;
+      return false;
 
     case FixBehavior::Error:
-      return false;
+      return true;
     }
   }
 
-  /// Whether this kind of fix affects the solution score, and which score
-  /// it affects.
-  Optional<ScoreKind> affectsSolutionScore() const;
-
-  /// The diagnostic behavior limit that will be applied to any emitted
-  /// diagnostics.
-  FixBehavior diagfixBehavior() const { return fixBehavior; }
+  /// Determine the impact of this fix on the solution score, if any.
+  Optional<ScoreKind> impact() const;
 
   virtual std::string getName() const = 0;
 
@@ -804,6 +799,16 @@ public:
                                          Type rhs, ConstraintLocator *locator,
                                          FixBehavior fixBehavior);
 
+  /// Try to apply this fix to the given types.
+  ///
+  /// \returns \c true if the fix cannot be applied and the solver must fail,
+  /// or \c false if the fix has been applied and the solver can continue.
+  static bool attempt(ConstraintSystem &cs,
+                      ConstraintKind constraintKind,
+                      FunctionType *fromType,
+                      FunctionType *toType,
+                      ConstraintLocatorBuilder locator);
+
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::MarkGlobalActorFunction;
   }
@@ -854,6 +859,16 @@ public:
                                       FunctionType *toType,
                                       ConstraintLocator *locator,
                                       FixBehavior fixBehavior);
+
+  /// Try to apply this fix to the given types.
+  ///
+  /// \returns \c true if the fix cannot be applied and the solver must fail,
+  /// or \c false if the fix has been applied and the solver can continue.
+  static bool attempt(ConstraintSystem &cs,
+                      ConstraintKind constraintKind,
+                      FunctionType *fromType,
+                      FunctionType *toType,
+                      ConstraintLocatorBuilder locator);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AddSendableAttribute;
