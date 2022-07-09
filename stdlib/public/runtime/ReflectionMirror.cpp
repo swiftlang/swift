@@ -404,8 +404,22 @@ getFieldAt(const Metadata *base, unsigned index) {
   } else {
     typeInfo = result.getType();
   }
+  auto metadata = typeInfo.getMetadata();
 
-  auto fieldType = FieldType(typeInfo.getMetadata());
+  // We can't actually properly support closures via reflection.
+  // The compiler juggles several representations and runtime
+  // reflection loses enough context to make the closure un-callable.
+  // So we erase closure values in mirrors:
+  if (isa<FunctionTypeMetadata>(metadata)) {
+    typeInfo = TypeInfo({&METADATA_SYM(EMPTY_TUPLE_MANGLING),
+        MetadataState::Complete}, {});
+    metadata = typeInfo.getMetadata();
+    warning(0, "Swift runtime cannot reflect fields that hold closures; "
+            "'%*s' will show up as an empty tuple in Mirrors",
+            (int)name.size(), name.data());
+  }
+
+  auto fieldType = FieldType(metadata);
   fieldType.setIndirect(field.isIndirectCase());
   fieldType.setReferenceOwnership(typeInfo.getReferenceOwnership());
   fieldType.setIsVar(field.isVar());
