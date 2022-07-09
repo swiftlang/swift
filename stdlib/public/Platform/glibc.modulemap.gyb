@@ -44,7 +44,7 @@ module SwiftGlibc [system] {
   header "SwiftGlibc.h"
 
   // <assert.h>'s use of NDEBUG requires textual inclusion. 
-  textual header "assert.h"
+  textual header "${GLIBC_INCLUDE_PATH}/assert.h"
 
   export *
 }
