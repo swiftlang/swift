@@ -23,6 +23,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
+#include <assert.h>
 #include <functional>
 
 namespace swift {
