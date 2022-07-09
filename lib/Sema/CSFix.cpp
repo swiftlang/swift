@@ -2162,7 +2162,7 @@ IgnoreDefaultExprTypeMismatch::create(ConstraintSystem &cs, Type argType,
 bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
                                               bool asNote) const {
   MissingExplicitExistentialCoercion failure(solution, ErasedResultType,
-                                             getLocator());
+                                             getLocator(), diagfixBehavior());
   return failure.diagnose(asNote);
 }
 
@@ -2394,8 +2394,9 @@ bool AddExplicitExistentialCoercion::isRequired(
 AddExplicitExistentialCoercion *
 AddExplicitExistentialCoercion::create(ConstraintSystem &cs, Type resultTy,
                                        ConstraintLocator *locator) {
+  FixBehavior fixBehavior = FixBehavior::Error;
   return new (cs.getAllocator())
-      AddExplicitExistentialCoercion(cs, resultTy, locator);
+      AddExplicitExistentialCoercion(cs, resultTy, locator, fixBehavior);
 }
 
 bool RenameConflictingPatternVariables::diagnose(const Solution &solution,

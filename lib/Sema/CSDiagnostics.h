@@ -2725,8 +2725,9 @@ class MissingExplicitExistentialCoercion final : public FailureDiagnostic {
 public:
   MissingExplicitExistentialCoercion(const Solution &solution,
                                      Type erasedResultTy,
-                                     ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
+                                     ConstraintLocator *locator,
+                                     FixBehavior fixBehavior)
+      : FailureDiagnostic(solution, locator, fixBehavior),
         ErasedResultType(resolveType(erasedResultTy)) {}
 
   SourceRange getSourceRange() const override {
