@@ -36,6 +36,8 @@
 #include <shellapi.h>
 #endif
 
+#include <errno.h>
+
 // Backing storage for overrides of `Swift.CommandLine.arguments`.
 static char **_swift_stdlib_ProcessOverrideUnsafeArgv = nullptr;
 static int _swift_stdlib_ProcessOverrideUnsafeArgc = 0;
