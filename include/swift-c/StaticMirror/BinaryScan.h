@@ -25,7 +25,7 @@
 /// SWIFTSTATICMIRROR_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSTATICMIRROR_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSTATICMIRROR_VERSION_MAJOR 0
-#define SWIFTSTATICMIRROR_VERSION_MINOR 4 // Added opaque associated type's protocol requirements
+#define SWIFTSTATICMIRROR_VERSION_MINOR 5 // Added opaque associated type's same-type requirements
 
 SWIFTSTATICMIRROR_BEGIN_DECLS
 
@@ -116,7 +116,10 @@ SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_string_ref_t
     swift_static_mirror_type_alias_get_substituted_type_mangled_name(
         swift_static_mirror_type_alias_t);
 SWIFTSTATICMIRROR_PUBLIC swiftscan_string_set_t *
-swift_static_mirror_type_alias_get_opaque_type_requirements(
+swift_static_mirror_type_alias_get_opaque_type_protocol_requirements(
+        swift_static_mirror_type_alias_t);
+SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_type_alias_set_t *
+swift_static_mirror_type_alias_get_opaque_type_same_type_requirements(
         swift_static_mirror_type_alias_t);
 
 // swift_static_mirror_associated_type_info query methods
