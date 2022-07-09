@@ -386,8 +386,13 @@ extension Array {
     _ index: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
 #if _runtime(_ObjC)
-    _buffer._checkInoutAndNativeTypeCheckedBounds(
-      index, wasNativeTypeChecked: wasNativeTypeChecked)
+    // There is no need to do bounds checking for the non-native case because
+    // ObjectiveC arrays do bounds checking by their own.
+    // And in the native-non-type-checked case, it's also not needed to do bounds
+    // checking here, because it's done in ArrayBuffer._getElementSlowPath.
+    if _fastPath(wasNativeTypeChecked) {
+      _buffer._native._checkValidSubscript(index)
+    }
 #else
     _buffer._checkValidSubscript(index)
 #endif
