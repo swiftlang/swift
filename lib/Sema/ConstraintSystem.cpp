@@ -4621,7 +4621,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // let's diagnose this as regular ambiguity.
   if (llvm::all_of(solutions, [](const Solution &solution) {
         return llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
-          return fix->canApplySolution();
+          return !fix->isFatal();
         });
       })) {
     return diagnoseAmbiguity(solutions);
@@ -4643,7 +4643,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       // source of ambiguity or failures.
       // Ignore warnings in favor of actual error fixes,
       // because they are not the source of ambiguity/failures.
-      if (!fix->affectsSolutionScore())
+      if (!fix->impact())
         continue;
 
       fixes.insert({&solution, fix});
