@@ -3025,8 +3025,10 @@ class AddExplicitExistentialCoercion final : public ConstraintFix {
   Type ErasedResultType;
 
   AddExplicitExistentialCoercion(ConstraintSystem &cs, Type erasedResultTy,
-                                 ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddExplicitExistentialCoercion, locator),
+                                 ConstraintLocator *locator,
+                                 FixBehavior fixBehavior)
+      : ConstraintFix(cs, FixKind::AddExplicitExistentialCoercion, locator,
+                      fixBehavior),
         ErasedResultType(erasedResultTy) {}
 
 public:
