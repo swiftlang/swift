@@ -248,27 +248,27 @@ extension _SmallString {
       self = _SmallString()
       return
     }
-    zeroTrailingBytes(of: &_storage, from: len)
+    _zeroTrailingBytes(of: &_storage, from: len)
     self = _SmallString(leading: _storage.0, trailing: _storage.1, count: len)
   }
 }
 
 @inlinable @inline(__always)
-internal func zeroTrailingBytes(
-  of storage: inout _SmallString.RawBitPattern, from len: Int
+internal func _zeroTrailingBytes(
+  of storage: inout _SmallString.RawBitPattern, from index: Int
 ) {
-  _internalInvariant(len > 0)
-  _internalInvariant(len <= _SmallString.capacity)
-  if len <= 0 {
+  _internalInvariant(index > 0)
+  _internalInvariant(index <= _SmallString.capacity)
+  if index <= 0 {
     storage.0 = 0
     storage.1 = 0
-  } else if len <= 8 {
-    let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* (8 &- len)))
+  } else if index <= 8 {
+    let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* (8 &- index)))
     //FIXME: Verify this on big-endian architecture
     storage.0 &= mask0.littleEndian
     storage.1 = 0
   } else {
-    let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- len)))
+    let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- index)))
     //FIXME: Verify this on big-endian architecture
     storage.1 &= mask1.littleEndian
   }
