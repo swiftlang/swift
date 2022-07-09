@@ -422,6 +422,9 @@ extension _ArrayBuffer {
   /// wasNative == _isNative in the absence of inout violations.
   /// Because the optimizer can hoist the original check it might have
   /// been invalidated by illegal user code.
+  ///
+  /// This function is obsolete but must stay in the library for backward
+  /// compatibility.
   @inlinable
   internal func _checkInoutAndNativeBounds(_ index: Int, wasNative: Bool) {
     _precondition(
@@ -439,6 +442,9 @@ extension _ArrayBuffer {
   /// wasNativeTypeChecked == _isNativeTypeChecked in the absence of
   /// inout violations.  Because the optimizer can hoist the original
   /// check it might have been invalidated by illegal user code.
+  ///
+  /// This function is obsolete but must stay in the library for backward
+  /// compatibility.
   @inlinable
   internal func _checkInoutAndNativeTypeCheckedBounds(
     _ index: Int, wasNativeTypeChecked: Bool
