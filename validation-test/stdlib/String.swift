@@ -2358,8 +2358,9 @@ StringTests.test("SmallString.zeroTrailingBytes") {
     for i in testIndices {
       // The internal invariants in `_zeroTrailingBytes(of:from:)`
       expectTrue(0 < i && i <= _SmallString.capacity)
+      print(i)
       var bits = full
-      _zeroTrailingBytes(of: &bits, from: i)
+      _SmallString.zeroTrailingBytes(of: &bits, from: i)
       withUnsafeBytes(of: bits) {
         expectTrue($0[..<i].allSatisfy({ $0 == 0xff }))
         expectTrue($0[i...].allSatisfy({ $0 == 0 }))

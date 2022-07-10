@@ -248,29 +248,22 @@ extension _SmallString {
       self = _SmallString()
       return
     }
-    _zeroTrailingBytes(of: &_storage, from: len)
+    _SmallString.zeroTrailingBytes(of: &_storage, from: len)
     self = _SmallString(leading: _storage.0, trailing: _storage.1, count: len)
   }
-}
 
-@inlinable @inline(__always)
-internal func _zeroTrailingBytes(
-  of storage: inout _SmallString.RawBitPattern, from index: Int
-) {
-  _internalInvariant(index > 0)
-  _internalInvariant(index <= _SmallString.capacity)
-  if index <= 0 {
-    storage.0 = 0
-    storage.1 = 0
-  } else if index <= 8 {
-    let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* (8 &- index)))
+  @inlinable
+  @_alwaysEmitIntoClient
+  internal static func zeroTrailingBytes(
+    of storage: inout RawBitPattern, from index: Int
+  ) {
+    _internalInvariant(index > 0)
+    _internalInvariant(index <= _SmallString.capacity)
     //FIXME: Verify this on big-endian architecture
-    storage.0 &= mask0.littleEndian
-    storage.1 = 0
-  } else {
-    let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- index)))
-    //FIXME: Verify this on big-endian architecture
-    storage.1 &= mask1.littleEndian
+    let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* ( 8 &- Swift.min(index, 8))))
+    let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- Swift.max(index, 8))))
+    storage.0 &= (index <= 0) ? 0 : mask0.littleEndian
+    storage.1 &= (index <= 8) ? 0 : mask1.littleEndian
   }
 }
 
