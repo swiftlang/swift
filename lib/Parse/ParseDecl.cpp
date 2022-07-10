@@ -4723,7 +4723,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     if (Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
       Tok.setKind(tok::contextual_keyword);
-      DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ActorDecl);
       DeclResult = parseDeclClass(Flags, Attributes);
       break;
     }
