@@ -98,7 +98,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'CodeBlock': 93,
     'DeclNameArgument': 94,
     'DeclNameArguments': 95,
-    # removed: 'FunctionCallArgument': 96,
+    'ActorDecl': 96,
     'TupleExprElement': 97,
     'ArrayElement': 98,
     'DictionaryElement': 99,
