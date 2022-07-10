@@ -611,7 +611,7 @@ func tuples_generic<T, U, V>(_: T, _: U, _: V) {
 }
 
 func payloadCases(_: Color) {
-  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
   let _ = \Color.generic
 
   // The following produces a "self" KVC objc keypath.
@@ -626,7 +626,7 @@ func payloadCasesGeneric<T, U>(_: T, _: U) {
   // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
   let _ = \(T, U)?.some?.1
 
-  // CHECK: keypath $KeyPath<GenericColor<T>, Optional<T>>, <τ_0_0, τ_0_1> (root $GenericColor<τ_0_0>; payload_case #GenericColor.generic : $Optional<τ_0_0>) <T, U>
+  // CHECK: keypath $KeyPath<GenericColor<T>, Optional<T>>, <τ_0_0, τ_0_1> (root $GenericColor<τ_0_0>; enum_case #GenericColor.generic : $Optional<τ_0_0>) <T, U>
   let _ = \GenericColor<T>.generic
 }
 

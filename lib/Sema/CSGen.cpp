@@ -3494,7 +3494,7 @@ namespace {
           llvm_unreachable("DictionaryKey only valid in #keyPath");
           break;
 
-        case KeyPathExpr::Component::Kind::PayloadCase:
+        case KeyPathExpr::Component::Kind::EnumCase:
           // Comment here explaining why this is not implemented.
           llvm_unreachable("not implemented");
           break;

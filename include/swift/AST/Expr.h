@@ -5419,7 +5419,7 @@ public:
       TupleElement,
       DictionaryKey,
       CodeCompletion,
-      PayloadCase,
+      EnumCase,
     };
   
   private:
@@ -5439,6 +5439,7 @@ public:
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
+    bool EnumCaseRequiresComputedGetter = false;
 
     // Private constructor for subscript component.
     explicit Component(DeclNameOrRef decl, ArgumentList *argList,
@@ -5449,7 +5450,7 @@ public:
     explicit Component(DeclNameOrRef decl, Kind kind, Type type, SourceLoc loc)
         : Component(kind, type, loc) {
       assert(kind == Kind::Property || kind == Kind::UnresolvedProperty ||
-             kind == Kind::DictionaryKey || kind == Kind::PayloadCase);
+             kind == Kind::DictionaryKey || kind == Kind::EnumCase);
       Decl = decl;
     }
 
@@ -5538,10 +5539,10 @@ public:
       return Component(Kind::CodeCompletion, Type(), Loc);
     }
 
-    static Component forPayloadCase(ConcreteDeclRef payloadCase,
-                                    Type payloadType,
-                                    SourceLoc loc) {
-      return Component(payloadCase, Kind::PayloadCase, payloadType, loc);
+    static Component forEnumCase(ConcreteDeclRef enumCase,
+                                 Type payloadType,
+                                 SourceLoc loc) {
+      return Component(enumCase, Kind::EnumCase, payloadType, loc);
     }
 
     SourceLoc getLoc() const {
@@ -5576,7 +5577,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
-      case Kind::PayloadCase:
+      case Kind::EnumCase:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -5604,7 +5605,7 @@ public:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
       case Kind::CodeCompletion:
-      case Kind::PayloadCase:
+      case Kind::EnumCase:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -5634,7 +5635,7 @@ public:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
       case Kind::CodeCompletion:
-      case Kind::PayloadCase:
+      case Kind::EnumCase:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5656,7 +5657,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::CodeCompletion:
-      case Kind::PayloadCase:
+      case Kind::EnumCase:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5666,7 +5667,7 @@ public:
       switch (getKind()) {
       case Kind::Property:
       case Kind::Subscript:
-      case Kind::PayloadCase:
+      case Kind::EnumCase:
         return true;
 
       case Kind::Invalid:
@@ -5688,7 +5689,7 @@ public:
       switch (getKind()) {
       case Kind::Property:
       case Kind::Subscript:
-      case Kind::PayloadCase:
+      case Kind::EnumCase:
         return Decl.ResolvedDecl;
 
       case Kind::Invalid:
@@ -5722,7 +5723,7 @@ public:
         case Kind::Subscript:
         case Kind::DictionaryKey:
         case Kind::CodeCompletion:
-        case Kind::PayloadCase:
+        case Kind::EnumCase:
           llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5734,6 +5735,14 @@ public:
     
     void setComponentType(Type t) {
       ComponentType = t;
+    }
+
+    bool getEnumCaseRequiresComputedGetter() const {
+      return EnumCaseRequiresComputedGetter;
+    }
+
+    void setEnumCaseRequiresComputedGetter(bool requires) {
+      EnumCaseRequiresComputedGetter = requires;
     }
   };
 

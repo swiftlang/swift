@@ -2085,32 +2085,6 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
                     Platform, Version);
 }
 
-void TypeChecker::diagnosePotentialPayloadCaseKeyPathUnavailability(
-    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
-    const UnavailabilityReason &Reason) {
-  ASTContext &context = ReferenceDC->getASTContext();
-
-  auto requiredRange = Reason.getRequiredOSVersionRange();
-
-  {
-    auto err =
-      context.Diags.diagnose(
-        ReferenceRange.Start,
-        diag::availability_payload_case_keypath_only_version_newer,
-        prettyPlatformString(targetPlatform(context.LangOpts)),
-        Reason.getRequiredOSVersionRange().getLowerEndpoint());
-
-    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
-                                                     ReferenceDC,
-                                                     requiredRange,
-                                                     context, err)) {
-      return;
-    }
-  }
-
-  fixAvailability(ReferenceRange, ReferenceDC, requiredRange, context);
-}
-
 bool TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
@@ -3448,7 +3422,7 @@ private:
     if (KP->isObjC())
       flags = DeclAvailabilityFlag::ForObjCKeyPath;
 
-    for (auto &component : KP->getComponents()) {
+    for (auto &component : KP->getMutableComponents()) {
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
       case KeyPathExpr::Component::Kind::Subscript: {
@@ -3458,18 +3432,17 @@ private:
         break;
       }
 
-      // Payload case keypaths were introduced in Swift 5.*
-      case KeyPathExpr::Component::Kind::PayloadCase: {
+      // Enum case keypaths were introduced in Swift 5.*
+      case KeyPathExpr::Component::Kind::EnumCase: {
         auto enumElement = component.getDeclRef();
         auto loc = component.getLoc();
         auto runningOS = Where.getAvailabilityContext();
         auto availability = Context.getPayloadCaseKeyPathAvailability();
 
+        // If our availability context is less than 5.*, back deploy enum
+        // case by emitting a computed read only getter for older clients.
         if (!runningOS.isContainedIn(availability)) {
-          TypeChecker::diagnosePotentialPayloadCaseKeyPathUnavailability(
-            KP->getSourceRange(),
-            Where.getDeclContext(),
-            UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+          component.setEnumCaseRequiresComputedGetter(true);
         }
 
         // Otherwise, diagnose potential availability issues with the enum decl.

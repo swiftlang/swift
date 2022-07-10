@@ -100,8 +100,8 @@ entry:
 
 sil shared @payload_cases : $@convention(thin) () -> () {
 entry:
-  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
-  %a = keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
+  %a = keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
 
   return undef : $()
 }
@@ -168,8 +168,8 @@ entry:
 
 sil shared @payload_cases_generic : $@convention(thin) <T, U> () -> () {
 entry:
-  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
-  %a = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  %a = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
 
   return undef : $()
 }

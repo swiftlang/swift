@@ -199,20 +199,21 @@ public:
   }
 };
 
-class PayloadCaseProjector : public ComponentProjector {
+class EnumCaseProjector : public ComponentProjector {
 public:
-  PayloadCaseProjector(KeyPathInst *keyPath,
-                       const KeyPathPatternComponent &component,
-                       std::unique_ptr<KeyPathProjector> parent,
-                       BeginAccessInst *&beginAccess,
-                       SILLocation loc, SILBuilder &builder)
+  EnumCaseProjector(KeyPathInst *keyPath,
+                    const KeyPathPatternComponent &component,
+                    std::unique_ptr<KeyPathProjector> parent,
+                    BeginAccessInst *&beginAccess,
+                    SILLocation loc, SILBuilder &builder)
       : ComponentProjector(component, std::move(parent), loc, builder),
         keyPath(keyPath),
         beginAccess(beginAccess) {}
 
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
-    assert(component.getKind() == KeyPathPatternComponent::Kind::PayloadCase);
+    assert(component.getKind() == KeyPathPatternComponent::Kind::EnumCase ||
+           component.getKind() == KeyPathPatternComponent::Kind::ComputedEnumCase);
     assert(accessType == AccessType::Get &&
            "payload case components are only gettable");
 
@@ -253,18 +254,32 @@ public:
                                                               someCase,
                                                               objType);
 
-      // We have to create a copy of the parentValue because
-      // unchecked_take_enum_data is destructive and invalidates the original
-      // memory.
-      auto enumCopy = builder.createAllocStack(loc,
+      AllocStackInst *enumCopy;
+
+      if (enumElement->hasAssociatedValues()) {
+        // We have to create a copy of the parentValue because
+        // unchecked_take_enum_data is destructive and invalidates the original
+        // memory.
+        enumCopy = builder.createAllocStack(loc,
                                         parentValue->getType().getObjectType());
-      builder.createCopyAddr(loc, parentValue, enumCopy, IsNotTake, IsInitialization);
 
-      auto payload = builder.createUncheckedTakeEnumDataAddr(loc, enumCopy,
-                                                             enumElement);
+        builder.createCopyAddr(loc, parentValue, enumCopy, IsNotTake,
+                               IsInitialization);
 
-      // Move the payload value into the optional result payload.
-      builder.createCopyAddr(loc, payload, resultPayloadAddr, IsNotTake, IsInitialization);
+        auto payload = builder.createUncheckedTakeEnumDataAddr(loc, enumCopy,
+                                                               enumElement);
+
+        auto actualPayload = builder.createUncheckedAddrCast(loc, payload,
+                                                             objType);
+
+        // Move the payload value into the optional result payload.
+        builder.createCopyAddr(loc, actualPayload, resultPayloadAddr, IsNotTake,
+                               IsInitialization);
+      }
+
+      // If the enum case did not have a payload, then its resulting type will
+      // be ()?. In this case, we don't have to store anything into the result
+      // payload addr.
 
       builder.createInjectEnumAddr(loc, resultAddr, someCase);
 
@@ -272,8 +287,12 @@ public:
 
       callback(resultAddr);
 
-      builder.createDestroyAddr(loc, enumCopy);
-      builder.createDeallocStack(loc, enumCopy);
+      // Destroy our result optional and the *potential* enum copy we made.
+      if (enumElement->hasAssociatedValues()) {
+        builder.createDestroyAddr(loc, enumCopy);
+        builder.createDeallocStack(loc, enumCopy);
+      }
+
       builder.createDestroyAddr(loc, resultAddr);
       builder.createDeallocStack(loc, resultAddr);
 
@@ -291,6 +310,10 @@ public:
       builder.createInjectEnumAddr(loc, nil, noneCase);
 
       callback(nil);
+
+      // Destroy the nil
+      builder.createDestroyAddr(loc, nil);
+      builder.createDeallocStack(loc, nil);
 
       builder.createBranch(loc, continuation);
       builder.setInsertionPoint(continuation, continuation->begin());
@@ -739,6 +762,7 @@ private:
             (comp, std::move(parent), loc, builder);
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::ComputedEnumCase:
         projector = std::make_unique<GettablePropertyProjector>
             (keyPath, comp, std::move(parent), keyPath->getSubstitutions(),
              beginAccess, loc, builder);
@@ -761,11 +785,9 @@ private:
             (comp, std::move(parent), beginAccess, optionalChainResult, loc,
              builder);
         break;
-      case KeyPathPatternComponent::Kind::PayloadCase:
-        projector = std::make_unique<PayloadCaseProjector>(keyPath, comp,
-                                                           std::move(parent),
-                                                           beginAccess,
-                                                           loc, builder);
+      case KeyPathPatternComponent::Kind::EnumCase:
+        projector = std::make_unique<EnumCaseProjector>
+            (keyPath, comp, std::move(parent), beginAccess, loc, builder);
         break;
     }
     

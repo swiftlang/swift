@@ -69,13 +69,15 @@ enum class KeyPathComponentKindEncoding : uint8_t {
   OptionalChain,
   OptionalForce,
   OptionalWrap,
-  PayloadCase,
+  EnumCase,
+  ComputedEnumCase,
   Trivial,
 };
 enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,
   Function,
   DeclRef,
+  EnumElement,
 };
 
 /// The record types within the "sil-index" block.

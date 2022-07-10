@@ -1932,6 +1932,10 @@ public:
 
   /// Determine whether give reference requires a fix and produce one.
   static AllowInvalidRefInKeyPath *
+  forRef(ConstraintSystem &cs, OverloadChoice choice, ConstraintLocator *locator);
+
+  /// Determine whether give reference requires a fix and produce one.
+  static AllowInvalidRefInKeyPath *
   forRef(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
 
   bool isEqual(const ConstraintFix *other) const;

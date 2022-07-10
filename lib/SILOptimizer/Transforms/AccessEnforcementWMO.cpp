@@ -233,7 +233,8 @@ bool GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
       case KeyPathPatternComponent::Kind::OptionalForce:
       case KeyPathPatternComponent::Kind::OptionalWrap:
       case KeyPathPatternComponent::Kind::TupleElement:
-      case KeyPathPatternComponent::Kind::PayloadCase:
+      case KeyPathPatternComponent::Kind::EnumCase:
+      case KeyPathPatternComponent::Kind::ComputedEnumCase:
         break;
       }
     }

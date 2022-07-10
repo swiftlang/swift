@@ -1193,9 +1193,6 @@ enum Color {
   case generic(name: String)
 }
 
-@available(SwiftStdlib 9999, *)
 func testPayloadKeyPaths() {
-  let _ = \Color.red // expected-error {{key path cannot refer to static member 'red'}}
-
-  //let _ = 
+  let _ = \Color.red
 }

@@ -4003,6 +4003,8 @@ extension AnyKeyPath: CustomDebugStringConvertible {
           description.append("?")
         case .optionalForce:
           description.append("!")
+        case .payloadCase:
+          description.append("some enum case")
         }
         if hasEnded {
           break
