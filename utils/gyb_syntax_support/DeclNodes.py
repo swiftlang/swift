@@ -197,7 +197,7 @@ DECL_NODES = [
          ]),
 
     # class-declaration -> attributes? access-level-modifier?
-    #                      ('class' | 'actor') class-name
+    #                      'class' class-name
     #                      generic-parameter-clause?
     #                      type-inheritance-clause?
     #                      generic-where-clause?
@@ -210,8 +210,7 @@ DECL_NODES = [
                    collection_element_name='Attribute', is_optional=True),
              Child('Modifiers', kind='ModifierList',
                    collection_element_name='Modifier', is_optional=True),
-             Child('ClassOrActorKeyword', kind='Token',
-                    token_choices=['ClassToken', 'ContextualKeywordToken']),
+             Child('ClassKeyword', kind='ClassToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
@@ -222,6 +221,31 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
+    # actor-declaration -> attributes? access-level-modifier?
+    #                      'actor' actor-name
+    #                      generic-parameter-clause?
+    #                      type-inheritance-clause?
+    #                      generic-where-clause?
+    #                     '{' actor-members '}'
+    # actor-name -> identifier
+    Node('ActorDecl', kind='Decl',
+         traits=['DeclGroup', 'IdentifiedDecl'],
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   collection_element_name='Attribute', is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   collection_element_name='Modifier', is_optional=True),
+             Child('ActorKeyword', kind='ContextualKeywordToken',
+                   text_choices=['actor']),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
     # struct-declaration -> attributes? access-level-modifier?
     #                         'struct' struct-name
     #                         generic-parameter-clause?
