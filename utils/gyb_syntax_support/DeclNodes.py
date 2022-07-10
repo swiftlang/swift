@@ -171,7 +171,8 @@ DECL_NODES = [
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating', 'indirect', '__consuming',
-                       'actor', 'async', 'distributed'
+                       'actor', 'async', 'distributed', 'isolated',
+                       'nonisolated', '_const', '_local'
                    ]),
              Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
              Child('Detail', kind='IdentifierToken', is_optional=True),
@@ -391,10 +392,13 @@ DECL_NODES = [
     #                       | mutation-modifier
     #                       | 'class'
     #                       | 'convenience'
+    #                       | 'distributed'
     #                       | 'dynamic'
     #                       | 'final'
     #                       | 'infix'
+    #                       | 'isolated'
     #                       | 'lazy'
+    #                       | 'nonisolated'
     #                       | 'optional'
     #                       | 'override'
     #                       | 'postfix'
