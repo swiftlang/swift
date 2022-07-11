@@ -109,7 +109,8 @@ public:
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
-    if (argType.isLoadable(SGF.F)) {
+    bool argIsLoadable = argType.isLoadable(SGF.F);
+    if (argIsLoadable) {
       if (argType.isAddress()) {
         if (mv.isPlusOne(SGF))
           mv = SGF.B.createLoadTake(loc, mv);
@@ -117,18 +118,18 @@ public:
           mv = SGF.B.createLoadBorrow(loc, mv);
         argType = argType.getObjectType();
       }
-    } else {
-      if (isNoImplicitCopy) {
-        // We do not support no implicit copy address only types. Emit an error.
-        auto diag = diag::noimplicitcopy_used_on_generic_or_existential;
-        diagnose(SGF.getASTContext(), mv.getValue().getLoc().getSourceLoc(),
-                 diag);
-      }
     }
 
     if (argType.getASTType() != paramType.getASTType()) {
       // Reabstract the value if necessary.
       mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
+    }
+
+    if (isNoImplicitCopy && !argIsLoadable) {
+      // We do not support no implicit copy address only types. Emit an error.
+      auto diag = diag::noimplicitcopy_used_on_generic_or_existential;
+      diagnose(SGF.getASTContext(), mv.getValue().getLoc().getSourceLoc(),
+               diag);
     }
 
     // If the value is a (possibly optional) ObjC block passed into the entry
