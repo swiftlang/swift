@@ -354,6 +354,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
   endif()
 
+  if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
+  endif()
+
   string(TOUPPER "${SWIFT_SDK_${CFLAGS_SDK}_THREADING_PACKAGE}" _threading_package)
   list(APPEND result "-DSWIFT_THREADING_${_threading_package}")
 
@@ -1785,6 +1789,10 @@ function(add_swift_target_library name)
 
   if(SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_ENABLE_PRESPECIALIZATION)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-prespecialize-generic-metadata")
+  endif()
+
+  if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+      list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-concurrency-model=task-to-thread")
   endif()
 
   # If we are building this library for targets, loop through the various
