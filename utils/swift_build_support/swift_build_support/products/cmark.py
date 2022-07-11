@@ -99,13 +99,10 @@ class CMark(cmake_product.CMakeProduct):
             "CTEST_OUTPUT_ON_FAILURE": "ON"
         }
 
-        # The environment is passed with pushenv to avoid giving a general
-        # mechanism for test environments - this is because lit.cfg filters out
-        # environment variables. However, since `test_with_cmake` calls cmake
-        # (and thus ctest) directly, we can pass the environment along like this.
-        with shell.pushenv(test_env):
-            self.test_with_cmake(executable_target, results_targets,
-                                 self.args.cmark_build_variant, [])
+        # see the comment in cmake_product.py if you want to copy this code to pass environment
+        # variables to tests
+        self.test_with_cmake(executable_target, results_targets,
+                             self.args.cmark_build_variant, [], test_env)
 
     def should_install(self, host_target):
         """should_install() -> Bool
