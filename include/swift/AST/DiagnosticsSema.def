@@ -6380,5 +6380,17 @@ NOTE(candidate_result_requires_explicit_coercion,none,
      "loss of generic requirements",
      (Type))
 
+ERROR(concurrency_task_to_thread_model_custom_executor,none,
+      "custom executors are not permitted within %0", (StringRef))
+ERROR(concurrency_task_to_thread_model_async_main,none,
+      "async main functions are not permitted within %0", (StringRef))
+ERROR(concurrency_task_to_thread_model_main_actor,none,
+      "MainActor is not permitted within %0", (StringRef))
+ERROR(concurrency_task_to_thread_model_global_actor,none,
+      "globalActor is not permitted within %0", (StringRef))
+ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
+      "annotating a type with a global actor %0 is not permitted within %1",
+      (TypeRepr*, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

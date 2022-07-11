@@ -188,9 +188,18 @@ bool IsDefaultActorRequest::evaluate(
   // If we synthesized the unownedExecutor property, we should've
   // added a semantics attribute to it (if it was actually a default
   // actor).
-  if (auto executorProperty = classDecl->getUnownedExecutorProperty())
-    return executorProperty->getAttrs()
-             .hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
+  if (auto executorProperty = classDecl->getUnownedExecutorProperty()) {
+    bool isDefaultActor =
+        executorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
+    if (!isDefaultActor &&
+        classDecl->getASTContext().LangOpts.isConcurrencyModelTaskToThread() &&
+        !AvailableAttr::isUnavailable(classDecl)) {
+      classDecl->diagnose(
+          diag::concurrency_task_to_thread_model_custom_executor,
+          "task-to-thread concurrency model");
+    }
+    return isDefaultActor;
+  }
 
   return true;
 }
