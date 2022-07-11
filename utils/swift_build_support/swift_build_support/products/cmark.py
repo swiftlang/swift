@@ -12,7 +12,6 @@
 
 from . import cmake_product
 from . import earlyswiftdriver
-from .. import shell
 
 
 class CMark(cmake_product.CMakeProduct):
@@ -99,8 +98,8 @@ class CMark(cmake_product.CMakeProduct):
             "CTEST_OUTPUT_ON_FAILURE": "ON"
         }
 
-        # see the comment in cmake_product.py if you want to copy this code to pass environment
-        # variables to tests
+        # see the comment in cmake_product.py if you want to copy this code to pass
+        # environment variables to tests
         self.test_with_cmake(executable_target, results_targets,
                              self.args.cmark_build_variant, [], test_env)
 

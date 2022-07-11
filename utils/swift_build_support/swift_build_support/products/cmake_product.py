@@ -110,7 +110,6 @@ class CMakeProduct(product.Product):
         if executable_target:
             shell.call(cmake_build + target_flag(executable_target))
 
-
         for target in results_targets:
             if target:
                 test_target = target
@@ -118,8 +117,8 @@ class CMakeProduct(product.Product):
                 if test_target.startswith("check-swift") and self.args.test_paths:
                     test_target = test_target + "-custom"
 
-                # note that passing variables via test_env won't affect lit tests - lit.cfg will
-                # filter environment variables out!
+                # note that passing variables via test_env won't affect lit tests -
+                # lit.cfg will filter environment variables out!
                 shell.call(cmake_build + target_flag(test_target), env=test_env)
 
                 print("--- %s finished ---" % target)
