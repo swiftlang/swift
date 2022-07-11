@@ -148,7 +148,7 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
       }
     }
 
-    if (T->isTypeParameter()) {
+    if (T->isTypeParameter() && T->getKind() != TypeKind::DependentMember) {
       ShouldLink = false;
     }
   }

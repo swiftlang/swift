@@ -10,27 +10,28 @@ public protocol WithPrimary<Assoc> {
 // CHECK-LABEL: "precise": "s:16PrimaryAssocType04WithA0P"
 // CHECK:           "declarationFragments": [
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "kind": "keyword",
+// CHECK-NEXT:          "kind": "keyword"
 // CHECK-NEXT:          "spelling": "protocol"
-// CHECK-NEXT:        },
+// CHECK-NEXT:        }
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "kind": "text",
+// CHECK-NEXT:          "kind": "text"
 // CHECK-NEXT:          "spelling": " "
-// CHECK-NEXT:        },
+// CHECK-NEXT:        }
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "kind": "identifier",
+// CHECK-NEXT:          "kind": "identifier"
 // CHECK-NEXT:          "spelling": "WithPrimary"
-// CHECK-NEXT:        },
+// CHECK-NEXT:        }
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "kind": "text",
+// CHECK-NEXT:          "kind": "text"
 // CHECK-NEXT:          "spelling": "<"
-// CHECK-NEXT:        },
+// CHECK-NEXT:        }
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "kind": "typeIdentifier",
+// CHECK-NEXT:          "kind": "typeIdentifier"
 // CHECK-NEXT:          "spelling": "Assoc"
-// CHECK-NEXT:        },
+// CHECK-NEXT:          "preciseIdentifier": "s:16PrimaryAssocType04WithA0P0B0Qa"
+// CHECK-NEXT:        }
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "kind": "text",
+// CHECK-NEXT:          "kind": "text"
 // CHECK-NEXT:          "spelling": ">"
 // CHECK-NEXT:        }
-// CHECK-NEXT:      ],
+// CHECK-NEXT:      ]
