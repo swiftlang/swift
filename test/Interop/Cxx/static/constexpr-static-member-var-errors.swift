@@ -8,3 +8,6 @@
 
 // CHECK: error: type 'int' cannot be used prior to '::' because it has no members
 // CHECK: note: in instantiation of static data member 'GetTypeValueInline<int>::value' requested here
+
+// CHECK: error: no viable conversion from 'int' to 'const S'
+// CHECK: note: in instantiation of template class 'IsSubtypeSame<int>' requested here
