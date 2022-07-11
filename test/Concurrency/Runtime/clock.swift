@@ -102,6 +102,44 @@ var tests = TestSuite("Time")
       expectEqual(twoSeconds, .seconds(2))
     }
 
+    tests.test("Duration components/whole second increments") {
+      for i in 0 ..< 1_000_000 {
+        let d = Duration.seconds(i)
+        let comps = d.components
+        expectEqual(comps.seconds, Int64(i))
+        expectEqual(comps.attoseconds, 0)
+      }
+    }
+
+    tests.test("Duration components/1ms increments") {
+      for i in 0 ..< 1_000_000 {
+        let d = Duration.milliseconds(i)
+        let comps = d.components
+        expectEqual(comps.seconds, Int64(i / 1000))
+        expectEqual(comps.attoseconds, Int64(i % 1000) * 1_000_000_000_000_000)
+      }
+    }
+
+    tests.test("Duration components/100µs increments") {
+      for i in 0 ..< 1_000_000 {
+        let ms = 100 * i
+        let d = Duration.microseconds(ms)
+        let comps = d.components
+        expectEqual(comps.seconds, Int64(ms / 1_000_000))
+        expectEqual(comps.attoseconds, Int64(ms % 1_000_000) * 1_000_000_000_000)
+      }
+    }
+
+    tests.test("Duration components/200ns increments") {
+      for i in 0 ..< 1_000_000 {
+        let ns = 200 * i
+        let d = Duration.nanoseconds(ns)
+        let comps = d.components
+        expectEqual(comps.seconds, Int64(ns / 1_000_000_000))
+        expectEqual(comps.attoseconds, Int64(ns % 1_000_000_000) * 1_000_000_000)
+      }
+    }
+
     await runAllTestsAsync()
   }
 }
