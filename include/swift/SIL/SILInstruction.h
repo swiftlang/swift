@@ -7580,7 +7580,10 @@ private:
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
         OwnershipForwardingMixin(SILInstructionKind::MarkMustCheckInst,
                                  operand->getOwnershipKind()),
-        kind(checkKind) {}
+        kind(checkKind) {
+    assert(operand->getType().isMoveOnlyWrapped() &&
+           "mark_must_check can only take a move only wrapped value");
+  }
 
 public:
   CheckKind getCheckKind() const { return kind; }
