@@ -23,12 +23,18 @@ public struct ImportedType {
     public init() {}
 }
 
+// Test exportability of conformance uses
+public protocol SomeProtocol {}
+public func conformanceUse(_ a: SomeProtocol) {}
+
 // BEGIN libB.swift
 import libA
 
 extension ImportedType {
     public func implicitlyImportedMethod() {}
 }
+
+extension ImportedType : SomeProtocol {}
 
 /// Client module
 // BEGIN clientFileA-Swift5.swift
@@ -40,6 +46,8 @@ import libA
 
   // Expected implicit imports are still fine
   a.localModuleMethod()
+
+  conformanceUse(a) // expected-warning {{cannot use conformance of 'ImportedType' to 'SomeProtocol' here; 'libB' was not imported by this file; this is an error in Swift 6}}
 }
 
 // BEGIN clientFileA-OldCheck.swift
@@ -52,6 +60,8 @@ import libA
 
   // Expected implicit imports are still fine
   a.localModuleMethod()
+
+  conformanceUse(a) // expected-warning {{cannot use conformance of 'ImportedType' to 'SomeProtocol' here; 'libB' was not imported by this file; this is an error in Swift 6}}
 }
 
 // BEGIN clientFileA-Swift6.swift
@@ -63,6 +73,8 @@ import libA
 
   // Expected implicit imports are still fine
   a.localModuleMethod()
+
+  conformanceUse(a) // expected-error {{cannot use conformance of 'ImportedType' to 'SomeProtocol' here; 'libB' was not imported by this file}}
 }
 
 // BEGIN clientFileB.swift
