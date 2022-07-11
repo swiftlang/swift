@@ -5646,7 +5646,7 @@ public:
     return false;
   }
 
-  bool isTooComplex(SmallVectorImpl<Solution> const &solutions) {
+  bool isTooComplex(ArrayRef<Solution> solutions) {
     if (isAlreadyTooComplex.first)
       return true;
 
