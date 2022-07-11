@@ -5004,7 +5004,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
 
 class SILMoveOnlyWrappedType;
 class SILModule; // From SIL
-typedef CanTypeWrapper<SILMoveOnlyWrappedType> CanMoveOnlyType;
+typedef CanTypeWrapper<SILMoveOnlyWrappedType> CanSILMoveOnlyWrappedType;
 
 /// A wrapper type that marks an inner type as being a move only value. Can not
 /// be written directly at the Swift level, instead it is triggered by adding
@@ -5022,7 +5022,7 @@ class SILMoveOnlyWrappedType final : public TypeBase,
 public:
   CanType getInnerType() const { return innerType; }
 
-  static CanMoveOnlyType get(CanType innerType);
+  static CanSILMoveOnlyWrappedType get(CanType innerType);
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILMoveOnlyWrapped;
