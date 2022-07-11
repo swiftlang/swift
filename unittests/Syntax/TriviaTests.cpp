@@ -173,7 +173,7 @@ TEST(TriviaTests, Contains) {
               .contains(TriviaKind::DocBlockComment));
   ASSERT_TRUE(Trivia::docLineComment("///")
               .contains(TriviaKind::DocLineComment));
-  ASSERT_TRUE(Trivia::garbageText("#!swift").contains(TriviaKind::GarbageText));
+  ASSERT_TRUE(Trivia::shebang("#!swift").contains(TriviaKind::Shebang));
   ASSERT_TRUE(Trivia::lineComment("//").contains(TriviaKind::LineComment));
   ASSERT_TRUE(Trivia::newlines(1).contains(TriviaKind::Newline));
   ASSERT_TRUE(Trivia::spaces(1).contains(TriviaKind::Space));

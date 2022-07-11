@@ -3214,7 +3214,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
         // Hashbang '#!/path/to/swift'.
         advanceToEndOfLine(CurPtr, BufferEnd);
         size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::GarbageText, Length);
+        Pieces.push_back(TriviaKind::Shebang, Length);
         continue;
       }
       break;
