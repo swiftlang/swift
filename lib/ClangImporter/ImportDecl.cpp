@@ -16,6 +16,7 @@
 
 #include "CFTypeInfo.h"
 #include "ImporterImpl.h"
+#include "ClangDerivedConformances.h"
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
@@ -2499,7 +2500,18 @@ namespace {
         return nullptr;
       }
 
-      return VisitRecordDecl(decl);
+      auto result = VisitRecordDecl(decl);
+
+      // If this module is declared as a C++ module, try to synthesize
+      // conformances to Swift protocols from the Cxx module.
+      auto clangModule = decl->getOwningModule();
+      if (clangModule && requiresCPlusPlus(clangModule)) {
+        if (auto structDecl = dyn_cast_or_null<NominalTypeDecl>(result)) {
+          conformToCxxIteratorIfNeeded(Impl, structDecl, decl);
+        }
+      }
+
+      return result;
     }
 
     bool isSpecializationDepthGreaterThan(
