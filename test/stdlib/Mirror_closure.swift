@@ -52,4 +52,26 @@ tests.test("Reflect struct with closure field boxed in Any") {
   }
 }
 
+struct Fozzle: CustomReflectable {
+  let my_closure_property: () -> Int
+
+  var customMirror: Mirror {
+    Mirror(self, children: ["my_closure_property": my_closure_property])
+  }
+}
+
+tests.test("Reflect struct with custom mirror") {
+  let quux = Fozzle(my_closure_property: { return 7 })
+  let mirror = Mirror(reflecting: quux)
+  let children = mirror.children
+  let firstChild = children.first!
+  let childValue: Any = firstChild.value
+  expectNil(childValue as? ())
+  expectNotNil(childValue as? () -> Int)
+  if let closure = childValue as? () -> Int {
+    expectEqual(7, closure())
+  }
+}
+
+
 runAllTests()
