@@ -26,10 +26,10 @@ using namespace swift::constraints;
 namespace {
 
 // Produce an implicit empty tuple expression.
-Expr *getVoidExpr(ASTContext &ctx) {
+Expr *getVoidExpr(ASTContext &ctx, SourceLoc contextLoc = SourceLoc()) {
   auto *voidExpr = TupleExpr::createEmpty(ctx,
-                                          /*LParenLoc=*/SourceLoc(),
-                                          /*RParenLoc=*/SourceLoc(),
+                                          /*LParenLoc=*/contextLoc,
+                                          /*RParenLoc=*/contextLoc,
                                           /*Implicit=*/true);
   voidExpr->setType(ctx.TheEmptyTupleType);
   return voidExpr;
@@ -885,11 +885,13 @@ private:
     } else {
       // If this is simplify `return`, let's create an empty tuple
       // which is also useful if contextual turns out to be e.g. `Void?`.
-      resultExpr = getVoidExpr(cs.getASTContext());
+      // Also, attach return stmt source location so if there is a contextual
+      // mismatch we can produce a diagnostic in a valid source location.
+      resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
     }
 
     SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                     CTP_ReturnStmt, resultType,
+                                     CTP_ClosureResult, resultType,
                                      /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
@@ -898,7 +900,7 @@ private:
     }
 
     cs.setContextualType(target.getAsExpr(), TypeLoc::withoutLoc(resultType),
-                         CTP_ReturnStmt);
+                         CTP_ClosureResult);
     cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
@@ -1508,7 +1510,7 @@ private:
     // number of times.
     {
       SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                       CTP_ReturnStmt, resultType,
+                                       CTP_ClosureResult, resultType,
                                        /*isDiscarded=*/false);
       cs.setSolutionApplicationTarget(returnStmt, target);
 
@@ -1574,7 +1576,7 @@ private:
 
     SolutionApplicationTarget resultTarget(
         resultExpr, context.getAsDeclContext(),
-        mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
+        mode == convertToResult ? CTP_ClosureResult : CTP_Unused,
         mode == convertToResult ? resultType : Type(),
         /*isDiscarded=*/false);
     if (auto newResultTarget = rewriteTarget(resultTarget))
