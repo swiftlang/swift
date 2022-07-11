@@ -927,8 +927,10 @@ SILGenBuilder::createCopyableToMoveOnlyWrapperValue(SILLocation loc,
                                                     ManagedValue value) {
   assert(value.isPlusOne(SGF) && "Argument must be at +1!");
   CleanupCloner cloner(*this, value);
-  auto *mdi = SILBuilder::createCopyableToMoveOnlyWrapperValue(
-      loc, value.forward(getSILGenFunction()));
+  SILValue v = value.forward(getSILGenFunction());
+  auto *mdi = SILBuilder::createCopyableToMoveOnlyWrapperValue(loc, v);
+  if (v->getType().isTrivial(getFunction()))
+    return SGF.emitManagedRValueWithCleanup(mdi);
   return cloner.clone(mdi);
 }
 
