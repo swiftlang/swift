@@ -19,7 +19,6 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
-#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SwiftObjectHeader.h"
 #include <type_traits>
@@ -47,9 +46,6 @@ enum class SILNodeKind {
   Last_##ID = LAST,
 #include "swift/SIL/SILNodes.def"
 };
-
-enum { NumSILNodeKindBits =
-  countBitsUsed(static_cast<unsigned>(SILNodeKind::Last_SILNode)) };
 
 enum class SILInstructionKind : std::underlying_type<SILNodeKind>::type;
 
@@ -127,341 +123,200 @@ public:
   enum { NumAssignByWrapperModeBits = 2 };
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 2 };
+  enum { NumAllocRefTailTypesBits = 4 };
 
 protected:
   friend class SILInstruction;
 
-  union { uint64_t OpaqueBits;
+  static_assert((unsigned)SILNodeKind::Last_SILNode <= (unsigned)std::numeric_limits<uint8_t>::max(),
+          "too many SILNode kinds");
 
-  SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8),
-    Kind : bitmax(NumSILNodeKindBits,8)
-  );
+  uint8_t kind;
 
-  SWIFT_INLINE_BITFIELD_EMPTY(ValueBase, SILNode);
+  // Part of SILInstruction's debug location. Together with
+  // `SILInstruction::locationStorage` this forms the SILLocation.
+  uint8_t locationKindAndFlags;
 
-  SWIFT_INLINE_BITFIELD(SILArgument, ValueBase, NumVOKindBits,
-    VOKind : NumVOKindBits
-  );
-
-  // No MultipleValueInstructionResult subclass needs inline bits right now,
-  // therefore let's naturally align and size the Index for speed.
-  SWIFT_INLINE_BITFIELD_FULL(MultipleValueInstructionResult, ValueBase,
-                             NumVOKindBits+32,
-      VOKind : NumVOKindBits,
-      : NumPadBits,
-      Index : 32
-  );
-
-  SWIFT_INLINE_BITFIELD(SILInstruction, SILNode, 8,
-    LocationKindAndFlags : 8
-  );
-
-  // Special handling for UnaryInstructionWithTypeDependentOperandsBase
-  SWIFT_INLINE_BITFIELD(IBWTO, SILNode, 64-NumSILNodeBits,
-    // DO NOT allocate bits at the front!
-    // IBWTO is a template, and templates must allocate bits from back to front
-    // so that "normal" subclassing can allocate bits from front to back.
-    // If you update this, then you must update the IBWTO_BITFIELD macros.
-
-    /*pad*/ : 32-NumSILNodeBits,
-
-    // Total number of operands of this instruction.
-    // It is number of type dependent operands + 1.
-    NumOperands : 32;
-    template<SILInstructionKind Kind, typename, typename, typename...>
-    friend class InstructionBaseWithTrailingOperands
-  );
-
-#define IBWTO_BITFIELD(T, U, C, ...) \
-  SWIFT_INLINE_BITFIELD_TEMPLATE(T, U, (C), 32, __VA_ARGS__)
-#define IBWTO_BITFIELD_EMPTY(T, U) \
-  SWIFT_INLINE_BITFIELD_EMPTY(T, U)
-
-#define UIWTDOB_BITFIELD(T, U, C, ...) \
-  IBWTO_BITFIELD(T, U, (C), __VA_ARGS__)
-#define UIWTDOB_BITFIELD_EMPTY(T, U) \
-  IBWTO_BITFIELD_EMPTY(T, U)
-
-  SWIFT_INLINE_BITFIELD_EMPTY(SingleValueInstruction, SILInstruction);
-  SWIFT_INLINE_BITFIELD_EMPTY(DeallocationInst, SILInstruction);
-  SWIFT_INLINE_BITFIELD_EMPTY(LiteralInst, SingleValueInstruction);
-  SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
-
-  // Ensure that StructInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(StructInst, SingleValueInstruction);
-
-  // Ensure that TupleInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(TupleInst, SingleValueInstruction);
-
-  IBWTO_BITFIELD(ObjectInst, SingleValueInstruction,
-                             32-NumSingleValueInstructionBits,
-    NumBaseElements : 32-NumSingleValueInstructionBits
-  );
-
-  IBWTO_BITFIELD(SelectEnumInstBase, SingleValueInstruction, 1,
-    HasDefault : 1
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
-    : NumPadBits,
-    numBits : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(FloatLiteralInst, LiteralInst, 32,
-    : NumPadBits,
-    numBits : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(StringLiteralInst, LiteralInst, 2+32,
-    TheEncoding : 2,
-    : NumPadBits,
-    Length : 32
-  );
-
-  // Ensure that AllocBoxInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(AllocBoxInst, AllocationInst);
-  // Ensure that AllocExistentialBoxInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(AllocExistentialBoxInst, AllocationInst);
-  SWIFT_INLINE_BITFIELD_FULL(AllocStackInst, AllocationInst,
-                             64-NumAllocationInstBits,
-    NumOperands : 32-NumAllocationInstBits,
-    VarInfo : 32
-  );
-  IBWTO_BITFIELD(AllocRefInstBase, AllocationInst, 32-NumAllocationInstBits,
-    ObjC : 1,
-    OnStack : 1,
-    NumTailTypes : 32-1-1-NumAllocationInstBits
-  );
-  static_assert(32-1-1-NumAllocationInstBits >= 14, "Reconsider bitfield use?");
-
-  // TODO: Sort the following in SILNodes.def order
-
-  SWIFT_INLINE_BITFIELD_EMPTY(NonValueInstruction, SILInstruction);
-  SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
-      atomicity : 1
-  );
-
-  // Ensure that BindMemoryInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(BindMemoryInst, NonValueInstruction);
-
-  // Ensure that MarkFunctionEscapeInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(MarkFunctionEscapeInst, NonValueInstruction);
-
-  // Ensure that MetatypeInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(MetatypeInst, SingleValueInstruction);
-
-  SWIFT_INLINE_BITFIELD(CopyAddrInst, NonValueInstruction, 1+1,
-    /// IsTakeOfSrc - True if ownership will be taken from the value at the
-    /// source memory location.
-    IsTakeOfSrc : 1,
-
-    /// IsInitializationOfDest - True if this is the initialization of the
-    /// uninitialized destination memory location.
-    IsInitializationOfDest : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(LoadReferenceInstBaseT, NonValueInstruction, 1,
-    IsTake : 1;
-    template<SILInstructionKind K>
-    friend class LoadReferenceInstBase
-  );
-
-  SWIFT_INLINE_BITFIELD(StoreReferenceInstBaseT, NonValueInstruction, 1,
-    IsInitializationOfDest : 1;
-    template<SILInstructionKind K>
-    friend class StoreReferenceInstBase
-  );
-
-  SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
-                        NumSILAccessKindBits+NumSILAccessEnforcementBits
-                        + 1 + 1,
-    AccessKind : NumSILAccessKindBits,
-    Enforcement : NumSILAccessEnforcementBits,
-    NoNestedConflict : 1,
-    FromBuiltin : 1
-  );
-  SWIFT_INLINE_BITFIELD(BeginUnpairedAccessInst, NonValueInstruction,
-                        NumSILAccessKindBits + NumSILAccessEnforcementBits
-                        + 1 + 1,
-                        AccessKind : NumSILAccessKindBits,
-                        Enforcement : NumSILAccessEnforcementBits,
-                        NoNestedConflict : 1,
-                        FromBuiltin : 1);
-
-  SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
-    Aborting : 1
-  );
-  SWIFT_INLINE_BITFIELD(EndUnpairedAccessInst, NonValueInstruction,
-                        NumSILAccessEnforcementBits + 1 + 1,
-                        Enforcement : NumSILAccessEnforcementBits,
-                        Aborting : 1,
-                        FromBuiltin : 1);
-
-  SWIFT_INLINE_BITFIELD(StoreInst, NonValueInstruction,
-                        NumStoreOwnershipQualifierBits,
-    OwnershipQualifier : NumStoreOwnershipQualifierBits
-  );
-  SWIFT_INLINE_BITFIELD(LoadInst, SingleValueInstruction,
-                        NumLoadOwnershipQualifierBits,
-    OwnershipQualifier : NumLoadOwnershipQualifierBits
-  );
-  SWIFT_INLINE_BITFIELD(AssignInst, NonValueInstruction,
-                        NumAssignOwnershipQualifierBits,
-    OwnershipQualifier : NumAssignOwnershipQualifierBits
-  );
-  SWIFT_INLINE_BITFIELD(AssignByWrapperInst, NonValueInstruction,
-                        NumAssignByWrapperModeBits,
-    Mode : NumAssignByWrapperModeBits
-  );
-
-  SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
-                        NumVOKindBits,
-    Kind : NumVOKindBits
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(TupleExtractInst, SingleValueInstruction, 32,
-    : NumPadBits,
-    FieldNo : 32
-  );
-  SWIFT_INLINE_BITFIELD_FULL(TupleElementAddrInst, SingleValueInstruction, 32,
-    : NumPadBits,
-    FieldNo : 32
-  );
-
-  SWIFT_INLINE_BITFIELD(RefElementAddrInst, SingleValueInstruction, 1,
-    Immutable : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(RefTailAddrInst, SingleValueInstruction, 1,
-    Immutable : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(HopToExecutorInst, NonValueInstruction, 1,
-    mandatory : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(DestroyValueInst, NonValueInstruction, 1,
-                        PoisonRefs : 1);
-
-  SWIFT_INLINE_BITFIELD(DebugValueInst, NonValueInstruction, 1,
-                        PoisonRefs : 1);
-
-  SWIFT_INLINE_BITFIELD(EndCOWMutationInst, NonValueInstruction, 1,
-    KeepUnique : 1
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL_TEMPLATE(FieldIndexCacheBase,
-                                      SingleValueInstruction, 32,
-    : NumPadBits,
-    FieldIndex : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(EnumInst,
-                                      SingleValueInstruction, 32,
-    : NumPadBits,
-    CaseIndex : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(UncheckedEnumDataInst,
-                                      SingleValueInstruction, 32,
-    : NumPadBits,
-    CaseIndex : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(InjectEnumAddrInst,
-                                      SILInstruction, 32,
-    : NumPadBits,
-    CaseIndex : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(InitEnumDataAddrInst,
-                                      SingleValueInstruction, 32,
-    : NumPadBits,
-    CaseIndex : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(UncheckedTakeEnumDataAddrInst,
-                                      SingleValueInstruction, 32,
-    : NumPadBits,
-    CaseIndex : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
-  // Ensure that WitnessMethodInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(WitnessMethodInst, MethodInst);
-  UIWTDOB_BITFIELD_EMPTY(ObjCMethodInst, MethodInst);
-
-  SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
-  SWIFT_INLINE_BITFIELD(PointerToAddressInst, ConversionInst, 8 + 1 + 1,
-                        Alignment : 8, IsStrict : 1, IsInvariant : 1);
-
-  UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
-                   WithoutActuallyEscaping : 1);
-  UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(UncheckedRefCastInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(UncheckedAddrCastInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(UncheckedTrivialBitCastInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(UncheckedBitwiseCastInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(ThinToThickFunctionInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(InitExistentialAddrInst, SingleValueInstruction);
-  UIWTDOB_BITFIELD_EMPTY(InitExistentialValueInst, SingleValueInstruction);
-  UIWTDOB_BITFIELD_EMPTY(InitExistentialRefInst, SingleValueInstruction);
-  UIWTDOB_BITFIELD_EMPTY(InitExistentialMetatypeInst, SingleValueInstruction);
-
-  SWIFT_INLINE_BITFIELD_EMPTY(TermInst, SILInstruction);
-  UIWTDOB_BITFIELD_EMPTY(CheckedCastBranchInst, SingleValueInstruction);
-
-  // Ensure that BranchInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(BranchInst, TermInst);
-  // Ensure that YieldInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(YieldInst, TermInst);
-  IBWTO_BITFIELD(CondBranchInst, TermInst, 32-NumTermInstBits,
-    NumTrueArgs : 32-NumTermInstBits
-  );
-  IBWTO_BITFIELD(SwitchValueInst, TermInst, 1,
-    HasDefault : 1
-  );
-
-  // Special handling for SwitchEnumInstBase.
+  //===--------------------------------------------------------------------===//
+  //               MARK: Shared 8-bit and 32-bit fields
   //
-  // We assume all subsequent SwitchEnumBit uses do not use any further bits.
-  SWIFT_INLINE_BITFIELD(SEIBase, TermInst, 32-NumTermInstBits,
-    // Does this switch enum inst have a default block.
-    HasDefault : 1,
-    // Number of cases 
-    NumCases : 31 - NumTermInstBits;
-    template <typename BaseTy>
-    friend class SwitchEnumInstBase
-  );
+  // Several instructions share the space for integer fields to reduce SIL
+  // instruction memory.
+  //
+  // How to define a shared field in a SIL instruction class:
+  //
+  // * Decide whether to use an 8-bit (e.g. a boolean) or 32-bit integer.
+  // * Add the `USE_SHARED_UINT8/32` or `TEMPLATE_USE_SHARED_UINT8/32` macros
+  //   to the instruction class. This is mainly used to check for accidental
+  //   overlaps of shared fields in base and derived classes.
+  // * Use `SHARED_FIELD` or `SHARED_TEMPLATE_FIELD` below to add the field.
+  // * In the instruction implementation use `sharedUInt8/32()` to access the
+  //   field.
+  //===--------------------------------------------------------------------===//
 
-#define SEIB_BITFIELD_EMPTY(T, U) \
-  IBWTO_BITFIELD_EMPTY(T, U)
+/// Adds a shared field for instruction class `I`.
+#define SHARED_FIELD(I, ...) \
+  class { friend class I; __VA_ARGS__; } I;
 
-  SEIB_BITFIELD_EMPTY(SwitchEnumInst, SEIBase);
-  SEIB_BITFIELD_EMPTY(SwitchEnumAddrInst, SEIBase);
+/// Adds a shared field for a template instruction class `I` which has a single
+/// template argument of type `T`.
+#define SHARED_TEMPLATE_FIELD(T, I, ...) \
+  class { template <T> friend class I; __VA_ARGS__; } I;
+  
+/// Special case for `InstructionBaseWithTrailingOperands`.
+#define SHARED_TEMPLATE4_FIELD(T1, T2, T3, T4, I, ...) \
+  class { template <T1, T2, T3, T4> friend class I; __VA_ARGS__; } I;
 
-  SWIFT_INLINE_BITFIELD_EMPTY(MultipleValueInstruction, SILInstruction);
+  union SharedUInt8Fields {
+    uint8_t opaque;
 
-  SWIFT_INLINE_BITFIELD(BeginCOWMutationInst, MultipleValueInstruction, 1,
-    Native : 1
-  );
+    SHARED_TEMPLATE_FIELD(typename, SwitchEnumInstBase, bool hasDefault);
+    SHARED_TEMPLATE_FIELD(SILInstructionKind, LoadReferenceInstBase, bool isTake);
+    SHARED_TEMPLATE_FIELD(SILInstructionKind, StoreReferenceInstBase, bool isInitializationOfDest);
+    SHARED_FIELD(SILArgument, uint8_t valueOwnershipKind);
+    SHARED_FIELD(MultipleValueInstructionResult, uint8_t valueOwnershipKind);
+    SHARED_FIELD(UncheckedOwnershipConversionInst, uint8_t valueOwnershipKind);
+    SHARED_FIELD(StoreInst, uint8_t ownershipQualifier);
+    SHARED_FIELD(LoadInst, uint8_t ownershipQualifier);
+    SHARED_FIELD(AssignInst, uint8_t ownershipQualifier);
+    SHARED_FIELD(AssignByWrapperInst, uint8_t mode);
+    SHARED_FIELD(StringLiteralInst, uint8_t encoding);
+    SHARED_FIELD(SelectEnumInstBase, bool hasDefault);
+    SHARED_FIELD(SwitchValueInst, bool hasDefault);
+    SHARED_FIELD(RefCountingInst, bool atomicity);
+    SHARED_FIELD(EndAccessInst, bool aborting);
+    SHARED_FIELD(RefElementAddrInst, bool immutable);
+    SHARED_FIELD(RefTailAddrInst, bool immutable);
+    SHARED_FIELD(HopToExecutorInst, bool mandatory);
+    SHARED_FIELD(DestroyValueInst, bool poisonRefs);
+    SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
+    SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
+    SHARED_FIELD(BeginCOWMutationInst, bool native);
 
-  } Bits;
+    SHARED_FIELD(DebugValueInst, uint8_t
+      poisonRefs : 1,
+      operandWasMoved : 1);
+
+    SHARED_FIELD(AllocStackInst, uint8_t
+      dynamicLifetime : 1,
+      lexical : 1,
+      wasMoved : 1,
+      hasInvalidatedVarInfo : 1);
+
+    SHARED_FIELD(AllocRefInstBase, uint8_t
+      objC : 1,
+      onStack : 1,
+      numTailTypes: NumAllocRefTailTypesBits);
+
+    SHARED_FIELD(CopyAddrInst, uint8_t
+      isTakeOfSrc : 1,
+      isInitializationOfDest : 1);
+
+    SHARED_FIELD(PointerToAddressInst, uint8_t
+      isStrict : 1,
+      isInvariant : 1);
+
+    SHARED_TEMPLATE_FIELD(typename, BeginAccessBase, uint8_t
+      accessKind : NumSILAccessKindBits,
+      enforcement : NumSILAccessEnforcementBits,
+      noNestedConflict : 1,
+      fromBuiltin : 1);
+    
+    SHARED_FIELD(EndUnpairedAccessInst, uint8_t
+      enforcement : NumSILAccessEnforcementBits,
+      aborting : 1,
+      fromBuiltin : 1);
+
+  // Do not use `_sharedUInt8_private` outside of SILNode.
+  } _sharedUInt8_private;
+
+  static_assert(sizeof(SharedUInt8Fields) == sizeof(uint8_t),
+    "A SILNode's shared uint8 field is too large");
+
+  union SharedUInt32Fields {
+    uint32_t opaque;
+
+    SHARED_TEMPLATE4_FIELD(SILInstructionKind, typename, typename, typename...,
+      InstructionBaseWithTrailingOperands, uint32_t numOperands);
+    SHARED_TEMPLATE_FIELD(typename, FieldIndexCacheBase, uint32_t fieldIndex);
+    SHARED_TEMPLATE_FIELD(typename, SwitchEnumInstBase, uint32_t numCases);
+    SHARED_FIELD(AllocStackInst, uint32_t numOperands);
+    SHARED_FIELD(EnumInst, uint32_t caseIndex);
+    SHARED_FIELD(UncheckedEnumDataInst, uint32_t caseIndex);
+    SHARED_FIELD(InjectEnumAddrInst, uint32_t caseIndex);
+    SHARED_FIELD(InitEnumDataAddrInst, uint32_t caseIndex);
+    SHARED_FIELD(UncheckedTakeEnumDataAddrInst, uint32_t caseIndex);
+    SHARED_FIELD(TupleExtractInst, uint32_t fieldNo);
+    SHARED_FIELD(TupleElementAddrInst, uint32_t fieldNo);
+    SHARED_FIELD(MultipleValueInstructionResult, uint32_t index);
+    SHARED_FIELD(IntegerLiteralInst, uint32_t numBits);
+    SHARED_FIELD(FloatLiteralInst, uint32_t numBits);
+    SHARED_FIELD(StringLiteralInst, uint32_t length);
+    SHARED_FIELD(PointerToAddressInst, uint32_t alignment);
+
+  // Do not use `_sharedUInt32_private` outside of SILNode.
+  } _sharedUInt32_private;
+
+  static_assert(sizeof(SharedUInt32Fields) == sizeof(uint32_t),
+    "A SILNode's shared uint32 field is too large");
+
+#undef SHARED_FIELD
+#undef SHARED_TEMPLATE_FIELD
+#undef SHARED_TEMPLATE4_FIELD
+
+  // Used for checking field overlaps between super and derived classes.
+  enum { SharedUInt8Used = 0 };
+  enum { SharedUInt32Used = 0 };
+
+#define _USE_SHARED_UINT_BASE(T, SUPER) \
+  static_assert(SUPER == 0, \
+    "SILNode's shared " #T " already used in super class"); \
+  enum { Shared##T##Used = 1 }; \
+  SILNode::Shared##T##Fields &shared##T() { \
+    return SILNode::_shared##T##_private; \
+  } \
+  SILNode::Shared##T##Fields shared##T() const { \
+    return SILNode::_shared##T##_private; \
+  }
+
+/// To be used inside a SIL instruction/value class. It declares that the
+/// instruction/value uses the SILNode's shared uint8 field.
+#define USE_SHARED_UINT8 \
+  _USE_SHARED_UINT_BASE(UInt8, SharedUInt8Used)
+
+/// To be used inside a SIL instruction/value class. It declares that the
+/// instruction/value uses the SILNode's shared uint32 field.
+#define USE_SHARED_UINT32 \
+  _USE_SHARED_UINT_BASE(UInt32, SharedUInt32Used)
+
+/// To be used inside a template SILInstruction class. It declares that the
+/// instruction uses the SILNode's shared uint8 field. The `BASE` is the
+/// template argument which defines the super class of the instruction.
+#define TEMPLATE_USE_SHARED_UINT8(BASE) \
+  _USE_SHARED_UINT_BASE(UInt8, BASE::SharedUInt8Used)
+
+/// To be used inside a template SILInstruction class. It declares that the
+/// instruction uses the SILNode's shared uint32 field. The `BASE` is the
+/// template argument which defines the super class of the instruction.
+#define TEMPLATE_USE_SHARED_UINT32(BASE) \
+  _USE_SHARED_UINT_BASE(UInt32, BASE::SharedUInt32Used)
+
+  //===---------------------- end of shared fields ------------------------===//
 
 private:
   SwiftMetatype getSILNodeMetatype(SILNodeKind kind);
 
 protected:
-  SILNode(SILNodeKind kind) : SwiftObjectHeader(getSILNodeMetatype(kind)) {
-    Bits.OpaqueBits = 0;
-    Bits.SILNode.Kind = unsigned(kind);
+  SILNode(SILNodeKind kind) : SwiftObjectHeader(getSILNodeMetatype(kind)),
+                              kind((uint8_t)kind) {
+    _sharedUInt8_private.opaque = 0;
+    _sharedUInt32_private.opaque = 0;
   }
 
 public:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SILNodeKind getKind() const {
-    return SILNodeKind(Bits.SILNode.Kind);
+    return SILNodeKind(kind);
   }
 
   /// If this is a SILArgument or a SILInstruction get its parent basic block,
@@ -499,6 +354,9 @@ public:
 
   static bool classof(SILNodePointer node) { return true; }
 };
+
+static_assert(sizeof(SILNode) <= 3 * sizeof(void *),
+              "SILNode must stay small");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                                      const SILNode &node) {
