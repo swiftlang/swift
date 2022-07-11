@@ -326,6 +326,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
   endif()
 
+  if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
+  endif()
+
   string(TOUPPER "${SWIFT_SDK_${sdk}_THREADING_PACKAGE}" _threading_package)
   list(APPEND result "-D" "SWIFT_THREADING_${_threading_package}")
 

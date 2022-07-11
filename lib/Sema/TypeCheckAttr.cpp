@@ -2335,6 +2335,14 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   auto where = ExportContext::forDeclSignature(D);
   diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where, None);
 
+  if (mainFunction->hasAsync() &&
+      context.LangOpts.isConcurrencyModelTaskToThread() &&
+      !AvailableAttr::isUnavailable(mainFunction)) {
+    mainFunction->diagnose(diag::concurrency_task_to_thread_model_async_main,
+                           "task-to-thread concurrency model");
+    return nullptr;
+  }
+
   auto *const func = FuncDecl::createImplicit(
       context, StaticSpellingKind::KeywordStatic,
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
@@ -3307,6 +3315,15 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   }
 }
 
+/// Determine whether this is the main actor type.
+/// FIXME: the diagnostics engine and TypeCheckConcurrency both have a copy of
+///        this
+static bool isMainActor(NominalTypeDecl *nominal) {
+  return nominal->getName().is("MainActor") &&
+         nominal->getParentModule()->getName() ==
+             nominal->getASTContext().Id_Concurrency;
+}
+
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
@@ -3339,6 +3356,14 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     }
 
     attr->setInvalid();
+    return;
+  }
+
+  if (isMainActor(nominal) && Ctx.LangOpts.isConcurrencyModelTaskToThread() &&
+      !AvailableAttr::isUnavailable(D)) {
+    Ctx.Diags.diagnose(attr->getLocation(),
+                       diag::concurrency_task_to_thread_model_main_actor,
+                       "task-to-thread concurrency model");
     return;
   }
 
@@ -6024,6 +6049,15 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
   auto nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
     return; // already diagnosed
+
+  auto &context = nominal->getASTContext();
+  if (context.LangOpts.isConcurrencyModelTaskToThread() &&
+      !AvailableAttr::isUnavailable(nominal)) {
+    context.Diags.diagnose(attr->getLocation(),
+                           diag::concurrency_task_to_thread_model_global_actor,
+                           "task-to-thread concurrency model");
+    return;
+  }
 
   (void)nominal->isGlobalActor();
 }

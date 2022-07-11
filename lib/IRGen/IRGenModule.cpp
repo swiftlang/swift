@@ -841,6 +841,15 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TaskRunInlineAvailability(ASTContext &context) {
+    if (context.LangOpts.isConcurrencyModelTaskToThread()) {
+      return RuntimeAvailability::AlwaysAvailable;
+    }
+    // swift_task_run_inline is only available under task-to-thread execution
+    // model.
+    return RuntimeAvailability::ConditionallyAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the

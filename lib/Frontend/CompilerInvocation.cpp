@@ -1018,6 +1018,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
+  if (const Arg *A = Args.getLastArg(options::OPT_concurrency_model)) {
+    Opts.ActiveConcurrencyModel =
+        llvm::StringSwitch<ConcurrencyModel>(A->getValue())
+            .Case("standard", ConcurrencyModel::Standard)
+            .Case("task-to-thread", ConcurrencyModel::TaskToThread)
+            .Default(ConcurrencyModel::Standard);
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 

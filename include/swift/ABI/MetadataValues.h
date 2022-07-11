@@ -2360,6 +2360,8 @@ enum class TaskOptionRecordKind : uint8_t {
   AsyncLet  = 2,
   /// Request a child task for an 'async let'.
   AsyncLetWithBuffer = 3,
+  /// Request a child task for swift_task_run_inline.
+  RunInline = UINT8_MAX,
 };
 
 /// Flags for cancellation records.
