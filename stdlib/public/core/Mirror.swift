@@ -58,17 +58,23 @@ public struct Mirror {
 
   /// Creates a mirror that reflects on the given instance.
   ///
-  /// If the dynamic type of `subject` conforms to `CustomReflectable`, the
-  /// resulting mirror is determined by its `customMirror` property.
-  ///
   /// If the dynamic type of `subject` does not conform to `CustomReflectable`,
   /// the language runtime will build a default representation.
   /// For struct and class types, the default representation includes
-  /// all fields known to the runtime, including `private` fields.
-  /// If a particular field cannot be correctly reflected, the value will
-  /// reflect as the empty tuple `()`.
+  /// all stored properties known to the runtime, including `private` ones.
+  /// Computed properties are omitted.
+  /// Properties whose value cannot be correctly reflected will instead
+  /// reflect their value as the empty tuple `()`.
   /// This can occur for closure-typed fields or for types for which the
   /// reflection data has been stripped from the binary.
+  /// (Closure-typed fields can be made reflectable by storing them in a property
+  /// with type `Any` or by using a custom mirror implementation.)
+  ///
+  /// If the dynamic type of `subject` conforms to `CustomReflectable`, the
+  /// resulting mirror is determined by its `customMirror` property.
+  /// This allows the `subject` to control what fields are exposed
+  /// and to expose field values (such as closures) that cannot be
+  /// correctly exposed by the default implementation.
   ///
   /// If the dynamic type of `subject` has value semantics, subsequent
   /// mutations of `subject` will not observable in `Mirror`.  In general,
