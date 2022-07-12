@@ -2919,7 +2919,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
-      "the conformance is declared as SPI}4",
+      "the conformance is declared as SPI|"
+      "%3 was not imported by this file}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
