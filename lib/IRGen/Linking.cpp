@@ -765,7 +765,13 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable: {
-    auto *nominal = getType().getAnyNominal();
+    auto ty = getType();
+    ValueDecl *nominal = nullptr;
+    if (auto *otat = ty->getAs<OpaqueTypeArchetypeType>()) {
+      nominal = otat->getDecl();
+    } else {
+      nominal = ty->getAnyNominal();
+    }
     assert(nominal);
     if (getDeclLinkage(nominal) == FormalLinkage::Private ||
         getLinkageAsConformance() == SILLinkage::Private) {
