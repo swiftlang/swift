@@ -134,7 +134,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.unaligned.SIMD")
 
   offset = 11
   let vector32 = bytes.withUnsafeMutableBytes { buffer -> SIMD32<UInt8> in
-    let aligned = buffer.baseAddress!.alignedUp(for: SIMD16<UInt8>.self)
+    let aligned = buffer.baseAddress!.alignedUp(for: SIMD32<UInt8>.self)
     offset += buffer.baseAddress!.distance(to: aligned)
     return buffer.loadUnaligned(fromByteOffset: offset, as: SIMD32<UInt8>.self)
   }
