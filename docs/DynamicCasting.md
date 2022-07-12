@@ -36,7 +36,7 @@ Where possible, each section includes machine-verifiable _invariants_ that can b
 
 Casting an instance of a type to its own type will always succeed and return the original value unchanged.
 
-```
+```swift
 let a: Int = 7
 a is Int // true
 a as? Int // Succeeds
@@ -109,13 +109,13 @@ Note: The associated `_ObjectiveCType` is constrained to be a subtype of `AnyObj
 In particular, this mechanism is equally available to the Swift implementation of Foundation on non-Apple platforms and the Objective-C Foundation on Apple platforms.
 
 Example #1:  Foundation extends the `Array` type in the standard library with an `_ObjectiveCBridgeable` conformance to `NSArray`.  This allows Swift arrays to be cast to and from Foundation `NSArray` instances.
-```
+```swift
 let a = [1, 2, 3] // Array<Int>
 let b = a as? AnyObject // casts to NSArray
 ```
 
 Example #2:  Foundation also extends each Swift numeric type with an `_ObjectiveCBridgeable` conformance to `NSNumber`.
-```
+```swift
 let a = 1 // Int
 // After the next line, b is an Optional<AnyObject>
 // holding a reference to an NSNumber
@@ -151,7 +151,7 @@ Casting to and from optional types will transparently unwrap optionals as much a
 Note: For "Optional Injection" above, the requirement that `t` is a non-nil instance of `T` implies that either `T` is not an `Optional` or that `T` is `Optional` and `t` has the form `.some(u)`
 
 Examples
-```
+```swift
 // T and U are any two distinct types (possibly optional)
 // NO is any non-optional type
 let t: T
@@ -187,7 +187,7 @@ Note that "optional depth" here refers to the number of optional wrappers needed
 2. Otherwise, the value should inject with the greatest optional depth possible.
 
 Examples
-```
+```swift
 // Depth preservation
 // The `.none` here has type `T?` with optional depth 1
 let t1: T???? = .some(.some(.some(.none)))
@@ -220,14 +220,14 @@ The result will be a new array where each `Int` in the original array has been i
 
 However, if any component item cannot be cast, then the outer cast will also fail.
 For example, consider the following:
-```
+```swift
 let a: Array<Any> = [Int(7), "string"]
 a as? Array<Int> // Fails because "string" cannot be cast to `Int`
 ```
 
 Specifically, the casting operator acts for `Array` as if it were implemented as follows.
 In particular, note that an empty array can be successfully cast to any destination array type.
-```
+```swift
 func arrayCast<T,U>(source: Array<T>) -> Optional<Array<U>> {
   var result = Array<U>()
   for t in source {
@@ -249,7 +249,7 @@ Similar logic applies to `Set` and `Dictionary` casts.
 Note that the resulting `Set` or `Dictionary` may have fewer items than the original if the component casting operation converts non-equal items in the source into equal items in the destination.
 
 Specifically, the casting operator acts on `Set` and `Dictionary` as if by the following code:
-```
+```swift
 func setCast<T,U>(source: Set<T>) -> Optional<Set<U>> {
   var result = Set<U>()
   for t in source {
@@ -382,7 +382,7 @@ For example, its metatype is named `AnyHashable.Type` and it does not have an ex
 Any protocol definition (except those that include an `associatedtype` property or which makes use of the `Self` typealias) has an associated existential type named after the protocol.
 
 Specifically, assume you have a protocol definition
-```
+```swift
 protocol P {}
 ```
 
@@ -427,7 +427,7 @@ We call this type the "metatype of `T`".
 Technically, static variables or methods of a type belong to the `T.self` instance and are defined by the metatype of `T`:
 
 Example:
-```
+```swift
 struct S {
   let ivar = 2
   static let svar = 1
@@ -447,7 +447,7 @@ However, in the following cases the metatype has a different name:
 * As explained above, although `AnyHashable` behaves like an existential type in some respects, its metatype is called `AnyHashable.Type`.
 
 Example:
-```
+```swift
 // Metatype of a struct type
 struct S: P {}
 S.self is S.Type // always true
@@ -501,7 +501,7 @@ As with other existentials, casting _from_ an existential metatype is equivalent
 Casting _to_ an existential metatype succeeds whenever the source is a conforming metatype instance (or can be unwrapped to yield such a metatype instance).
 
 Example
-```
+```swift
 protocol P {
    var ivar: Int { get }
    static svar: Int { get }
@@ -532,7 +532,7 @@ This is equivalent to saying that `P.self` is an instance of `P.Type`.
 (Remember that `P.self` is always an instance of `P.Protocol`.)
 
 This is a concern for Swift because of the following construct, which attempts to invoke a generic `f` in a situation where the concrete instance clearly conforms to `P` but is represented as a `P` existential:
-```
+```swift
 func f<T:P>(t: T) { .. use t .. }
 let a : P = something
 f(a)
@@ -540,7 +540,7 @@ f(a)
 This construct is valid only if `T` conforms to `P` when `T = P`; that is, if `P` self-conforms.
 
 A similar situation arises with generic types:
-```
+```swift
 struct MyGenericType<T: P> {
   init(_ value: T) { ... }
 }
@@ -591,7 +591,7 @@ These are some of the ways in which Swift 5.3 differs from the behavior describe
 
 * Casts for which the target type is "more Optional" than the static source type previously produced errors.  This disallowed all of the following: injecting an `Int` into an `Int?`, extracting an `Int?` from an opaque `Any` container, and casting an `Array<Int>` to an `Array<Int?>`. This document allows all of these.
 
-```
+```swift
 let a = 7
 // Swift 5.3: error: cannot downcast to a more optional type
 // Specification: returns true
@@ -609,7 +609,7 @@ c is Int?
 
 * An instance of a CoreFoundation type could sometimes be cast to a protocol defined on the companion Obj-C type and sometimes not.  To make the behavior consistent, we had to choose one; having such casts always succeed seems more consistent with the general dual nature of Obj-C/CF types.
 
-```
+```swift
 import Foundation
 protocol P {}
 extension NSString: P {}
@@ -625,7 +625,7 @@ print(b is P)
 
 * The Swift 5.3 compiler asserts attempting to cast a struct to AnyObject
 
-```
+```swift
 struct S {}
 let s = S()
 // Swift 5.3: Compiler crash (in asserts build)
@@ -635,7 +635,7 @@ s as? AnyObject
 
 * `NSNumber()` does not cast to itself via `as?` in unoptimized builds
 
-```
+```swift
 import Foundation
 let a = NSNumber()
 // true in 5.3 for optimized builds; false for unoptimized builds
@@ -644,7 +644,7 @@ print((a as? NSNumber) != nil)
 
 * `Optional<NSNumber>` does not project
 
-```
+```swift
 import Foundation
 let a: Optional<NSNumber> = NSNumber()
 // Swift 5.3: false
@@ -657,7 +657,7 @@ print(a as? NSNumber)
 
 * Casting `NSNumber()` to `Any` crashes at runtime
 
-```
+```swift
 import Foundation
 let a = NSNumber()
 // Swift 5.3: Runtime crash (both optimized and unoptimized builds)
@@ -667,7 +667,7 @@ print(a is Any)
 
 * [#44896](https://github.com/apple/swift/issues/44896): CF types cannot be cast to protocol existentials
 
-```
+```swift
 import Foundation
 protocol P {}
 extension CFBitVector : P {
@@ -682,7 +682,7 @@ print(CFBitVector.makeImmutable(from: [10,20]) is P)
 
 * [#47129](https://github.com/apple/swift/issues/47129): Cannot cast `Optional<T> as Any` to protocol type.  Note that this is a particular problem for reflection with weak fields, since `Mirror` reflects those as `Any` containing an `Optional` value.
 
-```
+```swift
 protocol P {}
 class C: P {}
 let c: C? = C()
@@ -694,7 +694,7 @@ print(a is P)
 
 * [#51469](https://github.com/apple/swift/issues/51469): `Any` containing `Optional<Any>` cannot cast to `Error`
 
-```
+```swift
 struct MyError: Error { }
 let a: Any? = MyError()
 let b: Any = a
@@ -705,7 +705,7 @@ print(b is Error)
 
 * [#48681](https://github.com/apple/swift/issues/48681): Inconsistent results for nested optionals
 
-```
+```swift
 // Note: This issue includes many cases similar to the following
 let x: Int? = nil
 print(x as Int??) // ==> "Optional(nil)"
@@ -716,7 +716,7 @@ print((x as? Int??)!)
 
 * `Error.self` does not fully self-conform
 
-```
+```swift
 // Swift 5.3: Prints "false"
 // Specification: prints "true"
 print(Error.self is Error.Type)
@@ -724,7 +724,7 @@ print(Error.self is Error.Type)
 
 * Objective-C protocol metatypes do not fully self-conform
 
-```
+```swift
 import Foundation
 let a = NSObjectProtocol.self
 print(a is NSObjectProtocol.Type)
@@ -732,7 +732,7 @@ print(a is NSObjectProtocol.Type)
 
 * [#44608](https://github.com/apple/swift/issues/44608): Cannot cast `Any` contents to a protocol type
 
-```
+```swift
 protocol P {}
 class Foo: P {}
 let optionalFoo: Foo? = Foo()
