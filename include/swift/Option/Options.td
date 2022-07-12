@@ -1262,6 +1262,10 @@ def index_ignore_clang_modules : Flag<["-"], "index-ignore-clang-modules">,
   Flags<[FrontendOption]>,
   HelpText<"Avoid indexing clang modules (pcms)">;
 
+def index_include_locals : Flag<["-"], "index-include-locals">,
+  Flags<[FrontendOption]>,
+  HelpText<"Include local definitions/references in the produced index data.">;
+
 def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   Flags<[NoInteractiveOption]>,
   HelpText<"Avoid indexing system modules">;

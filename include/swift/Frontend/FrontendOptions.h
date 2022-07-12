@@ -105,6 +105,9 @@ public:
   /// If indexing system modules, don't index the stdlib.
   bool IndexIgnoreStdlib = false;
 
+  /// Include local definitions/references in the index data.
+  bool IndexIncludeLocals = false;
+
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
