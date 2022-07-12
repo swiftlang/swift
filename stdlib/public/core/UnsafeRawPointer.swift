@@ -244,7 +244,7 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Parameter other: The typed pointer to convert.
   @_transparent
   public init<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
-   _rawValue = other._rawValue
+    _rawValue = other._rawValue
   }
 
   /// Creates a new raw pointer from the given typed pointer.
@@ -257,8 +257,8 @@ public struct UnsafeRawPointer: _Pointer {
   ///   result is `nil`.
   @_transparent
   public init?<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
-   guard let unwrapped = other else { return nil }
-   _rawValue = unwrapped._rawValue
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
   }
 
   /// Deallocates the previously allocated memory block referenced by this pointer.
@@ -429,7 +429,7 @@ public struct UnsafeRawPointer: _Pointer {
                               MemoryLayout<T>.alignment._builtinWordValue)
     return Builtin.loadRaw(alignedPointer)
 #else
-  return Builtin.loadRaw(rawPointer)
+    return Builtin.loadRaw(rawPointer)
 #endif
   }
 
