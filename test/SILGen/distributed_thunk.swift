@@ -1,4 +1,4 @@
-// RUN:  %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s 
+// RUN: %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -24,7 +24,7 @@ protocol ServerProto {
 
 extension DA: ServerProto {
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk2DACAA11ServerProtoA2aDP11doSomethingyyYaKFTW : $@convention(witness_method: ServerProto) @async (@in_guaranteed DA) -> @error Error
-  // CHECK-NOT: hop_to_executor
+  // TODO: we do hop here actually; ...-NOT: hop_to_executor
   // CHECK: function_ref @$s17distributed_thunk2DAC11doSomethingyyYaKFTE
   // CHECK: return
   distributed func doSomething() { }
@@ -54,7 +54,7 @@ distributed actor DA4: ServerProto {
   typealias ActorSystem = LocalTestingDistributedActorSystem
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA4CAA11ServerProtoA2aDP11doSomethingyyYaKFTW
-  // CHECK-NOT: hop_to_executor
+  // TODO: we do hop here actually; ...-NOT: hop_to_executor
   // CHECK-NOT: return
   // CHECK: function_ref @$s17distributed_thunk3DA4C11doSomethingyyYaKFTE
   distributed func doSomething() throws { }

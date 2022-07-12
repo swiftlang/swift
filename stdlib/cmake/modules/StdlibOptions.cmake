@@ -1,7 +1,6 @@
 include_guard(GLOBAL)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/SwiftUtils.cmake)
-include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/Threading.cmake)
 
 precondition(SWIFT_HOST_VARIANT_SDK)
 precondition(SWIFT_DARWIN_PLATFORMS)
@@ -173,6 +172,16 @@ option(SWIFT_ENABLE_REFLECTION
   "Build stdlib with support for runtime reflection and mirrors."
   TRUE)
 
+if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple" AND NOT SWIFT_FREESTANDING_IS_DARWIN)
+  set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default TRUE)
+else()
+  set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+       "Should concurrency use the task-to-thread model."
+       "${SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default}")
+
 option(SWIFT_STDLIB_HAS_STDIN
        "Build stdlib assuming the platform supports stdin and getline API."
        TRUE)
@@ -190,16 +199,6 @@ if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
 else()
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
 endif()
-
-include(Threading)
-
-threading_package_default("${SWIFT_HOST_VARIANT_SDK}"
-  SWIFT_THREADING_PACKAGE_default)
-
-set(SWIFT_THREADING_PACKAGE "${SWIFT_THREADING_PACKAGE_default}"
-    CACHE STRING
-    "The threading package to use.  Must be one of 'none', 'pthreads',
-    'darwin', 'linux', 'win32', 'c11'.")
 
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
     "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING

@@ -2116,6 +2116,15 @@ namespace {
           continue;
         }
 
+        if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
+          if (friendDecl->getFriendDecl()) {
+            m = friendDecl->getFriendDecl();
+            auto lookupTable = Impl.findLookupTable(m->getOwningModule());
+            addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
+                                  Impl.getNameImporter());
+          }
+        }
+
         auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.
@@ -2145,6 +2154,7 @@ namespace {
         }
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
+
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
@@ -2486,8 +2496,16 @@ namespace {
       // deep/complex template, or we've run into an infinite loop. In either
       // case, its not worth the compile time, so bail.
       // TODO: this could be configurable at some point.
-      if (llvm::size(decl->getSpecializedTemplate()->specializations()) > 10000)
+      if (llvm::size(decl->getSpecializedTemplate()->specializations()) >
+          1000) {
+        std::string name;
+        llvm::raw_string_ostream os(name);
+        decl->printQualifiedName(os);
+        // Emit a warning if we haven't warned about this decl yet.
+        if (Impl.tooDeepTemplateSpecializations.insert(name).second)
+          Impl.diagnose({}, diag::too_many_class_template_instantiations, name);
         return nullptr;
+      }
 
       // `Sema::isCompleteType` will try to instantiate the class template as a
       // side-effect and we rely on this here. `decl->getDefinition()` can
@@ -4753,12 +4771,6 @@ namespace {
     }
 
     Decl *VisitAccessSpecDecl(const clang::AccessSpecDecl *decl) {
-      return nullptr;
-    }
-
-    Decl *VisitFriendDecl(const clang::FriendDecl *decl) {
-      // Friends are not imported; Swift has a different access control
-      // mechanism.
       return nullptr;
     }
 

@@ -1,6 +1,3 @@
-template <class From, class To>
-To __swift_interopStaticCast(From from) { return from; }
-
 struct HasThreeFields {
   int a = 1;
   int b = 2;

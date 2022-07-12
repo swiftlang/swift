@@ -317,10 +317,6 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
-
-def enable_experimental_bound_generic_extensions :
-  Flag<["-"], "enable-experimental-bound-generic-extensions">,
-  HelpText<"Enable experimental support for extensions of bound generic types">;
 }
 
 // HIDDEN FLAGS
@@ -1069,4 +1065,11 @@ def enable_ad_hoc_availability :
   Flag<["-"], "enable-ad-hoc-availability">,
   HelpText<"Enable experimental support for ad hoc availability">;
 
+def concurrency_model :
+    Separate<["-"], "concurrency-model">,
+    HelpText<"Which concurrency model is used.  Defaults to standard.">,
+    MetaVarName<"standard|task-to-thread">;
+def concurrency_model_EQ :
+    Joined<["-"], "concurrency-model=">,
+    Alias<concurrency_model>;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

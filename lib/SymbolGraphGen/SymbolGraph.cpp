@@ -732,7 +732,7 @@ bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) cons
 bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
   // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName() && !Walker.isFromExportedImportedModule(D)) {
+  if (D->getModuleContext()->getName() != M.getName() && !Walker.isConsideredExportedImported(D)) {
     return false;
   }
 

@@ -62,6 +62,8 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
   ///
   private let bytes: UInt64
 
+  // TODO: add better support for tail elements by tracking the
+  // index of `index_addr` instructions.
   public enum FieldKind : Int {
     case root           = 0x0 // The pseudo component denoting the end of the path.
     case structField    = 0x1 // A concrete struct field: syntax e.g. `s3`

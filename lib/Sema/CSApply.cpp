@@ -1720,7 +1720,8 @@ namespace {
         return forceUnwrapIfExpected(result, memberLocator);
       }
 
-      if (member->getInterfaceType()->hasDynamicSelfType()) {
+      auto *func = dyn_cast<FuncDecl>(member);
+      if (func && func->getResultInterfaceType()->hasDynamicSelfType()) {
         refTy = refTy->replaceCovariantResultType(containerTy, 2);
         adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
             containerTy, 2);
@@ -2237,23 +2238,18 @@ namespace {
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
-      auto resultTy = solution.simplifyType(openedFullType);
+      auto *resultTy =
+          solution.simplifyType(openedFullType)->castTo<FunctionType>();
 
-      auto selfTy = getBaseType(resultTy->castTo<FunctionType>());
-
-      // Also replace the result type with the base type, so that calls
-      // to constructors defined in a superclass will know to cast the
-      // result to the derived type.
-      resultTy = resultTy->replaceCovariantResultType(selfTy, 2);
+      const auto selfTy = getBaseType(resultTy);
 
       ParameterTypeFlags flags;
       if (!selfTy->hasReferenceSemantics())
         flags = flags.withInOut(true);
 
       auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-      resultTy = FunctionType::get({selfParam},
-                                   resultTy->castTo<FunctionType>()->getResult(),
-                                   resultTy->castTo<FunctionType>()->getExtInfo());
+      resultTy = FunctionType::get({selfParam}, resultTy->getResult(),
+                                   resultTy->getExtInfo());
 
       // Build the constructor reference.
       Expr *ctorRef = cs.cacheType(
@@ -3545,9 +3541,11 @@ namespace {
 
       auto elementType = expr->getElementType();
 
-      for (auto &element : expr->getElements()) {
-        element = coerceToType(element, elementType,
-                               cs.getConstraintLocator(element));
+      for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
+        expr->setElement(
+            i, coerceToType(expr->getElement(i), elementType,
+                            cs.getConstraintLocator(
+                                expr, {LocatorPathElt::TupleElement(i)})));
       }
 
       return expr;
@@ -3590,9 +3588,12 @@ namespace {
       expr->setInitializer(witness);
 
       auto elementType = expr->getElementType();
-      for (auto &element : expr->getElements()) {
-        element = coerceToType(element, elementType,
-                               cs.getConstraintLocator(element));
+
+      for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
+        expr->setElement(
+            i, coerceToType(expr->getElement(i), elementType,
+                            cs.getConstraintLocator(
+                                expr, {LocatorPathElt::TupleElement(i)})));
       }
 
       return expr;
@@ -3794,10 +3795,12 @@ namespace {
       expr->setCondExpr(cond);
 
       // Coerce the then/else branches to the common type.
-      expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy,
-                               cs.getConstraintLocator(expr->getThenExpr())));
-      expr->setElseExpr(coerceToType(expr->getElseExpr(), resultTy,
-                                 cs.getConstraintLocator(expr->getElseExpr())));
+      expr->setThenExpr(coerceToType(
+          expr->getThenExpr(), resultTy,
+          cs.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(true))));
+      expr->setElseExpr(coerceToType(
+          expr->getElseExpr(), resultTy,
+          cs.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(false))));
 
       return expr;
     }
@@ -4369,9 +4372,12 @@ namespace {
     Expr *visitAssignExpr(AssignExpr *expr) {
       // Convert the source to the simplified destination type.
       auto destTy = simplifyType(cs.getType(expr->getDest()));
-      auto locator =
-        ConstraintLocatorBuilder(cs.getConstraintLocator(expr->getSrc()));
-      Expr *src = coerceToType(expr->getSrc(), destTy->getRValueType(), locator);
+      // Conversion is recorded as anchored on an assignment itself by
+      // constraint generator and that has to be preserved here in case
+      // anything depends on the locator (i.e. Double<->CGFloat implicit
+      // conversion).
+      Expr *src = coerceToType(expr->getSrc(), destTy->getRValueType(),
+                               cs.getConstraintLocator(expr));
       if (!src)
         return nullptr;
 
@@ -5638,25 +5644,22 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(
-      Expr *expr, bool implicitSelfCapture, bool inheritActorContext,
-      bool isolatedByPreconcurrency) {
+      Expr *expr, bool implicitSelfCapture, bool inheritActorContext) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
-    closure->setIsolatedByPreconcurrency(isolatedByPreconcurrency);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(
         captureList->getClosureBody(), implicitSelfCapture,
-        inheritActorContext, isolatedByPreconcurrency);
+        inheritActorContext);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(
-        identity->getSubExpr(), implicitSelfCapture, inheritActorContext,
-        isolatedByPreconcurrency);
+        identity->getSubExpr(), implicitSelfCapture, inheritActorContext);
   }
 }
 
@@ -5683,8 +5686,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Determine the parameter bindings.
   ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
 
-  bool preconcurrency = callee && callee.getDecl()->preconcurrency();
-
   // If this application is an init(wrappedValue:) call that needs an injected
   // wrapped value placeholder, the first non-defaulted argument must be
   // wrapped in an OpaqueValueExpr.
@@ -5706,8 +5707,9 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Quickly test if any further fix-ups for the argument types are necessary.
   auto matches = args->matches(params, [&](Expr *E) { return cs.getType(E); });
   if (matches && !shouldInjectWrappedValuePlaceholder &&
-      !paramInfo.anyContextualInfo())
+      !paramInfo.anyContextualInfo()) {
     return args;
+  }
 
   // Determine the parameter bindings that were applied.
   auto *locatorPtr = cs.getConstraintLocator(locator);
@@ -5856,7 +5858,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     applyContextualClosureFlags(
-        argExpr, isImplicitSelfCapture, inheritsActorContext, preconcurrency);
+        argExpr, isImplicitSelfCapture, inheritsActorContext);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
@@ -6815,6 +6817,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       auto *argExpr = locator.trySimplifyToExpr();
       assert(argExpr);
+
+      // Source requires implicit conversion to match destination
+      // type but the conversion itself is recorded on assignment.
+      if (auto *assignment = dyn_cast<AssignExpr>(argExpr))
+        argExpr = assignment->getSrc();
 
       // Load the value for conversion.
       argExpr = cs.coerceToRValue(argExpr);
@@ -8476,7 +8483,7 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
         auto diagnosed =
             primaryFix->coalesceAndDiagnose(solution, secondaryFixes);
-        if (primaryFix->isWarning()) {
+        if (!primaryFix->isFatal()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;
         } else {
@@ -9128,16 +9135,23 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     Solution &solution, SolutionApplicationTarget target) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
+  unsigned numResolvableFixes = 0;
   if (!solution.Fixes.empty()) {
     if (shouldSuppressDiagnostics())
       return None;
 
     bool diagnosedErrorsViaFixes = applySolutionFixes(solution);
+    bool canApplySolution = true;
+    for (const auto fix : solution.Fixes) {
+      if (fix->isFatal())
+        canApplySolution = false;
+      if (fix->impact() == SK_Fix && !fix->isFatal())
+        ++numResolvableFixes;
+    }
+
     // If all of the available fixes would result in a warning,
     // we can go ahead and apply this solution to AST.
-    if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
-          return fix->isWarning();
-        })) {
+    if (!canApplySolution) {
       // If we already diagnosed any errors via fixes, that's it.
       if (diagnosedErrorsViaFixes)
         return None;
@@ -9154,7 +9168,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   // produce a fallback diagnostic to highlight the problem.
   {
     const auto &score = solution.getFixedScore();
-    if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0) {
+    if (score.Data[SK_Fix] > numResolvableFixes || score.Data[SK_Hole] > 0) {
       maybeProduceFallbackDiagnostic(target);
       return None;
     }

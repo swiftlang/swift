@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
+
 public struct SourceLoc {
   /// Points into a source file.
   let locationInFile: UnsafePointer<UInt8>
@@ -47,27 +49,27 @@ extension Optional where Wrapped == SourceLoc {
 
 public struct CharSourceRange {
   private let start: SourceLoc
-  private let byteLength: Int
+  private let byteLength: UInt32
 
-  public init(start: SourceLoc, byteLength: Int) {
+  public init(start: SourceLoc, byteLength: UInt32) {
     self.start = start
     self.byteLength = byteLength
   }
 
-  public init?(bridged: BridgedCharSourceRange) {
-    guard let start = SourceLoc(bridged: bridged.start) else {
+  public init?(bridged: swift.CharSourceRange) {
+    guard let start = SourceLoc(bridged: bridged.getStart()) else {
       return nil
     }
-    self.init(start: start, byteLength: bridged.byteLength)
+    self.init(start: start, byteLength: bridged.getByteLength())
   }
 
-  public var bridged: BridgedCharSourceRange {
-    .init(start: start.bridged, byteLength: byteLength)
+  public var bridged: swift.CharSourceRange {
+    .init(start.bridged, byteLength)
   }
 }
 
 extension Optional where Wrapped == CharSourceRange {
-  public var bridged: BridgedCharSourceRange {
-    self?.bridged ?? .init(start: .init(), byteLength: 0)
+  public var bridged: swift.CharSourceRange {
+    self?.bridged ?? .init(.init(), 0)
   }
 }

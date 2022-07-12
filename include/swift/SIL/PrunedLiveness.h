@@ -180,9 +180,16 @@ public:
 protected:
   void markBlockLive(SILBasicBlock *bb, IsLive isLive) {
     assert(isLive != Dead && "erasing live blocks isn't implemented.");
-    liveBlocks[bb] = (isLive == LiveOut);
-    if (discoveredBlocks)
-      discoveredBlocks->push_back(bb);
+    bool isLiveOut = (isLive == LiveOut);
+    auto iterAndInserted =
+      liveBlocks.insert(std::make_pair(bb, isLiveOut));
+    if (iterAndInserted.second) {
+      if (discoveredBlocks)
+        discoveredBlocks->push_back(bb);
+    } else if (isLiveOut) {
+      // Update the existing entry to be live-out.
+      iterAndInserted.first->getSecond() = true;
+    }
   }
 
   void computeUseBlockLiveness(SILBasicBlock *userBB);

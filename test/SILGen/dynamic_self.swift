@@ -519,6 +519,17 @@ public class CaptureTwoValuesTest {
   }
 }
 
+
+final class Final {
+  static func useSelf(_ body: (Self) -> ()) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self13testNoErasureyyyAA5FinalCXEF : $@convention(thin) (@noescape @callee_guaranteed (@guaranteed Final) -> ()) -> () {
+func testNoErasure(_ body: (Final) -> ()) {
+  // CHECK: function_ref @$s12dynamic_self5FinalC7useSelfyyyACXDXEFZ : $@convention(method) (@noescape @callee_guaranteed (@guaranteed Final) -> (), @thick Final.Type) -> ()
+  return Final.useSelf(body)
+}
+
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f: {{.*}} : @$s12dynamic_self1XCAA1PA2aDP1f{{[_0-9a-zA-Z]*}}FTW
 

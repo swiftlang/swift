@@ -218,7 +218,7 @@ RequirementMachine::computeMinimalProtocolRequirements() {
   assert(protos.size() > 0 &&
          "Not a protocol connected component rewrite system");
 
-  System.minimizeRewriteSystem();
+  System.minimizeRewriteSystem(Map);
 
   if (Dump) {
     llvm::dbgs() << "Minimized rewrite system:\n";
@@ -463,7 +463,7 @@ RequirementMachine::computeMinimalGenericSignature(
   assert(!Params.empty() &&
          "Not a from-source top-level generic signature rewrite system");
 
-  System.minimizeRewriteSystem();
+  System.minimizeRewriteSystem(Map);
 
   if (Dump) {
     llvm::dbgs() << "Minimized rewrite system:\n";

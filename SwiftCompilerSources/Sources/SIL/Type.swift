@@ -50,7 +50,9 @@ public struct Type : CustomStringConvertible, CustomReflectable {
     return idx >= 0 ? idx : nil
   }
 
-  public var description: String { SILType_debugDescription(bridged).takeString() }
+  public var description: String {
+    String(_cxxString: SILType_debugDescription(bridged))
+  }
 
   public var customMirror: Mirror { Mirror(self, children: []) }
 }

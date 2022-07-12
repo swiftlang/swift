@@ -333,3 +333,18 @@ llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
   Builder.CreateRetVoid();
   return suspendFn;
 }
+
+void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
+                              llvm::Value *result, llvm::Value *closure,
+                              llvm::Value *closureContext) {
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "taskRunInline should have a type substitution");
+  auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
+
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskRunInlineFn(),
+      {result, closure, closureContext, resultTypeMetadata});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}

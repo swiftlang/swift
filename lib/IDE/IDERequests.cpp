@@ -172,12 +172,18 @@ ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
   assert(Loc.isValid());
   LocToResolve = Loc;
   CursorInfo.Loc = Loc;
+
   walk(SrcFile);
-  auto ShorthandShadowedDecl = ShorthandShadowedDecls[CursorInfo.ValueD];
-  while (ShorthandShadowedDecl) {
-    CursorInfo.ShorthandShadowedDecls.push_back(ShorthandShadowedDecl);
-    ShorthandShadowedDecl = ShorthandShadowedDecls[ShorthandShadowedDecl];
+
+  if (!CursorInfo.IsRef) {
+    // If we have a definition, add any decls that it potentially shadows
+    auto ShorthandShadowedDecl = ShorthandShadowedDecls[CursorInfo.ValueD];
+    while (ShorthandShadowedDecl) {
+      CursorInfo.ShorthandShadowedDecls.push_back(ShorthandShadowedDecl);
+      ShorthandShadowedDecl = ShorthandShadowedDecls[ShorthandShadowedDecl];
+    }
   }
+
   return CursorInfo;
 }
 

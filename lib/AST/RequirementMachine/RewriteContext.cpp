@@ -170,6 +170,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
       .Case("homotopy-reduction-detail", DebugFlags::HomotopyReductionDetail)
       .Case("minimal-conformances", DebugFlags::MinimalConformances)
+      .Case("minimal-conformances-detail", DebugFlags::MinimalConformancesDetail)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
       .Case("minimization", DebugFlags::Minimization)
       .Case("redundant-rules", DebugFlags::RedundantRules)

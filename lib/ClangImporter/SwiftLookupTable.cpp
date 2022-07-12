@@ -1967,8 +1967,14 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
         if (!alreadyAdded.insert(canonicalMember).second)
           continue;
 
-        if (auto namedMember = dyn_cast<clang::NamedDecl>(canonicalMember))
+        if (auto namedMember = dyn_cast<clang::NamedDecl>(canonicalMember)) {
+          // Make sure we're looking at the definition, otherwise, there won't
+          // be any members to add.
+          if (auto recordDecl = dyn_cast<clang::RecordDecl>(namedMember))
+            if (auto def = recordDecl->getDefinition())
+              namedMember = def;
           addEntryToLookupTable(table, namedMember, nameImporter);
+        }
       }
     }
   }

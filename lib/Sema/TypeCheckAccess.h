@@ -35,12 +35,14 @@ void checkAccessControl(Decl *D);
 // Problematic origin of an exported type.
 //
 // This enum must be kept in sync with
+// diag::inlinable_decl_ref_from_hidden_module,
 // diag::decl_from_hidden_module and
 // diag::conformance_from_implementation_only_module.
 enum class DisallowedOriginKind : uint8_t {
   ImplementationOnly,
   SPIImported,
   SPILocal,
+  ImplicitlyImported,
   None
 };
 

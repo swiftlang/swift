@@ -1734,7 +1734,7 @@ static int finishFormatting(char *dest, size_t length,
 // low-order part (rounding).  So most of the arithmetic helpers here
 // are for multiplication.
 
-// Note: With 64-bit GCC and Clang, we get a noticable performance
+// Note: With 64-bit GCC and Clang, we get a noticeable performance
 // gain by using `__uint128_t`.  Otherwise, we have to break things
 // down into 32-bit chunks so we don't overflow 64-bit temporaries.
 

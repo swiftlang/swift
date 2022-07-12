@@ -141,6 +141,24 @@ public:
   }
 };
 
+class RunInlineTaskOptionRecord : public TaskOptionRecord {
+  void *allocation;
+  size_t allocationBytes;
+
+public:
+  RunInlineTaskOptionRecord(void *allocation, size_t allocationBytes)
+      : TaskOptionRecord(TaskOptionRecordKind::RunInline),
+        allocation(allocation), allocationBytes(allocationBytes) {}
+
+  void *getAllocation() const { return allocation; }
+
+  size_t getAllocationBytes() const { return allocationBytes; }
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::RunInline;
+  }
+};
+
 } // end namespace swift
 
 #endif

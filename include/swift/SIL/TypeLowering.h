@@ -169,12 +169,6 @@ enum IsInfiniteType_t : bool {
   IsInfiniteType = true,
 };
 
-/// Does this type contain a move only type that affects type lowering?
-enum IsMoveOnly_t : bool {
-  IsNotMoveOnly = false,
-  IsMoveOnly = true,
-};
-
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -190,7 +184,6 @@ public:
       TypeExpansionSensitiveFlag = 1 << 4,
       InfiniteFlag               = 1 << 5,
       HasRawPointerFlag          = 1 << 6,
-      MoveOnlyFlag               = 1 << 7,
     };
     // clang-format on
 
@@ -205,15 +198,13 @@ public:
         IsAddressOnly_t isAddressOnly, IsResilient_t isResilient,
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
             IsNotTypeExpansionSensitive,
-        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
-        IsMoveOnly_t isMoveOnly = IsNotMoveOnly)
+        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
                 (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
-                (hasRawPointer ? HasRawPointerFlag : 0U) |
-                (isMoveOnly ? MoveOnlyFlag : 0U)) {}
+                (hasRawPointer ? HasRawPointerFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -238,36 +229,6 @@ public:
 
     static constexpr RecursiveProperties forResilient() {
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient};
-    }
-
-    static constexpr RecursiveProperties forMoveOnlyReference() {
-      return {IsNotTrivial,
-              IsFixedABI,
-              IsNotAddressOnly,
-              IsNotResilient,
-              IsNotTypeExpansionSensitive,
-              DoesNotHaveRawPointer,
-              IsMoveOnly};
-    }
-
-    static constexpr RecursiveProperties forMoveOnlyOpaque() {
-      return {IsNotTrivial,
-              IsNotFixedABI,
-              IsAddressOnly,
-              IsNotResilient,
-              IsNotTypeExpansionSensitive,
-              DoesNotHaveRawPointer,
-              IsMoveOnly};
-    }
-
-    static constexpr RecursiveProperties forMoveOnlyResilient() {
-      return {IsTrivial,
-              IsFixedABI,
-              IsNotAddressOnly,
-              IsResilient,
-              IsNotTypeExpansionSensitive,
-              DoesNotHaveRawPointer,
-              IsMoveOnly};
     }
 
     void addSubobject(RecursiveProperties other) {
@@ -296,9 +257,6 @@ public:
     IsInfiniteType_t isInfinite() const {
       return IsInfiniteType_t((Flags & InfiniteFlag) != 0);
     }
-    IsMoveOnly_t isMoveOnlyWrapped() const {
-      return IsMoveOnly_t((Flags & MoveOnlyFlag) != 0);
-    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -309,7 +267,6 @@ public:
               (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0);
     }
     void setInfinite() { Flags |= InfiniteFlag; }
-    void setMoveOnly() { Flags |= MoveOnlyFlag; }
   };
 
 private:

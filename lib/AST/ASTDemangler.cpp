@@ -659,6 +659,11 @@ Type ASTBuilder::createConstrainedExistentialType(
   return ExistentialType::get(constrainedBase);
 }
 
+Type ASTBuilder::createSymbolicExtendedExistentialType(NodePointer shapeNode,
+                                                       ArrayRef<Type> genArgs) {
+  return Type();
+}
+
 Type ASTBuilder::createMetatypeType(Type instance,
                          Optional<Demangle::ImplMetatypeRepresentation> repr) {
   if (!repr)

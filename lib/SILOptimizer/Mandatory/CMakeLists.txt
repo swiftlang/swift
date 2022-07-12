@@ -36,5 +36,5 @@ target_sources(swiftSILOptimizer PRIVATE
   YieldOnceCheck.cpp
   MandatoryCombine.cpp
   OSLogOptimization.cpp
-  MoveOnlyTypeEliminator.cpp
+  MoveOnlyWrappedTypeEliminator.cpp
   OwnershipModelEliminator.cpp)

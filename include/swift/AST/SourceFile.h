@@ -25,6 +25,16 @@ namespace swift {
 
 class PersistentParserState;
 
+/// Kind of import affecting how a decl can be reexported.
+/// This is a subset of \c DisallowedOriginKind.
+///
+/// \sa getRestrictedImportKind
+enum class RestrictedImportKind {
+  ImplementationOnly,
+  Implicit,
+  None // No restriction, i.e. the module is imported publicly.
+};
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -336,7 +346,8 @@ public:
   /// If not, we can fast-path module checks.
   bool hasImplementationOnlyImports() const;
 
-  bool isImportedImplementationOnly(const ModuleDecl *module) const;
+  /// Get the most permissive restriction applied to the imports of \p module.
+  RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
 
   /// Find all SPI names imported from \p importedModule by this file,
   /// collecting the identifiers in \p spiGroups.

@@ -81,7 +81,7 @@ public struct DiagnosticEngine {
                        fixIts: [DiagnosticFixIt] = []) {
 
     let bridgedSourceLoc: swift.SourceLoc = position.bridged
-    let bridgedHighlightRange: BridgedCharSourceRange = highlight.bridged
+    let bridgedHighlightRange: swift.CharSourceRange = highlight.bridged
     var bridgedArgs: [BridgedDiagnosticArgument] = []
     var bridgedFixIts: [BridgedDiagnosticFixIt] = []
 
