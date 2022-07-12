@@ -422,6 +422,8 @@ ERROR(expected_lparen_initializer,PointsToFirstBadToken,
       "expected '(' for initializer parameters", ())
 ERROR(initializer_has_name,PointsToFirstBadToken,
       "initializers cannot have a name", ())
+ERROR(initializer_result_type,PointsToFirstBadToken,
+      "initializers cannot have a result type", ())
 
 // Destructor
 ERROR(destructor_decl_outside_class,none,
