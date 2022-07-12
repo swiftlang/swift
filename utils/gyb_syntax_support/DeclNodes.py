@@ -455,13 +455,7 @@ DECL_NODES = [
                    is_optional=True),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
-             Child('Parameters', kind='ParameterClause'),
-             Child('ThrowsOrRethrowsKeyword', kind='Token',
-                   is_optional=True,
-                   token_choices=[
-                       'ThrowsToken',
-                       'RethrowsToken',
-                   ]),
+             Child('Signature', kind='FunctionSignature'),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
              # the body is not necessary inside a protocol definition
