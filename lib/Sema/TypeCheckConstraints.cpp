@@ -55,6 +55,24 @@ using namespace constraints;
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   getTypeVariable()->print(OS, PrintOptions());
+  
+  SmallVector<TypeVariableOptions, 4> bindingOptions;
+  if (canBindToLValue())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
+  if (canBindToInOut())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToInOut);
+  if (canBindToNoEscape())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToNoEscape);
+  if (canBindToHole())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
+  if (!bindingOptions.empty()) {
+    OS << " [allows bindings to: ";
+    interleave(bindingOptions, OS,
+               [&](TypeVariableOptions option) {
+                  (OS << getTypeVariableOptions(option));},
+               ", ");
+               OS << "]";
+  }
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
@@ -1415,24 +1433,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
              });
   for (auto tv : typeVariables) {
     out.indent(2);
-    Type(tv).print(out, PO);
-    SmallVector<TypeVariableOptions, 4> bindingOptions;
-    if (tv->getImpl().canBindToLValue())
-      bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
-    if (tv->getImpl().canBindToInOut())
-      bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToInOut);
-    if (tv->getImpl().canBindToNoEscape())
-      bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToNoEscape);
-    if (tv->getImpl().canBindToHole())
-      bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
-    if (!bindingOptions.empty()) {
-      out << " [allows bindings to: ";
-      interleave(bindingOptions, out,
-                 [&](TypeVariableOptions option) {
-                    (out << tv->getImpl().getTypeVariableOptions(option));},
-                 ", ");
-                 out << "]";
-    }
+    tv->getImpl().print(out);
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
