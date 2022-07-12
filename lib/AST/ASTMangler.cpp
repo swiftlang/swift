@@ -243,6 +243,7 @@ std::string ASTMangler::mangleWitnessThunk(
       appendOperator("TW");
     }
   }
+
   return finalize();
 }
 
@@ -1233,6 +1234,18 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::ExistentialMetatype: {
       ExistentialMetatypeType *EMT = cast<ExistentialMetatypeType>(tybase);
+
+      // ExtendedExistentialTypeShapes consider existential metatypes to
+      // be part of the existential, so if we're symbolically referencing
+      // shapes, we need to handle that at this level.
+      if (EMT->hasParameterizedExistential()) {
+        auto referent = SymbolicReferent::forExtendedExistentialTypeShape(EMT);
+        if (canSymbolicReference(referent)) {
+          appendSymbolicExtendedExistentialType(referent, EMT, sig, forDecl);
+          return;
+        }
+      }
+
       if (EMT->getInstanceType()->isExistentialType() &&
           EMT->hasParameterizedExistential())
         appendConstrainedExistential(EMT->getInstanceType(), sig, forDecl);
@@ -1293,7 +1306,13 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::Existential: {
       auto *ET = cast<ExistentialType>(tybase);
-      if (tybase->hasParameterizedExistential()) {
+      if (ET->hasParameterizedExistential()) {
+        auto referent = SymbolicReferent::forExtendedExistentialTypeShape(ET);
+        if (canSymbolicReference(referent)) {
+          appendSymbolicExtendedExistentialType(referent, ET, sig, forDecl);
+          return;
+        }
+
         return appendConstrainedExistential(ET->getConstraintType(), sig,
                                             forDecl);
       }
@@ -1455,7 +1474,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       return;
     }
-    case TypeKind::SILMoveOnly:
+    case TypeKind::SILMoveOnlyWrapped:
       // If we hit this, we just mangle the underlying name and move on.
       llvm_unreachable("should never be mangled?");
     case TypeKind::SILBlockStorage:
@@ -1751,6 +1770,36 @@ void ASTMangler::appendRetroactiveConformances(Type type, GenericSignature sig) 
   }
 
   appendRetroactiveConformances(subMap, sig, module);
+}
+
+void ASTMangler::appendSymbolicExtendedExistentialType(
+                                             SymbolicReferent shapeReferent,
+                                             Type type,
+                                             GenericSignature sig,
+                                             const ValueDecl *forDecl) {
+  assert(shapeReferent.getKind() ==
+           SymbolicReferent::ExtendedExistentialTypeShape);
+  assert(canSymbolicReference(shapeReferent));
+  assert(type->isAnyExistentialType());
+
+  // type ::= symbolic-extended-existential-type-shape
+  //          type* retroactive-conformance* 'Xj'
+
+  appendSymbolicReference(shapeReferent);
+
+  auto genInfo = ExistentialTypeGeneralization::get(type);
+  if (genInfo.Generalization) {
+    for (auto argType : genInfo.Generalization.getReplacementTypes())
+      appendType(argType, sig, forDecl);
+
+    // What module should be used here?  The existential isn't anchored
+    // to any given module; we should just treat conformances as
+    // retroactive if they're "objectively" retroactive.
+    appendRetroactiveConformances(genInfo.Generalization, sig,
+                                  /*from module*/ nullptr);
+  }
+
+  appendOperator("Xj");
 }
 
 static char getParamConvention(ParameterConvention conv) {
@@ -2933,6 +2982,21 @@ void ASTMangler::appendGenericSignatureParts(
   appendOperator("r", StringRef(OpStorage.data(), OpStorage.size()));
 }
 
+/// Determine whether an associated type reference into the given set of
+/// protocols is unambiguous.
+static bool associatedTypeRefIsUnambiguous(ArrayRef<ProtocolDecl *> protocols) {
+  unsigned numProtocols = 0;
+  for (auto proto : protocols) {
+    // Skip marker protocols, which cannot have associated types.
+    if (proto->isMarkerProtocol())
+      continue;
+
+    ++numProtocols;
+  }
+
+  return numProtocols <= 1;
+}
+
 // If the base type is known to have a single protocol conformance
 // in the current generic context, then we don't need to disambiguate the
 // associated type name by protocol.
@@ -2942,7 +3006,7 @@ ASTMangler::dropProtocolFromAssociatedType(DependentMemberType *dmt,
   auto baseTy = dmt->getBase();
   bool unambiguous =
       (!dmt->getAssocType() ||
-       sig->getRequiredProtocols(baseTy).size() <= 1);
+       associatedTypeRefIsUnambiguous(sig->getRequiredProtocols(baseTy)));
 
   if (auto *baseDMT = baseTy->getAs<DependentMemberType>())
     baseTy = dropProtocolFromAssociatedType(baseDMT, sig);
@@ -2978,7 +3042,8 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt,
     // in the current generic context, then we don't need to disambiguate the
     // associated type name by protocol.
     if (!OptimizeProtocolNames || !sig ||
-        sig->getRequiredProtocols(dmt->getBase()).size() > 1) {
+        !associatedTypeRefIsUnambiguous(
+            sig->getRequiredProtocols(dmt->getBase()))) {
       appendAnyGenericType(assocTy->getProtocol());
     }
     return;

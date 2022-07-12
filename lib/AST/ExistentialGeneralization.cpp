@@ -175,7 +175,7 @@ private:
   INVALID_TO_GENERALIZE(SILBox)
   INVALID_TO_GENERALIZE(SILFunction)
   INVALID_TO_GENERALIZE(SILToken)
-  INVALID_TO_GENERALIZE(SILMoveOnly)
+  INVALID_TO_GENERALIZE(SILMoveOnlyWrapped)
 #undef INVALID_TO_GENERALIZE
 
   /// Generalize the generic arguments of the given generic type.s
@@ -267,7 +267,7 @@ private:
 
 ExistentialTypeGeneralization
 ExistentialTypeGeneralization::get(Type rawType) {
-  assert(rawType->isExistentialType());
+  assert(rawType->isAnyExistentialType());
   assert(!rawType->hasTypeParameter());
 
   // Canonicalize.  We need to generalize the canonical shape of the

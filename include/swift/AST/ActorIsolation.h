@@ -193,6 +193,9 @@ ActorIsolation getActorIsolation(ValueDecl *value);
 /// Determine how the given declaration context is isolated.
 ActorIsolation getActorIsolationOfContext(DeclContext *dc);
 
+/// Check if both the value, and context are isolated to the same actor.
+bool isSameActorIsolated(ValueDecl *value, DeclContext *dc);
+
 /// Determines whether this function's body uses flow-sensitive isolation.
 bool usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn);
 

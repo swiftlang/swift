@@ -2905,6 +2905,8 @@ static bool usesFeatureBuiltinMove(Decl *decl) {
 
 static bool usesFeatureBuiltinCopy(Decl *decl) { return false; }
 
+static bool usesFeatureBuiltinTaskRunInline(Decl *) { return false; }
+
 static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto specialize : func->getAttrs().getAttributes<SpecializeAttr>()) {
@@ -3032,10 +3034,6 @@ static bool usesFeatureOneWayClosureParameters(Decl *decl) {
 }
 
 static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBoundGenericExtensions(Decl *decl) {
   return false;
 }
 
@@ -6203,7 +6201,7 @@ public:
     }
   }
 
-  void visitSILMoveOnlyType(SILMoveOnlyType *T) {
+  void visitSILMoveOnlyWrappedType(SILMoveOnlyWrappedType *T) {
     Printer << "@moveOnly ";
     printWithParensIfNotSimple(T->getInnerType());
   }

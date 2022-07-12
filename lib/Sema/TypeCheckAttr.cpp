@@ -2335,6 +2335,14 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   auto where = ExportContext::forDeclSignature(D);
   diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where, None);
 
+  if (mainFunction->hasAsync() &&
+      context.LangOpts.isConcurrencyModelTaskToThread() &&
+      !AvailableAttr::isUnavailable(mainFunction)) {
+    mainFunction->diagnose(diag::concurrency_task_to_thread_model_async_main,
+                           "task-to-thread concurrency model");
+    return nullptr;
+  }
+
   auto *const func = FuncDecl::createImplicit(
       context, StaticSpellingKind::KeywordStatic,
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
@@ -3307,6 +3315,15 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   }
 }
 
+/// Determine whether this is the main actor type.
+/// FIXME: the diagnostics engine and TypeCheckConcurrency both have a copy of
+///        this
+static bool isMainActor(NominalTypeDecl *nominal) {
+  return nominal->getName().is("MainActor") &&
+         nominal->getParentModule()->getName() ==
+             nominal->getASTContext().Id_Concurrency;
+}
+
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
@@ -3339,6 +3356,14 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     }
 
     attr->setInvalid();
+    return;
+  }
+
+  if (isMainActor(nominal) && Ctx.LangOpts.isConcurrencyModelTaskToThread() &&
+      !AvailableAttr::isUnavailable(D)) {
+    Ctx.Diags.diagnose(attr->getLocation(),
+                       diag::concurrency_task_to_thread_model_main_actor,
+                       "task-to-thread concurrency model");
     return;
   }
 
@@ -3600,6 +3625,13 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     overrideInterfaceTy = FunctionType::get(
         overrideInterfaceFuncTy->getParams(),
         overrideInterfaceFuncTy->getResult(), overrideInterfaceInfo);
+  }
+
+  // If @preconcurrency is involved, strip concurrency from the types before
+  // comparing them.
+  if (overridden->preconcurrency() || VD->preconcurrency()) {
+    derivedInterfaceTy = derivedInterfaceTy->stripConcurrency(true, false);
+    overrideInterfaceTy = overrideInterfaceTy->stripConcurrency(true, false);
   }
 
   if (!derivedInterfaceTy->isEqual(overrideInterfaceTy)) {
@@ -5910,24 +5942,6 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       }
       return;
     }
-
-    // Diagnose for the limitation that we currently have to require distributed
-    // actor constrained protocols to declare the distributed requirements as
-    // 'async throws'
-    // FIXME: rdar://95949498 allow requirements to not declare explicit async/throws in protocols; those effects are implicit in any case
-    if (isa<ProtocolDecl>(dc)) {
-      if (!funcDecl->hasAsync() || !funcDecl->hasThrows()) {
-        auto diag = funcDecl->diagnose(diag::distributed_method_requirement_must_be_async_throws,
-                           funcDecl->getName());
-        if (!funcDecl->hasAsync()) {
-          diag.fixItInsertAfter(funcDecl->getThrowsLoc(), " async");
-        }
-        if (!funcDecl->hasThrows()) {
-          diag.fixItInsertAfter(funcDecl->getThrowsLoc(), " throws");
-        }
-        return;
-      }
-    }
   }
 }
 
@@ -6035,6 +6049,15 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
   auto nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
     return; // already diagnosed
+
+  auto &context = nominal->getASTContext();
+  if (context.LangOpts.isConcurrencyModelTaskToThread() &&
+      !AvailableAttr::isUnavailable(nominal)) {
+    context.Diags.diagnose(attr->getLocation(),
+                           diag::concurrency_task_to_thread_model_global_actor,
+                           "task-to-thread concurrency model");
+    return;
+  }
 
   (void)nominal->isGlobalActor();
 }

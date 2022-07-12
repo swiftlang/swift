@@ -40,8 +40,7 @@ import SIL
 /// Later optimizations can clean that up.
 let stackPromotion = FunctionPass(name: "stack-promotion", {
   (function: Function, context: PassContext) in
-
-  var escapeInfo = EscapeInfo(calleeAnalysis: context.calleeAnalysis)
+  
   let deadEndBlocks = context.deadEndBlocks
 
   var changed = false
@@ -59,7 +58,7 @@ let stackPromotion = FunctionPass(name: "stack-promotion", {
           break
         }
 
-        if tryPromoteAlloc(ar, &escapeInfo, deadEndBlocks, context) {
+        if tryPromoteAlloc(ar, deadEndBlocks, context) {
           changed = true
         }
       }
@@ -73,15 +72,16 @@ let stackPromotion = FunctionPass(name: "stack-promotion", {
 
 private
 func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
-                     _ escapeInfo: inout EscapeInfo,
                      _ deadEndBlocks: DeadEndBlocksAnalysis,
                      _ context: PassContext) -> Bool {
   if allocRef.isObjC || allocRef.canAllocOnStack {
     return false
   }
-
+  struct DefaultVisitor : EscapeInfoVisitor {}
+  var ei = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: DefaultVisitor())
+  
   // The most important check: does the object escape the current function?
-  if escapeInfo.isEscaping(object:allocRef) {
+  if ei.isEscaping(object:allocRef) {
     return false
   }
 
@@ -120,18 +120,13 @@ func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   //     destroy_value %o
   //
   let domTree = context.dominatorTree
-  let outerDominatingBlock = escapeInfo.getDominatingBlockOfAllUsePoints(allocRef, domTree: domTree)
+  let outerDominatingBlock = getDominatingBlockOfAllUsePoints(context: context, allocRef, domTree: domTree)
 
   // The "inner" liferange contains all use points which are dominated by the allocation block
-  var innerRange = InstructionRange(begin: allocRef, context)
-  defer { innerRange.deinitialize() }
-
   // The "outer" liferange contains all use points.
-  var outerBlockRange = BasicBlockRange(begin: outerDominatingBlock, context)
-  defer { outerBlockRange.deinitialize() }
+  var (innerRange, outerBlockRange) = computeInnerAndOuterLiferanges(instruction: allocRef, in: outerDominatingBlock, domTree: domTree, context: context)
+  defer { innerRange.deinitialize(); outerBlockRange.deinitialize() }
   
-  escapeInfo.computeInnerAndOuterLiferanges(&innerRange, &outerBlockRange, domTree: domTree)
-
   precondition(innerRange.blockRange.isValid, "inner range should be valid because we did a dominance check")
 
   if !outerBlockRange.isValid {
@@ -200,60 +195,84 @@ func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
 //                              utility functions
 //===----------------------------------------------------------------------===//
 
-private extension EscapeInfo {
-  mutating func getDominatingBlockOfAllUsePoints(_ value: SingleValueInstruction,
-                                                 domTree: DominatorTree) -> BasicBlock {
-    // The starting point
-    var dominatingBlock = value.block
-
-    _ = isEscaping(object: value, visitUse: { op, _, _ in
-        let defBlock = op.value.definingBlock
-        if defBlock.dominates(dominatingBlock, domTree) {
-          dominatingBlock = defBlock
-        }
-        return .continueWalking
-      })
-    return dominatingBlock
+private func getDominatingBlockOfAllUsePoints(context: PassContext,
+                                              _ value: SingleValueInstruction,
+                                              domTree: DominatorTree) -> BasicBlock {
+  struct Visitor : EscapeInfoVisitor {
+    var dominatingBlock: BasicBlock
+    let domTree: DominatorTree
+    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+      let defBlock = operand.value.definingBlock
+      if defBlock.dominates(dominatingBlock, domTree) {
+        dominatingBlock = defBlock
+      }
+      return .continueWalk
+    }
   }
+  
+  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: Visitor(dominatingBlock: value.block, domTree: domTree))
+  _ = walker.isEscaping(object: value)
+  return walker.visitor.dominatingBlock
+}
 
+
+func computeInnerAndOuterLiferanges(instruction: SingleValueInstruction, in domBlock: BasicBlock, domTree: DominatorTree, context: PassContext) -> (InstructionRange, BasicBlockRange) {
+  
   /// All uses which are dominated by the `innerInstRange`s begin-block are included
   /// in both, the `innerInstRange` and the `outerBlockRange`.
   /// All _not_ dominated uses are only included in the `outerBlockRange`.
-  mutating
-  func computeInnerAndOuterLiferanges(_ innerInstRange: inout InstructionRange,
-                                      _ outerBlockRange: inout BasicBlockRange,
-                                      domTree: DominatorTree) {
-    _ = isEscaping(object: innerInstRange.begin as! SingleValueInstruction, visitUse: { op, _, _ in
-        let user = op.instruction
-        if innerInstRange.blockRange.begin.dominates(user.block, domTree) {
-          innerInstRange.insert(user)
-        }
-        outerBlockRange.insert(user.block)
-
-        let val = op.value
-        let defBlock = val.definingBlock
-
-        // Also insert the operand's definition. Otherwise we would miss allocation
-        // instructions (for which the `visitUse` closure is not called).
-        outerBlockRange.insert(defBlock)
-        
-        // We need to explicitly add predecessor blocks of phi-arguments becaues they
-        // are not necesesarily visited by `EscapeInfo.walkDown`.
-        // This is important for the special case where there is a back-edge from the
-        // inner range to the inner rage's begin-block:
-        //
-        //   bb0:                      // <- need to be in the outer range
-        //     br bb1(%some_init_val)
-        //   bb1(%arg):
-        //     %k = alloc_ref $Klass   // innerInstRange.begin
-        //     cond_br bb2, bb1(%k)    // back-edge to bb1 == innerInstRange.blockRange.begin
-        //
-        if val is BlockArgument {
-          outerBlockRange.insert(contentsOf: defBlock.predecessors)
-        }
-        return .continueWalking
-      })
+  struct Visitor : EscapeInfoVisitor {
+    var innerRange: InstructionRange
+    var outerBlockRange: BasicBlockRange
+    let domTree: DominatorTree
+    
+    init(instruction: Instruction, domBlock: BasicBlock, domTree: DominatorTree, context: PassContext) {
+      innerRange = InstructionRange(begin: instruction, context)
+      outerBlockRange = BasicBlockRange(begin: domBlock, context)
+      self.domTree = domTree
+    }
+    
+    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+      let user = operand.instruction
+      if innerRange.blockRange.begin.dominates(user.block, domTree) {
+        innerRange.insert(user)
+      }
+      outerBlockRange.insert(user.block)
+      
+      let val = operand.value
+      let defBlock = val.definingBlock
+      
+      // Also insert the operand's definition. Otherwise we would miss allocation
+      // instructions (for which the `visitUse` closure is not called).
+      outerBlockRange.insert(defBlock)
+      
+      // We need to explicitly add predecessor blocks of phi-arguments becaues they
+      // are not necesesarily visited by `EscapeInfo.walkDown`.
+      // This is important for the special case where there is a back-edge from the
+      // inner range to the inner rage's begin-block:
+      //
+      //   bb0:                      // <- need to be in the outer range
+      //     br bb1(%some_init_val)
+      //   bb1(%arg):
+      //     %k = alloc_ref $Klass   // innerInstRange.begin
+      //     cond_br bb2, bb1(%k)    // back-edge to bb1 == innerInstRange.blockRange.begin
+      //
+      if val is BlockArgument {
+        outerBlockRange.insert(contentsOf: defBlock.predecessors)
+      }
+      return .continueWalk
+    }
   }
+  
+  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis,
+                                visitor: Visitor(
+                                  instruction: instruction,
+                                  domBlock: domBlock,
+                                  domTree: domTree,
+                                  context: context
+                                ))
+  _ = walker.isEscaping(object: instruction)
+  return (walker.visitor.innerRange, walker.visitor.outerBlockRange)
 }
 
 private extension BasicBlockRange {
@@ -284,3 +303,4 @@ private extension BasicBlockRange {
     exits.contains { !deadEndBlocks.isDeadEnd($0) && !$0.hasSinglePredecessor }
   }
 }
+

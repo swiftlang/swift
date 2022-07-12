@@ -102,6 +102,11 @@ The following symbolic reference kinds are currently implemented:
      metadata-access-function ::= '\x09' .{4}  // Reference points directly to metadata access function that can be invoked to produce referenced object
    #endif
 
+   #if SWIFT_RUNTIME_VERISON >= 5.7
+     symbolic-extended-existential-type-shape ::= '\x0A' .{4} // Reference points directly to an ExtendedExistentialTypeShape
+     symbolic-extended-existential-type-shape ::= '\x0B' .{4} // Reference points directly to a NonUniqueExtendedExistentialTypeShape
+   #endif
+
 A mangled name may also include ``\xFF`` bytes, which are only used for
 alignment padding. They do not affect what the mangled name references and can
 be skipped over and ignored.
@@ -654,6 +659,10 @@ Types
     type ::= type assoc-type-list 'QX' // associated type relative to base `type`
   #endif
 
+  #if SWIFT_RUNTIME_VERSION >= 5.7
+    type ::= symbolic-extended-existential-type-shape type* retroactive-conformance* 'Xj'
+  #endif
+
   protocol-list ::= protocol '_' protocol*
   protocol-list ::= empty-list
 
@@ -1124,7 +1133,7 @@ Some kinds need arguments, which precede ``Tf``.
   spec-arg ::= identifier
   spec-arg ::= type
 
-  SPEC-INFO ::= FRAGILE? PASSID
+  SPEC-INFO ::= MT-REMOVED? FRAGILE? PASSID
 
   PASSID ::= '0'                             // AllocBoxToStack,
   PASSID ::= '1'                             // ClosureSpecializer,
@@ -1132,6 +1141,8 @@ Some kinds need arguments, which precede ``Tf``.
   PASSID ::= '3'                             // CapturePropagation,
   PASSID ::= '4'                             // FunctionSignatureOpts,
   PASSID ::= '5'                             // GenericSpecializer,
+
+  MT-REMOVED ::= 'm'                         // non-generic metatype arguments are removed in the specialized function
 
   FRAGILE ::= 'q'
 

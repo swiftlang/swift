@@ -366,6 +366,7 @@ private:
     case TriviaKind::DocBlockComment:
       return Text.startswith("/**") && Text.endswith("*/");
     case TriviaKind::GarbageText:
+    case TriviaKind::Shebang:
       return !Text.empty();
 % for trivia in TRIVIAS:
 %   if trivia.is_collection():

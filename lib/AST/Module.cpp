@@ -792,15 +792,33 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
   return true;
 }
 
-void swift::collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
+void swift::collectParsedExportedImports(const ModuleDecl *M,
+                                         SmallPtrSetImpl<ModuleDecl *> &Imports,
+                                         llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
         for (auto import : source->getImports()) {
           if (import.options.contains(ImportFlags::Exported) &&
-              !Imports.contains(import.module.importedModule) &&
               import.module.importedModule->shouldCollectDisplayDecls()) {
-            Imports.insert(import.module.importedModule);
+            auto *TheModule = import.module.importedModule;
+
+            if (import.module.getAccessPath().size() > 0) {
+              if (QualifiedImports.find(TheModule) == QualifiedImports.end()) {
+                QualifiedImports.try_emplace(TheModule);
+              }
+              auto collectDecls = [&](ValueDecl *VD,
+                                      DeclVisibilityKind reason) {
+                if (reason == DeclVisibilityKind::VisibleAtTopLevel)
+                  QualifiedImports[TheModule].insert(VD);
+              };
+              auto consumer = makeDeclConsumer(std::move(collectDecls));
+              TheModule->lookupVisibleDecls(
+                  import.module.getAccessPath(), consumer,
+                  NLKind::UnqualifiedLookup);
+            } else if (!Imports.contains(TheModule)) {
+              Imports.insert(TheModule);
+            }
           }
         }
       }
@@ -956,7 +974,12 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive) const {
   if (Recursive && isParsedModule(this)) {
     SmallPtrSet<ModuleDecl *, 4> Modules;
-    collectParsedExportedImports(this, Modules);
+    llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
+    collectParsedExportedImports(this, Modules, QualifiedImports);
+    for (const auto &QI : QualifiedImports) {
+      auto &Decls = QI.getSecond();
+      Results.append(Decls.begin(), Decls.end());
+    }
     for (const ModuleDecl *import : Modules) {
       import->getDisplayDecls(Results, Recursive);
     }
@@ -1841,6 +1864,8 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
       if (existingDiagLoc.isValid()) {
         getASTContext().Diags.diagnose(existingDiagLoc,
                            diag::attr_ApplicationMain_script_here);
+        getASTContext().Diags.diagnose(existingDiagLoc,
+                           diag::attr_ApplicationMain_parse_as_library);
       }
     }
   }
@@ -2438,28 +2463,33 @@ bool SourceFile::hasTestableOrPrivateImport(
       });
 }
 
-bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
-  // Implementation-only imports are (currently) always source-file-specific,
-  // so if we don't have any, we know the search is complete.
-  if (!hasImplementationOnlyImports())
-    return false;
-
+RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
+  RestrictedImportKind importKind = RestrictedImportKind::Implicit;
+
+  if (module->getName().str() == CLANG_HEADER_MODULE_NAME)
+    return RestrictedImportKind::None;
 
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
     // Ignore implementation-only imports.
-    if (desc.options.contains(ImportFlags::ImplementationOnly))
+    if (desc.options.contains(ImportFlags::ImplementationOnly)) {
+      if (imports.isImportedBy(module, desc.module.importedModule))
+        importKind = RestrictedImportKind::ImplementationOnly;
       continue;
+    }
 
-    // If the module is imported this way, it's not imported
+    // If the module is imported publicly, it's not imported
     // implementation-only.
     if (imports.isImportedBy(module, desc.module.importedModule))
-      return false;
+      return RestrictedImportKind::None;
   }
 
   // Now check this file's enclosing module in case there are re-exports.
-  return !imports.isImportedBy(module, getParentModule());
+  if (imports.isImportedBy(module, getParentModule()))
+    return RestrictedImportKind::None;
+
+  return importKind;
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {

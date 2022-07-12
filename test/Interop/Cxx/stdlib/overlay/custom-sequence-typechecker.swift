@@ -1,6 +1,4 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
-//
-// REQUIRES: OS=macosx || OS=linux-gnu
 
 import CustomSequence
 import Cxx

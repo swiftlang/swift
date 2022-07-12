@@ -2033,6 +2033,24 @@ FUNCTION(EndAsyncLet,
          ATTRS(NoUnwind),
          EFFECT(Concurrency))
 
+/// void swift_task_run_inline(
+///     OpaqueValue *result,
+///     void *closureAFP,
+///     OpaqueValue *closureContext,
+///     const Metadata *futureResultType
+/// )
+FUNCTION(TaskRunInline,
+         swift_task_run_inline, SwiftCC,
+         TaskRunInlineAvailability,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy,       // OpaqueValue *result
+              Int8PtrTy,         // void *closure
+              OpaquePtrTy,       // OpaqueValue *closureContext
+              TypeMetadataPtrTy, // const Metadata *futureResultType
+         ),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect))
+
 // void swift_taskGroup_initialize(TaskGroup *group);
 FUNCTION(TaskGroupInitialize,
          swift_taskGroup_initialize, SwiftCC,

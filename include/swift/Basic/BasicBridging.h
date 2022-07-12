@@ -40,15 +40,6 @@ void OStream_write(BridgedOStream os, BridgedStringRef str);
 
 void freeBridgedStringRef(BridgedStringRef str);
 
-//===----------------------------------------------------------------------===//
-// Source location
-//===----------------------------------------------------------------------===//
-
-typedef struct {
-  swift::SourceLoc start;
-  SwiftInt byteLength;
-} BridgedCharSourceRange;
-
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif

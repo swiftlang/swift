@@ -117,8 +117,15 @@ WARNING(nonmutating_without_mutable_fields,none,
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
+WARNING(glibc_not_found, none,
+        "glibc not found for '%0'; C stdlib may be unavailable",
+        (StringRef))
 WARNING(libstdcxx_not_found, none,
         "libstdc++ not found for '%0'; C++ stdlib may be unavailable",
+        (StringRef))
+
+WARNING(too_many_class_template_instantiations, none,
+        "template instantiation for '%0' not imported: too many instantiations",
         (StringRef))
 
 NOTE(macro_not_imported_unsupported_operator, none, "operator not supported in macro arithmetic", ())

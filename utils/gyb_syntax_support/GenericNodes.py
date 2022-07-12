@@ -67,20 +67,11 @@ GENERIC_NODES = [
     Node('PrimaryAssociatedTypeList', kind='SyntaxCollection',
          element='PrimaryAssociatedType'),
 
-    # primary-associated-type -> type-name
-    #                          | type-name (: type-identifier)? (= type)?
+    # primary-associated-type -> type-name ','?
     Node('PrimaryAssociatedType', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
-             Child('Attributes', kind='AttributeList',
-                   collection_element_name='Attribute', is_optional=True),
              Child('Name', kind='IdentifierToken'),
-             Child('Colon', kind='ColonToken',
-                   is_optional=True),
-             Child('InheritedType', kind='Type',
-                   is_optional=True),
-             Child('Initializer', kind='TypeInitializerClause',
-                   is_optional=True),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),

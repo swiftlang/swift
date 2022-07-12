@@ -476,17 +476,28 @@ struct MoveOnlyChecker {
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks)
       : fn(fn), copyOfBorrowedProjectionChecker(deBlocks) {}
 
+  /// Search through the current function for candidate mark_must_check
+  /// [noimplicitcopy]. If we find one that does not fit a pattern that we
+  /// understand, emit an error diagnostic telling the programmer that the move
+  /// checker did not know how to recognize this code pattern.
+  ///
+  /// \returns true if we deleted a mark_must_check inst that we didn't
+  /// recognize after emitting the diagnostic.
+  bool searchForCandidateMarkMustChecks();
+
   bool check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
              DominanceInfo *domTree);
 };
 
 } // namespace
 
-bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                            DominanceInfo *domTree) {
+bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
+  bool changed = false;
   for (auto &block : *fn) {
-    for (auto &ii : block) {
-      auto *mmci = dyn_cast<MarkMustCheckInst>(&ii);
+    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
+      auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
+      ++ii;
+
       if (!mmci || !mmci->isNoImplicitCopy())
         continue;
 
@@ -496,6 +507,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
           if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
             if (bbi->isLexical()) {
               moveIntroducersToProcess.insert(mmci);
+              continue;
             }
           }
         }
@@ -505,11 +517,44 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
           if (bbi->isLexical()) {
             moveIntroducersToProcess.insert(mmci);
+            continue;
           }
         }
       }
+
+      // If we see a mark_must_check that is marked no implicit copy that we
+      // don't understand, emit a diagnostic to fail the compilation. This
+      // ensures that if someone marks something no implicit copy and we fail to
+      // check it, we fail the compilation.
+      //
+      // We then RAUW the mark_must_check once we have emitted the error since
+      // later passes expect that mark_must_check has been eliminated by
+      // us. Since we are failing already, this is ok to do.
+      diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
+               diag::sil_moveonlychecker_not_understand_mark_move);
+      mmci->replaceAllUsesWith(mmci->getOperand());
+      mmci->eraseFromParent();
+      changed = true;
     }
   }
+  return changed;
+}
+
+bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                            DominanceInfo *domTree) {
+  bool changed = false;
+
+  // First search for candidates to process and emit diagnostics on any
+  // mark_must_check [noimplicitcopy] we didn't recognize.
+  changed |= searchForCandidateMarkMustChecks();
+
+  // If we didn't find any introducers to check, just return changed.
+  //
+  // NOTE: changed /can/ be true here if we had any mark_must_check
+  // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
+  // and then deleting.
+  if (moveIntroducersToProcess.empty())
+    return changed;
 
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
@@ -518,7 +563,6 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
         instToDelete->eraseFromParent();
       });
   InstructionDeleter deleter(std::move(callbacks));
-  bool changed = false;
 
   SmallVector<Operand *, 32> consumingUsesNeedingCopy;
   auto foundConsumingUseNeedingCopy = [&](Operand *use) {

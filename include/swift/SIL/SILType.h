@@ -93,11 +93,11 @@ class SILParser;
 /// In addition to the Swift type system, SIL adds "address" types that can
 /// reference any Swift type (but cannot take the address of an address). *T
 /// is the type of an address pointing at T.
-///
 class SILType {
 public:
   /// The unsigned is a SILValueCategory.
   using ValueType = llvm::PointerIntPair<TypeBase *, 2, unsigned>;
+
 private:
   ValueType value;
 
@@ -151,7 +151,7 @@ public:
 
   /// Returns the \p Category variant of this type.
   SILType getCategoryType(SILValueCategory Category) const {
-    return SILType(getASTType(), Category);
+    return SILType(getRawASTType(), Category);
   }
 
   /// Returns the variant of this type that matches \p Ty.getCategory()
@@ -194,7 +194,6 @@ public:
     return removingMoveOnlyWrapper().getRawASTType();
   }
 
-private:
   /// Returns the canonical AST type references by this SIL type without looking
   /// through move only. Should only be used by internal utilities of SILType.
   CanType getRawASTType() const { return CanType(value.getPointer()); }
@@ -607,7 +606,7 @@ public:
   /// Canonical way to check if a SILType is move only. Using is/getAs/castTo
   /// will look through moveonly-ness.
   bool isMoveOnlyWrapped() const {
-    return getRawASTType()->is<SILMoveOnlyType>();
+    return getRawASTType()->is<SILMoveOnlyWrappedType>();
   }
 
   /// If this is already a move only wrapped type, return *this. Otherwise, wrap
@@ -615,7 +614,7 @@ public:
   SILType addingMoveOnlyWrapper() const {
     if (isMoveOnlyWrapped())
       return *this;
-    auto newType = SILMoveOnlyType::get(getRawASTType());
+    auto newType = SILMoveOnlyWrappedType::get(getRawASTType());
     return SILType::getPrimitiveType(newType, getCategory());
   }
 
@@ -624,7 +623,7 @@ public:
   SILType removingMoveOnlyWrapper() const {
     if (!isMoveOnlyWrapped())
       return *this;
-    auto moveOnly = getRawASTType()->castTo<SILMoveOnlyType>();
+    auto moveOnly = getRawASTType()->castTo<SILMoveOnlyWrappedType>();
     return SILType::getPrimitiveType(moveOnly->getInnerType(), getCategory());
   }
 

@@ -589,6 +589,10 @@ importer::getNormalInvocationArguments(
     });
   }
 
+  if (auto path = getCxxShimModuleMapPath(searchPathOpts, triple)) {
+    invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
+  }
+
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -694,13 +698,6 @@ importer::getNormalInvocationArguments(
         invocationArgStrs.insert(invocationArgStrs.end(), {"-D_AMD64_"});
         break;
       }
-    }
-
-    SmallString<128> buffer;
-    if (auto path = getGlibcModuleMapPath(searchPathOpts, triple, buffer)) {
-      invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
-    } else {
-      // FIXME: Emit a warning of some kind.
     }
   }
 
@@ -4441,10 +4438,12 @@ DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
     derived = derived->wrapInPointer(PTK_UnsafePointer);
   }
 
-  // Lookup our static cast helper function.
-  // TODO: change this to stdlib or something.
-  auto wrapperModule =
-      ctx.getClangModuleLoader()->getWrapperForModule(owningModule);
+  // Lookup our static cast helper function in the C++ shim module.
+  auto wrapperModule = ctx.getLoadedModule(ctx.getIdentifier("CxxShim"));
+  assert(wrapperModule &&
+         "CxxShim module is required when using members of a base class. "
+         "Make sure you `import CxxShim`.");
+
   SmallVector<ValueDecl *, 1> results;
   ctx.lookupInModule(wrapperModule, "__swift_interopStaticCast", results);
   assert(

@@ -26,8 +26,8 @@ public protocol IOIProtocol {}
 
 @_spi(A) @_implementationOnly import Lib
 
-@_spi(B) public func leakSPIStruct(_ a: SPIStruct) -> SPIStruct { fatalError() } // expected-warning 2 {{cannot use struct 'SPIStruct' in SPI; 'Lib' has been imported as implementation-only}}
-@_spi(B) public func leakIOIStruct(_ a: IOIStruct) -> IOIStruct { fatalError() } // expected-warning 2 {{cannot use struct 'IOIStruct' in SPI; 'Lib' has been imported as implementation-only}}
+@_spi(B) public func leakSPIStruct(_ a: SPIStruct) -> SPIStruct { fatalError() } // expected-warning 2 {{cannot use struct 'SPIStruct' here; 'Lib' has been imported as implementation-only}}
+@_spi(B) public func leakIOIStruct(_ a: IOIStruct) -> IOIStruct { fatalError() } // expected-warning 2 {{cannot use struct 'IOIStruct' here; 'Lib' has been imported as implementation-only}}
 
 public struct PublicStruct : IOIProtocol, SPIProtocol { // expected-error {{cannot use protocol 'IOIProtocol' here; 'Lib' has been imported as implementation-only}}
 // expected-error @-1 {{cannot use protocol 'SPIProtocol' here; 'Lib' has been imported as implementation-only}}
@@ -46,8 +46,8 @@ public struct PublicStruct : IOIProtocol, SPIProtocol { // expected-error {{cann
 }
 
 @_spi(B)
-public struct LocalSPIStruct : IOIProtocol, SPIProtocol { // expected-warning {{cannot use protocol 'IOIProtocol' in SPI; 'Lib' has been imported as implementation-only}}
-// expected-warning @-1 {{cannot use protocol 'SPIProtocol' in SPI; 'Lib' has been imported as implementation-only}}
+public struct LocalSPIStruct : IOIProtocol, SPIProtocol { // expected-warning {{cannot use protocol 'IOIProtocol' here; 'Lib' has been imported as implementation-only}}
+// expected-warning @-1 {{cannot use protocol 'SPIProtocol' here; 'Lib' has been imported as implementation-only}}
 }
 
 #endif

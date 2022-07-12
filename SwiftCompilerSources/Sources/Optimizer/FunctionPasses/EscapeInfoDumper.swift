@@ -21,29 +21,35 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
   (function: Function, context: PassContext) in
 
   print("Escape information for \(function.name):")
-
-  var escapeInfo = EscapeInfo(calleeAnalysis: context.calleeAnalysis)
-
+  
+  struct Visitor : EscapeInfoVisitor {
+    var results: Set<String> =  Set()
+    
+    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+      if operand.instruction is ReturnInst {
+        results.insert("return[\(path)]")
+        return .ignore
+      }
+      return .continueWalk
+    }
+    
+    mutating func visitDef(def: Value, path: Path, state: State) -> DefResult {
+      guard let arg = def as? FunctionArgument else {
+        return .continueWalkUp
+      }
+      results.insert("arg\(arg.index)[\(path)]")
+      return .walkDown
+    }
+  }
+  
+  
   for block in function.blocks {
     for inst in block.instructions {
       if let allocRef = inst as? AllocRefInst {
-        var results = Set<String>() 
-      
-        let escapes = escapeInfo.isEscaping(object: allocRef,
-          visitUse: { op, path, _ in
-            if op.instruction is ReturnInst {
-              results.insert("return[\(path)]")
-              return .ignore
-            }
-            return .continueWalking
-          },
-          visitDef: { def, path, followStores in
-            guard let arg = def as? FunctionArgument else {
-              return .continueWalkingUp
-            }
-            results.insert("arg\(arg.index)[\(path)]")
-            return .continueWalkingDown
-          })
+        
+        var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: Visitor())
+        let escapes = walker.isEscaping(object: allocRef)
+        let results = walker.visitor.results
         
         let res: String
         if escapes {
@@ -59,6 +65,7 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
   }
   print("End function \(function.name)\n")
 })
+
 
 /// Dumps the results of address-related escape analysis.
 ///
@@ -86,30 +93,35 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
       }
     }
   }
-
-  var escapeInfo = EscapeInfo(calleeAnalysis: context.calleeAnalysis)
+  
+  struct Visitor : EscapeInfoVisitor {
+    let apply: Instruction
+    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+      let user = operand.instruction
+      if user == apply {
+        return .abort
+      }
+      if user is ReturnInst {
+        // Anything which is returned cannot escape to an instruction inside the function.
+        return .ignore
+      }
+      return .continueWalk
+    }
+  }
 
   // test `isEscaping(addressesOf:)`
   for value in valuesToCheck {
     print("value:\(value)")
     for apply in applies {
       let path = AliasAnalysis.getPtrOrAddressPath(for: value)
-      let escaping = escapeInfo.isEscaping(addressesOf: value, path: path,
-        visitUse: { op, _, _ in
-              let user = op.instruction
-              if user == apply {
-                return .markEscaping
-              }
-              if user is ReturnInst {
-                // Anything which is returned cannot escape to an instruction inside the function.
-                return .ignore
-              }
-              return .continueWalking
-            })
+      
+      var escapeInfo = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: Visitor(apply: apply))
+      let escaping = escapeInfo.isEscaping(addressesOf: value, path: path)
       print("  \(escaping ? "==>" : "-  ") \(apply)")
     }
   }
   
+  var eaa = EscapeAliasAnalysis(calleeAnalysis: context.calleeAnalysis)
   // test `canReferenceSameField` for each pair of `fix_lifetime`.
   if !valuesToCheck.isEmpty {
     for lhsIdx in 0..<(valuesToCheck.count - 1) {
@@ -119,7 +131,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
         let rhs = valuesToCheck[rhsIdx]
         print(lhs)
         print(rhs)
-        if escapeInfo.canReferenceSameField(
+        if eaa.canReferenceSameField(
             lhs, path: AliasAnalysis.getPtrOrAddressPath(for: lhs),
             rhs, path: AliasAnalysis.getPtrOrAddressPath(for: rhs)) {
           print("may alias")

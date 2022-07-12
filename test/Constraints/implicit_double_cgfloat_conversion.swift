@@ -216,3 +216,49 @@ func test_multi_argument_conversion_with_optional(d: Double, cgf: CGFloat) {
 
   test(cgf, d) // Ok (CGFloat -> Double and Double? -> CGFloat?)
 }
+
+extension CGFloat: Hashable {
+  public func hash(into hasher: inout Hasher) { fatalError() }
+}
+
+func test_collection_literals_as_call_arguments() {
+  enum E {
+    case test_arr([CGFloat])
+    case test_dict_key([CGFloat: String])
+    case test_dict_value([String: CGFloat])
+    case test_arr_nested([String: [[CGFloat]: String]])
+    case test_dict_nested([String: [String: CGFloat]])
+  }
+
+  struct Container {
+    var prop: E
+  }
+
+  struct Point {
+    var x: Double
+    var y: Double
+  }
+
+  func test(cont: inout Container, point: Point) {
+    cont.prop = .test_arr([point.x]) // Ok
+    cont.prop = .test_dict_key([point.y: ""]) // Ok
+    cont.prop = .test_dict_value(["": point.y]) // Ok
+    cont.prop = .test_arr_nested(["": [[point.x]: ""]]) // Ok
+    cont.prop = .test_dict_nested(["": ["": point.x]]) // Ok
+  }
+}
+
+func assignments_with_and_without_optionals() {
+  class C {
+    var prop: CGFloat = 0
+  }
+
+  func test(c: C?, v: Double, cgf: CGFloat) {
+    c?.prop = v / 2.0 // Ok
+    c?.prop = (false ? cgf : v)
+
+    let copy = c!
+    copy.prop = Optional(v) ?? 0 // Ok
+    copy.prop = (true ? cgf : (false ? v : cgf))
+  }
+}

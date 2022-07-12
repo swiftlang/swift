@@ -2801,6 +2801,11 @@ ManglingError Remangler::mangleIsSerialized(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleMetatypeParamsRemoved(Node *node, unsigned depth) {
+  Buffer << 'm';
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleStatic(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << 'Z';
@@ -3496,6 +3501,29 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
     Buffer << "Xg";
 
   return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSymbolicExtendedExistentialType(Node *node,
+                                                     unsigned int depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth+1));
+  for (auto arg: *node->getChild(1))
+    RETURN_IF_ERROR(mangle(arg, depth+1));
+  if (node->getNumChildren() > 2)
+    for (auto conf: *node->getChild(2))
+      RETURN_IF_ERROR(mangle(conf, depth+1));
+  return ManglingError::Success;
+}
+ManglingError Remangler::
+mangleUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  // We don't support absolute references in the mangling of these
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+ManglingError Remangler::
+mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  // We don't support absolute references in the mangling of these
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 } // anonymous namespace

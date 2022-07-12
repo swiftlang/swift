@@ -350,11 +350,24 @@ extension _${U}Int128: FixedWidthInteger {
   ) -> (high: Self, low: Magnitude) {
     let isNegative = Self.isSigned && (self._isNegative != other._isNegative)
 
+    func sum(_ x: Low, _ y: Low) -> (high: Low, low: Low) {
+      let (sum, overflow) = x.addingReportingOverflow(y)
+      return (overflow ? 1 : 0, sum)
+    }
+
     func sum(_ x: Low, _ y: Low, _ z: Low) -> (high: Low, low: Low) {
-      let (sum1, overflow1) = x.addingReportingOverflow(y)
-      let (sum2, overflow2) = sum1.addingReportingOverflow(z)
-      let carry: Low = (overflow1 ? 1 : 0) + (overflow2 ? 1 : 0)
-      return (carry, sum2)
+      let s1 = sum(x, y)
+      let s2 = sum(s1.low, z)
+      return (s1.high &+ s2.high, s2.low)
+    }
+
+    func sum(
+      _ x0: Low, _ x1: Low, _ x2: Low, _ x3: Low
+    ) -> (high: Low, low: Low) {
+      let s1 = sum(x0, x1)
+      let s2 = sum(x2, x3)
+      let s = sum(s1.low, s2.low)
+      return (s1.high &+ s2.high &+ s.high, s.low)
     }
 
     let lhs = self.magnitude
@@ -366,12 +379,14 @@ extension _${U}Int128: FixedWidthInteger {
     let d = rhs.high.multipliedFullWidth(by: lhs.high)
 
     let mid1 = sum(a.high, b.low, c.low)
-    let mid2 = sum(b.high, c.high, d.low)
+    let mid2 = sum(b.high, c.high, mid1.high, d.low)
 
-    let low = _UInt128(high: mid1.low, low: a.low)
     let high = _${U}Int128(
-      high: High(mid2.high + d.high),
-      low: mid1.high + mid2.low)
+      high: High(d.high &+ mid2.high), // Note: this addition will never wrap
+      low: mid2.low)
+    let low = _UInt128(
+      high: mid1.low,
+      low: a.low)
 
     if isNegative {
       let (lowComplement, overflow) = (~low).addingReportingOverflow(.one)

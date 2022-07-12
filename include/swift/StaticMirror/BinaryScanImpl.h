@@ -34,6 +34,8 @@ struct swift_static_mirror_type_alias_s {
   swift_static_mirror_string_ref_t type_alias_name;
   swift_static_mirror_string_ref_t substituted_type_name;
   swift_static_mirror_string_ref_t substituted_type_mangled_name;
+  swift_static_mirror_string_set_t *opaque_protocol_requirements_set;
+  swift_static_mirror_type_alias_set_t *opaque_same_type_requirements_set;
 };
 
 struct swift_static_mirror_associated_type_info_s {

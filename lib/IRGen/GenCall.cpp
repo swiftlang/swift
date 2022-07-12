@@ -2917,8 +2917,19 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
   llvm::CallInst *call =
       IRBuilderBase::CreateCall(fnTy, fn.getRawPointer(), args, bundles);
 
-  call->setAttributes(
-      fixUpTypesInByValAndStructRetAttributes(fnTy, fn.getAttributes()));
+  llvm::AttributeList attrs = fn.getAttributes();
+  // If a parameter of a function is SRet, the corresponding argument should be
+  // wrapped in SRet(...).
+  if (auto func = dyn_cast<llvm::Function>(fn.getRawPointer())) {
+    for (unsigned argIndex = 0; argIndex < func->arg_size(); ++argIndex) {
+      if (func->hasParamAttribute(argIndex, llvm::Attribute::StructRet)) {
+        llvm::AttrBuilder builder;
+        builder.addStructRetAttr(nullptr);
+        attrs = attrs.addParamAttributes(func->getContext(), argIndex, builder);
+      }
+    }
+  }
+  call->setAttributes(fixUpTypesInByValAndStructRetAttributes(fnTy, attrs));
   call->setCallingConv(fn.getCallingConv());
   return call;
 }

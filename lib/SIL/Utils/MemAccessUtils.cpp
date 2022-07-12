@@ -2436,6 +2436,11 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       visitor(&builtin->getAllOperands()[2]);
       return;
 
+    // Writes back to the first operand.
+    case BuiltinValueKind::TaskRunInline:
+      visitor(&builtin->getAllOperands()[0]);
+      return;
+
     // These effect both operands.
     case BuiltinValueKind::Move:
     case BuiltinValueKind::Copy:

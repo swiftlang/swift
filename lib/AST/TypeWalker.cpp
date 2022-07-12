@@ -234,7 +234,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getCaptureType());
   }
 
-  bool visitSILMoveOnlyType(SILMoveOnlyType *ty) {
+  bool visitSILMoveOnlyWrappedType(SILMoveOnlyWrappedType *ty) {
     return doIt(ty->getInnerType());
   }
 

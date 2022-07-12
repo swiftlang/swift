@@ -1,9 +1,6 @@
 #ifndef TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_INLINE_H
 #define TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_INLINE_H
 
-template <class From, class To>
-To __swift_interopStaticCast(From from) { return from; }
-
 struct LoadableIntWrapper {
   int value;
   LoadableIntWrapper operator-(LoadableIntWrapper rhs) {
@@ -23,6 +20,16 @@ struct LoadableIntWrapper {
   LoadableIntWrapper &operator++() {
     value++;
     return *this;
+  }
+
+  // Friend functions
+  friend bool operator==(const LoadableIntWrapper lhs,
+                         const LoadableIntWrapper &rhs) {
+    return lhs.value == rhs.value;
+  }
+
+  friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
+    return LoadableIntWrapper{.value = -obj.value};
   }
 };
 

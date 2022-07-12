@@ -25,10 +25,10 @@ func testOptional(obj: P) {
 
 
 func test_double_cgfloat_conversion_filtering(d: Double, cgf: CGFloat) {
-  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).CGFloat.init(_:)@{{.*}} : (CGFloat.Type) -> (Double) -> CGFloat {{.*}} -> implicit conversion [Double-to-CGFloat] -> apply function -> constructor member
+  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).CGFloat.init(_:)@{{.*}} : (CGFloat.Type) -> (Double) -> CGFloat
   let _: CGFloat = d
 
-  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).Double extension.init(_:)@{{.*}} : (Double.Type) -> (CGFloat) -> Double {{.*}} -> implicit conversion [CGFloat-to-Double] -> apply function -> constructor member
+  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).Double extension.init(_:)@{{.*}} : (Double.Type) -> (CGFloat) -> Double
   let _: Double = cgf
 
   func test_optional_cgf(_: CGFloat??) {
@@ -37,9 +37,9 @@ func test_double_cgfloat_conversion_filtering(d: Double, cgf: CGFloat) {
   func test_optional_double(_: Double??) {
   }
 
-  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).CGFloat.init(_:)@{{.*}} : (CGFloat.Type) -> (Double) -> CGFloat {{.*}} -> implicit conversion [Double-to-CGFloat] -> apply function -> constructor member
+  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).CGFloat.init(_:)@{{.*}} : (CGFloat.Type) -> (Double) -> CGFloat
   test_optional_cgf(d)
 
-  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).Double extension.init(_:)@{{.*}} : (Double.Type) -> (CGFloat) -> Double {{.*}} -> implicit conversion [CGFloat-to-Double] -> apply function -> constructor member
+  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).Double extension.init(_:)@{{.*}} : (Double.Type) -> (CGFloat) -> Double
   test_optional_double(cgf)
 }

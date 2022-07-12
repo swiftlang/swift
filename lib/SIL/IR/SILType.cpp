@@ -295,7 +295,7 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
   // If this type is not a class type, then we propagate "move only"-ness to the
   // field. Example:
   if (!getClassOrBoundGenericClass() && isMoveOnlyWrapped())
-    loweredTy = SILMoveOnlyType::get(loweredTy);
+    loweredTy = SILMoveOnlyWrappedType::get(loweredTy);
 
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
     return SILType::getPrimitiveAddressType(loweredTy);
