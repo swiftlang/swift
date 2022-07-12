@@ -2795,14 +2795,6 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
                     });
 }
 
-static bool isNonGenericTypeAliasType(Type type) {
-  // A non-generic typealias can extend a specialized type.
-  if (auto *aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
-    return aliasType->getDecl()->getGenericContextDepth() == (unsigned)-1;
-
-  return false;
-}
-
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
