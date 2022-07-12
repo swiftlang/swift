@@ -1450,6 +1450,10 @@ public:
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
   void emitOpaqueTypeDecl(OpaqueTypeDecl *D);
+  /// This method does additional checking vs. \c emitOpaqueTypeDecl
+  /// based on the state and flags associated with the module.
+  void maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *D);
+
   void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
   void emitSILFunction(SILFunction *f);
@@ -1772,7 +1776,6 @@ private:
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(GenericTypeDecl *nominal);
-  void maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque);
 
   /// Add all conformances of the given \c IterableDeclContext
   /// LazyWitnessTables.
