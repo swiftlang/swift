@@ -286,3 +286,18 @@ func look_through_parens_when_checking_inout() {
   modifyPoint((&point), 0) // expected-error {{use of extraneous '&}} {{16-17=(}} {{15-16=&}}
   modifyPoint((&point), msg: "") // expected-error {{use of extraneous '&}} {{16-17=(}} {{15-16=&}}
 }
+
+// rdar://96631324 - compiler crash while producing diagnostics
+func test_incorrect_inout_at_assignment_source() {
+  class S {
+    var prop: String = ""
+  }
+
+  func test(s: S) {
+    let str: String = ""
+    let val: Int = 0
+
+    s.prop = &str // expected-error {{use of extraneous '&'}}
+    s.prop = &val // expected-error {{use of extraneous '&'}}
+  }
+}
