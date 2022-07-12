@@ -469,7 +469,7 @@ DECL_NODES = [
              Child('Modifiers', kind='ModifierList',
                    collection_element_name='Modifier', is_optional=True),
              Child('DeinitKeyword', kind='DeinitToken'),
-             Child('Body', kind='CodeBlock'),
+             Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
     Node('SubscriptDecl', kind='Decl',
