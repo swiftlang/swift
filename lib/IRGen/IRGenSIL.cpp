@@ -2231,6 +2231,22 @@ void IRGenSILFunction::emitSILFunction() {
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
+  if (CurSILFn->getLinkage() == SILLinkage::Shared) {
+    if (auto *V = CurSILFn->getLocation().getAsASTNode<ValueDecl>()) {
+      bool alwaysEmitIntoClient =
+          V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+      auto *opaqueResult = V->getOpaqueResultTypeDecl();
+      // `@_alwaysEmitIntoClient` declaration with opaque result
+      // has to emit opaque type descriptor into client module
+      // when it has availability conditions because the underlying
+      // type in such cases is unknown until runtime.
+      if (alwaysEmitIntoClient && opaqueResult &&
+          opaqueResult->hasConditionallyAvailableSubstitutions()) {
+        IGM.maybeEmitOpaqueTypeDecl(opaqueResult);
+      }
+    }
+  }
+
   auto funcTy = CurSILFn->getLoweredFunctionType();
   bool isAsyncFn = funcTy->isAsync();
   if (isAsyncFn && funcTy->getLanguage() == SILFunctionLanguage::Swift) {
