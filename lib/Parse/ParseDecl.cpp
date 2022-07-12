@@ -2033,12 +2033,19 @@ static AttrOptionSwitch<R>
 parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
                       StringRef AttrName, DeclAttrKind DK) {
   bool isModifier = DeclAttribute::isDeclModifier(DK);
-  if (!P.consumeIf(tok::l_paren)) {
+  if (!P.Tok.is(tok::l_paren)) {
     AttrRange = SourceRange(Loc);
     // Create an AttrOptionSwitch with an empty value. The calls on it will
     // decide whether or not that's valid.
     return AttrOptionSwitch<R>(StringRef(), P, Loc, AttrName, isModifier);
   }
+
+  llvm::Optional<SyntaxParsingContext> ModDetailContext;
+  if (DK == DAK_ReferenceOwnership) {
+    ModDetailContext.emplace(P.SyntaxContext, SyntaxKind::DeclModifierDetail);
+  }
+
+  P.consumeToken(tok::l_paren);
 
   StringRef parsedName = P.Tok.getText();
   if (!P.consumeIf(tok::identifier)) {
@@ -2288,7 +2295,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .Case("public", AccessLevel::Public)
       .Case("open", AccessLevel::Open);
 
-    if (!consumeIf(tok::l_paren)) {
+    if (!Tok.is(tok::l_paren)) {
       // Normal access control attribute.
       AttrRange = Loc;
       DuplicateAttribute = Attributes.getAttribute<AccessControlAttr>();
@@ -2296,6 +2303,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         Attributes.add(new (Context) AccessControlAttr(AtLoc, Loc, access));
       break;
     }
+
+    SyntaxParsingContext ModDetailContext(
+        SyntaxContext, SyntaxKind::DeclModifierDetail);
+
+    consumeToken(tok::l_paren);
 
     // Parse the subject.
     if (Tok.isContextualKeyword("set")) {

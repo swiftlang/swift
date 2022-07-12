@@ -18,7 +18,8 @@ DeclModifierSyntax getCannedDeclModifier(const RC<SyntaxArena> &Arena) {
   auto LParen = Factory.makeLeftParenToken("", "");
   auto Set = Factory.makeIdentifier("set", "", "");
   auto RParen = Factory.makeRightParenToken("", "");
-  return Factory.makeDeclModifier(Private, LParen, Set, RParen);
+  return Factory.makeDeclModifier(
+      Private, Factory.makeDeclModifierDetail(LParen, Set, RParen));
 }
 
 TEST(DeclSyntaxTests, DeclModifierMakeAPIs) {
@@ -45,12 +46,13 @@ TEST(DeclSyntaxTests, DeclModifierGetAPIs) {
   auto LParen = Factory.makeLeftParenToken("", "");
   auto Set = Factory.makeIdentifier("set", "", "");
   auto RParen = Factory.makeRightParenToken("", "");
-  auto Mod = Factory.makeDeclModifier(Private, LParen, Set, RParen);
+  auto Mod = Factory.makeDeclModifier(
+      Private, Factory.makeDeclModifierDetail(LParen, Set, RParen));
 
   ASSERT_EQ(Private.getRaw(), Mod.getName().getRaw());
-  ASSERT_EQ(LParen.getRaw(), Mod.getDetailLeftParen()->getRaw());
-  ASSERT_EQ(Set.getRaw(), Mod.getDetail()->getRaw());
-  ASSERT_EQ(RParen.getRaw(), Mod.getDetailRightParen()->getRaw());
+  ASSERT_EQ(LParen.getRaw(), Mod.getDetail()->getLeftParen().getRaw());
+  ASSERT_EQ(Set.getRaw(), Mod.getDetail()->getDetail().getRaw());
+  ASSERT_EQ(RParen.getRaw(), Mod.getDetail()->getRightParen().getRaw());
 }
 
 TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
@@ -65,9 +67,7 @@ TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
   llvm::raw_svector_ostream OS(Scratch);
   Factory.makeBlankDeclModifier()
       .withName(Private)
-      .withDetailLeftParen(LParen)
-      .withDetail(Set)
-      .withDetailRightParen(RParen)
+      .withDetail(Factory.makeDeclModifierDetail(LParen, Set, RParen))
       .print(OS);
   ASSERT_EQ(OS.str().str(), "private(set)");
 }
@@ -509,11 +509,15 @@ ModifierListSyntax getCannedModifiers(const RC<SyntaxArena> &Arena) {
   auto NoArgument = TokenSyntax::missingToken(tok::identifier, "", Arena);
   auto NoRParen = TokenSyntax::missingToken(tok::r_paren, ")", Arena);
   auto Public =
-      Factory.makeDeclModifier(PublicID, NoLParen, NoArgument, NoRParen);
+      Factory.makeDeclModifier(
+         PublicID,
+        Factory.makeDeclModifierDetail(NoLParen, NoArgument, NoRParen));
 
   auto StaticKW = Factory.makeStaticKeyword("", " ");
   auto Static =
-      Factory.makeDeclModifier(StaticKW, NoLParen, NoArgument, NoRParen);
+      Factory.makeDeclModifier(
+        StaticKW,
+        Factory.makeDeclModifierDetail(NoLParen, NoArgument, NoRParen));
 
   return Factory.makeBlankModifierList().appending(Public).appending(Static);
 }

@@ -162,6 +162,14 @@ DECL_NODES = [
              Child('LineNumber', kind='IntegerLiteralToken'),
          ]),
 
+    Node('DeclModifierDetail', kind='Syntax',
+         traits=['Parenthesized'],
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Detail', kind='IdentifierToken'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
     Node('DeclModifier', kind='Syntax',
          children=[
              Child('Name', kind='Token', classification='Attribute',
@@ -174,9 +182,7 @@ DECL_NODES = [
                        'actor', 'async', 'distributed', 'isolated',
                        'nonisolated', '_const', '_local'
                    ]),
-             Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
-             Child('Detail', kind='IdentifierToken', is_optional=True),
-             Child('DetailRightParen', kind='RightParenToken', is_optional=True),
+             Child('Detail', kind='DeclModifierDetail', is_optional=True),
          ]),
 
     Node('InheritedType', kind='Syntax',
@@ -500,11 +506,7 @@ DECL_NODES = [
     Node('AccessLevelModifier', kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
-             Child('LeftParen', kind='LeftParenToken',
-                   is_optional=True),
-             Child('Modifier', kind='IdentifierToken',
-                   is_optional=True),
-             Child('RightParen', kind='RightParenToken',
+             Child('Modifier', kind='DeclModifierDetail',
                    is_optional=True),
          ]),
 
