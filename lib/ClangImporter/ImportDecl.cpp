@@ -3209,11 +3209,21 @@ namespace {
     AccessorDecl *tryCreateConstexprAccessor(const clang::VarDecl *clangVar,
                                              VarDecl *swiftVar) {
       assert(clangVar->isConstexpr());
+
+      // Taken from clang/AST/Decl.cpp
+      // We must check if this eval is not value dependent
+      // as the assert there will fail otherwise
+      clang::EvaluatedStmt *Eval = clangVar->ensureEvaluatedStmt();
+      const auto *Init = cast<clang::Expr>(Eval->Value);
+
+      // Bail if the assert in clang/AST/Decl will fail
+      if (Init->isValueDependent())
+        return nullptr;
+
       clangVar->evaluateValue();
       auto evaluated = clangVar->getEvaluatedValue();
       if (!evaluated)
         return nullptr;
-
       // If we have a constexpr var with an evaluated value, try to create an
       // accessor for it. If we can remove all references to the global (which
       // we should be able to do for constexprs) then we can remove the global
