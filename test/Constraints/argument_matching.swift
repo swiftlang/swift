@@ -1789,3 +1789,16 @@ func rdar93922410(_ completion: (Int?) -> Void) { // expected-note {{'completion
     return completion() // expected-error {{missing argument for parameter #1 in call}}
   }
 }
+
+// https://github.com/apple/swift/issues/43509
+do {
+  func myAssertionFailure(
+    _ message: @autoclosure () -> String = String(),
+    file: StaticString = #file, line: UInt = #line
+  ) {}
+
+  let x: Int?
+  myAssertionFailure(x != nil, "error")
+  // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
+  // expected-error@-2 {{missing argument label 'file:' in call}}
+}
