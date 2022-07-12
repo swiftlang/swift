@@ -144,7 +144,10 @@ build_target_toolchain() {
     -G Ninja \
     -S "$SOURCE_PATH/swift"
 
-  ninja install -C "$SWIFT_STDLIB_BUILD_DIR"
+  # FIXME(katei): 'sdk-overlay' is explicitly used to build libcxxshim.modulemap
+  # which is used only in tests, so 'ninja install' doesn't build it
+  # the header and modulemap custom targets should be added as dependency of install
+  ninja sdk-overlay install -C "$SWIFT_STDLIB_BUILD_DIR"
 
   # Link compiler-rt libs to stdlib build dir
   mkdir -p "$SWIFT_STDLIB_BUILD_DIR/lib/clang/10.0.0/"
