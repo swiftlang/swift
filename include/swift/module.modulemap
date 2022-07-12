@@ -6,6 +6,9 @@ module BasicBridging {
 
 module ASTBridging {
   header "AST/ASTBridging.h"
+  header "AST/DiagnosticEngine.h"
+  header "AST/DiagnosticConsumer.h"
+  requires cplusplus
   export *
 }
 
