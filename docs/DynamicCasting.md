@@ -665,7 +665,7 @@ let a = NSNumber()
 print(a is Any)
 ```
 
-* SR-2289: CF types cannot be cast to protocol existentials
+* [#44896](https://github.com/apple/swift/issues/44896): CF types cannot be cast to protocol existentials
 
 ```
 import Foundation
@@ -680,7 +680,7 @@ extension CFBitVector : P {
 print(CFBitVector.makeImmutable(from: [10,20]) is P)
 ```
 
-* SR-4552: Cannot cast `Optional<T> as Any` to protocol type.  Note that this is a particular problem for reflection with weak fields, since `Mirror` reflects those as `Any` containing an `Optional` value.
+* [#47129](https://github.com/apple/swift/issues/47129): Cannot cast `Optional<T> as Any` to protocol type.  Note that this is a particular problem for reflection with weak fields, since `Mirror` reflects those as `Any` containing an `Optional` value.
 
 ```
 protocol P {}
@@ -692,7 +692,7 @@ let a = c as? Any
 print(a is P)
 ```
 
-* SR-8964: `Any` containing `Optional<Any>` cannot cast to `Error`
+* [#51469](https://github.com/apple/swift/issues/51469): `Any` containing `Optional<Any>` cannot cast to `Error`
 
 ```
 struct MyError: Error { }
@@ -703,10 +703,10 @@ let b: Any = a
 print(b is Error)
 ```
 
-* SR-6126: Inconsistent results for nested optionals
+* [#48681](https://github.com/apple/swift/issues/48681): Inconsistent results for nested optionals
 
 ```
-// Note: SR-6126 includes many cases similar to the following
+// Note: This issue includes many cases similar to the following
 let x: Int? = nil
 print(x as Int??) // ==> "Optional(nil)"
 // Swift 5.3: prints "nil"
@@ -730,7 +730,7 @@ let a = NSObjectProtocol.self
 print(a is NSObjectProtocol.Type)
 ```
 
-* SR-1999: Cannot cast `Any` contents to a protocol type
+* [#44608](https://github.com/apple/swift/issues/44608): Cannot cast `Any` contents to a protocol type
 
 ```
 protocol P {}
