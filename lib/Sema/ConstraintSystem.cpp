@@ -3843,6 +3843,10 @@ SolutionResult ConstraintSystem::salvage() {
     // Solve the system.
     solveImpl(viable);
 
+    // If we hit a threshold, we're done.
+    if (isTooComplex(viable))
+      return SolutionResult::forTooComplex(getTooComplexRange());
+
     // Before removing any "fixed" solutions, let's check
     // if ambiguity is caused by fixes and diagnose if possible.
     if (diagnoseAmbiguityWithFixes(viable))
@@ -3887,9 +3891,6 @@ SolutionResult ConstraintSystem::salvage() {
 
     // Fall through to produce diagnostics.
   }
-
-  if (isTooComplex(viable))
-    return SolutionResult::forTooComplex(getTooComplexRange());
 
   // Could not produce a specific diagnostic; punt to the client.
   return SolutionResult::forUndiagnosedError();

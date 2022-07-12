@@ -1405,6 +1405,10 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 Optional<unsigned>
 ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
                                    bool minimize) {
+  // Don't spend time filtering solutions if we already hit a threshold.
+  if (isTooComplex(viable))
+    return None;
+
   if (viable.empty())
     return None;
   if (viable.size() == 1)
@@ -1449,6 +1453,10 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       bestIdx = i;
       break;
     }
+
+    // Give up if we're out of time.
+    if (isTooComplex(/*solutions=*/{}))
+      return None;
   }
 
   // Make sure that our current best is better than all of the solved systems.
@@ -1479,6 +1487,10 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       ambiguous = true;
       break;
     }
+
+    // Give up if we're out of time.
+    if (isTooComplex(/*solutions=*/{}))
+      return None;
   }
 
   // If the result was not ambiguous, we're done.
