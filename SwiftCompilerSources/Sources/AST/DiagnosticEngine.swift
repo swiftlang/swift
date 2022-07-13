@@ -16,26 +16,17 @@ import Basic
 
 public typealias DiagID = BridgedDiagID
 
-extension BridgedDiagnosticArgument {
-  init(stringRef val: BridgedStringRef) {
-    self.init(kind: .stringRef, value: .init(stringRefValue: val))
-  }
-  init(int val: Int) {
-    self.init(kind: .int, value: .init(intValue: val))
-  }
-}
-
 public protocol DiagnosticArgument {
-  func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void)
+  func _withBridgedDiagnosticArgument(_ fn: (swift.DiagnosticArgument) -> Void)
 }
 extension String: DiagnosticArgument {
-  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
-    withBridgedStringRef { fn(BridgedDiagnosticArgument(stringRef: $0)) }
+  public func _withBridgedDiagnosticArgument(_ fn: (swift.DiagnosticArgument) -> Void) {
+    withBridgedStringRef { fn(swift.DiagnosticArgument(llvm.StringRef($0))) }
   }
 }
 extension Int: DiagnosticArgument {
-  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
-    fn(BridgedDiagnosticArgument(int: self))
+  public func _withBridgedDiagnosticArgument(_ fn: (swift.DiagnosticArgument) -> Void) {
+    fn(swift.DiagnosticArgument(Int32(self)))
   }
 }
 
@@ -82,7 +73,7 @@ public struct DiagnosticEngine {
 
     let bridgedSourceLoc: swift.SourceLoc = position.bridged
     let bridgedHighlightRange: swift.CharSourceRange = highlight.bridged
-    var bridgedArgs: [BridgedDiagnosticArgument] = []
+    var bridgedArgs: [swift.DiagnosticArgument] = []
     var bridgedFixIts: [swift.DiagnosticInfo.FixIt] = []
 
     // Build a higher-order function to wrap every 'withBridgedXXX { ... }'
