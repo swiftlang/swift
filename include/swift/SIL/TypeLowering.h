@@ -961,12 +961,12 @@ public:
   }
 
   CanType getLoweredRValueType(TypeExpansionContext context, Type t) {
-    return getLoweredType(t, context).getASTType();
+    return getLoweredType(t, context).getRawASTType();
   }
 
   CanType getLoweredRValueType(TypeExpansionContext context,
                                AbstractionPattern origType, Type substType) {
-    return getLoweredType(origType, substType, context).getASTType();
+    return getLoweredType(origType, substType, context).getRawASTType();
   }
 
   AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
