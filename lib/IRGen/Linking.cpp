@@ -728,7 +728,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
     // The opaque result type descriptor with availability conditions
     // has to be emitted into a client module when associated with
-    // `@_alwaysInlineIntoClient` declaration which means it's linkage
+    // `@_alwaysEmitIntoClient` declaration which means it's linkage
     // has to be "shared".
     if (opaqueType->hasConditionallyAvailableSubstitutions()) {
       if (auto *srcDecl = opaqueType->getNamingDecl()) {
