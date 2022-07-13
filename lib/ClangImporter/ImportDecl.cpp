@@ -3208,17 +3208,55 @@ namespace {
 
     AccessorDecl *tryCreateConstexprAccessor(const clang::VarDecl *clangVar,
                                              VarDecl *swiftVar) {
+
+      // If this a templated we need to import dependent types
+      GenericParamList *genericParamList = nullptr;
+      if(clangVar->isTemplateDecl()) {
+        SmallVector<GenericTypeParamDecl *, 4> genericParams;
+        void *InsertPos = nullptr;
+        for (unsigned int i = 0; i < clangVar->getNumTemplateParameterLists(); i++) {
+          for (auto &param : *clangVar->getTemplateParameterList(i)) {
+            auto genericParamDecl =
+                Impl.createDeclWithClangNode<GenericTypeParamDecl>(
+                    param, AccessLevel::Public, swiftVar->getDeclContext(),
+                    Impl.SwiftContext.getIdentifier(param->getName()),
+                    Impl.importSourceLoc(param->getLocation()),
+                    /*type sequence*/ false, /*depth*/ 0,
+                    /*index*/ genericParams.size());
+            genericParams.push_back(genericParamDecl);
+          }
+
+          SmallVector<Type, 2> typesOfGenericArgs;
+          for (auto arg : genericParams) {
+            typesOfGenericArgs.push_back(arg->getInterfaceType());
+          }
+
+          SmallVector<clang::TemplateArgument, 2> templateArguments;
+          auto error = Impl.SwiftContext.getClangTemplateArguments(clangVar->getTemplateParameterList(i), typesOfGenericArgs, templateArguments);
+
+          if(error)
+            continue;
+
+          auto specialization = clangVar->getDescribedVarTemplate()->findSpecialization(templateArguments, InsertPos);
+
+          if (!specialization) {
+            specialization = clang::VarTemplateSpecializationDecl::Create(
+                clangVar->getASTContext(),
+                clangVar->getDeclContext(),
+                clangVar->getDescribedVarTemplate()->getBeginLoc(),
+                clangVar->getDescribedVarTemplate()->getLocation(),
+                clangVar->getDescribedVarTemplate(),
+                clangVar->getType(),
+                clangVar->getTypeSourceInfo(),
+                clangVar->getStorageClass(),
+                templateArguments);
+            Impl.importDecl(specialization, getActiveSwiftVersion());
+            clangVar->getDescribedVarTemplate()->AddSpecialization(specialization, InsertPos);
+          }
+        }
+      }
+
       assert(clangVar->isConstexpr());
-
-      // Taken from clang/AST/Decl.cpp
-      // We must check if this eval is not value dependent
-      // as the assert there will fail otherwise
-      clang::EvaluatedStmt *Eval = clangVar->ensureEvaluatedStmt();
-      const auto *Init = cast<clang::Expr>(Eval->Value);
-
-      // Bail if the assert in clang/AST/Decl will fail
-      if (Init->isValueDependent())
-        return nullptr;
 
       clangVar->evaluateValue();
       auto evaluated = clangVar->getEvaluatedValue();
@@ -3232,7 +3270,7 @@ namespace {
           Impl.SwiftContext, SourceLoc(), SourceLoc(), AccessorKind::Get,
           swiftVar, SourceLoc(), StaticSpellingKind::KeywordStatic,
           /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-          /*throws=*/false, SourceLoc(), /*genericParams*/ nullptr,
+          /*throws=*/false, SourceLoc(), /*genericParams*/ genericParamList,
           ParameterList::createEmpty(Impl.SwiftContext), swiftVar->getType(),
           swiftVar->getDeclContext());
       Expr *value = nullptr;
@@ -3277,7 +3315,6 @@ namespace {
       bool isAudited = decl->getType().isConstQualified();
 
       auto declType = decl->getType();
-
       // Special case: NS Notifications
       if (isNSNotificationGlobal(decl))
         if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
