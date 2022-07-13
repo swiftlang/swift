@@ -68,6 +68,7 @@ class SILArgument : public ValueBase {
 
   SILBasicBlock *parentBlock;
   const ValueDecl *decl;
+  USE_SHARED_UINT8;
 
 protected:
   SILArgument(ValueKind subClassKind, SILBasicBlock *inputParentBlock,
@@ -81,7 +82,7 @@ protected:
                        const ValueDecl *inputDecl = nullptr)
       : ValueBase(subClassKind, type),
         parentBlock(nullptr), decl(inputDecl) {
-    Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
+    sharedUInt8().SILArgument.valueOwnershipKind = uint8_t(ownershipKind);
   }
 
 public:
@@ -89,11 +90,11 @@ public:
   void operator delete(void *, size_t) = delete;
 
   ValueOwnershipKind getOwnershipKind() const {
-    return static_cast<ValueOwnershipKind>(Bits.SILArgument.VOKind);
+    return ValueOwnershipKind(sharedUInt8().SILArgument.valueOwnershipKind);
   }
 
   void setOwnershipKind(ValueOwnershipKind newKind) {
-    Bits.SILArgument.VOKind = static_cast<unsigned>(newKind);
+    sharedUInt8().SILArgument.valueOwnershipKind = uint8_t(newKind);
   }
 
   SILBasicBlock *getParent() const { return parentBlock; }

@@ -723,6 +723,23 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(getDeclLinkage(getterDecl), forDefinition);
   }
 
+  case Kind::OpaqueTypeDescriptor: {
+    auto *opaqueType = cast<OpaqueTypeDecl>(getDecl());
+
+    // The opaque result type descriptor with availability conditions
+    // has to be emitted into a client module when associated with
+    // `@_alwaysInlineIntoClient` declaration which means it's linkage
+    // has to be "shared".
+    if (opaqueType->hasConditionallyAvailableSubstitutions()) {
+      if (auto *srcDecl = opaqueType->getNamingDecl()) {
+        if (srcDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+          return SILLinkage::Shared;
+      }
+    }
+
+    return getSILLinkage(getDeclLinkage(opaqueType), forDefinition);
+  }
+
   case Kind::AssociatedConformanceDescriptor:
   case Kind::BaseConformanceDescriptor:
   case Kind::ObjCClass:
@@ -735,7 +752,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ProtocolDescriptorRecord:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
-  case Kind::OpaqueTypeDescriptor:
   case Kind::OpaqueTypeDescriptorRecord:
   case Kind::OpaqueTypeDescriptorAccessor:
   case Kind::OpaqueTypeDescriptorAccessorImpl:
@@ -765,7 +781,13 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable: {
-    auto *nominal = getType().getAnyNominal();
+    auto ty = getType();
+    ValueDecl *nominal = nullptr;
+    if (auto *otat = ty->getAs<OpaqueTypeArchetypeType>()) {
+      nominal = otat->getDecl();
+    } else {
+      nominal = ty->getAnyNominal();
+    }
     assert(nominal);
     if (getDeclLinkage(nominal) == FormalLinkage::Private ||
         getLinkageAsConformance() == SILLinkage::Private) {

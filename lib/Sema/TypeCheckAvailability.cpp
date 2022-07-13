@@ -2397,13 +2397,40 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
                         ("." + baseReplace.str() + "(").str());
       diag.fixItReplace(SE->getEndLoc(), ")");
     } else {
-      if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
-          isa<VarDecl>(renamedDecl)) {
-        // If we're going from a var to a function with no arguments, emit an
-        // empty parameter list.
-        baseReplace += "()";
+      bool shouldEmitRenameFixit = true;
+      if (auto *CE = dyn_cast_or_null<CallExpr>(call)) {
+        SmallString<64> callContextName;
+        llvm::raw_svector_ostream name(callContextName);
+        if (auto *DCE = dyn_cast<DotSyntaxCallExpr>(CE->getDirectCallee())) {
+          if (auto *TE = dyn_cast<TypeExpr>(DCE->getBase())) {
+            TE->getTypeRepr()->print(name);
+            if (!parsed.ContextName.empty()) {
+              // If there is a context in rename function e.g.
+              // `Context.function()` and call context is a `DotSyntaxCallExpr`
+              // adjust the range so it replaces the base as well.
+              referenceRange =
+                  SourceRange(TE->getStartLoc(), referenceRange.End);
+            }
+          }
+        }
+        // Function names are the same(including context if applicable), so
+        // renaming fix-it doesn't need do be produced.
+        if ((parsed.ContextName.empty() ||
+             parsed.ContextName == callContextName) &&
+            CE->getCalledValue()->getBaseName() == parsed.BaseName) {
+          shouldEmitRenameFixit = false;
+        }
       }
-      diag.fixItReplace(referenceRange, baseReplace);
+      if (shouldEmitRenameFixit) {
+        if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
+            isa<VarDecl>(renamedDecl)) {
+          // If we're going from a var to a function with no arguments, emit an
+          // empty parameter list.
+          baseReplace += "()";
+        }
+
+        diag.fixItReplace(referenceRange, baseReplace);
+      }
     }
   }
 

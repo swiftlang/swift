@@ -52,12 +52,6 @@ typedef struct {
 } BridgedDiagnosticArgument;
 
 typedef struct {
-  swift::SourceLoc start;
-  SwiftInt byteLength;
-  BridgedStringRef text;
-} BridgedDiagnosticFixIt;
-
-typedef struct {
   void * _Nonnull object;
 } BridgedDiagnosticEngine;
 

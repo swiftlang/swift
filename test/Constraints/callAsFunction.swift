@@ -83,7 +83,7 @@ struct Test {
   var body8: MyLayout {
     MyLayout {
       let x = ""
-      return x // expected-error {{cannot convert return expression of type 'String' to return type 'Int'}}
+      return x // expected-error {{cannot convert value of type 'String' to closure result type 'Int'}}
     } content: {
       EmptyView()
     }

@@ -690,7 +690,7 @@ func testSR13239_ArgsFn() -> Int {
 func testSR13239MultiExpr() -> Int {
   callit {
     print("hello") 
-    return print("hello") // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+    return print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
   }
 }
 
@@ -732,3 +732,21 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
         }
     }
 }
+
+// https://github.com/apple/swift/issues/59716
+["foo"].map { s in
+    if s == "1" { return } // expected-error{{cannot convert value of type '()' to closure result type 'Bool'}}
+    return s.isEmpty
+}.filter { $0 }
+
+["foo"].map { s in
+    if s == "1" { return } // expected-error{{cannot convert value of type '()' to closure result type 'Bool'}}
+    if s == "2" { return }
+    if s == "3" { return }
+    return s.isEmpty
+}.filter { $0 }
+
+["foo"].map { s in
+    if s == "1" { return () } // expected-error{{cannot convert value of type '()' to closure result type 'Bool'}}
+    return s.isEmpty
+}.filter { $0 }

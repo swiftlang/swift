@@ -42,7 +42,7 @@ void DiagnosticEngine_diagnose(
     BridgedDiagID bridgedDiagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
     CharSourceRange highlight,
-    BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
+    BridgedArrayRef /*DiagnosticInfo::FixIt*/ bridgedFixIts) {
   auto *D = getDiagnosticEngine(bridgedEngine);
 
   auto diagID = static_cast<DiagID>(bridgedDiagID);
@@ -59,10 +59,9 @@ void DiagnosticEngine_diagnose(
   }
 
   // Add fix-its.
-  for (auto bridgedFixIt : getArrayRef<BridgedDiagnosticFixIt>(bridgedFixIts)) {
-    auto range = CharSourceRange(bridgedFixIt.start,
-                                 bridgedFixIt.byteLength);
-    auto text = getStringRef(bridgedFixIt.text);
+  for (auto bridgedFixIt : getArrayRef<DiagnosticInfo::FixIt>(bridgedFixIts)) {
+    auto range = bridgedFixIt.getRange();
+    auto text = bridgedFixIt.getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
   }
 }
