@@ -54,7 +54,9 @@ using namespace constraints;
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
-  getTypeVariable()->print(OS, PrintOptions());
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  getTypeVariable()->print(OS, PO);
   
   SmallVector<TypeVariableOptions, 4> bindingOptions;
   if (canBindToLValue())
