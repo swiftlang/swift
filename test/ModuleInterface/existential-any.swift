@@ -44,5 +44,10 @@ public protocol ProtocolTypealias {
   typealias A = P
 }
 
-// CHECK: public func dependentExistential<T>(value: (T) -> main.P) where T : main.ProtocolTypealias
+// CHECK: public func dependentExistential<T>(value: (T) -> T.A) where T : main.ProtocolTypealias
 public func dependentExistential<T: ProtocolTypealias>(value: (T) -> T.A) {}
+
+public typealias Composition = ProtocolTypealias & P
+
+// CHECK: public func optionalComposition(value: main.Composition?)
+public func optionalComposition(value: Composition?) {}
