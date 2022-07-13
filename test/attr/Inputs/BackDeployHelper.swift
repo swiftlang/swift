@@ -1,3 +1,4 @@
+import Foundation
 
 /// Returns the dsohandle for the dynamic library.
 public func libraryHandle() -> UnsafeRawPointer {
@@ -125,8 +126,8 @@ extension IntArray {
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
   public func print() {
-    // Tests recursive @_backDeploy since `values` is also @_backDeploy
-    testPrint(handle: #dsohandle, values.description)
+    // Tests recursive @_backDeploy since `Array.print()` is also @_backDeploy
+    _values.print()
   }
 
   @available(BackDeploy 1.0, *)
@@ -143,6 +144,12 @@ extension IntArray {
     get { _values[i] }
     _modify { yield &_values[i] }
   }
+  
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public var rawValues: [Int] {
+    _read { yield _values }
+  }
 }
 
 extension ReferenceIntArray {
@@ -153,8 +160,8 @@ extension ReferenceIntArray {
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
   public final func print() {
-    // Tests recursive @_backDeploy since `values` is also @_backDeploy
-    testPrint(handle: #dsohandle, values.description)
+    // Tests recursive @_backDeploy since `Array.print()` is also @_backDeploy
+    _values.print()
   }
 
   @available(BackDeploy 1.0, *)
@@ -176,6 +183,20 @@ extension ReferenceIntArray {
   public final subscript(_ i: Int) -> Int {
     get { _values[i] }
     _modify { yield &_values[i] }
+  }
+  
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public final var rawValues: [Int] {
+    _read { yield _values }
+  }
+}
+
+extension Array {
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public func print() {
+    testPrint(handle: #dsohandle, description)
   }
 }
 
