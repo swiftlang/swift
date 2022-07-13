@@ -13,8 +13,10 @@
 #ifndef SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 #define SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "clang/AST/CharUnits.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -92,6 +94,10 @@ public:
   /// Returns the function signature that is used for the the type metadata
   /// access function.
   FunctionABISignature getTypeMetadataAccessFunctionSignature();
+
+  /// Returns EnumElementDecls (enum cases) in their declaration order with
+  /// their tag indices from the given EnumDecl
+  llvm::MapVector<EnumElementDecl *, unsigned> getEnumTagMapping(EnumDecl *ED);
 
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;
