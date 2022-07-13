@@ -23,8 +23,8 @@ public enum EnumCaseIsCxxKeyword {
 
 // CHECK: class EnumCaseIsCxxKeyword final {
 // CHECK:      enum class cases {
-// CHECK-NEXT:   first,
 // CHECK-NEXT:   second,
+// CHECK-NEXT:   first,
 // CHECK-NEXT:   const_
 // CHECK-NEXT: };
 
