@@ -32,25 +32,27 @@ public struct TopLevelStruct {
   // CHECK: [[UNAVAIL_BB]]:
   // CHECK:   [[FALLBACKFN:%.*]] = function_ref @$s11back_deploy14TopLevelStructV8propertyACvrTwB : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
   // CHECK:   ([[YIELD_RES:%.*]], [[YIELD_TOK:%.*]]) = begin_apply [[FALLBACKFN]]([[BB0_ARG]]) : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
-  // CHECK:   end_apply [[YIELD_TOK]]
   // CHECK:   yield [[YIELD_RES]] : $TopLevelStruct, resume [[UNAVAIL_RESUME_BB:bb[0-9]+]], unwind [[UNAVAIL_UNWIND_BB:bb[0-9]+]]
   //
   // CHECK: [[UNAVAIL_UNWIND_BB]]:
+  // CHECK:   end_apply [[YIELD_TOK]]
   // CHECK:   br [[UNWIND_BB:bb[0-9]+]]
   //
   // CHECK: [[UNAVAIL_RESUME_BB]]:
+  // CHECK:   end_apply [[YIELD_TOK]]
   // CHECK:   br [[RETURN_BB:bb[0-9]+]]
   //
   // CHECK: [[AVAIL_BB]]:
   // CHECK:   [[ORIGFN:%.*]] = function_ref @$s11back_deploy14TopLevelStructV8propertyACvr : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
   // CHECK:   ([[YIELD_RES:%.*]], [[YIELD_TOK:%.*]]) = begin_apply [[ORIGFN]]([[BB0_ARG]]) : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
-  // CHECK:   end_apply [[YIELD_TOK]]
   // CHECK:   yield [[YIELD_RES]] : $TopLevelStruct, resume [[AVAIL_RESUME_BB:bb[0-9]+]], unwind [[UAVAIL_UNWIND_BB:bb[0-9]+]]
   //
   // CHECK: [[UAVAIL_UNWIND_BB]]:
+  // CHECK:   end_apply [[YIELD_TOK]]
   // CHECK:   br [[UNWIND_BB]]
   //
   // CHECK: [[AVAIL_RESUME_BB]]:
+  // CHECK:   end_apply [[YIELD_TOK]]
   // CHECK:   br [[RETURN_BB]]
   //
   // CHECK: [[RETURN_BB]]:
