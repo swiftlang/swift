@@ -4207,6 +4207,7 @@ bool ConstraintSystem::generateConstraints(
       print(log, expr);
       log << "\n";
       print(log);
+      log << "\n";
     }
 
     return false;
