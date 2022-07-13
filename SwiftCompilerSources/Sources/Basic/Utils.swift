@@ -48,6 +48,12 @@ extension BridgedStringRef {
   }
 }
 
+extension llvm.StringRef {
+  public init(_ bridged: BridgedStringRef) {
+    self.init(bridged.data, bridged.length)
+  }
+}
+
 extension String {
   public func withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
     var str = self
