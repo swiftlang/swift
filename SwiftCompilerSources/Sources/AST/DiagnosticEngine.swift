@@ -50,12 +50,12 @@ public struct DiagnosticFixIt {
     self.text = text
   }
 
-  func withBridgedDiagnosticFixIt(_ fn: (BridgedDiagnosticFixIt) -> Void) {
+  func withBridgedDiagnosticFixIt(_ fn: (swift.DiagnosticInfo.FixIt) -> Void) {
     text.withBridgedStringRef { bridgedTextRef in
-      let bridgedDiagnosticFixIt = BridgedDiagnosticFixIt(
-        start: start.bridged,
-        byteLength: byteLength,
-        text: bridgedTextRef)
+      let bridgedDiagnosticFixIt = swift.DiagnosticInfo.FixIt(
+        swift.CharSourceRange(start.bridged, UInt32(byteLength)),
+        llvm.StringRef(bridgedTextRef),
+        llvm.ArrayRef<swift.DiagnosticArgument>())
       fn(bridgedDiagnosticFixIt)
     }
   }
@@ -83,7 +83,7 @@ public struct DiagnosticEngine {
     let bridgedSourceLoc: swift.SourceLoc = position.bridged
     let bridgedHighlightRange: swift.CharSourceRange = highlight.bridged
     var bridgedArgs: [BridgedDiagnosticArgument] = []
-    var bridgedFixIts: [BridgedDiagnosticFixIt] = []
+    var bridgedFixIts: [swift.DiagnosticInfo.FixIt] = []
 
     // Build a higher-order function to wrap every 'withBridgedXXX { ... }'
     // calls, so we don't escape anything from the closure. 'bridgedArgs' and
