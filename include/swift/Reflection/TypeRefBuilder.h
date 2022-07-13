@@ -1598,7 +1598,7 @@ private:
     // is an offset to a TypeRef string, read it.
     auto readRequirementTypeRefAddress =
         [&](uintptr_t offsetFromOpaqueDescBase,
-            uintptr_t requirementAddress) -> uint32_t {
+            uintptr_t requirementAddress) -> uintptr_t {
       std::string typeRefString = "";
       auto fieldOffsetOffset = requirementAddress + offsetFromOpaqueDescBase -
                                (uintptr_t)opaqueTypeDescriptor;
