@@ -108,15 +108,16 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
       rawResults.push_back(result);
 
     auto token = rawResults.pop_back_val();
-    SGF.B.createEndApply(loc, token);
     SGF.B.createYield(loc, rawResults, resumeBB, unwindBB);
 
     // Emit resume block.
     SGF.B.emitBlock(resumeBB);
+    SGF.B.createEndApply(loc, token);
     SGF.B.createBranch(loc, SGF.ReturnDest.getBlock());
 
     // Emit unwind block.
     SGF.B.emitBlock(unwindBB);
+    SGF.B.createEndApply(loc, token);
     SGF.B.createBranch(loc, SGF.CoroutineUnwindDest.getBlock());
     return;
   }
