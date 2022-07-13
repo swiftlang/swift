@@ -2432,7 +2432,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
               .build();
 
       return ::getNativeSILFunctionType(TC, forExpansion, origType, substFnType,
-                                        silExtInfo);
+                                        silExtInfo, None, None, None, {});
     }
 
     // Ignore dynamic self types.
