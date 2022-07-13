@@ -781,7 +781,7 @@ namespace swift {
 
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
-  class DiagnosticEngine {
+  class SWIFT_IMPORT_REFERENCE DiagnosticEngine {
   public:
     /// The source manager used to interpret source locations and
     /// display diagnostics.
