@@ -17,7 +17,7 @@ on:
       - swiftwasm-release/5.5
       - swiftwasm-release/5.6
       - swiftwasm-release/5.7
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
 jobs:
   start-runner:
     name: Start self-hosted EC2 runner
