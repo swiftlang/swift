@@ -216,9 +216,10 @@ void setModuleFlags(IRGenModule &IGM) {
   }
 }
 
-void swift::performLLVMOptimizations(const IRGenOptions &Opts,
-                                     llvm::Module *Module,
-                                     llvm::TargetMachine *TargetMachine) {
+static void
+performOptimizationsUsingLegacyPassManger(const IRGenOptions &Opts,
+                                          llvm::Module *Module,
+                                          llvm::TargetMachine *TargetMachine) {
   // Set up a pipeline.
   PassManagerBuilderWrapper PMBuilder(Opts);
 
@@ -387,6 +388,20 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
       }
     }
   }
+}
+
+static void
+performOptimizationsUsingNewPassManger(const IRGenOptions &Opts,
+                                       llvm::Module *Module,
+                                       llvm::TargetMachine *TargetMachine) {}
+
+void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+                                     llvm::Module *Module,
+                                     llvm::TargetMachine *TargetMachine) {
+  if (Opts.LegacyPassManager)
+    performOptimizationsUsingLegacyPassManger(Opts, Module, TargetMachine);
+  else
+    performOptimizationsUsingNewPassManger(Opts, Module, TargetMachine);
 }
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
