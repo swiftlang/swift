@@ -89,6 +89,8 @@ class BasicBlockSet {
   BasicBlockFlag flag;
 
 public:
+  using Element = SILBasicBlock *;
+
   BasicBlockSet(SILFunction *function) : flag(function) {}
 
   SILFunction *getFunction() const { return flag.getFunction(); }
@@ -100,6 +102,8 @@ public:
 
   void erase(SILBasicBlock *block) { flag.reset(block); }
 };
+
+using BasicBlockSetWithSize = KnownSizeSet<BasicBlockSet>;
 
 } // namespace swift
 

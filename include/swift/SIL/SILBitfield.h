@@ -108,6 +108,43 @@ public:
   }
 };
 
+/// A set which knowns its size.
+///
+/// This template adds a size property to a base `Set`.
+template <class Set>
+class KnownSizeSet {
+  Set set;
+  size_t numElements = 0;
+public:
+  using Element = typename Set::Element;
+
+  KnownSizeSet(SILFunction *function) : set(function) {}
+
+  SILFunction *getFunction() const { return set.getFunction(); }
+
+  bool contains(Element element) const { return set.contains(element); }
+
+  /// Returns true if \p value was not contained in the set before inserting.
+  bool insert(Element element) {
+    if (set.insert(element)) {
+      numElements += 1;
+      return true;
+    }
+    return false;
+  }
+
+  void erase(Element element) {
+    if (contains(element)) {
+      set.erase(element);
+      assert(numElements > 0);
+      numElements -= 1;
+    }
+  }
+
+  bool empty() const { return numElements == 0; }
+  
+  size_t size() const { return numElements; }
+};
 
 } // namespace swift
 

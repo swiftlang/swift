@@ -94,6 +94,8 @@ class InstructionSet {
   NodeSet nodeSet;
   
 public:
+  using Element = SILInstruction *;
+
   InstructionSet(SILFunction *function) : nodeSet(function) {}
 
   SILFunction *getFunction() const { return nodeSet.getFunction(); }
@@ -106,6 +108,8 @@ public:
   void erase(SILInstruction *inst) { nodeSet.erase(inst->asSILNode()); }
 };
 
+using InstructionSetWithSize = KnownSizeSet<InstructionSet>;
+
 /// A set of SILValues.
 ///
 /// For details see NodeBitfield.
@@ -113,6 +117,8 @@ class ValueSet {
   NodeSet nodeSet;
   
 public:
+  using Element = SILValue;
+
   ValueSet(SILFunction *function) : nodeSet(function) {}
 
   SILFunction *getFunction() const { return nodeSet.getFunction(); }
@@ -124,6 +130,8 @@ public:
 
   void erase(SILValue value) { nodeSet.erase(value); }
 };
+
+using ValueSetWithSize = KnownSizeSet<ValueSet>;
 
 } // namespace swift
 
