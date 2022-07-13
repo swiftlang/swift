@@ -968,6 +968,8 @@ bb0(%0 : @owned $Z):
 sil [ossa] [escapes !%1] @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
 sil [ossa] [escapes !%0] @closure2 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
 sil [escapes !%0.**] @closure3 : $@convention(thin) (@guaranteed Z) -> ()
+sil [ossa] [escapes %0 => %1, !%1] @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> ()
+sil [ossa] [escapes %1 => %0, !%1] @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> ()
 
 // CHECK-LABEL: Escape information for callClosure1:
 // CHECK:  -    :   %0 = alloc_ref $Y
@@ -1017,6 +1019,40 @@ bb0:
   %5 = partial_apply [callee_guaranteed] %4(%0) : $@convention(thin) (@guaranteed Z) -> ()
   %6 = tuple ()
   return %6 : $()
+}
+
+// CHECK-LABEL: Escape information for callClosureWithEscapesToEffect1:
+// CHECK:  -    :   %0 = alloc_ref $Y
+// CHECK: global:   %1 = alloc_ref $X
+// CHECK: End function callClosureWithEscapesToEffect1
+sil [ossa] @callClosureWithEscapesToEffect1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $X
+  %2 = function_ref @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> ()
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@guaranteed X, @guaranteed Y) -> ()
+  %8 = apply %3(%1) : $@callee_guaranteed (@guaranteed X) -> ()
+  destroy_value %3 : $@callee_guaranteed (@guaranteed X) -> ()
+  destroy_value %1 : $X
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Escape information for callClosureWithEscapesToEffect2:
+// CHECK: global:   %0 = alloc_ref $Y
+// CHECK:  -    :   %1 = alloc_ref $X
+// CHECK: End function callClosureWithEscapesToEffect2
+sil [ossa] @callClosureWithEscapesToEffect2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $X
+  %2 = function_ref @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> ()
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (@guaranteed Y, @guaranteed X) -> ()
+  %8 = apply %3(%0) : $@callee_guaranteed (@guaranteed Y) -> ()
+  destroy_value %3 : $@callee_guaranteed (@guaranteed Y) -> ()
+  destroy_value %0 : $Y
+  %11 = tuple ()
+  return %11 : $()
 }
 
 // CHECK-LABEL: Escape information for escape_via_destroy_of_closure:
