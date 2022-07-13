@@ -15,6 +15,7 @@
 
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -37,19 +38,6 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 #define DIAG(KIND, ID, Options, Text, Signature) BridgedDiagID_##ID,
 #include "swift/AST/DiagnosticsAll.def"
 } BridgedDiagID;
-
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticArgumentKind {
-  BridgedDiagnosticArgumentKind_StringRef,
-  BridgedDiagnosticArgumentKind_Int,
-} BridgedDiagnosticArgumentKind;
-
-typedef struct {
-  BridgedDiagnosticArgumentKind kind;
-  union {
-    BridgedStringRef stringRefValue;
-    SwiftInt intValue;
-  } value;
-} BridgedDiagnosticArgument;
 
 typedef struct {
   void * _Nonnull object;
