@@ -19,6 +19,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1526,7 +1527,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   }
   InitEnumDataAddrInst *DataAddrInst = nullptr;
   InjectEnumAddrInst *EnumAddrIns = nullptr;
-  llvm::SmallPtrSet<SILInstruction *, 32> WriteSet;
+  InstructionSetWithSize WriteSet(IEAI->getFunction());
   for (auto UsersIt : ASO->getUses()) {
     SILInstruction *CurrUser = UsersIt->getUser();
     if (CurrUser->isDeallocatingStack()) {
@@ -1592,7 +1593,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           // don't care about what comes before init enum in the basic block
           break;
         }
-        if (WriteSet.count(Ins) != 0) {
+        if (WriteSet.contains(Ins) != 0) {
           return nullptr;
         }
       }
