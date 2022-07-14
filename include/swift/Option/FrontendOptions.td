@@ -1083,5 +1083,8 @@ def concurrency_model_EQ :
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
-  HelpText<"Enable new llvm pass manager">;
+  HelpText<"Enable the new llvm pass manager">;
+def disable_new_llvm_pass_manager :
+  Flag<["-"], "disable-new-llvm-pass-manager">,
+  HelpText<"Disable the new llvm pass manager">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
