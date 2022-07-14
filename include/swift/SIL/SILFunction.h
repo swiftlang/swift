@@ -1121,6 +1121,32 @@ public:
     return false;
   }
 
+  /// Returns true if this function belongs to a declaration that
+  /// has `@_alwaysEmitIntoClient` attribute.
+  bool markedAsAlwaysEmitIntoClient() const {
+    if (!hasLocation())
+      return false;
+
+    auto *V = getLocation().getAsASTNode<ValueDecl>();
+    return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+  }
+
+  /// Returns true if this function belongs to a declaration that returns
+  /// an opaque result type with one or more availability conditions that are
+  /// allowed to produce a different underlying type at runtime.
+  bool hasOpaqueResultTypeWithAvailabilityConditions() const {
+    if (!hasLocation())
+      return false;
+
+    if (auto *V = getLocation().getAsASTNode<ValueDecl>()) {
+      auto *opaqueResult = V->getOpaqueResultTypeDecl();
+      return opaqueResult &&
+             opaqueResult->hasConditionallyAvailableSubstitutions();
+    }
+
+    return false;
+  }
+
   //===--------------------------------------------------------------------===//
   // Block List Access
   //===--------------------------------------------------------------------===//

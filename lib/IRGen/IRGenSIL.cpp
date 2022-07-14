@@ -2232,18 +2232,15 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
   if (CurSILFn->getLinkage() == SILLinkage::Shared) {
-    if (auto *V = CurSILFn->getLocation().getAsASTNode<ValueDecl>()) {
-      bool alwaysEmitIntoClient =
-          V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+    if (CurSILFn->markedAsAlwaysEmitIntoClient() &&
+        CurSILFn->hasOpaqueResultTypeWithAvailabilityConditions()) {
+      auto *V = CurSILFn->getLocation().castToASTNode<ValueDecl>();
       auto *opaqueResult = V->getOpaqueResultTypeDecl();
       // `@_alwaysEmitIntoClient` declaration with opaque result
       // has to emit opaque type descriptor into client module
       // when it has availability conditions because the underlying
       // type in such cases is unknown until runtime.
-      if (alwaysEmitIntoClient && opaqueResult &&
-          opaqueResult->hasConditionallyAvailableSubstitutions()) {
-        IGM.maybeEmitOpaqueTypeDecl(opaqueResult);
-      }
+      IGM.maybeEmitOpaqueTypeDecl(opaqueResult);
     }
   }
 
