@@ -55,6 +55,7 @@
 
 #define DEBUG_TYPE "access-enforcement-wmo"
 
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
@@ -143,6 +144,7 @@ namespace {
 // checks).
 class GlobalAccessRemoval {
   SILModule &module;
+  SmallPtrSetVector<SILFunction *, 8> changedFunctions;
 
   using BeginAccessSet = SmallDenseSet<BeginAccessInst *, 8>;
 
@@ -162,6 +164,8 @@ public:
   GlobalAccessRemoval(SILModule &module) : module(module) {}
 
   void perform();
+  
+  void invalidateAnalysis(SILModuleTransform *pass);
 
 protected:
   bool visitInstruction(SILInstruction *I);
@@ -187,6 +191,13 @@ void GlobalAccessRemoval::perform() {
     }
   }
   removeNonreentrantAccess();
+}
+
+void GlobalAccessRemoval::invalidateAnalysis(SILModuleTransform *pass) {
+  for (SILFunction *changedFunction : changedFunctions) {
+    pass->invalidateAnalysis(changedFunction,
+                             SILAnalysis::InvalidationKind::Instructions);
+  }
 }
 
 bool GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
@@ -292,6 +303,7 @@ void GlobalAccessRemoval::removeNonreentrantAccess() {
     for (BeginAccessInst *beginAccess : info.beginAccessSet) {
       LLVM_DEBUG(llvm::dbgs() << "  Disabling access marker " << *beginAccess);
       beginAccess->setEnforcement(SILAccessEnforcement::Static);
+      changedFunctions.insert(beginAccess->getFunction());
     }
   }
 }
@@ -301,6 +313,7 @@ struct AccessEnforcementWMO : public SILModuleTransform {
   void run() override {
     GlobalAccessRemoval eliminationPass(*getModule());
     eliminationPass.perform();
+    eliminationPass.invalidateAnalysis(this);
   }
 };
 }
