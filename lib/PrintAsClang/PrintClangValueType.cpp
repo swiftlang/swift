@@ -228,8 +228,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
           "metadata._0);\n";
     os << "    return _getOpaquePointer();\n";
     os << "  }\n";
-    // FIXME: (tongjie) return type should be unsigned
-    os << "  inline int _getEnumTag() const {\n";
+    os << "  inline unsigned _getEnumTag() const {\n";
     printEnumVWTableVariable();
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
