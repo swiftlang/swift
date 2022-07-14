@@ -145,7 +145,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
 }
 
 static void printOpaqueAllocFee(raw_ostream &os) {
-  os << R"text(inline void * _Nonnull opaqueAlloc(size_t size, size_t align) {
+  os << R"text(inline void * _Nonnull opaqueAlloc(size_t size, size_t align) noexcept {
 #if defined(_WIN32)
   void *r = _aligned_malloc(size, align);
 #else
@@ -156,7 +156,7 @@ static void printOpaqueAllocFee(raw_ostream &os) {
 #endif
   return r;
 }
-inline void opaqueFree(void * _Nonnull p) {
+inline void opaqueFree(void * _Nonnull p) noexcept {
 #if defined(_WIN32)
   _aligned_free(p);
 #else
