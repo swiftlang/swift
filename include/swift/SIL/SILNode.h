@@ -127,11 +127,18 @@ public:
 
 protected:
   friend class SILInstruction;
+  template <class, class> friend class SILBitfield;
 
   static_assert((unsigned)SILNodeKind::Last_SILNode <= (unsigned)std::numeric_limits<uint8_t>::max(),
           "too many SILNode kinds");
 
   uint8_t kind;
+
+  // Used by `NodeBitfield`.
+  enum { numCustomBits = 8 };
+
+  // Used by `NodeBitfield`.
+  uint8_t customBits;
 
   // Part of SILInstruction's debug location. Together with
   // `SILInstruction::locationStorage` this forms the SILLocation.
@@ -303,6 +310,22 @@ protected:
 
   //===---------------------- end of shared fields ------------------------===//
 
+  /// The NodeBitfield ID of the last initialized bitfield in `customBits`.
+  /// Example:
+  ///
+  ///                   Last initialized field:
+  ///           lastInitializedBitfieldID == C.bitfieldID
+  ///                              |
+  ///                              V
+  /// customBits:  <unused> EE DDD C BB AAA
+  ///              31         ...         0
+  ///
+  /// -> AAA, BB and C are initialized,
+  ///    DD and EEE are uninitialized
+  ///
+  /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
+  uint64_t lastInitializedBitfieldID = 0;
+
 private:
   SwiftMetatype getSILNodeMetatype(SILNodeKind kind);
 
@@ -312,6 +335,11 @@ protected:
     _sharedUInt8_private.opaque = 0;
     _sharedUInt32_private.opaque = 0;
   }
+
+  // Used by `NodeBitfield`.
+  unsigned getCustomBits() const { return customBits; }
+  // Used by `NodeBitfield`.
+  void setCustomBits(unsigned value) { customBits = value; }
 
 public:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -349,13 +377,18 @@ public:
   SILInstruction *castToInstruction();
   const SILInstruction *castToInstruction() const;
   
+  // Called when transferring basic blocks from one function to another.
+  void resetBitfields() {
+    lastInitializedBitfieldID = 0;
+  }
+
   static SILNode *instAsNode(SILInstruction *inst);
   static const SILNode *instAsNode(const SILInstruction *inst);
 
   static bool classof(SILNodePointer node) { return true; }
 };
 
-static_assert(sizeof(SILNode) <= 3 * sizeof(void *),
+static_assert(sizeof(SILNode) <= 4 * sizeof(void *),
               "SILNode must stay small");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

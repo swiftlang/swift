@@ -36,6 +36,7 @@ class SILModule;
 class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
+class NodeBitfield;
 
 namespace Lowering {
 class TypeLowering;
@@ -169,7 +170,9 @@ private:
   friend class SILModule;
   friend class SILFunctionBuilder;
   template <typename, unsigned> friend class BasicBlockData;
+  template <class, class> friend class SILBitfield;
   friend class BasicBlockBitfield;
+  friend class NodeBitfield;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -226,14 +229,15 @@ private:
   Identifier ObjCReplacementFor;
 
   /// The head of a single-linked list of currently alive BasicBlockBitfield.
-  BasicBlockBitfield *newestAliveBitfield = nullptr;
+  BasicBlockBitfield *newestAliveBlockBitfield = nullptr;
+
+  /// The head of a single-linked list of currently alive NodeBitfield.
+  NodeBitfield *newestAliveNodeBitfield = nullptr;
 
   /// A monotonically increasing ID which is incremented whenever a
-  /// BasicBlockBitfield is constructed.
-  /// Usually this stays below 100000, so a 32-bit unsigned is more than
-  /// sufficient.
-  /// For details see BasicBlockBitfield::bitfieldID;
-  unsigned currentBitfieldID = 1;
+  /// BasicBlockBitfield or NodeBitfield is constructed.
+  /// For details see SILBitfield::bitfieldID;
+  uint64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.
   /// May be reused when zombie functions are recovered.
