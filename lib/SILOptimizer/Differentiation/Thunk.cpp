@@ -474,6 +474,12 @@ getOrCreateSubsetParametersThunkForLinearMap(
     return mappedIndex;
   };
 
+  auto toIndirectResultsIter = thunk->getIndirectResults().begin();
+  auto useNextIndirectResult = [&]() {
+      assert(toIndirectResultsIter != thunk->getIndirectResults().end());
+      arguments.push_back(*toIndirectResultsIter++);
+  };
+
   switch (kind) {
   // Differential arguments are:
   // - All indirect results, followed by:
@@ -482,9 +488,29 @@ getOrCreateSubsetParametersThunkForLinearMap(
   //     indices).
   //   - Zeros (when parameter is not in desired indices).
   case AutoDiffDerivativeFunctionKind::JVP: {
-    // Forward all indirect results.
-    arguments.append(thunk->getIndirectResults().begin(),
-                     thunk->getIndirectResults().end());
+    unsigned numIndirectResults = linearMapType->getNumIndirectFormalResults();
+    // Forward desired indirect results
+    for (unsigned idx : *actualConfig.resultIndices) {
+      if (idx >= numIndirectResults)
+        break;
+
+      auto resultInfo = linearMapType->getResults()[idx];
+      assert(idx < linearMapType->getNumResults());
+
+      // Forward result argument in case we do not need to thunk it away
+      if (desiredConfig.resultIndices->contains(idx)) {
+        useNextIndirectResult();
+        continue;
+      }
+
+      // Otherwise, allocate and use an uninitialized indirect result
+      auto *indirectResult = builder.createAllocStack(
+        loc, resultInfo.getSILStorageInterfaceType());
+      localAllocations.push_back(indirectResult);
+      arguments.push_back(indirectResult);
+    }
+    assert(toIndirectResultsIter == thunk->getIndirectResults().end());
+
     auto toArgIter = thunk->getArgumentsWithoutIndirectResults().begin();
     auto useNextArgument = [&]() { arguments.push_back(*toArgIter++); };
     // Iterate over actual indices.
@@ -509,10 +535,6 @@ getOrCreateSubsetParametersThunkForLinearMap(
   //   - Zeros (when parameter is not in desired indices).
   // - All actual arguments.
   case AutoDiffDerivativeFunctionKind::VJP: {
-    auto toIndirectResultsIter = thunk->getIndirectResults().begin();
-    auto useNextIndirectResult = [&]() {
-      arguments.push_back(*toIndirectResultsIter++);
-    };
     // Collect pullback arguments.
     unsigned pullbackResultIndex = 0;
     for (unsigned i : actualConfig.parameterIndices->getIndices()) {
