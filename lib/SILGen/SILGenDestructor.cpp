@@ -142,10 +142,6 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
         cleanupLoc, resultSelfValue, OwnershipKind::Owned);
   }
   B.createReturn(returnLoc, resultSelfValue);
-
-  if (cd->isDistributedActor()) {
-    F.dump();
-  }
 }
 
 void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
@@ -403,7 +399,6 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
   /// A distributed actor may be 'remote' in which case there is no need to
   /// destroy "all" members, because they never had storage to begin with.
   if (cd->isDistributedActor()) {
-    // finishBB = createBasicBlock("finishBB");
     normalMemberDestroyBB = createBasicBlock("normalMemberDestroyBB");
 
     emitDistributedActorClassMemberDestruction(cleanupLoc, selfValue, cd,
