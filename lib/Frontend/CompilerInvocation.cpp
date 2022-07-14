@@ -2389,8 +2389,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
   }
 
-  if (Args.hasArg(OPT_enable_new_llvm_pass_manager))
-    Opts.LegacyPassManager = false;
+  Opts.LegacyPassManager =
+      Args.hasFlag(OPT_disable_new_llvm_pass_manager,
+                   OPT_enable_new_llvm_pass_manager,
+                   Opts.LegacyPassManager);
 
   return false;
 }
