@@ -62,6 +62,10 @@ typedef struct {
 } BridgedBasicBlockSet;
 
 typedef struct {
+  void * _Nullable nds;
+} BridgedNodeSet;
+
+typedef struct {
   void * _Nullable data;
 } BridgedSlab;
 
@@ -138,6 +142,17 @@ SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock bloc
 void BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block);
 void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block);
 BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set);
+
+BridgedNodeSet PassContext_allocNodeSet(BridgedPassContext context);
+void PassContext_freeNodeSet(BridgedPassContext context,
+                             BridgedNodeSet set);
+SwiftInt NodeSet_containsValue(BridgedNodeSet set, BridgedValue value);
+void NodeSet_insertValue(BridgedNodeSet set, BridgedValue value);
+void NodeSet_eraseValue(BridgedNodeSet set, BridgedValue value);
+SwiftInt NodeSet_containsInstruction(BridgedNodeSet set, BridgedInstruction inst);
+void NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst);
+void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst);
+BridgedFunction NodeSet_getFunction(BridgedNodeSet set);
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
 

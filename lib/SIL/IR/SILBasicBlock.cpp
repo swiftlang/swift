@@ -301,6 +301,11 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
     First->index = -1;
     First->lastInitializedBitfieldID = 0;
     for (auto &II : *First) {
+      for (SILValue result : II.getResults()) {
+        result->resetBitfields();
+      }
+      II.asSILNode()->resetBitfields();
+    
       II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
       // Special handling for SILDebugVariable.
       if (auto DVI = DebugVarCarryingInst(&II))
@@ -308,6 +313,9 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
           if (VarInfo->Scope)
             DVI.setDebugVarScope(
                 ScopeCloner.getOrCreateClonedScope(VarInfo->Scope));
+    }
+    for (SILArgument *arg : First->getArguments()) {
+      arg->resetBitfields();
     }
   }
 }
