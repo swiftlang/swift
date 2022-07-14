@@ -481,8 +481,6 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     }
   }
 
-  assert(bool(anchor) && "Expected an anchor!");
-
   {
     // If we have a locator for a member found through key path dynamic member
     // lookup, then we need to chop off the elements after the
