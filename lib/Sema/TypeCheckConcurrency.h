@@ -210,6 +210,9 @@ struct ActorReferenceResult {
     /// The declaration is being accessed from outside the actor and
     /// potentially from a different node, so it must be marked 'distributed'.
     Distributed = 1 << 2,
+
+    /// The declaration is being accessed from a @preconcurrency context.
+    Preconcurrency = 1 << 3,
   };
 
   using Options = OptionSet<Flags>;
