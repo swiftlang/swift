@@ -69,7 +69,7 @@ printValueWitnessTableFunctionType(raw_ostream &os, StringRef prefix,
                                    uint16_t ptrauthDisc) {
   os << "using " << prefix << name << "Ty = " << returnType
      << "(* __ptrauth_swift_value_witness_function_pointer(" << ptrauthDisc
-     << "))(" << paramTypes << ");\n";
+     << "))(" << paramTypes << ") SWIFT_NOEXCEPT_FUNCTION_PTR;\n";
 }
 
 static std::string makeParams(const char *arg) { return arg; }
@@ -82,6 +82,13 @@ static std::string makeParams(const char *arg, const T... args) {
 static void printValueWitnessTable(raw_ostream &os) {
   std::string members;
   llvm::raw_string_ostream membersOS(members);
+
+  // C++ only supports noexcept on `using` function types in C++17.
+  os << "#if __cplusplus > 201402L\n";
+  os << "#  define SWIFT_NOEXCEPT_FUNCTION_PTR noexcept\n";
+  os << "#else\n";
+  os << "#  define SWIFT_NOEXCEPT_FUNCTION_PTR\n";
+  os << "#endif\n\n";
 
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define DATA_VALUE_WITNESS(lowerId, upperId, type)                             \
@@ -129,6 +136,8 @@ static void printValueWitnessTable(raw_ostream &os) {
   os << "\nstruct EnumValueWitnessTable {\n"
      << "  ValueWitnessTable vwTable;\n"
      << membersOS.str() << "};\n\n";
+
+  os << "#undef SWIFT_NOEXCEPT_FUNCTION_PTR\n\n";
 }
 
 static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
