@@ -2234,6 +2234,9 @@ namespace {
 
               // Make the actual member operator private.
               MD->overwriteAccess(AccessLevel::Private);
+
+              // Make sure the synthesized decl can be found by lookupDirect.
+              result->addMemberToLookupTable(opFuncDecl);
             }
 
             if (cxxMethod->getDeclName().isIdentifier()) {

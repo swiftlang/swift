@@ -1059,9 +1059,9 @@ private:
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
-    funcPrinter.printCxxThunkBody(funcABI.getSymbolName(), resultTy,
-                                  FD->getParameters(), additionalParams,
-                                  funcTy->isThrowing());
+    funcPrinter.printCxxThunkBody(
+        funcABI.getSymbolName(), FD->getModuleContext(), resultTy,
+        FD->getParameters(), additionalParams, funcTy->isThrowing());
     os << "}\n";
   }
 

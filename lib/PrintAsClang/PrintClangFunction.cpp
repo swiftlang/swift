@@ -85,12 +85,13 @@ public:
       PrimitiveTypeMapping &typeMapping, OutputLanguageMode languageMode,
       SwiftToClangInteropContext &interopContext,
       CFunctionSignatureTypePrinterModifierDelegate modifiersDelegate,
+      const ModuleDecl *moduleContext,
       FunctionSignatureTypeUse typeUseKind =
           FunctionSignatureTypeUse::ParamType)
       : ClangSyntaxPrinter(os), cPrologueOS(cPrologueOS),
         typeMapping(typeMapping), interopContext(interopContext),
         languageMode(languageMode), modifiersDelegate(modifiersDelegate),
-        typeUseKind(typeUseKind) {}
+        moduleContext(moduleContext), typeUseKind(typeUseKind) {}
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               Optional<OptionalTypeKind> optionalKind,
@@ -168,11 +169,12 @@ public:
 
       } else {
         ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
-            .printValueTypeParameterType(decl, languageMode, isInOutParam);
+            .printValueTypeParameterType(decl, languageMode, moduleContext,
+                                         isInOutParam);
       }
     } else
       ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
-          .printValueTypeReturnType(decl, languageMode);
+          .printValueTypeReturnType(decl, languageMode, moduleContext);
   }
 
   void visitPart(Type Ty, Optional<OptionalTypeKind> optionalKind,
@@ -186,6 +188,7 @@ private:
   SwiftToClangInteropContext &interopContext;
   OutputLanguageMode languageMode;
   CFunctionSignatureTypePrinterModifierDelegate modifiersDelegate;
+  const ModuleDecl *moduleContext;
   FunctionSignatureTypeUse typeUseKind;
 };
 
@@ -195,6 +198,7 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, StringRef name, Type resultTy,
     FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams,
     FunctionSignatureModifiers modifiers) {
+  auto emittedModule = FD->getModuleContext();
   OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
                                       ? OutputLanguageMode::ObjC
                                       : OutputLanguageMode::Cxx;
@@ -205,8 +209,9 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                 CFunctionSignatureTypePrinterModifierDelegate delegate = {}) {
         // FIXME: add support for noescape and PrintMultiPartType,
         // see DeclAndTypePrinter::print.
-        CFunctionSignatureTypePrinter typePrinter(
-            os, cPrologueOS, typeMapping, outputLang, interopContext, delegate);
+        CFunctionSignatureTypePrinter typePrinter(os, cPrologueOS, typeMapping,
+                                                  outputLang, interopContext,
+                                                  delegate, emittedModule);
         typePrinter.visit(ty, optionalKind, isInOutParam);
 
         if (!name.empty()) {
@@ -228,7 +233,7 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
         DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
     CFunctionSignatureTypePrinter typePrinter(
         os, cPrologueOS, typeMapping, outputLang, interopContext,
-        CFunctionSignatureTypePrinterModifierDelegate(),
+        CFunctionSignatureTypePrinterModifierDelegate(), emittedModule,
         FunctionSignatureTypeUse::ReturnType);
     // Param for indirect return cannot be marked as inout
     typePrinter.visit(objTy, retKind, /*isInOutParam=*/false);
@@ -312,8 +317,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
-    Type type, StringRef name, bool isInOut, bool isIndirect,
-    llvm::Optional<AdditionalParam::Role> paramRole) {
+    Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
+    bool isIndirect, llvm::Optional<AdditionalParam::Role> paramRole) {
   auto namePrinter = [&]() { ClangSyntaxPrinter(os).printIdentifier(name); };
   if (!isKnownCxxType(type, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(type)) {
@@ -323,7 +328,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
             .printParameterCxxToCUseScaffold(
                 isIndirect || decl->isResilient() ||
                     interopContext.getIrABIDetails().shouldPassIndirectly(type),
-                decl, namePrinter, isInOut,
+                decl, moduleContext, namePrinter, isInOut,
                 /*isSelf=*/paramRole &&
                     *paramRole == AdditionalParam::Role::Self);
         return;
@@ -339,12 +344,14 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
 
 void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     const ParamDecl *param, StringRef name) {
-  printCxxToCFunctionParameterUse(param->getType(), name, param->isInOut());
+  printCxxToCFunctionParameterUse(param->getType(), name,
+                                  param->getModuleContext(), param->isInOut());
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
-    StringRef swiftSymbolName, Type resultTy, const ParameterList *params,
-    ArrayRef<AdditionalParam> additionalParams, bool hasThrows) {
+    StringRef swiftSymbolName, const ModuleDecl *moduleContext, Type resultTy,
+    const ParameterList *params, ArrayRef<AdditionalParam> additionalParams,
+    bool hasThrows) {
   if (hasThrows) {
     os << "  void* opaqueError = nullptr;\n";
     os << "  void* self = nullptr;\n";
@@ -382,17 +389,17 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         os << ", ";
       interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
          if (param.role == AdditionalParam::Role::Self && !hasThrows)
-          printCxxToCFunctionParameterUse(param.type, "*this", /*isInOut=*/false,
-                                          /*isIndirect=*/param.isIndirect,
-                                          param.role);
+           printCxxToCFunctionParameterUse(
+               param.type, "*this", moduleContext, /*isInOut=*/false,
+               /*isIndirect=*/param.isIndirect, param.role);
          else if(param.role == AdditionalParam::Role::Self && hasThrows)
-            printCxxToCFunctionParameterUse(param.type, "self", /*isInOut=*/false,
-                                            /*isIndirect=*/param.isIndirect,
-                                            param.role);
+           printCxxToCFunctionParameterUse(
+               param.type, "self", moduleContext, /*isInOut=*/false,
+               /*isIndirect=*/param.isIndirect, param.role);
          else if(param.role == AdditionalParam::Role::Error && hasThrows)
-           printCxxToCFunctionParameterUse(param.type, "&opaqueError", /*isInOut=*/false,
-                                           /*isIndirect=*/param.isIndirect,
-                                           param.role);
+           printCxxToCFunctionParameterUse(
+               param.type, "&opaqueError", moduleContext, /*isInOut=*/false,
+               /*isIndirect=*/param.isIndirect, param.role);
       });
     }
 
@@ -412,12 +419,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
                                                interopContext);
         if (isIndirect) {
           valueTypePrinter.printValueTypeIndirectReturnScaffold(
-              decl, [&](StringRef returnParam) {
+              decl, moduleContext, [&](StringRef returnParam) {
                 printCallToCFunc(/*additionalParam=*/returnParam);
               });
         } else {
           valueTypePrinter.printValueTypeDirectReturnScaffold(
-              decl, [&]() { printCallToCFunc(/*additionalParam=*/None); });
+              decl, moduleContext,
+              [&]() { printCallToCFunc(/*additionalParam=*/None); });
         }
         return;
       }
@@ -464,8 +472,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
         typeDeclContext->getDeclaredType(),
         /*isIndirect=*/isMutating,
     });
-  printCxxThunkBody(swiftSymbolName, resultTy, FD->getParameters(),
-                    additionalParams, FD->hasThrows());
+  printCxxThunkBody(swiftSymbolName, FD->getModuleContext(), resultTy,
+                    FD->getParameters(), additionalParams, FD->hasThrows());
   os << "  }\n";
 }
 
@@ -482,7 +490,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   CFunctionSignatureTypePrinter typePrinter(
       os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx, interopContext,
       CFunctionSignatureTypePrinterModifierDelegate(),
-      FunctionSignatureTypeUse::ReturnType);
+      accessor->getModuleContext(), FunctionSignatureTypeUse::ReturnType);
   typePrinter.visit(objTy, retKind, /*isInOut=*/false);
 
   ClangSyntaxPrinter printer(os);
@@ -506,7 +514,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   }
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(swiftSymbolName, resultTy, accessor->getParameters(),
+  printCxxThunkBody(swiftSymbolName, accessor->getModuleContext(), resultTy,
+                    accessor->getParameters(),
                     {AdditionalParam{AdditionalParam::Role::Self,
                                      typeDeclContext->getDeclaredType(),
                                      /*isIndirect=*/false}});
