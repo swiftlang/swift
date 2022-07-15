@@ -377,11 +377,6 @@ WARNING(warning_module_shadowing_may_break_module_interface,none,
         /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
-REMARK(rebuilding_stdlib_from_interface,none,
-       "did not find a prebuilt standard library for target '%0' compatible "
-       "with this Swift compiler; building it may take a few minutes, but it "
-       "should only happen once for this combination of compiler and target",
-       (StringRef))
 NOTE(sdk_version_pbm_version,none,
      "SDK build version is '%0'; prebuilt modules were "
      "built using SDK build version: '%1'", (StringRef, StringRef))
