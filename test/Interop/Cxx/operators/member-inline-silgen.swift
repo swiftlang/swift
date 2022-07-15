@@ -16,7 +16,7 @@ public func exclaim(_ wrapper: inout LoadableBoolWrapper) -> LoadableBoolWrapper
 // CHECK: bb0([[SELF:%.*]] : $*LoadableBoolWrapper):
 // CHECK:   [[METATYPE:%.*]] = metatype $@thin LoadableBoolWrapper.Type
 // CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*LoadableBoolWrapper
-// CHECK:   [[OP:%.*]] = function_ref @$sSo19LoadableBoolWrapperV1noiyA2BzFZ : $@convention(method) (@inout LoadableBoolWrapper, @thin LoadableBoolWrapper.Type) -> LoadableBoolWrapper
+// CHECK:   [[OP:%.*]] = function_ref @$sSo19LoadableBoolWrapperV1nopyA2BzFZ : $@convention(method) (@inout LoadableBoolWrapper, @thin LoadableBoolWrapper.Type) -> LoadableBoolWrapper
 // CHECK:   apply [[OP]]([[SELFACCESS]], [[METATYPE]]) : $@convention(method) (@inout LoadableBoolWrapper, @thin LoadableBoolWrapper.Type) -> LoadableBoolWrapper
 // CHECK:   end_access [[SELFACCESS]]
 
