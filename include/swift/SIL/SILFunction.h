@@ -472,6 +472,9 @@ public:
   SILFunction *getDynamicallyReplacedFunction() const {
     return ReplacedFunction;
   }
+
+  static SILFunction *getFunction(SILDeclRef ref, SILModule &M);
+
   void setDynamicallyReplacedFunction(SILFunction *f) {
     assert(ReplacedFunction == nullptr && "already set");
     assert(!hasObjCReplacement());

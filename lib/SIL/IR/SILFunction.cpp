@@ -21,6 +21,7 @@
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "../../SILGen/SILGen.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -873,4 +874,9 @@ visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const {
     c(idx, (flags & EffectsFlagDerived) != 0, kind);
     idx++;
   }
+}
+
+SILFunction *SILFunction::getFunction(SILDeclRef ref, SILModule &M) {
+  swift::Lowering::SILGenModule SILGenModule(M, ref.getModuleContext());
+  return SILGenModule.getFunction(ref, swift::NotForDefinition);
 }

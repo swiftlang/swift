@@ -8,14 +8,12 @@
 
 // CHECK-LABEL: namespace _impl {
 
-// CHECK: SWIFT_EXTERN void $s9Functions18emptyThrowFunctionyyKF(void) SWIFT_CALL; // emptyThrowFunction()
-// CHECK: SWIFT_EXTERN void $s9Functions13throwFunctionyyKF(void) SWIFT_CALL; // throwFunction()
+// CHECK: SWIFT_EXTERN void $s9Functions18emptyThrowFunctionyyKF(SWIFT_CONTEXT void * _Nonnull _self, SWIFT_ERROR_RESULT void ** _error) SWIFT_CALL; // emptyThrowFunction()
+// CHECK: SWIFT_EXTERN void $s9Functions13throwFunctionyyKF(SWIFT_CONTEXT void * _Nonnull _self, SWIFT_ERROR_RESULT void ** _error) SWIFT_CALL; // throwFunction()
 
 // CHECK: }
 
-//XFAIL: *
-
-enum NaiveErrors: Error {
+enum NaiveErrors : Error {
     case returnError
     case throwError
 }
@@ -23,7 +21,9 @@ enum NaiveErrors: Error {
 public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 
 // CHECK: inline void emptyThrowFunction() {
-// CHECK: return _impl::$s9Functions18emptyThrowFunctionyyKF();
+// CHECK: void* opaqueError = nullptr;
+// CHECK: void* self = nullptr;
+// CHECK: return _impl::$s9Functions18emptyThrowFunctionyyKF(self, &opaqueError);
 // CHECK: }
 
 public func throwFunction() throws {
@@ -32,5 +32,7 @@ public func throwFunction() throws {
 }
 
 // CHECK: inline void throwFunction() {
-// CHECK: return _impl::$s9Functions13throwFunctionyyKF();
+// CHECK: void* opaqueError = nullptr;
+// CHECK: void* self = nullptr;
+// CHECK: return _impl::$s9Functions13throwFunctionyyKF(self, &opaqueError);
 // CHECK: }

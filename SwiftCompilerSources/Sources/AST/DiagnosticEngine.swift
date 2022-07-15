@@ -53,16 +53,10 @@ public struct DiagnosticFixIt {
 }
 
 public struct DiagnosticEngine {
-  private let bridged: BridgedDiagnosticEngine
+  private let bridged: swift.DiagnosticEngine
 
-  public init(bridged: BridgedDiagnosticEngine) {
+  public init(bridged: swift.DiagnosticEngine) {
     self.bridged = bridged
-  }
-  public init?(bridged: BridgedOptionalDiagnosticEngine) {
-    guard let object = bridged.object else {
-      return nil
-    }
-    self.bridged = BridgedDiagnosticEngine(object: object)
   }
 
   public func diagnose(_ position: SourceLoc?,

@@ -6875,6 +6875,60 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
+  // Use an opaque type to abstract a value of the underlying concrete type.
+  // The full check here would be that `toType` and `fromType` are structurally
+  // equal except in any position where `toType` has an opaque archetype. The
+  // below is just an approximate check since the above would be expensive to
+  // verify and still relies on the type checker ensuing `fromType` is
+  // compatible with any opaque archetypes.
+  if (toType->hasOpaqueArchetype() &&
+      cs.getConstraintLocator(locator)->isForContextualType()) {
+    // Find the opaque type declaration. We need its generic signature.
+    OpaqueTypeDecl *opaqueDecl = nullptr;
+    bool found = toType.findIf([&](Type type) {
+      if (auto opaqueType = type->getAs<OpaqueTypeArchetypeType>()) {
+        opaqueDecl = opaqueType->getDecl();
+        return true;
+      }
+
+      return false;
+    });
+    (void)found;
+    assert(found && "No opaque type archetype?");
+
+    // Compute the substitutions for the opaque type declaration.
+    auto opaqueLocator = solution.getConstraintSystem().getOpenOpaqueLocator(
+        locator, opaqueDecl);
+    SubstitutionMap substitutions = solution.computeSubstitutions(
+        opaqueDecl->getOpaqueInterfaceGenericSignature(), opaqueLocator);
+
+    // If we don't have substitutions, this is an opaque archetype from
+    // another declaration being manipulated, and not an erasure of a
+    // concrete type to an opaque type inside its defining declaration.
+    if (!substitutions.empty()) {
+      // Compute the underlying type by replacing all opaque archetypes with
+      // the fixed type of their opened type.
+      auto underlyingType = toType.subst(
+        [&](SubstitutableType *type) -> Type {
+          if (auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>()) {
+            if (opaqueType->getDecl() == opaqueDecl) {
+              return opaqueType->getInterfaceType().subst(substitutions);
+            }
+          }
+          return type;
+        },
+        LookUpConformanceInModule(cs.DC->getParentModule()),
+        SubstFlags::SubstituteOpaqueArchetypes);
+
+      // Coerce the result expression to the underlying type.
+      // FIXME: Wrong locator?
+      auto *subExpr = coerceToType(expr, underlyingType, locator);
+
+      return cs.cacheType(
+          new (ctx) UnderlyingToOpaqueExpr(subExpr, toType, substitutions));
+    }
+  }
+
   // Handle "from specific" coercions before "catch all" coercions.
   auto desugaredFromType = fromType->getDesugaredType();
   switch (desugaredFromType->getKind()) {
@@ -7259,36 +7313,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Unresolved types come up in diagnostics for lvalue and inout types.
   if (fromType->hasUnresolvedType() || toType->hasUnresolvedType())
     return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
-
-  // Use an opaque type to abstract a value of the underlying concrete type.
-  // The full check here would be that `toType` and `fromType` are structurally
-  // equal except in any position where `toType` has an opaque archetype. The
-  // below is just an approximate check since the above would be expensive to
-  // verify and still relies on the type checker ensuing `fromType` is
-  // compatible with any opaque archetypes.
-  if (toType->hasOpaqueArchetype()) {
-    // Find the opaque type declaration. We need its generic signature.
-    OpaqueTypeDecl *opaqueDecl = nullptr;
-    bool found = toType.findIf([&](Type type) {
-      if (auto opaqueType = type->getAs<OpaqueTypeArchetypeType>()) {
-        opaqueDecl = opaqueType->getDecl();
-        return true;
-      }
-
-      return false;
-    });
-    (void)found;
-    assert(found && "No opaque type archetype?");
-
-    // Compute the substitutions for the opaque type declaration.
-    auto opaqueLocator = solution.getConstraintSystem().getOpenOpaqueLocator(
-        locator, opaqueDecl);
-    SubstitutionMap substitutions = solution.computeSubstitutions(
-        opaqueDecl->getOpaqueInterfaceGenericSignature(), opaqueLocator);
-    assert(!substitutions.empty() && "Missing substitutions for opaque type");
-    return cs.cacheType(
-        new (ctx) UnderlyingToOpaqueExpr(expr, toType, substitutions));
-  }
 
   llvm_unreachable("Unhandled coercion");
 }
