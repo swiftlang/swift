@@ -17,28 +17,18 @@
 
 using namespace swift;
 
-namespace {
-/// BridgedDiagnosticEngine -> DiagnosticEngine *.
-DiagnosticEngine *getDiagnosticEngine(const BridgedDiagnosticEngine &bridged) {
-  return static_cast<DiagnosticEngine *>(bridged.object);
-}
-
-} // namespace
-
 void DiagnosticEngine_diagnose(
-    BridgedDiagnosticEngine bridgedEngine, SourceLoc loc,
-    BridgedDiagID bridgedDiagID,
+    DiagnosticEngine &engine, SourceLoc loc, BridgedDiagID bridgedDiagID,
     BridgedArrayRef /*DiagnosticArgument*/ bridgedArguments,
     CharSourceRange highlight,
     BridgedArrayRef /*DiagnosticInfo::FixIt*/ bridgedFixIts) {
-  auto *D = getDiagnosticEngine(bridgedEngine);
 
   auto diagID = static_cast<DiagID>(bridgedDiagID);
   SmallVector<DiagnosticArgument, 2> arguments;
   for (auto arg : getArrayRef<DiagnosticArgument>(bridgedArguments)) {
     arguments.push_back(arg);
   }
-  auto inflight = D->diagnose(loc, diagID, arguments);
+  auto inflight = engine.diagnose(loc, diagID, arguments);
 
   // Add highlight.
   if (highlight.isValid()) {
@@ -51,9 +41,4 @@ void DiagnosticEngine_diagnose(
     auto text = fixIt.getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
   }
-}
-
-bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine bridgedEngine) {
-  auto *D = getDiagnosticEngine(bridgedEngine);
-  return D->hadAnyError();
 }
