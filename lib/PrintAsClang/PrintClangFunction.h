@@ -26,6 +26,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class AccessorDecl;
 class FuncDecl;
+class ModuleDecl;
 class NominalTypeDecl;
 class ParamDecl;
 class ParameterList;
@@ -82,7 +83,8 @@ public:
 
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
-  void printCxxThunkBody(StringRef swiftSymbolName, Type resultTy,
+  void printCxxThunkBody(StringRef swiftSymbolName,
+                         const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params,
                          ArrayRef<AdditionalParam> additionalParams = {},
                          bool hasThrows = false);
@@ -101,7 +103,8 @@ public:
 
 private:
   void printCxxToCFunctionParameterUse(
-      Type type, StringRef name, bool isInOut, bool isIndirect = false,
+      Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
+      bool isIndirect = false,
       llvm::Optional<AdditionalParam::Role> paramRole = None);
 
   bool hasKnownOptionalNullableCxxMapping(Type type);

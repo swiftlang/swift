@@ -50,6 +50,12 @@ public:
   /// C type names inside the module.
   void printModuleNameCPrefix(const ModuleDecl &mod);
 
+  /// Print the optional namespace qualifiers for the given module reference if
+  /// it's not the same as the current context.
+  void
+  printModuleNamespaceQualifiersIfNeeded(const ModuleDecl *referencedModule,
+                                         const ModuleDecl *currentContext);
+
   /// Print a C++ namespace declaration with the give name and body.
   void
   printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,
