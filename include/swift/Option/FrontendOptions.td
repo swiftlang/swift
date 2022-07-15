@@ -1072,4 +1072,8 @@ def concurrency_model :
 def concurrency_model_EQ :
     Joined<["-"], "concurrency-model=">,
     Alias<concurrency_model>;
+
+def enable_new_llvm_pass_manager :
+  Flag<["-"], "enable-new-llvm-pass-manager">,
+  HelpText<"Enable new llvm pass manager">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
