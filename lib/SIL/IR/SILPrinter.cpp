@@ -950,6 +950,16 @@ public:
       if (br->getDestBB()->getDebugName().hasValue()) {
         *this << ", dest->" << br->getDestBB()->getDebugName().getValue();
       }
+    } else if (auto termInst = dyn_cast<TermInst>(inst)) {
+      // Otherwise, we just print the successors in order without pretty printing
+      for (unsigned i = 0, numSuccessors = termInst->getSuccessors().size();
+           i != numSuccessors; ++i) {
+        auto &successor = termInst->getSuccessors()[i];
+        if (successor.getBB()->getDebugName().hasValue()) {
+          *this << ", #" << i
+                << "->" << successor.getBB()->getDebugName().getValue();
+        }
+      }
     }
   }
 
