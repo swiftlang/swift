@@ -15,7 +15,6 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
