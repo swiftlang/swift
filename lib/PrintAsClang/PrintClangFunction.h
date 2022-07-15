@@ -15,7 +15,6 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
@@ -26,6 +25,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class AccessorDecl;
 class FuncDecl;
+class ModuleDecl;
 class NominalTypeDecl;
 class ParamDecl;
 class ParameterList;
@@ -82,7 +82,8 @@ public:
 
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
-  void printCxxThunkBody(StringRef swiftSymbolName, Type resultTy,
+  void printCxxThunkBody(StringRef swiftSymbolName,
+                         const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params,
                          ArrayRef<AdditionalParam> additionalParams = {},
                          bool hasThrows = false);
@@ -101,7 +102,8 @@ public:
 
 private:
   void printCxxToCFunctionParameterUse(
-      Type type, StringRef name, bool isInOut, bool isIndirect = false,
+      Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
+      bool isIndirect = false,
       llvm::Optional<AdditionalParam::Role> paramRole = None);
 
   bool hasKnownOptionalNullableCxxMapping(Type type);
