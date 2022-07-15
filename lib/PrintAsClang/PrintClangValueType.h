@@ -21,6 +21,7 @@
 
 namespace swift {
 
+class ModuleDecl;
 class NominalTypeDecl;
 class PrimitiveTypeMapping;
 class StructDecl;
@@ -44,24 +45,27 @@ public:
   /// Print the pararameter type that referes to a Swift struct type in C/C++.
   void printValueTypeParameterType(const NominalTypeDecl *type,
                                    OutputLanguageMode outputLang,
+                                   const ModuleDecl *moduleContext,
                                    bool isInOutParam);
 
   /// Print the use of a C++ struct/enum parameter value as it's passed to the
   /// underlying C function that represents the native Swift function.
   void
   printParameterCxxToCUseScaffold(bool isIndirect, const NominalTypeDecl *type,
+                                  const ModuleDecl *moduleContext,
                                   llvm::function_ref<void()> cxxParamPrinter,
                                   bool isInOut, bool isSelf);
 
   /// Print the return type that refers to a Swift struct type in C/C++.
   void printValueTypeReturnType(const NominalTypeDecl *typeDecl,
-                                OutputLanguageMode outputLang);
+                                OutputLanguageMode outputLang,
+                                const ModuleDecl *moduleContext);
 
   /// Print the supporting code  that's required to indirectly return a C++
   /// class that represents a Swift value type as it's being indirectly passed
   /// from the C function that represents the native Swift function.
   void printValueTypeIndirectReturnScaffold(
-      const NominalTypeDecl *typeDecl,
+      const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext,
       llvm::function_ref<void(StringRef)> bodyPrinter);
 
   /// Print the supporting code  that's required to directly return a C++ class
@@ -69,6 +73,7 @@ public:
   /// function that represents the native Swift function.
   void
   printValueTypeDirectReturnScaffold(const NominalTypeDecl *typeDecl,
+                                     const ModuleDecl *moduleContext,
                                      llvm::function_ref<void()> bodyPrinter);
 
 private:

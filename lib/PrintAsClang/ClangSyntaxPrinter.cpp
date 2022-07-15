@@ -57,6 +57,14 @@ void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
   os << mod.getName().str() << '_';
 }
 
+void ClangSyntaxPrinter::printModuleNamespaceQualifiersIfNeeded(
+    const ModuleDecl *referencedModule, const ModuleDecl *currentContext) {
+  if (referencedModule == currentContext)
+    return;
+  printBaseName(referencedModule);
+  os << "::";
+}
+
 /// Print a C++ namespace declaration with the give name and body.
 void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> namePrinter,
