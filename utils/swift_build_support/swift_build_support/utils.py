@@ -42,8 +42,9 @@ def log_time_path():
 
 
 def clear_log_time():
-    f = open(log_time_path(), "w")
-    f.close()
+    if os.path.exists(log_time_path()):
+        f = open(log_time_path(), "w")
+        f.close()
 
 
 def log_time(event, command, duration=0):
