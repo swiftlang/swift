@@ -36,8 +36,6 @@
 using namespace swift;
 using namespace Lowering;
 
-STATISTIC(MaxBitfieldID, "Max value of SILFunction::currentBitfieldID");
-
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
                                      SILFunction *target, Identifier spiGroup,
@@ -229,10 +227,10 @@ SILFunction::~SILFunction() {
 
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
-  assert(!newestAliveBitfield &&
+  assert(!newestAliveBlockBitfield &&
          "Not all BasicBlockBitfields deleted at function destruction");
-  if (currentBitfieldID > MaxBitfieldID)
-    MaxBitfieldID = currentBitfieldID;
+  assert(!newestAliveNodeBitfield &&
+         "Not all NodeBitfields deleted at function destruction");
 
   if (destroyFunction)
     destroyFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
@@ -706,6 +704,13 @@ SILFunction::isPossiblyUsedExternally() const {
     return true;
 
   if (isDistributed() && isThunk())
+    return true;
+
+  // Declaration marked as `@_alwaysEmitIntoClient` that
+  // returns opaque result type with availability conditions
+  // has to be kept alive to emit opaque type metadata descriptor.
+  if (markedAsAlwaysEmitIntoClient() &&
+      hasOpaqueResultTypeWithAvailabilityConditions())
     return true;
 
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());

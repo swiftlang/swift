@@ -588,6 +588,19 @@ public:
 
   /// Print the type variable to the given output stream.
   void print(llvm::raw_ostream &OS);
+  
+private:
+  StringRef getTypeVariableOptions(TypeVariableOptions TVO) const {
+  #define ENTRY(Kind, String) case TypeVariableOptions::Kind: return String
+    switch (TVO) {
+    ENTRY(TVO_CanBindToLValue, "lvalue");
+    ENTRY(TVO_CanBindToInOut, "inout");
+    ENTRY(TVO_CanBindToNoEscape, "noescape");
+    ENTRY(TVO_CanBindToHole, "hole");
+    ENTRY(TVO_PrefersSubtypeBinding, "");
+    }
+  #undef ENTRY
+  }
 };
 
 namespace constraints {
@@ -1189,6 +1202,9 @@ public:
     }
     llvm_unreachable("invalid statement kind");
   }
+
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
 /// Describes the arguments to which a parameter binds.

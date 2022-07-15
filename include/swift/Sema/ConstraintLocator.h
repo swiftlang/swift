@@ -191,6 +191,11 @@ public:
     bool isClosureResult() const {
       return getKind() == PathElementKind::ClosureResult;
     }
+
+    void dump(raw_ostream &out) const LLVM_ATTRIBUTE_USED;
+    SWIFT_DEBUG_DUMP {
+      dump(llvm::errs());
+    }
   };
 
   /// Return the summary flags for an entire path.
@@ -1256,6 +1261,12 @@ public:
 
     return None;
   }
+
+  /// Produce a debugging dump of this locator.
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
+
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
 } // end namespace constraints

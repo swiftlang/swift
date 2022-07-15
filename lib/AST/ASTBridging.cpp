@@ -23,33 +23,20 @@ DiagnosticEngine *getDiagnosticEngine(const BridgedDiagnosticEngine &bridged) {
   return static_cast<DiagnosticEngine *>(bridged.object);
 }
 
-/// BridgedDiagnosticArgument -> DiagnosticArgument
-DiagnosticArgument
-getDiagnosticArgument(const BridgedDiagnosticArgument &bridged) {
-  switch (bridged.kind) {
-  case BridgedDiagnosticArgumentKind_StringRef:
-    return {getStringRef(bridged.value.stringRefValue)};
-  case BridgedDiagnosticArgumentKind_Int:
-    return {(int)bridged.value.intValue};
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
 } // namespace
 
 void DiagnosticEngine_diagnose(
     BridgedDiagnosticEngine bridgedEngine, SourceLoc loc,
     BridgedDiagID bridgedDiagID,
-    BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
+    BridgedArrayRef /*DiagnosticArgument*/ bridgedArguments,
     CharSourceRange highlight,
     BridgedArrayRef /*DiagnosticInfo::FixIt*/ bridgedFixIts) {
   auto *D = getDiagnosticEngine(bridgedEngine);
 
   auto diagID = static_cast<DiagID>(bridgedDiagID);
   SmallVector<DiagnosticArgument, 2> arguments;
-  for (auto bridgedArg :
-       getArrayRef<BridgedDiagnosticArgument>(bridgedArguments)) {
-    arguments.push_back(getDiagnosticArgument(bridgedArg));
+  for (auto arg : getArrayRef<DiagnosticArgument>(bridgedArguments)) {
+    arguments.push_back(arg);
   }
   auto inflight = D->diagnose(loc, diagID, arguments);
 
@@ -59,9 +46,9 @@ void DiagnosticEngine_diagnose(
   }
 
   // Add fix-its.
-  for (auto bridgedFixIt : getArrayRef<DiagnosticInfo::FixIt>(bridgedFixIts)) {
-    auto range = bridgedFixIt.getRange();
-    auto text = bridgedFixIt.getText();
+  for (auto fixIt : getArrayRef<DiagnosticInfo::FixIt>(bridgedFixIts)) {
+    auto range = fixIt.getRange();
+    auto text = fixIt.getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
   }
 }

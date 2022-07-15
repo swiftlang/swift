@@ -1210,6 +1210,30 @@ void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
   }
 }
 
+NodeSet *SwiftPassInvocation::allocNodeSet() {
+  assert(numNodeSetsAllocated < NodeSetCapacity - 1 &&
+         "too many BasicNodeSets allocated");
+
+  auto *storage = (NodeSet *)nodeSetStorage + numNodeSetsAllocated;
+  NodeSet *set = new (storage) NodeSet(function);
+  aliveNodeSets[numNodeSetsAllocated] = true;
+  ++numNodeSetsAllocated;
+  return set;
+}
+
+void SwiftPassInvocation::freeNodeSet(NodeSet *set) {
+  int idx = set - (NodeSet *)nodeSetStorage;
+  assert(idx >= 0 && idx < numNodeSetsAllocated);
+  assert(aliveNodeSets[idx] && "double free of NodeSet");
+  aliveNodeSets[idx] = false;
+
+  while (numNodeSetsAllocated > 0 && !aliveNodeSets[numNodeSetsAllocated - 1]) {
+    auto *set = (NodeSet *)nodeSetStorage + numNodeSetsAllocated - 1;
+    set->~NodeSet();
+    --numNodeSetsAllocated;
+  }
+}
+
 void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
   assert(!this->function && !this->transform && "a pass is already running");
   this->function = transform->getFunction();
@@ -1235,6 +1259,7 @@ void SwiftPassInvocation::finishedInstructionPassRun() {
 void SwiftPassInvocation::endPassRunChecks() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
+  assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1263,6 +1288,10 @@ inline BridgedSlab toBridgedSlab(FixedSizeSlab *slab) {
 
 inline BasicBlockSet *castToBlockSet(BridgedBasicBlockSet blockSet) {
   return static_cast<BasicBlockSet *>(blockSet.bbs);
+}
+
+inline NodeSet *castToNodeSet(BridgedNodeSet nodeSet) {
+  return static_cast<NodeSet *>(nodeSet.nds);
 }
 
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab) {
@@ -1402,6 +1431,43 @@ void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
 
 BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
   return {castToBlockSet(set)->getFunction()};
+}
+
+BridgedNodeSet PassContext_allocNodeSet(BridgedPassContext context) {
+  return {castToPassInvocation(context)->allocNodeSet()};
+}
+
+void PassContext_freeNodeSet(BridgedPassContext context,
+                                   BridgedNodeSet set) {
+  castToPassInvocation(context)->freeNodeSet(castToNodeSet(set));
+}
+
+SwiftInt NodeSet_containsValue(BridgedNodeSet set, BridgedValue value) {
+  return castToNodeSet(set)->contains(castToSILValue(value)) ? 1 : 0;
+}
+
+void NodeSet_insertValue(BridgedNodeSet set, BridgedValue value) {
+  castToNodeSet(set)->insert(castToSILValue(value));
+}
+
+void NodeSet_eraseValue(BridgedNodeSet set, BridgedValue value) {
+  castToNodeSet(set)->erase(castToSILValue(value));
+}
+
+SwiftInt NodeSet_containsInstruction(BridgedNodeSet set, BridgedInstruction inst) {
+  return castToNodeSet(set)->contains(castToInst(inst)->asSILNode()) ? 1 : 0;
+}
+
+void NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst) {
+  castToNodeSet(set)->insert(castToInst(inst)->asSILNode());
+}
+
+void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst) {
+  castToNodeSet(set)->erase(castToInst(inst)->asSILNode());
+}
+
+BridgedFunction NodeSet_getFunction(BridgedNodeSet set) {
+  return {castToNodeSet(set)->getFunction()};
 }
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {

@@ -558,6 +558,18 @@ private:
   /// Check whether the given binding set covers any of the
   /// literal protocols associated with this type variable.
   void determineLiteralCoverage();
+  
+  StringRef getLiteralBindingKind(LiteralBindingKind K) const {
+  #define ENTRY(Kind, String) case LiteralBindingKind::Kind: return String
+    switch (K) {
+    ENTRY(None, "none");
+    ENTRY(Collection, "collection");
+    ENTRY(Float, "float");
+    ENTRY(Atom, "atom");
+    }
+  #undef ENTRY
+  }
+  
 };
 
 } // end namespace inference
