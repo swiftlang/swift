@@ -685,8 +685,12 @@ public:
   ///
   /// \param selfValue The 'self' value.
   /// \param cd The class declaration whose members are being destroyed.
+  /// \param finishBB If set, used as the basic block after members have been
+  ///                 destroyed, and we're ready to perform final cleanups
+  ///                 before returning.
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
-                                  CleanupLocation cleanupLoc);
+                                  CleanupLocation cleanupLoc,
+                                  SILBasicBlock* finishBB);
 
   /// Generates code to destroy linearly recursive data structures, without
   /// building up the call stack.
@@ -2096,8 +2100,12 @@ public:
 
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
-  void emitDistributedActorFactory(
-      FuncDecl *fd); // TODO(distributed): this is the "resolve"
+  void emitDistributedActorFactory(FuncDecl *fd); // TODO(distributed): this is the "resolve"
+
+  void emitDistributedIfRemoteBranch(SILLocation Loc,
+                                     ManagedValue selfValue, Type selfTy,
+                                     SILBasicBlock *isRemoteBB,
+                                     SILBasicBlock *isLocalBB);
 
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.
@@ -2127,11 +2135,14 @@ public:
   void emitConditionalResignIdentityCall(SILLocation loc,
                                          ClassDecl *actorDecl,
                                          ManagedValue actorSelf,
-                                         SILBasicBlock *continueBB);
+                                         SILBasicBlock *continueBB,
+                                         SILBasicBlock *finishBB);
 
   void emitDistributedActorClassMemberDestruction(
       SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
-      SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB);
+      SILBasicBlock *normalMemberDestroyBB,
+      SILBasicBlock *remoteMemberDestroyBB,
+      SILBasicBlock *finishBB);
 
   //===--------------------------------------------------------------------===//
   // Declarations
