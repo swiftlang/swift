@@ -565,7 +565,6 @@ void SILGenFunction::emitDistributedActorClassMemberDestruction(
   Scope scope(Cleanups, CleanupLocation(cleanupLoc));
 
   auto isLocalBB = createBasicBlock("isLocalBB");
-  // auto remoteMemberDestroyBB = createBasicBlock("remoteMemberDestroyBB");
 
   // if __isRemoteActor(self) {
   //   ...
