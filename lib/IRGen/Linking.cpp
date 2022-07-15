@@ -1142,9 +1142,12 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
 
   case Kind::AssociatedConformanceDescriptor:
   case Kind::DefaultAssociatedConformanceAccessor: {
-    // Associated conformance descriptors use the protocol as
-    // their declaration, but are weak linked if the associated
-    // type stored in extra storage area is weak linked.
+    // Associated conformance descriptors use the protocol as their declaration
+    // and are weak linked if either the protocol or the associated type stored
+    // in extra storage area is weak linked.
+    if (cast<ProtocolDecl>(getDecl())->isWeakImported(module))
+      return true;
+
     auto assocConformance = getAssociatedConformance();
     auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
     return depMemTy->getAssocType()->isWeakImported(module);
