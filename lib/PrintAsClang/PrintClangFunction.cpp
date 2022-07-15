@@ -284,17 +284,23 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       os << ", ";
     HasParams = true;
     interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
-      assert(param.role == AdditionalParam::Role::Self);
-      CFunctionSignatureTypePrinterModifierDelegate delegate;
-      delegate.prefixIndirectParamValueTypeInC = [](raw_ostream &os) {
-        os << "SWIFT_CONTEXT ";
-      };
-      if (param.isIndirect) {
-        (*delegate.prefixIndirectParamValueTypeInC)(os);
-        os << "void * _Nonnull _self";
-      } else {
-        print(param.type, OptionalTypeKind::OTK_None, "_self",
-              /*isInOut*/ false, delegate);
+      if (param.role == AdditionalParam::Role::Self) {
+        CFunctionSignatureTypePrinterModifierDelegate delegate;
+        delegate.prefixIndirectParamValueTypeInC = [](raw_ostream &os) {
+          os << "SWIFT_CONTEXT ";
+        };
+        if (FD->hasThrows())
+          os << "SWIFT_CONTEXT ";
+        if (param.isIndirect) {
+          (*delegate.prefixIndirectParamValueTypeInC)(os);
+          os << "void * _Nonnull _self";
+        } else {
+          print(param.type, OptionalTypeKind::OTK_None, "_self",
+                /*isInOut*/ false, delegate);
+        }
+      } else if (param.role ==  AdditionalParam::Role::Error) {
+        os << "SWIFT_ERROR_RESULT ";
+        os << "void ** _error";
       }
     });
   }
@@ -338,7 +344,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
 
 void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     StringRef swiftSymbolName, Type resultTy, const ParameterList *params,
-    ArrayRef<AdditionalParam> additionalParams) {
+    ArrayRef<AdditionalParam> additionalParams, bool hasThrows) {
+  if (hasThrows) {
+    os << "  void* opaqueError = nullptr;\n";
+    os << "  void* self = nullptr;\n";
+  }
   auto printCallToCFunc = [&](Optional<StringRef> additionalParam) {
     os << cxx_synthesis::getCxxImplNamespaceName() << "::" << swiftSymbolName
        << '(';
@@ -371,10 +381,18 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       if (hasParams)
         os << ", ";
       interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
-        assert(param.role == AdditionalParam::Role::Self);
-        printCxxToCFunctionParameterUse(param.type, "*this", /*isInOut=*/false,
-                                        /*isIndirect=*/param.isIndirect,
-                                        param.role);
+         if (param.role == AdditionalParam::Role::Self && !hasThrows)
+          printCxxToCFunctionParameterUse(param.type, "*this", /*isInOut=*/false,
+                                          /*isIndirect=*/param.isIndirect,
+                                          param.role);
+         else if(param.role == AdditionalParam::Role::Self && hasThrows)
+            printCxxToCFunctionParameterUse(param.type, "self", /*isInOut=*/false,
+                                            /*isIndirect=*/param.isIndirect,
+                                            param.role);
+         else if(param.role == AdditionalParam::Role::Error && hasThrows)
+           printCxxToCFunctionParameterUse(param.type, "&opaqueError", /*isInOut=*/false,
+                                           /*isIndirect=*/param.isIndirect,
+                                           param.role);
       });
     }
 
@@ -447,7 +465,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
         /*isIndirect=*/isMutating,
     });
   printCxxThunkBody(swiftSymbolName, resultTy, FD->getParameters(),
-                    additionalParams);
+                    additionalParams, FD->hasThrows());
   os << "  }\n";
 }
 

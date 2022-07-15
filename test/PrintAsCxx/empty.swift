@@ -80,6 +80,7 @@
 // CHECK-LABEL: # define SWIFT_CALL __attribute__((swiftcall))
 // CHECK:       # define SWIFT_INDIRECT_RESULT __attribute__((swift_indirect_result))
 // CHECK:       # define SWIFT_CONTEXT __attribute__((swift_context))
+// CHECK:       # define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
 
 // CHECK-LABEL: #if defined(__OBJC__)
 // CHECK-NEXT:  #if __has_feature(modules)
