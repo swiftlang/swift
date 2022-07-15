@@ -325,3 +325,28 @@ func acceptStyle<S: Style>(_: S) {}
 
 acceptStyle(.formattedString(format: "hi")) // Ok
 acceptStyle(.number(42)) // Ok
+
+protocol Container {
+  associatedtype Content
+}
+
+struct Box<T>: Container { // expected-note {{'T' declared as parameter to type 'Box'}}
+  typealias Content = T
+  init(_: Content) {}
+}
+
+extension Container {
+  // leading-dot syntax is going to use a typealias
+  typealias box = Box
+}
+
+// rdar://88513939 - Allow to call init through a typealias using leading-dot syntax in generic context
+func test_leading_dot_syntax_with_typelias() {
+  func test<T: Container>(_: T) {} // expected-note {{required by local function 'test' where 'T' = 'Box<T>.Type'}}
+
+  test(Container.box(1)) // Ok
+  test(.box(1)) // Ok `Container.box(1)` means `Box.init(1)`
+
+  test(.box) // expected-error {{type 'Box<T>.Type' cannot conform to 'Container'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+}
