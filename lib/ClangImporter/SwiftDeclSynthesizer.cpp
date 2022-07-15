@@ -1881,9 +1881,13 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 FuncDecl *
 SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
                                    clang::CXXMethodDecl *clangOperator) {
+  clang::OverloadedOperatorKind opKind = clangOperator->getOverloadedOperator();
+
+  assert(opKind != clang::OverloadedOperatorKind::OO_None &&
+         "expected a C++ operator");
+
   auto &ctx = ImporterImpl.SwiftContext;
-  auto opName =
-      clang::getOperatorSpelling(clangOperator->getOverloadedOperator());
+  auto opName = clang::getOperatorSpelling(opKind);
   auto paramList = operatorMethod->getParameters();
   auto genericParamList = operatorMethod->getGenericParams();
 
@@ -1934,6 +1938,11 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   topLevelStaticFuncDecl->setStatic();
   topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody,
                                              operatorMethod);
+
+  // If this is a unary prefix operator (e.g. `!`), add a `prefix` attribute.
+  if (clangOperator->param_empty()) {
+    topLevelStaticFuncDecl->getAttrs().add(new (ctx) PrefixAttr(SourceLoc()));
+  }
 
   return topLevelStaticFuncDecl;
 }
