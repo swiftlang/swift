@@ -290,7 +290,7 @@ performOptimizationsUsingLegacyPassManger(const IRGenOptions &Opts,
         if (Builder.OptLevel > 0) {
           const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
           unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
-          PM.add(createSwiftMergeFunctionsPass(schema.isEnabled(), key));
+          PM.add(createLegacySwiftMergeFunctionsPass(schema.isEnabled(), key));
         }
       });
   }

@@ -242,11 +242,10 @@ int main(int argc, char **argv) {
 
   // Register Swift Only Passes.
   initializeSwiftAAWrapperPassPass(Registry);
-  initializeSwiftRCIdentityPass(Registry);
   initializeSwiftARCOptPass(Registry);
   initializeSwiftARCContractPass(Registry);
   initializeInlineTreePrinterPass(Registry);
-  initializeSwiftMergeFunctionsPass(Registry);
+  initializeLegacySwiftMergeFunctionsPass(Registry);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM optimizer\n");
 
