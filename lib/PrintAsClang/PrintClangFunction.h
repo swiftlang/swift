@@ -15,6 +15,7 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
@@ -52,7 +53,7 @@ public:
 
   /// Information about any additional parameters.
   struct AdditionalParam {
-    enum class Role { Self };
+    enum class Role { Self, Error };
 
     Role role;
     Type type;
@@ -83,7 +84,8 @@ public:
   /// Swift function.
   void printCxxThunkBody(StringRef swiftSymbolName, Type resultTy,
                          const ParameterList *params,
-                         ArrayRef<AdditionalParam> additionalParams = {});
+                         ArrayRef<AdditionalParam> additionalParams = {},
+                         bool hasThrows = false);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
