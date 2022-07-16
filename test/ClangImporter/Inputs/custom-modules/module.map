@@ -271,3 +271,8 @@ module CommonName {
   header "CommonName.h"
   export *
 }
+
+module objc_init_redundant {
+  header "objc_init_redundant.h"
+  export *
+}
