@@ -38,4 +38,18 @@ struct ReturnsNonNullValue {
   }
 };
 
+struct HasOperatorExclaim {
+  int value;
+
+  HasOperatorExclaim operator!() const { return {-value}; }
+};
+
+struct HasOperatorEqualEqual {
+  int value;
+  
+  bool operator==(const HasOperatorEqualEqual &other) const {
+    return value == other.value;
+  }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_PROTOCOL_CONFORMANCE_H

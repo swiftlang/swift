@@ -35,10 +35,13 @@ static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type) {
 }
 
 /// Print out the C++ type name of a struct/enum declaration.
-static void printCxxTypeName(raw_ostream &os, const NominalTypeDecl *type) {
-  // FIXME: Print namespace qualifiers for references from other modules.
+static void printCxxTypeName(raw_ostream &os, const NominalTypeDecl *type,
+                             const ModuleDecl *moduleContext) {
   // FIXME: Print class qualifiers for nested class references.
-  ClangSyntaxPrinter(os).printBaseName(type);
+  ClangSyntaxPrinter printer(os);
+  printer.printModuleNamespaceQualifiersIfNeeded(type->getModuleContext(),
+                                                 moduleContext);
+  printer.printBaseName(type);
 }
 
 /// Print out the C++ type name of the implementation class that provides hidden
@@ -236,6 +239,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << ";\n";
   os << "};\n\n";
 
+  const auto *moduleContext = typeDecl->getModuleContext();
   // Print out the "hidden" _impl class.
   printer.printNamespace(
       cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
@@ -245,19 +249,19 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "public:\n";
 
         os << "  static inline char * _Nonnull getOpaquePointer(";
-        printCxxTypeName(os, typeDecl);
+        printCxxTypeName(os, typeDecl, moduleContext);
         os << " &object) { return object._getOpaquePointer(); }\n";
 
         os << "  static inline const char * _Nonnull getOpaquePointer(const ";
-        printCxxTypeName(os, typeDecl);
+        printCxxTypeName(os, typeDecl, moduleContext);
         os << " &object) { return object._getOpaquePointer(); }\n";
 
         os << "  template<class T>\n";
         os << "  static inline ";
-        printCxxTypeName(os, typeDecl);
+        printCxxTypeName(os, typeDecl, moduleContext);
         os << " returnNewValue(T callable) {\n";
         os << "    auto result = ";
-        printCxxTypeName(os, typeDecl);
+        printCxxTypeName(os, typeDecl, moduleContext);
         os << "::_make();\n";
         os << "    callable(result._getOpaquePointer());\n";
         os << "    return result;\n";
@@ -348,7 +352,7 @@ void ClangValueTypePrinter::printCStubTypeName(const NominalTypeDecl *type) {
 
 void ClangValueTypePrinter::printValueTypeParameterType(
     const NominalTypeDecl *type, OutputLanguageMode outputLang,
-    bool isInOutParam) {
+    const ModuleDecl *moduleContext, bool isInOutParam) {
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   if (outputLang != OutputLanguageMode::Cxx) {
     if (!isInOutParam) {
@@ -365,13 +369,14 @@ void ClangValueTypePrinter::printValueTypeParameterType(
   if (!isInOutParam) {
     os << "const ";
   }
-  printCxxTypeName(os, type);
+  printCxxTypeName(os, type, moduleContext);
   os << '&';
 }
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
     bool isIndirect, const NominalTypeDecl *type,
-    llvm::function_ref<void()> cxxParamPrinter, bool isInOut, bool isSelf) {
+    const ModuleDecl *moduleContext, llvm::function_ref<void()> cxxParamPrinter,
+    bool isInOut, bool isSelf) {
   // A Swift value type is passed to its underlying Swift function
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   if (!isIndirect && !isInOut) {
@@ -383,6 +388,8 @@ void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
   if (isSelf) {
     os << "_getOpaquePointer()";
   } else {
+    ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
+        type->getModuleContext(), moduleContext);
     os << cxx_synthesis::getCxxImplNamespaceName() << "::";
     printCxxImplClassName(os, type);
     os << "::getOpaquePointer(";
@@ -395,10 +402,11 @@ void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
 }
 
 void ClangValueTypePrinter::printValueTypeReturnType(
-    const NominalTypeDecl *type, OutputLanguageMode outputLang) {
+    const NominalTypeDecl *type, OutputLanguageMode outputLang,
+    const ModuleDecl *moduleContext) {
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   if (outputLang == OutputLanguageMode::Cxx) {
-    printCxxTypeName(os, type);
+    printCxxTypeName(os, type, moduleContext);
   } else {
     os << "struct ";
     printCStubTypeName(type);
@@ -406,10 +414,13 @@ void ClangValueTypePrinter::printValueTypeReturnType(
 }
 
 void ClangValueTypePrinter::printValueTypeIndirectReturnScaffold(
-    const NominalTypeDecl *type,
+    const NominalTypeDecl *type, const ModuleDecl *moduleContext,
     llvm::function_ref<void(StringRef)> bodyPrinter) {
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
-  os << "  return " << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  os << "  return ";
+  ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
+      type->getModuleContext(), moduleContext);
+  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, type);
   os << "::returnNewValue([&](void * _Nonnull result) {\n    ";
   bodyPrinter("result");
@@ -418,9 +429,13 @@ void ClangValueTypePrinter::printValueTypeIndirectReturnScaffold(
 }
 
 void ClangValueTypePrinter::printValueTypeDirectReturnScaffold(
-    const NominalTypeDecl *type, llvm::function_ref<void()> bodyPrinter) {
+    const NominalTypeDecl *type, const ModuleDecl *moduleContext,
+    llvm::function_ref<void()> bodyPrinter) {
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
-  os << "  return " << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  os << "  return ";
+  ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
+      type->getModuleContext(), moduleContext);
+  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, type);
   os << "::returnNewValue([&](char * _Nonnull result) {\n";
   os << "    ";

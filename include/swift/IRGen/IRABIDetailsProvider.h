@@ -47,6 +47,16 @@ public:
     SizeType alignment;
   };
 
+  /// Information about any ABI additional parameters.
+  struct ABIAdditionalParam {
+    enum class ABIParameterRole { Self, Error };
+
+    ABIParameterRole role;
+    TypeDecl *type;
+  };
+
+  SmallVector<ABIAdditionalParam, 1> ABIAdditionalParams;
+
   /// Returns the size and alignment for the given type, or \c None if the type
   /// is not a fixed layout type.
   llvm::Optional<SizeAndAlignment>
@@ -98,6 +108,10 @@ public:
   /// Returns EnumElementDecls (enum cases) in their declaration order with
   /// their tag indices from the given EnumDecl
   llvm::MapVector<EnumElementDecl *, unsigned> getEnumTagMapping(EnumDecl *ED);
+
+  /// Returns the additional params if they exist after lowering the function.
+  SmallVector<ABIAdditionalParam, 1>
+  getFunctionABIAdditionalParams(AbstractFunctionDecl *fd);
 
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;

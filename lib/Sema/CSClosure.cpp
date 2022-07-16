@@ -891,7 +891,7 @@ private:
     }
 
     SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                     CTP_ClosureResult, resultType,
+                                     CTP_ReturnStmt, resultType,
                                      /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
@@ -900,7 +900,7 @@ private:
     }
 
     cs.setContextualType(target.getAsExpr(), TypeLoc::withoutLoc(resultType),
-                         CTP_ClosureResult);
+                         CTP_ReturnStmt);
     cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
@@ -1510,7 +1510,7 @@ private:
     // number of times.
     {
       SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                       CTP_ClosureResult, resultType,
+                                       CTP_ReturnStmt, resultType,
                                        /*isDiscarded=*/false);
       cs.setSolutionApplicationTarget(returnStmt, target);
 
@@ -1576,7 +1576,7 @@ private:
 
     SolutionApplicationTarget resultTarget(
         resultExpr, context.getAsDeclContext(),
-        mode == convertToResult ? CTP_ClosureResult : CTP_Unused,
+        mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
         mode == convertToResult ? resultType : Type(),
         /*isDiscarded=*/false);
     if (auto newResultTarget = rewriteTarget(resultTarget))

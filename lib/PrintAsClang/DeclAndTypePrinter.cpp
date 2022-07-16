@@ -43,6 +43,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
+#include "SwiftToClangInteropContext.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -937,6 +938,28 @@ private:
     StringRef symbolName;
   };
 
+  // Converts the array of ABIAdditionalParam into an array of AdditionalParam
+  void convertABIAdditionalParams(
+      AbstractFunctionDecl *FD, Type resultTy,
+      llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1> ABIparams,
+      llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
+          &params) {
+    for (auto param : ABIparams) {
+      if (param.role ==
+          IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self)
+        params.push_back(
+            {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
+             resultTy->getASTContext().getOpaquePointerType(),
+             /*isIndirect=*/
+             isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
+      if (param.role ==
+          IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Error)
+        params.push_back(
+            {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Error,
+             resultTy->getASTContext().getOpaquePointerType()});
+    }
+  }
+
   // Print out the extern C Swift ABI function signature.
   FuncionSwiftABIInformation printSwiftABIFunctionSignatureAsCxxFunction(
       AbstractFunctionDecl *FD, Optional<FunctionType *> givenFuncType = None,
@@ -962,7 +985,9 @@ private:
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
                                                 owningPrinter.typeMapping,
                                                 owningPrinter.interopContext);
-    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 1>
+    auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
+                         .getFunctionABIAdditionalParams(FD);
+    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
         additionalParams;
     if (selfTypeDeclContext && !isa<ConstructorDecl>(FD)) {
       additionalParams.push_back(
@@ -971,6 +996,9 @@ private:
            /*isIndirect=*/
            isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
     }
+    if (funcTy->isThrowing() && !ABIparams.empty())
+      convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
+
     funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto,
@@ -978,7 +1006,9 @@ private:
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
-    os << " SWIFT_NOEXCEPT";
+    // FIXME: Support throwing exceptions for Swift errors.
+    if (!funcTy->isThrowing())
+      os << " SWIFT_NOEXCEPT";
     if (!funcABI.useCCallingConvention())
       os << " SWIFT_CALL";
     printAvailability(FD);
@@ -1013,16 +1043,25 @@ private:
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
                                                 owningPrinter.typeMapping,
                                                 owningPrinter.interopContext);
+    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
+        additionalParams;
+    auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
+                         .getFunctionABIAdditionalParams(FD);
+    if (funcTy->isThrowing() && !ABIparams.empty())
+      convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
+
     funcPrinter.printFunctionSignature(
         FD, FD->getName().getBaseIdentifier().get(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
     // FIXME: Support throwing exceptions for Swift errors.
-    os << " noexcept";
+    if (!funcTy->isThrowing())
+      os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
-    funcPrinter.printCxxThunkBody(funcABI.getSymbolName(), resultTy,
-                                  FD->getParameters());
+    funcPrinter.printCxxThunkBody(
+        funcABI.getSymbolName(), FD->getModuleContext(), resultTy,
+        FD->getParameters(), additionalParams, funcTy->isThrowing());
     os << "}\n";
   }
 

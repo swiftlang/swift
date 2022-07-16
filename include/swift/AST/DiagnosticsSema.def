@@ -4215,6 +4215,9 @@ NOTE(opaque_type_underlying_type_candidate_here,none,
 ERROR(opaque_type_self_referential_underlying_type,none,
       "function opaque return type was inferred as %0, which defines the "
       "opaque type in terms of itself", (Type))
+ERROR(opaque_type_cannot_contain_dynamic_self,none,
+      "function with opaque return type cannot return "
+      "the covariant 'Self' type of a class", ())
 ERROR(opaque_type_var_no_init,none,
       "property declares an opaque return type, but has no initializer "
       "expression from which to infer an underlying type", ())

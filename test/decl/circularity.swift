@@ -41,7 +41,7 @@ class Sub: Base {
     var foo = { () -> Int in
         let x = 42
         // FIXME: Bogus diagnostic
-        return foo(1) // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+        return foo(1) // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
     }()
 }
 
