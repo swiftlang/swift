@@ -14,16 +14,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParsedSyntaxBuilders.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
+#include "swift/Parse/Parser.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -180,7 +181,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   case tok::kw_Self:
   case tok::kw_Any:
   case tok::identifier: {
-    ty = parseTypeIdentifier();
+    ty = parseTypeIdentifier(false, reason);
     break;
   }
   case tok::l_paren:
@@ -679,7 +680,8 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
 ParserResult<TypeRepr>
-Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
+Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType,
+                            ParseTypeReason reason) {
   // If parsing a qualified declaration name, return error if base type cannot
   // be parsed.
   if (isParsingQualifiedDeclBaseType && !canParseBaseTypeForQualifiedDeclName())
@@ -722,9 +724,14 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       SourceLoc LAngle, RAngle;
       SmallVector<TypeRepr*, 8> GenericArgs;
       if (startsWithLess(Tok)) {
-        auto genericArgsStatus = parseGenericArguments(GenericArgs, LAngle, RAngle);
-        if (genericArgsStatus.isErrorOrHasCompletion())
-          return genericArgsStatus;
+        if (Tok.isAnyOperator() &&
+            (Tok.getText().str() == "<" ||
+             reason != ParseTypeReason::CastDestination)) {
+          auto genericArgsStatus =
+              parseGenericArguments(GenericArgs, LAngle, RAngle);
+          if (genericArgsStatus.isErrorOrHasCompletion())
+            return genericArgsStatus;
+        }
       }
       EndLoc = Loc.getEndLoc();
 

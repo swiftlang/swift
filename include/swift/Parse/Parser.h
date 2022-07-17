@@ -1259,6 +1259,9 @@ public:
 
     /// Whether the type is for a closure attribute.
     CustomAttribute,
+
+    /// Whether the type is a destination of a cast.
+    CastDestination,
   };
 
   ParserResult<TypeRepr> parseType();
@@ -1297,8 +1300,9 @@ public:
   ///   positioned at '.f'.
   /// - If there is no base type qualifier (e.g. when parsing just 'f'), returns
   ///   an empty parser error.
-  ParserResult<TypeRepr> parseTypeIdentifier(
-      bool isParsingQualifiedDeclBaseType = false);
+  ParserResult<TypeRepr>
+  parseTypeIdentifier(bool isParsingQualifiedDeclBaseType = false,
+                      ParseTypeReason reason = ParseTypeReason::Unspecified);
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,

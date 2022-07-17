@@ -76,3 +76,12 @@ A<B?>(x: 0) // parses as type // expected-warning{{unused}}
 _ = a < b ? c : d
 
 A<(B) throws -> D>(x: 0) // expected-warning{{unused}}
+
+do {
+  let _ = 1 as Int16 << 7
+  let _ = 1 as? Int16 << 7 // expected-warning{{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}} expected-warning{{value of optional type 'Int16?' must be unwrapped to a value of type 'Int16'}} expected-note{{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  let _ = 1 is Int16 << 7 // expected-warning{{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}} expected-error{{binary operator '<<' cannot be applied to operands of type 'Bool' and 'Int'}}
+  let _ = 1 as! Int16 << 7 // expected-warning{{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}}
+  let _ = 1 as Int16 < 7 // expected-error{{expected type}}
+  let _ = 1 as Int16 <= 7
+}

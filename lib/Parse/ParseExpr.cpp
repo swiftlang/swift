@@ -74,7 +74,8 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
 ParserResult<Expr> Parser::parseExprIs() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
 
-  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_is);
+  ParserResult<TypeRepr> type =
+      parseType(diag::expected_type_after_is, ParseTypeReason::CastDestination);
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())
@@ -101,7 +102,8 @@ ParserResult<Expr> Parser::parseExprAs() {
     exclaimLoc = consumeToken(tok::exclaim_postfix);
   }
 
-  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
+  ParserResult<TypeRepr> type =
+      parseType(diag::expected_type_after_as, ParseTypeReason::CastDestination);
 
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
