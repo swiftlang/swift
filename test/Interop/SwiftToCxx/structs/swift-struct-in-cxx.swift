@@ -48,6 +48,11 @@
 // CHECK-NEXT:   callable(result._getOpaquePointer());
 // CHECK-NEXT:   return result;
 // CHECK-NEXT:  }
+// CHECK-NEXT: static inline void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
+// CHECK-NEXT:   auto metadata = _impl::$s7Structs18StructWithIntFieldVMa(0);
+// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
+// CHECK-NEXT: }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: }

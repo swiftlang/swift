@@ -13,8 +13,10 @@
 #ifndef SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 #define SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 
+#include "OutputLanguageMode.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
@@ -99,6 +101,11 @@ public:
                                       const AccessorDecl *accessor,
                                       StringRef swiftSymbolName, Type resultTy,
                                       bool isDefinition);
+
+  /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
+  void printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
+                                    ModuleDecl *moduleContext,
+                                    OutputLanguageMode outputLang);
 
 private:
   void printCxxToCFunctionParameterUse(
