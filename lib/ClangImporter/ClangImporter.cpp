@@ -5939,9 +5939,21 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Reference;
   }
 
-  // TODO: diagnose if the decl also has any attrs.
   if (!hasRequiredValueTypeOperations(decl)) {
-    return CxxRecordSemanticsKind::UnsafeLifetimeOperation;
+    if (hasUnsafeAPIAttr(decl))
+      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                                            "import_unsafe",
+                                            decl->getNameAsString());
+    if (hasOwnedValueAttr(decl))
+      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                                            "import_owned",
+                                            decl->getNameAsString());
+    if (hasIteratorAPIAttr(decl))
+      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                                            "import_iterator",
+                                            decl->getNameAsString());
+
+    return CxxRecordSemanticsKind::MissingLifetimeOperation;
   }
 
   if (hasUnsafeAPIAttr(decl)) {
@@ -5992,7 +6004,8 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       if (auto cxxRecordReturnType =
               dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
         auto semanticsKind = evaluateOrDefault(
-            evaluator, CxxRecordSemantics({cxxRecordReturnType}), {});
+            evaluator,
+            CxxRecordSemantics({cxxRecordReturnType, desc.ctx}), {});
 
         if (semanticsKind == CxxRecordSemanticsKind::UnsafePointerMember ||
             // Pretend all methods that return iterators are unsafe so protocol
@@ -6011,10 +6024,12 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
   }
 
   auto semanticsKind =
-      evaluateOrDefault(evaluator, CxxRecordSemantics({recordDecl}), {});
+      evaluateOrDefault(evaluator,
+                        CxxRecordSemantics({recordDecl, desc.ctx}), {});
 
   // Always unsafe.
-  if (semanticsKind == CxxRecordSemanticsKind::UnsafeLifetimeOperation)
+  if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
+      semanticsKind == CxxRecordSemanticsKind::UnsafeLifetimeOperation)
     return false;
 
   // Always OK.

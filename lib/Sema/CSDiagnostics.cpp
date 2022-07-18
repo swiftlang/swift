@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
@@ -35,6 +36,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -3653,6 +3655,38 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
   return false;
 }
 
+static void diagnoseUnsafeCxxMethod(SourceLoc loc,
+                                    Type baseType,
+                                    DeclName name) {
+  auto &ctx = baseType->getASTContext();
+
+  if (baseType->getAnyNominal() == nullptr ||
+      // Don't waist time on non-cxx-methods.
+      !isa_and_nonnull<clang::CXXRecordDecl>(baseType->getAnyNominal()->getClangDecl()))
+    return;
+
+  auto unsafeId = ctx.getIdentifier("__" + name.getBaseIdentifier().str().str() + "Unsafe");
+  for (auto found : baseType->getAnyNominal()->lookupDirect(DeclBaseName(unsafeId))) {
+    auto cxxMethod = dyn_cast_or_null<clang::CXXMethodDecl>(found->getClangDecl());
+    if (!cxxMethod)
+      continue;
+
+    if (name.getBaseIdentifier().str() == "begin" ||
+        name.getBaseIdentifier().str() == "end") {
+      ctx.Diags.diagnose(loc, diag::dont_use_iterator_api, name.getBaseIdentifier().str());
+    } else if (cxxMethod->getReturnType()->isPointerType())
+      ctx.Diags.diagnose(loc, diag::projection_not_imported, name.getBaseIdentifier().str(), "pointer");
+    else if (cxxMethod->getReturnType()->isReferenceType())
+      ctx.Diags.diagnose(loc, diag::projection_not_imported, name.getBaseIdentifier().str(), "reference");
+    else if (cxxMethod->getReturnType()->isRecordType()) {
+      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(cxxMethod->getReturnType()->getAsRecordDecl())) {
+        assert(evaluateOrDefault(ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx}), {}) == CxxRecordSemanticsKind::UnsafePointerMember);
+        ctx.Diags.diagnose(loc, diag::projection_not_imported, name.getBaseIdentifier().str(), cxxRecord->getNameAsString());
+      }
+    }
+  }
+}
+
 /// When a user refers a enum case with a wrong member name, we try to find a
 /// enum element whose name differs from the wrong name only in convention;
 /// meaning their lower case counterparts are identical.
@@ -3727,6 +3761,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
       ctx.getClangModuleLoader()->diagnoseMemberValue(getName().getFullName(),
                                                       baseType);
+      diagnoseUnsafeCxxMethod(getLoc(), baseType, getName().getFullName());
     }
   };
 

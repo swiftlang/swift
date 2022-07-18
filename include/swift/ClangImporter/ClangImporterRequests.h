@@ -186,6 +186,8 @@ enum class CxxRecordSemanticsKind {
   // An API that has be annotated as explicitly unsafe, but still importable.
   // TODO: we should rename these APIs.
   ExplicitlyUnsafe,
+  // A record that is either not copyable or not destructible.
+  MissingLifetimeOperation,
   // A record that has custom lifetime operations which we cannot prove are
   // safe.
   UnsafeLifetimeOperation,
@@ -195,8 +197,11 @@ enum class CxxRecordSemanticsKind {
 
 struct CxxRecordSemanticsDescriptor final {
   const clang::CXXRecordDecl *decl;
+  ASTContext &ctx;
 
-  CxxRecordSemanticsDescriptor(const clang::CXXRecordDecl *decl) : decl(decl) {}
+  CxxRecordSemanticsDescriptor(const clang::CXXRecordDecl *decl,
+                               ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -241,8 +246,11 @@ private:
 
 struct SafeUseOfCxxDeclDescriptor final {
   const clang::Decl *decl;
+  ASTContext &ctx;
 
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl) : decl(decl) {}
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl,
+                             ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
 
   friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
     return llvm::hash_combine(desc.decl);

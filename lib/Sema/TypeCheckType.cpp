@@ -1238,6 +1238,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
     diags.diagnose(L, diag::cannot_find_type_in_scope, comp->getNameRef())
         .highlight(R);
+    if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
+      ctx.getClangModuleLoader()->diagnoseTopLevelValue(
+          comp->getNameRef().getFullName());
+    }
 
     return ErrorType::get(ctx);
   }
