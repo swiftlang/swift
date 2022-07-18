@@ -126,18 +126,6 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_HOST_VARIANT_SDK:STRING', 'OSX')
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', "")
 
-        # Configure back-deployment targets
-        self.cmake_options.define(
-            'SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX:STRING', '10.15')
-        self.cmake_options.define(
-            'SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS:STRING', '13.0')
-        self.cmake_options.define(
-            'SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST:STRING', '13.0')
-        self.cmake_options.define(
-            'SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS:STRING', '13.0')
-        self.cmake_options.define(
-            'SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS:STRING', '6.0')
-
         self.build_with_cmake(["back-deployment"], build_variant, [],
                               prefer_just_built_toolchain=True)
 
