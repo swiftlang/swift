@@ -114,6 +114,13 @@ void swift::copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks) {
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   defUseWorklist.initialize(currentDef);
   while (SILValue value = defUseWorklist.pop()) {
+    SILPhiArgument *arg;
+    if ((arg = dyn_cast<SILPhiArgument>(value)) && arg->isPhi()) {
+      visitAdjacentReborrowsOfPhi(arg, [&](SILPhiArgument *reborrow) {
+        defUseWorklist.insert(reborrow);
+        return true;
+      });
+    }
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
 
@@ -169,7 +176,10 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::EndBorrow:
       case OperandOwnership::Reborrow:
-        llvm_unreachable("operand kind cannot take an owned value");
+        // Guaranteed values are considered uses of the value when the value is
+        // an owned phi and the guaranteed values are adjacent reborrow phis.
+        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        break;
       }
     }
   }
