@@ -273,6 +273,13 @@ public:
   /// If visitor returns false, iteration is stopped and we return false.
   bool visitIncomingPhiOperands(function_ref<bool(Operand *)> visitor) const;
 
+  /// Visit incoming phi operands and the argument into which they are incoming;
+  /// if an operand's value is itself a phi, visit that phi's operands.
+  ///
+  /// Returns false when called on a non-phi and when the visitor returns false.
+  bool visitTransitiveIncomingPhiOperands(
+      function_ref<bool(SILPhiArgument *, Operand *)> visitor);
+
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
   /// stored in OutArray.
