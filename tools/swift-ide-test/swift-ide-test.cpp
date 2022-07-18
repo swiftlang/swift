@@ -827,6 +827,11 @@ static llvm::cl::opt<bool> EnableBareSlashRegexLiterals(
     llvm::cl::init(false));
 
 static llvm::cl::list<std::string>
+  EnableExperimentalFeatures("enable-experimental-feature",
+                             llvm::cl::desc("Enable an experimental feature"),
+                             llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
 
@@ -4319,6 +4324,12 @@ int main(int argc, char *argv[]) {
   if (options::EnableBareSlashRegexLiterals) {
     InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
+  }
+
+  for (const auto &featureArg : options::EnableExperimentalFeatures) {
+    if (auto feature = getExperimentalFeature(featureArg)) {
+      InitInvok.getLangOptions().Features.insert(*feature);
+    }
   }
 
   if (!options::Triple.empty())
