@@ -19,7 +19,7 @@
 // But don't print @available if it was implicitly added to an imported Clang decl (rdar://76685011).
 // OBJC-GEN-INTERFACE-LABEL: class ClassWithHandlerMethod {
 // OBJC-GEN-INTERFACE-NOT:     @available
-// OBJC-GEN-INTERFACE:         func method(withHandler operation: String!, completionHandler handler: (@Sendable (Int) -> Void)!)
+// OBJC-GEN-INTERFACE:         func method(withHandler operation: String!, completionHandler handler: ((Int) -> Void)!)
 // OBJC-GEN-INTERFACE:         func method(withHandler operation: String!) async -> Int
 
 // OBJC-GEN-INTERFACE:         @MainActor open func mainActorMethod()
