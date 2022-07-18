@@ -600,8 +600,18 @@ public:
         methodVal = SGF.emitClassMethodRef(
             Loc, borrowedSelf->getValue(), *constant, methodTy);
       } else {
+        auto *AFD = cast<AbstractFunctionDecl>(Constant.getDecl());
+        auto *AFDCtx = dyn_cast_or_null<ClassDecl>(AFD->getDeclContext());
+        auto objcDecl =
+            dyn_cast_or_null<clang::ObjCMethodDecl>(AFD->getClangDecl());
+        // Methods on unsafe foreign objects are always called directly.
+        const bool isObjCDirect = (objcDecl && objcDecl->isDirectMethod()) ||
+                                  (AFDCtx && AFDCtx->isForeignReferenceType());
+        if (isObjCDirect) {
+          (void)SGF.SGM.getFunction(*constant, NotForDefinition);
+        }
         methodVal = SGF.B.createObjCMethod(
-            Loc, borrowedSelf->getValue(), *constant,
+            Loc, isObjCDirect, borrowedSelf->getValue(), *constant,
             SILType::getPrimitiveObjectType(methodTy));
       }
       S.pop();
@@ -655,8 +665,9 @@ public:
           Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
       } else {
-        fn = SGF.B.createObjCMethod(Loc, borrowedSelf->getValue(),
-                                    *constant, constantInfo.getSILType());
+        fn = SGF.B.createObjCMethod(Loc, /*direct*/ false,
+                                    borrowedSelf->getValue(), *constant,
+                                    constantInfo.getSILType());
       }
       S.pop();
       return ManagedValue::forUnmanaged(fn);
@@ -666,9 +677,9 @@ public:
           SGF.SGM.M, *constant, getSubstFormalType());
 
       ArgumentScope S(SGF, Loc);
-      SILValue fn = SGF.B.createObjCMethod(
-          Loc, borrowedSelf->getValue(), *constant,
-          closureType);
+      SILValue fn = SGF.B.createObjCMethod(Loc, /*direct*/ false,
+                                           borrowedSelf->getValue(), *constant,
+                                           closureType);
       S.pop();
       return ManagedValue::forUnmanaged(fn);
     }
@@ -1086,21 +1097,7 @@ public:
     }
 
     auto subs = e->getDeclRef().getSubstitutions();
-
-    bool isObjCDirect = false;
-    if (auto objcDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(
-            afd->getClangDecl())) {
-      isObjCDirect = objcDecl->isDirectMethod();
-    }
-
-    // Methods on unsafe foreign objects are always called directly.
-    bool isUFO = isa_and_nonnull<ClassDecl>(afd->getDeclContext()) &&
-        cast<ClassDecl>(afd->getDeclContext())->isForeignReferenceType();
-    if (isObjCDirect || isUFO) {
-      setCallee(Callee::forDirect(SGF, constant, subs, e));
-    } else {
-      setCallee(Callee::forClassMethod(SGF, constant, subs, e));
-    }
+    setCallee(Callee::forClassMethod(SGF, constant, subs, e));
   }
 
   //
@@ -5492,14 +5489,8 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
     }
   }
 
-  bool isObjCDirect = false;
-  if (auto objcDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(
-          decl->getClangDecl())) {
-    isObjCDirect = objcDecl->isDirectMethod();
-  }
-
   // Dispatch in a struct/enum or to a final method is always direct.
-  if (!isClassDispatch || isObjCDirect)
+  if (!isClassDispatch)
     return Callee::forDirect(SGF, constant, subs, loc);
 
   // Otherwise, if we have a non-final class dispatch to a normal method,

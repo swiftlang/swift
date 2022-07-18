@@ -13,7 +13,11 @@ protocol BarProtocol {
 
 extension Bar: BarProtocol {}
 
-let bar = Bar()
+let bar = Bar(value: 22)!
+// CHECK: -[Bar initWithValue:]
+
+let bar2 = Bar.init(value: 33)!
+// CHECK: -[Bar initWithValue:]
 
 bar.directProperty = 123
 print(bar.directProperty)

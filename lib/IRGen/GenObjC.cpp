@@ -666,12 +666,22 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   return Callee(std::move(info), fn, receiverValue, selectorValue);
 }
 
-Callee irgen::getObjCDirectMethodCallee(CalleeInfo &&info, const FunctionPointer &fn,
-                                        llvm::Value *selfValue) {
+Callee irgen::getObjCDirectMethodCallee(IRGenFunction &IGF,
+                                        const ObjCMethod &fn,
+                                        llvm::Value *selfValue,
+                                        CalleeInfo &&info) {
   // Direct calls to Objective-C methods have a selector value of `undef`.
-  auto selectorType = fn.getFunctionType()->getParamType(1);
-  auto selectorValue = llvm::UndefValue::get(selectorType);
-  return Callee(std::move(info), fn, selfValue, selectorValue);
+  Signature sig = IGF.IGM.getSignature(info.OrigFnType);
+  auto selTy = sig.getType()->getParamType(1);
+  auto selectorValue = llvm::UndefValue::get(selTy);
+  auto silFn = IGF.getSILModule().lookUpFunction(fn.getMethod());
+  assert(silFn && "Missing direct method function!");
+  auto directFnAddr = IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition);
+  auto *directConst = llvm::ConstantExpr::getBitCast(
+      directFnAddr, sig.getType()->getPointerTo());
+  auto directFn = FunctionPointer::forDirect(FunctionPointer::Kind::Function,
+                                             directConst, nullptr, sig);
+  return Callee(std::move(info), directFn, selfValue, selectorValue);
 }
 
 /// Call [self allocWithZone: nil].

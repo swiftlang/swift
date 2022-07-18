@@ -6803,16 +6803,22 @@ class ObjCMethodInst final
           MethodInst>
 {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
-  ObjCMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 ArrayRef<SILValue> TypeDependentOperands,
-                 SILDeclRef Member, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                               TypeDependentOperands, Ty, Member) {}
+  ObjCMethodInst(SILDebugLocation DebugLoc, bool Direct, SILValue Operand,
+                 ArrayRef<SILValue> TypeDependentOperands, SILDeclRef Member,
+                 SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, Ty, Member) {
+    sharedUInt8().ObjCMethodInst.isDirect = Direct;
+  }
 
-  static ObjCMethodInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand,
-         SILDeclRef Member, SILType Ty, SILFunction *F);
+  static ObjCMethodInst *create(SILDebugLocation DebugLoc, bool Direct,
+                                SILValue Operand, SILDeclRef Member, SILType Ty,
+                                SILFunction *F);
+
+public:
+  bool isDirect() const { return sharedUInt8().ObjCMethodInst.isDirect; }
 };
 
 /// ObjCSuperMethodInst - Given the address of a value of class type and a method

@@ -2128,6 +2128,8 @@ public:
     *this << AMI->getType();
   }
   void visitObjCMethodInst(ObjCMethodInst *AMI) {
+    if (AMI->isDirect())
+      *this << "[direct] ";
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
     *this << ", ";

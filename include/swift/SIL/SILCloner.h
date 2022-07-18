@@ -2153,10 +2153,11 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitObjCMethodInst(ObjCMethodInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createObjCMethod(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getMember(), getOpType(Inst->getType())));
+  recordClonedInstruction(Inst,
+                          getBuilder().createObjCMethod(
+                              getOpLocation(Inst->getLoc()), Inst->isDirect(),
+                              getOpValue(Inst->getOperand()), Inst->getMember(),
+                              getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

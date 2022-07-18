@@ -199,6 +199,7 @@ protected:
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
     SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
+    SHARED_FIELD(ObjCMethodInst, bool isDirect);
 
     SHARED_FIELD(DebugValueInst, uint8_t
       poisonRefs : 1,

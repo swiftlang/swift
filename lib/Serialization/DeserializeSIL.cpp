@@ -2566,6 +2566,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
     unsigned NextValueIndex = 0;
+    bool isObjCDirectMethod = false;
+    if (OpCode == SILInstructionKind::ObjCMethodInst) {
+      unsigned Flags = ListOfValues[NextValueIndex];
+      isObjCDirectMethod = (bool)(Flags & 1);
+      NextValueIndex += 1;
+    }
     SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
     SILType Ty =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
@@ -2590,8 +2596,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       break;
     case SILInstructionKind::ObjCMethodInst:
       ResultInst = Builder.createObjCMethod(
-          Loc, getLocalValue(ListOfValues[NextValueIndex], operandTy), DRef,
-          Ty);
+          Loc, isObjCDirectMethod,
+          getLocalValue(ListOfValues[NextValueIndex], operandTy), DRef, Ty);
       break;
     case SILInstructionKind::ObjCSuperMethodInst:
       ResultInst = Builder.createObjCSuperMethod(

@@ -4821,6 +4821,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       SILType MethodTy;
       SourceLoc TyLoc;
       SmallVector<ValueDecl *, 4> values;
+      bool IsObjC = false;
+      if (P.consumeIf(tok::l_square)) {
+        Identifier Id;
+        parseSILIdentifier(Id, diag::expected_in_attribute_list);
+        StringRef Optional = Id.str();
+        if (Optional == "direct") {
+          IsObjC = true;
+        } else {
+          return true;
+        }
+        P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      }
+
       if (parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
         return true;
@@ -4842,7 +4855,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         ResultVal = B.createSuperMethod(InstLoc, Val, Member, MethodTy);
         break;
       case SILInstructionKind::ObjCMethodInst:
-        ResultVal = B.createObjCMethod(InstLoc, Val, Member, MethodTy);
+        ResultVal = B.createObjCMethod(InstLoc, IsObjC, Val, Member, MethodTy);
         break;
       case SILInstructionKind::ObjCSuperMethodInst:
         ResultVal = B.createObjCSuperMethod(InstLoc, Val, Member, MethodTy);

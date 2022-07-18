@@ -58,12 +58,16 @@ namespace irgen {
     /// the dynamic type of the object.
     llvm::PointerIntPair<SILType, 1, bool> searchTypeAndSuper;
 
+    bool direct;
+
   public:
-    ObjCMethod(SILDeclRef method, SILType searchType, bool startAtSuper)
-      : method(method), searchTypeAndSuper(searchType, startAtSuper)
-    {}
-    
+    ObjCMethod(SILDeclRef method, bool direct, SILType searchType,
+               bool startAtSuper)
+        : method(method), searchTypeAndSuper(searchType, startAtSuper),
+          direct(direct) {}
+
     SILDeclRef getMethod() const { return method; }
+    bool isDirect() const { return direct; }
     SILType getSearchType() const { return searchTypeAndSuper.getPointer(); }
     bool shouldStartAtSuper() const { return searchTypeAndSuper.getInt(); }
     
@@ -89,8 +93,8 @@ namespace irgen {
                              llvm::Value *selfValue, CalleeInfo &&info);
 
   /// Prepare a callee for an Objective-C method with the `objc_direct` attribute.
-  Callee getObjCDirectMethodCallee(CalleeInfo &&info, const FunctionPointer &fn,
-                                   llvm::Value *selfValue);
+  Callee getObjCDirectMethodCallee(IRGenFunction &IGF, const ObjCMethod &fn,
+                                   llvm::Value *selfValue, CalleeInfo &&info);
 
   /// Emit a partial application of an Objective-C method to its 'self'
   /// argument.

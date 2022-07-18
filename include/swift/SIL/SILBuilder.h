@@ -1762,10 +1762,12 @@ public:
         getSILDebugLocation(Loc), Operand, Member, MethodTy));
   }
 
-  ObjCMethodInst *createObjCMethod(SILLocation Loc, SILValue Operand,
-                                   SILDeclRef Member, SILType MethodTy) {
-    return insert(ObjCMethodInst::create(getSILDebugLocation(Loc), Operand,
-                                         Member, MethodTy, &getFunction()));
+  ObjCMethodInst *createObjCMethod(SILLocation Loc, bool Direct,
+                                   SILValue Operand, SILDeclRef Member,
+                                   SILType MethodTy) {
+    return insert(ObjCMethodInst::create(getSILDebugLocation(Loc), Direct,
+                                         Operand, Member, MethodTy,
+                                         &getFunction()));
   }
 
   ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,

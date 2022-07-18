@@ -1,6 +1,12 @@
 #import "objc_direct.h"
 
 @implementation Bar
+- (instancetype)initWithValue:(int)value {
+  puts(__FUNCTION__);
+  self = [super init];
+  _directProperty = value;
+  return self;
+}
 - (int)objectAtIndexedSubscript:(int)i {
   return 789;
 }

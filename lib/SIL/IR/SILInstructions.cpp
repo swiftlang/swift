@@ -1988,9 +1988,9 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                                           Ty, TypeDependentOperands);
 }
 
-ObjCMethodInst *
-ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                       SILDeclRef Member, SILType Ty, SILFunction *F) {
+ObjCMethodInst *ObjCMethodInst::create(SILDebugLocation DebugLoc, bool Direct,
+                                       SILValue Operand, SILDeclRef Member,
+                                       SILType Ty, SILFunction *F) {
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, *F, Ty.getASTType());
@@ -1998,9 +1998,8 @@ ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ObjCMethodInst));
-  return ::new (Buffer) ObjCMethodInst(DebugLoc, Operand,
-                                       TypeDependentOperands,
-                                       Member, Ty);
+  return ::new (Buffer) ObjCMethodInst(DebugLoc, Direct, Operand,
+                                       TypeDependentOperands, Member, Ty);
 }
 
 InitExistentialAddrInst *InitExistentialAddrInst::create(

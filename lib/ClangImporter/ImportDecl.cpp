@@ -7560,22 +7560,10 @@ void ClangImporter::Implementation::importAttributes(
     if (method->isDirectMethod() && !AnyUnavailable) {
       assert(isa<AbstractFunctionDecl>(MappedDecl) &&
              "objc_direct declarations are expected to be an AbstractFunctionDecl");
-      if (isa<ConstructorDecl>(MappedDecl)) {
-        // TODO: Teach Swift how to directly call these functions.
-        auto attr = AvailableAttr::createPlatformAgnostic(
-            C,
-            "Swift cannot call Objective-C initializers marked with "
-            "'objc_direct'",
-            /*Rename*/ "",
-            PlatformAgnosticAvailabilityKind::UnavailableInSwift);
-        MappedDecl->getAttrs().add(attr);
-        AnyUnavailable = true;
-      } else {
-        MappedDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
-        if (auto accessorDecl = dyn_cast<AccessorDecl>(MappedDecl)) {
-          auto attr = new (C) FinalAttr(/*isImplicit=*/true);
-          accessorDecl->getStorage()->getAttrs().add(attr);
-        }
+      MappedDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
+      if (auto accessorDecl = dyn_cast<AccessorDecl>(MappedDecl)) {
+        auto attr = new (C) FinalAttr(/*isImplicit=*/true);
+        accessorDecl->getStorage()->getAttrs().add(attr);
       }
     }
   }

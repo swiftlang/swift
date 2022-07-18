@@ -10,7 +10,11 @@ protocol BarProtocol {
 
 extension Bar: BarProtocol {}
 
-let bar = Bar()
+let bar = Bar(value: 0)!
+// CHECK: call swiftcc i64 @"$sSo3BarC5valueABSgs5Int32V_tcfC"
+
+let bar2 = Bar.init(value: 0)!
+// CHECK: call swiftcc i64 @"$sSo3BarC5valueABSgs5Int32V_tcfC"
 
 bar.directProperty = 123
 // CHECK: call void @"\01-[Bar setDirectProperty:]"({{.*}}, i8* undef, i32 {{.*}})
@@ -53,6 +57,10 @@ markUsed(Bar.directClassMethod2())
 markUsed(bar.directProtocolMethod())
 // CHECK: call {{.*}} @"\01-[Bar directProtocolMethod]"({{.*}}, i8* undef)
 
+// CHECK: define {{.*}} swiftcc i64 @"$sSo3BarC5valueABSgs5Int32V_tcfC"
+// CHECK:   call swiftcc i64 @"$sSo3BarC5valueABSgs5Int32V_tcfcTO"
+// CHECK: }
+
 // CHECK-DAG: declare i32 @"\01-[Bar directProperty]"
 // CHECK-DAG: declare void @"\01-[Bar setDirectProperty:]"
 // CHECK-DAG: declare i32 @"\01-[Bar directProperty2]"
@@ -64,3 +72,7 @@ markUsed(bar.directProtocolMethod())
 // CHECK-DAG: declare {{.*}} @"\01+[Bar directClassMethod]"
 // CHECK-DAG: declare {{.*}} @"\01+[Bar directClassMethod2]"
 // CHECK-DAG: declare {{.*}} @"\01-[Bar directProtocolMethod]"
+
+// CHECK: define {{.*}} swiftcc i64 @"$sSo3BarC5valueABSgs5Int32V_tcfcTO"
+// CHECK:   call {{.*}} @"\01-[Bar initWithValue:]"
+// CHECK: }
