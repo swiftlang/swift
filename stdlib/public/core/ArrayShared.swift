@@ -168,7 +168,9 @@ internal func _expectEnd<C: Collection>(of s: C, is i: C.Index) {
 
 @inlinable
 internal func _growArrayCapacity(_ capacity: Int) -> Int {
-  return capacity * 2
+  // using 1.5 because it's easy to generate compact code for due to no
+  // int -> float -> int conversions, not because it's particularly special 
+  return capacity + (capacity >> 1)
 }
 
 @_alwaysEmitIntoClient
