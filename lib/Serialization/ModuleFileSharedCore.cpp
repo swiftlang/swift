@@ -359,7 +359,7 @@ static ValidationInfo validateControlBlock(
       StringRef moduleRevision = blobData;
       if (isCompilerTagged) {
         StringRef compilerRevision = forcedDebugRevision ?
-          forcedDebugRevision : version::getSwiftRevision();
+          forcedDebugRevision : version::getCurrentCompilerTag();
         if (moduleRevision != compilerRevision) {
           result.status = Status::RevisionIncompatible;
 
