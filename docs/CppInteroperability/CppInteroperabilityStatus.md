@@ -76,7 +76,7 @@ This status table describes which of the following C++ language features can be 
 | Typedefs / Type aliases                     | Yes    |
 | Global Variables                            | Yes    |
 | Namespaces                                  | Yes    |
-| Inline Namespaces                           | Yes, with some known issues (https://bugs.swift.org/browse/SR-15956) |
+| Inline Namespaces                           | Yes, with some known issues ([#58217](https://github.com/apple/swift/issues/58217)) |
 | Exceptions                                  | No  |
 | Fields                                      | Yes |
 | Member functions                            | Yes. Some value category overloads aren't imported |
@@ -120,7 +120,7 @@ This status table describes which of the following C++ standard library features
 ## Known Issues
 
 ### Inline Namespaces
-- https://bugs.swift.org/browse/SR-15956: Swift's typechecker currently doesn't allow calling a function from an inline namespace when it's referenced through the parent namespace. Example of a test that fails: https://github.com/apple/swift/blob/main/test/Interop/Cxx/namespace/inline-namespace-function-call-broken.swift 
+- [#58217](https://github.com/apple/swift/issues/58217): Swift's typechecker currently doesn't allow calling a function from an inline namespace when it's referenced through the parent namespace. Example of a test that fails: https://github.com/apple/swift/blob/main/test/Interop/Cxx/namespace/inline-namespace-function-call-broken.swift
 
 
 ## Swift to C++ Interoperability Status

@@ -85,7 +85,7 @@ toolchain as a one-off, there are a couple of differences:
    **Note:** If you've already forked the project on GitHub at this stage,
    **do not clone your fork** to start off. We describe
    [how to setup your fork](#setting-up-your-fork) in a subsection below.
-   <!-- Recommending against cloning the fork due to SR-13476 and SR-13505. -->
+   <!-- Recommending against cloning the fork due to https://github.com/apple/swift/issues/55918 and https://github.com/apple/swift/issues/55947. -->
 3. Double-check that `swift`'s sibling directories are present.
    ```sh
    ls ..
