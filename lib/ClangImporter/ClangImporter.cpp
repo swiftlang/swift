@@ -5980,7 +5980,6 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
                                   SafeUseOfCxxDeclDescriptor desc) const {
   const clang::Decl *decl = desc.decl;
   const clang::CXXRecordDecl *recordDecl = nullptr;
-  bool isCxxMethod = false;
   bool cxxMethodIsSafe = true;
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
@@ -6010,7 +6009,6 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       }
     }
 
-    isCxxMethod = true;
     recordDecl = method->getParent();
   } else if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
     recordDecl = cxxRecordDecl;
@@ -6029,19 +6027,10 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
   if (semanticsKind == CxxRecordSemanticsKind::Reference)
     return true;
 
-  // Cannot return projections.
-  if (semanticsKind == CxxRecordSemanticsKind::Trivial ||
-      semanticsKind == CxxRecordSemanticsKind::Owned)
-    return cxxMethodIsSafe;
 
-  if (semanticsKind == CxxRecordSemanticsKind::ExplicitlyUnsafe)
-    return cxxMethodIsSafe;
-
-  assert(semanticsKind == CxxRecordSemanticsKind::UnsafePointerMember);
-  // We can't dis-allow *all* APIs that potentially return unsafe projections
-  // because this would break ObjC interop. So only do this when it's a known
-  // C++ API (maybe this could warn in a specific compiler mode, though).
-  return !isCxxMethod;
+  // All other record semantics kinds are some varient of an "owned" type, so
+  // dis-allow potential projections.
+  return cxxMethodIsSafe;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
