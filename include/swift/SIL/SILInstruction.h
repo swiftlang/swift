@@ -1317,6 +1317,7 @@ FirstArgOwnershipForwardingSingleValueInst::classof(SILInstructionKind kind) {
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
     return true;
   default:
     return false;
@@ -7591,16 +7592,49 @@ public:
   bool isNoImplicitCopy() const { return kind == CheckKind::NoImplicitCopy; }
 };
 
+/// Convert from a non-trivial copyable type to an `@moveOnly` wrapper type.
+///
+/// IMPORTANT: Unlike other forwarding instructions, the ownership of
+/// copyable_to_moveonly is not decided by the operand passed in on
+/// construction. Instead in SILBuilder one must select the specific type of
+/// ownership one wishes by using the following APIs:
+///
+/// * SILBuilder::createOwnedCopyableToMoveOnlyWrapperValueInst
+/// * SILBuilder::createGuaranteedCopyableToMoveOnlyWrapperInst
+///
+/// The reason why this instruction was designed in this manner is that a
+/// frontend chooses the ownership form of this instruction based off of the
+/// semantic place that the value is used. Specifically:
+///
+/// 1. When creating a moveOnly wrapped value for an owned argument or a value,
+/// we use the owned variant.
+///
+/// 2. When creating a moveOnly wrapped value from a guaranteed argument, we use
+/// the guaranteed variant.
 class CopyableToMoveOnlyWrapperValueInst
     : public UnaryInstructionBase<
           SILInstructionKind::CopyableToMoveOnlyWrapperValueInst,
-          SingleValueInstruction> {
+          FirstArgOwnershipForwardingSingleValueInst> {
+public:
+  enum InitialKind {
+    Guaranteed,
+    Owned,
+  };
+
+private:
   friend class SILBuilder;
 
+  InitialKind initialKind;
+
   CopyableToMoveOnlyWrapperValueInst(SILDebugLocation DebugLoc,
-                                     SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand,
-                             operand->getType().addingMoveOnlyWrapper()) {}
+                                     SILValue operand, InitialKind kind)
+      : UnaryInstructionBase(
+            DebugLoc, operand, operand->getType().addingMoveOnlyWrapper(),
+            kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
+                                            : OwnershipKind::Owned) {}
+
+public:
+  InitialKind getInitialKind() const { return initialKind; }
 };
 
 /// Convert from an @moveOnly wrapper type to the underlying copyable type. Can
@@ -9821,6 +9855,8 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
   if (auto *result = dyn_cast<MarkMustCheckInst>(inst))
     return result;
   if (auto *result = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(inst))
+    return result;
+  if (auto *result = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(inst))
     return result;
   return nullptr;
 }

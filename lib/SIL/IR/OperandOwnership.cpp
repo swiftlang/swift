@@ -256,7 +256,6 @@ OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
 
 // TODO: Should this be a forwarding consume.
 OPERAND_OWNERSHIP(DestroyingConsume, MoveValue)
-OPERAND_OWNERSHIP(DestroyingConsume, CopyableToMoveOnlyWrapperValue)
 
 // Instructions that move an owned value.
 OPERAND_OWNERSHIP(ForwardingConsume, InitExistentialValue)
@@ -330,6 +329,7 @@ FORWARDING_OWNERSHIP(DifferentiableFunction)
 FORWARDING_OWNERSHIP(LinearFunction)
 FORWARDING_OWNERSHIP(MarkMustCheck)
 FORWARDING_OWNERSHIP(MoveOnlyWrapperToCopyableValue)
+FORWARDING_OWNERSHIP(CopyableToMoveOnlyWrapperValue)
 #undef FORWARDING_OWNERSHIP
 
 // Arbitrary value casts are forwarding instructions that are also allowed to
