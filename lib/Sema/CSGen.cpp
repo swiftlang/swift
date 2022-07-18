@@ -2327,9 +2327,10 @@ namespace {
         }
 
         if (!varType) {
-          varType =
-              CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                    TVO_CanBindToNoEscape | TVO_CanBindToHole);
+          varType = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      LocatorPathElt::NamedPatternDecl()),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
           // If this is either a `weak` declaration or capture e.g.
           // `weak var ...` or `[weak self]`. Let's wrap type variable
