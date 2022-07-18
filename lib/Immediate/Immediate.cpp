@@ -34,7 +34,7 @@
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ObjectTransformLayer.h"
-#include "llvm/ExecutionEngine/Orc/OrcRPCExecutorProcessControl.h"
+#include "llvm/ExecutionEngine/Orc/TargetProcess/TargetExecutionUtils.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -148,7 +148,7 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
 
     // Try user-provided framework search paths first; frameworks contain
     // binaries as well as modules.
-    for (auto &frameworkDir : searchPathOpts.FrameworkSearchPaths) {
+    for (const auto &frameworkDir : searchPathOpts.getFrameworkSearchPaths()) {
       path = frameworkDir.Path;
       llvm::sys::path::append(path, frameworkPart.str());
       success = loadRuntimeLib(path);
@@ -200,6 +200,25 @@ bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
   };
 
   M->collectLinkLibraries(addLinkLibrary);
+
+  // Workaround for rdar://94645534.
+  //
+  // The framework layout of Foundation has changed in 13.0, causing unresolved symbol
+  // errors to libswiftFoundation in immediate mode when running on older OS versions
+  // with a 13.0 SDK. This workaround scans through the list of dependencies and
+  // manually adds libswiftFoundation if necessary.
+  auto &Target = M->getASTContext().LangOpts.Target;
+  if (Target.isMacOSX() && Target.getOSMajorVersion() < 13) {
+    bool linksFoundation = std::any_of(AllLinkLibraries.begin(),
+        AllLinkLibraries.end(), [](auto &Lib) {
+      return Lib.getName() == "Foundation";
+    });
+
+    if (linksFoundation) {
+      AllLinkLibraries.push_back(LinkLibrary("libswiftFoundation.dylib",
+                                             LibraryKind::Library));
+    }
+  }
 
   tryLoadLibraries(AllLinkLibraries, M->getASTContext().SearchPathOpts,
                    M->getASTContext().Diags);
@@ -253,15 +272,15 @@ int swift::RunImmediately(CompilerInstance &CI,
   if (emplaceProcessArgs == nullptr)
     return -1;
 #else
-  // In case the compiler is built with libswift, it already has the stdlib
+  // In case the compiler is built with swift modules, it already has the stdlib
   // linked to. First try to lookup the symbol with the standard library
   // resolving.
   auto emplaceProcessArgs
      = (ArgOverride)dlsym(RTLD_DEFAULT, "_swift_stdlib_overrideUnsafeArgvArgc");
 
   if (dlerror()) {
-    // If this does not work (= not build with libswift), we have to explicitly
-    // load the stdlib.
+    // If this does not work (= the Swift modules are not linked to the tool),
+    // we have to explicitly load the stdlib.
     auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
     if (!stdlib) {
       CI.getDiags().diagnose(SourceLoc(),

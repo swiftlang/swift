@@ -21,7 +21,7 @@ if #available(OSX 10.51, *) && #available(OSX 10.52, *) { // expected-error {{ex
 }
 
 
-if #available { // expected-error {{expected availability condition}} expected-error {{closure expression is unused}} expected-error {{top-level statement cannot begin with a closure expression}} expected-note {{did you mean to use a 'do' statement?}} {{15-15=do }}
+if #available { // expected-error {{expected availability condition}}
 }
 
 if #available( { // expected-error {{expected platform name}} expected-error {{expected ')'}} expected-note {{to match this opening '('}}

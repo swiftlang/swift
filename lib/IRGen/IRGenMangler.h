@@ -468,6 +468,18 @@ public:
     }
   }
 
+  void appendExtendedExistentialTypeShape(CanGenericSignature genSig,
+                                          CanType shapeType);
+  void appendExtendedExistentialTypeShapeSymbol(CanGenericSignature genSig,
+                                                CanType shapeType,
+                                                bool isUnique);
+
+  /// Mangle the symbol name for an extended existential type shape.
+  std::string mangleExtendedExistentialTypeShapeSymbol(
+                                                CanGenericSignature genSig,
+                                                CanType shapeType,
+                                                bool isUnique);
+
   std::string mangleCoroutineContinuationPrototype(CanSILFunctionType type) {
     return mangleTypeSymbol(type, "TC");
   }
@@ -585,6 +597,14 @@ public:
     return mangleTypeWithoutPrefix(type);
   }
 
+  void configureForSymbolicMangling() {
+    OptimizeProtocolNames = false;
+    UseObjCRuntimeNames = true;
+  }
+
+  SymbolicMangling mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
+                                                  CanType ty);
+
   SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
                                            CanGenericSignature genericSig,
                                            CanType Ty);
@@ -612,6 +632,13 @@ public:
                                            CanGenericSignature genericSig,
                                            CanType type,
                                            ProtocolConformanceRef conformance);
+
+  std::string
+  mangleSymbolNameForUnderlyingTypeAccessorString(OpaqueTypeDecl *opaque,
+                                                  unsigned index);
+
+  std::string mangleSymbolNameForUnderlyingWitnessTableAccessorString(
+      OpaqueTypeDecl *opaque, const Requirement &req, ProtocolDecl *protocol);
 
   std::string mangleSymbolNameForGenericEnvironment(
                                                 CanGenericSignature genericSig);

@@ -10,7 +10,7 @@
 
 // Force reading the argument macros.
 @available(_brokenPlatforms)
-public func brokenPlaforms() {}
+public func brokenPlatforms() {}
 
 // CHECK: -define-availability argument:1:16: error: expected version number
 // CHECK-NEXT: _brokenParse:a b c d

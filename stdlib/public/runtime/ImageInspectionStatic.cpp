@@ -22,6 +22,8 @@
 #include "ImageInspection.h"
 #include "ImageInspectionCommon.h"
 
+extern "C" const char __dso_handle[];
+
 using namespace swift;
 
 #define GET_SECTION_START_AND_SIZE(start, size, _seg, _sec)                    \
@@ -37,7 +39,7 @@ void swift::initializeProtocolLookup() {
                              MachOProtocolsSection);
   if (start == nullptr || size == 0)
     return;
-  addImageProtocolsBlockCallbackUnsafe(start, size);
+  addImageProtocolsBlockCallbackUnsafe(__dso_handle, start, size);
 }
 
 void swift::initializeProtocolConformanceLookup() {
@@ -47,7 +49,7 @@ void swift::initializeProtocolConformanceLookup() {
                              MachOProtocolConformancesSection);
   if (start == nullptr || size == 0)
     return;
-  addImageProtocolConformanceBlockCallbackUnsafe(start, size);
+  addImageProtocolConformanceBlockCallbackUnsafe(__dso_handle, start, size);
 }
 void swift::initializeTypeMetadataRecordLookup() {
   void *start;
@@ -56,7 +58,7 @@ void swift::initializeTypeMetadataRecordLookup() {
                              MachOTypeMetadataRecordSection);
   if (start == nullptr || size == 0)
     return;
-  addImageTypeMetadataRecordBlockCallbackUnsafe(start, size);
+  addImageTypeMetadataRecordBlockCallbackUnsafe(__dso_handle, start, size);
 }
 
 void swift::initializeDynamicReplacementLookup() {
@@ -72,7 +74,8 @@ void swift::initializeDynamicReplacementLookup() {
                              MachODynamicReplacementSection);
   if (start2 == nullptr || size2 == 0)
     return;
-  addImageDynamicReplacementBlockCallback(start1, size1, start2, size2);
+  addImageDynamicReplacementBlockCallback(__dso_handle,
+                                          start1, size1, start2, size2);
 }
 void swift::initializeAccessibleFunctionsLookup() {
   void *start;
@@ -81,7 +84,7 @@ void swift::initializeAccessibleFunctionsLookup() {
                              MachOAccessibleFunctionsSection);
   if (start == nullptr || size == 0)
     return;
-  addImageAccessibleFunctionBlockCallbackUnsafe(start, size);
+  addImageAccessibleFunctionsBlockCallbackUnsafe(__dso_handle, start, size);
 }
 
 #endif // defined(__MACH__) && defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)

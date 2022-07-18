@@ -1,6 +1,9 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-copy-propagation) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library -Xfrontend -enable-copy-propagation) | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 // =============================================================================
 // = Declarations                                                           {{ =
@@ -98,7 +101,7 @@ func test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference() {
   var d = D()
   let c = C(d)
   // Reenable with rdar://86271875
-  // HECK: cWillFoo{{.*}} test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference
+  // CHECK: cWillFoo{{.*}} test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference
   c.foo(#function)
 }
 
@@ -142,19 +145,78 @@ func test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction() {
   test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction_doit("blue")
 }
 
+func do_foo(_ work: () -> ()) {
+  work()
+}
+class Fooer {
+  __consuming func foo() {
+    weak var weakSelf = self
+    do_foo {
+      weakSelf?.foo1()
+      weakSelf?.foo2()
+    }
+  }
+  func foo1() {
+    // CHECK: Fooer foo1
+    print(type(of: self), #function)
+  }
+  func foo2() {
+    // CHECK: Fooer foo2
+    print(type(of: self), #function)
+  }
+}
+
+func test_self_keepsObjectAliveBeyond_callTo_functionTakingClosureCapturingWeakVar() {
+  Fooer().foo()
+}
+
+func do_foo_async(_ work: @escaping () -> ()) -> Task<Void, Never> {
+  Task {
+    work()
+  }
+}
+class FooerAsync {
+  var strongSelf: FooerAsync?
+  __consuming func foo() -> Task<Void, Never> {
+    weak var weakSelf = self
+    strongSelf = self
+    return do_foo_async {
+      // At this point, strongSelf is keeping the object alive.
+      weakSelf?.foo1()
+      // By this point, strongSelf has been nil'd.  However, self in the 
+      // enclosing foo() may still be keeping the object alive, depending on how
+      // the closure was scheduled.
+      weakSelf?.foo2()
+    }
+  }
+  func foo1() {
+    // CHECK: FooerAsync foo1
+    print(type(of: self), #function)
+    strongSelf = nil
+  }
+  func foo2() {
+    print(type(of: self), #function)
+  }
+}
+
+func test_repeatedLoadWeakSelf() -> Task<Void, Never> {
+  FooerAsync().foo()
+}
+
 // =============================================================================
 // = Tests                                                                  }} =
 // =============================================================================
 
-func run() {
-  test_localLet_keepsObjectAliveBeyondCallToClassWithWeakReference()
-  // Reenable with rdar://86271875
-  // test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference()
-  test_localLet_keepsObjectAliveBeyondCallToClassWithPointer()
-  test_localVar_keepsObjectAliveBeyondCallToClassWithPointer()
-  test_localLet_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
-  test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
+@main struct Main {
+  static func main() async {
+    test_localLet_keepsObjectAliveBeyondCallToClassWithWeakReference()
+    test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference()
+    test_localLet_keepsObjectAliveBeyondCallToClassWithPointer()
+    test_localVar_keepsObjectAliveBeyondCallToClassWithPointer()
+    test_localLet_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
+    test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
+
+    test_self_keepsObjectAliveBeyond_callTo_functionTakingClosureCapturingWeakVar()
+    await test_repeatedLoadWeakSelf().value
+  }
 }
-
-run()
-

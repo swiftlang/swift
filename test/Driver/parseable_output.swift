@@ -1,6 +1,6 @@
 // RUN: %swiftc_driver_plain -emit-executable %s -o %t.out -emit-module -emit-module-path %t.swiftmodule -emit-objc-header-path %t.h -serialize-diagnostics -emit-dependencies -parseable-output -driver-skip-execution 2>&1 | %FileCheck %s
 
-// XFAIL: freebsd, openbsd, linux
+// XFAIL: OS=freebsd, OS=openbsd, OS=linux-gnu, OS=linux-android, OS=linux-androideabi
 
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
@@ -94,7 +94,7 @@
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output.swift.tmp.swiftsourceinfo"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
-// CHECK-NEXT:       "type": "objc-header",
+// CHECK-NEXT:       "type": "clang-header",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output.swift.tmp.h"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],

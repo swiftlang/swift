@@ -1,0 +1,1242 @@
+// RUN: %target-sil-opt %s -dump-escape-info -module-name=test -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol ClassP : AnyObject {
+  func foo()
+}
+
+class X : ClassP {
+  func foo()
+  deinit
+}
+
+class Derived : X {
+}
+
+struct Str {
+  @_hasStorage var a: X
+  @_hasStorage var b: (X, X)
+}
+
+class Y {
+  @_hasStorage var s: Str
+}
+
+class Z {
+  @_hasStorage var y: Y
+  @_hasStorage var y2: Y
+}
+
+class DerivedZ : Z {
+}
+
+final class F {
+  @_hasStorage var y: Y
+}
+
+struct TwoF {
+  @_hasStorage var a: F
+  @_hasStorage var b: F
+}
+
+class WZ {
+  @_hasStorage weak var w: @sil_weak Y?
+  @_hasStorage unowned var u: @sil_unowned Y
+}
+
+struct PointerStr {
+  @_hasStorage var p: UnsafeMutablePointer<Y>
+}
+
+class LinkedNode {
+  @_hasStorage var next: LinkedNode;
+  @_hasStorage var x: X;
+}
+
+struct TwoNodes {
+  @_hasStorage var a: LinkedNode
+  @_hasStorage var b: LinkedNode
+}
+
+enum E {
+  case A(Z)
+  case B(Z)
+}
+
+sil [escapes !%0.**] @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> ()
+sil [ossa] [escapes !%1.**] @not_escaping_second_argument : $@convention(thin) (@owned X, @owned Y) -> ()
+sil [escapes %0 => %r, %0.c*.c*.v** => %r.c*.c*.v**] @exclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z
+sil [escapes %0 => %r, %0.c*.c*.v** -> %r.c*.c*.v**] @nonexclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z
+sil [ossa] [escapes %0 => %r.s0] @arg_to_return : $@convention(thin) (@owned X) -> @owned Str
+sil [escapes %1 => %0.s0, !%0] [ossa] @arg_to_arg : $@convention(thin) (@owned X) -> @out Str
+sil [escapes !%0, %0.c* => %r] [ossa] @content_of_arg_to_return : $@convention(thin) (@owned Z) -> @owned Y
+sil [ossa] [escapes !%0.**] @non_escaping_in_arg : $@convention(thin) (@in Z) -> ()
+sil [escapes %0 -> %r, %0.c*.v** -> %r.c*.v**] @load_from_inout : $@convention(thin) (@inout Y) -> @owned Y
+sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @forward_from_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z
+sil [escapes %0 -> %r, %0.c*.v** -> %r.c*.v**] @load_and_store_to_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z
+sil [escapes %0 => %r, %0.c1.v** => %r.c1.v**] @exclusive2 : $@convention(thin) (@owned Z) -> @owned Z
+sil [escapes %0 -> %r, %0.c1.v** -> %r.c1.v**] @nonexclusive2 : $@convention(thin) (@owned Z) -> @owned Z
+
+// CHECK-LABEL: Escape information for test_simple:
+// CHECK: return[]: %1 = alloc_ref $X
+// CHECK:  -    :   %2 = alloc_ref $Y
+// CHECK: arg0[]:   %3 = alloc_ref $X
+// CHECK: End function test_simple
+sil [ossa] @test_simple : $@convention(thin) (@inout X) -> @owned X {
+bb0(%0 : $*X):
+  %1 = alloc_ref $X
+  %2 = alloc_ref $Y
+  %3 = alloc_ref $X
+  store %3 to [assign] %0 : $*X
+  destroy_value %2 : $Y
+  return %1 : $X
+}
+
+// CHECK-LABEL: Escape information for test_value_projection:
+// %0 is conservatively calculated as "return" because of path merging
+// CHECK: return[v**]: %0 = alloc_ref $X
+// CHECK: return[]:    %1 = alloc_ref $X
+// CHECK:  -    :      %2 = alloc_ref $Y
+// CHECK: End function test_value_projection
+sil @test_value_projection : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $X
+  %1 = alloc_ref $X
+  %2 = alloc_ref $Y
+  %3 = ref_element_addr %2 : $Y, #Y.s
+  %4 = begin_access [modify] [dynamic] %3 : $*Str
+  %5 = tuple (%0 : $X, %1 : $X)
+  %6 = struct $Str (%0 : $X, %5 : $(X, X))
+  store %6 to %3 : $*Str
+  %8 = load %3 : $*Str
+  end_access %4 : $*Str
+  %10 = struct_extract %8 : $Str, #Str.b
+  %11 = tuple_extract %10 : $(X, X), 1
+  return %11 : $X
+}
+
+// CHECK-LABEL: Escape information for test_addr_projection:
+// %0 is conservatively calculated as "return" because of path merging
+// CHECK: return[v**]: %0 = alloc_ref $X
+// CHECK: return[]:    %1 = alloc_ref $X
+// CHECK:  -    :      %2 = alloc_ref $Y
+// CHECK: End function test_addr_projection
+sil @test_addr_projection : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $X
+  %1 = alloc_ref $X
+  %2 = alloc_ref $Y
+  %3 = ref_element_addr %2 : $Y, #Y.s
+  %4 = struct_element_addr %3 : $*Str, #Str.a
+  store %0 to %4 : $*X
+  %6 = struct_element_addr %3 : $*Str, #Str.b
+  %7 = tuple_element_addr %6 : $*(X, X), 0
+  %8 = tuple_element_addr %6 : $*(X, X), 1
+  store %0 to %7 : $*X
+  store %1 to %8 : $*X
+  %11 = struct_element_addr %3 : $*Str, #Str.b
+  %12 = tuple_element_addr %6 : $*(X, X), 1
+  %13 = load %12 : $*X
+  return %13 : $X
+}
+
+// CHECK-LABEL: Escape information for test_follow_stores:
+// CHECK: arg0[c0.s0]: %1 = alloc_ref $X
+// CHECK:  -    :      %2 = alloc_ref $Z
+// CHECK: End function test_follow_stores
+sil @test_follow_stores : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_ref $X
+  %2 = alloc_ref $Z
+  %3 = ref_element_addr %2 : $Z, #Z.y
+  store %0 to %3 : $*Y
+  %5 = load %3 : $*Y
+  %6 = ref_element_addr %5 : $Y, #Y.s
+  %7 = struct_element_addr %6 : $*Str, #Str.a
+  store %1 to %7 : $*X
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Escape information for dont_follow_stores:
+// CHECK: return[]:   %1 = alloc_ref $Y
+// CHECK:  -      :   %2 = alloc_ref $Z
+// CHECK: End function dont_follow_stores
+sil @dont_follow_stores : $@convention(thin) (Y) -> Y {
+bb0(%0 : $Y):
+  %1 = alloc_ref $Y
+  %2 = alloc_ref $Z
+  %3 = ref_element_addr %2 : $Z, #Z.y
+  cond_br undef, bb1, bb2
+bb1:
+  store %0 to %3 : $*Y
+  br bb3
+bb2:
+  store %1 to %3 : $*Y
+  br bb3
+bb3: 
+  %9 = load %3 : $*Y
+  return %9 : $Y
+}
+
+// CHECK-LABEL: Escape information for walkup_multiple_struct_tuple_operands:
+// CHECK: arg0[**],arg0[c*.**]:   %1 = alloc_ref $X
+// CHECK:  -    :   %2 = alloc_ref $LinkedNode
+// CHECK:  -    :   %3 = alloc_ref $LinkedNode
+// CHECK: End function walkup_multiple_struct_tuple_operands
+sil @walkup_multiple_struct_tuple_operands : $@convention(thin) (LinkedNode) -> () {
+bb0(%0 : $LinkedNode):
+  %1 = alloc_ref $X
+  %2 = alloc_ref $LinkedNode
+  %3 = alloc_ref $LinkedNode
+  %4 = ref_element_addr %3 : $LinkedNode, #LinkedNode.next
+  store %0 to %4 : $*LinkedNode
+  %6 = tuple(%2 : $LinkedNode, %3 : $LinkedNode)
+  cond_br undef, bb1, bb2
+bb1:
+  %8 = tuple_extract %6 : $(LinkedNode, LinkedNode), 0
+  br bb3(%8 : $LinkedNode)
+bb2:
+  %10 = tuple_extract %6 : $(LinkedNode, LinkedNode), 1
+  br bb3(%10 : $LinkedNode)
+
+bb3(%12 : $LinkedNode):
+  %13 = struct $TwoNodes (%12 : $LinkedNode, %3 : $LinkedNode)
+  cond_br undef, bb4, bb5
+bb4:
+  %16 = struct_extract %13 : $TwoNodes, #TwoNodes.a
+  br bb6(%16 : $LinkedNode)
+bb5:
+  %18 = struct_extract %13 : $TwoNodes, #TwoNodes.b
+  br bb6(%18 : $LinkedNode)
+
+bb6(%20 : $LinkedNode):
+  br bb7(%20 : $LinkedNode)
+bb7(%22 : $LinkedNode):
+  %23 = ref_element_addr %22 : $LinkedNode, #LinkedNode.x
+  store %1 to %23 : $*X
+  %25 = ref_element_addr %22 : $LinkedNode, #LinkedNode.next
+  %26 = load %25 : $*LinkedNode
+  cond_br undef, bb7(%26 : $LinkedNode), bb8
+
+bb8:
+  %28 = tuple ()
+  return %28 : $()
+}
+
+// CHECK-LABEL: Escape information for callee_may_store_to_non_escaping_argument:
+// CHECK: global:   %1 = alloc_ref $X
+// CHECK:  -    :   %2 = alloc_ref $Z
+// CHECK: End function callee_may_store_to_non_escaping_argument
+sil @callee_may_store_to_non_escaping_argument : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_ref $X
+  %2 = alloc_ref $Z
+  %3 = function_ref @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Z) -> ()
+  %5 = ref_element_addr %2 : $Z, #Z.y
+  %6 = load %5 : $*Y
+  %7 = ref_element_addr %6 : $Y, #Y.s
+  %8 = struct_element_addr %7 : $*Str, #Str.a
+  store %1 to %8 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: Escape information for callee_may_store_to_forwarded_argument:
+// CHECK: global:   %1 = alloc_ref $X
+// CHECK:  -    :   %2 = alloc_ref $Z
+// CHECK: End function callee_may_store_to_forwarded_argument
+sil @callee_may_store_to_forwarded_argument : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_ref $X
+  %2 = alloc_ref $Z
+  %3 = function_ref @exclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z
+  %4 = apply %3(%2) : $@convention(thin) (@owned Z) -> @owned Z
+  %5 = ref_element_addr %4 : $Z, #Z.y
+  %6 = load %5 : $*Y
+  %7 = ref_element_addr %6 : $Y, #Y.s
+  %8 = struct_element_addr %7 : $*Str, #Str.a
+  store %1 to %8 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: Escape information for callee_may_not_store_to_forwarded_argument:
+// CHECK: global:   %1 = alloc_ref $X
+// CHECK:  -    :   %2 = alloc_ref $Z
+// CHECK: End function callee_may_not_store_to_forwarded_argument
+sil @callee_may_not_store_to_forwarded_argument : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_ref $X
+  %2 = alloc_ref $Z
+  %3 = function_ref @nonexclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z
+  %4 = apply %3(%2) : $@convention(thin) (@owned Z) -> @owned Z
+  %5 = ref_element_addr %4 : $Z, #Z.y
+  %6 = load %5 : $*Y
+  %7 = ref_element_addr %6 : $Y, #Y.s
+  %8 = struct_element_addr %7 : $*Str, #Str.a
+  store %1 to %8 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: Escape information for callee_may_load:
+// CHECK: global:   %1 = alloc_ref $X
+// CHECK: End function callee_may_load
+sil @callee_may_load : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_ref $X
+  %2 = alloc_stack $Y
+  store %0 to %2 : $*Y
+  %3 = function_ref @load_from_inout : $@convention(thin) (@inout Y) -> @owned Y
+  %4 = apply %3(%2) : $@convention(thin) (@inout Y) -> @owned Y
+  %7 = ref_element_addr %4 : $Y, #Y.s
+  %8 = struct_element_addr %7 : $*Str, #Str.a
+  store %1 to %8 : $*X
+  dealloc_stack %2 : $*Y
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: Escape information for test_phiterms_merge_down:
+// CHECK: return[]: %1 = alloc_ref $X
+// CHECK:  -    :   %2 = alloc_ref $Y
+// CHECK: return[]: %4 = alloc_ref $X
+// CHECK:  -    :   %5 = alloc_ref $Y
+// CHECK: End function test_phiterms_merge_down
+sil @test_phiterms_merge_down : $@convention(thin) () -> @owned X {
+bb0:
+  cond_br undef, bb1, bb2
+bb1:
+  %0 = alloc_ref $X
+  %1 = alloc_ref $Y
+  br bb3(%0 : $X, %1 : $Y)
+bb2:
+  %3 = alloc_ref $X
+  %4 = alloc_ref $Y
+  br bb3(%3 : $X, %4 : $Y)
+bb3(%5 : $X, %6 : $Y):
+  return %5 : $X
+}
+
+// CHECK-LABEL: Escape information for test_phiterms_merge_up:
+// CHECK:  -    :                            %3 = alloc_ref $LinkedNode
+// CHECK: arg0[**],arg1[**],arg1[],arg2[**]: %4 = alloc_ref $X
+// CHECK: End function test_phiterms_merge_up
+sil @test_phiterms_merge_up : $@convention(thin) (@inout X, @inout X, @inout X) -> () {
+bb0(%0 : $*X, %1 : $*X, %2 : $*X):
+  %3 = alloc_ref $LinkedNode
+  %4 = alloc_ref $X
+  %5 = ref_element_addr %3 : $LinkedNode, #LinkedNode.next
+  %6 = load %5 : $*LinkedNode
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3(%3 : $LinkedNode)
+bb2:
+  br bb3(%6 : $LinkedNode)
+bb3(%9 : $LinkedNode):
+  %10 = ref_element_addr %9 : $LinkedNode, #LinkedNode.x
+  // store X to either indirection level 0 or 1 of Y
+  store %4 to %10 : $*X
+
+  // load x of indirection levels 0, 1, 2 and store to arguments 0, 1, 2
+  %12 = ref_element_addr %3 : $LinkedNode, #LinkedNode.x
+  %13 = load %12 : $*X
+  store %13 to %0 : $*X
+  %15 = ref_element_addr %6 : $LinkedNode, #LinkedNode.x
+  %16 = load %15 : $*X
+  store %16 to %1 : $*X
+  %18 = ref_element_addr %6 : $LinkedNode, #LinkedNode.next
+  %19 = load %18 : $*LinkedNode
+  %20 = ref_element_addr %19 : $LinkedNode, #LinkedNode.x
+  %21 = load %20 : $*X
+  store %21 to %2 : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Escape information for test_cycle:
+// CHECK:  -    :     %0 = alloc_ref $LinkedNode
+// CHECK: return[**]: %1 = alloc_ref $X
+// CHECK: End function test_cycle
+sil @test_cycle : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $LinkedNode
+  %1 = alloc_ref $X
+  br bb1(%0 : $LinkedNode)
+
+bb1(%5 : $LinkedNode):
+  cond_br undef, bb2, bb3
+
+bb2:
+  %8 = ref_element_addr %5 : $LinkedNode, #LinkedNode.next
+  %9 = load %8 : $*LinkedNode
+  br bb1(%9 : $LinkedNode)
+
+bb3:
+  %2 = ref_element_addr %5 : $LinkedNode, #LinkedNode.x
+  store %1 to %2 : $*X
+  %11 = ref_element_addr %0 : $LinkedNode, #LinkedNode.x
+  %12 = load %11 : $*X
+  return %12 : $X
+}
+
+// CHECK-LABEL: Escape information for test_switch_enum_walk_down:
+// CHECK: arg0[]: %1 = alloc_ref $Z
+// CHECK:  -    : %2 = alloc_ref $Z
+// CHECK: End function test_switch_enum_walk_down
+sil @test_switch_enum_walk_down : $@convention(thin) () -> @out Z {
+bb0(%0 : $*Z):
+  %1 = alloc_ref $Z
+  %2 = alloc_ref $Z
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = enum $E, #E.A!enumelt, %1 : $Z
+  br bb3(%3 : $E)
+
+bb2:
+  %5 = enum $E, #E.B!enumelt, %2 : $Z
+  br bb3(%5 : $E)
+
+bb3(%7 : $E):
+  switch_enum %7 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4(%9 : $Z):
+  store %9 to %0 : $*Z
+  br bb6
+
+bb5(%12: $Z):
+  br bb6
+
+bb6:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: Escape information for test_switch_enum_walk_up:
+// CHECK: arg0[c0]: %1 = alloc_ref $Y
+// CHECK:  -    :   %2 = alloc_ref $Y
+// CHECK:  -    :   %6 = alloc_ref $Z
+// CHECK: End function test_switch_enum_walk_up
+sil @test_switch_enum_walk_up : $@convention(thin) (@guaranteed Z) -> () {
+bb0(%0 : $Z):
+  %1 = alloc_ref $Y
+  %2 = alloc_ref $Y
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = enum $E, #E.A!enumelt, %0 : $Z
+  br bb3(%3 : $E)
+
+bb2:
+  %4 = alloc_ref $Z
+  %5 = enum $E, #E.B!enumelt, %4 : $Z
+  br bb3(%5 : $E)
+
+bb3(%7 : $E):
+  switch_enum %7 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4(%9 : $Z):
+  %10 = ref_element_addr %9 : $Z, #Z.y
+  store %1 to %10 : $*Y
+  br bb6
+
+bb5(%12: $Z):
+  %13 = ref_element_addr %12 : $Z, #Z.y
+  store %2 to %13 : $*Y
+  br bb6
+
+bb6:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: Escape information for test_enum_data_walk_down:
+// CHECK:  -    : %1 = alloc_ref $Z
+// CHECK: arg0[]: %2 = alloc_ref $Z
+// CHECK: End function test_enum_data_walk_down
+sil @test_enum_data_walk_down : $@convention(thin) () -> @out Z {
+bb0(%0 : $*Z):
+  %1 = alloc_ref $Z
+  %2 = alloc_ref $Z
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = enum $E, #E.A!enumelt, %1 : $Z
+  br bb3(%3 : $E)
+
+bb2:
+  %5 = enum $E, #E.B!enumelt, %2 : $Z
+  br bb3(%5 : $E)
+
+bb3(%7 : $E):
+  %8 = unchecked_enum_data %7 : $E, #E.B!enumelt
+  store %8 to %0 : $*Z
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: Escape information for test_enum_data_walk_up:
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK: arg0[c0]: %2 = alloc_ref $Y
+// CHECK:  -    :   %4 = alloc_ref $Z
+// CHECK: End function test_enum_data_walk_up
+sil @test_enum_data_walk_up : $@convention(thin) (@guaranteed Z) -> () {
+bb0(%0 : $Z):
+  %1 = alloc_ref $Y
+  %2 = alloc_ref $Y
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = alloc_ref $Z
+  %5 = enum $E, #E.A!enumelt, %4 : $Z
+  br bb3(%5 : $E)
+
+bb2:
+  %7 = enum $E, #E.B!enumelt, %0 : $Z
+  br bb3(%7 : $E)
+
+bb3(%9 : $E):
+  %10 = unchecked_enum_data %9 : $E, #E.A!enumelt
+  %11 = ref_element_addr %10 : $Z, #Z.y
+  store %1 to %11 : $*Y
+
+  %13 = unchecked_enum_data %9 : $E, #E.B!enumelt
+  %14 = ref_element_addr %13 : $Z, #Z.y
+  store %2 to %14 : $*Y
+
+  %16 = tuple ()
+  return %16 : $()
+}
+
+// CHECK-LABEL: Escape information for test_enum_addr:
+// CHECK:  -    :   %1 = alloc_ref $Z
+// CHECK: arg0[]:   %2 = alloc_ref $Z
+// CHECK: End function test_enum_addr
+sil @test_enum_addr : $@convention(thin) () -> @out Z {
+bb0(%0 : $*Z):
+  %1 = alloc_ref $Z
+  %2 = alloc_ref $Z
+  %3 = alloc_stack $E
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = init_enum_data_addr %3 : $*E, #E.A!enumelt
+  store %1 to %5 : $*Z
+  inject_enum_addr %3 : $*E, #E.A!enumelt
+  br bb3
+
+bb2:
+  %9 = init_enum_data_addr %3 : $*E, #E.B!enumelt
+  store %2 to %9 : $*Z
+  inject_enum_addr %3 : $*E, #E.B!enumelt
+  br bb3
+
+bb3:
+  %13 = unchecked_take_enum_data_addr %3 : $*E, #E.B!enumelt
+  copy_addr [take] %13 to [initialization] %0 : $*Z
+  dealloc_stack %3 : $*E
+  %15 = tuple ()
+  return %15 : $()
+}
+
+
+// CHECK-LABEL: Escape information for test_mark_dependence_not_escaping:
+// CHECK: -    :   %0 = alloc_ref $Z
+// CHECK: -    :   %3 = alloc_ref $Y
+// CHECK: End function test_mark_dependence_not_escaping
+sil @test_mark_dependence_not_escaping : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Z
+  %1 = ref_element_addr %0 : $Z, #Z.y
+  %2 = mark_dependence %1 : $*Y on %0 : $Z
+  %3 = alloc_ref $Y
+  store %3 to %2 : $*Y
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: Escape information for test_mark_dependence_escaping:
+// CHECK: return[]:     %0 = alloc_ref $Z
+// CHECK: return[c0]:   %3 = alloc_ref $Y
+// CHECK: End function test_mark_dependence_escaping
+sil @test_mark_dependence_escaping : $@convention(thin) () -> Z {
+bb0:
+  %0 = alloc_ref $Z
+  %1 = ref_element_addr %0 : $Z, #Z.y
+  %2 = mark_dependence %1 : $*Y on %0 : $Z
+  %3 = alloc_ref $Y
+  store %3 to %2 : $*Y
+  return %0 : $Z
+}
+
+
+// CHECK-LABEL: Escape information for test_cast_and_existentials_walk_down:
+// CHECK: return[]: %0 = alloc_ref $Derived
+// CHECK:  -    :   %1 = alloc_ref $Derived
+// CHECK: End function test_cast_and_existentials_walk_down
+sil @test_cast_and_existentials_walk_down : $@convention(thin) () -> ClassP {
+bb0:
+  %0 = alloc_ref $Derived
+  %1 = alloc_ref $Derived
+
+  (%2,%3) = begin_cow_mutation %0 : $Derived
+  %4 = end_cow_mutation %3 : $Derived
+  %5 = upcast %4 : $Derived to $X
+  %6 = init_existential_ref %5 : $X : $X, $ClassP
+  %7 = open_existential_ref %6 : $ClassP to $@opened("53729A20-8747-11EB-82C4-D0817AD9985D") ClassP 
+
+  (%8,%9) = begin_cow_mutation %1 : $Derived
+  %10 = end_cow_mutation %9 : $Derived
+  %11 = upcast %10 : $Derived to $X
+  %12 = init_existential_ref %11 : $X : $X, $ClassP
+  %13 = open_existential_ref %12 : $ClassP to $@opened("12345678-8747-11EB-82C4-D0817AD9985D") ClassP 
+
+  return %6 : $ClassP
+}
+
+// CHECK-LABEL: Escape information for test_cast_walk_up:
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK: arg0[c0]: %2 = alloc_ref $Y
+// CHECK:  -    :   %3 = alloc_ref $DerivedZ
+// CHECK: End function test_cast_walk_up
+sil @test_cast_walk_up : $@convention(thin) (@guaranteed DerivedZ) -> () {
+bb0(%0 : $DerivedZ):
+  %1 = alloc_ref $Y
+  %2 = alloc_ref $Y
+
+  %3 = alloc_ref $DerivedZ
+  (%4,%5) = begin_cow_mutation %3 : $DerivedZ
+  %6 = end_cow_mutation %5 : $DerivedZ
+  %7 = upcast %6 : $DerivedZ to $Z
+  %8 = ref_element_addr %7 : $Z, #Z.y
+  store %1 to %8 : $*Y
+
+  (%10,%11) = begin_cow_mutation %0 : $DerivedZ
+  %12 = end_cow_mutation %11 : $DerivedZ
+  %13 = upcast %12 : $DerivedZ to $Z
+  %14 = ref_element_addr %13 : $Z, #Z.y
+  store %2 to %14 : $*Y
+
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: Escape information for test_address_pointer_casts:
+// CHECK:  -      :   %0 = alloc_ref $Z
+// CHECK: return[]:   %1 = alloc_ref $Y
+// CHECK: return[]:   %2 = alloc_ref $Y
+// CHECK: End function test_address_pointer_casts
+sil @test_address_pointer_casts : $@convention(thin) () -> Y {
+bb0:
+  %0 = alloc_ref $Z
+  %1 = alloc_ref $Y
+  %2 = alloc_ref $Y
+  %3 = ref_element_addr %0 : $Z, #Z.y
+  store %1 to %3 : $*Y
+  %5 = address_to_pointer %3 : $*Y to $Builtin.RawPointer
+  %6 = struct $UnsafeMutablePointer<Y> (%5 : $Builtin.RawPointer)
+  %7 = struct_extract %6 : $UnsafeMutablePointer<Y>, #UnsafeMutablePointer._rawValue
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Y
+  store %2 to %8 : $*Y
+  %10 = load %8 : $*Y
+  return %10 : $Y
+}
+
+// CHECK-LABEL:Escape information for test_escaping_address_to_pointer:
+// CHECK:  -           :   %0 = alloc_ref $Z
+// CHECK: return[s0.s0]:   %1 = alloc_ref $Y
+// CHECK: End function test_escaping_address_to_pointer
+sil @test_escaping_address_to_pointer : $@convention(thin) () -> PointerStr {
+bb0:
+  %0 = alloc_ref $Z
+  %1 = alloc_ref $Y
+  %2 = ref_element_addr %0 : $Z, #Z.y
+  store %1 to %2 : $*Y
+  %4 = address_to_pointer %2 : $*Y to $Builtin.RawPointer
+  %5 = struct $UnsafeMutablePointer<Y> (%4 : $Builtin.RawPointer)
+  %6 = struct $PointerStr (%5 : $UnsafeMutablePointer<Y>)
+  return %6 : $PointerStr
+}
+
+// CHECK-LABEL: Escape information for test_copy_addr:
+// CHECK: arg0[]: %2 = alloc_ref $X
+// CHECK: End function test_copy_addr
+sil [ossa] @test_copy_addr : $@convention(thin) (@in_guaranteed X) -> @out X {
+bb0(%0 : $*X, %1 : $*X):
+  %2 = alloc_ref $X
+
+  %4 = alloc_stack $X
+  cond_br undef, bb1, bb2
+bb1:
+  store %2 to [init] %4 : $*X
+  br bb3
+bb2:
+  destroy_value %2 : $X
+  copy_addr %1 to [initialization] %4 : $*X
+  br bb3
+bb3:
+  copy_addr %4 to [initialization] %0 : $*X
+  destroy_addr %4 : $*X
+  dealloc_stack %4 : $*X
+
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Escape information for test_weak:
+// CHECK:  -        :   %0 = alloc_ref $WZ
+// CHECK: return[e1]:   %1 = alloc_ref $Y
+// CHECK: End function test_weak
+sil @test_weak : $@convention(thin) () -> Optional<Y> {
+bb0:
+  %0 = alloc_ref $WZ
+  %1 = alloc_ref $Y
+  %2 = enum $Optional<Y>, #Optional.some!enumelt, %1 : $Y
+  %3 = ref_element_addr %0 : $WZ, #WZ.w
+  store_weak %2 to [initialization] %3 : $*@sil_weak Optional<Y>
+  %5 = load_weak %3 : $*@sil_weak Optional<Y>
+  return %5 : $Optional<Y>
+}
+
+// CHECK-LABEL: Escape information for test_unowned:
+// CHECK:  -      :   %0 = alloc_ref $WZ
+// CHECK: return[]:   %1 = alloc_ref $Y
+// CHECK: End function test_unowned
+sil @test_unowned : $@convention(thin) () -> Y {
+bb0:
+  %0 = alloc_ref $WZ
+  %1 = alloc_ref $Y
+  %2 = ref_element_addr %0 : $WZ, #WZ.u
+  store_unowned %1 to [initialization] %2 : $*@sil_unowned Y
+  %4 = load_unowned %2 : $*@sil_unowned Y
+  return %4 : $Y
+}
+
+// CHECK-LABEL: Escape information for test_bridge_object:
+// CHECK: arg0[c0]:   %1 = alloc_ref $Y
+// CHECK: End function test_bridge_object
+sil @test_bridge_object : $@convention(thin) (Z) -> (Builtin.Int1, Builtin.Int1) {
+bb0(%0 : $Z):
+  %1 = alloc_ref $Y
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = ref_to_bridge_object %1 : $Y, %2 : $Builtin.Word
+  %4 = bridge_object_to_ref %3 : $Builtin.BridgeObject to $Y
+  %5 = ref_to_bridge_object %0 : $Z, %2 : $Builtin.Word
+  %6 = bridge_object_to_ref %5 : $Builtin.BridgeObject to $Z
+  %7 = ref_element_addr %6 : $Z, #Z.y
+  store %4 to %7 : $*Y
+  %9 = classify_bridge_object %3 : $Builtin.BridgeObject
+  return %9 : $(Builtin.Int1, Builtin.Int1)
+}
+
+// CHECK-LABEL: Escape information for test_ossa:
+// CHECK: global: %0 = alloc_ref $Y
+// CHECK:  -    : %1 = alloc_ref $Z
+// CHECK: End function test_ossa
+sil [ossa] @test_ossa : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Z
+  %2 = copy_value %1 : $Z
+  %3 = begin_borrow %2 : $Z
+  %4 = ref_element_addr %3 : $Z, #Z.y
+  store %0 to [init] %4 : $*Y
+  end_borrow %3 : $Z
+  // destoying %1 and %8 may escape %0 in its destructor
+  destroy_value %1 : $Z
+  %8 = enum $E, #E.A!enumelt, %2 : $Z
+  destroy_value %8 : $E
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Escape information for call_unknown:
+// CHECK: global: %0 = alloc_ref $X
+// CHECK:  -    : %1 = alloc_ref $Y
+// CHECK: End function call_unknown
+sil [ossa] @call_unknown : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = alloc_ref $Y
+  %2 = function_ref @not_escaping_second_argument : $@convention(thin) (@owned X, @owned Y) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@owned X, @owned Y) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: Escape information for call_arg_to_return:
+// CHECK:  -    :   %0 = alloc_ref $X
+// CHECK: return[]: %1 = alloc_ref $X
+// CHECK: End function call_arg_to_return
+sil [ossa] @call_arg_to_return : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $X
+  %1 = alloc_ref $X
+  %2 = function_ref @arg_to_return : $@convention(thin) (@owned X) -> @owned Str
+  %3 = apply %2(%0) : $@convention(thin) (@owned X) -> @owned Str
+  destroy_value %3 : $Str
+  %5 = apply %2(%1) : $@convention(thin) (@owned X) -> @owned Str
+  (%6, %7) = destructure_struct %5 : $Str
+  destroy_value %7 : $(X, X)
+  return %6 : $X
+}
+
+sil [escapes !%0.**] @$s4test1FCfD : $@convention(method) (@owned F) -> ()
+
+// CHECK-LABEL: Escape information for destructure_struct_walkup:
+// CHECK: arg0[c0]:   %2 = alloc_ref $Y                               // user: %9
+// CHECK: arg1[c0]:   %3 = alloc_ref $Y                               // user: %13
+// CHECK: End function destructure_struct_walkup
+sil [ossa] @destructure_struct_walkup : $@convention(thin) (@owned F, @owned F) -> () {
+bb0(%0 : @owned $F, %1 : @owned $F):
+  %2 = alloc_ref $Y
+  %3 = alloc_ref $Y
+  %4 = struct $TwoF (%0 : $F, %1 : $F)
+  (%5, %6) = destructure_struct %4 : $TwoF
+  %7 = begin_borrow %5 : $F
+  %8 = ref_element_addr %7 : $F, #F.y
+  store %2 to [init] %8 : $*Y
+  end_borrow %7 : $F
+  %11 = begin_borrow %6 : $F
+  %12 = ref_element_addr %11 : $F, #F.y
+  store %3 to [init] %12 : $*Y
+  end_borrow %11 : $F
+  destroy_value %5 : $F
+  destroy_value %6 : $F
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: Escape information for destructure_struct_walkdown:
+// CHECK:  -    :   %0 = alloc_ref $F                               // user: %2
+// CHECK: return[]:   %1 = alloc_ref $F                               // user: %2
+// CHECK: End function destructure_struct_walkdown
+sil [ossa] @destructure_struct_walkdown : $@convention(thin) () -> @owned F {
+bb0:
+  %0 = alloc_ref $F
+  %1 = alloc_ref $F
+  %2 = struct $TwoF (%0 : $F, %1 : $F)
+  (%3, %4) = destructure_struct %2 : $TwoF
+  destroy_value %3 : $F
+  return %4 : $F
+}
+
+
+// CHECK-LABEL: Escape information for destructure_tuple_walkup:
+// CHECK: arg0[c0]:   %2 = alloc_ref $Y                               // user: %9
+// CHECK: arg1[c0]:   %3 = alloc_ref $Y                               // user: %13
+// CHECK: End function destructure_tuple_walkup
+sil [ossa] @destructure_tuple_walkup : $@convention(thin) (@owned F, @owned F) -> () {
+bb0(%0 : @owned $F, %1 : @owned $F):
+  %2 = alloc_ref $Y
+  %3 = alloc_ref $Y
+  %4 = tuple (%0 : $F, %1 : $F)
+  (%5, %6) = destructure_tuple %4 : $(F, F)
+  %7 = begin_borrow %5 : $F
+  %8 = ref_element_addr %7 : $F, #F.y
+  store %2 to [init] %8 : $*Y
+  end_borrow %7 : $F
+  %11 = begin_borrow %6 : $F
+  %12 = ref_element_addr %11 : $F, #F.y
+  store %3 to [init] %12 : $*Y
+  end_borrow %11 : $F
+  destroy_value %5 : $F
+  destroy_value %6 : $F
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: Escape information for destructure_tuple_walkdown:
+// CHECK:  -    :   %0 = alloc_ref $F                               // user: %2
+// CHECK: return[]:   %1 = alloc_ref $F                               // user: %2
+// CHECK: End function destructure_tuple_walkdown
+sil [ossa] @destructure_tuple_walkdown : $@convention(thin) () -> @owned F {
+bb0:
+  %0 = alloc_ref $F
+  %1 = alloc_ref $F
+  %2 = tuple (%0 : $F, %1 : $F)
+  (%3, %4) = destructure_tuple %2 : $(F, F)
+  destroy_value %3 : $F
+  return %4 : $F
+}
+
+// CHECK-LABEL: Escape information for call_arg_to_arg:
+// CHECK:  -    :   %0 = alloc_ref $X
+// CHECK: return[]: %1 = alloc_ref $X
+// CHECK: End function call_arg_to_arg
+sil [ossa] @call_arg_to_arg : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $X
+  %1 = alloc_ref $X
+  %2 = function_ref @arg_to_arg : $@convention(thin) (@owned X) -> @out Str
+  %3 = alloc_stack $Str
+  %4 = apply %2(%3, %0) : $@convention(thin) (@owned X) -> @out Str
+  destroy_addr %3 : $*Str
+  dealloc_stack %3 : $*Str
+  %7 = alloc_stack $Str
+  %8 = apply %2(%7, %1) : $@convention(thin) (@owned X) -> @out Str
+  %9 = struct_element_addr %7 : $*Str, #Str.a
+  %10 = load [copy] %9 : $*X
+  destroy_addr %7 : $*Str
+  dealloc_stack %7 : $*Str
+  return %10 : $X
+}
+
+// CHECK-LABEL: Escape information for call_content_of_arg_to_arg:
+// CHECK:  -    :   %0 = alloc_ref $Z
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK:  -    :   %6 = alloc_ref $Z
+// CHECK: return[]: %7 = alloc_ref $Y
+// CHECK: End function call_content_of_arg_to_arg
+sil [ossa] @call_content_of_arg_to_arg : $@convention(thin) () -> @owned Y {
+bb0:
+  %0 = alloc_ref $Z
+  %1 = alloc_ref $Y
+  %2 = begin_borrow %0 : $Z
+  %3 = ref_element_addr %2 : $Z, #Z.y
+  store %1 to [init] %3 : $*Y
+  end_borrow %2 : $Z
+  
+  %6 = alloc_ref $Z
+  %7 = alloc_ref $Y
+  %8 = begin_borrow %6 : $Z
+  %9 = ref_element_addr %8 : $Z, #Z.y
+  store %7 to [init] %9 : $*Y
+  end_borrow %8 : $Z
+ 
+  %16 = function_ref @content_of_arg_to_return : $@convention(thin) (@owned Z) -> @owned Y
+  %17 = apply %16(%0) : $@convention(thin) (@owned Z) -> @owned Y
+  destroy_value %17 : $Y
+  %19 = apply %16(%6) : $@convention(thin) (@owned Z) -> @owned Y
+  return %19 : $Y
+}
+
+// CHECK-LABEL: Escape information for escape_via_copy_addr_destructor:
+// CHECK:  -    :   %1 = alloc_ref $Z
+// CHECK: global:   %2 = alloc_ref $Y
+// CHECK: End function escape_via_copy_addr_destructor
+sil [ossa] @escape_via_copy_addr_destructor : $@convention(thin) (@in_guaranteed Z) -> () {
+bb0(%0 : $*Z):
+  %1 = alloc_ref $Z
+  %2 = alloc_ref $Y
+  %3 = begin_borrow %1 : $Z
+  %4 = ref_element_addr %3 : $Z, #Z.y
+  store %2 to [init] %4 : $*Y
+  end_borrow %3 : $Z
+  %7 = alloc_stack $Z
+  store %1 to [init] %7 : $*Z
+  copy_addr %0 to %7 : $*Z
+  %f = function_ref @non_escaping_in_arg : $@convention(thin) (@in Z) -> ()
+  %a = apply %f(%7) : $@convention(thin) (@in Z) -> ()
+  dealloc_stack %7 : $*Z
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Escape information for escape_via_store_assign_destructor:
+// CHECK:  -    :   %1 = alloc_ref $Z
+// CHECK: global:   %2 = alloc_ref $Y
+// CHECK: End function escape_via_store_assign_destructor
+sil [ossa] @escape_via_store_assign_destructor : $@convention(thin) (@owned Z) -> () {
+bb0(%0 : @owned $Z):
+  %1 = alloc_ref $Z
+  %2 = alloc_ref $Y
+  %3 = begin_borrow %1 : $Z
+  %4 = ref_element_addr %3 : $Z, #Z.y
+  store %2 to [init] %4 : $*Y
+  end_borrow %3 : $Z
+  %7 = alloc_stack $Z
+  store %1 to [init] %7 : $*Z
+  store %0 to [assign] %7 : $*Z
+  %f = function_ref @non_escaping_in_arg : $@convention(thin) (@in Z) -> ()
+  %a = apply %f(%7) : $@convention(thin) (@in Z) -> ()
+  dealloc_stack %7 : $*Z
+  %11 = tuple ()
+  return %11 : $()
+}
+
+sil [ossa] [escapes !%1] @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
+sil [ossa] [escapes !%0] @closure2 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
+sil [escapes !%0.**] @closure3 : $@convention(thin) (@guaranteed Z) -> ()
+sil [ossa] [escapes %0 => %1, !%1] @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> ()
+sil [ossa] [escapes %1 => %0, !%1] @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> ()
+
+// CHECK-LABEL: Escape information for callClosure1:
+// CHECK:  -    :   %0 = alloc_ref $Y
+// CHECK: global:   %1 = alloc_ref $Y
+// CHECK: End function callClosure1
+sil [ossa] @callClosure1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Y
+  %2 = function_ref @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
+  %8 = apply %3(%1) : $@callee_guaranteed (@guaranteed Y) -> ()
+  destroy_value %3 : $@callee_guaranteed (@guaranteed Y) -> ()
+  destroy_value %1 : $Y
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Escape information for callClosure2:
+// CHECK: global:   %0 = alloc_ref $Y
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK: End function callClosure2
+sil [ossa] @callClosure2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Y
+  %2 = function_ref @closure2 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
+  %8 = apply %3(%1) : $@callee_guaranteed (@guaranteed Y) -> ()
+  destroy_value %3 : $@callee_guaranteed (@guaranteed Y) -> ()
+  destroy_value %1 : $Y
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Escape information for noescape_via_closure:
+// CHECK:  -    :   %0 = alloc_ref $Z
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK: End function noescape_via_closure
+sil @noescape_via_closure : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Z
+  %1 = alloc_ref $Y
+  %2 = ref_element_addr %0 : $Z, #Z.y
+  store %1 to %2 : $*Y
+  %4 = function_ref @closure3 : $@convention(thin) (@guaranteed Z) -> ()
+  %5 = partial_apply [callee_guaranteed] %4(%0) : $@convention(thin) (@guaranteed Z) -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: Escape information for callClosureWithEscapesToEffect1:
+// CHECK:  -    :   %0 = alloc_ref $Y
+// CHECK: global:   %1 = alloc_ref $X
+// CHECK: End function callClosureWithEscapesToEffect1
+sil [ossa] @callClosureWithEscapesToEffect1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $X
+  %2 = function_ref @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> ()
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@guaranteed X, @guaranteed Y) -> ()
+  %8 = apply %3(%1) : $@callee_guaranteed (@guaranteed X) -> ()
+  destroy_value %3 : $@callee_guaranteed (@guaranteed X) -> ()
+  destroy_value %1 : $X
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Escape information for callClosureWithEscapesToEffect2:
+// CHECK: global:   %0 = alloc_ref $Y
+// CHECK:  -    :   %1 = alloc_ref $X
+// CHECK: End function callClosureWithEscapesToEffect2
+sil [ossa] @callClosureWithEscapesToEffect2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $X
+  %2 = function_ref @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> ()
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (@guaranteed Y, @guaranteed X) -> ()
+  %8 = apply %3(%0) : $@callee_guaranteed (@guaranteed Y) -> ()
+  destroy_value %3 : $@callee_guaranteed (@guaranteed Y) -> ()
+  destroy_value %0 : $Y
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Escape information for escape_via_destroy_of_closure:
+// CHECK:  -    :   %0 = alloc_ref $Z
+// CHECK: global:   %1 = alloc_ref $Y
+// CHECK: End function escape_via_destroy_of_closure
+sil @escape_via_destroy_of_closure : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Z
+  %1 = alloc_ref $Y
+  %2 = ref_element_addr %0 : $Z, #Z.y
+  store %1 to %2 : $*Y
+  %4 = function_ref @closure3 : $@convention(thin) (@guaranteed Z) -> ()
+  %5 = partial_apply [callee_guaranteed] %4(%0) : $@convention(thin) (@guaranteed Z) -> ()
+  strong_release %5 : $@callee_guaranteed () -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: Escape information for escapingClosure:
+// CHECK: return[]:   %0 = alloc_ref $Y
+// CHECK: End function escapingClosure
+sil [ossa] @escapingClosure : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed Y) -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = function_ref @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
+  return %2 : $@callee_guaranteed (@guaranteed Y) -> ()
+}
+
+// CHECK-LABEL: Escape information for test_box:
+// CHECK:  -      :   %0 = alloc_ref $Z
+// CHECK: return[]:   %1 = alloc_ref $Z
+// CHECK: End function test_box
+sil @test_box : $@convention(thin) () -> Z {
+bb0:
+  %0 = alloc_ref $Z
+  %1 = alloc_ref $Z
+  %2 = alloc_box ${ var Z, var Z }
+  %3 = project_box %2 : ${ var Z, var Z }, 0
+  %4 = project_box %2 : ${ var Z, var Z }, 1
+  store %0 to %3 : $*Z
+  store %1 to %4 : $*Z
+  %7 = load %4 : $*Z
+  return %7 : $Z
+}
+
+// CHECK-LABEL: Escape information for exclusive_arg_and_load:
+// CHECK:  -    :   %2 = alloc_ref $Z
+// CHECK: global:   %4 = alloc_ref $Y
+// CHECK: End function exclusive_arg_and_load
+sil @exclusive_arg_and_load : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_stack $Z
+  %2 = alloc_ref $Z
+  store %2 to %1 : $*Z
+  %4 = alloc_ref $Y
+  %f = function_ref @forward_from_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z
+  %a = apply %f(%1, %0) : $@convention(thin) (@inout Z, @guaranteed Y) -> Z
+  %6 = load %1 : $*Z
+  %7 = ref_element_addr %6 : $Z, #Z.y
+  store %4 to %7 : $*Y
+  dealloc_stack %1 : $*Z
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: Escape information for nonexclusive_arg_and_load:
+// CHECK:  -    :   %2 = alloc_ref $Z
+// CHECK: global:   %4 = alloc_ref $Y
+// CHECK: End function nonexclusive_arg_and_load
+sil @nonexclusive_arg_and_load : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_stack $Z
+  %2 = alloc_ref $Z
+  store %2 to %1 : $*Z
+  %4 = alloc_ref $Y
+  %f = function_ref @load_and_store_to_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z
+  %a = apply %f(%1, %0) : $@convention(thin) (@inout Z, @guaranteed Y) -> Z
+  %6 = load %1 : $*Z
+  %7 = ref_element_addr %6 : $Z, #Z.y
+  store %4 to %7 : $*Y
+  dealloc_stack %1 : $*Z
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil [escapes !%0.c1.**] @$s4test1ZCfD : $@convention(method) (@owned Z) -> ()
+sil [escapes !%0.c0.**] @$s4test8DerivedZCfD : $@convention(method) (@owned DerivedZ) -> ()
+
+// CHECK-LABEL: Escape information for known_type:
+// CHECK: global:   %0 = alloc_ref $Y
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK:  -    :   %2 = alloc_ref $Z
+// CHECK: End function known_type
+sil @known_type : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Y
+  %2 = alloc_ref $Z
+  %3 = ref_element_addr %2 : $Z, #Z.y
+  store %0 to %3 : $*Y
+  %5 = ref_element_addr %2 : $Z, #Z.y2
+  store %1 to %5 : $*Y
+  strong_release %2 : $Z
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Escape information for propagate_types_through_phi_args:
+// CHECK:  -    :   %0 = alloc_ref $Y
+// CHECK: global:   %1 = alloc_ref $Y
+// CHECK:  -    :   %3 = alloc_ref $Z
+// CHECK:  -    :   %5 = alloc_ref $Z
+// CHECK:  -    :   %6 = alloc_ref $DerivedZ
+// CHECK: End function propagate_types_through_phi_args
+sil @propagate_types_through_phi_args : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Y
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = alloc_ref $Z
+  br bb3(%3 : $Z, %3 : $Z)
+bb2:
+  %5 = alloc_ref $Z
+  %6 = alloc_ref $DerivedZ
+  %7 = upcast %6 : $DerivedZ to $Z
+  br bb3(%5 : $Z, %7 : $Z)
+bb3(%9 : $Z, %10 : $Z):
+  %11 = ref_element_addr %9 : $Z, #Z.y2
+  store %0 to %11 : $*Y
+  %13 = ref_element_addr %10 : $Z, #Z.y2
+  store %1 to %13 : $*Y
+  strong_release %9 : $Z
+  strong_release %10 : $Z
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: Escape information for no_known_type_of_loaded_ref:
+// CHECK: global:   %0 = alloc_ref $X
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK:  -    :   %2 = alloc_ref $Z
+// CHECK: End function no_known_type_of_loaded_ref
+sil @no_known_type_of_loaded_ref : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = alloc_ref $Y
+  %2 = alloc_ref $Z
+  %3 = ref_element_addr %2 : $Z, #Z.y2
+  store %1 to %3 : $*Y
+  %5 = load %3 : $*Y
+  %6 = ref_element_addr %5 : $Y, #Y.s
+  %7 = struct_element_addr %6 : $*Str, #Str.a
+  store %0 to %7 : $*X
+  strong_release %5 : $Y
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: Escape information for known_type_through_callee:
+// CHECK:  -    :   %0 = alloc_ref $Y
+// CHECK: global:   %1 = alloc_ref $Y
+// CHECK:  -    :   %2 = alloc_ref $Z
+// CHECK:  -    :   %3 = alloc_ref $Z
+// CHECK: End function known_type_through_callee
+sil @known_type_through_callee : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Y
+  %2 = alloc_ref $Z
+  %3 = alloc_ref $Z
+  %4 = function_ref @exclusive2 : $@convention(thin) (@owned Z) -> @owned Z
+  %5 = apply %4(%2) : $@convention(thin) (@owned Z) -> @owned Z
+  %6 = function_ref @nonexclusive2 : $@convention(thin) (@owned Z) -> @owned Z
+  %7 = apply %6(%3) : $@convention(thin) (@owned Z) -> @owned Z
+  %8 = ref_element_addr %5 : $Z, #Z.y2
+  store %0 to %8 : $*Y
+  %10 = ref_element_addr %7 : $Z, #Z.y2
+  store %1 to %10 : $*Y
+  strong_release %5 : $Z
+  strong_release %7 : $Z
+  %14 = tuple ()
+  return %14 : $()
+}
+

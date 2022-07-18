@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // The rule
 //
@@ -15,7 +15,7 @@
 // reduce [P].[P:Z1] to [P:Z1] and [P].[P:Z2] to [P:Z2], respectively.
 
 // CHECK-LABEL: simplify_concrete_substitutions.(file).P@
-// CHECK-LABEL: Requirement signature: <Self where Self == Self.X.X, Self.X : P, Self.Y == G<Self.Z1, Self.Z2>>
+// CHECK-LABEL: Requirement signature: <Self where Self == Self.[P]X.[P]X, Self.[P]X : P, Self.[P]Y == G<Self.[P]Z1, Self.[P]Z2>>
 
 protocol P {
   associatedtype X : P where X.X == Self

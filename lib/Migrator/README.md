@@ -52,7 +52,7 @@ Here are the passes:
 
    - API Diff Pass
 
-     This pass injests an *API Diff Data File*, a JSON file describing API changes
+     This pass ingests an *API Diff Data File*, a JSON file describing API changes
      from the previous SDK, and looks for API references, performing textual edits
      to update code for things like referenced type and argument names or optionality
      changes. This is where the majority of changes come from in the Migrator.
@@ -81,7 +81,7 @@ Here are the passes:
    - Tuple Splat Migrator Pass
 
      This implements a few convenience transformations to ease the transition
-     for [SE-0110: Distinguish between single-tuple and multiple-argument function types](https://github.com/apple/swift-evolution/blob/master/proposals/0110-distingish-single-tuple-arg.md).
+     for [SE-0110: Distinguish between single-tuple and multiple-argument function types](https://github.com/apple/swift-evolution/blob/master/proposals/0110-distinguish-single-tuple-arg.md).
 
      In particular, this pass adds new variable bindings in closure expressions
      to destructure what are now are a single argument, a tuple. Prior to SE-0110,
@@ -133,7 +133,7 @@ Other controls for the frontend:
 
 For the pre- and post-fix-it passes, there are two basic rules for which fix-its the Migrator will take:
 
-1. Fix-its attached to *error* diagnosics are taken by default and are opt-out.
+1. Fix-its attached to *error* diagnostics are taken by default and are opt-out.
 2. Fix-its attached to *warning* or *note* diagnostics are not taken by default and so are opt-in.
 
 For the opt-out and opt-in cases, these are filtered in the `FixitFilter`, essentially just a small collection of Swift's compiler diagnostic IDs.

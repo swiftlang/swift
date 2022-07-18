@@ -3,14 +3,14 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-LABELED-RESULTS %s
-func mutlipleLabeledResults(completion: @escaping (_ first: String, _ second: String) -> Void) { }
+func multipleLabeledResults(completion: @escaping (_ first: String, _ second: String) -> Void) { }
 // MULTIPLE-LABELED-RESULTS: {
 // MULTIPLE-LABELED-RESULTS-NEXT: Task {
-// MULTIPLE-LABELED-RESULTS-NEXT: let result = await mutlipleLabeledResults()
+// MULTIPLE-LABELED-RESULTS-NEXT: let result = await multipleLabeledResults()
 // MULTIPLE-LABELED-RESULTS-NEXT: completion(result.first, result.second)
 // MULTIPLE-LABELED-RESULTS-NEXT: }
 // MULTIPLE-LABELED-RESULTS-NEXT: }
-// MULTIPLE-LABELED-RESULTS: func mutlipleLabeledResults() async -> (first: String, second: String) { }
+// MULTIPLE-LABELED-RESULTS: func multipleLabeledResults() async -> (first: String, second: String) { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED-LABELED-RESULTS %s
 func mixedLabeledResult(completion: @escaping (_ first: String, String) -> Void) { }
@@ -62,11 +62,11 @@ func multipleLabeledResultWithError(completion: @escaping (_ first: String?, _ s
 
 func testConvertCall() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=CONVERT-CALL %s
-  mutlipleLabeledResults() { (a, b) in
+  multipleLabeledResults() { (a, b) in
     print(a)
     print(b)
   }
-  // CONVERT-CALL: let (a, b) = await mutlipleLabeledResults()
+  // CONVERT-CALL: let (a, b) = await multipleLabeledResults()
   // CONVERT-CALL-NEXT: print(a)
   // CONVERT-CALL-NEXT: print(b)
 }

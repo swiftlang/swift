@@ -198,39 +198,83 @@ Expr *Expr::getSemanticsProvidingExpr() {
   return this;
 }
 
-bool Expr::isSemanticallyConstExpr() const {
-  auto E = getSemanticsProvidingExpr();
-  if (!E) {
-    return false;
-  }
-  switch(E->getKind()) {
-  case ExprKind::IntegerLiteral:
-  case ExprKind::NilLiteral:
-  case ExprKind::BooleanLiteral:
-  case ExprKind::FloatLiteral:
-  case ExprKind::StringLiteral:
+bool Expr::printConstExprValue(llvm::raw_ostream *OS,
+                        llvm::function_ref<bool(Expr*)> additionalCheck) const {
+  auto print = [&](StringRef text) {
+    if (OS) {
+      *OS << text;
+    }
+  };
+  auto *E = getSemanticsProvidingExpr();
+  assert(E);
+  switch(getKind()) {
+  case ExprKind::BooleanLiteral: {
+    auto isTrue = cast<BooleanLiteralExpr>(E)->getValue();
+    print(isTrue ? "true" : "false");
     return true;
+  }
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:  {
+    auto digits = cast<NumberLiteralExpr>(E)->getDigitsText();
+    assert(!digits.empty());
+    print(digits);
+    return true;
+  }
+  case ExprKind::NilLiteral: {
+    print("nil");
+    return true;
+  }
+  case ExprKind::StringLiteral: {
+    auto *LE = cast<StringLiteralExpr>(E);
+    print("\"");
+    print(LE->getValue());
+    print("\"");
+    return true;
+  }
+  case ExprKind::KeyPath: {
+    // FIXME: print keypath
+    print("\\.<NOT_IMPLEMENTED>");
+    return true;
+  }
   case ExprKind::Array:
   case ExprKind::Dictionary: {
+    print("[");
     auto *CE = cast<CollectionExpr>(E);
-    for (auto *EL: CE->getElements()) {
-      if (!EL->isSemanticallyConstExpr())
+    for (unsigned N = CE->getNumElements(), I = 0; I != N; I ++) {
+      auto Ele = CE->getElement(I);
+      auto needComma = I + 1 != N;
+      if (!Ele->printConstExprValue(OS, additionalCheck)) {
         return false;
+      }
+      if (needComma)
+        print(", ");
     }
+    print("]");
     return true;
   }
   case ExprKind::Tuple: {
+    print("(");
     auto *TE = cast<TupleExpr>(E);
-    for (auto *EL: TE->getElements()) {
-      if (!EL->isSemanticallyConstExpr()) {
+    for (unsigned N = TE->getNumElements(), I = 0; I != N; I ++) {
+      auto Ele = TE->getElement(I);
+      auto needComma = I + 1 != N;
+      if (!Ele->printConstExprValue(OS, additionalCheck)) {
         return false;
       }
+      if (needComma)
+        print(", ");
     }
+    print(")");
     return true;
   }
   default:
-    return false;
+    return additionalCheck && additionalCheck(const_cast<Expr*>(this));
   }
+}
+
+bool Expr::isSemanticallyConstExpr(
+    llvm::function_ref<bool(Expr*)> additionalCheck) const {
+  return printConstExprValue(nullptr, additionalCheck);
 }
 
 Expr *Expr::getValueProvidingExpr() {
@@ -397,6 +441,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
+  PASS_THROUGH_REFERENCE(ReifyPack, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -414,6 +459,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(KeyPathDot);
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
+  NO_REFERENCE(Pack);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -723,6 +769,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::BridgeFromObjC:
   case ExprKind::BridgeToObjC:
   case ExprKind::UnderlyingToOpaque:
+  case ExprKind::ReifyPack:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
@@ -740,6 +787,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
+  case ExprKind::Pack:
     return false;
 
   case ExprKind::Tap:
@@ -906,6 +954,8 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::KeyPathDot:
   case ExprKind::OneWay:
   case ExprKind::Tap:
+  case ExprKind::ReifyPack:
+  case ExprKind::Pack:
     return false;
   }
 
@@ -1116,18 +1166,30 @@ InOutExpr::InOutExpr(SourceLoc operLoc, Expr *subExpr, Type baseType,
          baseType.isNull() ? baseType : InOutType::get(baseType)),
     SubExpr(subExpr), OperLoc(operLoc) {}
 
+VarargExpansionExpr *VarargExpansionExpr::createParamExpansion(ASTContext &ctx, Expr *E) {
+  assert(E->getType() && "Expansion must have fully-resolved type!");
+  return new (ctx) VarargExpansionExpr(E, /*implicit*/ true, E->getType());
+}
+
+VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, ArrayExpr *AE) {
+  assert(AE->getType() && "Expansion must have fully-resolved type!");
+  return new (ctx) VarargExpansionExpr(AE, /*implicit*/ true, AE->getType());
+}
+
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
   size_t bytes = totalSizeToAlloc<Expr *>(elements.size());
   void *Buffer = ctx.Allocate(bytes, alignof(SequenceExpr));
-  return ::new(Buffer) SequenceExpr(elements);
+  return ::new (Buffer) SequenceExpr(elements);
 }
 
 ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
-                                 ArrayRef<ProtocolConformanceRef> conformances){
-  auto size = totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
+                                 ArrayRef<ProtocolConformanceRef> conformances,
+                                 ArrayRef<ConversionPair> argConversions) {
+  auto size = totalSizeToAlloc<ProtocolConformanceRef, ConversionPair>(conformances.size(),
+                                                                       argConversions.size());
   auto mem = ctx.Allocate(size, alignof(ErasureExpr));
-  return ::new(mem) ErasureExpr(subExpr, type, conformances);
+  return ::new (mem) ErasureExpr(subExpr, type, conformances, argConversions);
 }
 
 UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
@@ -1136,8 +1198,8 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              SourceLoc RAngleLoc) {
   auto size = totalSizeToAlloc<TypeRepr *>(UnresolvedParams.size());
   auto mem = ctx.Allocate(size, alignof(UnresolvedSpecializeExpr));
-  return ::new(mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
-                                             UnresolvedParams, RAngleLoc);
+  return ::new (mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
+                                              UnresolvedParams, RAngleLoc);
 }
 
 CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
@@ -1351,7 +1413,7 @@ DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                                   Ty);
 }
 
-static ValueDecl *getCalledValue(Expr *E) {
+static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
@@ -1360,11 +1422,16 @@ static ValueDecl *getCalledValue(Expr *E) {
 
   // Look through SelfApplyExpr.
   if (auto *SAE = dyn_cast<SelfApplyExpr>(E))
-    return SAE->getCalledValue();
+    return SAE->getCalledValue(skipFunctionConversions);
+
+  if (skipFunctionConversions) {
+    if (auto fnConv = dyn_cast<FunctionConversionExpr>(E))
+      return getCalledValue(fnConv->getSubExpr(), skipFunctionConversions);
+  }
 
   Expr *E2 = E->getValueProvidingExpr();
   if (E != E2)
-    return getCalledValue(E2);
+    return getCalledValue(E2, skipFunctionConversions);
 
   return nullptr;
 }
@@ -1406,8 +1473,8 @@ Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
                            new (ctx) ErrorExpr(getSourceRange(), getType()));
 }
 
-ValueDecl *ApplyExpr::getCalledValue() const {
-  return ::getCalledValue(Fn);
+ValueDecl *ApplyExpr::getCalledValue(bool skipFunctionConversions) const {
+  return ::getCalledValue(Fn, skipFunctionConversions);
 }
 
 SubscriptExpr::SubscriptExpr(Expr *base, ArgumentList *argList,
@@ -1844,6 +1911,14 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     return expr;
   };
 
+  auto maybeUnwrapConversions = [](Expr *expr) {
+    if (auto *covariantReturn = dyn_cast<CovariantReturnConversionExpr>(expr))
+      expr = covariantReturn->getSubExpr();
+    if (auto *functionConversion = dyn_cast<FunctionConversionExpr>(expr))
+      expr = functionConversion->getSubExpr();
+    return expr;
+  };
+
   switch (getThunkKind()) {
   case AutoClosureExpr::Kind::None:
   case AutoClosureExpr::Kind::AsyncLet:
@@ -1854,6 +1929,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     body = body->getSemanticsProvidingExpr();
     body = maybeUnwrapOpenExistential(body);
     body = maybeUnwrapOptionalEval(body);
+    body = maybeUnwrapConversions(body);
 
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
       return outerCall->getFn();
@@ -1872,9 +1948,11 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
       innerBody = innerBody->getSemanticsProvidingExpr();
       innerBody = maybeUnwrapOpenExistential(innerBody);
       innerBody = maybeUnwrapOptionalEval(innerBody);
+      innerBody = maybeUnwrapConversions(innerBody);
 
       if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
-        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
+        auto outerFn = maybeUnwrapConversions(outerCall->getFn());
+        if (auto *innerCall = dyn_cast<ApplyExpr>(outerFn)) {
           return innerCall->getFn();
         }
       }
@@ -2246,9 +2324,34 @@ SourceLoc TapExpr::getEndLoc() const {
 
 RegexLiteralExpr *
 RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
-                               StringRef regexText, unsigned version) {
-  return new (ctx) RegexLiteralExpr(loc, regexText, version,
+                               StringRef regexText, unsigned version,
+                               ArrayRef<uint8_t> serializedCaps) {
+  return new (ctx) RegexLiteralExpr(loc, regexText, version, serializedCaps,
                                     /*implicit*/ false);
+}
+
+PackExpr::PackExpr(ArrayRef<Expr *> SubExprs, Type Ty)
+  : Expr(ExprKind::Pack, /*implicit*/ true, Ty) {
+  Bits.PackExpr.NumElements = SubExprs.size();
+
+  // Copy elements.
+  std::uninitialized_copy(SubExprs.begin(), SubExprs.end(),
+                          getTrailingObjects<Expr *>());
+}
+
+PackExpr *PackExpr::create(ASTContext &ctx,
+                           ArrayRef<Expr *> SubExprs,
+                           Type Ty) {
+  assert(Ty->castTo<PackType>());
+
+  size_t size =
+      totalSizeToAlloc<Expr *>(SubExprs.size());
+  void *mem = ctx.Allocate(size, alignof(PackExpr));
+  return new (mem) PackExpr(SubExprs, Ty);
+}
+
+PackExpr *PackExpr::createEmpty(ASTContext &ctx) {
+  return create(ctx, {}, PackType::getEmpty(ctx));
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {

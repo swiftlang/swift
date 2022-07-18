@@ -13,13 +13,16 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(Localization)
   add_subdirectory(IDE)
   add_subdirectory(Parse)
+  add_subdirectory(Remangler)
   add_subdirectory(Sema)
   add_subdirectory(SIL)
   add_subdirectory(SwiftDemangle)
   add_subdirectory(Syntax)
+
   if(SWIFT_BUILD_SYNTAXPARSERLIB)
     add_subdirectory(SyntaxParser)
   endif()
+  add_subdirectory(Threading)
 
   if(SWIFT_BUILD_SDK_OVERLAY)
     # Runtime tests depend on symbols in StdlibUnittest.

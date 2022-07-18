@@ -163,7 +163,7 @@ class TestScanner : TestScannerSuper {
       expectEqual($0.scanInt64(), -1 as Int64, "Minus one")
       expectEqual($0.scanInt64(), -1 as Int64, "Minus one after whitespace")
       expectEqual($0.scanInt64(), Int64.min, "Min")
-      expectEqual($0.scanInt64(), Int64.max, "Max again after min (no joining it with preceding min even with ignroed whitespace)")
+      expectEqual($0.scanInt64(), Int64.max, "Max again after min (no joining it with preceding min even with ignored whitespace)")
     }
     
     // Overflow:
@@ -184,7 +184,7 @@ class TestScanner : TestScannerSuper {
       expectEqual($0.scanInt32(), -1 as Int32, "Minus one")
       expectEqual($0.scanInt32(), -1 as Int32, "Minus one after whitespace")
       expectEqual($0.scanInt32(), Int32.min, "Min")
-      expectEqual($0.scanInt32(), Int32.max, "Max again after min (no joining it with preceding min even with ignroed whitespace)")
+      expectEqual($0.scanInt32(), Int32.max, "Max again after min (no joining it with preceding min even with ignored whitespace)")
     }
     
     // Overflow:

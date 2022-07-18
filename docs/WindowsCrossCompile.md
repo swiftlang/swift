@@ -30,7 +30,6 @@ the `build-script` invocation to achieve this. You will need to expand out the
 path where `llvm-ar` and `llvm-ranlib` are built. These are needed to correctly
 build the static libraries. Note that cross-compiling will require the use of
 `lld`. Ensure that `lld-link.exe` is available to clang via your path.
-Additionally, the ICU headers and libraries need to be provided for the build.
 
 #### macOS
 
@@ -38,11 +37,7 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 --extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE,\
 -DCMAKE_AR=<path to llvm-ar>,\
 -DCMAKE_RANLIB=<path to llvm-ranlib>,\
--DSWIFT_SDKS='OSX;WINDOWS',\
--DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=<path to ICU i18n includes>,\
--DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=<path to ICU UC includes>,\
--DSWIFT_WINDOWS_x86_64_ICU_I18N=<path to ICU i18n lib>,\
--DSWIFT_WINDOWS_x86_64_ICU_UC=<path to ICU UC lib>
+-DSWIFT_SDKS='OSX;WINDOWS'
 ```
 
 #### Linux

@@ -66,14 +66,17 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   // If this is an opaque archetype, we'll need to instantiate using its
   // descriptor.
   if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
-    return emitOpaqueTypeMetadataRef(IGF, opaque, request);
+    if (opaque->isRoot())
+      return emitOpaqueTypeMetadataRef(IGF, opaque, request);
   }
 
   // If there's no local or opaque metadata, it must be a nested type.
-  auto nested = cast<NestedArchetypeType>(archetype);
+  assert(archetype->getParent() && "Not a nested archetype");
 
-  CanArchetypeType parent(nested->getParent());
-  AssociatedType association(nested->getAssocType());
+  CanArchetypeType parent(archetype->getParent());
+  AssociatedType association(
+      archetype->getInterfaceType()->castTo<DependentMemberType>()
+        ->getAssocType());
 
   MetadataResponse response =
     emitAssociatedTypeMetadataRef(IGF, parent, association, request);
@@ -186,8 +189,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
   if (wtable) return wtable;
 
-  auto origRoot = archetype->getRoot();
-  auto environment = origRoot->getGenericEnvironment();
+  auto environment = archetype->getGenericEnvironment();
 
   // Otherwise, ask the generic signature for the environment for the best
   // path to the conformance.
@@ -507,9 +509,11 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           DynamicMetadataRequest request) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
   auto opaqueDecl = archetype->getDecl();
-
+  auto genericParam = archetype->getInterfaceType()
+      ->castTo<GenericTypeParamType>();
   auto *descriptor = getAddressOfOpaqueTypeDescriptor(IGF, opaqueDecl);
-  auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+  auto indexValue = llvm::ConstantInt::get(
+      IGF.IGM.SizeTy, genericParam->getIndex());
 
   llvm::CallInst *result = nullptr;
   withOpaqueTypeGenericArgs(IGF, archetype,
@@ -518,8 +522,7 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                        {request.get(IGF), genericArgs, descriptor, indexValue});
       result->setDoesNotThrow();
       result->setCallingConv(IGF.IGM.SwiftCC);
-      result->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::ReadOnly);
+      result->addFnAttr(llvm::Attribute::ReadOnly);
     });
   assert(result);
   
@@ -533,16 +536,32 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           ProtocolDecl *protocol) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFn();
   auto opaqueDecl = archetype->getDecl();
-
+  assert(archetype->isRoot() && "Can only follow from the root");
 
   llvm::Value *descriptor = getAddressOfOpaqueTypeDescriptor(IGF, opaqueDecl);
 
-  auto foundProtocol = std::find(archetype->getConformsTo().begin(),
-                                 archetype->getConformsTo().end(),
-                                 protocol);
-  assert(foundProtocol != archetype->getConformsTo().end());
-  
-  unsigned index = foundProtocol - archetype->getConformsTo().begin() + 1;
+  // Compute the index at which this witness table resides.
+  unsigned index = opaqueDecl->getOpaqueGenericParams().size();
+  auto opaqueReqs =
+      opaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements();
+  bool found = false;
+  for (const auto &req : opaqueReqs) {
+    auto reqProto = opaqueTypeRequiresWitnessTable(opaqueDecl, req);
+    if (!reqProto)
+      continue;
+
+    // Is this requirement the one we're looking for?
+    if (reqProto == protocol &&
+        req.getFirstType()->isEqual(archetype->getInterfaceType())) {
+      found = true;
+      break;
+    }
+
+    ++index;
+  }
+
+  (void)found;
+  assert(found && "Opaque type does not conform to protocol");
   auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, index);
   
   llvm::CallInst *result = nullptr;
@@ -552,8 +571,7 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                    {genericArgs, descriptor, indexValue});
       result->setDoesNotThrow();
       result->setCallingConv(IGF.IGM.SwiftCC);
-      result->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::ReadOnly);
+      result->addFnAttr(llvm::Attribute::ReadOnly);
     });
   assert(result);
   

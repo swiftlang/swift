@@ -333,6 +333,8 @@
           key.usr: <usr>,
           key.line: 38,
           key.column: 9,
+          key.receiver_usr: "s:5index2CCC",
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
@@ -366,8 +368,7 @@
           key.name: "smeth()",
           key.usr: <usr>,
           key.line: 40,
-          key.column: 6,
-          key.receiver_usr: "s:5index2CCC"
+          key.column: 6
         },
         {
           key.kind: source.lang.swift.ref.enum,
@@ -844,8 +845,7 @@
                   key.name: "+(_:_:)",
                   key.usr: <usr>,
                   key.line: 86,
-                  key.column: 8,
-                  key.receiver_usr: "s:Si"
+                  key.column: 8
                 }
               ]
             },
@@ -904,6 +904,8 @@
           key.usr: <usr>,
           key.line: 92,
           key.column: 14,
+          key.receiver_usr: "s:5index16ComputedPropertyC",
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
@@ -922,6 +924,8 @@
           key.usr: <usr>,
           key.line: 93,
           key.column: 10,
+          key.receiver_usr: "s:5index16ComputedPropertyC",
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
@@ -940,6 +944,8 @@
           key.usr: <usr>,
           key.line: 94,
           key.column: 6,
+          key.receiver_usr: "s:5index16ComputedPropertyC",
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
@@ -958,6 +964,8 @@
           key.usr: <usr>,
           key.line: 96,
           key.column: 10,
+          key.receiver_usr: "s:5index3CC2C",
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
@@ -976,6 +984,8 @@
           key.usr: <usr>,
           key.line: 97,
           key.column: 6,
+          key.receiver_usr: "s:5index3CC2C",
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
@@ -1085,8 +1095,7 @@
           key.name: "sfoo()",
           key.usr: <usr>,
           key.line: 112,
-          key.column: 16,
-          key.receiver_usr: "s:5index2S2V"
+          key.column: 16
         }
       ],
       key.effective_access: source.decl.effective_access.internal
@@ -1179,8 +1188,7 @@
               key.name: "foo()",
               key.usr: <usr>,
               key.line: 123,
-              key.column: 11,
-              key.receiver_usr: "s:5index2B1C"
+              key.column: 11
             }
           ],
           key.attributes: [
@@ -1255,8 +1263,7 @@
           key.name: "sfoo()",
           key.usr: <usr>,
           key.line: 130,
-          key.column: 5,
-          key.receiver_usr: "s:5index2S2V"
+          key.column: 5
         }
       ],
       key.effective_access: source.decl.effective_access.internal
@@ -1367,8 +1374,7 @@
               key.name: "init(x:)",
               key.usr: <usr>,
               key.line: 145,
-              key.column: 11,
-              key.receiver_usr: "s:5index3CC4C"
+              key.column: 11
             }
           ],
           key.effective_access: source.decl.effective_access.internal
@@ -1448,6 +1454,11 @@
                   key.line: 153,
                   key.column: 7
                 }
+              ],
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
+                }
               ]
             },
             {
@@ -1463,6 +1474,11 @@
                   key.usr: <usr>,
                   key.line: 156,
                   key.column: 7
+                }
+              ],
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
                 }
               ]
             }
@@ -1514,7 +1530,12 @@
               key.name: "didSet:S1",
               key.usr: <usr>,
               key.line: 170,
-              key.column: 5
+              key.column: 5,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
+                }
+              ]
             }
           ],
           key.effective_access: source.decl.effective_access.internal

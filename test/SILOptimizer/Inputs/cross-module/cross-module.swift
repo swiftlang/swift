@@ -17,6 +17,7 @@ public struct Container {
     var arr = Array<Base>()
     arr.append(Base())
     print(arr)
+    dontBlockSerialization(arr)
     return t
   }
 
@@ -288,5 +289,9 @@ public let globalLet = 529387
 
 public struct StructWithClosure {
   public static let c = { (x: Int) -> Int in return x }
+}
+
+public func getEmptySet() -> Set<Int> {
+  return Set()
 }
 

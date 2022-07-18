@@ -159,6 +159,10 @@ OVERRIDE_TASK(task_suspend, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, ,)
 
+OVERRIDE_TASK(task_enqueueTaskOnExecutor, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (AsyncTask *task, ExecutorRef newExecutor), (task, newExecutor))
+
 OVERRIDE_TASK(continuation_init, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, (ContinuationAsyncContext *context,
@@ -308,29 +312,9 @@ OVERRIDE_TASK_LOCAL(task_localsCopyTo, void,
                     (AsyncTask *target),
                     (target))
 
-OVERRIDE_TASK_STATUS(task_addStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *newRecord), (newRecord))
-
-OVERRIDE_TASK_STATUS(task_tryAddStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *newRecord), (newRecord))
-
-OVERRIDE_TASK_STATUS(task_removeStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *record), (record))
-
 OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, , )
-
-OVERRIDE_TASK_STATUS(task_attachChild, ChildTaskStatusRecord *,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (AsyncTask *child), (child))
-
-OVERRIDE_TASK_STATUS(task_detachChild, void,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (ChildTaskStatusRecord *record), (record))
 
 OVERRIDE_TASK_STATUS(task_cancel, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                      SWIFT_CC(swift), swift::, (AsyncTask *task), (task))

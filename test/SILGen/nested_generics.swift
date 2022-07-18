@@ -155,7 +155,7 @@ func eatDinnerConcrete(d: inout Lunch<Pizzas<ChiliFlakes>.NewYork>.Dinner<HotDog
 }
 
 // CHECK-LABEL: // reabstraction thunk helper from @escaping @callee_guaranteed (@guaranteed nested_generics.Pizzas<nested_generics.ChiliFlakes>.NewYork) -> (@out nested_generics.HotDogs.American) to @escaping @callee_guaranteed (@guaranteed nested_generics.Pizzas<nested_generics.ChiliFlakes>.NewYork) -> (@unowned nested_generics.HotDogs.American)
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s15nested_generics6PizzasV7NewYorkCyAA11ChiliFlakesV_GAA7HotDogsC8AmericanVIeggr_AhLIeggd_TR : $@convention(thin) (@guaranteed Pizzas<ChiliFlakes>.NewYork, @guaranteed @callee_guaranteed (@guaranteed Pizzas<ChiliFlakes>.NewYork) -> @out HotDogs.American) -> HotDogs.American
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s15nested_generics6PizzasV7NewYorkCyAA11ChiliFlakesV_GAA7HotDogsC8AmericanVIeggr_AhLIeggd_TR : $@convention(thin) (@guaranteed Pizzas<ChiliFlakes>.NewYork, @guaranteed @callee_guaranteed (@guaranteed Pizzas<ChiliFlakes>.NewYork) -> @out HotDogs.American) -> HotDogs.American
 
 // CHECK-LABEL: // nested_generics.eatDinnerConcrete(d: inout nested_generics.Lunch<nested_generics.Pizzas<nested_generics.Pepper>.NewYork>.Dinner<nested_generics.HotDogs.American>, t: nested_generics.Deli<nested_generics.Pepper>.Pepperoni, u: nested_generics.Deli<nested_generics.Pepper>.Mustard) -> ()
 // CHECK-LABEL: sil hidden [ossa] @$s15nested_generics17eatDinnerConcrete1d1t1uyAA5LunchV0D0VyAA6PizzasV7NewYorkCyAA6PepperV_G_AA7HotDogsC8AmericanVGz_AA4DeliC9PepperoniCyAO_GAW7MustardOyAO_GtF : $@convention(thin) (@inout Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDogs.American>, @guaranteed Deli<Pepper>.Pepperoni, Deli<Pepper>.Mustard) -> ()
@@ -177,7 +177,7 @@ func eatDinnerConcrete(d: inout Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDogs.Ame
 }
 
 // CHECK-LABEL: // reabstraction thunk helper from @escaping @callee_guaranteed (@guaranteed nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@out nested_generics.HotDogs.American) to @escaping @callee_guaranteed (@guaranteed nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@unowned nested_generics.HotDogs.American)
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s15nested_generics6PizzasV7NewYorkCyAA6PepperV_GAA7HotDogsC8AmericanVIeggr_AhLIeggd_TR : $@convention(thin) (@guaranteed Pizzas<Pepper>.NewYork, @guaranteed @callee_guaranteed (@guaranteed Pizzas<Pepper>.NewYork) -> @out HotDogs.American) -> HotDogs.American
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s15nested_generics6PizzasV7NewYorkCyAA6PepperV_GAA7HotDogsC8AmericanVIeggr_AhLIeggd_TR : $@convention(thin) (@guaranteed Pizzas<Pepper>.NewYork, @guaranteed @callee_guaranteed (@guaranteed Pizzas<Pepper>.NewYork) -> @out HotDogs.American) -> HotDogs.American
 
 // CHECK-LABEL: // closure #1 (nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> nested_generics.HotDogs.American in nested_generics.calls() -> ()
 // CHECK-LABEL: sil private [ossa] @$s15nested_generics5callsyyFAA7HotDogsC8AmericanVAA6PizzasV7NewYorkCyAA6PepperV_GcfU_ :

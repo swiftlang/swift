@@ -16,6 +16,11 @@ let package = Package(
             dependencies: [
                 "SymbolicationShims",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            swiftSettings: [
+                .unsafeFlags([
+                    "-parse-as-library",
+                ]),
             ]),
         .testTarget(
             name: "swiftInspectTests",

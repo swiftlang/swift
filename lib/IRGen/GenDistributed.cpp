@@ -22,8 +22,10 @@
 #include "ClassTypeInfo.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
+#include "GenClass.h"
 #include "GenDecl.h"
 #include "GenMeta.h"
+#include "GenOpaque.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -33,6 +35,8 @@
 #include "ScalarPairTypeInfo.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
@@ -64,10 +68,55 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 
 namespace {
 
-struct AllocationInfo {
-  SILType Type;
-  const TypeInfo &TI;
-  StackAddress Addr;
+struct ArgumentDecoderInfo {
+  /// The instance of the decoder this information belongs to.
+  llvm::Value *Decoder;
+
+  /// The pointer to `decodeNextArgument` method which
+  /// could be used to form a call to it.
+  FunctionPointer MethodPtr;
+
+  /// The type of `decodeNextArgument` method.
+  CanSILFunctionType MethodType;
+
+  /// Protocol requirements associated with the generic
+  /// parameter `Argument` of this decode method.
+  GenericSignature::RequiredProtocols ProtocolRequirements;
+
+  // Witness metadata for conformance to DistributedTargetInvocationDecoder
+  // protocol.
+  WitnessMetadata Witness;
+
+  ArgumentDecoderInfo(llvm::Value *decoder, llvm::Value *decoderType,
+                      llvm::Value *decoderWitnessTable,
+                      FunctionPointer decodeNextArgumentPtr,
+                      CanSILFunctionType decodeNextArgumentTy)
+      : Decoder(decoder), MethodPtr(decodeNextArgumentPtr),
+        MethodType(decodeNextArgumentTy),
+        ProtocolRequirements(findProtocolRequirements(decodeNextArgumentTy)) {
+    Witness.SelfMetadata = decoderType;
+    Witness.SelfWitnessTable = decoderWitnessTable;
+  }
+
+  CanSILFunctionType getMethodType() const { return MethodType; }
+
+  ArrayRef<ProtocolDecl *> getProtocolRequirements() const {
+    return ProtocolRequirements;
+  }
+
+  /// Form a callee to a decode method - `decodeNextArgument`.
+  Callee getCallee() const;
+
+private:
+  static GenericSignature::RequiredProtocols
+  findProtocolRequirements(CanSILFunctionType decodeMethodTy) {
+    auto signature = decodeMethodTy->getInvocationGenericSignature();
+    auto genericParams = signature.getGenericParams();
+
+    // func decodeNextArgument<Arg : #SerializationRequirement#>() throws -> Arg
+    assert(genericParams.size() == 1);
+    return signature->getRequiredProtocols(genericParams.front());
+  }
 };
 
 class DistributedAccessor {
@@ -75,7 +124,7 @@ class DistributedAccessor {
   IRGenFunction &IGF;
 
   /// Underlying distributed method for this accessor.
-  SILFunction *Method;
+  SILFunction *Target;
 
   /// The interface type of this accessor function.
   CanSILFunctionType AccessorType;
@@ -83,67 +132,168 @@ class DistributedAccessor {
   AsyncContextLayout AsyncLayout;
 
   /// The list of all arguments that were allocated on the stack.
-  SmallVector<AllocationInfo, 4> AllocatedArguments;
+  SmallVector<StackAddress, 4> AllocatedArguments;
 
 public:
-  DistributedAccessor(IRGenFunction &IGF, SILFunction *method,
+  DistributedAccessor(IRGenFunction &IGF, SILFunction *target,
                       CanSILFunctionType accessorTy);
 
   void emit();
 
 private:
-  void computeArguments(llvm::Value *argumentBuffer, Explosion &arguments);
+  void decodeArguments(const ArgumentDecoderInfo &decoder,
+                       llvm::Value *argumentTypes, Explosion &arguments);
 
-  FunctionPointer getPointerToMethod() const;
+  /// Load an argument value from the given decoder \c decoder
+  /// to the given explosion \c arguments. Information describing
+  /// the type of argument comes from runtime metadata.
+  void decodeArgument(unsigned argumentIdx, const ArgumentDecoderInfo &decoder,
+                      llvm::Value *argumentType, const SILParameterInfo &param,
+                      Explosion &arguments);
 
-  Callee getCalleeForDistributedMethod(llvm::Value *self) const;
+  void lookupWitnessTables(llvm::Value *value,
+                           ArrayRef<ProtocolDecl *> protocols,
+                           Explosion &witnessTables);
+
+  /// Load witness table addresses (if any) from the given buffer
+  /// into the given argument explosion.
+  ///
+  /// Number of witnesses to load is provided by \c numTables but
+  /// it's checked against the number of \c expectedWitnessTables.
+  void emitLoadOfWitnessTables(llvm::Value *witnessTables,
+                               llvm::Value *numTables,
+                               unsigned expectedWitnessTables,
+                               Explosion &arguments);
+
+  /// Emit an async return from accessor which does cleanup of
+  /// all the argument allocations.
+  void emitReturn(llvm::Value *errorValue);
+
+  FunctionPointer getPointerToTarget() const;
+
+  Callee getCalleeForDistributedTarget(llvm::Value *self) const;
+
+  /// Given an instance of invocation decoder, its type metadata,
+  /// and protocol witness table, find `decodeNextArgument`.
+  ArgumentDecoderInfo findArgumentDecoder(llvm::Value *decoder,
+                                          llvm::Value *decoderTy,
+                                          llvm::Value *witnessTable);
+
+  /// The result type of the accessor.
+  SILType getResultType() const;
+
+  /// The error type of this accessor.
+  SILType getErrorType() const;
 };
 
 } // end namespace
 
+static NominalTypeDecl *getDistributedActorOf(SILFunction *thunk) {
+  assert(thunk->isDistributed() && thunk->isThunk());
+  return thunk->getDeclContext()
+      ->getInnermostTypeContext()
+      ->getSelfNominalTypeDecl();
+}
+
 /// Compute a type of a distributed method accessor function based
-/// on the provided distributed method.
+/// on the provided distributed target.
 static CanSILFunctionType getAccessorType(IRGenModule &IGM,
-                                          SILFunction *DistMethod) {
+                                          SILFunction *Target) {
   auto &Context = IGM.Context;
 
-  auto getRawPointerParmeter = [&]() {
-    auto ptrType = Context.getUnsafeRawPointerType();
-    return SILParameterInfo(ptrType->getCanonicalType(),
-                            ParameterConvention::Direct_Guaranteed);
-  };
+  // func __accessor__<D: DistributedTargetInvocationDecoder>(
+  //   inout D, <- invocation decoder
+  //   UnsafeRawPointer,  <- argument types
+  //   UnsafeRawPointer,  <- result buffer
+  //   UnsafeRawPointer?, <- generic parameter substitutions
+  //   UnsafeRawPointer?, <- witness tables
+  //   UInt,              <- number of witness tables
+  //   <actor>
+  // ) async throws
 
-  // `self` of the distributed actor is going to be passed as an argument
-  // to this accessor function.
-  auto extInfo = SILExtInfoBuilder()
-                     .withRepresentation(SILFunctionTypeRepresentation::Thick)
-                     .withAsync()
-                     .build();
+  SmallVector<GenericFunctionType::Param, 8> parameters;
 
-  auto methodTy = DistMethod->getLoweredFunctionType();
+  // A generic parameter that represents instance of invocation decoder.
+  auto *decoderType =
+      GenericTypeParamType::get(/*isTypeSequence=*/false,
+                                /*depth=*/1, /*index=*/0, Context);
 
-  assert(methodTy->isAsync());
-  assert(methodTy->hasErrorResult());
+  // decoder
+  parameters.push_back(GenericFunctionType::Param(
+      decoderType,
+      /*label=*/Identifier(),
+      /*flags=*/ParameterTypeFlags().withInOut(true)));
 
-  // Accessor gets argument value buffer and a reference to `self` of
-  // the actor and produces a call to the distributed thunk forwarding
-  // its result(s) out.
-  return SILFunctionType::get(
-      /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
-      ParameterConvention::Direct_Guaranteed,
-      {/*argumentBuffer=*/getRawPointerParmeter(),
-       /*resultBuffer=*/getRawPointerParmeter()},
-      /*Yields=*/{},
-      /*Results=*/{},
-      /*ErrorResult=*/methodTy->getErrorResult(),
-      /*patternSubs=*/SubstitutionMap(),
-      /*invocationSubs=*/SubstitutionMap(), Context);
+  // argument type buffer
+  parameters.push_back(
+      GenericFunctionType::Param(Context.getUnsafeRawPointerType()));
+
+  // result buffer
+  parameters.push_back(
+      GenericFunctionType::Param(Context.getUnsafeRawPointerType()));
+
+  // generic parameter substitutions
+  parameters.push_back(
+      GenericFunctionType::Param(Context.getUnsafeRawPointerType()));
+
+  // witness tables
+  parameters.push_back(
+      GenericFunctionType::Param(Context.getUnsafeRawPointerType()));
+
+  // number of witness tables
+  parameters.push_back(GenericFunctionType::Param(Context.getUIntType()));
+
+  // actor
+  {
+    auto targetTy = Target->getLoweredFunctionType();
+    auto actorLoc = targetTy->getParameters().back();
+
+    parameters.push_back(
+        GenericFunctionType::Param(actorLoc.getInterfaceType()));
+  }
+
+  auto decoderProtocolTy =
+      Context
+          .getProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder)
+          ->getDeclaredInterfaceType();
+
+  // Build generic signature that includes all contextual generic parameters.
+  GenericSignature signature;
+  {
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    SmallVector<Requirement, 4> genericRequirements;
+
+    auto *actor = getDistributedActorOf(Target);
+    assert(actor);
+
+    for (auto *genericParam : actor->getInnermostGenericParamTypes())
+      genericParams.push_back(genericParam);
+
+    // Add a generic parameter `D` which stands for decoder type in the
+    // accessor signature - `inout D`.
+    genericParams.push_back(decoderType);
+    // Add a requirement that decoder conforms to the expected protocol.
+    genericRequirements.push_back(
+        {RequirementKind::Conformance, decoderType, decoderProtocolTy});
+
+    signature = GenericSignature::get(genericParams, genericRequirements);
+  }
+
+  auto accessorTy = GenericFunctionType::get(
+      signature, parameters, Context.TheEmptyTupleType,
+      ASTExtInfoBuilder()
+          .withRepresentation(FunctionTypeRepresentation::Thin)
+          .withAsync()
+          .withThrows()
+          .build());
+
+  return IGM.getLoweredType(accessorTy).castTo<SILFunctionType>();
 }
 
 llvm::Function *
-IRGenModule::getAddrOfDistributedMethodAccessor(SILFunction *F,
+IRGenModule::getAddrOfDistributedTargetAccessor(SILFunction *F,
                                                 ForDefinition_t forDefinition) {
-  auto entity = LinkEntity::forDistributedMethodAccessor(F);
+  auto entity = LinkEntity::forDistributedTargetAccessor(F);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
@@ -158,30 +308,31 @@ IRGenModule::getAddrOfDistributedMethodAccessor(SILFunction *F,
   return createFunction(*this, link, signature);
 }
 
-void IRGenModule::emitDistributedMethodAccessor(SILFunction *method) {
-  assert(method->isDistributed());
+void IRGenModule::emitDistributedTargetAccessor(SILFunction *target) {
+  assert(target->isDistributed());
 
-  auto *f = getAddrOfDistributedMethodAccessor(method, ForDefinition);
+  auto *f = getAddrOfDistributedTargetAccessor(target, ForDefinition);
   if (!f->isDeclaration())
     return;
 
   IRGenFunction IGF(*this, f);
-  DistributedAccessor(IGF, method, getAccessorType(*this, method)).emit();
+  DistributedAccessor(IGF, target, getAccessorType(*this, target)).emit();
 }
 
 DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
-                                         SILFunction *method,
+                                         SILFunction *target,
                                          CanSILFunctionType accessorTy)
-    : IGM(IGF.IGM), IGF(IGF), Method(method), AccessorType(accessorTy),
+    : IGM(IGF.IGM), IGF(IGF), Target(target), AccessorType(accessorTy),
       AsyncLayout(getAsyncContextLayout(
-          IGM, AccessorType, AccessorType, SubstitutionMap(),
-          /*suppress generics*/ true,
-          FunctionPointer::Kind(
-              FunctionPointer::BasicKind::AsyncFunctionPointer))) {}
+          IGM, AccessorType, AccessorType, SubstitutionMap())) {
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
+}
 
-void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
-                                           Explosion &arguments) {
-  auto fnType = Method->getLoweredFunctionType();
+void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
+                                          llvm::Value *argumentTypes,
+                                          Explosion &arguments) {
+  auto fnType = Target->getLoweredFunctionType();
 
   // Cover all of the arguments except to `self` of the actor.
   auto parameters = fnType->getParameters().drop_back();
@@ -190,101 +341,258 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
   if (parameters.empty())
     return;
 
-  auto offset =
-      IGF.createAlloca(IGM.Int8PtrTy, IGM.getPointerAlignment(), "offset");
-  IGF.Builder.CreateLifetimeStart(offset, IGM.getPointerSize());
+  // Cast type buffer to `swift.type**`
+  argumentTypes =
+      IGF.Builder.CreateBitCast(argumentTypes, IGM.TypeMetadataPtrPtrTy);
 
-  // Initialize "offset" with the address of the base of the argument buffer.
-  IGF.Builder.CreateStore(argumentBuffer, offset);
-
-  for (const auto &param : parameters) {
+  for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
+    const auto &param = parameters[i];
     auto paramTy = param.getSILStorageInterfaceType();
-    const TypeInfo &typeInfo = IGF.getTypeInfo(paramTy);
 
-    // 1. Load current offset.
-    llvm::Value *currentOffset = IGF.Builder.CreateLoad(offset, "elt_offset");
-
-    // 2. Cast the pointer to the type of the element.
-    Address eltPtr = IGF.Builder.CreateBitCast(
-        Address(currentOffset, IGM.getPointerAlignment()),
-        IGM.getStoragePointerType(paramTy));
-
-    // 3. Adjust typed pointer to the alignement of the type.
-    auto alignedOffset = typeInfo.roundUpToTypeAlignment(IGF, eltPtr, paramTy);
-
+    // Check whether the native representation is empty e.g.
+    // this happens for empty enums, and if so - continue to
+    // the next argument.
     if (paramTy.isObject()) {
+      auto &typeInfo = IGM.getTypeInfo(paramTy);
       auto &nativeSchema = typeInfo.nativeParameterValueSchema(IGM);
-      // If schema is empty, skip to the next argument.
+
       if (nativeSchema.empty())
         continue;
     }
 
-    // 4. Create an exploded version of the type to pass as an
-    //    argument to distributed method.
+    auto offset =
+        Size(i * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
+    auto alignment = IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
 
-    switch (param.getConvention()) {
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant: {
-      // The +1 argument is passed indirectly, so we need to copy it into
-      // a temporary.
+    // Load metadata describing argument value from argument types buffer.
+    auto typeLoc = IGF.emitAddressAtOffset(
+        argumentTypes, Offset(offset), IGM.TypeMetadataPtrTy,
+        Alignment(alignment), "arg_type_loc");
 
-      auto stackAddr = typeInfo.allocateStack(IGF, paramTy, "arg.temp");
-      auto argPtr = stackAddr.getAddress().getAddress();
+    auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
 
-      typeInfo.initializeWithCopy(IGF, stackAddr.getAddress(), alignedOffset,
-                                  paramTy, /*isOutlined=*/false);
-      arguments.add(argPtr);
+    // Decode and load argument value using loaded type metadata.
+    decodeArgument(i, decoder, argumentTy, param, arguments);
+  }
+}
 
-      // Remember to deallocate later.
-      AllocatedArguments.push_back({paramTy, typeInfo, stackAddr});
-      break;
+void DistributedAccessor::decodeArgument(unsigned argumentIdx,
+                                         const ArgumentDecoderInfo &decoder,
+                                         llvm::Value *argumentType,
+                                         const SILParameterInfo &param,
+                                         Explosion &arguments) {
+  auto &paramInfo = IGM.getTypeInfo(param.getSILStorageInterfaceType());
+  // TODO: `emitLoad*` would actually load value witness table every
+  // time it's called, which is sub-optimal but all of the APIs that
+  // deal with value witness tables are currently hidden in GenOpaque.cpp
+  llvm::Value *valueSize = emitLoadOfSize(IGF, argumentType);
+
+  Callee callee = decoder.getCallee();
+
+  std::unique_ptr<CallEmission> emission =
+      getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
+
+  StackAddress resultValue = IGF.emitDynamicAlloca(
+      IGM.Int8Ty, valueSize, paramInfo.getBestKnownAlignment());
+
+  llvm::Value *resultAddr = resultValue.getAddress().getAddress();
+
+  resultAddr = IGF.Builder.CreateBitCast(resultAddr, IGM.OpaquePtrTy);
+
+  Explosion decodeArgs;
+  // indirect result buffer as `swift.opaque*`
+  decodeArgs.add(resultAddr);
+  // substitution Argument -> <argument metadata>
+  decodeArgs.add(argumentType);
+
+  // Lookup witness tables for the requirement on the argument type.
+  lookupWitnessTables(argumentType, decoder.getProtocolRequirements(),
+                      decodeArgs);
+
+  Address calleeErrorSlot;
+  llvm::Value *decodeError = nullptr;
+
+  emission->begin();
+  {
+    emission->setArgs(decodeArgs, /*isOutlined=*/false,
+                      /*witnessMetadata=*/nullptr);
+
+    Explosion result;
+    emission->emitToExplosion(result, /*isOutlined=*/false);
+    assert(result.empty());
+
+    // Load error from the slot to emit an early return if necessary.
+    {
+      SILFunctionConventions conv(decoder.getMethodType(), IGM.getSILModule());
+      SILType errorType =
+          conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+
+      calleeErrorSlot =
+          emission->getCalleeErrorSlot(errorType, /*isCalleeAsync=*/true);
+      decodeError = IGF.Builder.CreateLoad(calleeErrorSlot);
+    }
+  }
+  emission->end();
+
+  // Remember to deallocate later.
+  AllocatedArguments.push_back(resultValue);
+
+  // Check whether the error slot has been set and if so
+  // emit an early return from accessor.
+  {
+    auto contBB = IGF.createBasicBlock("");
+    auto errorBB = IGF.createBasicBlock("on-error");
+
+    auto nullError = llvm::Constant::getNullValue(decodeError->getType());
+    auto hasError = IGF.Builder.CreateICmpNE(decodeError, nullError);
+
+    IGF.Builder.CreateCondBr(hasError, errorBB, contBB);
+    {
+      IGF.Builder.emitBlock(errorBB);
+      // Emit an early return if argument decoding failed.
+      emitReturn(decodeError);
     }
 
-    case ParameterConvention::Indirect_In_Guaranteed: {
-      // The argument is +0, so we can use the address of the param in
-      // the context directly.
-      arguments.add(alignedOffset.getAddress());
-      break;
+    IGF.Builder.emitBlock(contBB);
+    // Reset value of the slot back to `null`
+    IGF.Builder.CreateStore(nullError, calleeErrorSlot);
+  }
+
+  switch (param.getConvention()) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant: {
+    // The only way to load opaque type is to allocate a temporary
+    // variable on the stack for it and initialize from the given address
+    // either at +0 or +1 depending on convention.
+
+    auto stackAddr =
+        IGF.emitDynamicAlloca(IGM.Int8Ty, valueSize, Alignment(16));
+
+    emitInitializeWithCopyCall(IGF, argumentType, stackAddr.getAddress(),
+                               resultValue.getAddress());
+
+    // Remember to deallocate a copy.
+    AllocatedArguments.push_back(stackAddr);
+    break;
+  }
+
+  case ParameterConvention::Indirect_In_Guaranteed: {
+    // The argument is +0, so we can use the address of the param in
+    // the context directly.
+    arguments.add(resultAddr);
+    break;
+  }
+
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    llvm_unreachable("indirect 'inout' parameters are not supported");
+
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Direct_Unowned: {
+    auto paramTy = param.getSILStorageInterfaceType();
+    Address eltPtr = IGF.Builder.CreateBitCast(
+        resultValue.getAddress(), IGM.getStoragePointerType(paramTy));
+
+    cast<LoadableTypeInfo>(paramInfo).loadAsTake(IGF, eltPtr, arguments);
+    break;
+  }
+
+  case ParameterConvention::Direct_Owned: {
+    // Copy the value out at +1.
+    cast<LoadableTypeInfo>(paramInfo).loadAsCopy(IGF, resultValue.getAddress(),
+                                                 arguments);
+    break;
+  }
+  }
+}
+
+void DistributedAccessor::lookupWitnessTables(
+    llvm::Value *value, ArrayRef<ProtocolDecl *> protocols,
+    Explosion &witnessTables) {
+  auto conformsToProtocol = IGM.getConformsToProtocolFn();
+
+  for (auto *protocol : protocols) {
+    auto *protocolDescriptor = IGM.getAddrOfProtocolDescriptor(protocol);
+    auto *witnessTable =
+        IGF.Builder.CreateCall(conformsToProtocol, {value, protocolDescriptor});
+
+    auto failBB = IGF.createBasicBlock("missing-witness");
+    auto contBB = IGF.createBasicBlock("");
+
+    auto isNull = IGF.Builder.CreateICmpEQ(
+        witnessTable, llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+    IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+
+    // This operation shouldn't fail because runtime should have checked that
+    // a particular argument type conforms to `SerializationRequirement`
+    // of the distributed actor the decoder is used for. If it does fail
+    // then accessor should trap.
+    {
+      IGF.Builder.emitBlock(failBB);
+      IGF.emitTrap("missing witness table", /*EmitUnreachable=*/true);
     }
 
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
-      llvm_unreachable("indirect parameters are not supported");
+    IGF.Builder.emitBlock(contBB);
+    witnessTables.add(witnessTable);
+  }
+}
 
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Unowned: {
-      cast<LoadableTypeInfo>(typeInfo).loadAsTake(IGF, alignedOffset,
-                                                  arguments);
-      break;
-    }
+void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
+                                                  llvm::Value *numTables,
+                                                  unsigned expectedWitnessTables,
+                                                  Explosion &arguments) {
+  auto contBB = IGF.createBasicBlock("");
+  auto unreachableBB = IGF.createBasicBlock("incorrect-witness-tables");
 
-    case ParameterConvention::Direct_Owned:
-      // Copy the value out at +1.
-      cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, alignedOffset,
-                                                  arguments);
-    }
+  auto incorrectNum = IGF.Builder.CreateICmpNE(
+      numTables, llvm::ConstantInt::get(IGM.SizeTy, expectedWitnessTables));
 
-    // 6. Move the offset to the beginning of the next element, unless
-    //    this is the last element.
-    if (param != parameters.back()) {
-      llvm::Value *typeSize = typeInfo.getSize(IGF, paramTy);
+  // Make sure that we have a correct number of witness tables provided to us.
+  IGF.Builder.CreateCondBr(incorrectNum, unreachableBB, contBB);
+  {
+    IGF.Builder.emitBlock(unreachableBB);
+    IGF.Builder.CreateUnreachable();
+  }
 
-      llvm::Value *addr = alignedOffset.getAddress();
-      addr = IGF.Builder.CreatePtrToInt(addr, IGM.IntPtrTy);
-      llvm::Value *nextOffset = IGF.Builder.CreateIntToPtr(
-          IGF.Builder.CreateAdd(addr, typeSize), IGM.Int8PtrTy);
+  IGF.Builder.emitBlock(contBB);
 
-      IGF.Builder.CreateStore(nextOffset, offset);
+  witnessTables = IGF.Builder.CreateBitCast(witnessTables,
+                                            IGM.Int8PtrPtrTy->getPointerTo());
+
+  for (unsigned i = 0, n = expectedWitnessTables; i != n; ++i) {
+    auto offset = Size(i * IGM.getPointerSize());
+    auto alignment = IGM.getPointerAlignment();
+
+    auto witnessTableAddr = IGF.emitAddressAtOffset(
+        witnessTables, Offset(offset), IGM.Int8PtrPtrTy, Alignment(alignment));
+
+    arguments.add(IGF.Builder.CreateLoad(witnessTableAddr));
+  }
+}
+
+void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
+  // Deallocate all of the copied arguments. Since allocations happened
+  // on stack they have to be deallocated in reverse order.
+  {
+    for (auto alloca = AllocatedArguments.rbegin();
+         alloca != AllocatedArguments.rend(); ++alloca) {
+      IGF.emitDeallocateDynamicAlloca(*alloca);
     }
   }
 
-  IGF.Builder.CreateLifetimeEnd(offset, IGM.getPointerSize());
+  Explosion voidResult;
+
+  Explosion error;
+  error.add(errorValue);
+
+  emitAsyncReturn(IGF, AsyncLayout, getResultType(), AccessorType, voidResult,
+                  error);
 }
 
 void DistributedAccessor::emit() {
-  auto methodTy = Method->getLoweredFunctionType();
-  SILFunctionConventions targetConv(methodTy, IGF.getSILModule());
-  SILFunctionConventions accessorConv(AccessorType, IGF.getSILModule());
+  auto *actor = getDistributedActorOf(Target);
+  auto targetTy = Target->getLoweredFunctionType();
+  SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
 
   auto params = IGF.collectParameters();
@@ -298,23 +606,43 @@ void DistributedAccessor::emit() {
       (unsigned)AsyncFunctionArgumentIndex::Context + 1;
   (void)params.claim(numAsyncContextParams);
 
-  // UnsafeRawPointer that holds all of the argument values.
-  auto *argBuffer = params.claimNext();
+  // A container that produces argument values based on the given set of
+  // argument types (supplied as a next argument).
+  auto *argDecoder = params.claimNext();
+  // `swift.type**` that holds the argument types that correspond to values.
+  auto *argTypes = params.claimNext();
   // UnsafeRawPointer that is used to store the result.
   auto *resultBuffer = params.claimNext();
+  // UnsafeRawPointer that represents a list of substitutions
+  auto *substitutions = params.claimNext();
+  // UnsafeRawPointer that represents a list of witness tables
+  auto *witnessTables = params.claimNext();
+  // Integer that represented the number of witness tables
+  auto *numWitnessTables = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
+  // Metadata that represents passed in the invocation decoder.
+  auto *decoderType = params.claimNext();
 
-  GenericContextScope scope(IGM, methodTy->getInvocationGenericSignature());
+  // If the distributed thunk is declared in a protocol that conforms
+  // to `DistributedActor` protocol, there is an extract parameter that
+  // represents a type of protocol witness.
+  if (isa<ProtocolDecl>(actor))
+    (void)params.claimNext();
+
+  // Witness table for decoder conformance to DistributedTargetInvocationDecoder
+  auto *decoderProtocolWitness = params.claimNext();
+
+  GenericContextScope scope(IGM, targetTy->getInvocationGenericSignature());
 
   // Preliminary: Setup async context for this accessor.
   {
+    auto fpKind = FunctionPointerKind::defaultAsync();
     auto asyncContextIdx =
-        Signature::forAsyncEntry(IGM, AccessorType,
-                                 /*useSpecialConvention*/ false)
+        Signature::forAsyncEntry(IGM, AccessorType, fpKind)
             .getAsyncContextIndex();
 
-    auto entity = LinkEntity::forDistributedMethodAccessor(Method);
+    auto entity = LinkEntity::forDistributedTargetAccessor(Target);
     emitAsyncFunctionEntry(IGF, AsyncLayout, entity, asyncContextIdx);
     emitAsyncFunctionPointer(IGM, IGF.CurFn, entity, AsyncLayout.getSize());
   }
@@ -330,17 +658,64 @@ void DistributedAccessor::emit() {
     arguments.add(typedResultBuffer);
   }
 
-  // Step one is to load all of the data from argument buffer,
-  // so it could be forwarded to the distributed method.
-  computeArguments(argBuffer, arguments);
+  // There is always at least one parameter associated with accessor - `self`
+  // of the distributed actor.
+  if (targetTy->getNumParameters() > 1) {
+    /// The argument decoder associated with the distributed actor
+    /// this accessor belong to.
+    ArgumentDecoderInfo decoder =
+        findArgumentDecoder(argDecoder, decoderType, decoderProtocolWitness);
+
+    // Step one is to load all of the data from argument buffer,
+    // so it could be forwarded to the distributed method.
+    decodeArguments(decoder, argTypes, arguments);
+  }
+
+  // Add all of the substitutions to the explosion
+  if (auto *genericEnvironment = Target->getGenericEnvironment()) {
+    // swift.type **
+    llvm::Value *substitutionBuffer =
+        IGF.Builder.CreateBitCast(substitutions, IGM.TypeMetadataPtrPtrTy);
+
+    // Collect the generic arguments expected by the distributed thunk.
+    // We need this to determine the expected number of witness tables
+    // to load from the buffer provided by the caller.
+    llvm::SmallVector<llvm::Type *, 4> targetGenericArguments;
+    expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
+
+    // Generic arguments associated with the distributed thunk directly
+    // e.g. `distributed func echo<T, U>(...)`
+    auto numDirectGenericArgs =
+        llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
+          return type == IGM.TypeMetadataPtrTy;
+        });
+
+    auto expectedWitnessTables =
+        targetGenericArguments.size() - numDirectGenericArgs;
+
+    for (unsigned index = 0; index < numDirectGenericArgs; ++index) {
+      auto offset =
+          Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
+      auto alignment =
+          IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+
+      auto substitution =
+          IGF.emitAddressAtOffset(substitutionBuffer, Offset(offset),
+                                  IGM.TypeMetadataPtrTy, Alignment(alignment));
+      arguments.add(IGF.Builder.CreateLoad(substitution, "substitution"));
+    }
+
+    emitLoadOfWitnessTables(witnessTables, numWitnessTables,
+                            expectedWitnessTables, arguments);
+  }
 
   // Step two, let's form and emit a call to the distributed method
   // using computed argument explosion.
   {
     Explosion result;
-    Explosion error;
+    llvm::Value *targetError = nullptr;
 
-    auto callee = getCalleeForDistributedMethod(actorSelf);
+    auto callee = getCalleeForDistributedTarget(actorSelf);
     auto emission =
         getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
 
@@ -362,46 +737,104 @@ void DistributedAccessor::emit() {
     // Both accessor and distributed method are always `async throws`
     // so we need to load error value (if any) from the slot.
     {
-      assert(methodTy->hasErrorResult());
+      assert(targetTy->hasErrorResult());
 
-      SILType errorType = accessorConv.getSILErrorType(expansionContext);
       Address calleeErrorSlot =
-          emission->getCalleeErrorSlot(errorType, /*isCalleeAsync=*/true);
-      error.add(IGF.Builder.CreateLoad(calleeErrorSlot));
+          emission->getCalleeErrorSlot(getErrorType(), /*isCalleeAsync=*/true);
+      targetError = IGF.Builder.CreateLoad(calleeErrorSlot);
     }
 
     emission->end();
 
-    // Deallocate all of the copied arguments.
-    {
-      for (auto &entry : AllocatedArguments)
-        entry.TI.deallocateStack(IGF, entry.Addr, entry.Type);
-    }
-
-    Explosion voidResult;
-    emitAsyncReturn(IGF, AsyncLayout,
-                    accessorConv.getSILResultType(expansionContext),
-                    AccessorType, voidResult, error);
+    // Emit an async return that does allocation cleanup and propagates error
+    // (if any) back to the caller.
+    emitReturn(targetError);
   }
 }
 
-FunctionPointer DistributedAccessor::getPointerToMethod() const {
-  auto fnType = Method->getLoweredFunctionType();
-  auto fpKind = classifyFunctionPointerKind(Method);
-  auto signature = IGM.getSignature(fnType, fpKind.useSpecialConvention());
+FunctionPointer DistributedAccessor::getPointerToTarget() const {
+  auto fnType = Target->getLoweredFunctionType();
+  auto fpKind = classifyFunctionPointerKind(Target);
+  auto signature = IGM.getSignature(fnType, fpKind);
 
   auto *fnPtr =
-      IGM.getAddrOfSILFunction(Method, NotForDefinition,
-                               /*isDynamicallyReplaceable=*/false,
-                               /*shouldCallPreviousImplementation=*/false);
+    llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(Target),
+                                   signature.getType()->getPointerTo());
 
-  return FunctionPointer::forDirect(fpKind, fnPtr, /*secondary=*/nullptr,
-                                    signature);
+  return FunctionPointer::forDirect(
+      FunctionPointer::Kind(fnType), fnPtr,
+      IGM.getAddrOfSILFunction(Target, NotForDefinition), signature);
 }
 
 Callee
-DistributedAccessor::getCalleeForDistributedMethod(llvm::Value *self) const {
-  auto fnType = Method->getLoweredFunctionType();
+DistributedAccessor::getCalleeForDistributedTarget(llvm::Value *self) const {
+  auto fnType = Target->getLoweredFunctionType();
   CalleeInfo info{fnType, fnType, SubstitutionMap()};
-  return {std::move(info), getPointerToMethod(), self};
+  return {std::move(info), getPointerToTarget(), self};
+}
+
+ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
+    llvm::Value *decoder, llvm::Value *decoderTy, llvm::Value *witnessTable) {
+  auto *actor = getDistributedActorOf(Target);
+  auto expansionContext = IGM.getMaximalTypeExpansionContext();
+
+  auto *decodeFn = IGM.Context.getDistributedActorArgumentDecodingMethod(actor);
+  assert(decodeFn && "no suitable decoder?");
+
+  auto methodTy = IGM.getSILTypes().getConstantFunctionType(
+      expansionContext, SILDeclRef(decodeFn));
+
+  auto fpKind = FunctionPointerKind::defaultAsync();
+  auto signature = IGM.getSignature(methodTy, fpKind);
+
+  // If the decoder class is `final`, let's emit a direct reference.
+  auto *decoderDecl = decodeFn->getDeclContext()->getSelfNominalTypeDecl();
+
+  // If decoder is a class, need to load it first because generic parameter
+  // is passed indirectly. This is good for structs and enums because
+  // `decodeNextArgument` is a mutating method, but not for classes because
+  // in that case heap object is mutated directly.
+  if (isa<ClassDecl>(decoderDecl)) {
+    auto selfTy = methodTy->getSelfParameter().getSILStorageType(
+        IGM.getSILModule(), methodTy, expansionContext);
+
+    auto &classTI = IGM.getTypeInfo(selfTy).as<ClassTypeInfo>();
+    auto &classLayout = classTI.getClassLayout(IGM, selfTy,
+                                               /*forBackwardDeployment=*/false);
+
+    llvm::Value *typedDecoderPtr = IGF.Builder.CreateBitCast(
+        decoder, classLayout.getType()->getPointerTo()->getPointerTo());
+
+    Explosion instance;
+
+    classTI.loadAsTake(IGF, {typedDecoderPtr, classTI.getBestKnownAlignment()},
+                       instance);
+
+    decoder = instance.claimNext();
+  }
+
+  auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+  auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
+                                         /*isDynamicallyReplaceable=*/false);
+
+  auto methodPtr = FunctionPointer::forDirect(
+    classifyFunctionPointerKind(decodeSIL), fnPtr,
+    /*secondaryValue=*/nullptr, signature);
+
+  return {decoder, decoderTy, witnessTable, methodPtr, methodTy};
+}
+
+SILType DistributedAccessor::getResultType() const {
+  SILFunctionConventions conv(AccessorType, IGF.getSILModule());
+  return conv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+}
+
+SILType DistributedAccessor::getErrorType() const {
+  SILFunctionConventions conv(AccessorType, IGF.getSILModule());
+  return conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+}
+
+Callee ArgumentDecoderInfo::getCallee() const {
+  CalleeInfo info(MethodType, MethodType, SubstitutionMap());
+  return {std::move(info), MethodPtr, Decoder};
 }

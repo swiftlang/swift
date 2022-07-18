@@ -188,7 +188,7 @@ bb0:
   %3 = ref_element_addr %0 : $foo, #foo.a
   store %2 to %3 : $*Int
   %4 = tuple ()
-  dealloc_ref [stack] %0 : $foo
+  dealloc_stack_ref %0 : $foo
   return %4 : $()
 }
 
@@ -198,7 +198,7 @@ bb0:
 // CHECK: bb0
 // CHECK: alloc_ref
 // CHECK: store
-// CHECK: dealloc_ref
+// CHECK: dealloc_stack_ref
 // CHECK: return
 sil hidden @blocking_read_on_local_store_into_alloc_ref_stack : $@convention(thin) () -> () {
 bb0:
@@ -209,7 +209,7 @@ bb0:
   store %2 to %3 : $*Int
   %4 = tuple ()
   strong_release %0 : $foo
-  dealloc_ref [stack] %0 : $foo
+  dealloc_stack_ref %0 : $foo
   return %4 : $()
 }
 
@@ -1537,6 +1537,6 @@ bb0:
   store %3 to %4 : $*Int
   set_deallocating %1 : $foo
   dealloc_ref %1 : $foo
-  dealloc_ref [stack] %1 : $foo
+  dealloc_stack_ref %1 : $foo
   return %3 : $Int
 }

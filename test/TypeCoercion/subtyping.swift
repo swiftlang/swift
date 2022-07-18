@@ -31,14 +31,14 @@ func protocolConformance(ac1: @autoclosure () -> CustomStringConvertible,
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
   f1 = { f2($0) } // okay
   f1 = { f3($0) } // okay
-  f2 = f1 // expected-error{{cannot assign value of type '(FormattedPrintable) -> CustomStringConvertible' to type '(CustomStringConvertible) -> FormattedPrintable'}}
+  f2 = f1 // expected-error{{cannot assign value of type '(any FormattedPrintable) -> any CustomStringConvertible' to type '(any CustomStringConvertible) -> any FormattedPrintable'}}
 
   accept_creates_Printable(ac1)
   accept_creates_Printable({ ac2() })
   accept_creates_Printable({ ip1() })
-  accept_creates_FormattedPrintable(ac1) // expected-error{{cannot convert value of type '() -> CustomStringConvertible' to expected argument type '() -> FormattedPrintable'}}
+  accept_creates_FormattedPrintable(ac1) // expected-error{{cannot convert value of type '() -> any CustomStringConvertible' to expected argument type '() -> any FormattedPrintable'}}
   accept_creates_FormattedPrintable(ac2)
-  accept_creates_FormattedPrintable(ip1) // expected-error{{cannot convert value of type '() -> IsPrintable1' to expected argument type '() -> FormattedPrintable'}}
+  accept_creates_FormattedPrintable(ip1) // expected-error{{cannot convert value of type '() -> IsPrintable1' to expected argument type '() -> any FormattedPrintable'}}
 }
 
 func p_gen_to_fp(_: () -> CustomStringConvertible) -> FormattedPrintable {}
@@ -51,6 +51,6 @@ func nonTrivialNested() {
   let f3 : (_ : () -> FormattedPrintable) -> CustomStringConvertible = fp_gen_to_p
 
   f1 = { f2($0) } // okay
-  f1 = f3 // expected-error{{cannot assign value of type '(() -> FormattedPrintable) -> CustomStringConvertible' to type '(() -> CustomStringConvertible) -> CustomStringConvertible'}}
+  f1 = f3 // expected-error{{cannot assign value of type '(() -> any FormattedPrintable) -> any CustomStringConvertible' to type '(() -> any CustomStringConvertible) -> any CustomStringConvertible'}}
   _ = f1
 }

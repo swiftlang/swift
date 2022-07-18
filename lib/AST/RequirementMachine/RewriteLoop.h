@@ -38,7 +38,7 @@ struct RewriteStep {
     /// *** Rewrite step kinds introduced by Knuth-Bendix completion ***
     ///
 
-    /// Apply a rewrite rule to the term at the top of the A stack.
+    /// Apply a rewrite rule to the term at the top of the primary stack.
     ///
     /// Formally, this is a whiskered, oriented rewrite rule. For example,
     /// given a rule (X => Y) and the term A.X.B, the application at
@@ -51,10 +51,10 @@ struct RewriteStep {
     ///
     /// The StartOffset field encodes the offset where to apply the rule.
     ///
-    /// The RuleID field encodes the rule to apply.
-    ApplyRewriteRule,
+    /// The Arg field encodes the rule to apply.
+    Rule,
 
-    /// The term at the top of the A stack must be a term ending with a
+    /// The term at the top of the primary stack must be a term ending with a
     /// superclass or concrete type symbol.
     ///
     /// If not inverted: prepend the prefix to each substitution.
@@ -62,85 +62,152 @@ struct RewriteStep {
     /// If inverted: strip the prefix from each substitution.
     ///
     /// The StartOffset field encodes the length of the prefix.
-    AdjustConcreteType,
+    PrefixSubstitutions,
 
     ///
     /// *** Rewrite step kinds introduced by simplifySubstitutions() ***
     ///
 
-    /// Move a term from the A stack to the B stack (if not inverted) or
-    /// B stack to A stack (if inverted).
+    /// Move a term from the primary stack to the secondary stack (if not
+    /// inverted) or the secondary stack to primary stack (if inverted).
     Shift,
 
-    /// If not inverted: the top of the A stack must be a term ending with a
-    /// superclass or concrete type symbol. Each concrete substitution in the
-    /// term is pushed onto the A stack.
+    /// If not inverted: the top of the primary stack must be a term ending
+    /// with a superclass or concrete type symbol:
     ///
-    /// If inverted: pop concrete substitutions from the A stack, which must
-    /// follow a term ending with a superclass or concrete type symbol. The
-    /// new substitutions replace the substitutions in that symbol.
+    ///    T.[concrete: C<...> with <X1, X2...>]
     ///
-    /// The RuleID field encodes the number of substitutions.
+    /// Each concrete substitution Xn is pushed onto the primary stack,
+    /// producing:
+    ///
+    ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
+    ///
+    /// If inverted: pop concrete substitutions Xn from the primary stack,
+    /// which must follow a term ending with a superclass or concrete type
+    /// symbol:
+    ///
+    ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
+    ///
+    /// The Arg field encodes the number of substitutions.
+    ///
+    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions().
     Decompose,
 
     ///
     /// *** Rewrite step kinds introduced by the property map ***
     ///
 
-    /// If not inverted: the top of the A stack must be a term ending in a
-    /// concrete type symbol [concrete: C] followed by a protocol symbol [P].
-    /// These two symbols are combined into a single concrete conformance
-    /// symbol [concrete: C : P].
+    /// If not inverted: the top of the primary stack must be a term T.[p1].[p2]
+    /// ending in a pair of property symbols [p1] and [p2], where [p1] < [p2].
+    /// The symbol [p2] is dropped, leaving behind the term T.[p1].
     ///
-    /// If inverted: the top of the A stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
-    /// with the concrete type symbol [concrete: C] followed by the protocol
-    /// symbol [P].
-    ConcreteConformance,
+    /// If inverted: the top of the primary stack must be a term T.[p1]
+    /// ending in a property symbol [p1]. The rewrite system must have a
+    /// recorded relation for the pair ([p1], [p2]). The symbol [p2] is added
+    /// to the end of the term, leaving behind the term T.[p1].[p2].
+    ///
+    /// The Arg field stores the result of calling
+    /// RewriteSystem::recordRelation().
+    Relation,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
-    /// superclass symbol [superclass: C] followed by a protocol symbol [P].
-    /// These two symbols are combined into a single concrete conformance
-    /// symbol [concrete: C : P].
+    /// A generalization of `Decompose` that can replace structural components
+    /// of the type with concrete types, using a TypeDifference that has been
+    /// computed previously.
     ///
-    /// If inverted: the top of the A stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
-    /// with the superclass symbol [superclass: C] followed by the protocol
-    /// symbol [P].
-    SuperclassConformance,
+    /// The Arg field is a TypeDifference ID, returned from
+    /// RewriteSystem::registerTypeDifference().
+    ///
+    /// Say the TypeDifference LHS is [concrete: C<...> with <X1, X2...>], and
+    /// say the TypeDifference RHS is [concrete: C'<...> with <X', X2', ...>].
+    ///
+    /// Note that the LHS and RHS may have a different number of substitutions.
+    ///
+    /// If not inverted: the top of the primary stack must be a term ending
+    /// with the RHS of the TypeDifference:
+    ///
+    ///    T.[concrete: C'<...> with <X1', X2'...>]
+    ///
+    /// First, the symbol at the end of the term is replaced by the LHS of the
+    /// TypeDifference:
+    ///
+    ///    T.[concrete: C<...> with <X1, X2...>]
+    ///
+    /// Then, each substitution of the LHS is pushed on the primary stack, with
+    /// the transforms of the TypeDifference applied:
+    ///
+    /// - If (n, f(Xn)) appears in TypeDifference::SameTypes, then we push
+    ///   f(Xn).
+    /// - If (n, [concrete: D]) appears in TypeDifference::ConcreteTypes, then
+    ///   we push Xn.[concrete: D].
+    /// - Otherwise, we push Xn.
+    ///
+    /// This gives you something like:
+    ///
+    ///    T.[concrete: C<...> with <X1, X2, X3...>] X1 f(X2) X3.[concrete: D]
+    ///
+    /// If inverted: the above is performed in reverse, leaving behind the
+    /// term ending with the TypeDifference RHS at the top of the primary stack:
+    ///
+    ///    T.[concrete: C'<...> with <X1', X2'...>]
+    ///
+    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions().
+    DecomposeConcrete,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P] followed by an associated
-    /// type symbol [P:X], and the concrete type symbol [concrete: C.X] for the
-    /// type witness of 'X' in the conformance 'C : P'. The concrete type symbol
-    /// is eliminated.
+    /// For decomposing the left hand side of an induced rule in concrete type
+    /// unification, using a TypeDifference that has been computed previously.
     ///
-    /// If inverted: the concrete type symbol [concrete: C.X] is introduced.
+    /// The Arg field is a TypeDifference ID together with a substitution index
+    /// of the TypeDifference LHS which identifies the induced rule.
     ///
-    /// The RuleID field is repurposed to store the result of calling
-    /// RewriteSystem::recordTypeWitness(). This index is then passed in
-    /// to RewriteSystem::getTypeWitness() when applying
-    /// the step.
-    ConcreteTypeWitness,
+    /// Say the TypeDifference LHS is [concrete: C<...> with <X1, X2...>], and
+    /// say the TypeDifference RHS is [concrete: C'<...> with <X', X2', ...>].
+    ///
+    /// Note that the LHS and RHS may have a different number of substitutions.
+    ///
+    /// Furthermore, let T be the base term of the TypeDifference, meaning that
+    /// the TypeDifference was derived from a pair of concrete type rules
+    /// (T.[LHS] => T) and (T.[RHS] => T).
+    ///
+    /// If not inverted: the top of the primary stack must be the term Xn,
+    /// where n is the substitution index of the type difference.
+    ///
+    /// Then, the term T.[LHS] is pushed on the primary stack.
+    ///
+    /// If inverted: the top of the primary stack must be T.[LHS], which is
+    /// popped. The next term must be the term Xn.
+    ///
+    /// Used by buildRewritePathForInducedRule() in PropertyMap.cpp.
+    LeftConcreteProjection,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P] followed by an associated
-    /// type symbol [P:X]. The associated type symbol is eliminated.
+    /// For introducing the right hand side of an induced rule in concrete type
+    /// unification, using a TypeDifference that has been computed previously.
     ///
-    /// If inverted: the associated type symbol [P:X] is introduced.
+    /// If not inverted: the top of the primary stack must be the term f(Xn),
+    /// where n is the substitution index of the type difference. There are
+    /// three cases:
     ///
-    /// The RuleID field is a TypeWitness ID as above.
-    /// the step.
-    SameTypeWitness,
-
-    /// If not inverted: replaces the abstract type witness term with the
-    /// subject type term.
+    /// - The substitution index appears in the SameTypes list of the
+    ///   TypeDifference. In this case, f(Xn) is the right hand side of the
+    ///   entry in the SameTypes list.
     ///
-    /// If inverted: replaces the subject type term with the abstract type
-    /// term.
+    /// - The substitution index appears in the ConcreteTypes list of the
+    ///   TypeDifference. In this case, f(Xn) is Xn.[concrete: D] where D
+    ///   is the right hand side of the entry in the ConcreteTypes list.
     ///
-    /// The RuleID field is a TypeWitness ID as above.
-    AbstractTypeWitness,
+    /// - The substitution index does not appear in either list, in which case
+    ///   it is unchanged and f(Xn) == Xn.
+    ///
+    /// The term f(Xn) is replaced with the original substitution Xn at the
+    /// top of the primary stack.
+    ///
+    /// Then, the term T.[RHS] is pushed on the primary stack.
+    ///
+    /// If inverted: the top of the primary stack must be T.[RHS], which is
+    /// popped. The next term must be the term f(Xn), which is replaced with
+    /// Xn.
+    ///
+    /// Used by buildRewritePathForInducedRule() in PropertyMap.cpp.
+    RightConcreteProjection
   };
 
   /// The rewrite step kind.
@@ -152,95 +219,155 @@ struct RewriteStep {
 
   /// The size of the left whisker, which is the position within the term where
   /// the rule is being applied. In A.(X => Y).B, this is |A|=1.
-  unsigned StartOffset : 16;
+  unsigned StartOffset : 13;
 
   /// The size of the right whisker, which is the length of the remaining suffix
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
-  unsigned EndOffset : 16;
+  unsigned EndOffset : 13;
 
-  /// If Kind is ApplyRewriteRule, the index of the rule in the rewrite system.
+  /// If Kind is Rule, the index of the rule in the rewrite system.
   ///
-  /// If Kind is AdjustConcreteType, the length of the prefix to add or remove
+  /// If Kind is PrefixSubstitutions, the length of the prefix to add or remove
   /// at the beginning of each concrete substitution.
   ///
-  /// If Kind is Concrete, the number of substitutions to push or pop.
-  unsigned RuleID : 16;
+  /// If Kind is Decompose, the number of substitutions to push or pop.
+  ///
+  /// If Kind is Relation, the relation index returned from
+  /// RewriteSystem::recordRelation().
+  ///
+  /// If Kind is DecomposeConcrete, the type difference ID returned from
+  /// RewriteSystem::recordTypeDifference().
+  ///
+  /// If Kind is LeftConcreteProjection or RightConcreteProjection, the
+  /// type difference returned from RewriteSystem::recordTypeDifference()
+  /// in the most significant 16 bits, together with the substitution index
+  /// in the least significant 16 bits. See getConcreteProjectionArg(),
+  /// getTypeDifference() and getSubstitutionIndex().
+  unsigned Arg;
 
   RewriteStep(StepKind kind, unsigned startOffset, unsigned endOffset,
-              unsigned ruleID, bool inverse) {
+              unsigned arg, bool inverse) {
     Kind = kind;
 
     StartOffset = startOffset;
     assert(StartOffset == startOffset && "Overflow");
     EndOffset = endOffset;
     assert(EndOffset == endOffset && "Overflow");
-    RuleID = ruleID;
-    assert(RuleID == ruleID && "Overflow");
+    Arg = arg;
+    assert(Arg == arg && "Overflow");
     Inverse = inverse;
   }
 
   static RewriteStep forRewriteRule(unsigned startOffset, unsigned endOffset,
                                     unsigned ruleID, bool inverse) {
-    return RewriteStep(ApplyRewriteRule, startOffset, endOffset, ruleID, inverse);
+    return RewriteStep(Rule, startOffset, endOffset, ruleID, inverse);
   }
 
-  static RewriteStep forAdjustment(unsigned offset, unsigned endOffset,
-                                   bool inverse) {
-    return RewriteStep(AdjustConcreteType, /*startOffset=*/0, endOffset,
-                       /*ruleID=*/offset, inverse);
+  static RewriteStep forPrefixSubstitutions(unsigned length, unsigned endOffset,
+                                            bool inverse) {
+    return RewriteStep(PrefixSubstitutions, /*startOffset=*/0, endOffset,
+                       /*arg=*/length, inverse);
   }
 
   static RewriteStep forShift(bool inverse) {
     return RewriteStep(Shift, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+                       /*arg=*/0, inverse);
   }
 
   static RewriteStep forDecompose(unsigned numSubstitutions, bool inverse) {
     return RewriteStep(Decompose, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/numSubstitutions, inverse);
+                       /*arg=*/numSubstitutions, inverse);
   }
 
-  static RewriteStep forConcreteConformance(bool inverse) {
-    return RewriteStep(ConcreteConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+  static RewriteStep forRelation(unsigned startOffset, unsigned relationID,
+                                 bool inverse) {
+    return RewriteStep(Relation, startOffset, /*endOffset=*/0,
+                       /*arg=*/relationID, inverse);
   }
 
-  static RewriteStep forSuperclassConformance(bool inverse) {
-    return RewriteStep(SuperclassConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+  static RewriteStep forDecomposeConcrete(unsigned differenceID, bool inverse) {
+    return RewriteStep(DecomposeConcrete, /*startOffset=*/0, /*endOffset=*/0,
+                       /*arg=*/differenceID, inverse);
   }
 
-  static RewriteStep forConcreteTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(ConcreteTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
+  static RewriteStep forLeftConcreteProjection(unsigned differenceID,
+                                               unsigned substitutionIndex,
+                                               bool inverse) {
+    unsigned arg = getConcreteProjectionArg(differenceID, substitutionIndex);
+    return RewriteStep(LeftConcreteProjection,
+                       /*startOffset=*/0, /*endOffset=*/0,
+                       arg, inverse);
   }
 
-  static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(SameTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
-  }
-
-  static RewriteStep forAbstractTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(AbstractTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
+  static RewriteStep forRightConcreteProjection(unsigned differenceID,
+                                                unsigned substitutionIndex,
+                                                bool inverse) {
+    unsigned arg = getConcreteProjectionArg(differenceID, substitutionIndex);
+    return RewriteStep(RightConcreteProjection,
+                       /*startOffset=*/0, /*endOffset=*/0,
+                       arg, inverse);
   }
 
   bool isInContext() const {
     return StartOffset > 0 || EndOffset > 0;
   }
 
+  bool pushesTermsOnStack() const {
+    switch (Kind) {
+    case RewriteStep::Rule:
+    case RewriteStep::PrefixSubstitutions:
+    case RewriteStep::Relation:
+    case RewriteStep::Shift:
+      return false;
+
+    case RewriteStep::Decompose:
+    case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
+      return true;
+    }
+
+    llvm_unreachable("Bad step kind");
+  }
+
   void invert() {
     Inverse = !Inverse;
   }
+
+  unsigned getRuleID() const {
+    assert(Kind == RewriteStep::Rule);
+    return Arg;
+  }
+
+  unsigned getTypeDifferenceID() const {
+    assert(Kind == RewriteStep::LeftConcreteProjection ||
+           Kind == RewriteStep::RightConcreteProjection);
+    return (Arg >> 16) & 0xffff;
+  }
+
+  unsigned getSubstitutionIndex() const {
+    assert(Kind == RewriteStep::LeftConcreteProjection ||
+           Kind == RewriteStep::RightConcreteProjection);
+    return Arg & 0xffff;
+  }
+
+  void dump(llvm::raw_ostream &out,
+            RewritePathEvaluator &evaluator,
+            const RewriteSystem &system) const;
 
   bool isInverseOf(const RewriteStep &other) const;
 
   bool maybeSwapRewriteSteps(RewriteStep &other,
                              const RewriteSystem &system);
 
-  void dump(llvm::raw_ostream &out,
-            RewritePathEvaluator &evaluator,
-            const RewriteSystem &system) const;
+private:
+  static unsigned getConcreteProjectionArg(unsigned differenceID,
+                                           unsigned substitutionIndex) {
+    assert(differenceID <= 0xffff);
+    assert(substitutionIndex <= 0xffff);
+
+    return (differenceID << 16) | substitutionIndex;
+  }
 };
 
 /// Records a sequence of zero or more rewrite rules applied to a term.
@@ -280,22 +407,32 @@ public:
 
   RewritePath splitCycleAtRule(unsigned ruleID) const;
 
+  bool replaceRulesWithPaths(llvm::function_ref<const RewritePath *(unsigned)> fn);
+
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
+  SmallVector<unsigned, 1>
+  findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
+                                       const RewriteSystem &system) const;
+
   void invert();
+
+  bool computeFreelyReducedForm();
+
+  bool computeCyclicallyReducedForm(MutableTerm &basepoint,
+                                    const RewriteSystem &system);
+
+  bool computeLeftCanonicalForm(const RewriteSystem &system);
+
+  bool computeNormalForm(const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
             const RewriteSystem &system) const;
-};
 
-/// Information about protocol conformance rules appearing in a rewrite loop.
-///
-/// This is the return value of RewriteLoop::findProtocolConformanceRules().
-struct ProtocolConformanceRules {
-  SmallVector<unsigned, 2> RulesInEmptyContext;
-  SmallVector<std::pair<MutableTerm, unsigned>, 2> RulesInContext;
-  bool SawIdentityConformance = false;
+  void dumpLong(llvm::raw_ostream &out,
+                MutableTerm term,
+                const RewriteSystem &system) const;
 };
 
 /// A loop (3-cell) that rewrites the basepoint back to the basepoint.
@@ -305,21 +442,45 @@ public:
   RewritePath Path;
 
 private:
-  unsigned Deleted : 1;
-
   /// Cached value for findRulesAppearingOnceInEmptyContext().
   SmallVector<unsigned, 1> RulesInEmptyContext;
 
-  /// If true, RulesInEmptyContext should be recomputed.
+  /// Cached value for getProjectionCount().
+  unsigned ProjectionCount : 15;
+
+  /// Cached value for getDecomposeCount().
+  unsigned DecomposeCount : 15;
+
+  /// Cached value for hasConcreteTypeAliasRule().
+  unsigned HasConcreteTypeAliasRule : 1;
+
+  /// A useful loop contains at least one rule in empty context, even if that
+  /// rule appears multiple times or also in non-empty context. The only loops
+  /// that are elimination candidates contain a rule in empty context *exactly
+  /// once*. A useful loop can become an elimination candidate after
+  /// normalization.
+  unsigned Useful : 1;
+
+  /// Loops are deleted once they are no longer useful, as defined above.
+  unsigned Deleted : 1;
+
+  /// If true, Useful, RulesInEmptyContext, ProjectionCount, and DecomposeCount
+  /// should be recomputed.
   unsigned Dirty : 1;
+
+  void recompute(const RewriteSystem &system);
 
 public:
   RewriteLoop(MutableTerm basepoint, RewritePath path)
     : Basepoint(basepoint), Path(path) {
+    ProjectionCount = 0;
+    DecomposeCount = 0;
+    HasConcreteTypeAliasRule = 0;
+    Useful = 0;
     Deleted = 0;
 
-    // Initially, the RulesInEmptyContext vector is not valid because
-    // it has not been computed yet.
+    // Initially, cached values are not valid because they have not been
+    // computed yet.
     Dirty = 1;
   }
 
@@ -337,15 +498,20 @@ public:
     Dirty = 1;
   }
 
-  bool isInContext(const RewriteSystem &system) const;
+  bool isUseful(const RewriteSystem &system) const;
 
   ArrayRef<unsigned>
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
 
-  void findProtocolConformanceRules(
-      llvm::SmallDenseMap<const ProtocolDecl *,
-                          ProtocolConformanceRules, 2> &result,
-      const RewriteSystem &system) const;
+  unsigned getProjectionCount(const RewriteSystem &system) const;
+
+  unsigned getDecomposeCount(const RewriteSystem &system) const;
+
+  bool hasConcreteTypeAliasRule(const RewriteSystem &system) const;
+
+  void computeNormalForm(const RewriteSystem &system);
+
+  void verify(const RewriteSystem &system) const;
 
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
 };
@@ -360,33 +526,39 @@ struct AppliedRewriteStep {
 
 /// A rewrite path is a list of instructions for a two-stack interpreter.
 ///
-/// - ApplyRewriteRule and AdjustConcreteType manipulate the term at the top of
-///   the A stack.
-///
-/// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
+/// - Shift moves a term from the primary stack to the secondary stack
+///   (if not inverted) or secondary to primary (if inverted).
 ///
 /// - Decompose splits off the substitutions from a superclass or concrete type
-///   symbol at the top of the A stack (if not inverted) or assembles a new
-///   superclass or concrete type symbol at the top of the A stack
+///   symbol at the top of the primary stack (if not inverted) or assembles a
+///   new superclass or concrete type symbol at the top of the primary stack
 ///   (if inverted).
+///
+/// - All other rewrite step kinds manipulate the term at the top of the primary
+///   stack.
+///
 struct RewritePathEvaluator {
-  SmallVector<MutableTerm, 2> A;
-  SmallVector<MutableTerm, 2> B;
+  /// The primary stack. Most rewrite steps operate on the top of this stack.
+  SmallVector<MutableTerm, 2> Primary;
+
+  /// The secondary stack. The 'Shift' rewrite step moves terms between the
+  /// primary and secondary stacks.
+  SmallVector<MutableTerm, 2> Secondary;
 
   explicit RewritePathEvaluator(const MutableTerm &term) {
-    A.push_back(term);
+    Primary.push_back(term);
   }
 
-  void checkA() const;
-  void checkB() const;
+  void checkPrimary() const;
+  void checkSecondary() const;
 
   MutableTerm &getCurrentTerm();
 
   /// We're "in context" if we're in the middle of rewriting concrete
   /// substitutions.
   bool isInContext() const {
-    assert(A.size() > 0);
-    return (A.size() > 1 || B.size() > 0);
+    assert(Primary.size() > 0);
+    return (Primary.size() > 1 || Secondary.size() > 0);
   }
 
   void apply(const RewriteStep &step,
@@ -396,8 +568,8 @@ struct RewritePathEvaluator {
                                       const RewriteSystem &system);
 
   std::pair<MutableTerm, MutableTerm>
-  applyAdjustment(const RewriteStep &step,
-                  const RewriteSystem &system);
+  applyPrefixSubstitutions(const RewriteStep &step,
+                           const RewriteSystem &system);
 
   void applyShift(const RewriteStep &step,
                   const RewriteSystem &system);
@@ -405,17 +577,18 @@ struct RewritePathEvaluator {
   void applyDecompose(const RewriteStep &step,
                       const RewriteSystem &system);
 
-  void applyConcreteConformance(const RewriteStep &step,
-                                const RewriteSystem &system);
+  AppliedRewriteStep
+  applyRelation(const RewriteStep &step,
+                const RewriteSystem &system);
 
-  void applyConcreteTypeWitness(const RewriteStep &step,
-                                const RewriteSystem &system);
+  void applyDecomposeConcrete(const RewriteStep &step,
+                              const RewriteSystem &system);
 
-  void applySameTypeWitness(const RewriteStep &step,
-                            const RewriteSystem &system);
+  void applyLeftConcreteProjection(const RewriteStep &step,
+                                   const RewriteSystem &system);
 
-  void applyAbstractTypeWitness(const RewriteStep &step,
-                                const RewriteSystem &system);
+  void applyRightConcreteProjection(const RewriteStep &step,
+                                    const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };

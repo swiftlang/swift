@@ -95,12 +95,16 @@ bool ExistentialSpecializer::findConcreteTypeFromSoleConformingType(
   auto ArgType = Arg->getType();
   auto SwiftArgType = ArgType.getASTType();
 
+  CanType constraint = SwiftArgType;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType()->getCanonicalType();
+
   /// Do not handle composition types yet.
-  if (isa<ProtocolCompositionType>(SwiftArgType))
+  if (isa<ProtocolCompositionType>(constraint))
     return false;
   assert(ArgType.isExistentialType());
   /// Find the protocol decl.
-  auto *PD = dyn_cast<ProtocolDecl>(SwiftArgType->getAnyNominal());
+  auto *PD = dyn_cast<ProtocolDecl>(constraint->getAnyNominal());
   if (!PD)
     return false;
 

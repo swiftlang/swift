@@ -141,3 +141,28 @@ void PostDominanceInfo::verify() const {
     abort();
   }
 }
+
+void swift::computeDominatedBoundaryBlocks(
+    SILBasicBlock *root, DominanceInfo *domTree,
+    SmallVectorImpl<SILBasicBlock *> &boundary) {
+  auto *function = root->getParent();
+  assert(function->hasOwnership());
+  assert(boundary.empty());
+
+  DominanceOrder domOrder(root, domTree);
+  while (SILBasicBlock *block = domOrder.getNext()) {
+    DominanceInfoNode *domNode = domTree->getNode(block);
+    if (!domNode->isLeaf()) {
+      domOrder.pushChildren(block);
+      continue;
+    }
+    if (block->getNumSuccessors() == 0) {
+      boundary.push_back(block);
+      continue;
+    }
+    auto *succ = block->getSingleSuccessorBlock();
+    if (!domTree->properlyDominates(root, succ)) {
+      boundary.push_back(block);
+    }
+  }
+}

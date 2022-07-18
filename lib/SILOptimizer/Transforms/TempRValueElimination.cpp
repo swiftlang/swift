@@ -21,6 +21,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -77,13 +78,13 @@ namespace {
 /// TODO: Check if we still need to handle stores when RLE supports OSSA.
 class TempRValueOptPass : public SILFunctionTransform {
   bool collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
-                    SmallPtrSetImpl<SILInstruction *> &loadInsts);
+                    InstructionSetWithSize &loadInsts);
   bool collectLoadsFromProjection(SingleValueInstruction *projection,
                                   CopyAddrInst *originalCopy,
-                                  SmallPtrSetImpl<SILInstruction *> &loadInsts);
+                                  InstructionSetWithSize &loadInsts);
 
   SILInstruction *getLastUseWhileSourceIsNotModified(
-    CopyAddrInst *copyInst, const SmallPtrSetImpl<SILInstruction *> &useInsts,
+    CopyAddrInst *copyInst, const InstructionSetWithSize &useInsts,
     AliasAnalysis *aa);
 
   bool
@@ -102,7 +103,7 @@ class TempRValueOptPass : public SILFunctionTransform {
 
 bool TempRValueOptPass::collectLoadsFromProjection(
     SingleValueInstruction *projection, CopyAddrInst *originalCopy,
-    SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+    InstructionSetWithSize &loadInsts) {
   // Transitively look through projections on stack addresses.
   for (auto *projUseOper : projection->getUses()) {
     auto *user = projUseOper->getUser();
@@ -130,7 +131,7 @@ bool TempRValueOptPass::collectLoadsFromProjection(
 /// that may write to memory at \p address.
 bool TempRValueOptPass::
 collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
-             SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+             InstructionSetWithSize &loadInsts) {
   SILInstruction *user = addressUse->getUser();
   SILValue address = addressUse->get();
 
@@ -330,7 +331,7 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
 /// of the temporary and look for the last use, which effectively ends the
 /// lifetime.
 SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
-    CopyAddrInst *copyInst, const SmallPtrSetImpl<SILInstruction *> &useInsts,
+    CopyAddrInst *copyInst, const InstructionSetWithSize &useInsts,
     AliasAnalysis *aa) {
   if (useInsts.empty())
     return copyInst;
@@ -345,7 +346,7 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
   for (; iter != iterEnd; ++iter) {
     SILInstruction *inst = &*iter;
 
-    if (useInsts.count(inst))
+    if (useInsts.contains(inst))
       ++numLoadsFound;
 
     // If this is the last use of the temp we are ok. After this point,
@@ -403,6 +404,11 @@ bool TempRValueOptPass::extendAccessScopes(
         assert(endAccess->getBeginAccess()->getAccessKind() ==
                  SILAccessKind::Read &&
                "a may-write end_access should not be in the copysrc lifetime");
+
+        // Don't move instructions beyond the block's terminator.
+        if (isa<TermInst>(lastUseInst))
+          return false;
+
         endAccessToMove = endAccess;
       }
     } else if (endAccessToMove) {
@@ -515,7 +521,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // to the value initialized by this copy. It is sufficient to check that the
   // only users that modify memory are the copy_addr [initialization] and
   // destroy_addr.
-  SmallPtrSet<SILInstruction *, 8> loadInsts;
+  InstructionSetWithSize loadInsts(getFunction());
   for (auto *useOper : tempObj->getUses()) {
     SILInstruction *user = useOper->getUser();
 
@@ -653,16 +659,27 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     return std::next(si->getIterator());
   }
 
+  bool isOrHasEnum = tempObj->getType().isOrHasEnum();
+
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
   // only users that modify memory are the copy_addr [initialization] and
   // destroy_addr.
-  SmallPtrSet<SILInstruction *, 8> loadInsts;
   for (auto *useOper : tempObj->getUses()) {
     SILInstruction *user = useOper->getUser();
 
     if (user == si)
       continue;
+
+    // For enums we require that all uses are in the same block.
+    // Otherwise it could be a switch_enum of an optional where the none-case
+    // does not have a destroy of the enum value.
+    // After transforming such an alloc_stack the value would leak in the none-
+    // case block.
+    if (isOrHasEnum && user->getParent() != si->getParent() &&
+        !isa<DeallocStackInst>(user)) {
+      return std::next(si->getIterator());
+    }
 
     // Bail if there is any kind of user which is not handled in the code below.
     switch (user->getKind()) {

@@ -26,6 +26,7 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "ScalarPairTypeInfo.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
 
@@ -180,6 +181,9 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
                                              llvm::Value *localContextInfo,
                                              llvm::Value *localResultBuffer,
                                              SubstitutionMap subs) {
+  localContextInfo = IGF.Builder.CreateBitCast(localContextInfo,
+                                               IGF.IGM.OpaquePtrTy);
+  
   // stack allocate AsyncLet, and begin lifetime for it (until EndAsyncLet)
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_AsyncLet);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_AsyncLet));
@@ -192,6 +196,48 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   auto futureResultType = subs.getReplacementTypes()[0]->getCanonicalType();
   auto futureResultTypeMetadata = IGF.emitAbstractTypeMetadataRef(futureResultType);
 
+  // The concurrency runtime for older Apple OSes has a bug in task formation
+  // for `async let`s that may manifest when trying to use room in the
+  // parent task's preallocated `async let` buffer for the child task's
+  // initial task allocator slab. If targeting those older OSes, pad the
+  // context size for async let entry points to never fit in the preallocated
+  // space, so that we don't run into that bug. We leave a note on the
+  // declaration so that coroutine splitting can pad out the final context
+  // size after splitting.
+  auto deploymentAvailability
+    = AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
+  if (!deploymentAvailability.isContainedIn(
+                                   IGF.IGM.Context.getSwift57Availability()))
+  {
+    auto taskAsyncFunctionPointer
+                = cast<llvm::GlobalVariable>(taskFunction->stripPointerCasts());
+
+    if (auto taskAsyncID
+          = IGF.IGM.getAsyncCoroIDMapping(taskAsyncFunctionPointer)) {
+      // If the entry point function has already been emitted, retroactively
+      // pad out the initial context size in the async function pointer record
+      // and ID intrinsic so that it will never fit in the preallocated space.
+      uint64_t origSize = cast<llvm::ConstantInt>(taskAsyncID->getArgOperand(0))
+        ->getValue().getLimitedValue();
+      
+      uint64_t paddedSize = std::max(origSize,
+                     (NumWords_AsyncLet * IGF.IGM.getPointerSize()).getValue());
+      auto paddedSizeVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, paddedSize);
+      taskAsyncID->setArgOperand(0, paddedSizeVal);
+      
+      auto origInit = taskAsyncFunctionPointer->getInitializer();
+      auto newInit = llvm::ConstantStruct::get(
+                                   cast<llvm::StructType>(origInit->getType()),
+                                   origInit->getAggregateElement(0u),
+                                   paddedSizeVal);
+      taskAsyncFunctionPointer->setInitializer(newInit);
+    } else {
+      // If it hasn't been emitted yet, mark it to get the padding when it does
+      // get emitted.
+      IGF.IGM.markAsyncFunctionPointerForPadding(taskAsyncFunctionPointer);
+    }
+  }
+  
   llvm::CallInst *call;
   if (localResultBuffer) {
     // This is @_silgen_name("swift_asyncLet_begin")
@@ -286,4 +332,19 @@ llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
 
   Builder.CreateRetVoid();
   return suspendFn;
+}
+
+void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
+                              llvm::Value *result, llvm::Value *closure,
+                              llvm::Value *closureContext) {
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "taskRunInline should have a type substitution");
+  auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
+
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskRunInlineFn(),
+      {result, closure, closureContext, resultTypeMetadata});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
 }

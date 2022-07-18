@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !SWIFT_STDLIB_STATIC_PRINT
+
 /// Writes the textual representations of the given items into the standard
 /// output.
 ///
@@ -247,3 +249,5 @@ internal func _debugPrint<Target: TextOutputStream>(
   }
   output.write(terminator)
 }
+
+#endif

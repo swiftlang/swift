@@ -31,6 +31,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -109,8 +110,8 @@ ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
     if (param->isInOut()) {
       ref = new (ctx) InOutExpr(SourceLoc(), ref, type, /*isImplicit=*/true);
     } else if (param->isVariadic()) {
-      ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
-      ref->setType(type);
+      assert(ref->getType()->isEqual(type));
+      ref = VarargExpansionExpr::createParamExpansion(ctx, ref);
     }
     args.emplace_back(SourceLoc(), param->getArgumentName(), ref);
   }
@@ -291,20 +292,21 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       params.push_back(arg);
     }
   } else if (ICK == ImplicitConstructorKind::DefaultDistributedActor) {
-    assert(isa<ClassDecl>(decl));
-    assert(decl->isDistributedActor() &&
+    auto classDecl = dyn_cast<ClassDecl>(decl);
+    assert(classDecl && decl->isDistributedActor() &&
            "Only 'distributed actor' type can gain implicit distributed actor init");
 
     /// Add 'system' parameter to default init of distributed actors.
     if (swift::ensureDistributedModuleLoaded(decl)) {
       // copy access level of distributed actor init from the nominal decl
       accessLevel = decl->getEffectiveAccess();
+      auto systemTy = getDistributedActorSystemType(classDecl);
 
-      // Create the parameter.
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_system, Loc,
+      // Create the parameter. API name is actorSystem, local name is system
+      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_actorSystem, Loc,
                                       ctx.Id_system, decl);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(getDistributedActorSystemType(decl));
+      arg->setInterfaceType(systemTy);
       arg->setImplicit();
 
       params.push_back(arg);
@@ -329,6 +331,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
     ctor->setIsMemberwiseInitializer();
+    addNonIsolatedToSynthesized(decl, ctor);
   }
 
   // If we are defining a default initializer for a class that has a superclass,
@@ -446,7 +449,7 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       moduleDecl, superclassDecl);
 
   if (superclassCtorSig.getPointer() != superclassSig.getPointer()) {
-    // If the base initiliazer's generic signature is different
+    // If the base initializer's generic signature is different
     // from that of the base class, the base class initializer either
     // has generic parameters or a 'where' clause.
     //
@@ -468,9 +471,10 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
         depth = genericSig.getGenericParams().back()->getDepth() + 1;
 
       for (auto *param : genericParams->getParams()) {
-        auto *newParam = new (ctx) GenericTypeParamDecl(
+        auto *newParam = GenericTypeParamDecl::create(
             classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
-            depth, param->getIndex());
+            depth, param->getIndex(), param->isOpaqueType(),
+            /*opaqueTypeRepr=*/nullptr);
         newParams.push_back(newParam);
       }
 
@@ -745,7 +749,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
           return GenericEnvironment::mapTypeIntoContext(
             genericEnv, substType);
         });
-    if (checkResult != RequirementCheckResult::Success)
+    if (checkResult != CheckGenericArgumentsResult::Success)
       return nullptr;
   }
 
@@ -927,10 +931,7 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
           if (VD->getAttrs().hasAttribute<NSManagedAttr>())
             CheckDefaultInitializer = false;
 
-          if (VD->hasStorage())
-            HasStorage = true;
-          auto *backing = VD->getPropertyWrapperBackingProperty();
-          if (backing && backing->hasStorage())
+          if (VD->hasStorageOrWrapsStorage())
             HasStorage = true;
         });
 
@@ -999,7 +1000,7 @@ static void collectNonOveriddenSuperclassInits(
   auto *superclassDecl = subclass->getSuperclassDecl();
   assert(superclassDecl);
 
-  // Record all of the initializers the subclass has overriden, excluding stub
+  // Record all of the initializers the subclass has overridden, excluding stub
   // overrides, which we don't want to consider as viable delegates for
   // convenience inits.
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
@@ -1072,11 +1073,11 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   if (!defaultInitable && !foundDesignatedInit)
     return;
 
-  SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
-  collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
+  SmallVector<ConstructorDecl *, 4> nonOverriddenSuperclassCtors;
+  collectNonOveriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
 
   bool inheritDesignatedInits = canInheritDesignatedInits(ctx.evaluator, decl);
-  for (auto *superclassCtor : nonOverridenSuperclassCtors) {
+  for (auto *superclassCtor : nonOverriddenSuperclassCtors) {
     // We only care about required or designated initializers.
     if (!superclassCtor->isDesignatedInit()) {
       if (superclassCtor->isRequired()) {
@@ -1163,16 +1164,16 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   if (canInheritDesignatedInits(eval, decl))
     return true;
 
-  // Otherwise we need to check whether the user has overriden all of the
+  // Otherwise we need to check whether the user has overridden all of the
   // superclass' designed inits.
-  SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
-  collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
+  SmallVector<ConstructorDecl *, 4> nonOverriddenSuperclassCtors;
+  collectNonOveriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
 
-  auto allDesignatedInitsOverriden =
-      llvm::none_of(nonOverridenSuperclassCtors, [](ConstructorDecl *ctor) {
+  auto allDesignatedInitsOverridden =
+      llvm::none_of(nonOverriddenSuperclassCtors, [](ConstructorDecl *ctor) {
         return ctor->isDesignatedInit();
       });
-  return allDesignatedInitsOverriden;
+  return allDesignatedInitsOverridden;
 }
 
 static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
@@ -1525,4 +1526,13 @@ void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
   }
   // Add `@_fixed_layout` to the nominal.
   nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
+}
+
+void swift::addNonIsolatedToSynthesized(
+    NominalTypeDecl *nominal, ValueDecl *value) {
+  if (!getActorIsolation(nominal).isActorIsolated())
+    return;
+
+  ASTContext &ctx = nominal->getASTContext();
+  value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
 }

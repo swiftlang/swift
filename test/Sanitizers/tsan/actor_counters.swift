@@ -1,12 +1,14 @@
-// RUN: %target-run-simple-swift( %import-libdispatch -parse-as-library -sanitize=thread)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library -sanitize=thread)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: linux
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc
+
+// REQUIRES: rdar83246843
 
 @available(SwiftStdlib 5.1, *)
 actor Counter {

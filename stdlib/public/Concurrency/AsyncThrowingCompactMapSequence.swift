@@ -30,7 +30,7 @@ extension AsyncSequence {
   /// transformed asynchronous sequence. When the value is `5`, the closure
   /// throws `MyError`, terminating the sequence.
   ///
-  ///     let romanNumeralDict: [Int : String] =
+  ///     let romanNumeralDict: [Int: String] =
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
   ///
   ///     do {
@@ -42,12 +42,12 @@ extension AsyncSequence {
   ///                 return romanNumeralDict[value]
   ///             }
   ///         for try await numeral in stream {
-  ///             print("\(numeral) ", terminator: " ")
+  ///             print(numeral, terminator: " ")
   ///         }
   ///     } catch {
   ///         print("Error: \(error)")
   ///     }
-  ///     // Prints: I  II  III  Error: MyError()
+  ///     // Prints "I II III Error: MyError()"
   ///
   /// - Parameter transform: An error-throwing mapping closure. `transform`
   ///   accepts an element of this sequence as its parameter and returns a
@@ -57,9 +57,10 @@ extension AsyncSequence {
   ///   non-`nil` elements produced by the `transform` closure. The sequence
   ///   ends either when the base sequence ends or when `transform` throws an
   ///   error.
+  @preconcurrency
   @inlinable
   public __consuming func compactMap<ElementOfResult>(
-    _ transform: @escaping (Element) async throws -> ElementOfResult?
+    _ transform: @Sendable @escaping (Element) async throws -> ElementOfResult?
   ) -> AsyncThrowingCompactMapSequence<Self, ElementOfResult> {
     return AsyncThrowingCompactMapSequence(self, transform: transform)
   }
@@ -151,3 +152,13 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingCompactMapSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingCompactMapSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

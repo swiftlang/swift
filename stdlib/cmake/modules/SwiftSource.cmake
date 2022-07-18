@@ -269,6 +269,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
+  if(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER)
+    list(APPEND result "-D" "SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER")
+  endif()
+
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY")
   endif()
@@ -296,6 +300,14 @@ function(_add_target_variant_swift_compile_flags
   if(SWIFT_STDLIB_STATIC_PRINT)
     list(APPEND result "-D" "SWIFT_STDLIB_STATIC_PRINT")
   endif()
+  
+  if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
+    list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
+  endif()
+  
+  if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+    list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_VECTOR_TYPES")
+  endif()
 
   if(SWIFT_STDLIB_HAS_COMMANDLINE)
     list(APPEND result "-D" "SWIFT_STDLIB_HAS_COMMANDLINE")
@@ -310,9 +322,16 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-Xcc" "-DSWIFT_STDLIB_HAS_ENVIRON")
   endif()
 
-  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-    list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
+  if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
   endif()
+
+  if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
+  endif()
+
+  string(TOUPPER "${SWIFT_SDK_${sdk}_THREADING_PACKAGE}" _threading_package)
+  list(APPEND result "-D" "SWIFT_THREADING_${_threading_package}")
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
@@ -453,12 +472,21 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
+  if(SWIFT_SIL_VERIFY_ALL_MACOS_ONLY)
+    # Only add if we have a macOS build triple
+    if ("${SWIFTFILE_SDK}" STREQUAL "OSX" AND
+        "${SWIFTFILE_ARCHITECTURE}" STREQUAL "x86_64")
+      list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
+    endif()
+  endif()
+
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
   if(SWIFTFILE_IS_STDLIB AND SWIFT_STDLIB_STABLE_ABI)
     list(APPEND swift_flags "-enable-library-evolution")
+    list(APPEND swift_flags "-Xfrontend" "-library-level"  "-Xfrontend" "api")
   endif()
 
-  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  if("${SWIFT_SDK_${SWIFTFILE_SDK}_THREADING_PACKAGE}" STREQUAL "none")
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
@@ -471,9 +499,13 @@ function(_compile_swift_files
   endif()
 
   if(NOT SWIFT_ENABLE_REFLECTION)
-    list(APPEND swift_flags "-Xfrontend" "-disable-reflection-metadata")
+    list(APPEND swift_flags "-Xfrontend" "-reflection-metadata-for-debugger-only")
   else()
     list(APPEND swift_flags "-D" "SWIFT_ENABLE_REFLECTION")
+  endif()
+
+  if(NOT "${SWIFT_STDLIB_TRAP_FUNCTION}" STREQUAL "")
+    list(APPEND swift_flags "-Xfrontend" "-trap-function" "-Xfrontend" "${SWIFT_STDLIB_TRAP_FUNCTION}")
   endif()
 
   # FIXME: Cleaner way to do this?
@@ -520,6 +552,10 @@ function(_compile_swift_files
 
   if(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK)
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
+  endif()
+
+  if(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES)
+    list(APPEND swift_flags "-Xfrontend" "-disable-preallocated-instantiation-caches")
   endif()
 
   list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
@@ -737,15 +773,13 @@ function(_compile_swift_files
   if(SWIFTFILE_IS_STDLIB)
     get_bootstrapping_swift_lib_dir(bs_lib_dir "${SWIFTFILE_BOOTSTRAPPING}")
     if(bs_lib_dir)
-      # When building the stdlib with libswift bootstrapping, the compiler needs
+      # When building the stdlib with bootstrapping, the compiler needs
       # to pick up the stdlib from the previous bootstrapping stage, because the
       # stdlib in the current stage is not built yet.
       if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "DYLD_LIBRARY_PATH=${bs_lib_dir}")
       elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD")
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "LD_LIBRARY_PATH=${bs_lib_dir}")
-      else()
-        message(FATAL_ERROR "TODO: bootstrapping support for ${SWIFT_HOST_VARIANT_SDK}")
       endif()
     endif()
 
@@ -937,6 +971,13 @@ function(_compile_swift_files
         OUTPUT ${module_outputs_static}
         DEPENDS
           "${module_dependency_target}"
+          "${line_directive_tool}"
+          "${file_path}"
+          ${swift_compiler_tool_dep}
+          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${swift_ide_test_dependency}
+          ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
       set("${dependency_module_target_out_var_name}" "${module_dependency_target_static}" PARENT_SCOPE)
     else()

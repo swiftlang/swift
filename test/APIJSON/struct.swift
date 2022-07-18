@@ -48,5 +48,6 @@ public struct TestStruct {
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "interfaces": [],
+// CHECK-NEXT:   "categories": [],
 // CHECK-NEXT:   "version": "1.0"
 // CHECK-NEXT: }

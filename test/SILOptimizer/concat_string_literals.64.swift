@@ -5,6 +5,10 @@
 // We have a separate test for 32-bit architectures.
 // REQUIRES: PTRSIZE=64
 
+// The string tag was recently shifted to the second byte on Android AArch64,
+// so these tests will need to be adapted for that.
+// XFAIL: OS=linux-android && CPU=aarch64
+
 // NOTE: 25185.byteSwapped = 0x62 'a', 0x61 'b'
 // CHECK-LABEL: test_ascii_scalar_scalar2
 // CHECK:  ret { i64, %swift.bridge* } { i64 25185, %swift.bridge* inttoptr (i64 -{{[0-9]+}} to %swift.bridge*) }

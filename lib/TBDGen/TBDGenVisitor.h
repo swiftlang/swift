@@ -68,7 +68,8 @@ public:
   virtual void addSymbol(StringRef name, llvm::MachO::SymbolKind kind,
                          SymbolSource source) {}
   virtual void addObjCInterface(const ClassDecl *decl) {}
-  virtual void addObjCMethod(const ClassDecl *cls, SILDeclRef method) {}
+  virtual void addObjCCategory(const ExtensionDecl *decl) {}
+  virtual void addObjCMethod(const GenericContext *ctx, SILDeclRef method) {}
 };
 
 class SimpleAPIRecorder final : public APIRecorder {
@@ -173,7 +174,8 @@ public:
                 ModuleDecl *swiftModule, const TBDGenOptions &opts,
                 APIRecorder &recorder)
       : DataLayoutDescription(dataLayoutString),
-        UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false),
+        UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false,
+                          /*static=*/false),
         SwiftModule(swiftModule), Opts(opts), recorder(recorder),
         previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}
 
@@ -212,6 +214,8 @@ public:
   void visitAbstractStorageDecl(AbstractStorageDecl *ASD);
 
   void visitVarDecl(VarDecl *VD);
+
+  void visitSubscriptDecl(SubscriptDecl *SD);
 
   void visitEnumDecl(EnumDecl *ED);
 

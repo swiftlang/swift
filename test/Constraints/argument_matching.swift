@@ -1782,3 +1782,23 @@ func testExtraTrailingClosure() {
   func qux(x: () -> Void, y: () -> Void, z: () -> Void) {} // expected-note {{'qux(x:y:z:)' declared here}}
   qux() {} m: {} y: {} n: {} z: {} o: {} // expected-error@:6 {{extra trailing closures at positions #2, #4, #6 in call}}
 }
+
+// rdar://93922410 - argument-to-parameter doesn't handle applies of ParamDecls
+func rdar93922410(_ completion: (Int?) -> Void) { // expected-note {{'completion' declared here}}
+  _ = {
+    return completion() // expected-error {{missing argument for parameter #1 in call}}
+  }
+}
+
+// https://github.com/apple/swift/issues/43509
+do {
+  func myAssertionFailure(
+    _ message: @autoclosure () -> String = String(),
+    file: StaticString = #file, line: UInt = #line
+  ) {}
+
+  let x: Int?
+  myAssertionFailure(x != nil, "error")
+  // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
+  // expected-error@-2 {{missing argument label 'file:' in call}}
+}

@@ -160,9 +160,9 @@ To ease reading/understanding type declarations, we prefer to define members in 
 
 Please keep all stored properties together in a single uninterrupted list, followed immediately by the type's most crucial initializer(s). Put these as close to the top of the type declaration as possible -- we don't want to force readers to scroll around to find these core definitions.
 
-We also have some recommendations for defining other members. These aren't strict rules, as the best way to present definitions varies; but it usually makes sense to break up the implementation into easily digestable, logical chunks.
+We also have some recommendations for defining other members. These aren't strict rules, as the best way to present definitions varies; but it usually makes sense to break up the implementation into easily digestible, logical chunks.
 
-- In general, it is a good idea to keep the main `struct`/`class` definiton as short as possible: preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
+- In general, it is a good idea to keep the main `struct`/`class` definition as short as possible: preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
 
 - Everything else should go in standalone extensions, arranged by logical theme. For example, it's often nice to define protocol conformances in dedicated extensions. If it makes sense, feel free to add a comment to title these sectioning extensions.
 
@@ -172,7 +172,7 @@ We also have some recommendations for defining other members. These aren't stric
 
 - It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule. 
 
-Extensions are a nice way to break up the implementation into easily digestable chunks, but they aren't the only way. The goal is to make things easy to understand -- if a type is small enough, it may be best to list every member directly in the `struct`/`class` definition, while for huge types it often makes more sense to break them up into a handful of separate source files instead. 
+Extensions are a nice way to break up the implementation into easily digestible chunks, but they aren't the only way. The goal is to make things easy to understand -- if a type is small enough, it may be best to list every member directly in the `struct`/`class` definition, while for huge types it often makes more sense to break them up into a handful of separate source files instead. 
 
 ```swift
 // BAD (a jumbled mess)

@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-experimental-async-top-level %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -9,6 +10,9 @@ func trap() -> Never {
 
 // CHECK-LABEL: sil [ossa] @main
 // CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+// CHECK-NOT: @async_Main
+
 
 // -- initialize x
 // CHECK: alloc_global @$s8toplevel1xSiv
@@ -118,9 +122,6 @@ defer {
 
 // CHECK: [[RET:%[0-9]+]] = struct $Int32
 // CHECK: return [[RET]]
-
-
-
 
 // CHECK-LABEL: sil hidden [ossa] @$s8toplevel7print_xyyF
 

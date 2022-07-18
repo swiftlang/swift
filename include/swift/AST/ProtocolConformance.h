@@ -67,7 +67,7 @@ enum class ProtocolConformanceKind {
   /// Conformance of a generic class type projected through one of its
   /// superclass's conformances.
   Inherited,
-  /// Builtin conformances are special conformaces that the runtime handles
+  /// Builtin conformances are special conformances that the runtime handles
   /// and isn't implemented directly in Swift.
   Builtin
 };
@@ -601,6 +601,9 @@ public:
   /// Set the witness for the given requirement.
   void setWitness(ValueDecl *requirement, Witness witness) const;
 
+  /// Override the witness for a given requirement.
+  void overrideWitness(ValueDecl *requirement, Witness newWitness);
+
   /// Retrieve the protocol conformances that satisfy the requirements of the
   /// protocol, which line up with the conformance constraints in the
   /// protocol's requirement signature.
@@ -660,7 +663,7 @@ class SelfProtocolConformance : public RootProtocolConformance {
 public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const {
-    return getType()->castTo<ProtocolType>()->getDecl();
+    return dyn_cast<ProtocolDecl>(getType()->getAnyNominal());
   }
 
   /// Get the declaration context in which this conformance was declared.

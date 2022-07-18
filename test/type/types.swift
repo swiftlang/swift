@@ -194,3 +194,12 @@ var _: sr5505 = sr5505 // expected-error {{cannot find type 'sr5505' in scope}}
 typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'inout' must not be used on variadic parameters}}
                                                           // expected-error@-1 {{only a single element can be variadic}} {{35-39=}}
                                                           // expected-error@-2 {{default argument not permitted in a tuple type}} {{39-49=}}
+
+// rdar://94888357 - failed to produce a diagnostic when type is used incorrectly
+func rdar94888357() {
+  struct S<T> { // expected-note {{generic type 'S' declared here}}
+    init(_ str: String) {}
+  }
+
+  let _ = S<String, String>("") // expected-error {{generic type 'S' specialized with too many type parameters (got 2, but expected 1)}}
+}

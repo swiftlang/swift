@@ -249,6 +249,10 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    // Only consider root archetypes.
+    if (!archetype->isRoot())
+      return Type();
+
     if (!isa<PrimaryArchetypeType>(archetype) &&
         !isa<SequenceArchetypeType>(archetype))
       return Type();
@@ -322,7 +326,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    if (!isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
+    if (!isa<OpaqueTypeArchetypeType>(archetype)) {
       type = archetype->getInterfaceType()->getCanonicalType();
     }
   }
@@ -355,15 +359,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (auto directConformance = getSignatureConformance(type, proto))
     return *directConformance;
 
-  // Check whether the superclass conforms.
-  if (auto superclass = genericSig->getSuperclassBound(type)) {
-    LookUpConformanceInSignature lookup(getGenericSignature().getPointer());
-    auto substType = type.subst(*this);
-    if (auto conformance = lookup(type->getCanonicalType(), substType, proto)){
-      return conformance;
-    }
-  }
-
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
   if (!genericSig->requiresProtocol(type, proto)) {
@@ -374,7 +369,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   auto accessPath =
     genericSig->getConformanceAccessPath(type, proto);
 
-  // Fall through because we cannot yet evaluate an access path.
   ProtocolConformanceRef conformance;
   for (const auto &step : accessPath) {
     // For the first step, grab the initial conformance.
@@ -507,15 +501,9 @@ SubstitutionMap::getOverrideSubstitutions(
                                       Optional<SubstitutionMap> derivedSubs) {
   // For overrides within a protocol hierarchy, substitute the Self type.
   if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
-    if (auto derivedProtoSelf =
-          derivedDecl->getDeclContext()->getSelfInterfaceType()) {
-      return SubstitutionMap::getProtocolSubstitutions(
-                                             baseProto,
-                                             derivedProtoSelf,
-                                             ProtocolConformanceRef(baseProto));
-    }
-
-    return SubstitutionMap();
+    auto baseSig = baseDecl->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+    return baseSig->getIdentitySubstitutionMap();
   }
 
   auto *baseClass = baseDecl->getDeclContext()->getSelfClassDecl();

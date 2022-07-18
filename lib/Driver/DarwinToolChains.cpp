@@ -859,6 +859,14 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   return false;
 }
 
+std::string toolchains::Darwin::getGlobalDebugPathRemapping() const {
+  // This matches the behavior in Clang (see
+  // clang/lib/driver/ToolChains/Darwin.cpp).
+  if (const char *S = ::getenv("RC_DEBUG_PREFIX_MAP"))
+    return S;
+  return {};
+}
+
 static void validateLinkObjcRuntimeARCLiteLib(const toolchains::Darwin &TC,
                                               DiagnosticEngine &diags,
                                               const llvm::opt::ArgList &args) {

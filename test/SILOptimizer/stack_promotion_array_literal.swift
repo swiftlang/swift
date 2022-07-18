@@ -1,11 +1,13 @@
 // RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
+// REQUIRES: swift_in_compiler
+
 // This is an end-to-end test to check if the array literal in the loop is
 // stack promoted.
 
 // CHECK-LABEL: sil @{{.*}}testit
-// CHECK:  alloc_ref [stack] [tail_elems
+// CHECK:  alloc_ref{{.*}} [stack] [tail_elems
 
 public func testit(_ N: Int, _ x: Int) {
   for _ in 0..<N {

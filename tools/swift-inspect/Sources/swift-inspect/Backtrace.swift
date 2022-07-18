@@ -12,45 +12,26 @@
 
 import SwiftRemoteMirror
 
-struct Backtrace {
-  enum Style {
-    case oneLine
-    case long
+internal enum BacktraceStyle {
+  case oneline
+  case long
+}
+
+internal func backtrace(_ stack: [swift_reflection_ptr_t], style: BacktraceStyle,
+                        _ symbolicate: (swift_addr_t) -> (module: String?, symbol: String?)) -> String {
+  func entry(_ address: swift_reflection_ptr_t) -> String {
+    let (module, symbol) = symbolicate(swift_addr_t(address))
+    return "\(hex: address) (\(module ?? "<unknown>")) \(symbol ??  "<unknown>")"
   }
 
-  /// The pointers to the locations in the backtrace. These are stored from
-  /// deepest to shallowest, so main() will be somewhere near the end.
-  var ptrs: [swift_reflection_ptr_t]
-
-  func symbolString(
-    ptr: swift_reflection_ptr_t,
-    inspector: Inspector
-  ) -> String {
-    let symbol = inspector.getSymbol(address: ptr)
-    let name = symbol.name ?? "<unknown>"
-    let library = symbol.library ?? "<unknown>"
-    return "\(hex: ptr) (\(library)) \(name)"
-  }
-
-  func symbolicatedOneLine(inspector: Inspector) -> String {
-    return ptrs.reversed().map {
-      symbolString(ptr: $0, inspector: inspector)
-    }.joined(separator: " | ")
-  }
-
-  func symbolicatedLong(inspector: Inspector) -> String {
-    return ptrs.reversed().enumerated().map {
-      let indent = String(repeating: "  ", count: $0 + 1)
-      return indent + symbolString(ptr: $1, inspector: inspector)
+  // The pointers to the locations in the backtrace are stored from deepest to
+  // shallowest, so `main` will be somewhere near the end.
+  switch style {
+  case .oneline:
+    return stack.reversed().map { entry($0) }.joined(separator: " | ")
+  case .long:
+    return stack.reversed().enumerated().map {
+      " \(String(repeating: " ", count: $0 + 1))\(entry($1))"
     }.joined(separator: "\n")
-  }
-
-  func symbolicated(style: Style, inspector: Inspector) -> String {
-    switch style {
-    case .oneLine:
-      return symbolicatedOneLine(inspector: inspector)
-    case .long:
-      return symbolicatedLong(inspector: inspector)
-    }
   }
 }

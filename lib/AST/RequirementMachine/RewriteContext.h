@@ -52,16 +52,6 @@ class RewriteContext final {
   llvm::DenseMap<const ProtocolDecl *,
                  llvm::TinyPtrVector<const ProtocolDecl *>> AllInherited;
 
-  /// Cached support of sets of protocols, which is the number of elements in
-  /// the transitive closure of the set under protocol inheritance.
-  llvm::DenseMap<ArrayRef<const ProtocolDecl *>, unsigned> Support;
-
-  /// Cache for associated type declarations.
-  llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
-
-  /// Cache for merged associated type symbols.
-  llvm::DenseMap<std::pair<Symbol, Symbol>, Symbol> MergedAssocTypes;
-
   /// Requirement machines built from generic signatures.
   llvm::DenseMap<GenericSignature, RequirementMachine *> Machines;
 
@@ -93,19 +83,39 @@ class RewriteContext final {
     /// The members of this connected component.
     ArrayRef<const ProtocolDecl *> Protos;
 
-    /// Each connected component has a lazily-created requirement machine.
-    bool InProgress = false;
+    /// Whether we have started computing the requirement signatures of
+    /// the protocols in this component.
+    bool ComputingRequirementSignatures = false;
+
+    /// Whether we have finished computing the requirement signatures of
+    /// the protocols in this component.
+    bool ComputedRequirementSignatures = false;
+
+    /// Each connected component has a lazily-created requirement machine
+    /// built from the requirement signatures of the protocols in this
+    /// component.
+    RequirementMachine *Machine = nullptr;
   };
 
-  /// The protocol dependency graph.
+  /// We pre-load protocol dependencies here to avoid re-entrancy.
+  llvm::DenseMap<const ProtocolDecl *, ArrayRef<ProtocolDecl *>> Dependencies;
+
+  /// Maps protocols to their connected components.
   llvm::DenseMap<const ProtocolDecl *, ProtocolNode> Protos;
 
   /// Used by Tarjan's algorithm.
   unsigned NextComponentIndex = 0;
 
+  /// Prevents re-entrant calls into getProtocolComponentRec().
+  bool ProtectProtocolComponentRec = false;
+
   /// The connected components. Keys are the ComponentID fields of
   /// ProtocolNode.
   llvm::DenseMap<unsigned, ProtocolComponent> Components;
+
+  /// The stack of timers for performance analysis. See beginTimer() and
+  /// endTimer().
+  llvm::SmallVector<uint64_t, 2> Timers;
 
   ASTContext &Context;
 
@@ -118,6 +128,7 @@ class RewriteContext final {
 
   void getProtocolComponentRec(const ProtocolDecl *proto,
                                SmallVectorImpl<const ProtocolDecl *> &stack);
+  ProtocolComponent &getProtocolComponentImpl(const ProtocolDecl *proto);
 
 public:
   /// Statistics.
@@ -137,50 +148,72 @@ public:
 
   DebugOptions getDebugOptions() const { return Debug; }
 
+  ASTContext &getASTContext() const { return Context; }
+
+  void beginTimer(StringRef name);
+
+  void endTimer(StringRef name);
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Reduction order on protocols.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
   const llvm::TinyPtrVector<const ProtocolDecl *> &
   getInheritedProtocols(const ProtocolDecl *proto);
 
-  unsigned getProtocolSupport(const ProtocolDecl *proto);
-
-  unsigned getProtocolSupport(ArrayRef<const ProtocolDecl *> protos);
-
   int compareProtocols(const ProtocolDecl *lhs,
                        const ProtocolDecl *rhs);
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Type to term conversion. The opposite direction is implemented in
+  /// PropertyMap because it depends on the current rewrite system.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  static unsigned getGenericParamIndex(Type type);
 
   Term getTermForType(CanType paramType, const ProtocolDecl *proto);
 
   MutableTerm getMutableTermForType(CanType paramType,
                                     const ProtocolDecl *proto);
 
-  ASTContext &getASTContext() const { return Context; }
-
-  Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
-
-  Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
-
-  Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix) const;
-
   MutableTerm getRelativeTermForType(CanType typeWitness,
                                      ArrayRef<Term> substitutions);
 
-  Type getTypeFromSubstitutionSchema(
-                      Type schema,
-                      ArrayRef<Term> substitutions,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const MutableTerm &prefix) const;
+  CanType getSubstitutionSchemaFromType(CanType concreteType,
+                                        const ProtocolDecl *proto,
+                                        SmallVectorImpl<Term> &result);
 
-  AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
+  CanType getRelativeSubstitutionSchemaFromType(CanType concreteType,
+                                                ArrayRef<Term> substitutions,
+                                                SmallVectorImpl<Term> &result);
 
-  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs);
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Construction of requirement machines for connected components in the
+  /// protocol dependency graph.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
 
   RequirementMachine *getRequirementMachine(CanGenericSignature sig);
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
 
-  ArrayRef<const ProtocolDecl *> getProtocolComponent(const ProtocolDecl *proto);
+  void installRequirementMachine(CanGenericSignature sig,
+                                 std::unique_ptr<RequirementMachine> machine);
+
+  ArrayRef<const ProtocolDecl *>
+  startComputingRequirementSignatures(const ProtocolDecl *proto);
+
+  void finishComputingRequirementSignatures(const ProtocolDecl *proto);
+
+  RequirementMachine *getRequirementMachine(const ProtocolDecl *proto);
   bool isRecursivelyConstructingRequirementMachine(const ProtocolDecl *proto);
+
+  void installRequirementMachine(const ProtocolDecl *proto,
+                                 std::unique_ptr<RequirementMachine> machine);
 
   ~RewriteContext();
 };

@@ -9,7 +9,8 @@ struct S {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin S.Type):
     // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S }
     // CHECK-NEXT:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK-NEXT:   [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT:   [[PB:%.*]] = project_box [[SELF_LIFETIME]]
     
     // CHECK-NEXT:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
     // CHECK:   [[X_CTOR:%[0-9]+]] = function_ref @$s19init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
@@ -19,6 +20,7 @@ struct S {
     self.init(x: X())
     // CHECK-NEXT:   assign [[REPLACEMENT_SELF]] to [[PB]] : $*S
     // CHECK-NEXT:   [[SELF_BOX1:%[0-9]+]] = load [trivial] [[PB]] : $*S
+    // CHECK-NEXT:   end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT:   destroy_value [[MARKED_SELF_BOX]] : ${ var S }
     // CHECK-NEXT:   return [[SELF_BOX1]] : $S
   }
@@ -36,7 +38,8 @@ enum E {
     // CHECK: bb0([[E_META:%[0-9]+]] : $@thin E.Type):
     // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box ${ var E }
     // CHECK:   [[MARKED_E_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[E_BOX]]
-    // CHECK:   [[PB:%.*]] = project_box [[MARKED_E_BOX]]
+    // CHECK:   [[E_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_E_BOX]]
+    // CHECK:   [[PB:%.*]] = project_box [[E_LIFETIME]]
 
     // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
     // CHECK:   [[E_DELEG_INIT:%[0-9]+]] = function_ref @$s19init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
@@ -46,6 +49,7 @@ enum E {
     // CHECK:   assign [[S:%[0-9]+]] to [[PB]] : $*E
     // CHECK:   [[E_BOX1:%[0-9]+]] = load [trivial] [[PB]] : $*E
     self.init(x: X())
+    // CHECK:   end_borrow [[E_LIFETIME]]
     // CHECK:   destroy_value [[MARKED_E_BOX]] : ${ var E }
     // CHECK:   return [[E_BOX1:%[0-9]+]] : $E
   }
@@ -60,7 +64,8 @@ struct S2 {
     // CHECK: bb0([[S2_META:%[0-9]+]] : $@thin S2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S2 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK:   [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK:   [[PB:%.*]] = project_box [[SELF_LIFETIME]]
 
     // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
     // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @$s19init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
@@ -73,6 +78,7 @@ struct S2 {
     // CHECK:   assign [[SELF_BOX1]] to [[PB]] : $*S2
     // CHECK:   [[SELF_BOX4:%[0-9]+]] = load [trivial] [[PB]] : $*S2
     self.init(t: X())
+    // CHECK:   end_borrow [[SELF_LIFETIME]]
     // CHECK:   destroy_value [[MARKED_SELF_BOX]] : ${ var S2 }
     // CHECK:   return [[SELF_BOX4]] : $S2
   }
@@ -90,12 +96,14 @@ class C1 {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[SELF_META:%[0-9]+]] : $@thick C1.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C1 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK:   [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK:   [[PB:%.*]] = project_box [[SELF_LIFETIME]]
 
     // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick C1.Type, #C1.init!allocator
     // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_META]])
     // CHECK:   assign [[SELFP]] to [[PB]]
     // CHECK:   [[SELFP:%[0-9]+]] = load [copy] [[PB]] : $*C1
+    // CHECK:   end_borrow [[SELF_LIFETIME]]
     // CHECK:   destroy_value [[MARKED_SELF_BOX]] : ${ var C1 }
     // CHECK:   return [[SELFP]] : $C1
     self.init(x1: x, x2: x)
@@ -112,11 +120,13 @@ class C1 {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[SELF_META:%[0-9]+]] : $@thick C2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C2 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK:   [[PB_SELF:%.*]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK:   [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK:   [[PB_SELF:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick C2.Type, #C2.init!allocator
     // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_META]])
     // CHECK:   assign [[REPLACE_SELF]] to [[PB_SELF]] : $*C2
     // CHECK:   [[VAR_15:%[0-9]+]] = load [copy] [[PB_SELF]] : $*C2
+    // CHECK:   end_borrow [[SELF_LIFETIME]]
     // CHECK:   destroy_value [[MARKED_SELF_BOX]] : ${ var C2 }
     // CHECK:   return [[VAR_15]] : $C2
     self.init(x1: x, x2: x)

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-protocol MyFormattedPrintable {
+protocol MyFormattedPrintable { // expected-note 3 {{declared here}}
   func myFormat() -> String
 }
 
@@ -230,18 +230,19 @@ class Top {}
 class Bottom<T : Bottom<Top>> {}
 // expected-error@-1 {{'Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
 // expected-note@-2 {{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
-// expected-error@-3 {{generic class 'Bottom' has self-referential generic requirements}}
-// expected-note@-4 {{while resolving type 'Bottom<Top>'}}
-// expected-note@-5 {{through reference here}}
+// expected-error@-3 *{{generic class 'Bottom' has self-referential generic requirements}}
 
 // Invalid inheritance clause
 
 struct UnsolvableInheritance1<T : T.A> {}
 // expected-error@-1 {{'A' is not a member type of type 'T'}}
+// expected-error@-2 {{type 'T' constrained to non-protocol, non-class type 'T.A'}}
 
 struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 // expected-error@-1 {{'A' is not a member type of type 'U'}}
 // expected-error@-2 {{'A' is not a member type of type 'T'}}
+// expected-error@-3 {{type 'T' constrained to non-protocol, non-class type 'U.A'}}
+// expected-error@-4 {{type 'U' constrained to non-protocol, non-class type 'T.A'}}
 
 enum X7<T> where X7.X : G { case X } // expected-error{{enum case 'X' is not a member type of 'X7<T>'}}
 // expected-error@-1{{cannot find type 'G' in scope}}
@@ -257,3 +258,10 @@ extension X8 where T == MetatypeTypeResolutionProto {
   static var property2: T.Type { property1 } // ok, still .Protocol
   static func method2() -> T.Type { method1() } // ok, still .Protocol
 }
+
+func bogusProtocolConstraint1(_ : any MyFormattedPrintable<String>) {}
+// expected-error@-1 {{protocol 'MyFormattedPrintable' does not have primary associated types that can be constrained}}{{59-67=}}
+func bogusProtocolConstraint2(_ : some MyFormattedPrintable<String>) {}
+// expected-error@-1 {{protocol 'MyFormattedPrintable' does not have primary associated types that can be constrained}}{{60-68=}}
+func bogusProtocolConstraint3(_ : MyFormattedPrintable<String>) {}
+// expected-error@-1 {{protocol 'MyFormattedPrintable' does not have primary associated types that can be constrained}}{{55-63=}}

@@ -323,7 +323,7 @@ class UTF16ToIdxRange: BenchmarkBase {
 }
 
 /// Split a string into `count` random slices and convert their index ranges
-/// into into UTF-16 offset pairs.
+/// into UTF-16 offset pairs.
 class IdxToUTF16Range: BenchmarkBase {
   let count: Int
   var inputIndices: [Range<String.Index>] = []

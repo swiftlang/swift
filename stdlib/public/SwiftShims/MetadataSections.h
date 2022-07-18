@@ -21,6 +21,10 @@
 #ifndef SWIFT_STDLIB_SHIMS_METADATASECTIONS_H
 #define SWIFT_STDLIB_SHIMS_METADATASECTIONS_H
 
+#if defined(__cplusplus) && !defined(__swift__)
+#include <atomic>
+#endif
+
 #include "SwiftStddef.h"
 #include "SwiftStdint.h"
 
@@ -36,22 +40,48 @@ typedef struct MetadataSectionRange {
 } MetadataSectionRange;
 
 
-/// Identifies the address space ranges for the Swift metadata required by the Swift runtime.
+/// Identifies the address space ranges for the Swift metadata required by the
+/// Swift runtime.
+///
+/// \warning If you change the size of this structure by adding fields, it is an
+///   ABI-breaking change on platforms that use it. Make sure to increment
+///   \c CurrentSectionMetadataVersion if you do.
 struct MetadataSections {
   __swift_uintptr_t version;
-  __swift_uintptr_t reserved;
 
-  /// `next` and `prev` are used by the runtime to construct a
-  /// circularly doubly linked list to quickly iterate over the metadata
-  /// from each image loaded into the address space.  These are invasive
-  /// to enable the runtime registration, which occurs at image load time, to
-  /// be allocation-free as it is invoked from an image constructor function
-  /// context where the system may not yet be ready to perform allocations.
-  /// Additionally, avoiding the allocation enables a fast load operation, which
-  /// directly impacts application load time.
-  struct MetadataSections *next;
-  struct MetadataSections *prev;
+  /// The base address of the image where this metadata section was defined, as
+  /// reported when the section was registered with the Swift runtime.
+  ///
+  /// The value of this field is equivalent to the value of
+  /// \c SymbolInfo::baseAddress as returned from \c lookupSymbol() for a symbol
+  /// in the image that contains these sections.
+  ///
+  /// For Mach-O images, set this field to \c __dso_handle (i.e. the Mach header
+  /// for the image.) For ELF images, set it to \c __dso_handle (the runtime
+  /// will adjust it to the start of the ELF image when the image is loaded.)
+  /// For COFF images, set this field to \c __ImageBase.
+  ///
+  /// For platforms that have a single statically-linked image or no dynamic
+  /// loader (i.e. no equivalent of \c __dso_handle or \c __ImageBase), this
+  /// field is ignored and should be set to \c nullptr.
+  ///
+  /// \bug When imported into Swift, this field is not atomic.
+  ///
+  /// \sa swift_addNewDSOImage()
+#if defined(__swift__) || defined(__STDC_NO_ATOMICS__)
+  const void *baseAddress;
+#elif defined(__cplusplus)
+  std::atomic<const void *> baseAddress;
+#else
+  _Atomic(const void *) baseAddress;
+#endif
 
+  /// Unused.
+  ///
+  /// These pointers (or the space they occupy) can be repurposed without
+  /// causing ABI breakage. Set them to \c nullptr.
+  void *unused0;
+  void *unused1;
 
   MetadataSectionRange swift5_protocols;
   MetadataSectionRange swift5_protocol_conformances;
@@ -64,6 +94,7 @@ struct MetadataSections {
   MetadataSectionRange swift5_replac2;
   MetadataSectionRange swift5_builtin;
   MetadataSectionRange swift5_capture;
+  MetadataSectionRange swift5_mpenum;
   MetadataSectionRange swift5_accessible_functions;
 };
 

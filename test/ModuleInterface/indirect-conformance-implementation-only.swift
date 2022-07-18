@@ -3,6 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-module %t/SecretLib.swift -o %t/SecretLib.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/Client.swift -I %t -emit-module-interface-path %t/Client.swiftinterface -enable-library-evolution -swift-version 5
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface)
 
 /// The indirect conformance of `s` to `_p` should not be printed. (rdar://78718838)
 // RUN: cat %t/Client.swiftinterface | %FileCheck %s

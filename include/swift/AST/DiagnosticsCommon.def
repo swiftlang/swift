@@ -38,9 +38,6 @@ ERROR(cannot_parse_group_info_file,none,
 ERROR(error_no_group_info,none,
       "no group info found for file: '%0'", (StringRef))
 
-NOTE(previous_decldef,none,
-     "previous definition of %0 is here", (DeclBaseName))
-
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
@@ -92,10 +89,6 @@ NOTE(note_typo_candidate,none,
 
 NOTE(profile_read_error,none,
      "failed to load profile data '%0': '%1'", (StringRef, StringRef))
-
-WARNING(protocol_extension_redundant_requirement,none,
-      "requirement of '%1' to '%2' is redundant in an extension of '%0'",
-      (StringRef, StringRef, StringRef))
 
 ERROR(attr_only_on_parameters, none,
       "'%0' may only be used on parameters", (StringRef))
@@ -205,7 +198,7 @@ ERROR(scanner_find_cycle, none,
 ERROR(scanner_arguments_invalid, none,
       "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
 
-WARNING(warn_scaner_deserialize_failed, none,
+WARNING(warn_scanner_deserialize_failed, none,
         "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
 
 REMARK(remark_reuse_cache, none,

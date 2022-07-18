@@ -20,7 +20,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/InitializeLibSwift.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -130,7 +130,7 @@ static llvm::cl::opt<llvm::cl::boolOrDefault>
 
 static llvm::cl::opt<llvm::cl::boolOrDefault> EnableExperimentalMoveOnly(
     "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
-    llvm::cl::desc("Enable experimental distributed actors."));
+    llvm::cl::desc("Enable experimental move-only semantics."));
 
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
@@ -296,6 +296,18 @@ static llvm::cl::opt<OptimizationMode> OptModeFlag(
                                 "ignore debug info, reduce runtime")),
     llvm::cl::init(OptimizationMode::NotSet));
 
+static llvm::cl::opt<IRGenDebugInfoLevel> IRGenDebugInfoLevelArg(
+    "irgen-debuginfo-level", llvm::cl::desc("IRGen debug info level"),
+    llvm::cl::values(clEnumValN(IRGenDebugInfoLevel::None, "none",
+                                "No debug info"),
+                     clEnumValN(IRGenDebugInfoLevel::LineTables, "line-tables",
+                                "Line tables only"),
+                     clEnumValN(IRGenDebugInfoLevel::ASTTypes, "ast-types",
+                                "Line tables + AST type references"),
+                     clEnumValN(IRGenDebugInfoLevel::DwarfTypes, "dwarf-types",
+                                "Line tables + AST type refs + Dwarf types")),
+    llvm::cl::init(IRGenDebugInfoLevel::ASTTypes));
+
 static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
     llvm::cl::values(
@@ -449,7 +461,7 @@ static cl::opt<std::string> RemarksFormat(
     cl::value_desc("format"), cl::init("yaml"));
 
 static llvm::cl::opt<bool>
-    EnableCxxInterop("enable-cxx-interop",
+    EnableCxxInterop("enable-experimental-cxx-interop",
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::init(false));
 
@@ -458,17 +470,15 @@ static llvm::cl::opt<bool>
                        llvm::cl::desc("Ignore [always_inline] attribute."),
                        llvm::cl::init(false));
 
-static llvm::cl::opt<std::string> EnableRequirementMachine(
-    "requirement-machine",
-    llvm::cl::desc("Control usage of experimental generics implementation: "
-                   "'on', 'off', or 'verify'."));
-
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
-  auto &opts = Module->getOptions();
+  const SILOptions &opts = Module->getOptions();
+  // If a specific pass was requested with -opt-mode=None, run the pass as a
+  // mandatory pass.
+  bool isMandatory = opts.OptMode == OptimizationMode::NoOptimization;
   executePassPipelinePlan(
       Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, Passes),
-      /*isMandatory*/ false, IRGenMod);
+      isMandatory, IRGenMod);
 
   if (Module->getOptions().VerifyAll)
     Module->verify();
@@ -505,7 +515,7 @@ int main(int argc, char **argv) {
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
-  initializeLibSwift();
+  initializeSwiftModules();
 
   if (PrintStats)
     llvm::EnableStatistics();
@@ -549,52 +559,32 @@ int main(int argc, char **argv) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     EnableExperimentalConcurrency;
-  Invocation.getLangOptions().EnableExperimentalDistributed =
-    EnableExperimentalDistributed;
   Optional<bool> enableExperimentalMoveOnly =
       toOptionalBool(EnableExperimentalMoveOnly);
-  if (enableExperimentalMoveOnly)
-    Invocation.getLangOptions().EnableExperimentalMoveOnly =
-        *enableExperimentalMoveOnly;
+  if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly)
+    Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
     DisableObjCInterop ? false : llvm::Triple(Target).isOSDarwin();
-
-  Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
 
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
       createOptRemarkRegex(PassRemarksMissed);
 
-  Invocation.getLangOptions().EnableExperimentalStaticAssert =
-      EnableExperimentalStaticAssert;
+  if (EnableExperimentalStaticAssert)
+    Invocation.getLangOptions().Features.insert(Feature::StaticAssert);
 
-  Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
-      EnableExperimentalDifferentiableProgramming;
+  if (EnableExperimentalDifferentiableProgramming) {
+    Invocation.getLangOptions().Features.insert(
+        Feature::DifferentiableProgramming);
+  }
 
   Invocation.getLangOptions().EnableCXXInterop = EnableCxxInterop;
 
   Invocation.getDiagnosticOptions().VerifyMode =
       VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
-
-  if (EnableRequirementMachine.size()) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(
-        EnableRequirementMachine)
-      .Case("off", RequirementMachineMode::Disabled)
-      .Case("on", RequirementMachineMode::Enabled)
-      .Case("verify", RequirementMachineMode::Verify)
-      .Default(None);
-
-    if (value)
-      Invocation.getLangOptions().EnableRequirementMachine = *value;
-    else {
-      fprintf(stderr, "Invalid value for -requirement-machine flag: %s\n",
-              EnableRequirementMachine.c_str());
-      exit(-1);
-    }
-  }
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
@@ -607,6 +597,7 @@ int main(int argc, char **argv) {
   SILOpts.OptRecordFile = RemarksFilename;
   SILOpts.OptRecordPasses = RemarksPasses;
   SILOpts.checkSILModuleLeaks = true;
+  SILOpts.EnablePerformanceAnnotations = true;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -640,6 +631,7 @@ int main(int argc, char **argv) {
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
+  SILOpts.EnableSILOpaqueValues = EnableSILOpaqueValues;
 
   if (CopyPropagationState) {
     SILOpts.CopyPropagation = *CopyPropagationState;
@@ -693,8 +685,19 @@ int main(int argc, char **argv) {
     SILOpts.OptMode = OptModeFlag;
   }
 
-  // Note: SILOpts must be set before the CompilerInstance is initializer below
-  // based on Invocation.
+  auto &IRGenOpts = Invocation.getIRGenOptions();
+  if (OptModeFlag == OptimizationMode::NotSet) {
+    if (OptimizationGroup == OptGroup::Diagnostics)
+      IRGenOpts.OptMode = OptimizationMode::NoOptimization;
+    else
+      IRGenOpts.OptMode = OptimizationMode::ForSpeed;
+  } else {
+    IRGenOpts.OptMode = OptModeFlag;
+  }
+  IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevelArg;
+
+  // Note: SILOpts, LangOpts, and IRGenOpts must be set before the
+  // CompilerInstance is initializer below based on Invocation.
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -792,7 +795,8 @@ int main(int argc, char **argv) {
   case OptGroup::Unknown: {
     auto T = irgen::createIRGenModule(
         SILMod.get(), Invocation.getOutputFilenameForAtMostOnePrimary(),
-        Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "");
+        Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "",
+        IRGenOpts);
     runCommandLineSelectedPasses(SILMod.get(), T.second);
     irgen::deleteIRGenModule(T);
     break;

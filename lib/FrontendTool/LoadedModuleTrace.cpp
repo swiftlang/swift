@@ -154,8 +154,8 @@ class ABIDependencyEvaluator {
   llvm::DenseSet<ModuleDecl *> visited;
 
   /// Helper function to handle invariant violations as crashes in debug mode.
-  void crashOnInvariantViolation(
-      llvm::function_ref<void(llvm::raw_string_ostream &)> f) const;
+  void
+  crashOnInvariantViolation(llvm::function_ref<void(raw_ostream &)> f) const;
 
   /// Computes the ABI exports for \p importedModule and adds them to
   /// \p module's ABI exports.
@@ -223,13 +223,13 @@ public:
 // See [NOTE: Bailing-vs-crashing-in-trace-emission].
 // TODO: Use PrettyStackTrace instead?
 void ABIDependencyEvaluator::crashOnInvariantViolation(
-    llvm::function_ref<void(llvm::raw_string_ostream &)> f) const {
+    llvm::function_ref<void(raw_ostream &)> f) const {
 #ifndef NDEBUG
-  std::string msg;
-  llvm::raw_string_ostream os(msg);
+  SmallVector<char, 0> msg;
+  llvm::raw_svector_ostream os(msg);
   os << "error: invariant violation: ";
   f(os);
-  llvm::report_fatal_error(os.str());
+  llvm::report_fatal_error(msg);
 #endif
 }
 
@@ -256,7 +256,7 @@ void ABIDependencyEvaluator::reexposeImportedABI(ModuleDecl *module,
                                                  ModuleDecl *importedModule,
                                                  bool includeImportedModule) {
   if (module == importedModule) {
-    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
+    crashOnInvariantViolation([&](raw_ostream &os) {
       os << "module ";
       printModule(module, os);
       os << " imports itself!\n";
@@ -266,7 +266,7 @@ void ABIDependencyEvaluator::reexposeImportedABI(ModuleDecl *module,
 
   auto addToABIExportMap = [this](ModuleDecl *module, ModuleDecl *reexport) {
     if (module == reexport) {
-      crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
+      crashOnInvariantViolation([&](raw_ostream &os) {
         os << "expected module ";
         printModule(reexport, os);
         os << "  to not re-export itself\n";
@@ -409,7 +409,7 @@ void ABIDependencyEvaluator::computeABIDependenciesForModule(
   if (moduleIter != searchStack.end()) {
     if (isFakeCycleThroughOverlay(moduleIter))
       return;
-    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
+    crashOnInvariantViolation([&](raw_ostream &os) {
       os << "unexpected cycle in import graph!\n";
       for (auto m : searchStack) {
         printModule(m, os);
@@ -557,21 +557,6 @@ static void computeSwiftModuleTraceInfo(
     const llvm::DenseMap<StringRef, ModuleDecl *> &pathToModuleDecl,
     const DependencyTracker &depTracker, StringRef prebuiltCachePath,
     std::vector<SwiftModuleTraceInfo> &traceInfo) {
-
-  SmallString<256> buffer;
-
-  std::string errMsg;
-  llvm::raw_string_ostream err(errMsg);
-
-  // FIXME: Use PrettyStackTrace instead.
-  auto errorUnexpectedPath =
-      [&pathToModuleDecl](llvm::raw_string_ostream &errStream) {
-        errStream << "The module <-> path mapping we have is:\n";
-        for (auto &m : pathToModuleDecl)
-          errStream << m.second->getName() << " <-> " << m.first << '\n';
-        llvm::report_fatal_error(errStream.str());
-      };
-
   using namespace llvm::sys;
 
   auto computeAdjacentInterfacePath = [](SmallVectorImpl<char> &modPath) {
@@ -580,6 +565,7 @@ static void computeSwiftModuleTraceInfo(
     path::replace_extension(modPath, swiftInterfaceExt);
   };
 
+  SmallString<256> buffer;
   auto deps = depTracker.getDependencies();
   SmallVector<std::string, 16> dependencies{deps.begin(), deps.end()};
   auto incrDeps = depTracker.getIncrementalDependencyPaths();
@@ -643,8 +629,14 @@ static void computeSwiftModuleTraceInfo(
     // built a swiftmodule from that interface, so we should have that
     // filename available.
     if (isSwiftinterface) {
+      // FIXME: Use PrettyStackTrace instead.
+      SmallVector<char, 0> errMsg;
+      llvm::raw_svector_ostream err(errMsg);
       err << "Unexpected path for swiftinterface file:\n" << depPath << "\n";
-      errorUnexpectedPath(err);
+      err << "The module <-> path mapping we have is:\n";
+      for (auto &m : pathToModuleDecl)
+        err << m.second->getName() << " <-> " << m.first << '\n';
+      llvm::report_fatal_error(errMsg);
     }
 
     // Skip cached modules in the prebuilt cache. We will add the corresponding

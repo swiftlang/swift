@@ -16,6 +16,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
@@ -100,8 +101,8 @@ class DCE {
   typedef llvm::DomTreeNodeBase<SILBasicBlock> PostDomTreeNode;
 
   SILFunction *F;
-  llvm::SmallPtrSet<SILArgument *, 16> LiveArguments;
-  llvm::SmallPtrSet<SILInstruction *, 16> LiveInstructions;
+  ValueSet LiveArguments;
+  InstructionSet LiveInstructions;
   BasicBlockSet LiveBlocks;
   llvm::SmallVector<SILInstruction *, 64> Worklist;
   PostDominanceInfo *PDT;
@@ -172,7 +173,8 @@ class DCE {
   void endLifetimeOfLiveValue(SILValue value, SILInstruction *insertPt);
 
 public:
-  DCE(SILFunction *F, PostDominanceInfo *PDT) : F(F), LiveBlocks(F), PDT(PDT) {}
+  DCE(SILFunction *F, PostDominanceInfo *PDT)
+    : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT) {}
 
   /// The entry point to the transformation.
   bool run() {
@@ -199,7 +201,7 @@ void DCE::markValueLive(SILValue V) {
   LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *V);
 
   auto *Arg = cast<SILArgument>(V);
-  if (!LiveArguments.insert(Arg).second)
+  if (!LiveArguments.insert(Arg))
     return;
 
   markControllingTerminatorsLive(Arg->getParent());
@@ -207,7 +209,7 @@ void DCE::markValueLive(SILValue V) {
 }
 
 void DCE::markInstructionLive(SILInstruction *Inst) {
-  if (!LiveInstructions.insert(Inst).second)
+  if (!LiveInstructions.insert(Inst))
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *Inst);
@@ -292,7 +294,7 @@ void DCE::markLive() {
           SmallVector<SILValue, 4> roots;
           findGuaranteedReferenceRoots(borrowInst->getOperand(), roots);
           for (auto root : roots) {
-            visitTransitiveEndBorrows(BorrowedValue(root),
+            visitTransitiveEndBorrows(root,
                                       [&](EndBorrowInst *endBorrow) {
                                         markInstructionLive(endBorrow);
                                       });
@@ -367,7 +369,6 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   case TermKind::DynamicMethodBranchInst:
   case TermKind::SwitchEnumInst:
   case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
     assert(ArgIndex == 0 && "Expected a single argument!");
 
     // We do not need to do anything with these. If the resulting
@@ -472,7 +473,6 @@ void DCE::propagateLiveness(SILInstruction *I) {
 
   case TermKind::AwaitAsyncContinuationInst:
   case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
@@ -519,7 +519,7 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
     std::vector<SILValue> Args;
     auto E = Block->args_end();
     for (auto A = Block->args_begin(); A != E; ++A) {
-      assert(!LiveArguments.count(*A) && "Unexpected live block argument!");
+      assert(!LiveArguments.contains(*A) && "Unexpected live block argument!");
       Args.push_back(SILUndef::get((*A)->getType(), *(*A)->getFunction()));
     }
     Branch =
@@ -534,10 +534,10 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
 
 void DCE::endLifetimeOfLiveValue(SILValue value, SILInstruction *insertPt) {
   if (SILInstruction *inst = value->getDefiningInstruction()) {
-    if (!LiveInstructions.count(inst))
+    if (!LiveInstructions.contains(inst))
       return;
   } else if (auto *arg = dyn_cast<SILArgument>(value)) {
-    if (!LiveArguments.count(arg))
+    if (!LiveArguments.contains(arg))
       return;
   }
   SILBuilderWithScope builder(insertPt);
@@ -558,7 +558,7 @@ bool DCE::removeDead() {
   for (auto &BB : *F) {
     for (unsigned i = 0; i < BB.getArguments().size();) {
       auto *arg = BB.getArgument(i);
-      if (LiveArguments.count(arg)) {
+      if (LiveArguments.contains(arg)) {
         i++;
         continue;
       }
@@ -575,8 +575,8 @@ bool DCE::removeDead() {
         continue;
       }
 
-      if (!arg->isPhiArgument()) {
-        // We cannot delete a non phi arg. If it was @owned, insert a
+      if (!arg->isPhi()) {
+        // We cannot delete a non phi. If it was @owned, insert a
         // destroy_value, because its consuming user has already been marked
         // dead and will be deleted.
         // We do not have to end lifetime of a @guaranteed non phi arg.
@@ -634,7 +634,7 @@ bool DCE::removeDead() {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       auto *Inst = &*I;
       ++I;
-      if (LiveInstructions.count(Inst) || isa<BranchInst>(Inst))
+      if (LiveInstructions.contains(Inst) || isa<BranchInst>(Inst))
         continue;
 
       // We want to replace dead terminators with unconditional branches to

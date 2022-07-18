@@ -68,7 +68,7 @@ struct TBDGenOptions {
   /// For these modules, TBD gen should embed their symbols in the emitted tbd
   /// file.
   /// Typically, these modules are static linked libraries. Thus their symbols
-  /// are embeded in the current dylib.
+  /// are embedded in the current dylib.
   std::vector<std::string> embedSymbolsFromModules;
 
   friend bool operator==(const TBDGenOptions &lhs, const TBDGenOptions &rhs) {

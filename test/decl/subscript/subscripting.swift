@@ -165,18 +165,22 @@ protocol ProtocolWillSetDidSet4 {
 }
 
 class DidSetInSubscript {
-  subscript(_: Int) -> Int {
+  subscript(x: Int) -> Bool {
     didSet { // expected-error {{'didSet' is not allowed in subscripts}}
       print("eek")
+      // Make sure implicit observer parameters pick up the right type.
+      let _: Int = x
     }
     get {}
   }
 }
 
 class WillSetInSubscript {
-  subscript(_: Int) -> Int {
+  subscript(x: Int) -> Bool {
     willSet { // expected-error {{'willSet' is not allowed in subscripts}}
       print("eek")
+      // Make sure implicit observer parameters pick up the right type.
+      let _: Int = x
     }
     get {}
   }
@@ -222,11 +226,17 @@ struct RetOverloadedSubscript {
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{subscript must have accessors specified}}
+  } // expected-error {{missing return in subscript expected to return 'Int'}}
 }
 struct MissingGetterSubscript2 {
   subscript (i : Int, j : Int) -> Int {
     set {} // expected-error{{subscript with a setter must also have a getter}}
+  }
+}
+
+struct MissingReturnTypeAndEmptyBodySubscript {
+  subscript(i: Int) { // expected-error{{expected '->' for subscript element type}}
+  // expected-error@-1{{expected subscripting element type}}
   }
 }
 

@@ -3,7 +3,7 @@ protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
   init() {} // expected-error {{protocol initializers must not have bodies}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
 }
 
 // Protocol decl.
@@ -119,7 +119,7 @@ struct Circle {
 func testCircular(_ circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
-  _ = circle as CircleStart // expected-error{{value of type 'Circle' does not conform to 'CircleStart' in coercion}}
+  _ = circle as any CircleStart // expected-error{{cannot convert value of type 'Circle' to type 'any CircleStart' in coercion}}
 }
 
 // <rdar://problem/14750346>
@@ -284,7 +284,7 @@ struct StaticAndInstanceS : InstanceP {
 }
 func StaticProtocolFunc() {
   let a: StaticP = StaticS1()
-  a.f() // expected-error{{static member 'f' cannot be used on instance of type 'StaticP'}}
+  a.f() // expected-error{{static member 'f' cannot be used on instance of type 'any StaticP'}}
 }
 func StaticProtocolGenericFunc<t : StaticP>(_: t) {
   t.f()
@@ -419,7 +419,7 @@ protocol ShouldntCrash {
 // rdar://problem/18168866
 protocol FirstProtocol {
     // expected-warning@+1 {{'weak' cannot be applied to a property declaration in a protocol; this is an error in Swift 5}}
-    weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'SecondProtocol'; consider adding a protocol conformance that has a class bound}}
+    weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'any SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 
 protocol SecondProtocol {
@@ -434,23 +434,22 @@ func f<T : C1>(_ x : T) {
 
 class C2 {}
 func g<T : C2>(_ x : T) {
-  x as P2 // expected-error{{value of type 'T' does not conform to 'P2' in coercion}}
+  x as P2 // expected-error{{cannot convert value of type 'T' to type 'any P2' in coercion}}
 }
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
 func h<T : C3>(_ x : T) {
-  _ = x as P1
+  _ = x as any P1
 }
 func i<T : C3>(_ x : T?) -> Bool {
-  return x is P1
-  // FIXME: Bogus diagnostic.  See SR-11920.
-  // expected-warning@-2 {{checking a value with optional type 'T?' against dynamic type 'P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
+  return x is any P1
+  // expected-warning@-1 {{checking a value with optional type 'T?' against type 'any P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
 }
 func j(_ x : C1) -> Bool {
-  return x is P1
+  return x is P1 // expected-error {{use of protocol 'P1' as a type must be written 'any P1'}}
 }
 func k(_ x : C1?) -> Bool {
-  return x is P1
+  return x is any P1
 }
 
 
@@ -498,7 +497,7 @@ class SR_11412_C1 {
   let c0 = SR_11412_C0()
 
   func conform() {
-    c0.foo1 = self // expected-error {{cannot assign value of type 'SR_11412_C1' to type 'SR_11412_P1?'}}
+    c0.foo1 = self // expected-error {{cannot assign value of type 'SR_11412_C1' to type '(any SR_11412_P1)?'}}
     // expected-note@-1 {{add missing conformance to 'SR_11412_P1' to class 'SR_11412_C1'}}{{18-18=: SR_11412_P1}}
   }
 }
@@ -509,7 +508,7 @@ class SR_11412_C2 {
   let c0 = SR_11412_C0()
 
   func conform() {
-    c0.foo2 = self // expected-error {{cannot assign value of type 'SR_11412_C2' to type '(SR_11412_P1 & SR_11412_P2)?'}}
+    c0.foo2 = self // expected-error {{cannot assign value of type 'SR_11412_C2' to type '(any SR_11412_P1 & SR_11412_P2)?'}}
     // expected-note@-1 {{add missing conformance to 'SR_11412_P1 & SR_11412_P2' to class 'SR_11412_C2'}}{{18-18=: SR_11412_P1 & SR_11412_P2}}
   }
 }
@@ -520,7 +519,7 @@ class SR_11412_C3: SR_11412_P3 {
   let c0 = SR_11412_C0()
 
   func conform() {
-    c0.foo1 = self // expected-error {{cannot assign value of type 'SR_11412_C3' to type 'SR_11412_P1?'}}
+    c0.foo1 = self // expected-error {{cannot assign value of type 'SR_11412_C3' to type '(any SR_11412_P1)?'}}
     // expected-note@-1 {{add missing conformance to 'SR_11412_P1' to class 'SR_11412_C3'}}{{31-31=, SR_11412_P1}}
   }
 }
@@ -531,7 +530,7 @@ class SR_11412_C4: SR_11412_P1 {
   let c0 = SR_11412_C0()
 
   func conform() {
-    c0.foo2 = self // expected-error {{cannot assign value of type 'SR_11412_C4' to type '(SR_11412_P1 & SR_11412_P2)?'}}
+    c0.foo2 = self // expected-error {{cannot assign value of type 'SR_11412_C4' to type '(any SR_11412_P1 & SR_11412_P2)?'}}
     // expected-note@-1 {{add missing conformance to 'SR_11412_P1 & SR_11412_P2' to class 'SR_11412_C4'}}{{31-31=, SR_11412_P2}}
   }
 }
@@ -542,6 +541,6 @@ struct SR_11412_S0 {
   let c0 = SR_11412_C0()
 
   func conform() {
-    c0.foo3 = self // expected-error {{cannot assign value of type 'SR_11412_S0' to type 'SR_11412_P4?'}}
+    c0.foo3 = self // expected-error {{cannot assign value of type 'SR_11412_S0' to type '(any SR_11412_P4)?'}}
   }
 }

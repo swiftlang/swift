@@ -205,7 +205,14 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i + 1
+    // NOTE: Wrapping math because we allow unsafe buffer pointers not to verify
+    // index preconditions in release builds. Our (optimistic) assumption is
+    // that the caller is already ensuring that indices are valid, so we can
+    // elide the usual checks to help the optimizer generate better code.
+    // However, we still check for overflow in debug mode.
+    let result = i.addingReportingOverflow(1)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -215,7 +222,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    i += 1
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let result = i.addingReportingOverflow(1)
+    _debugPrecondition(!result.overflow)
+    i = result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -225,7 +235,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i - 1
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let result = i.subtractingReportingOverflow(1)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -235,7 +248,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    i -= 1
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let result = i.subtractingReportingOverflow(1)
+    _debugPrecondition(!result.overflow)
+    i = result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -245,7 +261,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i + n
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let result = i.addingReportingOverflow(n)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -255,11 +274,18 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    let l = limit - i
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let maxOffset = limit.subtractingReportingOverflow(i)
+    _debugPrecondition(!maxOffset.overflow)
+    let l = maxOffset.partialValue
+
     if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
       return nil
     }
-    return i + n
+
+    let result = i.addingReportingOverflow(n)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -270,7 +296,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
     // NOTE: We allow the subtraction to silently overflow in release builds
-    // to eliminate a superflous check when `start` and `end` are both valid
+    // to eliminate a superfluous check when `start` and `end` are both valid
     // indices. (The operation can only overflow if `start` is negative, which
     // implies it's an invalid index.) `Collection` does not specify what
     // `distance` should return when given an invalid index pair.
@@ -295,7 +321,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 
   @inlinable // unsafe-performance
   public var indices: Indices {
-    return startIndex..<endIndex
+    // Not checked because init forbids negative count.
+    return Indices(uncheckedBounds: (startIndex, endIndex))
   }
 
   /// Accesses the element at the specified position.
@@ -654,8 +681,18 @@ extension Unsafe${Mutable}BufferPointer {
   /// the same memory as an unrelated type without first rebinding the memory
   /// is undefined.
   ///
-  /// The entire region of memory referenced by this buffer must be initialized.
+  /// The number of instances of `T` referenced by the rebound buffer may be
+  /// different than the number of instances of `Element` referenced by the
+  /// original buffer. The number of instances of `T` will be calculated
+  /// at runtime.
   /// 
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. Every instance of `Pointee` overlapping with a given
+  /// instance of `T` should have the same initialization state (i.e.
+  /// initialized or uninitialized.) Accessing a `T` whose underlying
+  /// `Pointee` storage is in a mixed initialization state shall be
+  /// undefined behaviour.
+  ///
   /// Because this buffer's memory is no longer bound to its `Element` type
   /// while the `body` closure executes, do not access memory using the
   /// original buffer from within `body`. Instead, use the `body` closure's
@@ -666,39 +703,81 @@ extension Unsafe${Mutable}BufferPointer {
   /// `Element` type.
   ///
   /// - Note: Only use this method to rebind the buffer's memory to a type
-  ///   with the same size and stride as the currently bound `Element` type.
-  ///   To bind a region of memory to a type that is a different size, convert
-  ///   the buffer to a raw buffer and use the `bindMemory(to:)` method.
+  ///   that is layout compatible with the currently bound `Element` type.
+  ///   The stride of the temporary type (`T`) may be an integer multiple
+  ///   or a whole fraction of `Element`'s stride.
+  ///   To bind a region of memory to a type that does not match these
+  ///   requirements, convert the buffer to a raw buffer and use the
+  ///   `bindMemory(to:)` method.
+  ///   If `T` and `Element` have different alignments, this buffer's
+  ///   `baseAddress` must be aligned with the larger of the two alignments.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     buffer. The type `T` must have the same size and be layout compatible
+  ///     buffer. The type `T` must be layout compatible
   ///     with the pointer's `Element` type.
   ///   - body: A closure that takes a ${Mutable.lower()} typed buffer to the
-  ///     same memory as this buffer, only bound to type `T`. The buffer argument 
-  ///     contains the same number of complete instances of `T` as the original  
-  ///     buffer’s `count`. The closure's buffer argument is valid only for the 
-  ///     duration of the closure's execution. If `body` has a return value, that 
-  ///     value is also used as the return value for the `withMemoryRebound(to:_:)` 
+  ///     same memory as this buffer, only bound to type `T`. The buffer
+  ///     parameter contains a number of complete instances of `T` based
+  ///     on the capacity of the original buffer and the stride of `Element`.
+  ///     The closure's buffer argument is valid only for the duration of the
+  ///     closure's execution. If `body` has a return value, that value
+  ///     is also used as the return value for the `withMemoryRebound(to:_:)`
   ///     method.
+  ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable // unsafe-performance
+  @_alwaysEmitIntoClient
+  // This custom silgen name is chosen to not interfere with the old ABI
+% if Mutable:
+  @_silgen_name("_swift_se0333_UnsafeMutableBufferPointer_withMemoryRebound")
+% else:
+  @_silgen_name("_swift_se0333_UnsafeBufferPointer_withMemoryRebound")
+% end
   public func withMemoryRebound<T, Result>(
-    to type: T.Type, _ body: (${Self}<T>) throws -> Result
+    to type: T.Type,
+    _ body: (_ buffer: ${Self}<T>) throws -> Result
   ) rethrows -> Result {
-    if let base = _position {
-      _debugPrecondition(MemoryLayout<Element>.stride == MemoryLayout<T>.stride)
-      Builtin.bindMemory(base._rawValue, count._builtinWordValue, T.self)
-      defer {
-        Builtin.bindMemory(base._rawValue, count._builtinWordValue, Element.self)
-      }
+    guard let base = _position?._rawValue else {
+      return try body(.init(start: nil, count: 0))
+    }
 
-      return try body(${Self}<T>(
-        start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: count))
+    let newCount: Int
+    if MemoryLayout<T>.stride == MemoryLayout<Element>.stride {
+      newCount = count
+      _debugPrecondition(
+        MemoryLayout<T>.alignment == MemoryLayout<Element>.alignment
+      )
+    } else {
+      newCount = count * MemoryLayout<Element>.stride / MemoryLayout<T>.stride
+      _debugPrecondition(
+        Int(bitPattern: .init(base)) & (MemoryLayout<T>.alignment-1) == 0 &&
+        MemoryLayout<T>.stride > MemoryLayout<Element>.stride
+        ? MemoryLayout<T>.stride % MemoryLayout<Element>.stride == 0
+        : MemoryLayout<Element>.stride % MemoryLayout<T>.stride == 0
+      )
     }
-    else {
-      return try body(${Self}<T>(start: nil, count: 0))
-    }
+    let binding = Builtin.bindMemory(base, newCount._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(base, binding) }
+    return try body(.init(start: .init(base), count: newCount))
+  }
+
+  // This unavailable implementation uses the expected mangled name
+  // of `withMemoryRebound<T, Result>(to:_:)`, and provides
+  // an entry point for any binary linked against the stdlib binary
+  // for Swift 5.6 and older.
+  @available(*, unavailable)
+% if Mutable:
+  @_silgen_name("$sSr17withMemoryRebound2to_qd_0_qd__m_qd_0_Sryqd__GKXEtKr0_lF")
+% else:
+  @_silgen_name("$sSR17withMemoryRebound2to_qd_0_qd__m_qd_0_SRyqd__GKXEtKr0_lF")
+% end
+  @usableFromInline
+  internal func _legacy_se0333_withMemoryRebound<T, Result>(
+    to type: T.Type,
+    _ body: (${Self}<T>) throws -> Result
+  ) rethrows -> Result {
+    return try withMemoryRebound(to: T.self, body)
   }
 
   /// A pointer to the first element of the buffer.

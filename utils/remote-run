@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # remote-run - Runs a command on another machine, for testing -----*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -11,13 +11,12 @@
 #
 # ----------------------------------------------------------------------------
 
-from __future__ import print_function
-
 import argparse
 import os
 import posixpath
 import subprocess
 import sys
+import shutil
 
 def quote(arg):
     return repr(arg)
@@ -26,6 +25,7 @@ class CommandRunner(object):
     def __init__(self):
         self.verbose = False
         self.dry_run = False
+        self.ignore_rsync_failure = False
 
     @staticmethod
     def _dirnames(files):
@@ -38,34 +38,26 @@ class CommandRunner(object):
             return None
         return subprocess.Popen(command, **kwargs)
 
-    def send(self, local_to_remote_files):
+    def mkdirs_remote(self, directories):
+        if directories:
+            mkdir_command = ['/bin/mkdir', '-p'] + directories
+            self.run_remote(mkdir_command)
+
+    def send(self, input_prefix, remote_prefix, local_to_remote_files):
         # Prepare the remote directory structure.
-        # FIXME: This could be folded into the sftp connection below.
-        dirs_to_make = self._dirnames(local_to_remote_files.values())
-        self.run_remote(['/bin/mkdir', '-p'] + dirs_to_make)
+        self.mkdirs_remote([remote_prefix])
 
-        # Send the local files.
-        sftp_commands = ("-put {0} {1}".format(quote(local_file), 
-                                               quote(remote_file))
-                         for local_file, remote_file
-                         in local_to_remote_files.items())
-        self.run_sftp(sftp_commands)
+        self.run_rsync_to(input_prefix, local_to_remote_files, remote_prefix)
 
-    def fetch(self, local_to_remote_files):
+    def fetch(self, output_prefix, remote_prefix, remote_to_local_files):
         # Prepare the local directory structure.
-        dirs_to_make = self._dirnames(local_to_remote_files.keys())
-        mkdir_command = ['/bin/mkdir', '-p'] + dirs_to_make
+        mkdir_command = ['/bin/mkdir', '-p', output_prefix]
         if self.verbose:
             print(' '.join(mkdir_command), file=sys.stderr)
         if not self.dry_run:
             subprocess.check_call(mkdir_command)
 
-        # Fetch the remote files.
-        sftp_commands = ("-get {0} {1}".format(quote(remote_file), 
-                                               quote(local_file))
-                         for local_file, remote_file
-                         in local_to_remote_files.items())
-        self.run_sftp(sftp_commands)
+        self.run_rsync_from(remote_prefix, remote_to_local_files, output_prefix)
 
     def run_remote(self, command, remote_env={}):
         env_strings = ['{0}={1}'.format(k,v) for k,v in sorted(remote_env.items())]
@@ -80,18 +72,25 @@ class CommandRunner(object):
             # FIXME: We may still want to fetch the output files to see what
             # went wrong.
             sys.exit(remote_proc.returncode)
-    
-    def run_sftp(self, commands):
-        sftp_proc = self.popen(self.sftp_invocation(), stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE, stderr=None)
-        concatenated_commands = '\n'.join(commands)
-        if self.verbose:
-            print(concatenated_commands, file=sys.stderr)
+
+    def run_rsync(self, invocation, sources):
+        rsync_proc = self.popen(invocation,
+                                stdin=subprocess.PIPE,
+                                stdout=None, stderr=None)
         if self.dry_run:
             return
-        _, _ = sftp_proc.communicate(concatenated_commands.encode('utf-8'))
-        if sftp_proc.returncode:
-            sys.exit(sftp_proc.returncode)
+        sources = '\n'.join(sources)
+        if self.verbose:
+            print(sources, file=sys.stderr)
+        _, _ = rsync_proc.communicate(sources.encode('utf-8'))
+        if not self.ignore_rsync_failure and rsync_proc.returncode:
+            sys.exit(rsync_proc.returncode)
+
+    def run_rsync_to(self, prefix, sources, dest):
+        self.run_rsync(self.rsync_to_invocation(prefix, dest), sources)
+
+    def run_rsync_from(self, prefix, sources, dest):
+        self.run_rsync(self.rsync_from_invocation(prefix, dest), sources)
 
 class RemoteCommandRunner(CommandRunner):
     def __init__(self, host, identity_path, ssh_options, config_file):
@@ -123,26 +122,109 @@ class RemoteCommandRunner(CommandRunner):
                 [self.remote_host, '--'] +
                 [quote(arg) for arg in command])
 
-    def sftp_invocation(self):
-        return (['/usr/bin/sftp', '-b', '-', '-q', '-r'] +
-                self.common_options(port_flag='-P') +
-                [self.remote_host])
+    def rsync_invocation(self, source, dest):
+        return ['/usr/bin/rsync', '-arRz', '--files-from=-',
+                '-e', ' '.join([quote(x) for x in
+                                ['/usr/bin/ssh'] +
+                                self.common_options(port_flag='-p')]),
+                source,
+                dest]
+
+    def rsync_from_invocation(self, source, dest):
+        return self.rsync_invocation(self.remote_host + ':' + source, dest)
+
+    def rsync_to_invocation(self, source, dest):
+        return self.rsync_invocation(source, self.remote_host + ':' + dest)
 
 class LocalCommandRunner(CommandRunner):
-    def __init__(self, sftp_server_path):
-        self.sftp_server_path = sftp_server_path
-
     def remote_invocation(self, command):
         return command
 
-    def sftp_invocation(self):
-        return ['/usr/bin/sftp', '-b', '-', '-q', '-D', self.sftp_server_path]
+    def rsync_invocation(self, source, dest):
+        return ['/usr/bin/rsync', '-arz', '--files-from=-', source, dest]
 
-def find_transfers(args, source_prefix, dest_prefix):
-    if source_prefix.endswith(posixpath.sep):
-        source_prefix = source_prefix[:-len(posixpath.sep)]
-    return dict((arg, dest_prefix + arg[len(source_prefix):])
-                for arg in args if arg.startswith(source_prefix))
+    def rsync_from_invocation(self, source, dest):
+        return self.rsync_invocation(source, dest)
+
+    def rsync_to_invocation(self, source, dest):
+        return self.rsync_invocation(source, dest)
+
+def strip_sep(name):
+    lsep = len(posixpath.sep)
+    while name.startswith(posixpath.sep):
+        name = name[lsep:]
+    return name
+
+class ArgumentProcessor(object):
+    def __init__(self,
+                 input_prefix, output_prefix,
+                 remote_dir, remote_input_prefix, remote_output_prefix,
+                 arguments):
+        assert not remote_input_prefix.startswith('..')
+        assert not remote_output_prefix.startswith('..')
+
+        self.input_prefix = input_prefix
+        self.output_prefix = output_prefix
+        self.remote_dir = remote_dir
+        self.remote_input_prefix = remote_input_prefix
+        self.remote_output_prefix = remote_output_prefix
+        self.original_args = arguments
+
+        if self.input_prefix:
+            while self.input_prefix.endswith(posixpath.sep):
+                self.input_prefix = self.input_prefix[:-len(posixpath.sep)]
+        if self.output_prefix:
+            while self.output_prefix.endswith(posixpath.sep):
+                self.output_prefix = self.output_prefix[:-len(posixpath.sep)]
+
+    def process_args(self):
+        self.args = []
+        self.inputs = set()
+        self.nodir_inputs = set()
+        self.existing_outputs = set()
+        self.outputs = set()
+        self.existing_nodir_outputs = set()
+        self.nodir_outputs = set()
+
+        iplen = 0
+        oplen = 0
+        if self.input_prefix:
+            iplen = len(self.input_prefix)
+            ipfxdir, ipfx = posixpath.split(self.input_prefix)
+        if self.output_prefix:
+            oplen = len(self.output_prefix)
+            opfxdir, opfx = posixpath.split(self.output_prefix)
+        for arg in self.original_args:
+            if iplen and arg.startswith(self.input_prefix):
+                name = arg[iplen:]
+                if not name.startswith(posixpath.sep):
+                    name = ipfx + name
+                    self.nodir_inputs.add(name)
+                else:
+                    name = strip_sep(name)
+                    self.inputs.add(name)
+
+                self.args.append(posixpath.join(self.remote_dir,
+                                                self.remote_input_prefix,
+                                                name))
+            elif oplen and arg.startswith(self.output_prefix):
+                name = arg[oplen:]
+                if not name.startswith(posixpath.sep):
+                    name = opfx + name
+                    self.nodir_outputs.add(name)
+                    if os.path.exists(arg):
+                        self.existing_nodir_outputs.add(name)
+                else:
+                    name = strip_sep(name)
+                    self.outputs.add(name)
+                    if os.path.exists(arg):
+                        self.existing_outputs.add(name)
+
+                self.args.append(posixpath.join(self.remote_dir,
+                                                self.remote_output_prefix,
+                                                name))
+            else:
+                self.args.append(arg)
 
 def collect_remote_env(local_env=os.environ, prefix='REMOTE_RUN_CHILD_'):
     return dict((key[len(prefix):], value)
@@ -179,10 +261,12 @@ def main():
     parser.add_argument('-o', '--ssh-option', action='append', default=[],
                         dest='ssh_options', metavar='OPTION',
                         help='extra SSH config options (man ssh_config)')
-    parser.add_argument('--debug-as-local', metavar='/PATH/TO/SFTP-SERVER',
+    parser.add_argument('--debug-as-local', action='store_true',
                         help='run commands locally instead of over SSH, for '
                              'debugging purposes. The "host" argument is '
                              'omitted.')
+    parser.add_argument('--ignore-rsync-failure', action='store_true',
+                        help='ignore rsync failures, for debugging.')
 
     parser.add_argument('host',
                         help='the host to connect to, in the form '
@@ -192,7 +276,7 @@ def main():
     args = parser.parse_args()
 
     if args.debug_as_local:
-        runner = LocalCommandRunner(args.debug_as_local)
+        runner = LocalCommandRunner()
         args.command.insert(0, args.host)
         del args.host
     else:
@@ -202,44 +286,56 @@ def main():
                                      args.config_file)
     runner.dry_run = args.dry_run
     runner.verbose = args.verbose or args.dry_run
+    runner.ignore_rsync_failure = args.ignore_rsync_failure
 
     assert not args.remote_dir == '/'
 
-    upload_files = dict()
-    download_files = dict()
-    remote_test_specific_dir = None
-    if args.input_prefix:
-        assert not args.remote_input_prefix.startswith("..")
-        remote_dir = posixpath.join(args.remote_dir, args.remote_input_prefix)
-        input_files = find_transfers(args.command, args.input_prefix, 
-                                     remote_dir)
-        assert not any(f in upload_files for f in input_files)
-        upload_files.update(input_files)
-    if args.output_prefix:
-        assert not args.remote_output_prefix.startswith("..")
-        remote_dir = posixpath.join(args.remote_dir, args.remote_output_prefix)
-        test_files = find_transfers(args.command, args.output_prefix, 
-                                    remote_dir)
-        assert not any(f in upload_files for f in test_files)
-        upload_files.update(test_files)
-        assert not any(f in download_files for f in test_files)
-        download_files.update(test_files)
-        remote_test_specific_dir = remote_dir
+    argproc = ArgumentProcessor(args.input_prefix,
+                                args.output_prefix,
+                                args.remote_dir,
+                                posixpath.normpath(args.remote_input_prefix),
+                                posixpath.normpath(args.remote_output_prefix),
+                                args.command)
 
-    if remote_test_specific_dir:
-        assert remote_test_specific_dir.startswith(args.remote_dir)
-        runner.run_remote(['/bin/rm', '-rf', remote_test_specific_dir])
-    if upload_files:
-        runner.send(upload_files)
+    argproc.process_args()
+
+    input_dir = posixpath.join(args.remote_dir, args.remote_input_prefix)
+    output_dir = posixpath.join(args.remote_dir, args.remote_output_prefix)
+
+    if args.output_prefix:
+        runner.run_remote(['/bin/rm', '-rf', output_dir])
+
+    dirs = set()
+    for output in argproc.outputs:
+        dirs.add(posixpath.join(output_dir, posixpath.dirname(output)))
+    for output in argproc.nodir_outputs:
+        dirs.add(posixpath.join(output_dir, posixpath.dirname(output)))
+    runner.mkdirs_remote(list(dirs))
+
+    if argproc.inputs:
+        runner.send(args.input_prefix, input_dir, argproc.inputs)
+
+    if argproc.nodir_inputs:
+        runner.send(posixpath.dirname(args.input_prefix),
+                    input_dir, argproc.nodir_inputs)
+
+    if argproc.existing_outputs:
+        runner.send(args.output_prefix, output_dir, argproc.existing_outputs)
+
+    if argproc.existing_nodir_outputs:
+        runner.send(posixpath.dirname(args.output_prefix),
+                    output_dir, argproc.existing_nodir_outputs)
 
     remote_env = collect_remote_env()
 
-    translated_command = [upload_files.get(arg, download_files.get(arg, arg))
-                          for arg in args.command]
-    runner.run_remote(translated_command, remote_env)
+    runner.run_remote(argproc.args, remote_env)
 
-    if download_files:
-        runner.fetch(download_files)
+    if argproc.outputs:
+        runner.fetch(args.output_prefix, output_dir, argproc.outputs)
+
+    if argproc.nodir_outputs:
+        runner.fetch(posixpath.dirname(args.output_prefix),
+                     output_dir, argproc.nodir_outputs)
 
 if __name__ == "__main__":
     main()

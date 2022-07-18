@@ -45,7 +45,7 @@ static FileOrError findModule(ASTContext &ctx, Identifier moduleID,
   // should be searched.
   StringRef moduleNameRef = ctx.getRealModuleName(moduleID).str();
 
-  for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
+  for (const auto &Path : ctx.SearchPathOpts.getImportSearchPaths()) {
     inputFilename = Path;
     llvm::sys::path::append(inputFilename, moduleNameRef);
     inputFilename.append(".swift");
@@ -69,9 +69,14 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
   // TODO: Implement?
 }
 
-bool SourceLoader::canImportModule(ImportPath::Element ID,
+bool SourceLoader::canImportModule(ImportPath::Module path,
                                    llvm::VersionTuple version,
                                    bool underlyingVersion) {
+  // FIXME: Swift submodules?
+  if (path.hasSubmodule())
+    return false;
+
+  auto ID = path[0];
   // Search the memory buffers to see if we can find this file on disk.
   FileOrError inputFileOrError = findModule(Ctx, ID.Item,
                                             ID.Loc);

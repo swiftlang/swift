@@ -123,7 +123,7 @@ extension P where Self : Q {
 public class C_PQ: P & Q {}
 
 // testExtensionProtocolComposition(c:)
-// CHECK-LABEL: sil @$s32sil_combine_concrete_existential32testExtensionProtocolComposition1cyAA4C_PQC_tF : $@convention(thin) (@guaranteed C_PQ) -> () {
+// CHECK-LABEL: sil {{.*}}@$s32sil_combine_concrete_existential32testExtensionProtocolComposition1cyAA4C_PQC_tF : $@convention(thin) (@guaranteed C_PQ) -> () {
 // CHECK-NOT: init_existential_ref
 // CHECK-NOT: function_ref
 // CHECK-NOT: apply

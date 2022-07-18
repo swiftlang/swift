@@ -142,9 +142,9 @@ def disable_testable_attr_requires_testable_module :
   Flag<["-"], "disable-testable-attr-requires-testable-module">,
   HelpText<"Disable checking of @testable">;
 
-def enable_clang_spi :
-  Flag<["-"], "enable-clang-spi">,
-  HelpText<"Import Clang SPIs as Swift SPIs">;
+def disable_clang_spi :
+  Flag<["-"], "disable-clang-spi">,
+  HelpText<"Don't import Clang SPIs as Swift SPIs">;
 
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
@@ -168,6 +168,9 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 
 def serialized_path_obfuscate : Separate<["-"], "serialized-path-obfuscate">,
     HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
+
+def empty_abi_descriptor : Flag<["-"], "empty-abi-descriptor">,
+  HelpText<"Avoid printing actual module content into ABI descriptor file">;
 
 def no_serialize_debugging_options :
   Flag<["-"], "no-serialize-debugging-options">,
@@ -237,6 +240,19 @@ def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_lexical_lifetimes :
+    Joined<["-"], "enable-lexical-lifetimes=">,
+    HelpText<"Whether to enable lexical lifetimes">,
+    MetaVarName<"true|false">;
+  def enable_lexical_lifetimes_noArg :
+    Flag<["-"], "enable-lexical-lifetimes">,
+    HelpText<"Enable lexical lifetimes">;
+  def enable_destroy_hoisting :
+    Joined<["-"], "enable-destroy-hoisting=">,
+    HelpText<"Whether to enable destroy hoisting">,
+    MetaVarName<"true|false">;
+}
 
 // Flags that are saved into module interfaces
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
@@ -262,18 +278,14 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
+def enable_experimental_cxx_interop :
+  Flag<["-"], "enable-experimental-cxx-interop">,
+  HelpText<"Enable C++ interop code generation and config directives">;
+
 def enable_lexical_borrow_scopes :
   Joined<["-"], "enable-lexical-borrow-scopes=">,
   HelpText<"Whether to emit lexical borrow scopes (default: true)">,
   MetaVarName<"true|false">;
-          
-def enable_lexical_lifetimes :
-  Joined<["-"], "enable-lexical-lifetimes=">,
-  HelpText<"Whether to enable lexical lifetimes">,
-  MetaVarName<"true|false">;
-def enable_lexical_lifetimes_noArg :
-  Flag<["-"], "enable-lexical-lifetimes">,
-  HelpText<"Enable lexical lifetimes">;
 
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
@@ -287,8 +299,24 @@ def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
   HelpText<"Enable flow-sensitive concurrent captures">;
 
+def disable_experimental_clang_importer_diagnostics :
+  Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
+  HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
+
+def enable_experimental_eager_clang_module_diagnostics :
+  Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
+  HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
+
+def enable_experimental_pairwise_build_block :
+  Flag<["-"], "enable-experimental-pairwise-build-block">,
+  HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
+
 def enable_resilience : Flag<["-"], "enable-resilience">,
      HelpText<"Deprecated, use -enable-library-evolution instead">;
+
+def enable_experimental_async_top_level :
+  Flag<["-"], "enable-experimental-async-top-level">,
+  HelpText<"Enable experimental concurrency in top-level code">;
 }
 
 // HIDDEN FLAGS
@@ -319,21 +347,48 @@ def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print out requirement machine statistics at the end of the compilation job">;
 
-def requirement_machine_step_limit : Separate<["-"], "requirement-machine-step-limit">,
+def requirement_machine_max_rule_count : Joined<["-"], "requirement-machine-max-rule-count=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the maximum steps before we give up on confluent completion">;
+  HelpText<"Set the maximum number of rules before giving up">;
 
-def requirement_machine_depth_limit : Separate<["-"], "requirement-machine-depth-limit">,
+def requirement_machine_max_rule_length : Joined<["-"], "requirement-machine-max-rule-length=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the maximum depth before we give up on confluent completion">;
+  HelpText<"Set the maximum rule length before giving up">;
 
-def disable_requirement_machine_merged_associated_types : Flag<["-"], "disable-requirement-machine-merged-associated-types">,
+def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machine-max-concrete-nesting=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Disable merged associated types">;
+  HelpText<"Set the maximum concrete type nesting depth before giving up">;
 
-def enable_requirement_machine_merged_associated_types : Flag<["-"], "enable-requirement-machine-merged-associated-types">,
+def requirement_machine_max_split_concrete_equiv_class_attempts : Joined<["-"], "requirement-machine-max-split-concrete-equiv-class-attempts=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Enable merged associated types">;
+  HelpText<"Set the maximum concrete number of attempts at splitting "
+           "concrete equivalence classes before giving up. There should "
+           "never be a reason to change this">;
+
+def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requirement-machine-concrete-contraction">,
+  HelpText<"Disable preprocessing pass to eliminate conformance requirements "
+           "on generic parameters which are made concrete">;
+
+def disable_requirement_machine_loop_normalization : Flag<["-"], "disable-requirement-machine-loop-normalization">,
+  HelpText<"Disable stronger minimization algorithm, for debugging only">;
+
+def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine-reuse">,
+  HelpText<"Disable re-use of requirement machines for minimization, for debugging only">;
+
+def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
+  HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
+
+def warn_redundant_requirements : Flag<["-"], "warn-redundant-requirements">,
+  HelpText<"Emit warnings for redundant requirements in generic signatures">;
+
+def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
+  HelpText<"Enables dumping type witness systems from associated type inference">;
+
+def enable_round_trip_debug_types : Flag<["-"], "enable-round-trip-debug-types">,
+  HelpText<"Enables verification of debug info mangling">;
+
+def disable_round_trip_debug_types : Flag<["-"], "disable-round-trip-debug-types">,
+  HelpText<"Disables verification of debug info mangling">;
 
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
@@ -376,9 +431,9 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
   "disable-implicit-concurrency-module-import">,
   HelpText<"Disable the implicit import of the _Concurrency module.">;
 
-def disable_implicit_distributed_module_import : Flag<["-"],
-  "disable-implicit-distributed-module-import">,
-  HelpText<"Disable the implicit import of the _Distributed module.">;
+def disable_implicit_string_processing_module_import : Flag<["-"],
+  "disable-implicit-string-processing-module-import">,
+  HelpText<"Disable the implicit import of the _StringProcessing module.">;
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
@@ -435,6 +490,9 @@ def enable_anonymous_context_mangled_names :
 def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
   HelpText<"Disable emission of reflection metadata for nominal types">;
 
+def reflection_metadata_for_debugger_only : Flag<["-"], "reflection-metadata-for-debugger-only">,
+  HelpText<"Emit reflection metadata for debugger only, don't make them available at runtime">;
+
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
@@ -442,6 +500,10 @@ def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
 def function_sections: Flag<["-"], "function-sections">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit functions to separate sections.">;
+
+def enable_single_module_llvm_emission: Flag<["-"], "enable-single-module-llvm-emission">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit LLVM IR into a single LLVM module in multithreaded mode.">;
 
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
@@ -471,9 +533,6 @@ def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier
 def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-swap">,
   HelpText<"Suppress static violations of exclusive access with swap()">;
 
-def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
-  HelpText<"Enable SIL Opaque Values">;
-  
 def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
@@ -486,13 +545,17 @@ def enable_experimental_named_opaque_types :
   Flag<["-"], "enable-experimental-named-opaque-types">,
   HelpText<"Enable experimental support for named opaque result types">;
 
-def enable_experimental_structural_opaque_types :
-  Flag<["-"], "enable-experimental-structural-opaque-types">,
-  HelpText<"Enable experimental support for structural opaque result types">;
-
 def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
   HelpText<"Enable experimental support for explicit existential types">;
+
+def enable_experimental_opened_existential_types :
+  Flag<["-"], "enable-experimental-opened-existential-types">,
+  HelpText<"Enable experimental support for implicitly opened existentials">;
+
+def disable_experimental_opened_existential_types :
+  Flag<["-"], "disable-experimental-opened-existential-types">,
+  HelpText<"Disable experimental support for implicitly opened existentials">;
 
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
@@ -504,6 +567,17 @@ def disable_deserialization_recovery :
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
+def disable_experimental_string_processing :
+  Flag<["-"], "disable-experimental-string-processing">,
+  HelpText<"Disable experimental string processing">;
+
+def enable_experimental_variadic_generics :
+  Flag<["-"], "enable-experimental-variadic-generics">,
+  HelpText<"Enable experimental support for variadic generic types">;
+
+def enable_experimental_associated_type_inference :
+  Flag<["-"], "enable-experimental-associated-type-inference">,
+  HelpText<"Enable experimental associated type inference via type witness systems">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -558,6 +632,18 @@ def internalize_at_link : Flag<["-"], "internalize-at-link">,
 def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allow removal of runtime metadata records (public types, protocol conformances) based on whether they're used or unused">;
+
+def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Avoid preallocating metadata instantiation caches in globals">;
+
+def disable_readonly_static_objects : Flag<["-"], "disable-readonly-static-objects">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Avoid allocating static objects in a read-only data section">;
+
+def trap_function
+  : Separate<["-"], "trap-function">, MetaVarName<"<name>">,
+    HelpText<"Lower traps to calls to this function instead of trap instructions">;
 
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
@@ -749,9 +835,9 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
 def emit_syntax : Flag<["-"], "emit-syntax">,
   HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
 
-def enable_cxx_interop :
-  Flag<["-"], "enable-cxx-interop">,
-  HelpText<"Enable C++ interop code generation and config directives">,
+def cxx_interop_getters_setters_as_properties :
+  Flag<["-"], "cxx-interop-getters-setters-as-properties">,
+  HelpText<"Import getters and setters as computed properties in Swift">,
   Flags<[FrontendOption, HelpHidden]>;
 
 def use_malloc : Flag<["-"], "use-malloc">,
@@ -817,10 +903,6 @@ def experimental_print_full_convention :
 def experimental_one_way_closure_params :
   Flag<["-"], "experimental-one-way-closure-params">,
   HelpText<"Enable experimental support for one-way closure parameters">;
-
-def experimental_multi_statement_closures :
-  Flag<["-"], "experimental-multi-statement-closures">,
-  HelpText<"Enable experimental support for type inference in multi-statement closures">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
@@ -962,8 +1044,32 @@ def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
   HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
            "when optimizing ownership will be lowered before serializing SIL">;
 
+def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
+  HelpText<"Enable SIL Opaque Values">;
+
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
 
+def skip_import_in_public_interface:
+  Separate<["-"], "skip-import-in-public-interface">,
+  HelpText<"Skip the import statement corresponding to a module name "
+           "when printing the public interface.">;
+
+def clang_header_expose_public_decls:
+  Flag<["-"], "clang-header-expose-public-decls">,
+  HelpText<"Expose all public declarations in the generated clang header">,
+  Flags<[FrontendOption, HelpHidden]>;
+  
+def enable_ad_hoc_availability :
+  Flag<["-"], "enable-ad-hoc-availability">,
+  HelpText<"Enable experimental support for ad hoc availability">;
+
+def concurrency_model :
+    Separate<["-"], "concurrency-model">,
+    HelpText<"Which concurrency model is used.  Defaults to standard.">,
+    MetaVarName<"standard|task-to-thread">;
+def concurrency_model_EQ :
+    Joined<["-"], "concurrency-model=">,
+    Alias<concurrency_model>;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

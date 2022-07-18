@@ -52,7 +52,7 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   // frontend command.
   Args.push_back("-whole-module-optimization");
 
-  // Explictly disable batch mode to avoid a spurious warning when combining
+  // Explicitly disable batch mode to avoid a spurious warning when combining
   // -enable-batch-mode with -whole-module-optimization.  This is an
   // implementation detail.
   Args.push_back("-disable-batch-mode");
@@ -106,13 +106,16 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     return true; // Don't emit an error; one should already have been emitted
 
   SmallPtrSet<const Job *, 4> CompileCommands;
-  for (const Job *Cmd : C->getJobs())
-    if (isa<CompileJobAction>(Cmd->getSource()))
+  for (const Job *Cmd : C->getJobs()) {
+    if (isa<CompileJobAction>(Cmd->getSource())) {
       CompileCommands.insert(Cmd);
+    }
+  }
 
   if (CompileCommands.size() != 1) {
     // TODO: include Jobs in the diagnostic.
     Diags.diagnose(SourceLoc(), diag::error_expected_one_frontend_job);
+    return true;
   }
 
   const Job *Cmd = *CompileCommands.begin();

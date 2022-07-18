@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements diagnostics for @inlinable.
+// This file implements diagnostics for fragile functions, like those with
+// @inlinable, @_alwaysEmitIntoClient, or @_backDeploy.
 //
 //===----------------------------------------------------------------------===//
 
@@ -70,7 +71,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   auto diagName = D->getName();
   bool isAccessor = false;
 
-  // Swift 4.2 did not check accessor accessiblity.
+  // Swift 4.2 did not check accessor accessibility.
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
     isAccessor = true;
 
@@ -91,12 +92,9 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
 
-  Context.Diags.diagnose(
-           loc, diagID,
-           D->getDescriptiveKind(), diagName,
-           D->getFormalAccessScope().accessLevelForDiagnostics(),
-           static_cast<unsigned>(fragileKind.kind),
-           isAccessor);
+  Context.Diags.diagnose(loc, diagID, D->getDescriptiveKind(), diagName,
+                         D->getFormalAccessScope().accessLevelForDiagnostics(),
+                         fragileKind.getSelector(), isAccessor);
 
   if (fragileKind.allowUsableFromInline) {
     Context.Diags.diagnose(D, diag::resilience_decl_declared_here,
@@ -148,10 +146,18 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
 
     D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   } else {
-    ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
+    // Only implicitly imported decls should be reported as a warning,
+    // and only for language versions below Swift 6.
+    assert(downgradeToWarning == DowngradeToWarning::No ||
+           originKind == DisallowedOriginKind::ImplicitlyImported &&
+           "Only implicitly imported decls should be reported as a warning.");
+    auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
+                              diag::inlinable_decl_ref_from_hidden_module_warn:
+                              diag::inlinable_decl_ref_from_hidden_module;
+
+    ctx.Diags.diagnose(loc, errorOrWarning,
                        D->getDescriptiveKind(), D->getName(),
-                       static_cast<unsigned>(fragileKind.kind),
-                       definingModule->getName(),
+                       fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind));
   }
   return true;
@@ -161,7 +167,8 @@ bool
 TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                                               const RootProtocolConformance *rootConf,
                                               const ExtensionDecl *ext,
-                                              const ExportContext &where) {
+                                              const ExportContext &where,
+                                              bool useConformanceAvailabilityErrorsOption) {
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
@@ -181,6 +188,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      rootConf->getProtocol()->getName(),
                      static_cast<unsigned>(*reason),
                      M->getName(),
-                     static_cast<unsigned>(originKind));
+                     static_cast<unsigned>(originKind))
+      .warnUntilSwiftVersionIf(useConformanceAvailabilityErrorsOption &&
+                               !ctx.LangOpts.EnableConformanceAvailabilityErrors,
+                               6);
   return true;
 }

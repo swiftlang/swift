@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This file defines extensions for interpolating strings into an OSLogMesage.
+// This file defines extensions for interpolating strings into an OSLogMessage.
 // It defines `appendInterpolation` function for String type. It also defines
 // extensions for serializing strings into the argument buffer passed to
 // os_log ABIs. Note that os_log requires passing a stable pointer to an
@@ -21,6 +21,8 @@
 //
 //  1.  "\(x, privacy: .private, align: .right\)"
 //  2.  "\(x, align: .right(columns: 10)\)"
+
+import ObjectiveC
 
 extension OSLogInterpolation {
 
@@ -169,7 +171,7 @@ internal func serialize(
 }
 
 /// Return a pointer that points to a contiguous sequence of null-terminated,
-/// UTF8 charcters. If necessary, extends the lifetime of `stringValue` by
+/// UTF8 characters. If necessary, extends the lifetime of `stringValue` by
 /// using `stringArgumentOwners`.
 @_alwaysEmitIntoClient
 @inline(never)

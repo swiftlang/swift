@@ -35,7 +35,7 @@ namespace swift {
 /// access by a cancelling thread.  In particular, the chain of
 /// status records must not be disturbed.  When the task leaves
 /// the scope that requires the status record, the record can
-/// be unregistered from the task with `swift_task_removeStatusRecord`,
+/// be unregistered from the task with `removeStatusRecord`,
 /// at which point the memory can be returned to the system.
 class TaskStatusRecord {
 public:
@@ -164,14 +164,21 @@ public:
 /// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
 class TaskGroupTaskStatusRecord : public TaskStatusRecord {
   AsyncTask *FirstChild;
+  AsyncTask *LastChild;
 
 public:
   TaskGroupTaskStatusRecord()
-      : TaskStatusRecord(TaskStatusRecordKind::TaskGroup), FirstChild(nullptr) {
+      : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
+        FirstChild(nullptr),
+        LastChild(nullptr) {
   }
 
   TaskGroupTaskStatusRecord(AsyncTask *child)
-      : TaskStatusRecord(TaskStatusRecordKind::TaskGroup), FirstChild(child) {}
+      : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
+        FirstChild(child),
+        LastChild(child) {
+    assert(!LastChild || !LastChild->childFragment()->getNextChild());
+  }
 
   TaskGroup *getGroup() { return reinterpret_cast<TaskGroup *>(this); }
 
@@ -185,38 +192,28 @@ public:
     assert(child->hasGroupChildFragment());
     assert(child->groupChildFragment()->getGroup() == getGroup());
 
+    auto oldLastChild = LastChild;
+    LastChild = child;
+    
     if (!FirstChild) {
       // This is the first child we ever attach, so store it as FirstChild.
       FirstChild = child;
       return;
     }
 
-    // We need to traverse the siblings to find the last one and add the child
-    // there.
-    // FIXME: just set prepend to the current head, no need to traverse.
-
-    auto cur = FirstChild;
-    while (cur) {
-      // no need to check hasChildFragment, all tasks we store here have them.
-      auto fragment = cur->childFragment();
-      if (auto next = fragment->getNextChild()) {
-        cur = next;
-      } else {
-        // we're done searching and `cur` is the last
-        break;
-      }
-    }
-
-    cur->childFragment()->setNextChild(child);
+    oldLastChild->childFragment()->setNextChild(child);
   }
 
   void detachChild(AsyncTask *child) {
     assert(child && "cannot remove a null child from group");
     if (FirstChild == child) {
       FirstChild = getNextChildTask(child);
+      if (FirstChild == nullptr) {
+        LastChild = nullptr;
+      }
       return;
     }
-
+    
     AsyncTask *prev = FirstChild;
     // Remove the child from the linked list, i.e.:
     //     prev -> afterPrev -> afterChild
@@ -230,6 +227,9 @@ public:
       if (afterPrev == child) {
         auto afterChild = getNextChildTask(child);
         prev->childFragment()->setNextChild(afterChild);
+        if (child == LastChild) {
+          LastChild = prev;
+        }
         return;
       }
 
@@ -256,7 +256,7 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeStatusRecord` and freely
+/// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
@@ -284,7 +284,7 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeStatusRecord` and freely
+/// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {

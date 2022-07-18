@@ -194,16 +194,6 @@ class AbstractionPattern {
     /// non-static member function. OrigType is valid and is a function type.
     /// CXXMethod is valid.
     PartialCurriedCXXMethodType,
-    /// The uncurried imported type of a C++ operator non-static member
-    /// function. OrigType is valid and is a function type. CXXMethod is valid.
-    CXXOperatorMethodType,
-    /// The curried imported type of a C++ operator non-static member function.
-    /// OrigType is valid and is a function type. CXXMethod is valid.
-    CurriedCXXOperatorMethodType,
-    /// The partially-applied curried imported type of a C++ operator non-static
-    /// member function. OrigType is valid and is a function type. CXXMethod is
-    /// valid.
-    PartialCurriedCXXOperatorMethodType,
     /// A Swift function whose parameters and results are opaque. This is
     /// like `AP::Type<T>((T) -> T)`, except that the number of parameters is
     /// unspecified.
@@ -470,9 +460,6 @@ class AbstractionPattern {
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
       return true;
 
     default:
@@ -513,9 +500,6 @@ class AbstractionPattern {
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
       return true;
 
     default:
@@ -614,9 +598,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::ObjCCompletionHandlerArgumentsType:
       return true;
     case Kind::Invalid:
@@ -679,7 +660,7 @@ public:
   /// imported as a method.
   ///
   /// For example, if the original function is:
-  ///   void CCRefrigatorSetTemperature(CCRefrigeratorRef fridge,
+  ///   void CCRefrigeratorSetTemperature(CCRefrigeratorRef fridge,
   ///                                   CCRefrigeratorCompartment compartment,
   ///                                   CCTemperature temperature);
   /// then the uncurried type is:
@@ -699,7 +680,7 @@ public:
   /// C function imported as a method.
   ///
   /// For example, if the original function is:
-  ///   void CCRefrigatorSetTemperature(CCRefrigeratorRef fridge,
+  ///   void CCRefrigeratorSetTemperature(CCRefrigeratorRef fridge,
   ///                                   CCRefrigeratorCompartment compartment,
   ///                                   CCTemperature temperature);
   /// then the curried type is:
@@ -711,10 +692,6 @@ public:
   /// Return an abstraction pattern for the curried type of a C++ method.
   static AbstractionPattern
   getCurriedCXXMethod(CanType origType, const AbstractFunctionDecl *function);
-
-  static AbstractionPattern
-  getCurriedCXXOperatorMethod(CanType origType,
-                              const AbstractFunctionDecl *function);
 
   /// Return an abstraction pattern for the uncurried type of a C++ method.
   ///
@@ -733,16 +710,6 @@ public:
     return pattern;
   }
 
-  static AbstractionPattern
-  getCXXOperatorMethod(CanType origType, const clang::CXXMethodDecl *method,
-                       ImportAsMemberStatus memberStatus) {
-    assert(isa<AnyFunctionType>(origType));
-    AbstractionPattern pattern;
-    pattern.initCXXMethod(nullptr, origType, method,
-                          Kind::CXXOperatorMethodType, memberStatus);
-    return pattern;
-  }
-
   /// Return an abstraction pattern for the curried type of a C++ method.
   ///
   /// For example, if the original function is:
@@ -757,17 +724,6 @@ public:
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method,
                           Kind::CurriedCXXMethodType, memberStatus);
-    return pattern;
-  }
-
-  static AbstractionPattern
-  getCurriedCXXOperatorMethod(CanType origType,
-                              const clang::CXXMethodDecl *method,
-                              ImportAsMemberStatus memberStatus) {
-    assert(isa<AnyFunctionType>(origType));
-    AbstractionPattern pattern;
-    pattern.initCXXMethod(nullptr, origType, method,
-                          Kind::CurriedCXXOperatorMethodType, memberStatus);
     return pattern;
   }
 
@@ -840,7 +796,7 @@ private:
   /// type of a C function imported as a method.
   ///
   /// For example, if the original function is:
-  ///   CCRefrigatorSetTemperature(CCRefrigeratorRef, CCTemperature)
+  ///   CCRefrigeratorSetTemperature(CCRefrigeratorRef, CCTemperature)
   /// then the curried type is:
   ///   (CCRefrigerator) -> (CCTemperature) -> ()
   /// and the partially-applied curried type is:
@@ -874,18 +830,6 @@ private:
     AbstractionPattern pattern;
     pattern.initCXXMethod(signature, origType, method,
                           Kind::PartialCurriedCXXMethodType, memberStatus);
-    return pattern;
-  }
-
-  static AbstractionPattern
-  getPartialCurriedCXXOperatorMethod(CanGenericSignature signature,
-                                     CanType origType,
-                                     const clang::CXXMethodDecl *method,
-                                     ImportAsMemberStatus memberStatus) {
-    assert(isa<AnyFunctionType>(origType));
-    AbstractionPattern pattern;
-    pattern.initCXXMethod(signature, origType, method,
-                          Kind::PartialCurriedCXXOperatorMethodType, memberStatus);
     return pattern;
   }
 
@@ -981,7 +925,7 @@ public:
         return true;
       }
       if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-        return !isa<OpaqueTypeArchetypeType>(archetype->getRoot());
+        return !isa<OpaqueTypeArchetypeType>(archetype);
       }
       return false;
     }
@@ -1026,9 +970,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::Type:
     case Kind::Discard:
       return OrigType;
@@ -1065,9 +1006,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::Type:
     case Kind::Discard:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1106,9 +1044,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::ObjCCompletionHandlerArgumentsType:
       return true;
     }
@@ -1147,9 +1082,7 @@ public:
   /// If so, it is legal to call getCXXMethod().
   bool isCXXMethod() const {
     return (getKind() == Kind::CXXMethodType ||
-            getKind() == Kind::CurriedCXXMethodType ||
-            getKind() == Kind::CXXOperatorMethodType ||
-            getKind() == Kind::CurriedCXXOperatorMethodType);
+            getKind() == Kind::CurriedCXXMethodType);
   }
 
   const clang::CXXMethodDecl *getCXXMethod() const {
@@ -1184,9 +1117,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1224,9 +1154,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::Type:
     case Kind::Discard:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1256,9 +1183,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1289,9 +1213,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return false;
@@ -1320,9 +1241,6 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    case Kind::CXXOperatorMethodType:
-    case Kind::CurriedCXXOperatorMethodType:
-    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       llvm_unreachable("pattern is not a tuple");      
@@ -1336,6 +1254,14 @@ public:
     }
     llvm_unreachable("bad kind");
   }
+
+  /// Given that the value being abstracted is a move only type, return the
+  /// abstraction pattern with the move only bit removed.
+  AbstractionPattern removingMoveOnlyWrapper() const;
+
+  /// Given that the value being abstracted is not a move only type, return the
+  /// abstraction pattern with the move only bit added.
+  AbstractionPattern addingMoveOnlyWrapper() const;
 
   /// Given that the value being abstracted is a tuple type, return
   /// the abstraction pattern for its object type.
@@ -1360,6 +1286,10 @@ public:
   /// If this pattern refers to a reference storage type, look through
   /// it.
   AbstractionPattern getReferenceStorageReferentType() const;
+
+  /// Give that the value being abstracted is an existential, return the
+  /// underlying constraint type.
+  AbstractionPattern getExistentialConstraintType() const;
 
   /// Given that the value being abstracted is a function type, return the
   /// abstraction pattern for the derivative function.

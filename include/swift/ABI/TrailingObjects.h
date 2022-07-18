@@ -46,7 +46,7 @@
 /// determine the size needed for allocation via
 /// 'additionalSizeToAlloc' and 'totalSizeToAlloc'.
 ///
-/// All the methods implemented by this class are are intended for use
+/// All the methods implemented by this class are intended for use
 /// by the implementation of the class, not as part of its interface
 /// (thus, private inheritance is suggested).
 ///

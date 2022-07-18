@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -g -O -emit-sil | %FileCheck %s
 
-public enum BenchmarkCategory : String {
+public enum BenchmarkCategory {
   case validation
   case api, Array, String, Dictionary, Codable, Set, Data, IndexPath, SIMD
 }

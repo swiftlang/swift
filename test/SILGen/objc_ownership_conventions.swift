@@ -12,7 +12,7 @@ func test3() -> NSObject {
   // CHECK: [[GIZMO_NS:%[0-9]+]] = upcast [[GIZMO:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK: return [[GIZMO_NS]] : $NSObject
 
-  // CHECK-LABEL: sil shared [serializable] [ossa] @$sSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
+  // CHECK-LABEL: sil shared [serialized] [ossa] @$sSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
   // alloc is implicitly ns_returns_retained
   // init is implicitly ns_consumes_self and ns_returns_retained
   // CHECK: bb0([[GIZMO_META:%[0-9]+]] : $@thick Gizmo.Type):
@@ -33,7 +33,8 @@ func test5(_ g: Gizmo) {
   Gizmo.inspect(g)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
   // CHECK:   [[CLASS:%.*]] = metatype $@objc_metatype Gizmo.Type
@@ -43,6 +44,7 @@ func test5(_ g: Gizmo) {
   // CHECK:   [[METHOD:%.*]] = objc_method [[CLASS]] : {{.*}}, #Gizmo.inspect!foreign
   // CHECK:   apply [[METHOD]]([[G]], [[CLASS]])
   // CHECK:   destroy_value [[G]]
+  // CHECK:   end_borrow [[GIZMO_BOX_LIFETIME]]
   // CHECK:   destroy_value [[GIZMO_BOX]]
   // CHECK-NOT:   destroy_value [[ARG]]
 }
@@ -55,7 +57,8 @@ func test6(_ g: Gizmo) {
   Gizmo.consume(g)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
   // CHECK:   [[CLASS:%.*]] = metatype $@objc_metatype Gizmo.Type
@@ -65,6 +68,7 @@ func test6(_ g: Gizmo) {
   // CHECK:   [[METHOD:%.*]] = objc_method [[CLASS]] : {{.*}}, #Gizmo.consume!foreign
   // CHECK:   apply [[METHOD]]([[G]], [[CLASS]])
   // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   end_borrow [[GIZMO_BOX_LIFETIME]]
   // CHECK:   destroy_value [[GIZMO_BOX]]
   // CHECK-NOT:  destroy_value [[G]]
   // CHECK-NOT:   destroy_value [[ARG]]
@@ -79,7 +83,8 @@ func test7(_ g: Gizmo) {
   g.fork()
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[GIZMO_BOX_PB]] : $*Gizmo
@@ -87,6 +92,7 @@ func test7(_ g: Gizmo) {
   // CHECK:   [[METHOD:%.*]] = objc_method [[G]] : {{.*}}, #Gizmo.fork!foreign
   // CHECK:   apply [[METHOD]]([[G]])
   // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   end_borrow [[GIZMO_BOX_LIFETIME]]
   // CHECK:   destroy_value [[GIZMO_BOX]]
   // CHECK-NOT:  destroy_value [[G]]
   // CHECK-NOT:   destroy_value [[ARG]]

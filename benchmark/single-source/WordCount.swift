@@ -245,7 +245,7 @@ public func run_WordCountUniqueUTF16(_ n: Int) {
 }
 
 /// Returns an array of all words in the supplied string, along with their
-/// number of occurances. The array is sorted by decreasing frequency.
+/// number of occurrences. The array is sorted by decreasing frequency.
 /// (Words are case-sensitive and only support a limited subset of Unicode.)
 @inline(never)
 func histogram<S: Sequence>(for words: S) -> [(String, Int)]

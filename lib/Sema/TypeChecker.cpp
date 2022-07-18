@@ -264,6 +264,37 @@ void swift::performTypeChecking(SourceFile &SF) {
                                  TypeCheckSourceFileRequest{&SF}, {});
 }
 
+/// If any of the imports in this source file was @preconcurrency but
+/// there were no diagnostics downgraded or suppressed due to that
+/// @preconcurrency, suggest that the attribute be removed.
+static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
+  switch (sf.Kind) {
+  case SourceFileKind::Interface:
+  case SourceFileKind::SIL:
+    return;
+
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    break;
+  }
+
+  ASTContext &ctx = sf.getASTContext();
+
+  if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
+    return;
+
+  for (const auto &import : sf.getImports()) {
+    if (import.options.contains(ImportFlags::Preconcurrency) &&
+        import.importLoc.isValid() &&
+        !sf.hasImportUsedPreconcurrency(import)) {
+      ctx.Diags.diagnose(
+          import.importLoc, diag::remove_predates_concurrency_import,
+          import.module.importedModule->getName())
+        .fixItRemove(import.preconcurrencyRange);
+    }
+  }
+}
+
 evaluator::SideEffect
 TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
@@ -304,6 +335,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
     typeCheckDelayedFunctions(*SF);
   }
+
+  diagnoseUnnecessaryPreconcurrencyImports(*SF);
 
   // Check to see if there's any inconsistent @_implementationOnly imports.
   evaluateOrDefault(
@@ -350,7 +383,7 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if `AdditiveArithmetic` derived conformances are explicitly
   // enabled.
-  if (ctx.LangOpts.EnableExperimentalAdditiveArithmeticDerivedConformances)
+  if (ctx.LangOpts.hasFeature(Feature::AdditiveArithmeticDerivedConformances))
     return true;
   // Otherwise, return true iff differentiable programming is enabled.
   // Differentiable programming depends on `AdditiveArithmetic` derived
@@ -435,7 +468,7 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
   }
 
   auto request = InferredGenericSignatureRequest{
-      DC->getParentModule(), /*parentSig=*/nullptr,
+      /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, /*allowConcreteGenericParams=*/true};
   auto sig = evaluateOrDefault(DC->getASTContext().evaluator, request,
@@ -461,12 +494,20 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                        /*patternType=*/Type(), options);
 }
 
-bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
-  auto &Ctx = DC->getASTContext();
+bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                                  SourceLoc TargetLoc) {
+  auto &Ctx = TypeCheckCtx.getDeclContext()->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  return !evaluateOrDefault(Ctx.evaluator,
-                            TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
-                            true);
+  return !evaluateOrDefault(
+      Ctx.evaluator, TypeCheckASTNodeAtLocRequest{TypeCheckCtx, TargetLoc},
+      true);
+}
+
+bool swift::typeCheckForCodeCompletion(
+    constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+    llvm::function_ref<void(const constraints::Solution &)> callback) {
+  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
+                                                 callback);
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
@@ -479,9 +520,7 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
 
   StringRef Str = Name.getIdentifier().str();
   if (Str.startswith(C.TypeCheckerOpts.DebugForbidTypecheckPrefix)) {
-    std::string Msg = "forbidden typecheck occurred: ";
-    Msg += Str;
-    llvm::report_fatal_error(Msg);
+    llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
   }
 }
 
@@ -519,6 +558,12 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                               Optional<FunctionTypeRepr *>repr,
                                               DeclContext *dc,
                                               Optional<TypeResolutionStage> stage) {
+  // Some of the below checks trigger cycles if we don't have a generic
+  // signature yet; we'll run the checks again in
+  // TypeResolutionStage::Interface.
+  if (stage == TypeResolutionStage::Structural)
+    return false;
+
   // If the type has a placeholder, don't try to diagnose anything now since
   // we'll produce a better diagnostic when (if) the expression successfully
   // typechecks.
@@ -558,8 +603,7 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
 
   // `@differentiable` function types must return a differentiable type and have
   // differentiable (or `@noDerivative`) parameters.
-  if (extInfo.isDifferentiable() &&
-      stage != TypeResolutionStage::Structural) {
+  if (extInfo.isDifferentiable()) {
     auto result = fnTy->getResult();
     auto params = fnTy->getParams();
     auto diffKind = extInfo.getDifferentiabilityKind();

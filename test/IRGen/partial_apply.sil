@@ -848,3 +848,20 @@ entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
   %40 = tuple()
   return %40 : $()
 }
+
+// Test that we don't have an alloc object with 0, because that is not allowed
+// CHECK-LABEL: define{{.*}} swiftcc void @my_test_case
+// CHECK-NOT: swift_allocObject
+// CHECK: ret
+sil @take_empty : $@convention(thin) (@in_guaranteed EmptyType) -> ()
+sil @my_test_case : $@convention(thin)  () -> () {
+entry:
+  %5 = alloc_stack $EmptyType
+  // store % to %5
+  %f = function_ref @take_empty : $@convention(thin) (@in_guaranteed EmptyType) -> ()
+  %36 = partial_apply [callee_guaranteed] %f(%5) : $@convention(thin) (@in_guaranteed EmptyType) -> ()
+  release_value %36: $@callee_guaranteed () ->()
+  dealloc_stack %5 : $*EmptyType
+  %t = tuple()
+  return %t : $()
+}

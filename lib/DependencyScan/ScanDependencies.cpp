@@ -47,6 +47,7 @@
 
 using namespace swift;
 using namespace swift::dependencies;
+using namespace swift::c_string_utils;
 using namespace llvm::yaml;
 
 namespace {
@@ -244,7 +245,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
   return std::vector<ModuleDependencyID>(result.begin(), result.end());
 }
 
-static void discoverCrosssImportOverlayDependencies(
+static void discoverCrossImportOverlayDependencies(
     CompilerInstance &instance, StringRef mainModuleName,
     ArrayRef<ModuleDependencyID> allDependencies,
     ModuleDependenciesCache &cache, InterfaceSubContextDelegate &ASTDelegate,
@@ -315,7 +316,7 @@ static void discoverCrosssImportOverlayDependencies(
                   std::set<ModuleDependencyID>>
       allModules;
 
-  // Seed the all module list from the dummpy main module.
+  // Seed the all module list from the dummy main module.
   allModules.insert({dummyMainName.str(), dummyMainDependencies.getKind()});
 
   // Explore the dependencies of every module.
@@ -332,6 +333,19 @@ static void discoverCrosssImportOverlayDependencies(
                 allModules.end(), action);
 }
 
+namespace {
+std::string quote(StringRef unquoted) {
+  llvm::SmallString<128> buffer;
+  llvm::raw_svector_ostream os(buffer);
+  for (const auto ch : unquoted) {
+    if (ch == '\\')
+      os << '\\';
+    os << ch;
+  }
+  return buffer.str().str();
+}
+}
+
 /// Write a single JSON field.
 template <typename T>
 void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
@@ -342,14 +356,14 @@ void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
 void writeJSONValue(llvm::raw_ostream &out, StringRef value,
                     unsigned indentLevel) {
   out << "\"";
-  out << value;
+  out << quote(value);
   out << "\"";
 }
 
 void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_ref_t value,
                     unsigned indentLevel) {
   out << "\"";
-  out << get_C_string(value);
+  out << quote(get_C_string(value));
   out << "\"";
 }
 
@@ -615,7 +629,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &arg =
               get_C_string(swiftTextualDeps->command_line->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << arg << "\"";
+          out << "\"" << quote(arg) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";
@@ -630,7 +644,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &candidate = get_C_string(
               swiftTextualDeps->compiled_module_candidates->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << candidate << "\"";
+          out << "\"" << quote(candidate) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";
@@ -654,7 +668,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &arg =
               get_C_string(swiftTextualDeps->extra_pcm_args->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << arg << "\"";
+          out << "\"" << quote(arg) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";
@@ -795,8 +809,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
                                         module.first,
                                         {module.second, currentImportPathSet});
     if (!moduleDepsQuery) {
-      std::string err = "Module Dependency Cache missing module" + module.first;
-      llvm::report_fatal_error(err);
+      llvm::report_fatal_error(Twine("Module Dependency Cache missing module") +
+                               module.first);
     }
 
     auto moduleDeps = *moduleDepsQuery;
@@ -1010,9 +1024,9 @@ static void updateCachedInstanceOpts(CompilerInstance &cachedInstance,
   cachedInstance.getASTContext().SearchPathOpts =
       invocationInstance.getASTContext().SearchPathOpts;
 
-  // The Clang Importer arguments must consiste of a combination of
+  // The Clang Importer arguments must consist of a combination of
   // Clang Importer arguments of the current invocation to inherit its Clang-specific
-  // search path options, followed by the options speicific to the given batch-entry,
+  // search path options, followed by the options specific to the given batch-entry,
   // which may overload some of the invocation's options (e.g. target)
   cachedInstance.getASTContext().ClangImporterOpts =
       invocationInstance.getASTContext().ClangImporterOpts;
@@ -1039,7 +1053,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
                   llvm::function_ref<void(BatchScanInput, CompilerInstance &,
                                           ModuleDependenciesCache &)>
                       scanningAction) {
-  const CompilerInvocation &invok = invocationInstance.getInvocation();
+  const CompilerInvocation &invoke = invocationInstance.getInvocation();
   bool localSubInstanceMap = false;
   CompilerArgInstanceCacheMap *subInstanceMap;
   if (versionedPCMInstanceCache)
@@ -1068,7 +1082,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       // those of the current scanner invocation.
       updateCachedInstanceOpts(*pInstance, invocationInstance, entry.arguments);
     } else {
-      // We must reset option occurences because we are handling an unrelated command-line
+      // We must reset option occurrences because we are handling an unrelated command-line
       // to those parsed before. We must do so because LLVM options parsing is done
       // using a managed static `GlobalParser`.
       llvm::cl::ResetAllOptionOccurrences();
@@ -1086,15 +1100,15 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       pCache = std::get<2>((*subInstanceMap)[entry.arguments]).get();
       SmallVector<const char *, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
-      CompilerInvocation subInvok = invok;
+      CompilerInvocation subInvoke = invoke;
       pInstance->addDiagnosticConsumer(&FDC);
-      if (subInvok.parseArgs(args, diags)) {
+      if (subInvoke.parseArgs(args, diags)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
       std::string InstanceSetupError;
-      if (pInstance->setup(subInvok, InstanceSetupError)) {
+      if (pInstance->setup(subInvoke, InstanceSetupError)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
@@ -1209,7 +1223,7 @@ static void deserializeDependencyCache(CompilerInstance &instance,
   auto loadPath = opts.SerializedDependencyScannerCachePath;
   if (module_dependency_cache_serialization::readInterModuleDependenciesCache(
           loadPath, cache)) {
-    Context.Diags.diagnose(SourceLoc(), diag::warn_scaner_deserialize_failed,
+    Context.Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed,
                            loadPath);
   } else if (opts.EmitDependencyScannerCacheRemarks) {
     Context.Diags.diagnose(SourceLoc(), diag::remark_reuse_cache, loadPath);
@@ -1420,13 +1434,13 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   }
 
   // We have all explicit imports now, resolve cross import overlays.
-  discoverCrosssImportOverlayDependencies(
+  discoverCrossImportOverlayDependencies(
       instance, mainModuleName,
       /*All transitive dependencies*/ allModules.getArrayRef().slice(1), cache,
       ASTDelegate, [&](ModuleDependencyID id) { allModules.insert(id); },
       currentImportPathSet);
 
-  // Dignose cycle in dependency graph.
+  // Diagnose cycle in dependency graph.
   if (diagnoseCycle(instance, cache, /*MainModule*/ allModules.front(),
                     ASTDelegate))
     return std::make_error_code(std::errc::not_supported);

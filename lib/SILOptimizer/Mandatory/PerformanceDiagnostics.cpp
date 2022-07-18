@@ -53,9 +53,17 @@ public:
   PerformanceDiagnostics(SILModule &module, BasicCalleeAnalysis *bca) :
     module(module), bca(bca) {}
 
+  /// Check a function with performance annotation(s) and all called functions
+  /// recursively.
   bool visitFunction(SILFunction *function, PerformanceConstraints perfConstr) {
     return visitFunction(function, perfConstr, /*parentLoc*/ nullptr);
   }
+
+  /// Check functions _without_ performance annotations.
+  ///
+  /// This is need to check closure arguments of called performance-annotated
+  /// functions.
+  void checkNonAnnotatedFunction(SILFunction *function);
 
 private:
   bool visitFunction(SILFunction *function, PerformanceConstraints perfConstr,
@@ -64,8 +72,29 @@ private:
   bool visitInst(SILInstruction *inst, PerformanceConstraints perfConstr,
                     LocWithParent *parentLoc);
 
-  bool visitCallee(FullApplySite as, PerformanceConstraints perfConstr,
-                      LocWithParent *parentLoc);
+  /// Check if `as` has any non-escaping closure arguments and if all those
+  /// passed closures meet the `perfConstr`.
+  ///
+  /// If `acceptFunctionArgs` is true it is assumed that calls to the function,
+  /// which contains `as`, are already checked to have correct closure arguments.
+  bool checkClosureArguments(ApplySite as,
+                             bool acceptFunctionArgs,
+                             PerformanceConstraints perfConstr,
+                             LocWithParent *parentLoc);
+
+  /// Check if `closure` meets the `perfConstr`.
+  ///
+  /// If `acceptFunctionArgs` is true it is assumed that calls to the function,
+  /// which contains `callInst`, are already checked to have correct closure
+  /// arguments.
+  bool checkClosureValue(SILValue closure,
+                         bool acceptFunctionArgs,
+                         SILInstruction *callInst,
+                         PerformanceConstraints perfConstr,
+                         LocWithParent *parentLoc);
+
+  bool visitCallee(SILInstruction *callInst, CalleeList callees,
+                   PerformanceConstraints perfConstr, LocWithParent *parentLoc);
                       
   template<typename ...ArgTypes>
   void diagnose(LocWithParent loc, Diag<ArgTypes...> ID,
@@ -90,6 +119,9 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
 bool PerformanceDiagnostics::visitFunction(SILFunction *function,
                                               PerformanceConstraints perfConstr,
                                               LocWithParent *parentLoc) {
+  if (!function->isDefinition())
+    return false;
+
   ReachingReturnBlocks rrBlocks(function);
   NonErrorHandlingBlocks neBlocks(function);
                                        
@@ -104,22 +136,110 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
         if (isEffectFreeArraySemanticCall(&inst))
           continue;
 
-        // Recursively walk into the callees.
-        if (visitCallee(as,  perfConstr, parentLoc))
+        // Check if closures, which are passed to `as` are okay.
+        if (checkClosureArguments(as, /*acceptFunctionArgs=*/ true,
+                                  perfConstr, parentLoc)) {
           return true;
+        }
+
+        if (as.getOrigCalleeType()->isNoEscape()) {
+          // This is a call of a non-escaping closure. Check if the closure is
+          // okay. In this case we don't need to `visitCallee`.
+          if (checkClosureValue(as.getCallee(), /*acceptFunctionArgs=*/ true,
+                                &inst, perfConstr, parentLoc)) {
+            return true;
+          }
+          continue;
+        }
+
+        // Recursively walk into the callees.
+        if (visitCallee(&inst, bca->getCalleeList(as), perfConstr, parentLoc))
+          return true;
+      } else if (auto *bi = dyn_cast<BuiltinInst>(&inst)) {
+        switch (bi->getBuiltinInfo().ID) {
+          case BuiltinValueKind::Once:
+          case BuiltinValueKind::OnceWithContext:
+            if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
+              if (visitCallee(bi, fri->getReferencedFunction(), perfConstr, parentLoc))
+                return true;
+            } else {
+              LocWithParent loc(inst.getLoc().getSourceLoc(), parentLoc);
+              diagnose(loc, diag::performance_unknown_callees);
+              return true;
+            }
+            break;
+          default:
+            break;
+        }
       }
     }
   }
   return false;
 }
 
-bool PerformanceDiagnostics::visitCallee(FullApplySite as,
+bool PerformanceDiagnostics::checkClosureArguments(ApplySite as,
+                                            bool acceptFunctionArgs,
                                             PerformanceConstraints perfConstr,
                                             LocWithParent *parentLoc) {
-  CalleeList callees = bca->getCalleeList(as);
-  LocWithParent asLoc(as.getLoc().getSourceLoc(), parentLoc);
+  if (SILFunction *knownCallee = as.getReferencedFunctionOrNull()) {
+    if (knownCallee->hasSemanticsAttr(semantics::NO_PERFORMANCE_ANALYSIS))
+      return false;
+  }
+
+  for (SILValue arg : as.getArguments()) {
+    auto fTy = arg->getType().getAs<SILFunctionType>();
+    if (!fTy || !fTy->isNoEscape())
+      continue;
+
+    if (checkClosureValue(arg, acceptFunctionArgs, as.getInstruction(),
+                          perfConstr, parentLoc)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
+                                            bool acceptFunctionArgs,
+                                            SILInstruction *callInst,
+                                            PerformanceConstraints perfConstr,
+                                            LocWithParent *parentLoc) {
+  // Walk through the definition of the closure until we find the "underlying"
+  // function_ref instruction.
+  while (!isa<FunctionRefInst>(closure)) {
+    if (auto *pai = dyn_cast<PartialApplyInst>(closure)) {
+      if (checkClosureArguments(ApplySite::isa(pai), acceptFunctionArgs,
+                                perfConstr, parentLoc)) {
+        return true;
+      }
+      closure = pai->getCallee();
+    } else if (auto *tfi = dyn_cast<ThinToThickFunctionInst>(closure)) {
+      closure = tfi->getOperand();
+    } else if (acceptFunctionArgs && isa<SILFunctionArgument>(closure)) {
+      // We can assume that a function closure argument is already checked at
+      // the call site.
+      return false;
+    } else {
+      diagnose(LocWithParent(callInst->getLoc().getSourceLoc(), parentLoc), diag::performance_unknown_callees);
+      return true;
+    }
+  }
+  // Check what's happening inside the closure body.
+  auto *fri = cast<FunctionRefInst>(closure);
+  if (visitCallee(callInst, fri->getReferencedFunction(),
+                  perfConstr, parentLoc)) {
+    return true;
+  }
+  return false;
+}
+
+bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
+                                         CalleeList callees,
+                                         PerformanceConstraints perfConstr,
+                                         LocWithParent *parentLoc) {
+  LocWithParent asLoc(callInst->getLoc().getSourceLoc(), parentLoc);
   LocWithParent *loc = &asLoc;
-  if (parentLoc && asLoc.loc == as.getFunction()->getLocation().getSourceLoc())
+  if (parentLoc && asLoc.loc == callInst->getFunction()->getLocation().getSourceLoc())
     loc = parentLoc;
 
   if (callees.isIncomplete()) {
@@ -152,6 +272,26 @@ bool PerformanceDiagnostics::visitCallee(FullApplySite as,
       return true;
   }
   return false;
+}
+
+static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
+  for (Operand *use : mt->getUses()) {
+    if (auto  *bi = dyn_cast<BuiltinInst>(use->getUser())) {
+      switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::Sizeof:
+        case BuiltinValueKind::Strideof:
+        case BuiltinValueKind::Alignof:
+        case BuiltinValueKind::IsPOD:
+        case BuiltinValueKind::IsConcrete:
+        case BuiltinValueKind::IsBitwiseTakable:
+          continue;
+        default:
+          break;
+      }
+    }
+    return false;
+  }
+  return true;
 }
 
 bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
@@ -191,6 +331,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       diagnose(loc, diag::performance_metadata, "generic function calls");
       break;
     }
+    case SILInstructionKind::MetatypeInst:
+      if (metatypeUsesAreNotRelevant(cast<MetatypeInst>(inst)))
+        break;
+      LLVM_FALLTHROUGH;
     default:
       // We didn't recognize the instruction, so try to give an error message
       // based on the involved type.
@@ -270,6 +414,33 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   return false;
 }
 
+void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
+  for (SILBasicBlock &block : *function) {
+    for (SILInstruction &inst : block) {
+      auto as = FullApplySite::isa(&inst);
+      if (!as)
+        continue;
+        
+      // We only consider direct calls.
+      // TODO: this is a hole in the verification because we are not catching
+      // cases where a "bad" closure is passed to a performance-annotated
+      // v-table, witness table or closure function.
+      SILFunction *callee = as.getReferencedFunctionOrNull();
+      if (!callee)
+        continue;
+
+      if (callee->getPerfConstraints() == PerformanceConstraints::None)
+        continue;
+
+      if (checkClosureArguments(as, /*acceptFunctionArgs=*/ false,
+                                callee->getPerfConstraints(),
+                                /*LocWithParent*/ nullptr)) {
+        return;
+      }
+    }
+  }
+}
+
 void PerformanceDiagnostics::diagnose(LocWithParent loc, Diagnostic &&D) {
   // Start with a valid location in the call tree.
   LocWithParent *validLoc = &loc;
@@ -303,13 +474,16 @@ private:
     SILModule *module = getModule();
 
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
+    bool annotatedFunctionsFound = false;
 
     for (SILFunction &function : *module) {
-      // Don't rerun diagnostics on deserialized functions.
-      if (function.wasDeserializedCanonical())
-        continue;
-
       if (function.getPerfConstraints() != PerformanceConstraints::None) {
+        annotatedFunctionsFound = true;
+      
+        // Don't rerun diagnostics on deserialized functions.
+        if (function.wasDeserializedCanonical())
+          continue;
+
         if (!module->getOptions().EnablePerformanceAnnotations) {
           module->getASTContext().Diags.diagnose(
             function.getLocation().getSourceLoc(),
@@ -318,6 +492,19 @@ private:
         }
 
         diagnoser.visitFunction(&function, function.getPerfConstraints());
+      }
+    }
+
+    if (!annotatedFunctionsFound)
+      return;
+
+    for (SILFunction &function : *module) {
+      // Don't rerun diagnostics on deserialized functions.
+      if (function.wasDeserializedCanonical())
+        continue;
+
+      if (function.getPerfConstraints() == PerformanceConstraints::None) {
+        diagnoser.checkNonAnnotatedFunction(&function);
       }
     }
   }

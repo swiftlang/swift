@@ -204,7 +204,7 @@ bb0(%arg0 : @owned $MyKlass, %arg1 : @owned $MyKlass, %arg2 : @owned $MyKlass):
   return %52 : $()
 }
 
-sil [ossa] @unkown_use : $@convention(thin) (@owned MyKlass) -> () {
+sil [ossa] @unknown_use : $@convention(thin) (@owned MyKlass) -> () {
 bb0(%arg0 : @owned $MyKlass):
   %0 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned _ContiguousArrayStorage<MyKlass>
   %1 = integer_literal $Builtin.Word, 1

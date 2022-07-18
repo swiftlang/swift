@@ -107,7 +107,7 @@ public class RemoveSetters {
   }
 }
 
-public protocol RequiementChanges {
+public protocol RequirementChanges {
   associatedtype addedTypeWithDefault = Int
   associatedtype addedTypeWithoutDefault
   func addedFunc()
@@ -115,7 +115,7 @@ public protocol RequiementChanges {
 }
 
 /// This protocol shouldn't be complained because its requirements are all derived.
-public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
+public protocol DerivedProtocolRequirementChanges: RequirementChanges {}
 
 public class SuperClassRemoval {}
 
@@ -224,8 +224,8 @@ public class Zoo {
   }
   @inlinable
   @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
-  public func getCurrentAnimalInlinable() -> some Animal {
-    return Dog()
+  public func getCurrentAnimalInlinable() -> [some Animal] {
+    return [Dog()]
   }
 }
 

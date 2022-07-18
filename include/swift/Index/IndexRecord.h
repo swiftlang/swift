@@ -14,6 +14,7 @@
 #define SWIFT_INDEX_INDEXRECORD_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/PathRemapper.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -33,22 +34,32 @@ namespace index {
 ///
 /// \param indexStorePath The location to write the indexing data to.
 ///
+/// \param indexClangModules If true, emit index data for imported clang modules
+/// (pcms).
+///
 /// \param indexSystemModules If true, emit index data for imported serialized
 /// swift system modules.
 ///
 /// \param skipStdlib If indexing system modules, don't index the standard
 /// library.
 ///
+/// \param includeLocals If true, emit index data for local definitions and
+/// references.
+///
 /// \param isDebugCompilation true for non-optimized compiler invocation.
 ///
 /// \param targetTriple The target for this compilation.
 ///
 /// \param dependencyTracker The set of dependencies seen while building.
+///
+/// \param pathRemapper Remapper to use for paths in index data.
 bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
-                    StringRef indexStorePath, bool indexSystemModules,
-                    bool skipStdlib, bool isDebugCompilation,
+                    StringRef indexStorePath, bool indexClangModules,
+                    bool indexSystemModules, bool skipStdlib,
+                    bool includeLocals, bool isDebugCompilation,
                     StringRef targetTriple,
-                    const DependencyTracker &dependencyTracker);
+                    const DependencyTracker &dependencyTracker,
+                    const PathRemapper &pathRemapper);
 
 /// Index the given module and store the results to \p indexStorePath.
 ///
@@ -65,22 +76,32 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
 ///
 /// \param indexStorePath The location to write the indexing data to.
 ///
+/// \param indexClangModules If true, emit index data for imported clang modules
+/// (pcms).
+///
 /// \param indexSystemModules If true, emit index data for imported serialized
 /// swift system modules.
 ///
 /// \param skipStdlib If indexing system modules, don't index the standard
 /// library.
 ///
+/// \param includeLocals If true, emit index data for local definitions and
+/// references.
+///
 /// \param isDebugCompilation true for non-optimized compiler invocation.
 ///
 /// \param targetTriple The target for this compilation.
 ///
 /// \param dependencyTracker The set of dependencies seen while building.
+///
+/// \param pathRemapper Remapper to use for paths in index data.
 bool indexAndRecord(ModuleDecl *module, ArrayRef<std::string> indexUnitTokens,
                     StringRef moduleUnitToken, StringRef indexStorePath,
-                    bool indexSystemModules, bool skipStdlib,
+                    bool indexClangModules, bool indexSystemModules,
+                    bool skipStdlib, bool includeLocals,
                     bool isDebugCompilation, StringRef targetTriple,
-                    const DependencyTracker &dependencyTracker);
+                    const DependencyTracker &dependencyTracker,
+                    const PathRemapper &pathRemapper);
 // FIXME: indexUnitTokens could be StringRef, but that creates an impedance
 // mismatch in the caller.
 

@@ -270,9 +270,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         capturedArgs.push_back(emitUndef(getLoweredType(type)));
         break;
       case CaptureKind::Immutable:
-      case CaptureKind::StorageAddress:
-        capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
+      case CaptureKind::StorageAddress: {
+        auto ty = getLoweredType(type);
+        if (SGM.M.useLoweredAddresses())
+          ty = ty.getAddressType();
+        capturedArgs.push_back(emitUndef(ty));
         break;
+      }
       case CaptureKind::Box: {
         auto boxTy = SGM.Types.getContextBoxTypeForCapture(
             vd,
@@ -290,13 +294,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
     auto getAddressValue = [&](SILValue entryValue) -> SILValue {
-      if (SGM.Types
-              .getTypeLowering(
-                  valueType,
-                  TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-                      expansion.getResilienceExpansion()))
-              .isAddressOnly() &&
-          !entryValue->getType().isAddress()) {
+      if (SGM.M.useLoweredAddresses()
+          && SGM.Types
+                 .getTypeLowering(
+                     valueType,
+                     TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                         expansion.getResilienceExpansion()))
+                 .isAddressOnly()
+          && !entryValue->getType().isAddress()) {
 
         auto addr = emitTemporaryAllocation(vd, entryValue->getType());
         auto val = B.emitCopyValueOperation(vd, entryValue);
@@ -343,13 +348,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     }
     case CaptureKind::Immutable: {
       if (canGuarantee) {
-        auto entryValue = getAddressValue(Entry.value);
         // No-escaping stored declarations are captured as the
         // address of the value.
-        assert(entryValue->getType().isAddress() && "no address for captured var!");
-        capturedArgs.push_back(ManagedValue::forLValue(entryValue));
+        auto entryValue = getAddressValue(Entry.value);
+        capturedArgs.push_back(ManagedValue::forBorrowedRValue(entryValue));
       }
-      else {
+      else if (!silConv.useLoweredAddresses()) {
+        capturedArgs.push_back(
+          B.createCopyValue(loc, ManagedValue::forUnmanaged(Entry.value)));
+      } else {
         auto entryValue = getAddressValue(Entry.value);
         // We cannot pass a valid SILDebugVariable while creating the temp here
         // See rdar://60425582
@@ -434,7 +441,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  SubstitutionMap subs,
                                  bool alreadyConverted) {
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
-
+  SGM.Types.setCaptureTypeExpansionContext(constant, SGM.M);
+  
   auto constantInfo = getConstantInfo(getTypeExpansionContext(), constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);
   SILType functionTy = functionRef->getType();
@@ -864,7 +872,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   entryBlock->createFunctionArgument(*std::next(paramTypeIter)); // argv
 
   // Lookup necessary functions
-  swift::ASTContext &ctx = entryPoint.getDecl()->getASTContext();
+  swift::ASTContext &ctx = entryPoint.getASTContext();
 
   B.setInsertionPoint(entryBlock);
 
@@ -880,7 +888,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   // Call CreateAsyncTask
   FuncDecl *builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(
-      getASTContext(),
+      ctx,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask))));
   auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
                                    {TupleType::getEmpty(ctx)},
@@ -922,36 +930,9 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
       JobType, {}, {task});
   jobResult = wrapCallArgs(jobResult, swiftJobRunFuncDecl, 0);
 
-  // Get main executor
-  FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
-  if (!getMainExecutorFuncDecl) {
-    // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
-    // up instead of crashing:
-    // @available(SwiftStdlib 5.1, *)
-    // @_silgen_name("swift_task_getMainExecutor")
-    // internal func _getMainExecutor() -> Builtin.Executor
+  ModuleDecl * moduleDecl = entryPoint.getModuleContext();
 
-    ParameterList *emptyParams = ParameterList::createEmpty(getASTContext());
-    getMainExecutorFuncDecl = FuncDecl::createImplicit(
-        getASTContext(), StaticSpellingKind::None,
-        DeclName(
-            getASTContext(),
-            DeclBaseName(getASTContext().getIdentifier("_getMainExecutor")),
-            /*Arguments*/ emptyParams),
-        {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
-        getASTContext().TheExecutorType,
-        entryPoint.getDecl()->getModuleContext());
-    getMainExecutorFuncDecl->getAttrs().add(
-        new (getASTContext())
-            SILGenNameAttr("swift_task_getMainExecutor", /*implicit*/ true));
-  }
-
-  SILFunction *getMainExeutorSILFunc = SGM.getFunction(
-      SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
-      NotForDefinition);
-  SILValue getMainExeutorFunc =
-      B.createFunctionRefFor(moduleLoc, getMainExeutorSILFunc);
-  SILValue mainExecutor = B.createApply(moduleLoc, getMainExeutorFunc, {}, {});
+  SILValue mainExecutor = emitMainExecutor(moduleLoc);
   mainExecutor = wrapCallArgs(mainExecutor, swiftJobRunFuncDecl, 1);
 
   // Run first part synchronously
@@ -972,8 +953,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
             DeclBaseName(getASTContext().getIdentifier("_asyncMainDrainQueue")),
             /*Arguments*/ emptyParams),
         {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
-        getASTContext().getNeverType(),
-        entryPoint.getDecl()->getModuleContext());
+        getASTContext().getNeverType(), moduleDecl);
     drainQueueFuncDecl->getAttrs().add(new (getASTContext()) SILGenNameAttr(
         "swift_task_asyncMainDrainQueue", /*implicit*/ true));
   }

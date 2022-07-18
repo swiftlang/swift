@@ -1,3 +1,10 @@
+# In some configurations (e.g. back deploy concurrency) we
+# configure the build from the root of the Swift repo but we skip
+# stdlib/CMakeLists.txt, with the risk of missing important parameters.
+# To account for this scenario, we include the stdlib options
+# before the guard
+include(${CMAKE_CURRENT_LIST_DIR}/../../stdlib/cmake/modules/StdlibOptions.cmake)
+
 # CMAKE_SOURCE_DIR is the directory that cmake got initially invoked on.
 # CMAKE_CURRENT_SOURCE_DIR is the current directory. If these are equal, it's
 # a top-level build of the CMAKE_SOURCE_DIR. Otherwise, define a guard variable
@@ -85,10 +92,6 @@ set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
 targets on Darwin platforms. These targets are in addition to the full \
 library targets.")
 
-option(SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS
-       "Build stdlib with fast-path context descriptor lookups based on well-known short manglings."
-       TRUE)
-
 # -----------------------------------------------------------------------------
 # Constants
 
@@ -129,7 +132,6 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(DarwinSDKs)
 
-find_package(Python2 COMPONENTS Interpreter REQUIRED)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 # Without this line, installing components is broken. This needs refactoring.

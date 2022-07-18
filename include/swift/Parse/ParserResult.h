@@ -168,7 +168,7 @@ public:
   }
 
   /// Return true if either 1) no errors were encountered while parsing this,
-  /// or 2) there were errors but the the parser already recovered from them.
+  /// or 2) there were errors but the parser already recovered from them.
   bool isSuccess() const { return !isError(); }
   bool isErrorOrHasCompletion() const { return IsError || IsCodeCompletion; }
 

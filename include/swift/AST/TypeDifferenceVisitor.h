@@ -130,6 +130,17 @@ public:
     return asImpl().visit(type1.getElementType(), type2.getElementType());
   }
 
+  bool visitPackType(CanPackType type1, CanPackType type2) {
+    return visitComponentArray(type1, type2,
+                               type1->getElementTypes(),
+                               type2->getElementTypes());
+  }
+
+  bool visitPackExpansionType(CanPackExpansionType type1,
+                              CanPackExpansionType type2) {
+    return asImpl().visit(type1.getPatternType(), type2.getPatternType());
+  }
+
   bool visitTupleType(CanTupleType type1, CanTupleType type2) {
     return visitComponentArray(type1, type2,
                                type1->getElements(), type2->getElements());
@@ -322,10 +333,24 @@ public:
     return asImpl().visit(type1->getCaptureType(), type2->getCaptureType());
   }
 
+  bool visitSILMoveOnlyWrappedType(CanSILMoveOnlyWrappedType type1,
+                                   CanSILMoveOnlyWrappedType type2) {
+    return asImpl().visit(type1->getInnerType(), type2->getInnerType());
+  }
+
   bool visitProtocolCompositionType(CanProtocolCompositionType type1,
                                     CanProtocolCompositionType type2) {
     return visitComponentArray(type1, type2,
                                type1->getMembers(), type2->getMembers());
+  }
+
+  bool visitParameterizedProtocolType(CanParameterizedProtocolType type1,
+                                      CanParameterizedProtocolType type2) {
+    if (asImpl().visit(type1.getBaseType(), type2.getBaseType()))
+      return true;
+
+    return visitComponentArray(type1, type2,
+                               type1->getArgs(), type2->getArgs());
   }
 
   bool visitExistentialType(CanExistentialType type1,

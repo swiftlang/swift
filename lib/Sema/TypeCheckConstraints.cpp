@@ -17,8 +17,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticSuppression.h"
@@ -28,7 +28,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/DenseMap.h"
@@ -54,7 +54,27 @@ using namespace constraints;
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
-  getTypeVariable()->print(OS, PrintOptions());
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  getTypeVariable()->print(OS, PO);
+  
+  SmallVector<TypeVariableOptions, 4> bindingOptions;
+  if (canBindToLValue())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
+  if (canBindToInOut())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToInOut);
+  if (canBindToNoEscape())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToNoEscape);
+  if (canBindToHole())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
+  if (!bindingOptions.empty()) {
+    OS << " [allows bindings to: ";
+    interleave(bindingOptions, OS,
+               [&](TypeVariableOptions option) {
+                  (OS << getTypeVariableOptions(option));},
+               ", ");
+               OS << "]";
+  }
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
@@ -122,6 +142,16 @@ bool TypeVariableType::Implementation::isSubscriptResultType() const {
 
   return isExpr<SubscriptExpr>(locator->getAnchor()) &&
          locator->isLastElement<LocatorPathElt::FunctionResult>();
+}
+
+bool TypeVariableType::Implementation::isTypeSequence() const {
+  return locator
+      && locator->isForGenericParameter()
+      && locator->getGenericParameter()->isTypeSequence();
+}
+
+bool TypeVariableType::Implementation::isCodeCompletionToken() const {
+  return locator && locator->directlyAt<CodeCompletionExpr>();
 }
 
 void *operator new(size_t bytes, ConstraintSystem& cs,
@@ -282,27 +312,35 @@ public:
 
 void constraints::performSyntacticDiagnosticsForTarget(
     const SolutionApplicationTarget &target,
-    bool isExprStmt, bool disableExprAvailabiltyChecking) {
+    bool isExprStmt, bool disableExprAvailabilityChecking) {
   auto *dc = target.getDeclContext();
   switch (target.kind) {
   case SolutionApplicationTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(target.getAsExpr(), dc,
-                                    isExprStmt, disableExprAvailabiltyChecking);
-
-    // If this is a for-in statement, we also need to check the where clause if
-    // present.
-    if (target.isForEachStmt()) {
-      if (auto *whereExpr = target.getForEachStmtInfo().whereExpr)
-        performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
-    }
+                                    isExprStmt, disableExprAvailabilityChecking);
     return;
   }
+
+  case SolutionApplicationTarget::Kind::forEachStmt: {
+    auto *stmt = target.getAsForEachStmt();
+
+    // First emit diagnostics for the main expression.
+    performSyntacticExprDiagnostics(stmt->getTypeCheckedSequence(), dc,
+                                    isExprStmt,
+                                    disableExprAvailabilityChecking);
+
+    if (auto *whereExpr = stmt->getWhere())
+      performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
+    return;
+  }
+
   case SolutionApplicationTarget::Kind::function: {
     FunctionSyntacticDiagnosticWalker walker(dc);
     target.getFunctionBody()->walk(walker);
     return;
   }
+  case SolutionApplicationTarget::Kind::closure:
   case SolutionApplicationTarget::Kind::stmtCondition:
   case SolutionApplicationTarget::Kind::caseLabelItem:
   case SolutionApplicationTarget::Kind::patternBinding:
@@ -330,34 +368,44 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   return expr->getType();
 }
 
+/// FIXME: In order to remote this function both \c FrontendStatsTracer
+/// and \c PrettyStackTrace* have to be updated to accept `ASTNode`
+// instead of each individual syntactic element types.
 Optional<SolutionApplicationTarget>
-TypeChecker::typeCheckExpression(
-    SolutionApplicationTarget &target,
-    TypeCheckExprOptions options) {
-  Expr *expr = target.getAsExpr();
+TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
+                                 TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats,
-                                  "typecheck-expr", expr);
-  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr",
+                                  target.getAsExpr());
+  PrettyStackTraceExpr stackTrace(Context, "type-checking", target.getAsExpr());
 
-  // First, pre-check the expression, validating any types that occur in the
+  return typeCheckTarget(target, options);
+}
+
+Optional<SolutionApplicationTarget>
+TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
+                             TypeCheckExprOptions options) {
+  DeclContext *dc = target.getDeclContext();
+  auto &Context = dc->getASTContext();
+  PrettyStackTraceLocation stackTrace(Context, "type-checking-target",
+                                      target.getLoc());
+
+  // First, pre-check the target, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckExpression(
-        expr, dc, /*replaceInvalidRefsWithErrors=*/true,
-        options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
-    target.setExpr(expr);
+  if (ConstraintSystem::preCheckTarget(
+          target, /*replaceInvalidRefsWithErrors=*/true,
+          options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
     return None;
   }
-  target.setExpr(expr);
 
-  // Check whether given expression has a code completion token which requires
+  // Check whether given target has a code completion token which requires
   // special handling.
   if (Context.CompletionCallback &&
-      typeCheckForCodeCompletion(target, /*needsPrecheck*/false,
+      typeCheckForCodeCompletion(target, /*needsPrecheck*/ false,
                                  [&](const constraints::Solution &S) {
-        Context.CompletionCallback->sawSolution(S);
-      }))
+                                   Context.CompletionCallback->sawSolution(S);
+                                 }))
     return None;
 
   // Construct a constraint system from this expression.
@@ -371,18 +419,18 @@ TypeChecker::typeCheckExpression(
 
   ConstraintSystem cs(dc, csOptions);
 
-  // Tell the constraint system what the contextual type is.  This informs
-  // diagnostics and is a hint for various performance optimizations.
-  cs.setContextualType(
-      expr,
-      target.getExprContextualTypeLoc(),
-      target.getExprContextualTypePurpose());
+  if (auto *expr = target.getAsExpr()) {
+    // Tell the constraint system what the contextual type is.  This informs
+    // diagnostics and is a hint for various performance optimizations.
+    cs.setContextualType(expr, target.getExprContextualTypeLoc(),
+                         target.getExprContextualTypePurpose());
 
-  // Try to shrink the system by reducing disjunction domains. This
-  // goes through every sub-expression and generate its own sub-system, to
-  // try to reduce the domains of those subexpressions.
-  cs.shrink(expr);
-  target.setExpr(expr);
+    // Try to shrink the system by reducing disjunction domains. This
+    // goes through every sub-expression and generate its own sub-system, to
+    // try to reduce the domains of those subexpressions.
+    cs.shrink(expr);
+    target.setExpr(expr);
+  }
 
   // If the client can handle unresolved type variables, leave them in the
   // system.
@@ -390,10 +438,8 @@ TypeChecker::typeCheckExpression(
 
   // Attempt to solve the constraint system.
   auto viable = cs.solve(target, allowFreeTypeVariables);
-  if (!viable) {
-    target.setExpr(expr);
+  if (!viable)
     return None;
-  }
 
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
@@ -406,7 +452,6 @@ TypeChecker::typeCheckExpression(
     // Failure already diagnosed, above, as part of applying the solution.
     return None;
   }
-  Expr *result = resultTarget->getAsExpr();
 
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
@@ -417,18 +462,269 @@ TypeChecker::typeCheckExpression(
         options.contains(TypeCheckExprFlags::DisableExprAvailabilityChecking));
   }
 
-  resultTarget->setExpr(result);
   return *resultTarget;
 }
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
                                             bool isAutoClosure) {
-  assert(paramType && !paramType->hasError());
-  return typeCheckExpression(defaultValue, DC, /*contextualInfo=*/
-                             {paramType, isAutoClosure
-                                             ? CTP_AutoclosureDefaultParameter
-                                             : CTP_DefaultParameter});
+  // During normal type checking we don't type check the parameter default if
+  // the param has an error type. For code completion, we also type check the
+  // parameter default because it might contain the code completion token.
+  assert(paramType &&
+         (!paramType->hasError() || DC->getASTContext().CompletionCallback));
+
+  auto &ctx = DC->getASTContext();
+
+  // First, let's try to type-check default expression using interface
+  // type of the parameter, if that succeeds - we are done.
+  SolutionApplicationTarget defaultExprTarget(
+      defaultValue, DC,
+      isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
+      paramType, /*isDiscarded=*/false);
+
+  auto paramInterfaceTy = paramType->mapTypeOutOfContext();
+
+  {
+    // Buffer all of the diagnostics produced by \c typeCheckExpression
+    // since in some cases we need to try type-checking again with a
+    // different contextual type, see below.
+    DiagnosticTransaction diagnostics(ctx.Diags);
+
+    // First, let's try to type-check default expression using
+    // archetypes, which guarantees that it would work for any
+    // substitution of the generic parameter (if they are involved).
+    if (auto result = typeCheckExpression(defaultExprTarget)) {
+      defaultValue = result->getAsExpr();
+      return defaultValue->getType();
+    }
+
+    // Caller-side defaults are always type-checked based on the concrete
+    // type of the argument deduced at a particular call site.
+    if (isa<MagicIdentifierLiteralExpr>(defaultValue))
+      return Type();
+
+    // Parameter type doesn't have any generic parameters mentioned
+    // in it, so there is nothing to infer.
+    if (!paramInterfaceTy->hasTypeParameter())
+      return Type();
+
+    // Ignore any diagnostics emitted by the original type-check.
+    diagnostics.abort();
+  }
+
+  // Let's see whether it would be possible to use default expression
+  // for generic parameter inference.
+  //
+  // First, let's check whether:
+  //  - Parameter type is a generic parameter; and
+  //  - It's only used in the current position in the parameter list
+  //    or result. This check makes sure that generic argument
+  //    could only come from an explicit argument or this expression.
+  //
+  // If both of aforementioned conditions are true, let's attempt
+  // to open generic parameter and infer the type of this default
+  // expression.
+  OpenedTypeMap genericParameters;
+
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::AllowFixes;
+
+  ConstraintSystem cs(DC, options);
+
+  auto *locator = cs.getConstraintLocator(
+      defaultValue, LocatorPathElt::ContextualType(
+                        defaultExprTarget.getExprContextualTypePurpose()));
+
+  auto getCanonicalGenericParamTy = [](GenericTypeParamType *GP) {
+    return cast<GenericTypeParamType>(GP->getCanonicalType());
+  };
+
+  // Find and open all of the generic parameters used by the parameter
+  // and replace them with type variables.
+  auto contextualTy = paramInterfaceTy.transform([&](Type type) -> Type {
+    assert(!type->is<UnboundGenericType>());
+
+    if (auto *GP = type->getAs<GenericTypeParamType>()) {
+      return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
+                                     locator);
+    }
+    return type;
+  });
+
+  auto containsTypes = [&](Type type, OpenedTypeMap &toFind) {
+    return type.findIf([&](Type nested) {
+      if (auto *GP = nested->getAs<GenericTypeParamType>())
+        return toFind.count(getCanonicalGenericParamTy(GP)) > 0;
+      return false;
+    });
+  };
+
+  auto containsGenericParamsExcluding = [&](Type type,
+                                            OpenedTypeMap &exclusions) -> bool {
+    return type.findIf([&](Type type) {
+      if (auto *GP = type->getAs<GenericTypeParamType>())
+        return !exclusions.count(getCanonicalGenericParamTy(GP));
+      return false;
+    });
+  };
+
+  // Anchor of this default expression i.e. function, subscript
+  // or enum case.
+  auto *anchor = cast<ValueDecl>(DC->getParent()->getAsDecl());
+
+  // Check whether generic parameters are only mentioned once in
+  // the anchor's signature.
+  {
+    auto anchorTy = anchor->getInterfaceType()->castTo<GenericFunctionType>();
+
+    // Reject if generic parameters are used in multiple different positions
+    // in the parameter list.
+
+    llvm::SmallVector<unsigned, 2> affectedParams;
+    for (unsigned i : indices(anchorTy->getParams())) {
+      const auto &param = anchorTy->getParams()[i];
+
+      if (containsTypes(param.getPlainType(), genericParameters))
+        affectedParams.push_back(i);
+    }
+
+    if (affectedParams.size() > 1) {
+      SmallString<32> paramBuf;
+      llvm::raw_svector_ostream params(paramBuf);
+
+      interleave(
+          affectedParams, [&](const unsigned index) { params << "#" << index; },
+          [&] { params << ", "; });
+
+      ctx.Diags.diagnose(
+          defaultValue->getLoc(),
+          diag::
+              cannot_default_generic_parameter_inferrable_from_another_parameter,
+          paramInterfaceTy, params.str());
+      return Type();
+    }
+  }
+
+  auto signature = DC->getGenericSignatureOfContext();
+  assert(signature && "generic parameter without signature?");
+
+  auto *requirementBaseLocator = cs.getConstraintLocator(
+      locator, LocatorPathElt::OpenedGeneric(signature));
+
+  // Let's check all of the requirements this parameter is involved in,
+  // If it's connected to any other generic types (directly or through
+  // a dependent member type), that means it could be inferred through
+  // them e.g. `T: X.Y` or `T == U`.
+  {
+    auto recordRequirement = [&](unsigned index, Requirement requirement,
+                                 ConstraintLocator *locator) {
+      cs.openGenericRequirement(DC->getParent(), index, requirement,
+                                /*skipSelfProtocolConstraint=*/false, locator,
+                                [&](Type type) -> Type {
+                                  return cs.openType(type, genericParameters);
+                                });
+    };
+
+    auto diagnoseInvalidRequirement = [&](Requirement requirement) {
+      SmallString<32> reqBuf;
+      llvm::raw_svector_ostream req(reqBuf);
+
+      requirement.print(req, PrintOptions());
+
+      ctx.Diags.diagnose(
+          defaultValue->getLoc(),
+          diag::cannot_default_generic_parameter_invalid_requirement,
+          paramInterfaceTy, req.str());
+    };
+
+    auto requirements = signature.getRequirements();
+    for (unsigned reqIdx = 0; reqIdx != requirements.size(); ++reqIdx) {
+      auto &requirement = requirements[reqIdx];
+
+      switch (requirement.getKind()) {
+      case RequirementKind::SameType: {
+        auto lhsTy = requirement.getFirstType();
+        auto rhsTy = requirement.getSecondType();
+
+        // Unrelated requirement.
+        if (!containsTypes(lhsTy, genericParameters) &&
+            !containsTypes(rhsTy, genericParameters))
+          continue;
+
+        // If both sides are dependent members, that's okay because types
+        // don't flow from member to the base e.g. `T.Element == U.Element`.
+        if (lhsTy->is<DependentMemberType>() &&
+            rhsTy->is<DependentMemberType>())
+          continue;
+
+        // Allow a subset of generic same-type requirements that only mention
+        // "in scope" generic parameters e.g. `T.X == Int` or `T == U.Z`
+        if (!containsGenericParamsExcluding(lhsTy, genericParameters) &&
+            !containsGenericParamsExcluding(rhsTy, genericParameters)) {
+          recordRequirement(reqIdx, requirement, requirementBaseLocator);
+          continue;
+        }
+
+        // If there is a same-type constraint that involves out of scope
+        // generic parameters mixed with in-scope ones, fail the type-check
+        // since the type could be inferred through other positions.
+        {
+          diagnoseInvalidRequirement(requirement);
+          return Type();
+        }
+      }
+
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+      case RequirementKind::Layout:
+        auto adheringTy = requirement.getFirstType();
+
+        // Unrelated requirement.
+        if (!containsTypes(adheringTy, genericParameters))
+          continue;
+
+        // If adhering type has a mix or in- and out-of-scope parameters
+        // mentioned we need to diagnose.
+        if (containsGenericParamsExcluding(adheringTy, genericParameters)) {
+          diagnoseInvalidRequirement(requirement);
+          return Type();
+        }
+
+        if (requirement.getKind() == RequirementKind::Superclass) {
+          auto superclassTy = requirement.getSecondType();
+
+          if (containsGenericParamsExcluding(superclassTy, genericParameters)) {
+            diagnoseInvalidRequirement(requirement);
+            return Type();
+          }
+        }
+
+        recordRequirement(reqIdx, requirement, requirementBaseLocator);
+        break;
+      }
+    }
+  }
+
+  defaultExprTarget.setExprConversionType(contextualTy);
+  cs.setContextualType(defaultValue,
+                       defaultExprTarget.getExprContextualTypeLoc(),
+                       defaultExprTarget.getExprContextualTypePurpose());
+
+  auto viable = cs.solve(defaultExprTarget, FreeTypeVariableBinding::Disallow);
+  if (!viable)
+    return Type();
+
+  auto &solution = (*viable)[0];
+
+  cs.applySolution(solution);
+
+  if (auto result = cs.applySolution(solution, defaultExprTarget)) {
+    defaultValue = result->getAsExpr();
+    return defaultValue->getType();
+  }
+
+  return Type();
 }
 
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
@@ -532,31 +828,6 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
-  // Bind a property with an opaque return type to the underlying type
-  // given by the initializer.
-  if (auto var = pattern->getSingleVar()) {
-    if (auto opaque = var->getOpaqueResultTypeDecl()) {
-      init->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
-          auto underlyingType =
-              coercionExpr->getSubExpr()->getType()->mapTypeOutOfContext();
-          auto underlyingSubs = SubstitutionMap::get(
-              opaque->getOpaqueInterfaceGenericSignature(),
-              [&](SubstitutableType *t) -> Type {
-                if (t->isEqual(opaque->getUnderlyingInterfaceType())) {
-                  return underlyingType;
-                }
-                return Type(t);
-              },
-              LookUpConformanceInModule(opaque->getModuleContext()));
-
-          opaque->setUnderlyingTypeSubstitutions(underlyingSubs);
-        }
-        return expr;
-      });
-    }
-  }
-
   if (hadError)
     PBD->setInvalid();
 
@@ -569,6 +840,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
 bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   auto &Context = dc->getASTContext();
+  FrontendStatsTracer statsTracer(Context.Stats, "typecheck-for-each", stmt);
+  PrettyStackTraceStmt stackTrace(Context, "type-checking-for-each", stmt);
 
   auto failed = [&]() -> bool {
     // Invalidate the pattern and the var decl.
@@ -581,35 +854,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     return true;
   };
 
-  auto sequenceProto = TypeChecker::getProtocol(
-      dc->getASTContext(), stmt->getForLoc(), 
-      stmt->getAwaitLoc().isValid() ? 
-        KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
-  if (!sequenceProto)
-    return failed();
-
-  // Precheck the sequence.
-  Expr *sequence = stmt->getSequence();
-  if (ConstraintSystem::preCheckExpression(
-          sequence, dc, /*replaceInvalidRefsWithErrors=*/true,
-          /*leaveClosureBodiesUnchecked=*/false))
-    return failed();
-  stmt->setSequence(sequence);
-
-  // Precheck the filtering condition.
-  if (Expr *whereExpr = stmt->getWhere()) {
-    if (ConstraintSystem::preCheckExpression(
-            whereExpr, dc,
-            /*replaceInvalidRefsWithErrors=*/true,
-            /*leaveClosureBodiesUnchecked=*/false))
-      return failed();
-
-    stmt->setWhere(whereExpr);
-  }
-
   auto target = SolutionApplicationTarget::forForEachStmt(
-      stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
-  if (!typeCheckExpression(target))
+      stmt, dc, /*bindPatternVarsOneWay=*/false);
+  if (!typeCheckTarget(target))
     return failed();
 
   // Check to see if the sequence expr is throwing (in async context),
@@ -648,14 +895,49 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                   "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
+  auto tildeEqualsApplication =
+      synthesizeTildeEqualsOperatorApplication(EP, DC, rhsType);
+
+  if (!tildeEqualsApplication)
+    return true;
+
+  VarDecl *matchVar;
+  Expr *matchCall;
+
+  std::tie(matchVar, matchCall) = *tildeEqualsApplication;
+
+  matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
+
+  // Result of `~=` should always be a boolean.
+  auto contextualTy = Context.getBoolDecl()->getDeclaredInterfaceType();
+  auto target = SolutionApplicationTarget::forExprPattern(matchCall, DC, EP,
+                                                          contextualTy);
+
+  // Check the expression as a condition.
+  auto result = typeCheckExpression(target);
+  if (!result)
+    return true;
+
+  // Save the synthesized $match variable in the pattern.
+  EP->setMatchVar(matchVar);
+  // Save the type-checked expression in the pattern.
+  EP->setMatchExpr(result->getAsExpr());
+  // Set the type on the pattern.
+  EP->setType(rhsType);
+  return false;
+}
+
+Optional<std::pair<VarDecl *, BinaryExpr *>>
+TypeChecker::synthesizeTildeEqualsOperatorApplication(ExprPattern *EP,
+                                                      DeclContext *DC,
+                                                      Type enumType) {
+  auto &Context = DC->getASTContext();
   // Create a 'let' binding to stand in for the RHS value.
   auto *matchVar =
       new (Context) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
                             EP->getLoc(), Context.Id_PatternMatchVar, DC);
-  matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   matchVar->setImplicit();
-  EP->setMatchVar(matchVar);
 
   // Find '~=' operators for the match.
   auto matchLookup =
@@ -665,19 +947,19 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   auto &diags = DC->getASTContext().Diags;
   if (!matchLookup) {
     diags.diagnose(EP->getLoc(), diag::no_match_operator);
-    return true;
+    return None;
   }
-  
+
   SmallVector<ValueDecl*, 4> choices;
   for (auto &result : matchLookup) {
     choices.push_back(result.getValueDecl());
   }
-  
+
   if (choices.empty()) {
     diags.diagnose(EP->getLoc(), diag::no_match_operator);
-    return true;
+    return None;
   }
-  
+
   // Build the 'expr ~= var' expression.
   // FIXME: Compound name locations.
   auto *matchOp =
@@ -689,15 +971,10 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
                                                 DeclNameLoc(EP->getEndLoc()),
                                                 /*Implicit=*/true);
-  Expr *matchCall = BinaryExpr::create(Context, EP->getSubExpr(), matchOp,
+  auto *matchCall = BinaryExpr::create(Context, EP->getSubExpr(), matchOp,
                                        matchVarRef, /*implicit*/ true);
-  // Check the expression as a condition.
-  bool hadError = typeCheckCondition(matchCall, DC);
-  // Save the type-checked expression in the pattern.
-  EP->setMatchExpr(matchCall);
-  // Set the type on the pattern.
-  EP->setType(rhsType);
-  return hadError;
+
+  return std::make_pair(matchVar, matchCall);
 }
 
 static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
@@ -711,14 +988,15 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         return found->second;
 
       if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
-        auto root = archetypeType->getRoot();
         // We leave opaque types and their nested associated types alone here.
         // They're globally available.
-        if (isa<OpaqueTypeArchetypeType>(root))
+        if (isa<OpaqueTypeArchetypeType>(archetypeType))
           return origType;
+
+        auto root = archetypeType->getRoot();
         // For other nested types, fail here so the default logic in subst()
         // for nested types applies.
-        else if (root != archetypeType)
+        if (root != archetypeType)
           return Type();
         
         auto locator = cs.getConstraintLocator({});
@@ -810,9 +1088,8 @@ bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
-  auto kind = TypeChecker::typeCheckCheckedCast(t1, t2,
-                                                CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange());
+  auto kind = TypeChecker::typeCheckCheckedCast(
+      t1, t2, CheckedCastContextKind::None, dc);
   return (kind != CheckedCastKind::Unresolved);
 }
 
@@ -964,7 +1241,13 @@ void Solution::dump(raw_ostream &out) const {
   out << "Fixed score: " << FixedScore << "\n";
 
   out << "Type variables:\n";
-  for (auto binding : typeBindings) {
+  std::vector<std::pair<TypeVariableType *, Type>> bindings(
+      typeBindings.begin(), typeBindings.end());
+  llvm::sort(bindings, [](const std::pair<TypeVariableType *, Type> &lhs,
+                          const std::pair<TypeVariableType *, Type> &rhs) {
+    return lhs.first->getID() < rhs.first->getID();
+  });
+  for (auto binding : bindings) {
     auto &typeVar = binding.first;
     out.indent(2);
     Type(typeVar).print(out, PO);
@@ -997,7 +1280,7 @@ void Solution::dump(raw_ostream &out) const {
         out << choice.getBaseType()->getString(PO) << ".";
 
       out << choice.getDecl()->getBaseName() << ": "
-          << ovl.second.openedType->getString(PO) << "\n";
+          << ovl.second.adjustedOpenedType->getString(PO) << "\n";
       break;
 
     case OverloadChoiceKind::KeyPathApplication:
@@ -1123,6 +1406,7 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
   };
 
   E->dump(out, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent);
+  out << "\n";
 }
 
 void ConstraintSystem::print(raw_ostream &out) const {
@@ -1143,15 +1427,15 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   out << "Type Variables:\n";
-  for (auto tv : getTypeVariables()) {
+  std::vector<TypeVariableType *> typeVariables(getTypeVariables().begin(),
+                                                getTypeVariables().end());
+  llvm::sort(typeVariables,
+             [](const TypeVariableType *lhs, const TypeVariableType *rhs) {
+               return lhs->getID() < rhs->getID();
+             });
+  for (auto tv : typeVariables) {
     out.indent(2);
-    Type(tv).print(out, PO);
-    if (tv->getImpl().canBindToLValue())
-      out << " [lvalue allowed]";
-    if (tv->getImpl().canBindToInOut())
-      out << " [inout allowed]";
-    if (tv->getImpl().canBindToNoEscape())
-      out << " [noescape allowed]";
+    tv->getImpl().print(out);
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
@@ -1213,26 +1497,29 @@ void ConstraintSystem::print(raw_ostream &out) const {
           out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "
             << resolved.boundType->getString(PO) << " == "
-            << resolved.openedType->getString(PO) << "\n";
+            << resolved.adjustedOpenedType->getString(PO);
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
         out << "key path application root "
-            << choice.getBaseType()->getString(PO) << "\n";
+            << choice.getBaseType()->getString(PO);
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
       case OverloadChoiceKind::KeyPathDynamicMemberLookup:
-        out << "dynamic member lookup:"
-            << choice.getBaseType()->getString(PO) << "  name="
-            << choice.getName() << "\n";
+        out << "dynamic member lookup: "
+            << choice.getBaseType()->getString(PO) << " name="
+            << choice.getName();
         break;
 
       case OverloadChoiceKind::TupleIndex:
         out << "tuple " << choice.getBaseType()->getString(PO) << " index "
-            << choice.getTupleIndex() << "\n";
+            << choice.getTupleIndex();
         break;
       }
+      out << " for ";
+      elt.first->dump(&getASTContext().SourceMgr, out);
+      out << "\n";
     }
     out << "\n";
   }
@@ -1302,24 +1589,10 @@ void ConstraintSystem::print(raw_ostream &out) const {
 }
 
 /// Determine the semantics of a checked cast operation.
-CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
-                                                  Type toType,
-                                                  CheckedCastContextKind contextKind,
-                                                  DeclContext *dc,
-                                                  SourceLoc diagLoc,
-                                                  Expr *fromExpr,
-                                                  SourceRange diagToRange) {
-  // Determine whether we should suppress diagnostics.
-  const bool suppressDiagnostics =
-      contextKind == CheckedCastContextKind::None ||
-      contextKind == CheckedCastContextKind::Coercion;
-  assert((suppressDiagnostics || diagLoc.isValid()) &&
-         "diagnostics require a valid source location");
-
-  SourceRange diagFromRange;
-  if (fromExpr)
-    diagFromRange = fromExpr->getSourceRange();
-  
+CheckedCastKind
+TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
+                                  CheckedCastContextKind contextKind,
+                                  DeclContext *dc) {
   // If the from/to types are equivalent or convertible, this is a coercion.
   bool unwrappedIUO = false;
   if (fromType->isEqual(toType) ||
@@ -1337,31 +1610,20 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::BridgingCoercion;
   }
 
-  Type origFromType = fromType;
-  Type origToType = toType;
-
   auto *module = dc->getParentModule();
-
-  auto &diags = dc->getASTContext().Diags;
   bool optionalToOptionalCast = false;
 
   // Local function to indicate failure.
   auto failed = [&] {
-    if (suppressDiagnostics) {
+    if (contextKind == CheckedCastContextKind::Coercion)
       return CheckedCastKind::Unresolved;
-    }
 
     // Explicit optional-to-optional casts always succeed because a nil
     // value of any optional type can be cast to any other optional type.
     if (optionalToOptionalCast)
       return CheckedCastKind::ValueCast;
 
-    diags.diagnose(diagLoc, diag::downcast_to_unrelated, origFromType,
-                   origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
-
-    return CheckedCastKind::ValueCast;
+    return CheckedCastKind::Unresolved;
   };
 
   // TODO: Explore optionals using the same strategy used by the
@@ -1390,9 +1652,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // downcast. Complain.
   auto &Context = dc->getASTContext();
   if (extraFromOptionals > 0) {
-    switch (typeCheckCheckedCast(fromType, toType,
-                                 CheckedCastContextKind::None, dc,
-                                 SourceLoc(), nullptr, SourceRange())) {
+    switch (typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
+                                 dc)) {
     case CheckedCastKind::Coercion:
     case CheckedCastKind::BridgingCoercion: {
       // Treat this as a value cast so we preserve the semantics.
@@ -1413,7 +1674,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   auto checkElementCast = [&](Type fromElt, Type toElt,
                               CheckedCastKind castKind) -> CheckedCastKind {
     switch (typeCheckCheckedCast(fromElt, toElt, CheckedCastContextKind::None,
-                                 dc, SourceLoc(), nullptr, SourceRange())) {
+                                 dc)) {
     case CheckedCastKind::Coercion:
       return CheckedCastKind::Coercion;
 
@@ -1428,13 +1689,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
     case CheckedCastKind::Unresolved:
       // Even though we know the elements cannot be downcast, we cannot return
-      // failed() here as it's possible for an empty Array, Set or Dictionary to
-      // be cast to any element type at runtime (SR-6192). The one exception to
-      // this is when we're checking whether we can treat a coercion as a checked
-      // cast because we don't want to tell the user to use as!, as it's probably
-      // the wrong suggestion.
+      // Unresolved here as it's possible for an empty Array, Set or Dictionary
+      // to be cast to any element type at runtime (SR-6192). The one exception
+      // to this is when we're checking whether we can treat a coercion as a
+      // checked cast because we don't want to tell the user to use as!, as it's
+      // probably the wrong suggestion.
       if (contextKind == CheckedCastContextKind::Coercion)
-        return failed();
+        return CheckedCastKind::Unresolved;
       return castKind;
     }
     llvm_unreachable("invalid cast type");
@@ -1455,8 +1716,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         hasBridgingConversion = NoBridging;
       bool hasCast = false;
       switch (typeCheckCheckedCast(fromKeyValue->first, toKeyValue->first,
-                                   CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange())) {
+                                   CheckedCastContextKind::None, dc)) {
       case CheckedCastKind::Coercion:
         hasCoercion = true;
         break;
@@ -1470,7 +1730,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         // Handled the same as in checkElementCast; see comment there for
         // rationale.
         if (contextKind == CheckedCastContextKind::Coercion)
-          return failed();
+          return CheckedCastKind::Unresolved;
         LLVM_FALLTHROUGH;
 
       case CheckedCastKind::ArrayDowncast:
@@ -1482,8 +1742,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       }
 
       switch (typeCheckCheckedCast(fromKeyValue->second, toKeyValue->second,
-                                   CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange())) {
+                                   CheckedCastContextKind::None, dc)) {
       case CheckedCastKind::Coercion:
         hasCoercion = true;
         break;
@@ -1497,7 +1756,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         // Handled the same as in checkElementCast; see comment there for
         // rationale.
         if (contextKind == CheckedCastContextKind::Coercion)
-          return failed();
+          return CheckedCastKind::Unresolved;
         LLVM_FALLTHROUGH;
 
       case CheckedCastKind::ArrayDowncast:
@@ -1579,31 +1838,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (fromFunctionType &&
       (toExistentialType || (toArchetypeType && toConstrainedArchetype))) {
     switch (contextKind) {
+    case CheckedCastContextKind::None:
     case CheckedCastContextKind::ConditionalCast:
     case CheckedCastContextKind::ForcedCast:
-      diags.diagnose(diagLoc, diag::downcast_to_unrelated, origFromType,
-                     origToType)
-          .highlight(diagFromRange)
-          .highlight(diagToRange);
-
-      // If we're referring to a function with a return value (not Void) then
-      // emit a fix-it suggesting to add `()` to call the function
-      if (auto DRE = dyn_cast<DeclRefExpr>(fromExpr)) {
-        if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
-          if (!FD->getResultInterfaceType()->isVoid()) {
-            diags.diagnose(diagLoc, diag::downcast_to_unrelated_fixit,
-                           FD->getBaseIdentifier())
-                .fixItInsertAfter(fromExpr->getEndLoc(), "()");
-          }
-        }
-      }
-
-      return CheckedCastKind::ValueCast;
+      return CheckedCastKind::Unresolved;
 
     case CheckedCastContextKind::IsPattern:
     case CheckedCastContextKind::EnumElementPattern:
     case CheckedCastContextKind::IsExpr:
-    case CheckedCastContextKind::None:
     case CheckedCastContextKind::Coercion:
       break;
     }
@@ -1613,8 +1855,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
                                                               toType)) {
     switch (typeCheckCheckedCast(bridgedToClass, fromType,
-                                 CheckedCastContextKind::None, dc, SourceLoc(),
-                                 nullptr, SourceRange())) {
+                                 CheckedCastContextKind::None, dc)) {
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::BridgingCoercion:
     case CheckedCastKind::Coercion:
@@ -1632,8 +1873,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Type bridgedFromClass = getDynamicBridgedThroughObjCClass(dc, toType,
                                                                 fromType)) {
     switch (typeCheckCheckedCast(toType, bridgedFromClass,
-                                 CheckedCastContextKind::None, dc, SourceLoc(),
-                                 nullptr, SourceRange())) {
+                                 CheckedCastContextKind::None, dc)) {
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::BridgingCoercion:
     case CheckedCastKind::Coercion:
@@ -1731,13 +1971,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     //
+    auto constraint = fromType;
+    if (auto existential = constraint->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
     if (auto *protocolDecl =
-          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
+          dyn_cast_or_null<ProtocolDecl>(constraint->getAnyNominal())) {
       if (!couldDynamicallyConformToProtocol(toType, protocolDecl, module)) {
         return failed();
       }
     } else if (auto protocolComposition =
-                   fromType->getAs<ProtocolCompositionType>()) {
+                   constraint->getAs<ProtocolCompositionType>()) {
       if (llvm::any_of(protocolComposition->getMembers(),
                        [&](Type protocolType) {
                          if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
@@ -1869,16 +2112,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // The runtime doesn't support casts to CF types and always lets them succeed.
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
-  auto clas = toType->getClassOrBoundGenericClass();
-  if (clas && clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
+  auto clazz = toType->getClassOrBoundGenericClass();
+  if (clazz && clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
   // Don't warn on casts that change the generic parameters of ObjC generic
   // classes. This may be necessary to force-fit ObjC APIs that depend on
   // covariance, or for APIs where the generic parameter annotations in the
   // ObjC headers are inaccurate.
-  if (clas && clas->isTypeErasedGenericClass()) {
-    if (fromType->getClassOrBoundGenericClass() == clas)
+  if (clazz && clazz->isTypeErasedGenericClass()) {
+    if (fromType->getClassOrBoundGenericClass() == clazz)
       return CheckedCastKind::ValueCast;
   }
 
@@ -1990,6 +2233,12 @@ static bool checkForDynamicAttribute(CanType ty,
       if (hasAttribute(superclass))
         return true;
     }
+  }
+
+  // If this is an existential type, check if its constraint type
+  // has the attribute.
+  if (auto existential = ty->getAs<ExistentialType>()) {
+    return hasAttribute(existential->getConstraintType());
   }
 
   // If this is a protocol composition, check if any of its members have the

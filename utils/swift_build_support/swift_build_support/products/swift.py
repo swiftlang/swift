@@ -13,7 +13,6 @@
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
-from . import libicu
 from . import llvm
 from . import product
 from ..cmake import CMakeOptions
@@ -63,6 +62,11 @@ class Swift(product.Product):
         self.cmake_options.extend(self._freestanding_is_darwin)
 
         self.cmake_options.extend(self._build_swift_private_stdlib)
+
+        self.cmake_options.extend(self._enable_stdlib_unicode_data)
+
+        self.cmake_options.extend(
+            self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -169,6 +173,11 @@ updated without updating swift.py?")
                  self.args.build_swift_stdlib_static_print)]
 
     @property
+    def _enable_stdlib_unicode_data(self):
+        return [('SWIFT_STDLIB_ENABLE_UNICODE_DATA',
+                 self.args.build_swift_stdlib_unicode_data)]
+
+    @property
     def _freestanding_is_darwin(self):
         return [('SWIFT_FREESTANDING_IS_DARWIN:BOOL',
                  self.args.swift_freestanding_is_darwin)]
@@ -178,10 +187,14 @@ updated without updating swift.py?")
         return [('SWIFT_STDLIB_BUILD_PRIVATE:BOOL',
                  self.args.build_swift_private_stdlib)]
 
+    @property
+    def _swift_tools_ld64_lto_codegen_only_for_supporting_targets(self):
+        return [('SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL',
+                 self.args.swift_tools_ld64_lto_codegen_only_for_supporting_targets)]
+
     @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
                 earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
-                libcxx.LibCXX,
-                libicu.LibICU]
+                libcxx.LibCXX]

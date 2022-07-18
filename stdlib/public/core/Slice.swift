@@ -135,6 +135,11 @@ public struct Slice<Base: Collection> {
   public var base: Base {
     return _base
   }
+
+  @_alwaysEmitIntoClient @inline(__always)
+  internal var _bounds: Range<Base.Index> {
+    Range(_uncheckedBounds: (_startIndex, _endIndex))
+  }
 }
 
 extension Slice: Collection {
@@ -157,7 +162,7 @@ extension Slice: Collection {
   @inlinable // generic-performance
   public subscript(index: Index) -> Base.Element {
     get {
-      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: _bounds)
       return _base[index]
     }
   }
@@ -165,13 +170,13 @@ extension Slice: Collection {
   @inlinable // generic-performance
   public subscript(bounds: Range<Index>) -> Slice<Base> {
     get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(bounds, bounds: _bounds)
       return Slice(base: _base, bounds: bounds)
     }
   }
 
-  public var indices: Indices { 
-    return _base.indices[_startIndex..<_endIndex]
+  public var indices: Indices {
+    return _base.indices[_bounds]
   }
 
   @inlinable // generic-performance
@@ -264,11 +269,11 @@ extension Slice: MutableCollection where Base: MutableCollection {
   @inlinable // generic-performance
   public subscript(index: Index) -> Base.Element {
     get {
-      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: _bounds)
       return _base[index]
     }
     set {
-      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: _bounds)
       _base[index] = newValue
       // MutableSlice requires that the underlying collection's subscript
       // setter does not invalidate indices, so our `startIndex` and `endIndex`
@@ -279,7 +284,7 @@ extension Slice: MutableCollection where Base: MutableCollection {
   @inlinable // generic-performance
   public subscript(bounds: Range<Index>) -> Slice<Base> {
     get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(bounds, bounds: _bounds)
       return Slice(base: _base, bounds: bounds)
     }
     set {

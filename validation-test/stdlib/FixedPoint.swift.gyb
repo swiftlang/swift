@@ -1,9 +1,8 @@
 // RUN: %target-run-stdlib-swiftgyb
 // REQUIRES: executable_test
 
-// FIXME: [SR-14363]
-//   FixedPoint.swift.gyb slowed down with -Onone copy propagation
-//   We should be able to move this out of long_test once fixed.
+// This is in long_test because it takes about 30s to build.
+// Most of that time is in TypeChecker::typeCheckExpression.
 // REQUIRES: long_test
 
 import StdlibUnittest
@@ -13,7 +12,6 @@ var FixedPoint = TestSuite("FixedPoint")
 
 %{
 
-from __future__ import division
 import gyb
 from SwiftIntTypes import all_integer_types
 

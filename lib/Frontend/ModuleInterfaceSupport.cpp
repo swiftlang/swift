@@ -19,7 +19,9 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
@@ -197,12 +199,22 @@ static void printImports(raw_ostream &out,
   // imports and filter them later.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
   if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
-    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
 
-    SmallVector<ImportedModule, 4> ioiImport;
-    M->getImportedModules(ioiImport,
+    SmallVector<ImportedModule, 4> ioiImports, allImports;
+    M->getImportedModules(ioiImports,
                           ModuleDecl::ImportFilterKind::ImplementationOnly);
-    ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
+
+    // Only consider modules imported consistently as implementation-only.
+    M->getImportedModules(allImports,
+                          allImportFilter);
+    llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> allImportSet;
+    allImportSet.insert(allImports.begin(), allImports.end());
+
+    for (auto import: ioiImports)
+      if (allImportSet.count(import) == 0)
+        ioiImportSet.insert(import);
+
+    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
 
   SmallVector<ImportedModule, 8> allImports;
@@ -222,6 +234,11 @@ static void printImports(raw_ostream &out,
     auto importedModule = import.importedModule;
     if (importedModule->isOnoneSupportModule() ||
         importedModule->isBuiltinModule()) {
+      continue;
+    }
+
+    if (llvm::count(Opts.ModulesToSkipInPublicInterface,
+                    importedModule->getName().str())) {
       continue;
     }
 
@@ -301,10 +318,11 @@ class InheritedProtocolCollector {
   static const StringLiteral DummyProtocolName;
 
   using AvailableAttrList = TinyPtrVector<const AvailableAttr *>;
-  using OtherAttrList = TinyPtrVector<const DeclAttribute*>;
+  using OriginallyDefinedInAttrList =
+      TinyPtrVector<const OriginallyDefinedInAttr *>;
   using ProtocolAndAvailability =
-    std::tuple<ProtocolDecl *, AvailableAttrList, bool /*isUnchecked*/,
-    OtherAttrList>;
+      std::tuple<ProtocolDecl *, AvailableAttrList, bool /*isUnchecked*/,
+                 OriginallyDefinedInAttrList>;
 
   /// Protocols that will be included by the ASTPrinter without any extra work.
   SmallVector<ProtocolDecl *, 8> IncludedProtocols;
@@ -340,10 +358,12 @@ class InheritedProtocolCollector {
     return cache.getValue();
   }
 
-  static OtherAttrList getOtherAttrList(const Decl *D) {
-    OtherAttrList results;
+  static OriginallyDefinedInAttrList
+  getOriginallyDefinedInAttrList(const Decl *D) {
+    OriginallyDefinedInAttrList results;
     while (D) {
-      for (auto *result: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+      for (auto *result :
+           D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
         results.push_back(result);
       }
       D = D->getDeclContext()->getAsDecl();
@@ -375,15 +395,13 @@ class InheritedProtocolCollector {
 
       bool canPrintNormally = canPrintProtocolTypeNormally(inheritedTy, D);
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
-      for (ProtocolType *protoTy : layout.getProtocols()) {
+      for (ProtocolDecl *protoDecl : layout.getProtocols()) {
         if (canPrintNormally)
-          IncludedProtocols.push_back(protoTy->getDecl());
+          IncludedProtocols.push_back(protoDecl);
         else
-          ExtraProtocols.push_back(
-            ProtocolAndAvailability(protoTy->getDecl(),
-                                    getAvailabilityAttrs(D, availableAttrs),
-                                    inherited.isUnchecked,
-                                    getOtherAttrList(D)));
+          ExtraProtocols.push_back(ProtocolAndAvailability(
+              protoDecl, getAvailabilityAttrs(D, availableAttrs),
+              inherited.isUnchecked, getOriginallyDefinedInAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -400,11 +418,9 @@ class InheritedProtocolCollector {
       for (auto *conf : localConformances) {
         if (conf->getSourceKind() != ConformanceEntryKind::Synthesized)
           continue;
-        ExtraProtocols.push_back(
-          ProtocolAndAvailability(conf->getProtocol(),
-                                  getAvailabilityAttrs(D, availableAttrs),
-                                  isUncheckedConformance(conf),
-                                  getOtherAttrList(D)));
+        ExtraProtocols.push_back(ProtocolAndAvailability(
+            conf->getProtocol(), getAvailabilityAttrs(D, availableAttrs),
+            isUncheckedConformance(conf), getOriginallyDefinedInAttrList(D)));
       }
     }
   }
@@ -418,7 +434,8 @@ class InheritedProtocolCollector {
         continue;
 
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
-      for (ProtocolType *protoTy : layout.getProtocols()) {
+      for (ProtocolDecl *protoDecl : layout.getProtocols()) {
+        auto protoTy = protoDecl->getDeclaredInterfaceType()->castTo<ProtocolType>();
         if (!isPublicOrUsableFromInline(protoTy))
           continue;
         ConditionalConformanceProtocols.push_back(protoTy);
@@ -554,13 +571,14 @@ public:
       });
     }
 
+    // Preserve the behavior of previous implementations which formatted of
+    // empty extensions compactly with '{}' on the same line.
+    PrintOptions extensionPrintOptions = printOptions;
+    extensionPrintOptions.PrintEmptyMembersOnSameLine = true;
+
     // Then walk the remaining ones, and see what we need to print.
-    // Note: We could do this in one pass, but the logic is easier to
-    // understand if we build up the list and then print it, even if it takes
-    // a bit more memory.
     // FIXME: This will pick the availability attributes from the first sight
     // of a protocol rather than the maximally available case.
-    SmallVector<ProtocolAndAvailability, 16> protocolsToPrint;
     for (const auto &protoAndAvailability : ExtraProtocols) {
       auto proto = std::get<0>(protoAndAvailability);
       auto availability = std::get<1>(protoAndAvailability);
@@ -586,61 +604,67 @@ public:
         if (isPublicOrUsableFromInline(inherited) &&
             conformanceDeclaredInModule(M, nominal, inherited) &&
             !M->isImportedImplementationOnly(inherited->getParentModule())) {
-          protocolsToPrint.push_back(
-            ProtocolAndAvailability(inherited, availability, isUnchecked,
-                                    otherAttrs));
+          auto protoAndAvailability = ProtocolAndAvailability(
+              inherited, availability, isUnchecked, otherAttrs);
+          printSynthesizedExtension(out, extensionPrintOptions, M, nominal,
+                                    protoAndAvailability);
           return TypeWalker::Action::SkipChildren;
         }
 
         return TypeWalker::Action::Continue;
       });
     }
-    if (protocolsToPrint.empty())
-      return;
+  }
 
-    for (const auto &protoAndAvailability : protocolsToPrint) {
-      StreamPrinter printer(out);
-      auto proto = std::get<0>(protoAndAvailability);
-      auto availability = std::get<1>(protoAndAvailability);
-      auto isUnchecked = std::get<2>(protoAndAvailability);
-      auto otherAttrs = std::get<3>(protoAndAvailability);
+  /// Prints a dummy extension on \p nominal to \p out for a public conformance
+  /// to the protocol contained by \p protoAndAvailability.
+  static void
+  printSynthesizedExtension(raw_ostream &out, const PrintOptions &printOptions,
+                            ModuleDecl *M, const NominalTypeDecl *nominal,
+                            ProtocolAndAvailability &protoAndAvailability) {
+    StreamPrinter printer(out);
 
-      bool haveFeatureChecks = printOptions.PrintCompatibilityFeatureChecks &&
-        printCompatibilityFeatureChecksPre(printer, proto);
+    auto proto = std::get<0>(protoAndAvailability);
+    auto availability = std::get<1>(protoAndAvailability);
+    auto isUnchecked = std::get<2>(protoAndAvailability);
+    auto originallyDefinedInAttrs = std::get<3>(protoAndAvailability);
 
-      // FIXME: Shouldn't this be an implicit conversion?
-      TinyPtrVector<const DeclAttribute *> attrs;
-      attrs.insert(attrs.end(), availability.begin(), availability.end());
-      auto spiAttributes = proto->getAttrs().getAttributes<SPIAccessControlAttr>();
-      attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
-      attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
-      DeclAttributes::print(printer, printOptions, attrs);
+    // Create a synthesized ExtensionDecl for the conformance.
+    ASTContext &ctx = M->getASTContext();
+    auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
+        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked)));
+    auto extension =
+        ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
+                              nominal->getModuleScopeContext(), nullptr);
+    extension->setImplicit();
 
-      printer << "extension ";
-      {
-        PrintOptions typePrintOptions = printOptions;
-        bool oldFullyQualifiedTypesIfAmbiguous =
-          typePrintOptions.FullyQualifiedTypesIfAmbiguous;
-        typePrintOptions.FullyQualifiedTypesIfAmbiguous =
-          typePrintOptions.FullyQualifiedExtendedTypesIfAmbiguous;
-        nominal->getDeclaredType().print(printer, typePrintOptions);
-        typePrintOptions.FullyQualifiedTypesIfAmbiguous =
-          oldFullyQualifiedTypesIfAmbiguous;
-      }
-      printer << " : ";
-
-      if (isUnchecked)
-        printer << "@unchecked ";
-
-      proto->getDeclaredInterfaceType()->print(printer, printOptions);
-
-      printer << " {}";
-
-      if (haveFeatureChecks)
-        printCompatibilityFeatureChecksPost(printer);
-      else
-        printer << "\n";
+    // Build up synthesized DeclAttributes for the extension.
+    TinyPtrVector<const DeclAttribute *> clonedAttrs;
+    for (auto *attr : availability) {
+      clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
     }
+    for (auto *attr : proto->getAttrs().getAttributes<SPIAccessControlAttr>()) {
+      clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
+    }
+    for (auto *attr : originallyDefinedInAttrs) {
+      clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
+    }
+
+    // Since DeclAttributes is a linked list where each added attribute becomes
+    // the head, we need to add these attributes in reverse order to reproduce
+    // the order in which previous implementations printed these attributes.
+    for (auto attr = clonedAttrs.rbegin(), end = clonedAttrs.rend();
+         attr != end; ++attr) {
+      extension->getAttrs().add(const_cast<DeclAttribute *>(*attr));
+    }
+
+    ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
+                              nominal->getDeclaredType());
+    ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
+                              const_cast<NominalTypeDecl *>(nominal));
+
+    extension->print(printer, printOptions);
+    printer << "\n";
   }
 
   /// If there were any conditional conformances that couldn't be printed,

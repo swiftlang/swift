@@ -1,0 +1,65 @@
+// RUN: %empty-directory(%t.tmp)
+// mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk
+// RUN: %api-digester -diagnose-sdk -module Swift -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location
+// RUN: %clang -E -P -x c %S/stability-stdlib-abi-without-asserts.test -o - > %t.tmp/stability-stdlib-abi.swift.expected
+// RUN: %clang -E -P -x c %S/stability-stdlib-abi-with-asserts.test -o - >> %t.tmp/stability-stdlib-abi.swift.expected
+// RUN: %clang -E -P -x c %S/stability-stdlib-abi-with-array-cow-checks.test -o - >> %t.tmp/stability-stdlib-abi.swift.expected
+// RUN: %clang -E -P -x c %t.tmp/stability-stdlib-abi.swift.expected -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-stdlib-abi.swift.expected.sorted
+// RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed -E -e '/^\s*$/d' -e 's/ in _[0-9A-F]{32}/ in #UNSTABLE ID#/g' | sort > %t.tmp/changes.txt.tmp
+// RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected.sorted %t.tmp/changes.txt.tmp
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
+
+// Welcome, Build Wrangler!
+//
+// This file lists APIs that are unique to stdlib builds with array_cow_checks.
+// (It is combined with the stability-stdlib-abi-without-asserts.test and
+// stability-stdlib-abi-with-asserts.test files to generate a full list of
+// potentially breaking API changes. In most cases you'll want to edit that file
+// instead of this one.)
+//
+// A failure in this test indicates that there is a potential breaking change in
+// the Standard Library. If you observe a failure outside of a PR test, please
+// reach out to the Standard Library team directly to make sure this gets
+// resolved quickly! If your own PR fails in this test, you probably have an
+// ABI- or source-breaking change in your commits. Please go and fix it.
+//
+// Please DO NOT DISABLE THIS TEST. In addition to ignoring the current set of
+// ABI breaks, XFAILing this test also silences any future ABI breaks that may
+// land on this branch, which simply generates extra work for the next person
+// that picks up the mess.
+//
+// Instead of disabling this test, consider extending the list of expected
+// changes at the bottom. (You'll also need to do this if your own PR triggers
+// false positives, or if you have special permission to break things.) You can
+// find a diff of what needs to be added in the output of the failed test run.
+// The order of lines doesn't matter, and you can also include comments to refer
+// to any bugs you filed. Remember that in almost all cases you'll want to edit
+// the stability-stdlib-abi-without-asserts.test file instead of this one.
+//
+// Thank you for your help ensuring the stdlib remains compatible with its past!
+//                                            -- Your friendly stdlib engineers
+
+// REQUIRES: swift_stdlib_asserts
+// REQUIRES: array_cow_checks
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+
+// SR-13362
+// We currently only have a baseline for Intel CPUs on macOS.
+// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
+
+// The digester can incorrectly register a generic signature change when
+// declarations are shuffled. rdar://problem/46618883
+// UNSUPPORTED: swift_evolve
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+
+// Note: normally you'll need to add new entries to
+// `stability-stdlib-abi-without-asserts.test`, not this file.
+Func _COWChecksEnabled() is a new API without @available attribute
+Func _swift_isImmutableCOWBuffer(_:) is a new API without @available attribute
+Func _swift_setImmutableCOWBuffer(_:_:) is a new API without @available attribute
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

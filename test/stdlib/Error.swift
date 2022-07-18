@@ -118,6 +118,8 @@ ErrorTests.test("default domain and code") {
 
 enum SillyError: Error { case JazzHands }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 ErrorTests.test("try!")
   .skip(.custom({ _isFastAssertConfiguration() },
                 reason: "trap is not guaranteed to happen in -Ounchecked"))
@@ -134,12 +136,13 @@ ErrorTests.test("try!/location")
   .skip(.custom({ _isFastAssertConfiguration() },
                 reason: "trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(shouldCheckErrorLocation()
-                        ? "main/Error.swift:140"
+                        ? "main/Error.swift:\(#line + 4)"
                         : "")
   .code {
     expectCrashLater()
     let _: () = try! { throw SillyError.JazzHands }()
 }
+#endif
 
 ErrorTests.test("try?") {
   var value = try? { () throws -> Int in return 1 }()

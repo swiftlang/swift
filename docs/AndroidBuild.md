@@ -34,7 +34,7 @@ git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
 git clone https://github.com/compnerd/swift-build swift-build
 ```
 
-## 1. Acquire the lastest toolchain and dependencies
+## 1. Acquire the latest toolchain and dependencies
 
 1. Download the toolchain, ICU, libxml2, and curl for android from
    [Azure](https://dev.azure.com/compnerd/swift-build) into `S:\b\a\Library`.
@@ -74,10 +74,6 @@ cmake -C S:\swift-build\cmake\caches\android-armv7.cmake                        
   -DANDROID_ALTERNATE_TOOLCHAIN=S:/b/a/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr       ^
   -DLLVM_DIR=S:/b/a/llvm/lib/cmake/llvm                                                                               ^
   -DSWIFT_NATIVE_SWIFT_TOOLS_PATH=S:/b/a/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin ^
-  -DSWIFT_ANDROID_armv7_ICU_UC_INCLUDE=S:/b/a/Library/icu-64/usr/include/unicode                                      ^
-  -DSWIFT_ANDROID_armv7_ICU_UC=S:/b/a/Library/icu-64/usr/lib/libicuuc64.so                                            ^
-  -DSWIFT_ANDROID_armv7_ICU_I18N_INCLUDE=S:/b/a/Library/icu-64/usr/include                                            ^
-  -DSWIFT_ANDROID_armv7_ICU_I18N=S:/b/a/Library/icu-64/usr/lib/libicuin64.so                                          ^
   S:/swift
 ninja
 ninja install

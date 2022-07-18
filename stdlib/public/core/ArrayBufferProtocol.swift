@@ -119,8 +119,7 @@ where Indices == Range<Int> {
   var identity: UnsafeRawPointer { get }
 }
 
-extension _ArrayBufferProtocol where Indices == Range<Int>{
-
+extension _ArrayBufferProtocol {
   @inlinable
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress

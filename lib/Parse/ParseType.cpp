@@ -564,7 +564,7 @@ ParserResult<TypeRepr> Parser::parseType(
 
 ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
   GenericParamList *genericParams = nullptr;
-  if (Context.LangOpts.EnableExperimentalNamedOpaqueTypes) {
+  if (Context.LangOpts.hasFeature(Feature::NamedOpaqueTypes)) {
     auto result = maybeParseGenericParams();
     genericParams = result.getPtrOrNull();
     if (result.hasCodeCompletion())
@@ -796,10 +796,12 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///
 ///   type-composition:
 ///     'some'? type-simple
+///     'any'? type-simple
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
-  SyntaxParsingContext SomeTypeContext(SyntaxContext, SyntaxKind::SomeType);
+  SyntaxParsingContext ConstrainedSugarTypeContext(
+      SyntaxContext, SyntaxKind::ConstrainedSugarType);
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
@@ -815,11 +817,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     anyLoc = consumeToken();
   } else {
     // This isn't a some type.
-    SomeTypeContext.setTransparent();
+    ConstrainedSugarTypeContext.setTransparent();
   }
   
-  auto applyOpaque = [&](TypeRepr *type) -> TypeRepr* {
-    if (opaqueLoc.isValid()) {
+  auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
+    if (opaqueLoc.isValid() &&
+        (anyLoc.isInvalid() || SourceMgr.isBeforeInBuffer(opaqueLoc, anyLoc))) {
       type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
     } else if (anyLoc.isValid()) {
       type = new (Context) ExistentialTypeRepr(anyLoc, type);
@@ -878,15 +881,26 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
         Tok.isContextualKeyword("any")) {
       auto keyword = Tok.getText();
       auto badLoc = consumeToken();
+                
+      // Suggest moving `some` or `any` in front of the first type unless
+      // the first type is an opaque or existential type.
+      if (opaqueLoc.isValid() || anyLoc.isValid()) {
+        diagnose(badLoc, diag::opaque_mid_composition, keyword)
+            .fixItRemove(badLoc);
+      } else {
+        diagnose(badLoc, diag::opaque_mid_composition, keyword)
+            .fixItRemove(badLoc)
+            .fixItInsert(FirstTypeLoc, keyword.str() + " ");
+      }
 
-      diagnose(badLoc, diag::opaque_mid_composition, keyword)
-          .fixItRemove(badLoc)
-          .fixItInsert(FirstTypeLoc, keyword.str() + " ");
+      const bool isAnyKeyword = keyword.equals("any");
 
-      if (opaqueLoc.isInvalid()) {
+      if (isAnyKeyword) {
+        if (anyLoc.isInvalid()) {
+          anyLoc = badLoc;
+        }
+      } else if (opaqueLoc.isInvalid()) {
         opaqueLoc = badLoc;
-      } else if (anyLoc.isInvalid()) {
-        anyLoc = badLoc;
       }
     }
 
@@ -1636,8 +1650,7 @@ bool Parser::canParseTypeTupleBody() {
 
       // If the tuple element starts with "ident :", then it is followed
       // by a type annotation.
-      if (Tok.canBeArgumentLabel() && 
-          (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
+      if (startsParameterName(/*isClosure=*/false)) {
         consumeToken();
         if (Tok.canBeArgumentLabel()) {
           consumeToken();

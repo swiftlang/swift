@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -requirement-machine=verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 enum E<T : P> {
   case a(T.X)
@@ -64,7 +64,8 @@ struct S4<Base> where Base : P1, Base.Element: P1 {
 // CHECK-LABEL: {{^}}sil {{.*}} @${{.*}}2S4{{.*}}3foo{{.*}}F :
 // CHECK: @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : P1, τ_0_0 == τ_0_1, τ_0_0.Element : P1> (@in_guaranteed S3<τ_0_0>) -> () for <Base, Base>
   func foo(index: S3<Base>?) {
-    _ = index.map({ _ = $0 })
+    let f: (S3<Base>) -> () = { _ = $0 }
+    _ = index.map(f)
   }
 }
 

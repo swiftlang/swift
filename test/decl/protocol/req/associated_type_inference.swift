@@ -537,14 +537,14 @@ protocol P32 {
   var bar: B { get }
 }
 protocol P33 {
-  associatedtype A
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
 
-  var baz: A { get } // expected-note {{protocol requires property 'baz' with type 'S31<T>.A' (aka 'Never'); do you want to add a stub?}}
+  var baz: A { get }
 }
 protocol P34 {
-  associatedtype A
+  associatedtype A  // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
 
-  func boo() -> A // expected-note {{protocol requires function 'boo()' with type '() -> S31<T>.A' (aka '() -> Never'); do you want to add a stub?}}
+  func boo() -> A
 }
 struct S31<T> {}
 extension S31: P32 where T == Int {} // OK
@@ -556,11 +556,11 @@ extension S31 where T: Equatable {
 }
 extension S31: P33 where T == Never {} // expected-error {{type 'S31<T>' does not conform to protocol 'P33'}}
 extension S31 where T == String {
-  var baz: Bool { true } // expected-note {{candidate has non-matching type 'Bool' [with A = S31<T>.A]}}
+  var baz: Bool { true }
 }
 extension S31: P34 {} // expected-error {{type 'S31<T>' does not conform to protocol 'P34'}}
 extension S31 where T: P32 {
-  func boo() -> Void {} // expected-note {{candidate has non-matching type '<T> () -> Void' [with A = S31<T>.A]}}
+  func boo() -> Void {}
 }
 
 // SR-12707
@@ -682,6 +682,27 @@ struct S40<E: Equatable>: P40c {
   func foo(arg: Never) {}
 
   typealias B = Self
+}
+
+protocol P41a {
+  associatedtype A
+  associatedtype B
+
+  func bar(_: B) -> A?
+}
+protocol P42b: P41a {
+  associatedtype A
+  associatedtype B
+
+  func foo(_: A, _: B)
+}
+extension P42b {
+  func bar(_: B) -> A? {}
+}
+do {
+  class Conformer: P42b {
+    func foo(_: Bool, _: String) {}
+  }
 }
 
 // Fails to find the fixed type witness B == FIXME_S1<A>.

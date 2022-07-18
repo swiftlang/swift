@@ -9,4 +9,47 @@ struct DoesNotConformToProtocol {
   int returnFortyTwo() { return 42; }
 };
 
+struct DummyStruct {};
+
+struct NonTrivial {
+  ~NonTrivial() {}
+  NonTrivial(DummyStruct) {}
+  NonTrivial() {}
+  void test1() {}
+  void test2(int) {}
+  char test3(int, unsigned) { return 42; }
+};
+
+struct Trivial {
+  Trivial(DummyStruct) {}
+  Trivial() {}
+  void test1() {}
+  void test2(int) {}
+  char test3(int, unsigned) { return 42; }
+};
+
+struct ReturnsNullableValue {
+  const int *returnPointer() { return nullptr; }
+};
+
+struct ReturnsNonNullValue {
+  const int *returnPointer() __attribute__((returns_nonnull)) {
+    return (int *)this;
+  }
+};
+
+struct HasOperatorExclaim {
+  int value;
+
+  HasOperatorExclaim operator!() const { return {-value}; }
+};
+
+struct HasOperatorEqualEqual {
+  int value;
+  
+  bool operator==(const HasOperatorEqualEqual &other) const {
+    return value == other.value;
+  }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_PROTOCOL_CONFORMANCE_H

@@ -2,7 +2,7 @@
 
 protocol P {
   associatedtype A
-  // expected-note@-1 3{{protocol requires nested type 'A'; do you want to add it?}}
+  // expected-note@-1 5{{protocol requires nested type 'A'; do you want to add it?}}
 }
 
 struct S1<T> {}
@@ -20,11 +20,7 @@ struct S2<T> {}
 extension S2 where T : P {
   typealias A = Never
 }
-
-// Hack: This is OK to make SwiftUI work, which accidentally relies on the
-// incorrect behavior with a typealias whose underlying type is 'Never'
-// (so it didn't hit the compiler crash).
-extension S2 : P {}
+extension S2 : P {} // expected-error {{type 'S2<T>' does not conform to protocol 'P'}}
 
 // Here we have a suitable witness
 struct S3<T> {}
@@ -48,7 +44,7 @@ struct S5<T> {
   typealias A = Never where T : P
 }
 
-extension S5 : P {}
+extension S5 : P {} // expected-error {{type 'S5<T>' does not conform to protocol 'P'}}
 
 struct S6<T> {
   typealias A = Int where T == Int

@@ -45,6 +45,40 @@ bb0(%0 : $Int):
   return %d : $Int
 }
 
+sil @read_emptytuple : $@convention(thin) (@in_guaranteed ()) -> ()
+
+// CHECK-LABEL: sil @emptytuple_promotion1 : 
+// CHECK: store
+// CHECK-LABEL: } // end sil function 'emptytuple_promotion1'
+sil @emptytuple_promotion1 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $()
+  %2 = tuple ()
+  store %2 to %1 : $*()
+  %f = function_ref @read_emptytuple : $@convention(thin) (@in_guaranteed ()) -> ()
+  apply %f(%1) : $@convention(thin) (@in_guaranteed ()) -> ()
+  dealloc_stack %1 : $*()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @emptytuple_promotion2 : 
+// CHECK: store
+// CHECK: store
+// CHECK-LABEL: } // end sil function 'emptytuple_promotion2'
+sil @emptytuple_promotion2 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $()
+  %2 = alloc_stack $()
+  %3 = tuple ()
+  store %3 to %1 : $*()
+  copy_addr %2 to %1 : $*()
+  %f = function_ref @read_emptytuple : $@convention(thin) (@in_guaranteed ()) -> ()
+  apply %f(%1) : $@convention(thin) (@in_guaranteed ()) -> ()
+  dealloc_stack %2 : $*()
+  dealloc_stack %1 : $*()
+  return %3 : $()
+}
+
 // In this example we create two boxes. The first box is initialized and then
 // taken from to initialize the second box. This means that the first box must
 // be dealloc_boxed (since its underlying memory is considered invalid). In

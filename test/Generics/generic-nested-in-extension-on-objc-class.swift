@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-build-swift -module-name test %t/main.swift %S/inputs/generic-nested-in-extension-on-objc-class.swift -o %t/a.out
+// RUN: %target-build-swift -module-name test %t/main.swift %S/Inputs/generic-nested-in-extension-on-objc-class.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 

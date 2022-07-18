@@ -61,8 +61,8 @@
 /// `replaceSubrange(_:with:)` with an empty collection for the `newElements`
 /// parameter. You can override any of the protocol's required methods to
 /// provide your own custom implementation.
-public protocol RangeReplaceableCollection: Collection
-  where SubSequence: RangeReplaceableCollection {
+public protocol RangeReplaceableCollection<Element>: Collection
+where SubSequence: RangeReplaceableCollection {
   // FIXME: Associated type inference requires this.
   override associatedtype SubSequence
 
@@ -369,7 +369,7 @@ public protocol RangeReplaceableCollection: Collection
 
   // FIXME: Associated type inference requires these.
   @_borrowed
-  override subscript(bounds: Index) -> Element { get }
+  override subscript(position: Index) -> Element { get }
   override subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 

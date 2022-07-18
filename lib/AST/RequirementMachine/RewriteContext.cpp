@@ -9,18 +9,150 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// The RewriteContext is a global singleton object with three primary
+// responsibilities:
+//
+// - Arena allocation of uniqued immutable Symbols and Terms.
+// - Caching requirement machine instances corresponding to generic signatures,
+//   used for generic signature queries.
+// - Building the graph of protocol connected components, in support of the
+//   above.
+//
+// # Requirement machines for generic signatures
+//
+// The RewriteContext caches requirement machine instances built from generic
+// signatures. When a generic signature is performed for the first time,
+// a requirement machine is built for the generic signature by calling the
+// RewriteContext::getRequirementMachine() method.
+//
+// An optimization is performed if this signature was written in source. When
+// a new minimal generic signature is built from generic requirements, the
+// AbstractGenericSignatureRequest and InferredGenericSignatureRequest requests
+// transfer ownership of the requirement machine used for minimization to the
+// RewriteContext by calling the installRequirementMachine() method, which
+// associates this requirement machine with the newly-built generic signature.
+//
+// This saves the effort of rebuilding a new requirement machine from this
+// signature the first time a query is performed, which typically happens when
+// type checking the body of the generic declaration. 
+//
+// A requirement machine for a generic signature must include rewrite rules
+// for all requirements in protocols referenced from this signature as well.
+// Instead of rebuilding all of these rules every time a requirement machine
+// is created, the rewrite rules for protocols themselves are also cached in
+// the RewriteContext.
+//
+// # Protocol dependency graph
+//
+// The central concept behind this caching is the protocol dependency graph.
+// This graph records which protocols mention other protocols via conformance
+// requirements.
+//
+// Formally, the protocol dependency graph is a (directed) graph where the
+// vertices are protocols, and there is an edge from protocol P to a protocol Q
+// if P has a conformance requirement with Q on the right hand side.
+//
+// Consider these definitions:
+//
+//   protocol P1 : P2 {}
+//   protocol P2 { associatedtype T : P3; associatedtype V : P4 }
+//   protocol P3 { associatedtype U : P2; associatedtype V : P5 }
+//   protocol P4 {}
+//
+// P1 has a dependency on P2; P2 and P3 depend on each other; P2 depends on P4,
+// and finally, P3 depends on P5. The protocol dependency graph looks like this:
+//
+//             +----+
+//             | P1 |
+//             +----+
+//              /  \
+//             /    \
+//            /      \
+//           /        \
+//          /          \
+//         /            \
+//        v              v
+//     +----+  ----->  +----+
+//     | P2 |          | P3 |
+//     +----+  <-----  +----+
+//       |                |
+//       v                v
+//     +----+          +----+
+//     | P4 |          | P5 |
+//     +----+          +----+
+//
+// When building a rewrite system for a generic signature that includes a
+// conformance to protocol P2, we must include rewrite rules for P2, as well as
+// all protocols reachable from P2 via the protocol dependency graph: P3, P4,
+// and P5. Note that the set of all protocols reachable from P2 includes P3,
+// and the set of all protocols reachable from P3 includes P2; so if a generic
+// signature depends on one, it necessarily depends on the other.
+//
+// In general, this graph can contain cycles, as with P2 and P3 above. If we
+// compute the strongly connected components of the protocol dependency graph,
+// we get an acyclic graph:
+//
+//          +----+
+//          | P1 |
+//          +----+
+//            |
+//            v
+//        +-------+
+//        | P2 P3 |
+//        +-------+
+//          /   \
+//         /     \
+//        v       v
+//     +----+   +----+
+//     | P4 |   | P5 |
+//     +----+   +----+
+//
+// The vertices of this graph are the strongly connected components of the
+// original protocol dependency graph. Each connected component is a set of
+// protocols that are interdependent and must be considered together as a
+// single unit when building a rewrite system.
+//
+// # Requirement machines for protocol connected components
+//
+// The RewriteContext computes the protocol dependency graph and the associated
+// graph of connected components. When building a rewrite system for a generic
+// signature, the RuleBuilder queries the RewriteContext for the set of all
+// connected components reachable from all conformance requirements in the
+// generic signature.
+//
+// The RewriteContext associates a requirement machine to each connected
+// component. This requirement machine is created when needed by the
+// RewriteContext::getRequirementMachine(ProtocolDecl *) method.
+//
+// The rewrite rules from the requirement machine of each connected component
+// are then imported into the newly-built requirement machine for the generic
+// signature.
+//
+// If the protocol definitions in the connected component were parsed from
+// source, this requirement machine is constructed when evaluating
+// RequirementSignatureRequest, which computes a requirement signature for
+// each protocol in the component from user-written requirements, and then
+// saves the requirement machine in the RewriteContext by calling the
+// installRequirementMachine() method.
+//
+// If the protocol definitions came from a deserialized module, we build a
+// requirement machine from the previously-computed requirement signatures
+// of those protocols.
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "RequirementMachine.h"
 #include "RewriteSystem.h"
 #include "RewriteContext.h"
-#include "RequirementMachine.h"
 
 using namespace swift;
 using namespace rewriting;
 
-/// Build a DebugOptions by parsing a comma-separated list of debug flags.
+/// Parse a comma-separated list from the -debug-requirement-machine= frontend
+/// flag.
 static DebugOptions parseDebugFlags(StringRef debugFlags) {
   DebugOptions result;
 
@@ -30,14 +162,23 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
     auto flag = llvm::StringSwitch<Optional<DebugFlags>>(flagStr)
       .Case("simplify", DebugFlags::Simplify)
       .Case("add", DebugFlags::Add)
-      .Case("merge", DebugFlags::Merge)
       .Case("completion", DebugFlags::Completion)
+      .Case("property-map", DebugFlags::PropertyMap)
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
+      .Case("conditional-requirements", DebugFlags::ConditionalRequirements)
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
+      .Case("homotopy-reduction-detail", DebugFlags::HomotopyReductionDetail)
       .Case("minimal-conformances", DebugFlags::MinimalConformances)
+      .Case("minimal-conformances-detail", DebugFlags::MinimalConformancesDetail)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
       .Case("minimization", DebugFlags::Minimization)
+      .Case("redundant-rules", DebugFlags::RedundantRules)
+      .Case("redundant-rules-detail", DebugFlags::RedundantRulesDetail)
+      .Case("concrete-contraction", DebugFlags::ConcreteContraction)
+      .Case("propagate-requirement-ids", DebugFlags::PropagateRequirementIDs)
+      .Case("timers", DebugFlags::Timers)
+      .Case("conflicting-rules", DebugFlags::ConflictingRules)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
@@ -65,6 +206,41 @@ RewriteContext::RewriteContext(ASTContext &ctx)
   auto debugFlags = StringRef(ctx.LangOpts.DebugRequirementMachine);
   if (!debugFlags.empty())
     Debug = parseDebugFlags(debugFlags);
+}
+
+void RewriteContext::beginTimer(StringRef name) {
+  auto now = std::chrono::system_clock::now();
+  auto dur = now.time_since_epoch();
+
+  for (unsigned i = 0; i < Timers.size(); ++i)
+    llvm::dbgs() << "| ";
+  llvm::dbgs() << "+ started " << name << " ";
+
+  Timers.push_back(std::chrono::duration_cast<std::chrono::microseconds>(dur).count());
+}
+
+void RewriteContext::endTimer(StringRef name) {
+  auto now = std::chrono::system_clock::now();
+  auto dur = now.time_since_epoch();
+  auto time = (std::chrono::duration_cast<std::chrono::microseconds>(dur).count()
+               - Timers.back());
+  Timers.pop_back();
+
+  // If we're nested inside of another timer, don't charge our time to the parent.
+  if (!Timers.empty()) {
+    Timers.back() += time;
+  }
+
+  for (unsigned i = 0; i < Timers.size(); ++i)
+    llvm::dbgs() << "| ";
+
+  llvm::dbgs() << "+ ";
+
+  if (time > 100000)
+    llvm::dbgs() << "**** SLOW **** ";
+
+  llvm::dbgs() << "finished " << name << " in " << time << "us: ";
+
 }
 
 const llvm::TinyPtrVector<const ProtocolDecl *> &
@@ -98,423 +274,15 @@ RewriteContext::getInheritedProtocols(const ProtocolDecl *proto) {
   return result;
 }
 
-unsigned RewriteContext::getProtocolSupport(
-    const ProtocolDecl *proto) {
-  return getInheritedProtocols(proto).size() + 1;
-}
-
-unsigned RewriteContext::getProtocolSupport(
-    ArrayRef<const ProtocolDecl *> protos) {
-  auto found = Support.find(protos);
-  if (found != Support.end())
-    return found->second;
-
-  unsigned result;
-  if (protos.size() == 1) {
-    result = getProtocolSupport(protos[0]);
-  } else {
-    llvm::DenseSet<const ProtocolDecl *> visited;
-    for (const auto *proto : protos) {
-      visited.insert(proto);
-      for (const auto *inheritedProto : getInheritedProtocols(proto))
-        visited.insert(inheritedProto);
-    }
-
-    result = visited.size();
-  }
-
-  Support[protos] = result;
-  return result;
-}
-
 int RewriteContext::compareProtocols(const ProtocolDecl *lhs,
                                      const ProtocolDecl *rhs) {
-  unsigned lhsSupport = getProtocolSupport(lhs);
-  unsigned rhsSupport = getProtocolSupport(rhs);
+  unsigned lhsSupport = getInheritedProtocols(lhs).size();
+  unsigned rhsSupport = getInheritedProtocols(rhs).size();
 
   if (lhsSupport != rhsSupport)
     return rhsSupport - lhsSupport;
 
   return TypeDecl::compare(lhs, rhs);
-}
-
-Term RewriteContext::getTermForType(CanType paramType,
-                                    const ProtocolDecl *proto) {
-  return Term::get(getMutableTermForType(paramType, proto), *this);
-}
-
-/// Map an interface type to a term.
-///
-/// If \p proto is null, this is a term relative to a generic
-/// parameter in a top-level signature. The term is rooted in a generic
-/// parameter symbol.
-///
-/// If \p proto is non-null, this is a term relative to a protocol's
-/// 'Self' type. The term is rooted in a protocol symbol for this protocol,
-/// or an associated type symbol for some associated type in this protocol.
-///
-/// Resolved DependentMemberTypes map to associated type symbols.
-/// Unresolved DependentMemberTypes map to name symbols.
-///
-/// Note the behavior of the root term is special if it is an associated
-/// type symbol. The protocol of the associated type is always mapped to
-/// \p proto if it was provided. This ensures we get the correct behavior
-/// if a protocol places a constraint on an associated type inherited from
-/// another protocol:
-///
-/// protocol P {
-///   associatedtype Foo
-/// }
-///
-/// protocol Q : P where Foo : R {}
-///
-/// protocol R {}
-///
-/// The DependentMemberType in the requirement signature of Q refers to
-/// P::Foo.
-///
-/// However, we want Q's requirement signature to introduce the rewrite rule
-///
-///   [Q:Foo].[R] => [Q:Foo]
-///
-/// and not
-///
-///   [P:Foo].[R] => [P:Foo]
-///
-/// This is because the rule only applies to Q's logical override of Foo, and
-/// not P's Foo.
-///
-/// To handle this, getMutableTermForType() behaves as follows:
-///
-/// Self.P::Foo with proto = P         => [P:Foo]
-/// Self.P::Foo with proto = Q         => [Q:Foo]
-/// τ_0_0.P::Foo with proto == nullptr => τ_0_0.[P:Foo]
-///
-MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
-                                                  const ProtocolDecl *proto) {
-  assert(paramType->isTypeParameter());
-
-  // Collect zero or more nested type names in reverse order.
-  bool innermostAssocTypeWasResolved = false;
-
-  SmallVector<Symbol, 3> symbols;
-  while (auto memberType = dyn_cast<DependentMemberType>(paramType)) {
-    paramType = memberType.getBase();
-
-    if (auto *assocType = memberType->getAssocType()) {
-      const auto *thisProto = assocType->getProtocol();
-      if (proto && isa<GenericTypeParamType>(paramType)) {
-        thisProto = proto;
-        innermostAssocTypeWasResolved = true;
-      }
-      symbols.push_back(Symbol::forAssociatedType(thisProto,
-                                                  assocType->getName(),
-                                                  *this));
-    } else {
-      symbols.push_back(Symbol::forName(memberType->getName(), *this));
-      innermostAssocTypeWasResolved = false;
-    }
-  }
-
-  // Add the root symbol at the end.
-  if (proto) {
-    assert(proto->getSelfInterfaceType()->isEqual(paramType));
-
-    // Self.Foo becomes [P].Foo
-    // Self.Q::Foo becomes [P:Foo] (not [Q:Foo] or [P].[Q:Foo])
-    if (!innermostAssocTypeWasResolved)
-      symbols.push_back(Symbol::forProtocol(proto, *this));
-  } else {
-    symbols.push_back(Symbol::forGenericParam(
-        cast<GenericTypeParamType>(paramType), *this));
-  }
-
-  std::reverse(symbols.begin(), symbols.end());
-
-  return MutableTerm(symbols);
-}
-
-/// Map an associated type symbol to an associated type declaration.
-///
-/// Note that the protocol graph is not part of the caching key; each
-/// protocol graph is a subgraph of the global inheritance graph, so
-/// the specific choice of subgraph does not change the result.
-AssociatedTypeDecl *RewriteContext::getAssociatedTypeForSymbol(Symbol symbol) {
-  auto found = AssocTypes.find(symbol);
-  if (found != AssocTypes.end())
-    return found->second;
-
-  assert(symbol.getKind() == Symbol::Kind::AssociatedType);
-  auto name = symbol.getName();
-
-  AssociatedTypeDecl *assocType = nullptr;
-
-  // An associated type symbol [P1&P1&...&Pn:A] has one or more protocols
-  // P0...Pn and an identifier 'A'.
-  //
-  // We map it back to a AssociatedTypeDecl as follows:
-  //
-  // - For each protocol Pn, look for associated types A in Pn itself,
-  //   and all protocols that Pn refines.
-  //
-  // - For each candidate associated type An in protocol Qn where
-  //   Pn refines Qn, get the associated type anchor An' defined in
-  //   protocol Qn', where Qn refines Qn'.
-  //
-  // - Out of all the candidiate pairs (Qn', An'), pick the one where
-  //   the protocol Qn' is the lowest element according to the linear
-  //   order defined by TypeDecl::compare().
-  //
-  // The associated type An' is then the canonical associated type
-  // representative of the associated type symbol [P0&...&Pn:A].
-  //
-  for (auto *proto : symbol.getProtocols()) {
-    auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
-      otherAssocType = otherAssocType->getAssociatedTypeAnchor();
-
-      if (otherAssocType->getName() == name &&
-          (assocType == nullptr ||
-           TypeDecl::compare(otherAssocType->getProtocol(),
-                             assocType->getProtocol()) < 0)) {
-        assocType = otherAssocType;
-      }
-    };
-
-    for (auto *otherAssocType : proto->getAssociatedTypeMembers()) {
-      checkOtherAssocType(otherAssocType);
-    }
-
-    for (auto *inheritedProto : getInheritedProtocols(proto)) {
-      for (auto *otherAssocType : inheritedProto->getAssociatedTypeMembers()) {
-        checkOtherAssocType(otherAssocType);
-      }
-    }
-  }
-
-  assert(assocType && "Need to look harder");
-  AssocTypes[symbol] = assocType;
-  return assocType;
-}
-
-/// Compute the interface type for a range of symbols, with an optional
-/// root type.
-///
-/// If the root type is specified, we wrap it in a series of
-/// DependentMemberTypes. Otherwise, the root is computed from
-/// the first symbol of the range.
-template<typename Iter>
-Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
-                           TypeArrayView<GenericTypeParamType> genericParams,
-                           const RewriteContext &ctx) {
-  Type result = root;
-
-  auto handleRoot = [&](GenericTypeParamType *genericParam) {
-    assert(genericParam->isCanonical());
-
-    if (!genericParams.empty()) {
-      // Return a sugared GenericTypeParamType if we're given an array of
-      // sugared types to substitute.
-      unsigned index = GenericParamKey(genericParam).findIndexIn(genericParams);
-      result = genericParams[index];
-      return;
-    }
-
-    // Otherwise, we're going to return a canonical type.
-    result = genericParam;
-  };
-
-  for (; begin != end; ++begin) {
-    auto symbol = *begin;
-
-    if (!result) {
-      // A valid term always begins with a generic parameter, protocol or
-      // associated type symbol.
-      switch (symbol.getKind()) {
-      case Symbol::Kind::GenericParam:
-        handleRoot(symbol.getGenericParam());
-        continue;
-
-      case Symbol::Kind::Protocol:
-        handleRoot(GenericTypeParamType::get(/*type sequence*/ false, 0, 0,
-                                             ctx.getASTContext()));
-        continue;
-
-      case Symbol::Kind::AssociatedType:
-        handleRoot(GenericTypeParamType::get(/*type sequence*/ false, 0, 0,
-                                             ctx.getASTContext()));
-
-        // An associated type term at the root means we have a dependent
-        // member type rooted at Self; handle the associated type below.
-        break;
-
-      case Symbol::Kind::Name:
-      case Symbol::Kind::Layout:
-      case Symbol::Kind::Superclass:
-      case Symbol::Kind::ConcreteType:
-      case Symbol::Kind::ConcreteConformance:
-        llvm_unreachable("Term has invalid root symbol");
-      }
-    }
-
-    // An unresolved type can appear if we have invalid requirements.
-    if (symbol.getKind() == Symbol::Kind::Name) {
-      result = DependentMemberType::get(result, symbol.getName());
-      continue;
-    }
-
-    // We can end up with an unsimplified term like this:
-    //
-    // X.[P].[P:X]
-    //
-    // Simplification will rewrite X.[P] to X, so just ignore a protocol symbol
-    // in the middle of a term.
-    if (symbol.getKind() == Symbol::Kind::Protocol) {
-#ifndef NDEBUG
-      // Ensure that the domain of the suffix contains P.
-      if (begin + 1 < end) {
-        auto protos = (begin + 1)->getProtocols();
-        assert(std::find(protos.begin(), protos.end(), symbol.getProtocol()));
-      }
-#endif
-      continue;
-    }
-
-    // We should have a resolved type at this point.
-    auto *assocType =
-        const_cast<RewriteContext &>(ctx)
-            .getAssociatedTypeForSymbol(symbol);
-    result = DependentMemberType::get(result, assocType);
-  }
-
-  return result;
-}
-
-Type RewriteContext::getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const {
-  return getTypeForSymbolRange(term.begin(), term.end(), Type(),
-                               genericParams, *this);
-}
-
-Type RewriteContext::getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const {
-  return getTypeForSymbolRange(term.begin(), term.end(), Type(),
-                               genericParams, *this);
-}
-
-Type RewriteContext::getRelativeTypeForTerm(
-    const MutableTerm &term, const MutableTerm &prefix) const {
-  assert(std::equal(prefix.begin(), prefix.end(), term.begin()));
-
-  auto genericParam =
-      CanGenericTypeParamType::get(/*type sequence*/ false, 0, 0, Context);
-  return getTypeForSymbolRange(
-      term.begin() + prefix.size(), term.end(), genericParam,
-      { }, *this);
-}
-
-/// Concrete type terms are written in terms of generic parameter types that
-/// have a depth of 0, and an index into an array of substitution terms.
-///
-/// See RewriteSystemBuilder::getConcreteSubstitutionSchema().
-static unsigned getGenericParamIndex(Type type) {
-  auto *paramTy = type->castTo<GenericTypeParamType>();
-  assert(paramTy->getDepth() == 0);
-  return paramTy->getIndex();
-}
-
-/// Computes the term corresponding to a member type access on a substitution.
-///
-/// The type witness is a type parameter of the form τ_0_n.X.Y.Z,
-/// where 'n' is an index into the substitution array.
-///
-/// If the nth entry in the array is S, this will produce S.X.Y.Z.
-///
-/// There is a special behavior if the substitution is a term consisting of a
-/// single protocol symbol [P]. If the innermost associated type in
-/// \p typeWitness is [Q:Foo], the result will be [P:Foo], not [P].[Q:Foo] or
-/// [Q:Foo].
-MutableTerm
-RewriteContext::getRelativeTermForType(CanType typeWitness,
-                                       ArrayRef<Term> substitutions) {
-  MutableTerm result;
-
-  // Get the substitution S corresponding to τ_0_n.
-  unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
-  result = MutableTerm(substitutions[index]);
-
-  // If the substitution is a term consisting of a single protocol symbol
-  // [P], save P for later.
-  const ProtocolDecl *proto = nullptr;
-  if (result.size() == 1 &&
-      result[0].getKind() == Symbol::Kind::Protocol) {
-    proto = result[0].getProtocol();
-  }
-
-  // Collect zero or more member type names in reverse order.
-  SmallVector<Symbol, 3> symbols;
-  while (auto memberType = dyn_cast<DependentMemberType>(typeWitness)) {
-    typeWitness = memberType.getBase();
-
-    auto *assocType = memberType->getAssocType();
-    assert(assocType != nullptr &&
-           "Conformance checking should not produce unresolved member types");
-
-    // If the substitution is a term consisting of a single protocol symbol [P],
-    // produce [P:Foo] instead of [P].[Q:Foo] or [Q:Foo].
-    const auto *thisProto = assocType->getProtocol();
-    if (proto && isa<GenericTypeParamType>(typeWitness)) {
-      thisProto = proto;
-
-      assert(result.size() == 1);
-      assert(result[0].getKind() == Symbol::Kind::Protocol);
-      assert(result[0].getProtocol() == proto);
-      result = MutableTerm();
-    }
-
-    symbols.push_back(Symbol::forAssociatedType(thisProto,
-                                                assocType->getName(), *this));
-  }
-
-  // Add the member type names.
-  for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
-    result.add(*iter);
-
-  return result;
-}
-
-/// Reverses the transformation performed by
-/// RewriteSystemBuilder::getConcreteSubstitutionSchema().
-Type RewriteContext::getTypeFromSubstitutionSchema(
-    Type schema, ArrayRef<Term> substitutions,
-    TypeArrayView<GenericTypeParamType> genericParams,
-    const MutableTerm &prefix) const {
-  assert(!schema->isTypeParameter() && "Must have a concrete type here");
-
-  if (!schema->hasTypeParameter())
-    return schema;
-
-  return schema.transformRec([&](Type t) -> Optional<Type> {
-    if (t->is<GenericTypeParamType>()) {
-      auto index = getGenericParamIndex(t);
-      auto substitution = substitutions[index];
-
-      // Prepend the prefix of the lookup key to the substitution.
-      if (prefix.empty()) {
-        // Skip creation of a new MutableTerm in the case where the
-        // prefix is empty.
-        return getTypeForTerm(substitution, genericParams);
-      } else {
-        // Otherwise build a new term by appending the substitution
-        // to the prefix.
-        MutableTerm result(prefix);
-        result.append(substitution);
-        return getTypeForTerm(result, genericParams);
-      }
-    }
-
-    assert(!t->isTypeParameter());
-    return None;
-  });
 }
 
 RequirementMachine *RewriteContext::getRequirementMachine(
@@ -530,15 +298,26 @@ RequirementMachine *RewriteContext::getRequirementMachine(
     return machine;
   }
 
+  if (Debug.contains(DebugFlags::Timers)) {
+    beginTimer("getRequirementMachine()");
+    llvm::dbgs() << sig << "\n";
+  }
+
   // Store this requirement machine before adding the signature,
   // to catch re-entrant construction via initWithGenericSignature()
   // below.
   auto *newMachine = new rewriting::RequirementMachine(*this);
   machine = newMachine;
 
-  // This might re-entrantly invalidate 'machine', which is a reference
-  // into Protos.
-  newMachine->initWithGenericSignature(sig);
+  // This might re-entrantly invalidate 'machine'.
+  auto status = newMachine->initWithGenericSignature(sig);
+  newMachine->checkCompletionResult(status.first);
+
+  if (Debug.contains(DebugFlags::Timers)) {
+    endTimer("getRequirementMachine()");
+    llvm::dbgs() << sig << "\n";
+  }
+
   return newMachine;
 }
 
@@ -549,6 +328,23 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
     return false;
 
   return !found->second->isComplete();
+}
+
+/// Given a requirement machine that built a minimized signature, attempt to
+/// re-use it for subsequent queries against the minimized signature, instead
+/// of building a new one later.
+void RewriteContext::installRequirementMachine(
+    CanGenericSignature sig,
+    std::unique_ptr<RequirementMachine> machine) {
+  if (!Context.LangOpts.EnableRequirementMachineReuse)
+    return;
+
+  auto &entry = Machines[sig];
+  if (entry != nullptr)
+    return;
+
+  machine->freeze();
+  entry = machine.release();
 }
 
 /// Implement Tarjan's algorithm to compute strongly-connected components in
@@ -571,7 +367,10 @@ void RewriteContext::getProtocolComponentRec(
   stack.push_back(proto);
 
   // Look at each successor.
-  for (auto *depProto : proto->getProtocolDependencies()) {
+  auto found = Dependencies.find(proto);
+  assert(found != Dependencies.end());
+
+  for (auto *depProto : found->second) {
     auto found = Protos.find(depProto);
     if (found == Protos.end()) {
       // Successor has not yet been visited. Recurse.
@@ -624,45 +423,161 @@ void RewriteContext::getProtocolComponentRec(
   }
 }
 
-/// Lazily construct a requirement machine for the given protocol's strongly
-/// connected component (SCC) in the protocol dependency graph.
+/// Get the strongly connected component (SCC) of the protocol dependency
+/// graph containing the given protocol.
 ///
-/// This can only be called once, to prevent multiple requirement machines
-/// for being built with the same component.
-ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
-    const ProtocolDecl *proto) {
+/// You must not hold on to this reference across calls to any other
+/// Requirement Machine operations, since they might insert new entries
+/// into the underlying DenseMap, invalidating the reference.
+RewriteContext::ProtocolComponent &
+RewriteContext::getProtocolComponentImpl(const ProtocolDecl *proto) {
+  {
+    // We pre-load protocol dependencies into the Dependencies map
+    // because getProtocolDependencies() can trigger recursive calls into
+    // the requirement machine in highly-invalid code, which violates
+    // invariants in getProtocolComponentRec().
+    SmallVector<const ProtocolDecl *, 3> worklist;
+    worklist.push_back(proto);
+
+    while (!worklist.empty()) {
+      const auto *otherProto = worklist.back();
+      worklist.pop_back();
+
+      auto found = Dependencies.find(otherProto);
+      if (found != Dependencies.end())
+        continue;
+
+      auto protoDeps = otherProto->getProtocolDependencies();
+      Dependencies.insert(std::make_pair(otherProto, protoDeps));
+      for (auto *nextProto : protoDeps)
+        worklist.push_back(nextProto);
+    }
+  }
+
   auto found = Protos.find(proto);
   if (found == Protos.end()) {
+    if (ProtectProtocolComponentRec) {
+      llvm::errs() << "Too much recursion is bad\n";
+      abort();
+    }
+
+    ProtectProtocolComponentRec = true;
+
     SmallVector<const ProtocolDecl *, 3> stack;
     getProtocolComponentRec(proto, stack);
     assert(stack.empty());
 
     found = Protos.find(proto);
     assert(found != Protos.end());
+
+    ProtectProtocolComponentRec = false;
   }
 
   assert(Components.count(found->second.ComponentID) != 0);
   auto &component = Components[found->second.ComponentID];
 
-  if (component.InProgress) {
-    llvm::errs() << "Re-entrant construction of requirement "
-                 << "machine for:";
+  assert(std::find(component.Protos.begin(), component.Protos.end(), proto)
+         != component.Protos.end() && "Protocol is in the wrong SCC");
+  return component;
+}
+
+/// Get the list of protocols in the strongly connected component (SCC)
+/// of the protocol dependency graph containing the given protocol.
+///
+/// This can only be called once, to prevent multiple requirement machines
+/// for being built with the same component.
+ArrayRef<const ProtocolDecl *>
+RewriteContext::startComputingRequirementSignatures(
+    const ProtocolDecl *proto) {
+  auto &component = getProtocolComponentImpl(proto);
+
+  if (component.ComputingRequirementSignatures) {
+    llvm::errs() << "Re-entrant minimization of requirement signatures for: ";
     for (auto *proto : component.Protos)
       llvm::errs() << " " << proto->getName();
     llvm::errs() << "\n";
     abort();
   }
 
-  component.InProgress = true;
+  component.ComputingRequirementSignatures = true;
 
   return component.Protos;
 }
 
+/// Mark the component as having completed, which will ensure that
+/// isRecursivelyComputingRequirementMachine() returns false.
+void RewriteContext::finishComputingRequirementSignatures(
+    const ProtocolDecl *proto) {
+  auto &component = getProtocolComponentImpl(proto);
+
+  assert(component.ComputingRequirementSignatures &&
+         "Didn't call startComputingRequirementSignatures()");
+  component.ComputedRequirementSignatures = true;
+}
+
+/// Get the list of protocols in the strongly connected component (SCC)
+/// of the protocol dependency graph containing the given protocol.
+///
+/// This can only be called once, to prevent multiple requirement machines
+/// for being built with the same component.
+RequirementMachine *RewriteContext::getRequirementMachine(
+    const ProtocolDecl *proto) {
+  // First, get the requirement signature. If this protocol was written in
+  // source, we'll minimize it and install the machine below, saving us the
+  // effort of recomputing it.
+  (void) proto->getRequirementSignature();
+
+  auto &component = getProtocolComponentImpl(proto);
+
+  if (component.Machine) {
+    if (!component.Machine->isComplete()) {
+      llvm::errs() << "Re-entrant construction of requirement machine for: ";
+      for (auto *proto : component.Protos)
+        llvm::errs() << " " << proto->getName();
+      llvm::errs() << "\n";
+      abort();
+    }
+
+    return component.Machine;
+  }
+
+  auto protos = component.Protos;
+
+  if (Debug.contains(DebugFlags::Timers)) {
+    beginTimer("getRequirementMachine()");
+    llvm::dbgs() << "[";
+    for (auto *proto : protos)
+      llvm::dbgs() << " " << proto->getName();
+    llvm::dbgs() << " ]\n";
+  }
+
+  // Store this requirement machine before adding the protocols, to catch
+  // re-entrant construction via initWithProtocolSignatureRequirements()
+  // below.
+  auto *newMachine = new rewriting::RequirementMachine(*this);
+  component.Machine = newMachine;
+
+  // This might re-entrantly invalidate 'component.Machine'.
+  auto status = newMachine->initWithProtocolSignatureRequirements(protos);
+  newMachine->checkCompletionResult(status.first);
+
+  if (Debug.contains(DebugFlags::Timers)) {
+    endTimer("getRequirementMachine()");
+    llvm::dbgs() << "[";
+    for (auto *proto : protos)
+      llvm::dbgs() << " " << proto->getName();
+    llvm::dbgs() << " ]\n";
+  }
+
+  return newMachine;
+}
+
+/// Note: This doesn't use Evaluator::hasActiveRequest(), because in reality
+/// the active request could be for any protocol in the connected component.
+///
+/// Instead, just check a flag set in the component itself.
 bool RewriteContext::isRecursivelyConstructingRequirementMachine(
     const ProtocolDecl *proto) {
-  if (proto->isRequirementSignatureComputed())
-    return false;
-
   auto found = Protos.find(proto);
   if (found == Protos.end())
     return false;
@@ -671,12 +586,38 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
   if (component == Components.end())
     return false;
 
-  return component->second.InProgress;
+  // If we've started but not finished, we're in the middle of computing
+  // requirement signatures.
+  return (component->second.ComputingRequirementSignatures &&
+          !component->second.ComputedRequirementSignatures);
+}
+
+/// Given a requirement machine that built the requirement signatures for a
+/// protocol connected component, attempt to re-use it for subsequent
+/// queries against the connected component, instead of building a new one
+/// later.
+void RewriteContext::installRequirementMachine(
+    const ProtocolDecl *proto,
+    std::unique_ptr<RequirementMachine> machine) {
+  if (!Context.LangOpts.EnableRequirementMachineReuse)
+    return;
+
+  auto &component = getProtocolComponentImpl(proto);
+  if (component.Machine != nullptr)
+    return;
+
+  machine->freeze();
+  component.Machine = machine.release();
 }
 
 /// We print stats in the destructor, which should get executed at the end of
 /// a compilation job.
 RewriteContext::~RewriteContext() {
+  for (const auto &pair : Components)
+    delete pair.second.Machine;
+
+  Components.clear();
+
   for (const auto &pair : Machines)
     delete pair.second;
 
@@ -698,7 +639,7 @@ RewriteContext::~RewriteContext() {
     PropertyTrieRootHistogram.dump(llvm::dbgs());
     llvm::dbgs() << "\n* Conformance rules:\n";
     ConformanceRulesHistogram.dump(llvm::dbgs());
-    llvm::dbgs() << "\n* Generating conformance equations:\n";
+    llvm::dbgs() << "\n* Minimal conformance equations:\n";
     MinimalConformancesHistogram.dump(llvm::dbgs());
   }
 }

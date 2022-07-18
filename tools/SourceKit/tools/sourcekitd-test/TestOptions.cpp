@@ -151,6 +151,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Case("dependency-updated", SourceKitRequest::DependencyUpdated)
         .Case("diags", SourceKitRequest::Diagnostics)
+        .Case("compile", SourceKitRequest::Compile)
+        .Case("compile.close", SourceKitRequest::CompileClose)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/IDE/RefactoringKinds.def"
         .Default(SourceKitRequest::None);
@@ -440,6 +442,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_disable_implicit_concurrency_module_import:
       DisableImplicitConcurrencyModuleImport = true;
+      break;
+
+    case OPT_disable_implicit_string_processing_module_import:
+      DisableImplicitStringProcessingModuleImport = true;
       break;
 
     case OPT_UNKNOWN:

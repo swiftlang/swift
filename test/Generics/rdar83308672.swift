@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
 
 // CHECK: rdar83308672.(file).A@
-// CHECK-NEXT: Requirement signature: <Self where Self == Self.X.T, Self.X : P1, Self.Y : P2>
+// CHECK-NEXT: Requirement signature: <Self where Self == Self.[A]X.[P1]T, Self.[A]X : P1, Self.[A]Y : P2>
 protocol A {
   associatedtype X : P1
   associatedtype Y : P2
@@ -15,13 +15,13 @@ protocol P1 {
 }
 
 // CHECK: rdar83308672.(file).P2@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : B>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P2]T : B>
 protocol P2 {
   associatedtype T : B
 }
 
 // CHECK: rdar83308672.(file).B@
-// CHECK-NEXT: Requirement signature: <Self where Self.X == Self.Y>
+// CHECK-NEXT: Requirement signature: <Self where Self.[B]X == Self.[B]Y>
 protocol B {
   associatedtype X
   associatedtype Y
@@ -32,25 +32,25 @@ protocol B {
 // we can drop one requirement but not both.
 
 // CHECK: rdar83308672.(file).G1@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
+// CHECK-NEXT: Requirement signature: <Self where Self.[G1]T : A, Self.[G1]T.[A]X == Self.[G1]T.[A]Y>
 protocol G1 {
   associatedtype T : A where T.X == T.Y
 }
 
 // CHECK: rdar83308672.(file).G2@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
+// CHECK-NEXT: Requirement signature: <Self where Self.[G2]T : A, Self.[G2]T.[A]X == Self.[G2]T.[A]Y>
 protocol G2 {
-  associatedtype T : A where T : B, T.X == T.Y
+  associatedtype T : A where T : B, T.X == T.Y // expected-warning {{redundant conformance constraint 'Self.T' : 'B'}}
 }
 
 // CHECK: rdar83308672.(file).G3@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
+// CHECK-NEXT: Requirement signature: <Self where Self.[G3]T : A, Self.[G3]T.[A]X == Self.[G3]T.[A]Y>
 protocol G3 {
-  associatedtype T : A where T.X == T.Y, T : B
+  associatedtype T : A where T.X == T.Y, T : B // expected-warning {{redundant conformance constraint 'Self.T' : 'B'}}
 }
 
 // CHECK: rdar83308672.(file).G4@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
+// CHECK-NEXT: Requirement signature: <Self where Self.[G4]T : A, Self.[G4]T.[A]X == Self.[G4]T.[A]Y>
 protocol G4 {
   associatedtype T : A where T : B
 }

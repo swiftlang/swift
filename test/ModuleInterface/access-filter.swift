@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface %s -module-name AccessFilter
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name AccessFilter
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name AccessFilter
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.swiftinterface
 
@@ -109,7 +110,7 @@ extension UFIProto {
 
 // CHECK: extension AccessFilter.PublicStruct {{[{]$}}
 extension PublicStruct {
-  // CHECK: @_hasInitialValue public static var secretlySettable: Swift.Int {
+  // CHECK: public static var secretlySettable: Swift.Int {
   // CHECK-NEXT: get
   // CHECK-NEXT: }
   public private(set) static var secretlySettable: Int = 0
@@ -123,12 +124,11 @@ extension InternalStruct_BAD: PublicProto {
 // CHECK: extension AccessFilter.UFIStruct : AccessFilter.PublicProto {{[{]$}}
 extension UFIStruct: PublicProto {
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal typealias Assoc = Swift.Int
-
-  // FIXME: Is it okay for this non-@usableFromInline implementation to satisfy
-  // the protocol?
-  func requirement() {}
+  // CHECK-NEXT: internal func requirement()
+  @usableFromInline func requirement() {}
   internal static var dummy: Int { return 0 }
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal typealias Assoc = Swift.Int
 } // CHECK-NEXT: {{^[}]$}}
 
 // CHECK: public enum PublicEnum {{[{]$}}
@@ -245,12 +245,12 @@ internal typealias InternalAlias_BAD = PublicAliasBase
 
 internal typealias ReallyInternalAlias_BAD = ReallyInternalAliasBase_BAD
 
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicAlias {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicAliasBase {{[{]$}}
 extension GenericStruct where T == PublicAlias {
   // CHECK-NEXT: public func constrainedToPublicAlias(){{$}}
   public func constrainedToPublicAlias() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.UFIAlias {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicAliasBase {{[{]$}}
 extension GenericStruct where T == UFIAlias {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIAlias(){{$}}

@@ -24,6 +24,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -212,7 +213,7 @@ void swift::runSILLoweringPasses(SILModule &Module) {
                           SILPassPipelinePlan::getLoweringPassPipeline(opts),
                           /*isMandatory*/ true);
 
-  assert(Module.getStage() == SILStage::Lowered);
+  Module.setStage(SILStage::Lowered);
 }
 
 /// Registered briged pass run functions.
@@ -240,10 +241,10 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
     llvm::errs() << "SILFunction metatype is not registered\n";
     abort();
   }
-  runFunction({{f}, {passManager->getLibswiftPassInvocation()}});
+  runFunction({{f}, {passManager->getSwiftPassInvocation()}});
 }
 
-// Called from libswift's initializeLibSwift().
+// Called from initializeSwiftModules().
 void SILPassManager_registerFunctionPass(BridgedStringRef name,
                                          BridgedFunctionPassRunFn runFn) {
   bridgedPassRunFunctions[getStringRef(name)] = runFn;

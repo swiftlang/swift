@@ -56,6 +56,27 @@ bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
   return false;
 }
 
+/// Determine if a symbol name is ignored when validating the TBD's contents
+/// against the IR's.
+///
+/// \param name The name of the symbol in question.
+/// \param IRModule The module being validated.
+///
+/// \returns Whether or not the presence or absence of the symbol named \a name
+///   should be ignored (instead of potentially producing a diagnostic.)
+static bool isSymbolIgnored(const StringRef& name,
+                            const llvm::Module &IRModule) {
+  if (llvm::Triple(IRModule.getTargetTriple()).isOSWindows()) {
+    // (SR-15938) Error when referencing #dsohandle in a Swift test on Windows
+    // On Windows, ignore the lack of __ImageBase in the TBD file.
+    if (name == "__ImageBase") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static bool validateSymbols(DiagnosticEngine &diags,
                             const std::vector<std::string> &symbols,
                             const llvm::Module &IRModule,
@@ -76,6 +97,11 @@ static bool validateSymbols(DiagnosticEngine &diags,
     // symbol table, so make sure to mangle IRGen names before comparing them
     // with what TBDGen created.
     auto unmangledName = nameValue.getKey();
+
+    if (isSymbolIgnored(unmangledName, IRModule)) {
+      // This symbol should not affect validation. Skip it.
+      continue;
+    }
 
     SmallString<128> name;
     llvm::Mangler::getNameWithPrefix(name, unmangledName,

@@ -1,21 +1,21 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
 //
 // REQUIRES: executable_test
+// XFAIL: OS=windows-msvc
 
 import StdlibUnittest
+import CxxShim
 import POD
 
-//  TODO: Waiting on foreign reference type metadata implementation.
-//
-//  struct StructHoldingPair {
-//    var pair: IntPair
-//  };
-//
-//  class ClassHoldingPair {
-//    var pair: IntPair
-//
-//    init(pair: IntPair) { self.pair = pair }
-//  };
+struct StructHoldingPair {
+  var pair: IntPair
+};
+
+class ClassHoldingPair {
+  var pair: IntPair
+
+  init(pair: IntPair) { self.pair = pair }
+};
 
 var globalPair: IntPair? = nil
 
@@ -106,33 +106,31 @@ PODTestSuite.test("RefHoldingPairPtr") {
   expectEqual(x.test(), 41)
 }
 
-//  TODO: Waiting on foreign reference types metadata implementation.
-//
-//  PODTestSuite.test("StructHoldingPair") {
-//   var x = StructHoldingPair(pair: IntPair.create())
-//   expectEqual(x.pair.test(), 1)
-//   expectEqual(x.pair.testMutable(), 1)
-//
-//   mutateIt(x.pair)
-//   expectEqual(x.pair.test(), 2)
-//   expectEqual(x.pair.testMutable(), 2)
-//
-//   x.pair = IntPair.create()
-//   expectEqual(x.pair.test(), 1)
-//  }
-//
-//  PODTestSuite.test("ClassHoldingPair") {
-//    var x = ClassHoldingPair(pair: IntPair.create())
-//    expectEqual(x.pair.test(), 1)
-//    expectEqual(x.pair.testMutable(), 1)
-//
-//    mutateIt(x.pair)
-//    expectEqual(x.pair.test(), 2)
-//    expectEqual(x.pair.testMutable(), 2)
-//
-//    x.pair = IntPair.create()
-//    expectEqual(x.pair.test(), 1)
-//  }
+PODTestSuite.test("StructHoldingPair") {
+  var x = StructHoldingPair(pair: IntPair.create())
+  expectEqual(x.pair.test(), 1)
+  expectEqual(x.pair.testMutable(), 1)
+
+  mutateIt(x.pair)
+  expectEqual(x.pair.test(), 2)
+  expectEqual(x.pair.testMutable(), 2)
+
+  x.pair = IntPair.create()
+  expectEqual(x.pair.test(), 1)
+}
+
+PODTestSuite.test("ClassHoldingPair") {
+  var x = ClassHoldingPair(pair: IntPair.create())
+  expectEqual(x.pair.test(), 1)
+  expectEqual(x.pair.testMutable(), 1)
+
+  mutateIt(x.pair)
+  expectEqual(x.pair.test(), 2)
+  expectEqual(x.pair.testMutable(), 2)
+
+  x.pair = IntPair.create()
+  expectEqual(x.pair.test(), 1)
+}
 
 PODTestSuite.test("BigType") {
   var x = BigType.create()
@@ -149,6 +147,20 @@ PODTestSuite.test("BigType") {
 
   x = BigType.create()
   expectEqual(x.test(), 1)
+}
+
+PODTestSuite.test("DerivedRef") {
+  var x = DerivedRef.create()
+  expectEqual(x.test(), 1)
+  expectEqual(x.testMutating(), 1)
+  expectEqual(x.testDerived(), 2)
+  expectEqual(x.testDerivedMutating(), 2)
+}
+
+PODTestSuite.test("BaseRef") {
+  var x = BaseRef.create()
+  expectEqual(x.test(), 1)
+  expectEqual(x.testMutating(), 1)
 }
 
 runAllTests()

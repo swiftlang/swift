@@ -747,8 +747,8 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                  charSourceRangeFromSourceRange(SM, ElemRange));
       }
     }
-    if (ForEachS->getSequence())
-      addExprElem(SyntaxStructureElementKind::Expr, ForEachS->getSequence(),SN);
+    if (auto *S = ForEachS->getParsedSequence())
+      addExprElem(SyntaxStructureElementKind::Expr, S, SN);
     pushStructureNode(SN, S);
 
   } else if (auto *WhileS = dyn_cast<WhileStmt>(S)) {
@@ -1619,10 +1619,10 @@ public:
     if (!advanceIf('-') || !advanceIf(' '))
       return None;
 
-    if (ptr == end || !clang::isIdentifierBody(*ptr))
+    if (ptr == end || !clang::isAsciiIdentifierContinue(*ptr))
       return None;
     const char *identStart = ptr++;
-    while (advanceIf([](char c) { return clang::isIdentifierBody(c); }))
+    while (advanceIf([](char c) { return clang::isAsciiIdentifierContinue(c); }))
       ;
     StringRef ident(identStart, ptr - identStart);
 

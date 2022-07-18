@@ -16,6 +16,7 @@ import Foundation
 // expected-provides {{NSObject}}
 // expected-provides {{Selector}}
 // expected-provides {{Bool}}
+// expected-provides {{ObjCBool}}
 // expected-provides {{==}}
 // expected-provides {{Equatable}}
 // expected-provides {{Hasher}}
@@ -80,7 +81,9 @@ import Foundation
 // expected-member {{ObjectiveC.NSObject.Hasher}}
 // expected-member {{ObjectiveC.NSObjectProtocol.hash}}
 
+// expected-member {{Swift.Hashable.init}}
 // expected-member {{Swift.Hashable.deinit}}
+// expected-member {{Swift.Equatable.init}}
 // expected-member {{Swift.Equatable.deinit}}
 
 // expected-member {{Swift.Hashable.==}}

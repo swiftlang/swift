@@ -42,22 +42,47 @@ typealias OtherAndP2 = Other & P2
 
 protocol P3 : class {}
 
+protocol P4 {}
+
 struct Unrelated {}
 
 //
 // If a class conforms to a protocol concretely, the resulting protocol
-// composition type should be equivalent to the class type.
-//
-// FIXME: Not implemented yet.
+// composition type should be equivalent to the class type for redeclaration
+// checking purposes.
 //
 
-func alreadyConforms<T>(_: Base<T>) {} // expected-note {{'alreadyConforms' previously declared here}}
-func alreadyConforms<T>(_: Base<T> & P1) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T>) {} // expected-note 3 {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T> & P1) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 func alreadyConforms<T>(_: Base<T> & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 func alreadyConforms<T>(_: Base<T> & P1 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 
-func alreadyConforms(_: P3) {}
-func alreadyConforms(_: P3 & AnyObject) {}
+func alreadyConformsMeta<T>(_: Base<T>.Type) {} // expected-note 7 {{'alreadyConformsMeta' previously declared here}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1).Protocol) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (any Base<T> & P1).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1 & AnyObject).Protocol) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (any Base<T> & P1 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+
+func alreadyConforms(_: P3) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms(_: P3 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
+
+func alreadyConformsMeta(_: P3.Type) {} // expected-note {{'alreadyConformsMeta' previously declared here}}
+func alreadyConformsMeta(_: (P3 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+
+func notARedeclaration(_: P4) {}
+func notARedeclaration(_: P4 & AnyObject) {}
+
+do {
+  class C: P4 {}
+  struct S<T: P4> {
+    // Don't crash when computing minimal compositions inside a generic context.
+    func redeclaration(_: C & P4) {} // expected-note {{'redeclaration' previously declared here}}
+    func redeclaration(_: C & P4) {} // expected-error {{invalid redeclaration of 'redeclaration'}}
+  }
+}
 
 // SE-0156 stipulates that a composition can contain multiple classes, as long
 // as they are all the same.
@@ -99,15 +124,15 @@ func basicSubtyping(
   // Errors
   let _: Base & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'P2'}}
   let _: Base<Int> & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'P2'}}
-  let _: P3 = baseAndP1 // expected-error {{value of type 'Base<Int> & P1' does not conform to specified type 'P3'}}
-  let _: P3 = baseAndP2 // expected-error {{value of type 'Base<Int> & P2' does not conform to specified type 'P3'}}
-  let _: Derived = baseAndP1 // expected-error {{cannot convert value of type 'Base<Int> & P1' to specified type 'Derived'}}
-  let _: Derived = baseAndP2 // expected-error {{cannot convert value of type 'Base<Int> & P2' to specified type 'Derived'}}
-  let _: Derived & P2 = baseAndP2 // expected-error {{cannot convert value of type 'Base<Int> & P2' to specified type 'Derived'}}
+  let _: P3 = baseAndP1 // expected-error {{value of type 'any Base<Int> & P1' does not conform to specified type 'P3'}}
+  let _: P3 = baseAndP2 // expected-error {{value of type 'any Base<Int> & P2' does not conform to specified type 'P3'}}
+  let _: Derived = baseAndP1 // expected-error {{cannot convert value of type 'any Base<Int> & P1' to specified type 'Derived'}}
+  let _: Derived = baseAndP2 // expected-error {{cannot convert value of type 'any Base<Int> & P2' to specified type 'Derived'}}
+  let _: Derived & P2 = baseAndP2 // expected-error {{cannot convert value of type 'any Base<Int> & P2' to specified type 'Derived'}}
 
-  let _ = Unrelated() as Derived & P2 // expected-error {{value of type 'Unrelated' does not conform to 'Derived & P2' in coercion}}
+  let _ = Unrelated() as Derived & P2 // expected-error {{cannot convert value of type 'Unrelated' to type 'any Derived & P2' in coercion}}
   let _ = Unrelated() as? Derived & P2 // expected-warning {{always fails}}
-  let _ = baseAndP2 as Unrelated // expected-error {{cannot convert value of type 'Base<Int> & P2' to type 'Unrelated' in coercion}}
+  let _ = baseAndP2 as Unrelated // expected-error {{cannot convert value of type 'any Base<Int> & P2' to type 'Unrelated' in coercion}}
   let _ = baseAndP2 as? Unrelated // expected-warning {{always fails}}
 
   // Different behavior on Linux vs Darwin because of id-as-Any.
@@ -200,26 +225,26 @@ func basicSubtyping(
   let _: Base<Int> & P2 = baseAndP2.protocolSelfReturn()
 
   // Downcasts
-  let _ = baseAndP2 as Derived //expected-error {{'Base<Int> & P2' is not convertible to 'Derived'}}
+  let _ = baseAndP2 as Derived //expected-error {{'any Base<Int> & P2' is not convertible to 'Derived'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{21-23=as!}}
   let _ = baseAndP2 as? Derived
   
-  let _ = baseAndP2 as Derived & P3 // expected-error {{'Base<Int> & P2' is not convertible to 'Derived & P3'}}
+  let _ = baseAndP2 as Derived & P3 // expected-error {{'any Base<Int> & P2' is not convertible to 'any Derived & P3'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{21-23=as!}}
   let _ = baseAndP2 as? Derived & P3
 
-  let _ = base as Derived & P2 //expected-error {{'Base<Int>' is not convertible to 'Derived & P2'}}
+  let _ = base as Derived & P2 //expected-error {{'Base<Int>' is not convertible to 'any Derived & P2'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}}
   let _ = base as? Derived & P2
 
   // Invalid cases
-  let _ = derived as Other & P2 // expected-error {{value of type 'Derived' does not conform to 'Other & P2' in coercion}}
+  let _ = derived as Other & P2 // expected-error {{cannot convert value of type 'Derived' to type 'any Other & P2' in coercion}}
   let _ = derived as? Other & P2 // expected-warning {{always fails}}
 
-  let _ = derivedAndP3 as Other // expected-error {{cannot convert value of type 'Derived & P3' to type 'Other' in coercion}}
+  let _ = derivedAndP3 as Other // expected-error {{cannot convert value of type 'any Derived & P3' to type 'Other' in coercion}}
   let _ = derivedAndP3 as? Other // expected-warning {{always fails}}
 
-  let _ = derivedAndP3 as Other & P3 // expected-error {{value of type 'Derived & P3' does not conform to 'Other & P3' in coercion}}
+  let _ = derivedAndP3 as Other & P3 // expected-error {{cannot convert value of type 'any Derived & P3' to type 'any Other & P3' in coercion}}
   let _ = derivedAndP3 as? Other & P3 // expected-warning {{always fails}}
 
   let _ = derived as Other // expected-error {{cannot convert value of type 'Derived' to type 'Other' in coercion}}
@@ -302,9 +327,8 @@ func dependentMemberTypes<T : BaseIntAndP2>(
   _: BaseIntAndP2.FullyConcrete) {}
 
 func conformsToAnyObject<T : AnyObject>(_: T) {}
-// expected-note@-1 {{where 'T' = 'P1'}}
+// expected-note@-1 {{where 'T' = 'any P1'}}
 func conformsToP1<T : P1>(_: T) {}
-// expected-note@-1 {{required by global function 'conformsToP1' where 'T' = 'P1'}}
 func conformsToP2<T : P2>(_: T) {}
 func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
 // expected-note@-1 {{where 'T' = 'FakeDerived'}}
@@ -414,11 +438,9 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
 
   // Errors
   conformsToAnyObject(p1)
-  // expected-error@-1 {{global function 'conformsToAnyObject' requires that 'P1' be a class type}}
+  // expected-error@-1 {{global function 'conformsToAnyObject' requires that 'any P1' be a class type}}
 
   conformsToP1(p1)
-  // expected-error@-1 {{protocol 'P1' as a type cannot conform to the protocol itself}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
   // FIXME: Following diagnostics are not great because when
   // `conformsTo*` methods are re-typechecked, they loose information
@@ -502,11 +524,11 @@ class ClassWithStaticMember {
 func staticMembers(
     m1: (ProtocolWithStaticMember & ClassWithStaticMember).Protocol,
     m2: (ProtocolWithStaticMember & ClassWithStaticMember).Type) {
-  _ = m1.staticProtocolMember() // expected-error {{static member 'staticProtocolMember' cannot be used on protocol metatype '(ClassWithStaticMember & ProtocolWithStaticMember).Protocol'}}
-  _ = m1.staticProtocolMember // expected-error {{static member 'staticProtocolMember' cannot be used on protocol metatype '(ClassWithStaticMember & ProtocolWithStaticMember).Protocol'}}
+  _ = m1.staticProtocolMember() // expected-error {{static member 'staticProtocolMember' cannot be used on protocol metatype '(any ClassWithStaticMember & ProtocolWithStaticMember).Type'}}
+  _ = m1.staticProtocolMember // expected-error {{static member 'staticProtocolMember' cannot be used on protocol metatype '(any ClassWithStaticMember & ProtocolWithStaticMember).Type'}}
 
-  _ = m1.staticClassMember() // expected-error {{static member 'staticClassMember' cannot be used on protocol metatype '(ClassWithStaticMember & ProtocolWithStaticMember).Protocol'}}
-  _ = m1.staticClassMember // expected-error {{static member 'staticClassMember' cannot be used on protocol metatype '(ClassWithStaticMember & ProtocolWithStaticMember).Protocol'}}
+  _ = m1.staticClassMember() // expected-error {{static member 'staticClassMember' cannot be used on protocol metatype '(any ClassWithStaticMember & ProtocolWithStaticMember).Type'}}
+  _ = m1.staticClassMember // expected-error {{static member 'staticClassMember' cannot be used on protocol metatype '(any ClassWithStaticMember & ProtocolWithStaticMember).Type'}}
 
   _ = m1.instanceProtocolMember
   _ = m1.instanceClassMember
@@ -536,7 +558,7 @@ struct DerivedBox<T : Derived> {}
 // expected-note@-1 {{requirement specified as 'T' : 'Derived' [with T = Derived & P3]}}
 
 func takesBoxWithP3(_: DerivedBox<Derived & P3>) {}
-// expected-error@-1 {{'DerivedBox' requires that 'Derived & P3' inherit from 'Derived'}}
+// expected-error@-1 {{'DerivedBox' requires that 'any Derived & P3' inherit from 'Derived'}}
 
 // A bit of a tricky setup -- the real problem is that matchTypes() did the
 // wrong thing when solving a Bind constraint where both sides were protocol

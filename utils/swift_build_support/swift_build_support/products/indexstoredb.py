@@ -60,6 +60,9 @@ class IndexStoreDB(product.Product):
     def install(self, host_target):
         pass
 
+    def has_cross_compile_hosts(self):
+        return False
+
     @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
@@ -76,7 +79,7 @@ class IndexStoreDB(product.Product):
 
 
 def run_build_script_helper(action, host_target, product, args,
-                            sanitize_all=False):
+                            sanitize_all=False, clean=True):
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
@@ -105,18 +108,27 @@ def run_build_script_helper(action, host_target, product, args,
     elif args.enable_tsan:
         helper_cmd.extend(['--sanitize', 'thread'])
 
-    if not product.is_darwin_host(
-            host_target) and product.is_cross_compile_target(host_target):
-        helper_cmd.extend(['--cross-compile-host', host_target])
-        build_toolchain_path = install_destdir + args.install_prefix
-        resource_dir = '%s/lib/swift' % build_toolchain_path
-        helper_cmd += [
-            '--cross-compile-config',
-            targets.StdlibDeploymentTarget.get_target_for_name(host_target).platform
-            .swiftpm_config(args, output_dir=build_toolchain_path,
-                            swift_toolchain=toolchain_path,
-                            resource_path=resource_dir)
-        ]
+    if not clean:
+        helper_cmd.append('--no-clean')
+
+    # Pass Cross compile host info
+    if product.has_cross_compile_hosts():
+        if product.is_darwin_host(host_target):
+            if len(args.cross_compile_hosts) != 1:
+                raise RuntimeError("Cross-Compiling indexstoredb to multiple " +
+                                   "targets is not supported")
+            helper_cmd += ['--cross-compile-host', args.cross_compile_hosts[0]]
+        elif product.is_cross_compile_target(host_target):
+            helper_cmd.extend(['--cross-compile-host', host_target])
+            build_toolchain_path = install_destdir + args.install_prefix
+            resource_dir = '%s/lib/swift' % build_toolchain_path
+            helper_cmd += [
+                '--cross-compile-config',
+                targets.StdlibDeploymentTarget.get_target_for_name(host_target).platform
+                .swiftpm_config(args, output_dir=build_toolchain_path,
+                                swift_toolchain=toolchain_path,
+                                resource_path=resource_dir)
+            ]
 
     if action == 'install' and product.product_name() == "sourcekitlsp":
         helper_cmd.extend([

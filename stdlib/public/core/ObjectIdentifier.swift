@@ -95,6 +95,11 @@ extension ObjectIdentifier: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(Int(Builtin.ptrtoint_Word(_value)))
   }
+
+  @_alwaysEmitIntoClient // For back deployment
+  public func _rawHashValue(seed: Int) -> Int {
+    Int(Builtin.ptrtoint_Word(_value))._rawHashValue(seed: seed)
+  }
 }
 
 extension UInt {

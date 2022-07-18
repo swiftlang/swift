@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/FixBehavior.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -45,6 +46,7 @@ class ConstraintSystem;
 class ConstraintLocator;
 class ConstraintLocatorBuilder;
 enum class ConversionRestrictionKind;
+enum ScoreKind: unsigned int;
 class Solution;
 struct MemberLookupResult;
 
@@ -103,7 +105,7 @@ enum class FixKind : uint8_t {
   GenericArgumentsMismatch,
 
   /// Fix up @autoclosure argument to the @autoclosure parameter,
-  /// to for a call to be able to foward it properly, since
+  /// to for a call to be able to forward it properly, since
   /// @autoclosure conversions are unsupported starting from
   /// Swift version 5.
   AutoClosureForwarding,
@@ -251,7 +253,7 @@ enum class FixKind : uint8_t {
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
 
-  /// Object literal type coudn't be inferred because the module where
+  /// Object literal type couldn't be inferred because the module where
   /// the default type that implements the associated literal protocol
   /// is declared was not imported.
   SpecifyObjectLiteralTypeImport,
@@ -274,7 +276,7 @@ enum class FixKind : uint8_t {
   /// Allow key path to be bound to a function type with more than 1 argument
   AllowMultiArgFuncKeyPathMismatch,
 
-  /// Specify key path root type when it cannot be infered from context.
+  /// Specify key path root type when it cannot be inferred from context.
   SpecifyKeyPathRootType,
 
   /// Unwrap optional base on key path application.
@@ -316,10 +318,18 @@ enum class FixKind : uint8_t {
   /// succeed.
   AllowNoopCheckedCast,
 
+  /// Warn about special runtime case where statically known
+  /// checked cast from existentials to CFType always succeed.
+  AllowNoopExistentialToCFTypeCheckedCast,
+
   /// Allow a runtime checked cast where at compile time the from is
-  /// convertible, but runtime does not support such convertions. e.g.
+  /// convertible, but runtime does not support such conversions. e.g.
   /// function type casts.
   AllowUnsupportedRuntimeCheckedCast,
+
+  /// Allow a runtime checked cast where it is known at compile time
+  /// always fails.
+  AllowCheckedCastToUnrelated,
 
   /// Allow reference to a static member on a protocol metatype
   /// even though result type of the reference doesn't conform
@@ -382,6 +392,18 @@ enum class FixKind : uint8_t {
 
   /// Produce an error for not getting a compile-time constant
   NotCompileTimeConst,
+
+  /// Ignore a type mismatch while trying to infer generic parameter type
+  /// from default expression.
+  IgnoreDefaultExprTypeMismatch,
+
+  /// Coerce a result type of a call to a particular existential type
+  /// by adding `as any <#Type#>`.
+  AddExplicitExistentialCoercion,
+
+  /// For example `.a(let x), .b(let x)` where `x` gets bound to different
+  /// types.
+  RenameConflictingPatternVariables,
 };
 
 class ConstraintFix {
@@ -389,14 +411,13 @@ class ConstraintFix {
   FixKind Kind;
   ConstraintLocator *Locator;
 
-  /// Determines whether this fix is simplify a warning which doesn't
-  /// require immediate source changes.
-  bool IsWarning;
-
 public:
+  /// The behavior limit to apply to the diagnostics emitted.
+  const FixBehavior fixBehavior;
+
   ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator,
-                bool warning = false)
-      : CS(cs), Kind(kind), Locator(locator), IsWarning(warning) {}
+                FixBehavior fixBehavior = FixBehavior::Error)
+      : CS(cs), Kind(kind), Locator(locator), fixBehavior(fixBehavior) {}
 
   virtual ~ConstraintFix();
 
@@ -407,7 +428,22 @@ public:
 
   FixKind getKind() const { return Kind; }
 
-  bool isWarning() const { return IsWarning; }
+  /// Whether this fix fatal for the constraint solver, meaning that it cannot
+  /// produce a usable type-checked AST.
+  bool isFatal() const {
+    switch (fixBehavior) {
+    case FixBehavior::AlwaysWarning:
+    case FixBehavior::DowngradeToWarning:
+    case FixBehavior::Suppress:
+      return false;
+
+    case FixBehavior::Error:
+      return true;
+    }
+  }
+
+  /// Determine the impact of this fix on the solution score, if any.
+  Optional<ScoreKind> impact() const;
 
   virtual std::string getName() const = 0;
 
@@ -438,7 +474,7 @@ public:
 
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without
-  /// any simplication attempts.
+  /// any simplification attempts.
   ASTNode getAnchor() const;
   ConstraintLocator *getLocator() const { return Locator; }
 
@@ -523,6 +559,8 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static RelabelArguments *create(ConstraintSystem &cs,
                                   llvm::ArrayRef<Identifier> correctLabels,
@@ -650,14 +688,16 @@ class ContextualMismatch : public ConstraintFix {
   Type LHS, RHS;
 
   ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                     ConstraintLocator *locator, bool warning)
-      : ConstraintFix(cs, FixKind::ContextualMismatch, locator, warning),
+                     ConstraintLocator *locator,
+                     FixBehavior fixBehavior)
+      : ConstraintFix(cs, FixKind::ContextualMismatch, locator, fixBehavior),
         LHS(lhs), RHS(rhs) {}
 
 protected:
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
-                     ConstraintLocator *locator, bool warning = false)
-      : ConstraintFix(cs, kind, locator, warning), LHS(lhs), RHS(rhs) {}
+                     ConstraintLocator *locator,
+                     FixBehavior fixBehavior = FixBehavior::Error)
+      : ConstraintFix(cs, kind, locator, fixBehavior), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -690,10 +730,13 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
-  static TreatArrayLiteralAsDictionary *create(ConstraintSystem &cs,
-                                               Type dictionaryTy, Type arrayTy,
-                                               ConstraintLocator *loc);
+  static TreatArrayLiteralAsDictionary *attempt(ConstraintSystem &cs,
+                                                Type dictionaryTy, Type arrayTy,
+                                                ConstraintLocator *loc);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::TreatArrayLiteralAsDictionary;
@@ -741,9 +784,10 @@ public:
 /// Mark function type as being part of a global actor.
 class MarkGlobalActorFunction final : public ContextualMismatch {
   MarkGlobalActorFunction(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator, bool warning)
+                          ConstraintLocator *locator,
+                          FixBehavior fixBehavior)
       : ContextualMismatch(cs, FixKind::MarkGlobalActorFunction, lhs, rhs,
-                           locator, warning) {
+                           locator, fixBehavior) {
   }
 
 public:
@@ -753,7 +797,17 @@ public:
 
   static MarkGlobalActorFunction *create(ConstraintSystem &cs, Type lhs,
                                          Type rhs, ConstraintLocator *locator,
-                                         bool warning);
+                                         FixBehavior fixBehavior);
+
+  /// Try to apply this fix to the given types.
+  ///
+  /// \returns \c true if the fix cannot be applied and the solver must fail,
+  /// or \c false if the fix has been applied and the solver can continue.
+  static bool attempt(ConstraintSystem &cs,
+                      ConstraintKind constraintKind,
+                      FunctionType *fromType,
+                      FunctionType *toType,
+                      ConstraintLocatorBuilder locator);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::MarkGlobalActorFunction;
@@ -789,9 +843,9 @@ public:
 class AddSendableAttribute final : public ContextualMismatch {
   AddSendableAttribute(ConstraintSystem &cs, FunctionType *fromType,
                        FunctionType *toType, ConstraintLocator *locator,
-                       bool warning)
+                       FixBehavior fixBehavior)
       : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
-                           locator, warning) {
+                           locator, fixBehavior) {
     assert(fromType->isSendable() != toType->isSendable());
   }
 
@@ -804,7 +858,17 @@ public:
                                       FunctionType *fromType,
                                       FunctionType *toType,
                                       ConstraintLocator *locator,
-                                      bool warning);
+                                      FixBehavior fixBehavior);
+
+  /// Try to apply this fix to the given types.
+  ///
+  /// \returns \c true if the fix cannot be applied and the solver must fail,
+  /// or \c false if the fix has been applied and the solver can continue.
+  static bool attempt(ConstraintSystem &cs,
+                      ConstraintKind constraintKind,
+                      FunctionType *fromType,
+                      FunctionType *toType,
+                      ConstraintLocatorBuilder locator);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AddSendableAttribute;
@@ -1367,10 +1431,14 @@ public:
 };
 
 class AllowInvalidPartialApplication final : public ConstraintFix {
+  bool isWarning;
+
   AllowInvalidPartialApplication(bool isWarning, ConstraintSystem &cs,
                                  ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowInvalidPartialApplication, locator,
-                      isWarning) {}
+                      isWarning ? FixBehavior::AlwaysWarning
+                                : FixBehavior::Error),
+        isWarning(isWarning) {}
 
 public:
   std::string getName() const override {
@@ -2104,8 +2172,9 @@ protected:
 
   AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
                         Type paramType, ConstraintLocator *locator,
-                        bool warning = false)
-      : ContextualMismatch(cs, kind, argType, paramType, locator, warning) {}
+                        FixBehavior fixBehavior = FixBehavior::Error)
+      : ContextualMismatch(
+            cs, kind, argType, paramType, locator, fixBehavior) {}
 
 public:
   std::string getName() const override {
@@ -2235,6 +2304,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static RemoveInvalidCall *create(ConstraintSystem &cs,
                                    ConstraintLocator *locator);
 
@@ -2249,9 +2322,9 @@ class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {
   TreatEphemeralAsNonEphemeral(ConstraintSystem &cs, ConstraintLocator *locator,
                                Type srcType, Type dstType,
                                ConversionRestrictionKind conversionKind,
-                               bool downgradeToWarning)
+                               FixBehavior fixBehavior)
       : AllowArgumentMismatch(cs, FixKind::TreatEphemeralAsNonEphemeral,
-                              srcType, dstType, locator, downgradeToWarning),
+                              srcType, dstType, locator, fixBehavior),
         ConversionKind(conversionKind) {}
 
 public:
@@ -2330,6 +2403,10 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static SpecifyClosureReturnType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
@@ -2411,7 +2488,7 @@ class AllowCoercionToForceCast final : public ContextualMismatch {
   AllowCoercionToForceCast(ConstraintSystem &cs, Type fromType, Type toType,
                            ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowCoercionToForceCast, fromType,
-                           toType, locator, /*warning*/ true) {}
+                           toType, locator, FixBehavior::AlwaysWarning) {}
 
 public:
   std::string getName() const override {
@@ -2468,6 +2545,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
                                         ConstraintLocator *locator);
 
@@ -2521,7 +2602,7 @@ class SpecifyLabelToAssociateTrailingClosure final : public ConstraintFix {
   SpecifyLabelToAssociateTrailingClosure(ConstraintSystem &cs,
                                          ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::SpecifyLabelToAssociateTrailingClosure,
-                      locator, /*isWarning=*/true) {}
+                      locator, FixBehavior::AlwaysWarning) {}
 
 public:
   std::string getName() const override {
@@ -2691,7 +2772,7 @@ class SpecifyBaseTypeForOptionalUnresolvedMember final : public ConstraintFix {
                                              DeclNameRef memberName,
                                              ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::SpecifyBaseTypeForOptionalUnresolvedMember,
-                      locator, /*isWarning=*/true),
+                      locator, FixBehavior::AlwaysWarning),
         MemberName(memberName) {}
   DeclNameRef MemberName;
 
@@ -2722,7 +2803,7 @@ protected:
                                        CheckedCastKind kind,
                                        ConstraintLocator *locator)
       : ContextualMismatch(cs, fixKind, fromType, toType, locator,
-                           /*isWarning*/ true),
+                           FixBehavior::AlwaysWarning),
         CastKind(kind) {}
   CheckedCastKind CastKind;
 };
@@ -2773,6 +2854,31 @@ public:
   }
 };
 
+class AllowNoopExistentialToCFTypeCheckedCast final
+    : public CheckedCastContextualMismatchWarning {
+  AllowNoopExistentialToCFTypeCheckedCast(ConstraintSystem &cs, Type fromType,
+                                          Type toType, CheckedCastKind kind,
+                                          ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowNoopExistentialToCFTypeCheckedCast, fromType,
+            toType, kind, locator) {}
+
+public:
+  std::string getName() const override {
+    return "checked cast from existential to CFType always succeeds";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowNoopExistentialToCFTypeCheckedCast *
+  attempt(ConstraintSystem &cs, Type fromType, Type toType,
+          CheckedCastKind kind, ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowNoopExistentialToCFTypeCheckedCast;
+  }
+};
+
 class AllowUnsupportedRuntimeCheckedCast final
     : public CheckedCastContextualMismatchWarning {
   AllowUnsupportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
@@ -2797,6 +2903,29 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowUnsupportedRuntimeCheckedCast;
+  }
+};
+
+class AllowCheckedCastToUnrelated final
+    : public CheckedCastContextualMismatchWarning {
+  AllowCheckedCastToUnrelated(ConstraintSystem &cs, Type fromType, Type toType,
+                              CheckedCastKind kind, ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowCheckedCastToUnrelated, fromType, toType, kind,
+            locator) {}
+
+public:
+  std::string getName() const override { return "checked cast always fails"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowCheckedCastToUnrelated *attempt(ConstraintSystem &cs,
+                                              Type fromType, Type toType,
+                                              CheckedCastKind kind,
+                                              ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowCheckedCastToUnrelated;
   }
 };
 
@@ -2833,7 +2962,7 @@ class AllowTupleLabelMismatch final : public ContextualMismatch {
   AllowTupleLabelMismatch(ConstraintSystem &cs, Type fromType, Type toType,
                           ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowTupleLabelMismatch, fromType,
-                           toType, locator, /*warning*/ true) {}
+                           toType, locator, FixBehavior::AlwaysWarning) {}
 
 public:
   std::string getName() const override { return "allow tuple label mismatch"; }
@@ -2882,6 +3011,106 @@ public:
 
   static AllowSwiftToCPointerConversion *create(ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
+};
+
+class IgnoreDefaultExprTypeMismatch : public AllowArgumentMismatch {
+protected:
+  IgnoreDefaultExprTypeMismatch(ConstraintSystem &cs, Type argType,
+                                Type paramType, ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::IgnoreDefaultExprTypeMismatch,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow default expression conversion mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreDefaultExprTypeMismatch *create(ConstraintSystem &cs,
+                                               Type argType, Type paramType,
+                                               ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreDefaultExprTypeMismatch;
+  }
+};
+
+class AddExplicitExistentialCoercion final : public ConstraintFix {
+  Type ErasedResultType;
+
+  AddExplicitExistentialCoercion(ConstraintSystem &cs, Type erasedResultTy,
+                                 ConstraintLocator *locator,
+                                 FixBehavior fixBehavior)
+      : ConstraintFix(cs, FixKind::AddExplicitExistentialCoercion, locator,
+                      fixBehavior),
+        ErasedResultType(erasedResultTy) {}
+
+public:
+  std::string getName() const override {
+    return "add explicit existential type coercion";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static bool
+  isRequired(ConstraintSystem &cs, Type resultTy,
+             ArrayRef<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+                 openedExistentials,
+             ConstraintLocatorBuilder locator);
+
+  static bool isRequired(ConstraintSystem &cs, Type resultTy,
+                         llvm::function_ref<Optional<Type>(TypeVariableType *)>
+                             findExistentialType,
+                         ConstraintLocatorBuilder locator);
+
+  static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
+                                                Type resultTy,
+                                                ConstraintLocator *locator);
+};
+
+class RenameConflictingPatternVariables final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<RenameConflictingPatternVariables,
+                                    VarDecl *> {
+  friend TrailingObjects;
+
+  Type ExpectedType;
+  unsigned NumConflicts;
+
+  RenameConflictingPatternVariables(ConstraintSystem &cs, Type expectedTy,
+                                    ArrayRef<VarDecl *> conflicts,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RenameConflictingPatternVariables, locator),
+        ExpectedType(expectedTy), NumConflicts(conflicts.size()) {
+    std::uninitialized_copy(conflicts.begin(), conflicts.end(),
+                            getConflictingBuffer().begin());
+  }
+
+  MutableArrayRef<VarDecl *> getConflictingBuffer() {
+    return {getTrailingObjects<VarDecl *>(), NumConflicts};
+  }
+
+public:
+  std::string getName() const override { return "rename pattern variables"; }
+
+  ArrayRef<VarDecl *> getConflictingVars() const {
+    return {getTrailingObjects<VarDecl *>(), NumConflicts};
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static RenameConflictingPatternVariables *
+  create(ConstraintSystem &cs, Type expectedTy, ArrayRef<VarDecl *> conflicts,
+         ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::RenameConflictingPatternVariables;
+  }
 };
 
 } // end namespace constraints

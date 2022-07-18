@@ -13,6 +13,7 @@
 #include "swift/Basic/TargetInfo.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
 
 #include "llvm/Support/raw_ostream.h"
@@ -35,11 +36,11 @@ static void printCompatibilityLibrary(
   out << "      {\n";
 
   out << "        \"libraryName\": \"";
-  out.write_escaped(libraryName);
+  swift::writeEscaped(libraryName, out);
   out << "\",\n";
 
   out << "        \"filter\": \"";
-  out.write_escaped(filter);
+  swift::writeEscaped(filter, out);
   out << "\"\n";
   out << "      }";
 
@@ -53,8 +54,7 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
 
   // Compiler version, as produced by --version.
   out << "  \"compilerVersion\": \"";
-  out.write_escaped(version::getSwiftFullVersion(
-                                                 version::Version::getCurrentLanguageVersion()));
+  writeEscaped(version::getSwiftFullVersion(version::Version::getCurrentLanguageVersion()), out);
   out << "\",\n";
 
   // Target triple and target variant triple.
@@ -75,9 +75,9 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
   auto &searchOpts = invocation.getSearchPathOptions();
   out << "  \"paths\": {\n";
 
-  if (!searchOpts.SDKPath.empty()) {
+  if (!searchOpts.getSDKPath().empty()) {
     out << "    \"sdkPath\": \"";
-    out.write_escaped(searchOpts.SDKPath);
+    writeEscaped(searchOpts.getSDKPath(), out);
     out << "\",\n";
   }
 
@@ -85,7 +85,7 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
     out << "    \"" << name << "\": [\n";
     llvm::interleave(paths, [&out](const std::string &path) {
       out << "      \"";
-      out.write_escaped(path);
+      writeEscaped(path, out);
       out << "\"";
     }, [&out] {
       out << ",\n";
@@ -95,10 +95,10 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
 
   outputPaths("runtimeLibraryPaths", searchOpts.RuntimeLibraryPaths);
   outputPaths("runtimeLibraryImportPaths",
-              searchOpts.RuntimeLibraryImportPaths);
+              searchOpts.getRuntimeLibraryImportPaths());
 
   out << "    \"runtimeResourcePath\": \"";
-  out.write_escaped(searchOpts.RuntimeResourcePath);
+  writeEscaped(searchOpts.RuntimeResourcePath, out);
   out << "\"\n";
 
   out << "  }\n";
@@ -113,20 +113,20 @@ void targetinfo::printTripleInfo(const llvm::Triple &triple,
   out << "{\n";
 
   out << "    \"triple\": \"";
-  out.write_escaped(triple.getTriple());
+  writeEscaped(triple.getTriple(), out);
   out << "\",\n";
 
   out << "    \"unversionedTriple\": \"";
-  out.write_escaped(getUnversionedTriple(triple).getTriple());
+  writeEscaped(getUnversionedTriple(triple).getTriple(), out);
   out << "\",\n";
 
   out << "    \"moduleTriple\": \"";
-  out.write_escaped(getTargetSpecificModuleTriple(triple).getTriple());
+  writeEscaped(getTargetSpecificModuleTriple(triple).getTriple(), out);
   out << "\",\n";
 
   if (runtimeVersion) {
     out << "    \"swiftRuntimeCompatibilityVersion\": \"";
-    out.write_escaped(runtimeVersion->getAsString());
+    writeEscaped(runtimeVersion->getAsString(), out);
     out << "\",\n";
 
     // Compatibility libraries that need to be linked.

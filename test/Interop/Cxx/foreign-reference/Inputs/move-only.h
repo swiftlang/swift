@@ -2,10 +2,13 @@
 #define TEST_INTEROP_CXX_FOREIGN_REFERENCE_INPUTS_MOVE_ONLY_H
 
 #include <stdlib.h>
+#if defined(_WIN32)
+inline void *operator new(size_t, void *p) { return p; }
+#else
+#include <new>
+#endif
 
 #include "visibility.h"
-
-inline void *operator new(size_t, void *p) { return p; }
 
 template <class _Tp>
 _Tp &&move(_Tp &t) {
@@ -28,6 +31,19 @@ struct __attribute__((swift_attr("import_as_ref"))) MoveOnly {
 };
 
 MoveOnly moveIntoResult(MoveOnly &x) { return move(x); }
+
+struct __attribute__((swift_attr("import_as_ref"))) NoCopyMove {
+  NoCopyMove() = default;
+  NoCopyMove(const NoCopyMove &) = delete;
+  NoCopyMove(NoCopyMove &&) = delete;
+
+  int test() const { return 42; }
+  int testMutable() { return 42; }
+
+  static NoCopyMove *create() {
+    return new (malloc(sizeof(NoCopyMove))) NoCopyMove();
+  }
+};
 
 struct __attribute__((swift_attr("import_as_ref"))) HasMoveOnlyChild {
   MoveOnly child;

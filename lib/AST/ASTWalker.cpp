@@ -602,6 +602,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     return E;
   }
+  Expr *visitPackExpr(PackExpr *E) {
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
+      if (E->getElement(i)) {
+        if (Expr *Elt = doIt(E->getElement(i)))
+          E->setElement(i, Elt);
+        else
+          return nullptr;
+      }
+    return E;
+  }
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     if (Expr *Base = doIt(E->getBase()))
       E->setBase(Base);
@@ -685,7 +695,29 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-  
+
+  Expr *visitErasureExpr(ErasureExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+    } else {
+      return nullptr;
+    }
+
+    for (unsigned i = 0; i < E->getArgumentConversions().size(); ++i) {
+      const auto &conv = E->getArgumentConversions()[i];
+      auto kConv = conv.Conversion;
+      if (!kConv) {
+        return nullptr;
+      } else if (Expr *E2 = doIt(kConv)) {
+        E->setArgumentConversion(i, {conv.OrigValue, E2});
+      } else {
+        return nullptr;
+      }
+    }
+    
+    return E;
+  }
+
   Expr *visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
@@ -1558,11 +1590,28 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
 
   // The iterator decl is built directly on top of the sequence
   // expression, so don't visit both.
-  if (Expr *Sequence = S->getSequence()) {
-    if ((Sequence = doIt(Sequence)))
-      S->setSequence(Sequence);
-    else
-      return nullptr;
+  //
+  // If for-in is already type-checked, the type-checked version
+  // of the sequence is going to be visited as part of `iteratorVar`.
+  if (S->getTypeCheckedSequence()) {
+    if (auto IteratorVar = S->getIteratorVar()) {
+      if (doIt(IteratorVar))
+        return nullptr;
+    }
+
+    if (auto NextCall = S->getNextCall()) {
+      if ((NextCall = doIt(NextCall)))
+        S->setNextCall(NextCall);
+      else
+        return nullptr;
+    }
+  } else {
+    if (Expr *Sequence = S->getParsedSequence()) {
+      if ((Sequence = doIt(Sequence)))
+        S->setParsedSequence(Sequence);
+      else
+        return nullptr;
+    }
   }
 
   if (Expr *Where = S->getWhere()) {
@@ -1575,18 +1624,6 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
   if (auto IteratorNext = S->getConvertElementExpr()) {
     if ((IteratorNext = doIt(IteratorNext)))
       S->setConvertElementExpr(IteratorNext);
-    else
-      return nullptr;
-  }
-
-  if (auto IteratorVar = S->getIteratorVar()) {
-    if (doIt(IteratorVar))
-      return nullptr;
-  }
-
-  if (auto IteratorVarRef = S->getIteratorVarRef()) {
-    if ((IteratorVarRef = doIt(IteratorVarRef)))
-      S->setIteratorVarRef(IteratorVarRef);
     else
       return nullptr;
   }

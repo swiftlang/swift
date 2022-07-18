@@ -9,8 +9,6 @@
 
 // Enable with rdar://81617749
 // UNSUPPORTED: CPU=i386 && OS=watchos
-// Enable with rdar://85526916
-// UNSUPPORTED: CPU=arm64e
 
 // rdar://82123254
 // UNSUPPORTED: use_os_stdlib

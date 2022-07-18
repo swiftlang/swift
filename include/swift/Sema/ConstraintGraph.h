@@ -436,7 +436,7 @@ private:
   SmallVector<Constraint *, 4> OrphanedConstraints;
 
   /// Increment the number of constraints considered per attempt
-  /// to contract constrant graph edges.
+  /// to contract constraint graph edges.
   void incrementConstraintsPerContractionCounter();
 
   /// The kind of change made to the graph.

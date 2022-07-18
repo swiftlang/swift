@@ -19,9 +19,6 @@
 // loaded too late").
 // REQUIRES: no_asan
 
-// Requires rdar://85970023 which is only fixed in the 20211026 branch of LLVM.
-// UNSUPPORTED: CPU=arm64e
-
 protocol TheProtocol {
   func func1_live()
   func func2_dead()

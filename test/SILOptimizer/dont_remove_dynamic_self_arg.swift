@@ -9,7 +9,7 @@ func transform<T>(_ a: Any, c: (Any) -> T?) -> T? {
   return c(a)
 }
 
-// CHECK-LABEL: sil private @$s4test1XC6testityACSgypFACXDSgypXEfU_ :
+// CHECK-LABEL: sil {{.*}}@$s4test1XC6testityACSgypFACXDSgypXEfU_ :
 // CHECK: bb0({{.*}}, {{%[0-9]+}} : $@thick @dynamic_self X.Type):
 
 // The checked_cast_addr_br must have %1 as implicit type dependend operand.

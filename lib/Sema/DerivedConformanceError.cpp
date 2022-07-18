@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "DerivedConformances.h"
 #include "swift/AST/Decl.h"
@@ -97,8 +98,10 @@ deriveBridgedNSError_enum_nsErrorDomain(
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
+      DerivedConformance::SynthesizedIntroducer::Var,
       derived.Context.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
       /*isFinal=*/true);
+  addNonIsolatedToSynthesized(derived.Nominal, propDecl);
 
   // Define the getter.
   auto getterDecl = derived.addGetterToReadOnlyDerivedProperty(
@@ -119,7 +122,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
 
     auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
     if (scope.isPublic() || scope.isInternal())
-      // PrintAsObjC may print this domain, so we should make sure we use the
+      // PrintAsClang may print this domain, so we should make sure we use the
       // same string it will.
       synthesizer = deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain;
 

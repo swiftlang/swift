@@ -87,9 +87,11 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+  virtual bool shouldCollectDisplayDecls() const override;
+
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
-  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const override;
 
   virtual void
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,

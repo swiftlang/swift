@@ -3,9 +3,6 @@
 // RUN:   -sil-print-functions=$s3del1MC4fromAcA12WithDelegate_p_tKcfc \
 // RUN:   -Xllvm -sil-print-debuginfo -o /dev/null -module-name del 2>&1 | %FileCheck %s
 
-// Unsupported on Windows due to SR-14267
-// UNSUPPORTED: OS=windows-msvc
-
 public protocol DelegateA {}
 public protocol DelegateB {}
 public protocol WithDelegate
@@ -33,14 +30,18 @@ public class M {
 
 // CHECK-LABEL: sil [ossa] @$s3del1MC4fromAcA12WithDelegate_p_tKcfc : $@convention(method) (@in WithDelegate, @owned M) -> (@owned M, @error Error)
 
-// CHECK:   [[I:%.*]] = integer_literal $Builtin.Int2, 1, loc {{.*}}:23:12, scope 5
-// CHECK:   [[V:%.*]] = load [trivial] %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 5
-// CHECK:   [[OR:%.*]] = builtin "or_Int2"([[V]] : $Builtin.Int2, [[I]] : $Builtin.Int2) : $Builtin.Int2, loc {{.*}}:23:12, scope 5
-// CHECK:   store [[OR]] to [trivial] %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 5
-// CHECK:   store %{{.*}} to [init] %{{.*}} : $*C, loc {{.*}}:26:20, scope 5
+// CHECK:   [[I:%.*]] = integer_literal $Builtin.Int2, 1, loc {{.*}}:20:12, scope 6
+// CHECK:   [[V:%.*]] = load [trivial] %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 6
+// CHECK:   [[OR:%.*]] = builtin "or_Int2"([[V]] : $Builtin.Int2, [[I]] : $Builtin.Int2) : $Builtin.Int2, loc {{.*}}:20:12, scope 6
+// CHECK:   store [[OR]] to [trivial] %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 6
+// CHECK:   store %{{.*}} to [init] %{{.*}} : $*C, loc {{.*}}:23:20, scope 6
 
 // Make sure the dealloc_stack gets the same scope of the instructions surrounding it.
 
-// CHECK:   destroy_addr %0 : $*WithDelegate, loc {{.*}}:29:5, scope 5
-// CHECK:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 5
-// CHECK:   throw %{{.*}} : $Error, loc {{.*}}:23:12, scope 1
+// CHECK:   destroy_addr %0 : $*WithDelegate, loc {{.*}}:26:5, scope 6
+// CHECK-NEXT:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 6
+
+// CHECK:   destroy_addr %0 : $*WithDelegate, loc {{.*}}:26:5, scope 6
+// CHECK-NEXT:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 6
+// CHECK-NEXT:   throw %{{.*}} : $Error, loc {{.*}}:26:5, scope 6
+// CHECK: end sil function '$s3del1MC4fromAcA12WithDelegate_p_tKcfc'

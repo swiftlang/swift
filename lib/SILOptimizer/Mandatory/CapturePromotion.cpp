@@ -541,8 +541,8 @@ SILFunction *ClosureCloner::constructClonedFunction(
   SILFunction *origF = fri->getReferencedFunction();
 
   IsSerialized_t isSerialized = IsNotSerialized;
-  if (f->isSerialized() && origF->isSerialized())
-    isSerialized = IsSerialized_t::IsSerializable;
+  if (f->isSerialized())
+    isSerialized = IsSerialized_t::IsSerialized;
 
   auto clonedName = getSpecializedName(origF, isSerialized, promotableIndices);
 
@@ -693,6 +693,25 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
     assert(
         value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed) &&
         "Expected argument value to be guaranteed");
+    recordFoldedValue(lbi, value);
+    return;
+  }
+
+  auto *seai = dyn_cast<StructElementAddrInst>(lbi->getOperand());
+  if (!seai) {
+    SILCloner<ClosureCloner>::visitLoadBorrowInst(lbi);
+    return;
+  }
+
+  if (SILValue value = getProjectBoxMappedVal(seai->getOperand())) {
+    // Loads of a struct_element_addr of an argument get replaced with a
+    // struct_extract of the new passed in value. The value should be borrowed
+    // already, so we can just extract the value.
+    assert(
+        !getBuilder().getFunction().hasOwnership() ||
+        value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
+    value = getBuilder().emitStructExtract(lbi->getLoc(), value,
+                                           seai->getField(), lbi->getType());
     recordFoldedValue(lbi, value);
     return;
   }
@@ -1040,6 +1059,7 @@ public:
   ALWAYS_NON_ESCAPING_INST(Load)
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
   ALWAYS_NON_ESCAPING_INST(DestroyValue)
+  ALWAYS_NON_ESCAPING_INST(EndBorrow)
 #undef ALWAYS_NON_ESCAPING_INST
 
   bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
@@ -1213,7 +1233,8 @@ static bool findEscapeOrMutationUses(Operand *op,
   // we want to be more conservative around non-top level copies (i.e. a copy
   // derived from a projection like instruction). In fact such a thing may not
   // even make any sense!
-  if (isa<CopyValueInst>(user) || isa<MarkUninitializedInst>(user)) {
+  if (isa<CopyValueInst>(user) || isa<MarkUninitializedInst>(user) ||
+      isa<BeginBorrowInst>(user)) {
     bool foundSomeMutations = false;
     for (auto *use : cast<SingleValueInstruction>(user)->getUses()) {
       foundSomeMutations |= findEscapeOrMutationUses(use, state);

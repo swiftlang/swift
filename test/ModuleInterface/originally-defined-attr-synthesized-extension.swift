@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 
 // Ensure the originallyDefinedIn attribute is printed in swiftinterface files for synthesized extensions
-// RUN: %target-swift-frontend-typecheck -emit-module-interface-path %t/Foo.swiftinterface %s -module-name Foo
+// RUN: %target-swift-emit-module-interface(%t/Foo.swiftinterface) %s -module-name Foo
+// RUN: %target-swift-typecheck-module-from-interface(%t/Foo.swiftinterface) -module-name Foo
 // RUN: %FileCheck %s < %t/Foo.swiftinterface
 
 @available(OSX 10.7, iOS 7.0, *)

@@ -30,12 +30,12 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CompletionInstance.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ConformingMethodList.h"
@@ -67,9 +67,10 @@
 #include "llvm/Support/ManagedStatic.h"
 #include <system_error>
 
+#include <algorithm>
+#include <chrono>
 #include <random>
 #include <string>
-#include <chrono>
 
 using namespace swift;
 using namespace ide;
@@ -527,6 +528,12 @@ FunctionDefinitions("function-definitions",
                     llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
+Expressions("expressions",
+            llvm::cl::desc("Print expressions"),
+            llvm::cl::cat(Category),
+            llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 AbstractAccessors("abstract-accessors",
                   llvm::cl::desc("Hide the concrete accessors used to "
                                  "implement a property or subscript"),
@@ -756,9 +763,14 @@ static llvm::cl::opt<bool>
                        llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-    EnableCxxInterop("enable-cxx-interop",
+    EnableCxxInterop("enable-experimental-cxx-interop",
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+    CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
+        llvm::cl::desc("Imports getters and setters as computed properties."),
+        llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 CanonicalizeType("canonicalize-type", llvm::cl::Hidden,
@@ -789,6 +801,11 @@ DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
                                  llvm::cl::desc("Disable implicit import of _Concurrency module"),
                                  llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+DisableImplicitStringProcessingImport("disable-implicit-string-processing-module-import",
+                                      llvm::cl::desc("Disable implicit import of _StringProcessing module"),
+                                      llvm::cl::init(false));
+
 static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
     "enable-experimental-named-opaque-types",
     llvm::cl::desc("Enable experimental support for named opaque result types"),
@@ -799,6 +816,16 @@ EnableExperimentalDistributed("enable-experimental-distributed",
                               llvm::cl::desc("Enable experimental distributed actors and functions"),
                               llvm::cl::init(false));
 
+static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
+    "enable-experimental-string-processing",
+    llvm::cl::desc("Enable experimental string processing"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> EnableBareSlashRegexLiterals(
+    "enable-bare-slash-regex",
+    llvm::cl::desc("Enable the ability to write '/.../' regex literals"),
+    llvm::cl::init(false));
+
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
@@ -808,7 +835,7 @@ AllowCompilerErrors("allow-compiler-errors",
                     llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
                     llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
+static llvm::cl::list<std::string>
   DefineAvailability("define-availability",
                      llvm::cl::desc("Define a macro for @available"),
                      llvm::cl::cat(Category));
@@ -1056,14 +1083,14 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
 }
 
 static void
-printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
+printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
                                llvm::raw_ostream &OS, bool IncludeKeywords,
                                bool IncludeComments, bool IncludeSourceText,
                                bool PrintAnnotatedDescription) {
   unsigned NumResults = 0;
   for (auto Result : Results) {
     if (!IncludeKeywords &&
-        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
+        Result->getKind() == CodeCompletionResultKind::Keyword)
       continue;
     ++NumResults;
   }
@@ -1073,7 +1100,7 @@ printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
   OS << "Begin completions, " << NumResults << " items\n";
   for (auto Result : Results) {
     if (!IncludeKeywords &&
-        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
+        Result->getKind() == CodeCompletionResultKind::Keyword)
       continue;
     Result->printPrefix(OS);
     if (PrintAnnotatedDescription) {
@@ -1085,8 +1112,7 @@ printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
       Result->getCompletionString()->print(OS);
     }
 
-    OS << "; name=";
-    printCodeCompletionResultFilterName(*Result, OS);
+    OS << "; name=" << Result->getFilterName();
 
     if (IncludeSourceText) {
       OS << "; sourcetext=";
@@ -1137,8 +1163,8 @@ static int printCodeCompletionResults(
   return printResult<CodeCompleteResult>(
       CancellableResult, [&](CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
-            Result.Results, llvm::outs(), IncludeKeywords, IncludeComments,
-            IncludeSourceText, PrintAnnotatedDescription);
+            Result.ResultSink.Results, llvm::outs(), IncludeKeywords,
+            IncludeComments, IncludeSourceText, PrintAnnotatedDescription);
         return 0;
       });
 }
@@ -1514,8 +1540,9 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           case CancellableResultKind::Success: {
             wasASTContextReused =
                 Result->Info.completionContext->ReusingASTContext;
-            printCodeCompletionResultsImpl(Result->Results, OS, IncludeKeywords,
-                                           IncludeComments, IncludeSourceText,
+            printCodeCompletionResultsImpl(Result->ResultSink.Results, OS,
+                                           IncludeKeywords, IncludeComments,
+                                           IncludeSourceText,
                                            CodeCompletionAnnotateResults);
             break;
           }
@@ -1597,6 +1624,17 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
         for (auto arg : FileCheckArgs)
           llvm::errs() << " " << arg;
         llvm::errs() << "\n";
+        llvm::errs() << "Code completion results:\n";
+        SmallVector<StringRef, 20> ResultLines;
+        llvm::SplitString(ResultStr, ResultLines, "\n");
+        for (size_t LineNo = 0;
+             LineNo < std::min(ResultLines.size(), static_cast<size_t>(20));
+             LineNo++) {
+          llvm::errs() << ResultLines[LineNo] << '\n';
+        }
+        if (ResultLines.size() > 20) {
+          llvm::errs() << " + " << (ResultLines.size() - 20) << " more lines\n";
+        }
       }
     }
 
@@ -1618,6 +1656,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   llvm::errs() << "----\n";
   if (!FailedTokens.empty()) {
     llvm::errs() << "Unexpected failures: ";
+    llvm::sort(FailedTokens);
     llvm::interleave(
         FailedTokens, [&](StringRef name) { llvm::errs() << name; },
         [&]() { llvm::errs() << ", "; });
@@ -1625,6 +1664,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   }
   if (!UPassTokens.empty()) {
     llvm::errs() << "Unexpected passes: ";
+    llvm::sort(UPassTokens);
     llvm::interleave(
         UPassTokens, [&](StringRef name) { llvm::errs() << name; },
         [&]() { llvm::errs() << ", "; });
@@ -2595,7 +2635,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
   int ExitCode = 0;
 
-  PrintOptions Options = PrintOptions::printEverything();
+  PrintOptions Options = PrintOptions::printDeclarations();
 
   for (StringRef ModuleName : ModulesToPrint) {
     auto *M = getModuleByFullName(Context, ModuleName);
@@ -2687,7 +2727,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
       llvm::outs() << remangled << "\n";
 
-      auto Options = PrintOptions::printEverything();
+      auto Options = PrintOptions::printDeclarations();
       Options.PrintAccess = false;
       LTD->print(llvm::outs(), Options);
       llvm::outs() << "\n";
@@ -2955,11 +2995,10 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
-  if (!Stdlib) {
-    llvm::errs() << "Failed loading stdlib\n";
-    return 1;
+  // Load implict imports so that Clang importer can use it.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
   }
 
   // If needed, load _Concurrency library so that the Clang importer can use it.
@@ -3023,11 +3062,10 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
-  if (!Stdlib) {
-    llvm::errs() << "Failed loading stdlib\n";
-    return 1;
+  // Load implict imports so that Clang importer can use it.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
   }
 
   auto &FEOpts = Invocation.getFrontendOptions();
@@ -3234,7 +3272,7 @@ static int doPrintTypes(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
-  PrintOptions Options = PrintOptions::printEverything();
+  PrintOptions Options = PrintOptions::printDeclarations();
   Options.FullyQualifiedTypes = FullyQualifiedTypes;
   ASTTypePrinter Printer(CI.getSourceMgr(), Options);
 
@@ -4113,6 +4151,7 @@ void anchorForGetMainExecutable() {}
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  initializeSwiftModules();
 
   if (argc > 1) {
     // Handle integrated test tools which do not use
@@ -4172,10 +4211,24 @@ int main(int argc, char *argv[]) {
         // FIXME: error?
         continue;
       }
+      // Make contextual CodeCompletionResults from the
+      // ContextFreeCodeCompletionResults so we can print them.
+      std::vector<CodeCompletionResult *> contextualResults;
+      contextualResults.reserve(resultsOpt->get()->Results.size());
+      for (auto contextFreeResult : resultsOpt->get()->Results) {
+        // We are leaking these results but it doesn't matter since the process
+        // just terminates afterwards anyway.
+        auto contextualResult = new CodeCompletionResult(
+            *contextFreeResult, SemanticContextKind::OtherModule,
+            CodeCompletionFlair(),
+            /*numBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
+            /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+        contextualResults.push_back(contextualResult);
+      }
       printCodeCompletionResultsImpl(
-          resultsOpt->get()->Sink.Results, llvm::outs(),
-          options::CodeCompletionKeywords, options::CodeCompletionComments,
-          options::CodeCompletionSourceText,
+          contextualResults, llvm::outs(), options::CodeCompletionKeywords,
+          options::CodeCompletionComments, options::CodeCompletionSourceText,
           options::CodeCompletionAnnotateResults);
     }
 
@@ -4216,8 +4269,8 @@ int main(int argc, char *argv[]) {
 
   InitInvok.setSDKPath(options::SDK);
 
-  if (!options::DefineAvailability.empty()) {
-    InitInvok.getLangOptions().AvailabilityMacros.push_back(options::DefineAvailability);
+  for (auto macro : options::DefineAvailability) {
+    InitInvok.getLangOptions().AvailabilityMacros.push_back(macro);
   }
   for (auto map: options::SerializedPathObfuscate) {
     auto SplitMap = StringRef(map).split('=');
@@ -4241,24 +4294,31 @@ int main(int argc, char *argv[]) {
   if (options::EnableCxxInterop) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
   }
+  if (options::CxxInteropGettersSettersAsProperties) {
+    InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;
+  }
   if (options::EnableExperimentalConcurrency) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
   }
   if (options::WarnConcurrency) {
-    InitInvok.getLangOptions().WarnConcurrency = true;
+    InitInvok.getLangOptions().StrictConcurrencyLevel =
+        StrictConcurrency::Complete;
   }
   if (options::DisableImplicitConcurrencyImport) {
     InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
   }
-  if (options::EnableExperimentalNamedOpaqueTypes) {
-    InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
+  if (options::DisableImplicitStringProcessingImport) {
+    InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
   }
-
-  if (options::EnableExperimentalDistributed) {
-    // distributed implies concurrency features:
-    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
-    // enable 'distributed' parsing and features
-    InitInvok.getLangOptions().EnableExperimentalDistributed = true;
+  if (options::EnableExperimentalNamedOpaqueTypes) {
+    InitInvok.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
+  }
+  if (options::EnableExperimentalStringProcessing) {
+    InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
+  }
+  if (options::EnableBareSlashRegexLiterals) {
+    InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
+    InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
 
   if (!options::Triple.empty())
@@ -4379,6 +4439,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
     PrintOpts.AbstractAccessors = options::AbstractAccessors;
     PrintOpts.FunctionDefinitions = options::FunctionDefinitions;
+    PrintOpts.PrintExprs = options::Expressions;
     PrintOpts.PreferTypeRepr = options::PreferTypeRepr;
     PrintOpts.ExplodePatternBindingDecls = options::ExplodePatternBindingDecls;
     PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;

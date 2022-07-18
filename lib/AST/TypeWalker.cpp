@@ -49,6 +49,17 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
   bool visitSILTokenType(SILTokenType *ty) { return false; }
 
+  bool visitPackType(PackType *ty) {
+    for (auto elementTy : ty->getElementTypes())
+      if (doIt(elementTy))
+        return true;
+    return false;
+  }
+
+  bool visitPackExpansionType(PackExpansionType *ty) {
+    return doIt(ty->getPatternType());
+  }
+
   bool visitParenType(ParenType *ty) {
     return doIt(ty->getUnderlyingType());
   }
@@ -163,6 +174,17 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
+  bool visitParameterizedProtocolType(ParameterizedProtocolType *ty) {
+    if (doIt(ty->getBaseType()))
+      return true;
+
+    for (auto arg : ty->getArgs())
+      if (doIt(arg))
+        return true;
+
+    return false;
+  }
+
   bool visitExistentialType(ExistentialType *ty) {
     return doIt(ty->getConstraintType());
   }
@@ -196,8 +218,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitArchetypeType(ArchetypeType *ty) {
     // If the root is an opaque archetype, visit its substitution replacement
     // types.
-    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(ty->getRoot())) {
-      for (auto arg : opaqueRoot->getSubstitutions().getReplacementTypes()) {
+    if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(ty)) {
+      for (auto arg : opaque->getSubstitutions().getReplacementTypes()) {
         if (doIt(arg)) {
           return true;
         }
@@ -210,6 +232,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
   
   bool visitSILBlockStorageType(SILBlockStorageType *ty) {
     return doIt(ty->getCaptureType());
+  }
+
+  bool visitSILMoveOnlyWrappedType(SILMoveOnlyWrappedType *ty) {
+    return doIt(ty->getInnerType());
   }
 
   bool visitSILBoxType(SILBoxType *ty) {

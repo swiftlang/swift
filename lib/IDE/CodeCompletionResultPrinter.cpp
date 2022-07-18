@@ -13,6 +13,7 @@
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Markup/XMLUtils.h"
 #include "llvm/Support/raw_ostream.h"
@@ -409,7 +410,7 @@ constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
   OS << "<#T##" << Display;
   if (Display == Type && Display == ExpansionType) {
     // Short version, display and type are the same.
-  } else {
+  } else if (!Type.empty()) {
     OS << "##" << Type;
     if (ExpansionType != Type)
       OS << "##" << ExpansionType;
@@ -450,9 +451,8 @@ void swift::ide::printCodeCompletionResultSourceText(
   }
 }
 
-void swift::ide::printCodeCompletionResultFilterName(
-    const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
-  auto str = Result.getCompletionString();
+static void printCodeCompletionResultFilterName(
+    const CodeCompletionString *str, llvm::raw_ostream &OS) {
   // FIXME: we need a more uniform way to handle operator completions.
   if (str->getChunks().size() == 1 && str->getChunks()[0].is(ChunkKind::Dot)) {
     OS << ".";
@@ -496,6 +496,10 @@ void swift::ide::printCodeCompletionResultFilterName(
       case ChunkKind::DeclIntroducer:
         ++i;
         continue;
+      case ChunkKind::ParameterDeclExternalName:
+        // Skip '_' parameter external name.
+        shouldPrint = shouldPrint && C.hasText() && C.getText() != "_";
+        break;
       case ChunkKind::CallArgumentTypeBegin:
       case ChunkKind::ParameterDeclTypeBegin:
       case ChunkKind::TypeAnnotationBegin:
@@ -535,4 +539,12 @@ void swift::ide::printCodeCompletionResultFilterName(
       ++i;
     }
   }
+}
+
+NullTerminatedStringRef swift::ide::getCodeCompletionResultFilterName(
+    const CodeCompletionString *Str, llvm::BumpPtrAllocator &Allocator) {
+  SmallString<32> buf;
+  llvm::raw_svector_ostream OS(buf);
+  printCodeCompletionResultFilterName(Str, OS);
+  return NullTerminatedStringRef(buf, Allocator);
 }

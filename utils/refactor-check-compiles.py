@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-from __future__ import print_function
-
+#!/usr/bin/env python3
 import argparse
 import os
 import subprocess
@@ -9,7 +7,7 @@ import sys
 
 def run_cmd(cmd, desc):
     try:
-        return subprocess.check_output(cmd)
+        return subprocess.check_output(cmd, universal_newlines=True)
     except subprocess.CalledProcessError:
         print('FAILED ' + desc + ':', file=sys.stderr)
         print(' '.join(cmd), file=sys.stderr)
@@ -130,7 +128,7 @@ def main():
         '-source-filename', args.source_filename,
         '-rewritten-output-file', temp_file_path,
         '-pos', args.pos
-    ] + extra_refactor_args + extra_both_args, desc='producing edit').decode("utf-8")
+    ] + extra_refactor_args + extra_both_args, desc='producing edit')
     sys.stdout.write(dump_text_output)
 
     run_cmd([

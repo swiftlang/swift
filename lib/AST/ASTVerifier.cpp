@@ -618,13 +618,7 @@ public:
           }
 
           // Get the archetype's generic signature.
-          GenericEnvironment *archetypeEnv;
-          if (auto seq = dyn_cast<SequenceArchetypeType>(root)) {
-            archetypeEnv = seq->getGenericEnvironment();
-          } else {
-            auto rootPrimary = cast<PrimaryArchetypeType>(root);
-            archetypeEnv = rootPrimary->getGenericEnvironment();
-          }
+          GenericEnvironment *archetypeEnv = root->getGenericEnvironment();
           auto archetypeSig = archetypeEnv->getGenericSignature();
 
           auto genericCtx = Generics.back();
@@ -657,24 +651,6 @@ public:
             Out << "Contextual type: " << contextType.getString() << "\n";
 
             return true;
-          }
-
-          // Make sure that none of the nested types are dependent.
-          for (const auto &nested : archetype->getKnownNestedTypes()) {
-            if (!nested.second)
-              continue;
-            
-            if (auto nestedType = nested.second) {
-              if (nestedType->hasTypeParameter()) {
-                Out << "Nested type " << nested.first.str()
-                    << " of archetype " << archetype->getString()
-                    << " is dependent type " << nestedType->getString()
-                    << "\n";
-                return true;
-              }
-            }
-
-            verifyChecked(nested.second, visitedArchetypes);
           }
         }
 
@@ -1493,6 +1469,25 @@ public:
       verifyCheckedBase(E);
     }
 
+    bool shouldVerify(ErasureExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      for (auto &elt : expr->getArgumentConversions()) {
+        assert(!OpaqueValues.count(elt.OrigValue));
+        OpaqueValues[elt.OrigValue] = 0;
+      }
+
+      return true;
+    }
+
+    void cleanup(ErasureExpr *expr) {
+      for (auto &elt : expr->getArgumentConversions()) {
+        assert(OpaqueValues.count(elt.OrigValue));
+        OpaqueValues.erase(elt.OrigValue);
+      }
+    }
+
     void verifyChecked(ErasureExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ErasureExpr", E);
 
@@ -2067,7 +2062,10 @@ public:
         abort();
       }
 
-      checkSameType(E->getBase()->getType(), metatype->getInstanceType(),
+      auto instance = metatype->getInstanceType();
+      if (auto existential = metatype->getAs<ExistentialMetatypeType>())
+        instance = existential->getExistentialInstanceType();
+      checkSameType(E->getBase()->getType(), instance,
                     "base type of .Type expression");
       verifyCheckedBase(E);
     }
@@ -2310,7 +2308,7 @@ public:
 
       auto *subExpr = E->getSubExpr();
       if (isa<ParenExpr>(subExpr) || isa<ForceValueExpr>(subExpr)) {
-        Out << "Immediate ParenExpr/ForceValueExpr should preceed a LoadExpr\n";
+        Out << "Immediate ParenExpr/ForceValueExpr should precede a LoadExpr\n";
         E->dump(Out);
         Out << "\n";
         abort();
@@ -2335,7 +2333,7 @@ public:
 
       if (VD->hasAccess()) {
         if (VD->getFormalAccess() == AccessLevel::Open) {
-          if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
+          if (!isa<ClassDecl>(VD) && !VD->isSyntacticallyOverridable()) {
             Out << "decl cannot be 'open'\n";
             VD->dump(Out);
             abort();
@@ -2741,7 +2739,8 @@ public:
       if (!normal->isInvalid()){
         auto conformances = normal->getSignatureConformances();
         unsigned idx = 0;
-        for (const auto &req : proto->getRequirementSignature()) {
+        auto reqs = proto->getRequirementSignature().getRequirements();
+        for (const auto &req : reqs) {
           if (req.getKind() != RequirementKind::Conformance)
             continue;
 
@@ -2828,6 +2827,19 @@ public:
 
       unsigned currentDepth = DC->getGenericContextDepth();
       if (currentDepth < GTPD->getDepth()) {
+        // If this is actually an opaque type's generic parameter, we're okay.
+        if (auto value = dyn_cast_or_null<ValueDecl>(DC->getAsDecl())) {
+          auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(value);
+          if (!opaqueDecl)
+            opaqueDecl = value->getOpaqueResultTypeDecl();
+          if (opaqueDecl) {
+            if (GTPD->getDepth() ==
+                    opaqueDecl->getOpaqueGenericParams().front()->getDepth()) {
+              return;
+            }
+          }
+        }
+
         Out << "GenericTypeParamDecl has incorrect depth\n";
         abort();
       }
@@ -3422,11 +3434,12 @@ public:
     }
 
     Type checkExceptionTypeExists(const char *where) {
-      auto exn = Ctx.getErrorDecl();
-      if (exn) return exn->getDeclaredInterfaceType();
+      if (!Ctx.getErrorDecl()) {
+        Out << "exception type does not exist in " << where << "\n";
+        abort();
+      }
 
-      Out << "exception type does not exist in " << where << "\n";
-      abort();
+      return Ctx.getErrorExistentialType();
     }
 
     bool isGoodSourceRange(SourceRange SR) {

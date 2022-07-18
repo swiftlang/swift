@@ -75,7 +75,6 @@ IsSerialized_t SILGlobalVariable::isSerialized() const {
   return Serialized ? IsSerialized : IsNotSerialized;
 }
 void SILGlobalVariable::setSerialized(IsSerialized_t isSerialized) {
-  assert(isSerialized != IsSerializable);
   Serialized = isSerialized ? 1 : 0;
 }
 

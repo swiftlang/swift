@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=off
-// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s 2>&1 | %FileCheck %s
 
-// CHECK-LABEL: Requirement signature: <Self where Self == Self.Dual.Dual, Self.Dual : Adjoint>
+// CHECK-LABEL: Requirement signature: <Self where Self == Self.[Adjoint]Dual.[Adjoint]Dual, Self.[Adjoint]Dual : Adjoint>
 public protocol Adjoint {
   associatedtype Dual: Adjoint where Self.Dual.Dual == Self
 }
@@ -11,7 +11,7 @@ public protocol Diffable {
   associatedtype Patch
 }
 
-// CHECK-LABEL: Requirement signature: <Self where Self : Adjoint, Self : Diffable, Self.Dual : AdjointDiffable, Self.Patch : Adjoint, Self.Dual.Patch == Self.Patch.Dual>
+// CHECK-LABEL: Requirement signature: <Self where Self : Adjoint, Self : Diffable, Self.[Adjoint]Dual : AdjointDiffable, Self.[Diffable]Patch : Adjoint, Self.[Adjoint]Dual.[Diffable]Patch == Self.[Diffable]Patch.[Adjoint]Dual>
 public protocol AdjointDiffable: Adjoint & Diffable
 where Self.Patch: Adjoint, Self.Dual: AdjointDiffable,
       Self.Patch.Dual == Self.Dual.Patch {
@@ -22,11 +22,10 @@ where Self.Patch: Adjoint, Self.Dual: AdjointDiffable,
 // proven from the other two, but dropping two or more conformance requirements
 // leaves us with an invalid signature.
 
-// CHECK-LABEL: Requirement signature: <Self where Self.A : P, Self.A == Self.B.C, Self.B : P, Self.B == Self.A.C, Self.C == Self.A.B>
+// CHECK-LABEL: Requirement signature: <Self where Self.[P]A : P, Self.[P]A == Self.[P]B.[P]C, Self.[P]B : P, Self.[P]B == Self.[P]A.[P]C, Self.[P]C == Self.[P]A.[P]B>
 protocol P {
   associatedtype A : P where A == B.C
   associatedtype B : P where B == A.C
-  // expected-note@-1 {{conformance constraint 'Self.C' : 'P' implied here}}
   associatedtype C : P where C == A.B
   // expected-warning@-1 {{redundant conformance constraint 'Self.C' : 'P'}}
 }

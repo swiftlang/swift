@@ -174,7 +174,7 @@ public:
     if (PaddedSize > SizeThreshold) {
       void *NewSlab =
           AllocatorT::Allocate(PaddedSize, alignof(std::max_align_t));
-      // We own the new slab and don't want anyone reading anyting other than
+      // We own the new slab and don't want anyone reading anything other than
       // pieces returned from this method.  So poison the whole slab.
       __asan_poison_memory_region(NewSlab, PaddedSize);
       CustomSizedSlabs.push_back(std::make_pair(NewSlab, PaddedSize));

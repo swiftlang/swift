@@ -240,6 +240,9 @@ _buildDemanglerForBuiltinType(const Metadata *type, Demangle::Demangler &Dem) {
 #define BUILTIN_TYPE(Symbol, Name) \
   if (type == &METADATA_SYM(Symbol).base) \
     return Dem.createNode(Node::Kind::BuiltinTypeName, Name);
+#if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 #include "swift/Runtime/BuiltinTypes.def"
   return nullptr;
 }
@@ -276,6 +279,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   }
   case MetadataKind::ForeignClass: {
     auto foreignType = static_cast<const ForeignClassMetadata *>(type);
+    description = foreignType->Description;
+    break;
+  }
+  case MetadataKind::ForeignReferenceType: {
+    auto foreignType = static_cast<const ForeignReferenceTypeMetadata *>(type);
     description = foreignType->Description;
     break;
   }
@@ -327,6 +335,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::Optional:
   case MetadataKind::Struct:
   case MetadataKind::ForeignClass:
+  case MetadataKind::ForeignReferenceType:
     return _buildDemanglingForNominalType(type, Dem);
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
@@ -439,6 +448,15 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     // Just a simple composition of protocols.
     return proto_list;
+  }
+  case MetadataKind::ExtendedExistential: {
+    // FIXME: Implement this by demangling the extended existential and
+    // substituting the generalization arguments into the demangle tree.
+    // For now, unconditional casts will report '<<< invalid type >>>' when
+    // they fail.
+    // TODO: for clients that need to guarantee round-tripping, demangle
+    // to a SymbolicExtendedExistentialType.
+    return nullptr;
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
@@ -717,6 +735,9 @@ char *swift_demangle(const char *mangledName,
   if (!Demangle::isSwiftSymbol(mangledName))
     return nullptr; // Not a mangled name
 
+#if !SWIFT_STDLIB_HAS_TYPE_PRINTING
+  return nullptr;
+#else
   // Demangle the name.
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
@@ -740,4 +761,5 @@ char *swift_demangle(const char *mangledName,
   }
 
   return outputBuffer;
+#endif
 }

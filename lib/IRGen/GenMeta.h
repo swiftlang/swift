@@ -29,6 +29,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  struct ExistentialTypeGeneralization;
   class FileUnit;
   class FuncDecl;
   enum class ResilienceExpansion : unsigned;
@@ -187,6 +188,16 @@ namespace irgen {
                                               llvm::Function *function,
                                               LinkEntity entity,
                                               Size size);
+
+  /// Determine whether the given opaque type requires a witness table for the
+  /// given requirement.
+  ///
+  /// \returns the protocol when a witness table is required, or \c nullptr
+  /// if the requirement isn't a conformance requirement or doesn't require a
+  /// witness table.
+  ProtocolDecl *opaqueTypeRequiresWitnessTable(
+      OpaqueTypeDecl *opaque, const Requirement &req);
+
 } // end namespace irgen
 } // end namespace swift
 

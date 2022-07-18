@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK: sr12736.(file).ColorModel@
-// CHECK-NEXT: Requirement signature: <Self where Self == Self.Float32Components.Model, Self.Float32Components : ColorComponents>
+// CHECK-NEXT: Requirement signature: <Self where Self == Self.[ColorModel]Float32Components.[ColorComponents]Model, Self.[ColorModel]Float32Components : ColorComponents>
 public protocol ColorModel {
   associatedtype Float32Components: ColorComponents where Float32Components.Model == Self
 }
@@ -15,7 +15,7 @@ public protocol ColorPixel {
 }
 
 // CHECK: sr12736.(file).P@
-// CHECK-NEXT: Requirement signature: <Self where Self.A : ColorPixel, Self.B : ColorPixel, Self.A.Model == Self.B.Model>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P]A : ColorPixel, Self.[P]B : ColorPixel, Self.[P]A.[ColorPixel]Model == Self.[P]B.[ColorPixel]Model>
 public protocol P {
   associatedtype A: ColorPixel
   associatedtype B: ColorPixel where B.Model == A.Model

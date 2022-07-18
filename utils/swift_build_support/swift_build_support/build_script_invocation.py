@@ -20,8 +20,6 @@ from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
-import six
-
 from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
@@ -124,6 +122,8 @@ class BuildScriptInvocation(object):
             "--lldb-assertions", str(
                 args.lldb_assertions).lower(),
             "--cmake-generator", args.cmake_generator,
+            "--cross-compile-append-host-target-to-destdir", str(
+                args.cross_compile_append_host_target_to_destdir).lower(),
             "--build-jobs", str(args.build_jobs),
             "--common-cmake-options=%s" % ' '.join(
                 pipes.quote(opt) for opt in cmake.common_options()),
@@ -254,7 +254,10 @@ class BuildScriptInvocation(object):
             (args.build_llbuild, "llbuild"),
             (args.build_libcxx, "libcxx"),
             (args.build_libdispatch, "libdispatch"),
-            (args.build_libicu, "libicu")
+            (args.build_libicu, "libicu"),
+            (args.build_libxml2, 'libxml2'),
+            (args.build_zlib, 'zlib'),
+            (args.build_curl, 'curl')
         ]
         for (should_build, string_name) in conditional_subproject_configs:
             if not should_build and not self.args.infer_dependencies:
@@ -311,11 +314,6 @@ class BuildScriptInvocation(object):
                 "--android-arch", args.android_arch,
                 "--android-ndk", args.android_ndk,
                 "--android-api-level", args.android_api_level,
-                "--android-icu-uc", args.android_icu_uc,
-                "--android-icu-uc-include", args.android_icu_uc_include,
-                "--android-icu-i18n", args.android_icu_i18n,
-                "--android-icu-i18n-include", args.android_icu_i18n_include,
-                "--android-icu-data", args.android_icu_data,
             ]
         # If building natively on an Android host, only pass the API level.
         if StdlibDeploymentTarget.Android.contains(StdlibDeploymentTarget
@@ -399,9 +397,9 @@ class BuildScriptInvocation(object):
                         args.build_jobs)
                 ]
 
-        if args.libswift_mode is not None:
+        if args.bootstrapping_mode is not None:
             impl_args += [
-                "--libswift=%s" % args.libswift_mode,
+                "--bootstrapping=%s" % args.bootstrapping_mode,
             ]
 
         impl_args += args.build_script_impl_args
@@ -430,6 +428,20 @@ class BuildScriptInvocation(object):
         if args.llvm_install_components:
             impl_args += [
                 "--llvm-install-components=%s" % args.llvm_install_components
+            ]
+
+        # On non-Darwin platforms, build lld so we can always have a
+        # linker that is compatible with the swift we are using to
+        # compile the stdlib.
+        #
+        # This makes it easier to build target stdlibs on systems that
+        # have old toolchains without more modern linker features.
+        #
+        # On Darwin, only build lld if explicitly requested using --build-lld.
+        should_build_lld = (platform.system() != 'Darwin' or args.build_lld)
+        if not should_build_lld:
+            impl_args += [
+                "--skip-build-lld"
             ]
 
         if not args.clean_libdispatch:
@@ -498,7 +510,7 @@ class BuildScriptInvocation(object):
             try:
                 config = HostSpecificConfiguration(host_target, args)
             except argparse.ArgumentError as e:
-                exit_rejecting_arguments(six.text_type(e))
+                exit_rejecting_arguments(str(e))
 
             # Convert into `build-script-impl` style variables.
             options[host_target] = {
@@ -545,6 +557,15 @@ class BuildScriptInvocation(object):
 
         builder.add_product(products.CMark,
                             is_enabled=self.args.build_cmark)
+
+        builder.add_product(products.LibXML2,
+                            is_enabled=self.args.build_libxml2)
+
+        builder.add_product(products.zlib.Zlib,
+                            is_enabled=self.args.build_zlib)
+
+        builder.add_product(products.curl.LibCurl,
+                            is_enabled=self.args.build_curl)
 
         # Begin a build-script-impl pipeline for handling the compiler toolchain
         # and a subset of the tools that we build. We build these in this manner
@@ -699,7 +720,7 @@ class BuildScriptInvocation(object):
             try:
                 config = HostSpecificConfiguration(host_target.name, self.args)
             except argparse.ArgumentError as e:
-                exit_rejecting_arguments(six.text_type(e))
+                exit_rejecting_arguments(str(e))
             print("Building the standard library for: {}".format(
                 " ".join(config.swift_stdlib_build_targets)))
             if config.swift_test_run_targets and (

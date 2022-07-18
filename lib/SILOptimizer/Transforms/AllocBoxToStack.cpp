@@ -172,7 +172,8 @@ static bool getFinalReleases(SILValue Box,
 
     // If we have a copy value or a mark_uninitialized, add its uses to the work
     // list and continue.
-    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
+    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User) ||
+        isa<BeginBorrowInst>(User)) {
       llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
                  std::back_inserter(Worklist));
       continue;
@@ -385,12 +386,14 @@ static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
     // Projections are fine as well.
     if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User) ||
         isa<ProjectBoxInst>(User) || isa<DestroyValueInst>(User) ||
-        (!inAppliedFunction && isa<DeallocBoxInst>(User)))
+        (!inAppliedFunction && isa<DeallocBoxInst>(User)) ||
+        isa<EndBorrowInst>(User))
       continue;
 
     // If our user instruction is a copy_value or a mark_uninitialized, visit
     // the users recursively.
-    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
+    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User) ||
+        isa<BeginBorrowInst>(User)) {
       llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
                  std::back_inserter(Worklist));
       continue;
@@ -502,10 +505,12 @@ static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
       continue;
     }
 
-    auto *CVI = dyn_cast<CopyValueInst>(Op->getUser());
-    if (!CVI)
-      continue;
-    llvm::copy(CVI->getUses(), std::back_inserter(Worklist));
+    auto *User = Op->getUser();
+    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User) ||
+        isa<BeginBorrowInst>(User)) {
+      llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
+                 std::back_inserter(Worklist));
+    }
   }
 }
 
@@ -578,8 +583,9 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   while (!Worklist.empty()) {
     auto *User = Worklist.pop_back_val();
 
-    // Look through any mark_uninitialized, copy_values.
-    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
+    // Look through any mark_uninitialized, copy_values, begin_borrow.
+    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User) ||
+        isa<BeginBorrowInst>(User)) {
       auto Inst = cast<SingleValueInstruction>(User);
       llvm::transform(Inst->getUses(), std::back_inserter(Worklist),
                       [](Operand *Op) -> SILInstruction * {
@@ -592,7 +598,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
     assert(isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User) ||
            isa<DeallocBoxInst>(User) || isa<ProjectBoxInst>(User) ||
-           isa<DestroyValueInst>(User));
+           isa<DestroyValueInst>(User) || isa<EndBorrowInst>(User));
 
     User->eraseFromParent();
   }
@@ -637,8 +643,10 @@ private:
   void visitCopyValueInst(CopyValueInst *Inst);
   void visitProjectBoxInst(ProjectBoxInst *Inst);
   void checkNoPromotedBoxInApply(ApplySite Apply);
-#define APPLYSITE_INST(Name, Parent) void visit##Name(Name *Inst);
-#include "swift/SIL/SILNodes.def"
+  void visitApplyInst(ApplyInst *Inst);
+  void visitBeginApplyInst(BeginApplyInst *Inst);
+  void visitPartialApplyInst(PartialApplyInst *Inst);
+  void visitTryApplyInst(TryApplyInst *Inst);
 };
 } // end anonymous namespace
 
@@ -896,7 +904,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
 
   IsSerialized_t Serialized = IsNotSerialized;
   if (Apply.getFunction()->isSerialized())
-    Serialized = IsSerializable;
+    Serialized = IsSerialized;
 
   std::string ClonedName =
     getClonedName(F, Serialized, PromotedCalleeArgIndices);
@@ -933,6 +941,8 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     SILValue Box = O.get();
     assert((isa<SingleValueInstruction>(Box) && isa<AllocBoxInst>(Box) ||
             isa<CopyValueInst>(Box) ||
+            isa<MarkUninitializedInst>(Box) ||
+            isa<BeginBorrowInst>(Box) ||
             isa<SILFunctionArgument>(Box)) &&
            "Expected either an alloc box or a copy of an alloc box or a "
            "function argument");

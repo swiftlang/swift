@@ -5,7 +5,7 @@
 import Foundation
 import ImportAsMember.Class
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : @owned $Optional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
@@ -25,7 +25,8 @@ extension Hive {
   // CHECK: bb0([[QUEEN:%.*]] : @owned $Bee, [[META:%.*]] : $@thick Hive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var Hive }, let, name "self"
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[PB_BOX:%.*]] = project_box [[MU]] : ${ var Hive }, 0
+  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var Hive }, 0
   // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [lexical] [[QUEEN]]
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
@@ -46,13 +47,14 @@ extension Hive {
   // CHECK: bb0([[QUEEN:%.*]] : @owned $Bee, [[META:%.*]] : $@thick Hive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var Hive }, let, name "self"
   // CHECK-NEXT:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK-NEXT:   [[PB_BOX:%.*]] = project_box [[MU]] : ${ var Hive }, 0
+  // CHECK-NEXT:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK-NEXT:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var Hive }, 0
   // CHECK-NEXT:   [[BORROWED_QUEEN:%.*]] = begin_borrow [lexical] [[QUEEN]]
   // CHECK:   [[FOREIGN_ERROR_STACK:%.*]] = alloc_stack [dynamic_lifetime] $Optional<NSError>
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
   // CHECK:   [[OPT_COPIED_BORROWED_QUEEN:%.*]] = enum $Optional<Bee>, #Optional.some!enumelt, [[COPIED_BORROWED_QUEEN]]
-  // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.foreign : (Hive.Type) -> (Bee?) throws -> Hive, $@convention(objc_method) (Optional<Bee>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive> // user: %25
+  // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.foreign : (Hive.Type) -> (Bee?) throws -> Hive, $@convention(objc_method) (Optional<Bee>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK:   [[ERROR_PTR_STACK:%.*]] = alloc_stack $AutoreleasingUnsafeMutablePointer<Optional<NSError>>
   // CHECK:   [[ERROR_PTR:%.*]] = load [trivial] [[ERROR_PTR_STACK]]
   // CHECK:   [[OPT_ERROR_PTR:%.*]] = enum $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, #Optional.some!enumelt, [[ERROR_PTR]]
@@ -93,7 +95,8 @@ class SubHive : Hive {
   // CHECK: bb0([[METATYPE:%.*]] : $@thick SubHive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SubHive }, let, name "self"
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var SubHive }
-  // CHECK:   [[PB_BOX:%.*]] = project_box [[MU]] : ${ var SubHive }, 0
+  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var SubHive }, 0
   // CHECK:   [[UP_METATYPE:%.*]] = upcast [[METATYPE]]
   // CHECK:   [[OBJC_METATYPE:%.*]] = thick_to_objc_metatype [[UP_METATYPE]]
   // CHECK:   [[QUEEN:%.*]] = unchecked_ref_cast {{.*}} : $Bee to $Optional<Bee>

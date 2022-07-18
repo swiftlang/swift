@@ -214,7 +214,8 @@ SYNTAX_TOKENS = [
     # Punctuators
     Punctuator('LeftParen', 'l_paren', text='(', serialization_code=88),
     Punctuator('RightParen', 'r_paren', text=')', serialization_code=89),
-    Punctuator('LeftBrace', 'l_brace', text='{', serialization_code=90),
+    Punctuator('LeftBrace', 'l_brace', text='{', requires_leading_space=True,
+               serialization_code=90),
     Punctuator('RightBrace', 'r_brace', text='}', serialization_code=91),
     Punctuator('LeftSquareBracket', 'l_square', text='[',
                serialization_code=92),

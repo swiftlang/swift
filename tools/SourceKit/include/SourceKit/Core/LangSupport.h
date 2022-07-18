@@ -732,6 +732,11 @@ public:
   virtual void cancelled() = 0;
 };
 
+struct CompilationResult {
+  unsigned int ResultStatus;
+  llvm::ArrayRef<DiagnosticEntryInfo> Diagnostics;
+};
+
 class LangSupport {
   virtual void anchor();
 
@@ -937,6 +942,15 @@ public:
       SourceKitCancellationToken CancellationToken,
       ConformingMethodListConsumer &Consumer,
       Optional<VFSOptions> vfsOptions) = 0;
+
+  virtual void
+  performCompile(StringRef Name, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> vfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<CompilationResult> &)>
+                     Receiver) = 0;
+
+  virtual void closeCompile(StringRef Name) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
 };

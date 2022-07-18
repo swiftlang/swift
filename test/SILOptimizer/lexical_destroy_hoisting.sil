@@ -1,0 +1,526 @@
+// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+// =============================================================================
+// = DECLARATIONS                                                             {{
+// =============================================================================
+
+class C {
+    weak var d: D?
+}
+class D {}
+struct S {}
+class DBox {
+  var d: D
+}
+
+struct CDCase {
+    var c: C
+    var d: D
+}
+
+class PointedTo {
+}
+class PointerWrapper {
+    var pointer: Builtin.RawPointer
+}
+
+enum OneOfThree { case one, two, three }
+
+sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @get_owned_c : $@convention(thin) () -> (@owned C)
+sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
+sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Optional<D>) -> ()
+sil [ossa] @synchronization_point : $@convention(thin) () -> ()
+sil [ossa] @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
+sil [ossa] @barrier : $@convention(thin) () -> ()
+
+
+// =============================================================================
+// = DECLARATIONS                                                             }}
+// =============================================================================
+
+// =============================================================================
+// branching tests                                                            {{
+// =============================================================================
+
+// Hoist over br.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_1 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_1'
+sil [ossa] @hoist_over_branch_1 : $@convention(thin) (@owned C) -> () {
+entry(%instance: @owned $C):
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br bl1
+bl1:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Hoist over cond_br.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         cond_br
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_2'
+sil [ossa] @hoist_over_branch_2 : $@convention(thin) (@owned C) -> () {
+entry(%instance: @owned $C):
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    cond_br undef, bl1, bl2
+bl1:
+    br exit
+bl2:
+    br exit
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Hoist over two brs.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_3 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         cond_br undef
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_3'
+sil [ossa] @hoist_over_branch_3 : $@convention(thin) (@owned C) -> () {
+entry(%instance: @owned $C):
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    cond_br undef, bl1, bl2
+bl1:
+    br exit
+bl2:
+    br exit
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't hoist over 1 / 2 brs.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_4 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
+// CHECK:       [[BL1]]:
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[BL2]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT]]
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_4'
+sil [ossa] @hoist_over_branch_4 : $@convention(thin) (@owned C) -> () {
+entry(%instance: @owned $C):
+    cond_br undef, bl1, bl2
+bl1:
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br exit
+bl2:
+    br exit
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Hoist over switch_enum.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_5 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C, [[CASE:%[^,]+]] : $OneOfThree):
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         switch_enum [[CASE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_5'
+sil [ossa] @hoist_over_branch_5 : $(@owned C, OneOfThree) -> () {
+entry(%instance: @owned $C, %case : $OneOfThree):
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    switch_enum %case : $OneOfThree, case #OneOfThree.one!enumelt: one_dest, case #OneOfThree.two!enumelt: two_dest, case #OneOfThree.three!enumelt: three_dest
+one_dest:
+    br exit
+two_dest:
+    br exit
+three_dest:
+    br exit
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't hoist when there are reborrows.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_terminator_4 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         br [[WORK:bb[0-9]+]]([[LIFETIME]] : $C)
+// CHECK:       [[WORK]]([[LIFETIME_2:%[^,]+]] : @guaranteed $C):
+// CHECK:         end_borrow [[LIFETIME_2]]
+// CHECK:         tuple ()
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br
+// CHECK-LABEL: } // end sil function 'hoist_over_terminator_4'
+sil [ossa] @hoist_over_terminator_4 : $@convention(thin) (@owned C) -> () {
+entry(%instance_c : @owned $C):
+    %lifetime_c_0 = begin_borrow %instance_c : $C
+    br work(%lifetime_c_0 : $C)
+
+work(%lifetime_c : @guaranteed $C):
+    end_borrow %lifetime_c : $C
+    %foo = tuple ()
+    destroy_value %instance_c : $C
+    br exit
+
+exit:
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't hoist over phi-use of value.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_some_barred_blocks : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]](undef : $C)
+// CHECK:       [[RIGHT]]:
+// CHECK:         br [[EXIT]]([[INSTANCE]] : $C)
+// CHECK:       [[EXIT]]([[THING:%[^,]+]] :
+// CHECK:         destroy_value [[THING]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_some_barred_blocks'
+sil [ossa] @dont_hoist_over_some_barred_blocks : $(@owned C) -> () {
+entry(%instance : @owned $C):
+    cond_br undef, left, right
+
+left:
+    destroy_value %instance : $C
+    br exit(undef : $C)
+
+right:
+    br exit(%instance : $C)
+
+exit(%thing : @owned $C):
+    destroy_value %thing : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// =============================================================================
+// branching tests                                                            }}
+// =============================================================================
+
+// =============================================================================
+// loop tests                                                                 {{
+// =============================================================================
+
+// Don't hoist over loop without uses.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_loop_1 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
+// CHECK:       [[LOOP_HEADER]]:
+// CHECK:         br [[LOOP_BODY:bb[0-9]+]]
+// CHECK:       [[LOOP_BODY]]:
+// CHECK:         br [[LOOP_LATCH:bb[0-9]+]]
+// CHECK:       [[LOOP_LATCH]]:
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[LOOP_BACKEDGE:bb[0-9]+]]
+// CHECK:       [[LOOP_BACKEDGE]]:
+// CHECK:         br [[LOOP_HEADER]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'hoist_over_loop_1'
+sil [ossa] @hoist_over_loop_1 : $@convention(thin) (@owned C) -> () {
+entry(%instance: @owned $C):
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br loop_header
+loop_header:
+    br loop_body
+loop_body:
+    br loop_latch
+loop_latch:
+    cond_br undef, exit, loop_backedge
+loop_backedge:
+    br loop_header
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't hoist over loop with uses.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_loop_2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
+// CHECK:       [[LOOP_HEADER]]:
+// CHECK:         br [[LOOP_BODY:bb[0-9]+]]
+// CHECK:       [[LOOP_BODY]]:
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         br [[LOOP_LATCH:bb[0-9]+]]
+// CHECK:       [[LOOP_LATCH]]:
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[LOOP_BACKEDGE:bb[0-9]+]]
+// CHECK:       [[LOOP_BACKEDGE]]:
+// CHECK:         br [[LOOP_HEADER]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_loop_2'
+sil [ossa] @hoist_over_loop_2 : $@convention(thin) (@owned C) -> () {
+entry(%instance: @owned $C):
+    br loop_header
+loop_header:
+    br loop_body
+loop_body:
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br loop_latch
+loop_latch:
+    cond_br undef, exit, loop_backedge
+loop_backedge:
+    br loop_header
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// =============================================================================
+// loop tests                                                                 }}
+// =============================================================================
+
+// =============================================================================
+// instruction tests                                                          {{
+// =============================================================================
+
+// Don't hoist over an apply that uses a copy of the value.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_apply_at_copy : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[REGISTER_0:%[^,]+]] :
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         apply
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         destroy_value [[COPY]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_apply_at_copy'
+sil [ossa] @dont_hoist_over_apply_at_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %copy = copy_value %instance : $C
+  apply %callee_guaranteed(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %instance : $C
+  destroy_value %copy : $C
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// Don't hoist over an apply that uses the value.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_at_value : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_at_value'
+sil [ossa] @hoist_over_apply_at_value : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %instance : $C
+  %result = tuple ()
+  return %result : $()
+}
+
+// Don't hoist over a try apply that uses the value.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_try_apply_at_value : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         try_apply undef([[INSTANCE]]) : {{.*}}, normal [[GOOD:bb[0-9]+]], error [[BAD:bb[0-9]+]] 
+// CHECK:       [[GOOD]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:       [[BAD]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_try_apply_at_value'
+sil [ossa] @dont_hoist_over_try_apply_at_value : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+  try_apply undef(%instance) : $@convention(thin) (@guaranteed C) -> @error Error, normal good, error bad
+
+good(%8 : $()):
+  destroy_value %instance : $C
+  %13 = tuple ()
+  return %13 : $()
+
+bad(%15 : @owned $Error):
+  destroy_value %instance : $C
+  throw %15 : $Error
+}
+
+// Don't hoist over barrier try_apply.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_try_apply_barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         try_apply undef() : {{.*}}, normal [[GOOD:bb[0-9]+]], error [[BAD:bb[0-9]+]]
+// CHECK:       [[GOOD]]({{%[^,]+}} : $()):
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:       [[BAD]]([[ERROR:%[^,]+]] : @owned $Error):
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         throw [[ERROR]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_try_apply_barrier'
+sil [ossa] @dont_hoist_over_try_apply_barrier : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+  apply undef(%instance) : $@convention(thin) (@guaranteed C) -> ()
+  try_apply undef() : $@convention(thin) () -> @error Error, normal good, error bad
+
+good(%8 : $()):
+  destroy_value %instance : $C
+  %13 = tuple ()
+  return %13 : $()
+
+bad(%15 : @owned $Error):
+  destroy_value %instance : $C
+  throw %15 : $Error
+}
+
+// Hoist up to two parallel barrier applies from a block with two predecessors.
+//
+// CHECK-LABEL: sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         apply undef()
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply undef()
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'hoist_up_to_two_barrier_applies'
+sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  cond_br undef, left, right
+
+left:
+  %result_left = apply undef() : $@convention(thin) () -> ()
+  br exit
+
+right:
+  %result_right = apply undef() : $@convention(thin) () -> ()
+  br exit
+
+exit:
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Don't hoist over end_apply.  These are lowered to calls to continuations
+// which can have the same sorts of side-effects as function calls.
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_end_apply : {{.*}} {
+// CHECK:         end_apply
+// CHECK:         destroy_value
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_end_apply'
+sil [ossa] @dont_hoist_over_end_apply : $@convention(thin) (@owned C, S) -> () {
+entry(%instance : @owned $C, %input : $S):
+    %modify_s = function_ref @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
+    (%addr, %continuation) = begin_apply %modify_s() : $@yield_once @convention(thin) () -> @yields @inout S
+    store %input to [trivial] %addr : $*S
+    end_apply %continuation
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+
+// =============================================================================
+// instruction tests                                                          }}
+// =============================================================================
+
+// =============================================================================
+// access scope tests                                                         {{
+// =============================================================================
+
+// Don't hoist into an access scope that contains a barrier.
+//
+// CHECK-LABEL: sil [ossa] @nofold_scoped_load_barrier : {{.*}} {
+// CHECK: end_access
+// CHECK: end_access
+// CHECK: destroy_value
+// CHECK-LABEL: // end sil function 'nofold_scoped_load_barrier'
+sil [ossa] @nofold_scoped_load_barrier : $@convention(thin) (@owned C, @owned C) -> (@owned C) {
+entry(%instance : @owned $C, %other : @owned $C):
+  %addr = alloc_stack $C
+  %store_scope = begin_access [modify] [static] %addr : $*C
+  store %other to [init] %store_scope : $*C
+  end_access %store_scope : $*C
+  %load_scope = begin_access [read] [static] %addr : $*C
+  %value = load [copy] %load_scope : $*C
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  apply %barrier() : $@convention(thin) () -> ()
+  end_access %load_scope : $*C
+  destroy_addr %addr : $*C
+  dealloc_stack %addr : $*C
+  destroy_value %instance : $C
+  return %value : $C
+}
+
+// Access scopes that are open at barrier blocks are barriers.  Otherwise, we
+// would hoist destroy_values into the scopes when the destroy_values are
+// hoisted up to the begin of blocks whose predecessor is the barrier block.
+//
+// CHECK-LABEL: sil [ossa] @nohoist_into_access_scope_barred_by_barrier_block : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C, [[INOUT:%[^,]+]] : $*C):
+// CHECK:         [[SCOPE:%[^,]+]] = begin_access [modify] [static] [[INOUT]] : $*C
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]],
+// CHECK:       [[LEFT]]:
+// CHECK:         end_access [[SCOPE]] : $*C
+// CHECK-NEXT:    destroy_value [[INSTANCE]] : $C
+// CHECK-LABEL: } // end sil function 'nohoist_into_access_scope_barred_by_barrier_block'
+sil [ossa] @nohoist_into_access_scope_barred_by_barrier_block : $@convention(thin) (@owned C, @inout C) -> () {
+entry(%instance : @owned $C, %second : $*C):
+    %scope = begin_access [modify] [static] %second : $*C
+    cond_br undef, left, right
+
+left:
+    end_access %scope : $*C
+    %ignore = tuple ()
+    destroy_value %instance : $C
+    br exit
+
+right:
+    end_access %scope : $*C
+    apply undef(%instance) : $@convention(thin) (@owned C) -> ()
+    br exit
+
+exit:
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// =============================================================================
+// access scope tests                                                         }}
+// =============================================================================

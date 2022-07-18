@@ -207,9 +207,9 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
   for (auto *op : value->getUses()) {
     auto *user = op->getUser();
 
-    // If this op is a type dependent operand, skip it. It is not interesting
+    // For example, type dependent operands are non-use. It is not interesting
     // from an ownership perspective.
-    if (user->isTypeDependentOperand(*op))
+    if (op->getOperandOwnership() == OperandOwnership::NonUse)
       continue;
 
     // First check if this recursive use is compatible with our values ownership
@@ -669,7 +669,7 @@ bool SILValueOwnershipChecker::checkUses() {
     }
   }
 
-  // Check if we are an instruction that forwards forwards guaranteed
+  // Check if we are an instruction that forwards guaranteed
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
   if (value.getOwnershipKind() == OwnershipKind::Guaranteed
@@ -687,7 +687,8 @@ bool SILValueOwnershipChecker::checkUses() {
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-void SILInstruction::verifyOperandOwnership() const {
+void SILInstruction::verifyOperandOwnership(
+    SILModuleConventions *silConv) const {
   if (DisableOwnershipVerification)
     return;
 
@@ -736,7 +737,7 @@ void SILInstruction::verifyOperandOwnership() const {
     if (isTypeDependentOperand(op))
       continue;
 
-    if (!checkOperandOwnershipInvariants(&op)) {
+    if (!checkOperandOwnershipInvariants(&op, silConv)) {
       errorBuilder->handleMalformedSIL([&] {
         llvm::errs() << "Found an operand with invalid invariants.\n";
         llvm::errs() << "Value: " << op.get();
@@ -747,8 +748,8 @@ void SILInstruction::verifyOperandOwnership() const {
       });
     }
 
-    if (!op.satisfiesConstraints()) {
-      auto constraint = op.getOwnershipConstraint();
+    if (!op.satisfiesConstraints(silConv)) {
+      auto constraint = op.getOwnershipConstraint(silConv);
       SILValue opValue = op.get();
       auto valueOwnershipKind = opValue.getOwnershipKind();
       errorBuilder->handleMalformedSIL([&] {
@@ -796,7 +797,7 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   //
   // NOTE: We purposely return if we do can not look up a module here to ensure
   // that if we run into something that we do not understand, we do not assert
-  // in user code even tohugh we aren't going to actually verify (the default
+  // in user code even though we aren't going to actually verify (the default
   // behavior when -sil-verify-all is disabled).
   auto *mod = Value->getModule();
   if (!mod || !mod->getOptions().VerifyAll)
@@ -840,7 +841,7 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   //
   // NOTE: We purposely return if we do can not look up a module here to ensure
   // that if we run into something that we do not understand, we do not assert
-  // in user code even tohugh we aren't going to actually verify (the default
+  // in user code even though we aren't going to actually verify (the default
   // behavior when -sil-verify-all is disabled).
   auto *mod = &getModule();
   if (!mod || !mod->getOptions().VerifyAll)

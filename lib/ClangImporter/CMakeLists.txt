@@ -11,8 +11,10 @@ add_swift_host_library(swiftClangImporter STATIC
   ClangDiagnosticConsumer.cpp
   ClangImporter.cpp
   ClangImporterRequests.cpp
+  ClangIncludePaths.cpp
   ClangModuleDependencyScanner.cpp
   ClangSourceBufferImporter.cpp
+  SwiftDeclSynthesizer.cpp
   DWARFImporter.cpp
   ImportDecl.cpp
   ImportEnumInfo.cpp

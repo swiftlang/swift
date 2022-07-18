@@ -123,7 +123,7 @@ collectExistentialConformances(ModuleDecl *M, CanType openedType,
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    auto conformance = M->lookupConformance(openedType, proto->getDecl());
+    auto conformance = M->lookupConformance(openedType, proto);
     assert(conformance);
     conformances.push_back(conformance);
   }
@@ -304,12 +304,17 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
     auto &param = params[Idx];
     auto PType = param.getArgumentType(M, FTy, F->getTypeExpansionContext());
     assert(PType.isExistentialType());
+
+    CanType constraint = PType;
+    if (auto existential = PType->getAs<ExistentialType>())
+      constraint = existential->getConstraintType()->getCanonicalType();
+
     /// Generate new generic parameter.
     auto *NewGenericParam =
         GenericTypeParamType::get(/*type sequence*/ false, Depth, GPIdx++, Ctx);
     genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
-                               PType);
+                               constraint);
     requirements.push_back(NewRequirement);
     ArgToGenericTypeMap.insert(
         std::pair<int, GenericTypeParamType *>(Idx, NewGenericParam));
@@ -442,7 +447,9 @@ void ExistentialTransform::populateThunkBody() {
       auto OrigOperand = ThunkBody->getArgument(ArgDesc.Index);
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
       auto OpenedType =
-          SwiftType->openAnyExistentialType(Opened)->getCanonicalType();
+          SwiftType
+              ->openAnyExistentialType(Opened, F->getGenericSignature())
+              ->getCanonicalType();
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;
       auto ExistentialRepr =

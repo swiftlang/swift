@@ -60,7 +60,7 @@ public:
   );
 
   /// Count the number of children for a given syntax node kind,
-  /// returning a pair of mininum and maximum count of children. The gap
+  /// returning a pair of minimum and maximum count of children. The gap
   /// between these two numbers is the number of optional children.
   static std::pair<unsigned, unsigned> countChildren(SyntaxKind Kind);
 

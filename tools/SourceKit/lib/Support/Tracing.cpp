@@ -12,8 +12,6 @@
 
 #include "SourceKit/Support/Tracing.h"
 
-#include "swift/Frontend/Frontend.h"
-
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/YAMLTraits.h"
 

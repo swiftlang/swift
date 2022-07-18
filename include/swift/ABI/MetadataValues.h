@@ -24,6 +24,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
+#include "llvm/ADT/ArrayRef.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -55,6 +56,13 @@ enum {
 
   /// The number of words in an AsyncLet (flags + child task context & allocation)
   NumWords_AsyncLet = 80, // 640 bytes ought to be enough for anyone
+
+  /// The size of a unique hash.
+  NumBytes_UniqueHash = 16,
+
+  /// The maximum number of generic parameters that can be
+  /// implicitly declared, for generic signatures that support that.
+  MaxNumImplicitGenericParamDescriptors = 64,
 };
 
 struct InProcess;
@@ -603,6 +611,21 @@ public:
 
   int_type getIntValue() const { return Value; }
 
+  /// Is the method implementation is represented as a native function pointer?
+  bool isFunctionImpl() const {
+    switch (getKind()) {
+    case ProtocolRequirementFlags::Kind::Method:
+    case ProtocolRequirementFlags::Kind::Init:
+    case ProtocolRequirementFlags::Kind::Getter:
+    case ProtocolRequirementFlags::Kind::Setter:
+    case ProtocolRequirementFlags::Kind::ReadCoroutine:
+    case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+      return !isAsync();
+    default:
+      return false;
+    }
+  }
+
   enum : uintptr_t {
     /// Bit used to indicate that an associated type witness is a pointer to
     /// a mangled name (vs. a pointer to metadata).
@@ -781,6 +804,141 @@ public:
                                      >> SpecialProtocolShift));
   }
   
+  int_type getIntValue() const {
+    return Data;
+  }
+};
+
+/// Flags in an extended existential shape.
+class ExtendedExistentialTypeShapeFlags {
+public:
+  typedef uint32_t int_type;
+
+  /// Special cases for the representation.
+  enum class SpecialKind {
+    None = 0,
+
+    /// The existential has a class constraint.
+    /// The inline storage is sizeof(void*) / alignof(void*),
+    /// the value is always stored inline, the value is reference-
+    /// counted (using unknown reference counting), and the
+    /// type metadata for the requirement generic parameters are
+    /// not stored in the existential container because they can
+    /// be recovered from the instance type of the class.
+    Class = 1,
+
+    /// The existential has a metatype constraint.
+    /// The inline storage is sizeof(void*) / alignof(void*),
+    /// the value is always stored inline, the value is a Metadata*,
+    /// and the type metadata for the requirement generic parameters
+    /// are not stored in the existential container because they can
+    /// be recovered from the stored metatype.
+    Metatype = 2,
+
+    /// The inline value storage has a non-storage layout.  The shape
+    /// must include a value witness table.  Type metadata for the
+    /// requirement generic parameters are still stored in the existential
+    /// container.
+    ExplicitLayout = 3,
+
+    // 255 is the maximum
+  };
+
+private:
+  enum : int_type {
+    SpecialKindMask             = 0x000000FFU,
+    SpecialKindShift            = 0,
+    HasGeneralizationSignature  = 0x00000100U,
+    HasTypeExpression           = 0x00000200U,
+    HasSuggestedValueWitnesses  = 0x00000400U,
+    HasImplicitReqSigParams     = 0x00000800U,
+    HasImplicitGenSigParams     = 0x00001000U,
+  };
+  int_type Data;
+
+public:
+  constexpr ExtendedExistentialTypeShapeFlags() : Data(0) {}
+  constexpr ExtendedExistentialTypeShapeFlags(int_type Data) : Data(Data) {}
+  constexpr ExtendedExistentialTypeShapeFlags
+  withSpecialKind(SpecialKind kind) const {
+    return ExtendedExistentialTypeShapeFlags(
+      (Data & ~SpecialKindMask) | (int_type(kind) << SpecialKindShift));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withHasTypeExpression(bool hasTypeExpression) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasTypeExpression ? (Data | HasTypeExpression)
+                        : (Data & ~HasTypeExpression));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withGeneralizationSignature(bool hasGeneralization) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasGeneralization ? (Data | HasGeneralizationSignature)
+                        : (Data & ~HasGeneralizationSignature));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withSuggestedValueWitnesses(bool hasSuggestedVWT) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasSuggestedVWT ? (Data | HasSuggestedValueWitnesses)
+                      : (Data & ~HasSuggestedValueWitnesses));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withImplicitReqSigParams(bool implicit) const {
+    return ExtendedExistentialTypeShapeFlags(
+      implicit ? (Data | HasImplicitReqSigParams)
+               : (Data & ~HasImplicitReqSigParams));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withImplicitGenSigParams(bool implicit) const {
+    return ExtendedExistentialTypeShapeFlags(
+      implicit ? (Data | HasImplicitGenSigParams)
+               : (Data & ~HasImplicitGenSigParams));
+  }
+
+  /// Is this a special kind of existential?
+  SpecialKind getSpecialKind() const {
+    return SpecialKind((Data & SpecialKindMask) >> SpecialKindShift);
+  }
+  bool isOpaque() const { return getSpecialKind() == SpecialKind::None; }
+  bool isClassConstrained() const {
+    return getSpecialKind() == SpecialKind::Class;
+  }
+  bool isMetatypeConstrained() const {
+    return getSpecialKind() == SpecialKind::Metatype;
+  }
+
+  bool hasGeneralizationSignature() const {
+    return Data & HasGeneralizationSignature;
+  }
+
+  bool hasTypeExpression() const {
+    return Data & HasTypeExpression;
+  }
+
+  bool hasSuggestedValueWitnesses() const {
+    return Data & HasSuggestedValueWitnesses;
+  }
+
+  /// The parameters of the requirement signature are not stored
+  /// explicitly in the shape.
+  ///
+  /// In order to enable this, there must be no more than
+  /// MaxNumImplicitGenericParamDescriptors generic parameters, and
+  /// they must match GenericParamDescriptor::implicit().
+  bool hasImplicitReqSigParams() const {
+    return Data & HasImplicitReqSigParams;
+  }
+
+  /// The parameters of the generalization signature are not stored
+  /// explicitly in the shape.
+  ///
+  /// In order to enable this, there must be no more than
+  /// MaxNumImplicitGenericParamDescriptors generic parameters, and
+  /// they must match GenericParamDescriptor::implicit().
+  bool hasImplicitGenSigParams() const {
+    return Data & HasImplicitGenSigParams;
+  }
+
   int_type getIntValue() const {
     return Data;
   }
@@ -1191,6 +1349,15 @@ namespace SpecialPointerAuthDiscriminators {
   /// Protocol conformance descriptors.
   const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
 
+  /// Pointer to value witness table stored in type metadata.
+  ///
+  /// Computed with ptrauth_string_discriminator("value_witness_table_t").
+  const uint16_t ValueWitnessTable = 0x2e3f;
+
+  /// Extended existential type shapes.
+  const uint16_t ExtendedExistentialTypeShape = 0x5a3d; // = 23101
+  const uint16_t NonUniqueExtendedExistentialTypeShape = 0xe798; // = 59288
+
   /// Value witness functions.
   const uint16_t InitializeBufferWithCopyOfBuffer = 0xda4a;
   const uint16_t Destroy = 0x04f8;
@@ -1263,6 +1430,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Dispatch integration.
   const uint16_t DispatchInvokeFunction = 0xf493; // = 62611
+
+  /// Functions accessible at runtime (i.e. distributed method accessors).
+  const uint16_t AccessibleFunctionRecord = 0x438c; // = 17292
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1652,7 +1822,39 @@ public:
   constexpr uint8_t getIntValue() const {
     return Value;
   }
+
+  friend bool operator==(GenericParamDescriptor lhs,
+                         GenericParamDescriptor rhs) {
+    return lhs.getIntValue() == rhs.getIntValue();
+  }
+  friend bool operator!=(GenericParamDescriptor lhs,
+                         GenericParamDescriptor rhs) {
+    return !(lhs == rhs);
+  }
+
+  /// The default parameter descriptor for an implicit parameter.
+  static constexpr GenericParamDescriptor implicit() {
+    return GenericParamDescriptor(GenericParamKind::Type,
+                                  /*key argument*/ true,
+                                  /*extra argument*/ false);
+  }
 };
+
+/// Can the given generic parameter array be implicit, for places in
+/// the ABI which support that?
+inline bool canGenericParamsBeImplicit(
+                            llvm::ArrayRef<GenericParamDescriptor> params) {
+  // If there are more parameters than the maximum, they cannot be implicit.
+  if (params.size() > MaxNumImplicitGenericParamDescriptors)
+    return false;
+
+  // If any parameter is not the implicit pattern, they cannot be implicit.
+  for (auto param : params)
+    if (param != GenericParamDescriptor::implicit())
+      return false;
+
+  return true;
+}
 
 enum class GenericRequirementKind : uint8_t {
   /// A protocol requirement.
@@ -2014,12 +2216,12 @@ enum class JobKind : size_t {
 enum class JobPriority : size_t {
   // This is modelled off of Dispatch.QoS, and the values are directly
   // stolen from there.
-  UserInteractive = 0x21,
-  UserInitiated   = 0x19,
-  Default         = 0x15,
-  Utility         = 0x11,
-  Background      = 0x09,
-  Unspecified     = 0x00,
+  UserInteractive = 0x21, /* UI */
+  UserInitiated   = 0x19, /* IN */
+  Default         = 0x15, /* DEF */
+  Utility         = 0x11, /* UT */
+  Background      = 0x09, /* BG */
+  Unspecified     = 0x00, /* UN */
 };
 
 /// A tri-valued comparator which orders higher priorities first.
@@ -2028,12 +2230,18 @@ inline int descendingPriorityOrder(JobPriority lhs,
   return (lhs == rhs ? 0 : lhs > rhs ? -1 : 1);
 }
 
+inline JobPriority withUserInteractivePriorityDowngrade(JobPriority priority) {
+  return (priority == JobPriority::UserInteractive) ? JobPriority::UserInitiated
+                                                    : priority;
+}
+
 /// Flags for task creation.
 class TaskCreateFlags : public FlagSet<size_t> {
 public:
   enum {
-    Priority       = 0,
-    Priority_width = 8,
+    // Priority that user specified while creating the task
+    RequestedPriority = 0,
+    RequestedPriority_width = 8,
 
     Task_IsChildTask                              = 8,
     // bit 9 is unused
@@ -2046,8 +2254,9 @@ public:
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
   constexpr TaskCreateFlags() {}
 
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Priority, Priority_width, JobPriority,
-                                 getPriority, setPriority)
+  FLAGSET_DEFINE_FIELD_ACCESSORS(RequestedPriority, RequestedPriority_width,
+                                 JobPriority, getRequestedPriority,
+                                 setRequestedPriority)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
                                 isChildTask,
                                 setIsChildTask)
@@ -2156,6 +2365,8 @@ enum class TaskOptionRecordKind : uint8_t {
   AsyncLet  = 2,
   /// Request a child task for an 'async let'.
   AsyncLetWithBuffer = 3,
+  /// Request a child task for swift_task_run_inline.
+  RunInline = UINT8_MAX,
 };
 
 /// Flags for cancellation records.
@@ -2192,57 +2403,6 @@ public:
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, TaskOptionRecordKind,
                                  getKind, setKind)
-};
-
-/// Kinds of async context.
-enum class AsyncContextKind {
-  /// An ordinary asynchronous function.
-  Ordinary         = 0,
-
-  /// A context which can yield to its caller.
-  Yielding         = 1,
-
-  /// A continuation context.
-  Continuation     = 2,
-
-  // Other kinds are reserved for interesting special
-  // intermediate contexts.
-
-  // Kinds >= 192 are private to the implementation.
-  First_Reserved = 192
-};
-
-/// Flags for async contexts.
-class AsyncContextFlags : public FlagSet<uint32_t> {
-public:
-  enum {
-    Kind                = 0,
-    Kind_width          = 8,
-
-    CanThrow            = 8,
-
-    // Kind-specific flags should grow down from 31.
-
-    Continuation_IsExecutorSwitchForced = 31,
-  };
-
-  explicit AsyncContextFlags(uint32_t bits) : FlagSet(bits) {}
-  constexpr AsyncContextFlags() {}
-  AsyncContextFlags(AsyncContextKind kind) {
-    setKind(kind);
-  }
-
-  /// The kind of context this represents.
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, AsyncContextKind,
-                                 getKind, setKind)
-
-  /// Whether this context is permitted to throw.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
-
-  /// See AsyncContinuationFlags::isExecutorSwitchForced.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Continuation_IsExecutorSwitchForced,
-                                continuation_isExecutorSwitchForced,
-                                continuation_setIsExecutorSwitchForced)
 };
 
 /// Flags passed to swift_continuation_init.

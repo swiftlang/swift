@@ -6,7 +6,7 @@
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
-// REQUIRES: libswift,executable_test,swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: swift_in_compiler,executable_test,swift_stdlib_no_asserts,optimized_stdlib
 
 // Check that we create reasonable optimized code for this function.
 
@@ -26,7 +26,7 @@ public func reverseArray(_ a: [Int]) -> [Int] {
 }
 
 
-// CHECK-LABEL: sil [noinline] @$s4test12reverseArrayySaySiGACF
+// CHECK-LABEL: sil [noinline] {{.*}}@$s4test12reverseArrayySaySiGACF
 
 // There must not be more than two begin_cow_mutation - end_cow_mutation pairs:
 // * the first one for the initial reserveCapacity

@@ -14,21 +14,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Concurrency.h"
+
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "Debug.h"
+#include "TaskPrivate.h"
+
 #include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskOptions.h"
-#include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "TaskPrivate.h"
-#include "Debug.h"
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 #endif
+
+#include <new>
 
 using namespace swift;
 
@@ -136,14 +141,20 @@ static AsyncLetImpl *asImpl(const AsyncLet *alet) {
 
 void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
                              bool didAllocateInParentTask) {
-  AsyncLetImpl *impl = new (asyncLet) AsyncLetImpl(task);
+  AsyncLetImpl *impl = ::new (asyncLet) AsyncLetImpl(task);
   impl->setDidAllocateFromParentTask(didAllocateInParentTask);
 
   auto record = impl->getTaskRecord();
   assert(impl == record && "the async-let IS the task record");
 
-  // ok, now that the group actually is initialized: attach it to the task
-  swift_task_addStatusRecord(record);
+  // ok, now that the async let task actually is initialized: attach it to the
+  // current task
+  bool addedRecord =
+      addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+        updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
+        return true;
+      });
+  assert(addedRecord);
 }
 
 // =============================================================================
@@ -309,7 +320,7 @@ static void swift_asyncLet_endImpl(AsyncLet *alet) {
 
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
-  swift_task_removeStatusRecord(record);
+  removeStatusRecord(record);
 
   // TODO: we need to implicitly await either before the end or here somehow.
 
@@ -337,7 +348,7 @@ static void asyncLet_finish_after_task_completion(SWIFT_ASYNC_CONTEXT AsyncConte
 
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
-  swift_task_removeStatusRecord(record);
+  removeStatusRecord(record);
 
   // and finally, release the task and destroy the async-let
   assert(swift_task_getCurrent() && "async-let must have a parent task");

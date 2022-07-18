@@ -9,12 +9,12 @@ cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake
 cake: Accessor GlobalVarChangedToLet.Set() has been removed
 cake: Accessor RemoveSetters.Value.Set() has been removed
 cake: Accessor RemoveSetters.subscript(_:).Set() has been removed
-cake: AssociatedType RequiementChanges.removedType has been removed
+cake: AssociatedType RequirementChanges.removedType has been removed
 cake: Constructor Somestruct2.init(_:) has been removed
 cake: Func C4.foo() has been removed
 cake: Func Int.IntEnhancer() has been removed
-cake: Func RequiementChanges.removedFunc() has been removed
-cake: Var RequiementChanges.removedVar has been removed
+cake: Func RequirementChanges.removedFunc() has been removed
+cake: Var RequirementChanges.removedVar has been removed
 
 /* Moved Decls */
 cake: Class ClassToStruct has been changed to a Struct
@@ -56,9 +56,9 @@ cake: Struct fixedLayoutStruct has removed conformance to P1
 
 /* Protocol Requirement Change */
 cake: AssociatedType AssociatedTypePro.T1 has removed default type Swift.Int
-cake: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
-cake: Func RequiementChanges.addedFunc() has been added as a protocol requirement
-cake: Var RequiementChanges.addedVar has been added as a protocol requirement
+cake: AssociatedType RequirementChanges.addedTypeWithoutDefault has been added as a protocol requirement
+cake: Func RequirementChanges.addedFunc() has been added as a protocol requirement
+cake: Var RequirementChanges.addedVar has been added as a protocol requirement
 cake: Accessor ClassWithOpenMember.property.Get() is no longer open for subclassing
 
 /* Class Inheritance Change */

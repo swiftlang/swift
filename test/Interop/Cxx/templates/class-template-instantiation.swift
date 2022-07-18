@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
 
@@ -18,7 +18,8 @@ TemplatesTestSuite.test("with-swift-type") {
   expectEqual(wrappedMagicNumber.getValuePlusArg(8), 21)
 }
 
-TemplatesTestSuite.test("with-c++-type-calling-method-on-arg") {
+TemplatesTestSuite.test("with-c++-type-calling-method-on-arg")
+  .skip(.watchOSSimulatorAny("rdar://problem/87262809")).code {
   let i1 = IntWrapper(value: 42)
   let i2 = IntWrapper(value: 12)
   var wrappedMagicNumber = MagicWrapper<IntWrapper>(t: i1)

@@ -112,7 +112,7 @@ struct TokenDescription {
   StringRef Text;
 };
 
-/// Desrialization traits for TokenDescription.
+/// Deserialization traits for TokenDescription.
 /// TokenDescriptions always serialized with a token kind, which is
 /// the stringified version of their name in the tok:: enum.
 /// ```

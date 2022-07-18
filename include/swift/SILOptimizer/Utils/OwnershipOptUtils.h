@@ -78,6 +78,16 @@ makeGuaranteedValueAvailable(SILValue value, SILInstruction *user,
                              DeadEndBlocks &deBlocks,
                              InstModCallbacks callbacks = InstModCallbacks());
 
+/// Compute the liveness boundary for a guaranteed value. Returns true if no
+/// uses are pointer escapes. If pointer escapes are present, the liveness
+/// boundary is still valid for all known uses.
+///
+/// Precondition: \p value has guaranteed ownership and no reborrows. It is
+/// either an "inner" guaranteed value or a simple borrow introducer whose
+/// end_borrows have not yet been inserted.
+bool computeGuaranteedBoundary(SILValue value,
+                               PrunedLivenessBoundary &boundary);
+
 //===----------------------------------------------------------------------===//
 //                        GuaranteedOwnershipExtension
 //===----------------------------------------------------------------------===//
@@ -212,7 +222,8 @@ public:
   /// their value ownership. This ignores any current uses of \p oldValue. To
   /// determine whether \p oldValue can be replaced as-is with it's existing
   /// uses, create an instance of OwnershipRAUWHelper and check its validity.
-  static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue);
+  static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue,
+                                    ArrayRef<Operand *> oldUses);
 
 private:
   OwnershipFixupContext *ctx;
@@ -282,6 +293,10 @@ private:
 
   SILValue getReplacementAddress();
 };
+
+/// Whether the provided uses lie within the current liveness of the
+/// specified lexical value.
+bool areUsesWithinLexicalValueLifetime(SILValue, ArrayRef<Operand *>);
 
 /// A utility composed ontop of OwnershipFixupContext that knows how to replace
 /// a single use of a value with another value with a different ownership. We

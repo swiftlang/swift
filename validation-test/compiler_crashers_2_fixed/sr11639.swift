@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 public protocol FooProtocol {
   associatedtype Bar
@@ -15,4 +15,4 @@ public protocol BazProtocol: FooProtocol {
 }
 
 // CHECK-LABEL: sr11639.(file).BazProtocol@
-// CHECK-NEXT: Requirement signature: <Self where Self : FooProtocol, Self.Foo1 : FooProtocol, Self.Foo2Bar == Self.Foo1.Bar>
+// CHECK-NEXT: Requirement signature: <Self where Self : FooProtocol, Self.[BazProtocol]Foo1 : FooProtocol, Self.[BazProtocol]Foo2Bar == Self.[BazProtocol]Foo1.[FooProtocol]Bar>

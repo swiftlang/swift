@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution
+// RUN: %target-swift-emit-module-interface(%t/main.swiftinterface) %s
+// RUN: %target-swift-typecheck-module-from-interface(%t/main.swiftinterface)
 // RUN: %FileCheck %s < %t/main.swiftinterface
 
 // CHECK: import Swift

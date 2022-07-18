@@ -215,6 +215,13 @@ static std::string getRuntimeLibPath() {
   return path.str().str();
 }
 
+static std::string getSwiftExecutablePath() {
+  llvm::SmallString<128> path;
+  getToolchainPrefixPath(path);
+  llvm::sys::path::append(path, "bin", "swift-frontend");
+  return path.str().str();
+}
+
 static std::string getDiagnosticDocumentationPath() {
   llvm::SmallString<128> path;
   getToolchainPrefixPath(path);
@@ -343,11 +350,11 @@ static void sourcekitdServer_event_handler(xpc_connection_t peer) {
   });
 }
 
-static void fatal_error_handler(void *user_data, const std::string& reason,
+static void fatal_error_handler(void *user_data, const char *reason,
                                 bool gen_crash_diag) {
   // Write the result out to stderr avoiding errs() because raw_ostreams can
   // call report_fatal_error.
-  fprintf(stderr, "SOURCEKITD SERVER FATAL ERROR: %s\n", reason.c_str());
+  fprintf(stderr, "SOURCEKITD SERVER FATAL ERROR: %s\n", reason);
   if (gen_crash_diag)
     ::abort();
 }
@@ -362,8 +369,9 @@ int main(int argc, const char *argv[]) {
       ^const char *(sourcekitd_uid_t uid) {
         return xpcUIdentFromSKDUID(uid).c_str();
       });
-  sourcekitd::initializeService(
-      getRuntimeLibPath(), getDiagnosticDocumentationPath(), postNotification);
+  sourcekitd::initializeService(getSwiftExecutablePath(), getRuntimeLibPath(),
+                                getDiagnosticDocumentationPath(),
+                                postNotification);
 
   // Increase the file descriptor limit.
   // FIXME: Portability ?

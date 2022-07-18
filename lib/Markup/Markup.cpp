@@ -15,7 +15,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/Markup/LineList.h"
 #include "swift/Markup/Markup.h"
-#include "cmark.h"
+#include "cmark-gfm.h"
 
 using namespace swift;
 using namespace markup;

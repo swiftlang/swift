@@ -33,6 +33,10 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/VersionTuple.h"
 
+namespace clang {
+class NamedDecl;
+}
+
 namespace swift {
   class Decl;
   class DeclAttribute;
@@ -116,7 +120,8 @@ namespace swift {
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
-    Diagnostic
+    Diagnostic,
+    ClangDecl
   };
 
   namespace diag {
@@ -149,6 +154,7 @@ namespace swift {
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
       DiagnosticInfo *DiagnosticVal;
+      const clang::NamedDecl *ClangDecl;
     };
     
   public:
@@ -250,6 +256,9 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::Diagnostic),
         DiagnosticVal(D) {
     }
+
+    DiagnosticArgument(const clang::NamedDecl *ND)
+        : Kind(DiagnosticArgumentKind::ClangDecl), ClangDecl(ND) {}
 
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
@@ -355,6 +364,11 @@ namespace swift {
     DiagnosticInfo *getAsDiagnostic() const {
       assert(Kind == DiagnosticArgumentKind::Diagnostic);
       return DiagnosticVal;
+    }
+
+    const clang::NamedDecl *getAsClangDecl() const {
+      assert(Kind == DiagnosticArgumentKind::ClangDecl);
+      return ClangDecl;
     }
   };
 
@@ -767,7 +781,7 @@ namespace swift {
 
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
-  class DiagnosticEngine {
+  class SWIFT_IMPORT_REFERENCE DiagnosticEngine {
   public:
     /// The source manager used to interpret source locations and
     /// display diagnostics.
@@ -834,6 +848,7 @@ namespace swift {
     friend class DiagnosticTransaction;
     friend class CompoundDiagnosticTransaction;
     friend class DiagnosticStateRAII;
+    friend class DiagnosticQueue;
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
@@ -1123,9 +1138,19 @@ namespace swift {
     /// Send \c diag to all diagnostic consumers.
     void emitDiagnostic(const Diagnostic &diag);
 
+    /// Handle a new diagnostic, which will either be emitted, or added to an
+    /// active transaction.
+    void handleDiagnostic(Diagnostic &&diag);
+
+    /// Clear any tentative diagnostics.
+    void clearTentativeDiagnostics();
+
     /// Send all tentative diagnostics to all diagnostic consumers and
     /// delete them.
     void emitTentativeDiagnostics();
+
+    /// Forward all tentative diagnostics to a different diagnostic engine.
+    void forwardTentativeDiagnosticsTo(DiagnosticEngine &targetEngine);
 
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
@@ -1319,6 +1344,78 @@ namespace swift {
     }
   };
 
+  /// Represents a queue of diagnostics that have their emission delayed until
+  /// the queue is destroyed. This is similar to DiagnosticTransaction, but
+  /// with a few key differences:
+  /// 
+  /// - The queue maintains its own diagnostic engine (which may be accessed
+  ///   through `getDiags()`), and diagnostics must be specifically emitted
+  ///   using that engine to be enqueued.
+  /// - It allows for non-LIFO transactions, as each queue operates
+  ///   independently.
+  /// - A queue can be drained multiple times without having to be recreated
+  ///   (unlike DiagnosticTransaction, it has no concept of "closing").
+  ///
+  /// Note you may add DiagnosticTransactions to the queue's diagnostic engine,
+  /// but they must be closed before attempting to clear or emit the diagnostics
+  /// in the queue.
+  ///
+  class DiagnosticQueue final {
+    /// The underlying diagnostic engine that the diagnostics will be emitted
+    /// by.
+    DiagnosticEngine &UnderlyingEngine;
+
+    /// A temporary engine used to queue diagnostics.
+    DiagnosticEngine QueueEngine;
+
+    /// Whether the queued diagnostics should be emitted on the destruction of
+    /// the queue, or whether they should be cleared.
+    bool EmitOnDestruction;
+
+  public:
+    DiagnosticQueue(const DiagnosticQueue &) = delete;
+    DiagnosticQueue &operator=(const DiagnosticQueue &) = delete;
+
+    /// Create a new diagnostic queue with a given engine to forward the
+    /// diagnostics to.
+    explicit DiagnosticQueue(DiagnosticEngine &engine, bool emitOnDestruction)
+        : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr),
+          EmitOnDestruction(emitOnDestruction) {
+      // Open a transaction to avoid emitting any diagnostics for the temporary
+      // engine.
+      QueueEngine.TransactionCount++;
+    }
+
+    /// Retrieve the engine which may be used to enqueue diagnostics.
+    DiagnosticEngine &getDiags() { return QueueEngine; }
+
+    /// Retrieve the underlying engine which will receive the diagnostics.
+    DiagnosticEngine &getUnderlyingDiags() const { return UnderlyingEngine; }
+
+    /// Clear this queue and erase all diagnostics recorded.
+    void clear() {
+      assert(QueueEngine.TransactionCount == 1 &&
+             "Must close outstanding DiagnosticTransactions before draining");
+      QueueEngine.clearTentativeDiagnostics();
+    }
+
+    /// Emit all the diagnostics recorded by this queue.
+    void emit() {
+      assert(QueueEngine.TransactionCount == 1 &&
+             "Must close outstanding DiagnosticTransactions before draining");
+      QueueEngine.forwardTentativeDiagnosticsTo(UnderlyingEngine);
+    }
+
+    ~DiagnosticQueue() {
+      if (EmitOnDestruction) {
+        emit();
+      } else {
+        clear();
+      }
+      QueueEngine.TransactionCount--;
+    }
+  };
+
   inline void
   DiagnosticEngine::diagnoseWithNotes(InFlightDiagnostic parentDiag,
                                       llvm::function_ref<void(void)> builder) {
@@ -1327,18 +1424,20 @@ namespace swift {
     builder();
   }
 
-/// Temporary on-stack storage and unescaping for encoded diagnostic
-/// messages.
-class EncodedDiagnosticMessage {
-  llvm::SmallString<128> Buf;
+  void printClangDeclName(const clang::NamedDecl *ND, llvm::raw_ostream &os);
 
-public:
-  /// \param S A string with an encoded message
-  EncodedDiagnosticMessage(StringRef S);
+  /// Temporary on-stack storage and unescaping for encoded diagnostic
+  /// messages.
+  class EncodedDiagnosticMessage {
+    llvm::SmallString<128> Buf;
 
-  /// The unescaped message to display to the user.
-  const StringRef Message;
-};
+  public:
+    /// \param S A string with an encoded message
+    EncodedDiagnosticMessage(StringRef S);
+
+    /// The unescaped message to display to the user.
+    const StringRef Message;
+  };
 
 /// Returns a value that can be used to select between accessor kinds in
 /// diagnostics.

@@ -16,8 +16,6 @@ sources.
 """
 
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import os
 import subprocess
 import sys
@@ -45,8 +43,8 @@ but these were not found on your system.
 
 You can install these using:
 
-    python -m pip install flake8
-    python -m pip install flake8-import-order
+    python3 -m pip install flake8
+    python3 -m pip install flake8-import-order
 
 For more help, see http://flake8.pycqa.org.
 """

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify)
 //
 // REQUIRES: executable_test
 
@@ -16,6 +16,15 @@ MoveOnlyTestSuite.test("MoveOnly") {
   expectEqual(x.testMutable(), 42)
 
   x = MoveOnly.create()
+  expectEqual(x.test(), 42)
+}
+
+MoveOnlyTestSuite.test("NoCopyMove") {
+  var x = NoCopyMove.create()
+  expectEqual(x.test(), 42)
+  expectEqual(x.testMutable(), 42)
+
+  x = NoCopyMove.create()
   expectEqual(x.test(), 42)
 }
 

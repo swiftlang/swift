@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/Test.swiftinterface -module-name Test -enable-library-evolution -swift-version 5 %s
+// RUN: %target-swift-emit-module-interface(%t/Test.swiftinterface) %s -module-name Test
+// RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface) -module-name Test
 // RUN: %FileCheck %s < %t/Test.swiftinterface
 
 public protocol P {

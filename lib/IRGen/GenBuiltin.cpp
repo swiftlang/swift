@@ -283,6 +283,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::TaskRunInline) {
+    auto result = args.claimNext();
+    auto closure = args.claimNext();
+    auto closureContext = args.claimNext();
+
+    emitTaskRunInline(IGF, substitutions, result, closure, closureContext);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
     // Claim metadata pointer.
     (void)args.claimAll();
@@ -592,10 +601,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   
     auto *fn = cast<llvm::Function>(IGF.IGM.getWillThrowFn());
     auto error = args.claimNext();
+    auto errorTy = IGF.IGM.Context.getErrorExistentialType();
     auto errorBuffer = IGF.getCalleeErrorResultSlot(
-        SILType::getPrimitiveObjectType(IGF.IGM.Context.getErrorDecl()
-                                            ->getDeclaredInterfaceType()
-                                            ->getCanonicalType()));
+        SILType::getPrimitiveObjectType(errorTy));
     IGF.Builder.CreateStore(error, errorBuffer);
     
     auto context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
@@ -603,10 +611,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::CallInst *call = IGF.Builder.CreateCall(fn,
                                         {context, errorBuffer.getAddress()});
     call->setCallingConv(IGF.IGM.SwiftCC);
-    call->addAttribute(llvm::AttributeList::FunctionIndex,
-                       llvm::Attribute::NoUnwind);
-    call->addAttribute(llvm::AttributeList::FirstArgIndex + 1,
-                       llvm::Attribute::ReadOnly);
+    call->addFnAttr(llvm::Attribute::NoUnwind);
+    call->addParamAttr(1, llvm::Attribute::ReadOnly);
 
     auto attrs = call->getAttributes();
     IGF.IGM.addSwiftSelfAttributes(attrs, 0);
@@ -1339,7 +1345,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
   if (Builtin.ID == BuiltinValueKind::AssumeAlignment) {
-    // A no-op pointer cast that passes on its first value. Common occurences of
+    // A no-op pointer cast that passes on its first value. Common occurrences of
     // this builtin should already be removed with the alignment guarantee moved
     // to the subsequent load or store.
     //

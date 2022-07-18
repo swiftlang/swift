@@ -197,7 +197,8 @@ public:
            (hasUsersBeforeDef || bb != getDefValueParentBlock());
   }
 
-  /// Checks if there is a dealloc_ref inside the value's live range.
+  /// Checks if there is a dealloc_ref or dealloc_stack_ref inside the
+  /// value's live range.
   bool containsDeallocRef(const FrontierImpl &frontier);
 
   /// For debug dumping.

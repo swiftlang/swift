@@ -90,7 +90,19 @@ public:
 
   std::string mangleNotReabstracted(SubstitutionMap subs);
 
-  std::string mangleReabstracted(SubstitutionMap subs, bool alternativeMangling);
+  /// Mangle a generic specialization with re-abstracted parameters.
+  ///
+  /// Re-abstracted means that indirect (generic) parameters/returns are
+  /// converted to direct parameters/returns.
+  ///
+  /// This is the default for generic specializations.
+  ///
+  /// \param alternativeMangling   true for specialized functions with a
+  ///                              differet resilience expansion.
+  /// \param metatyeParamsRemoved  true if non-generic metatype parameters are
+  ///                              removed in the specialized function.
+  std::string mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
+                                 bool metatyeParamsRemoved = false);
 
   std::string mangleForDebugInfo(GenericSignature sig, SubstitutionMap subs,
                                  bool forInlining);

@@ -16,6 +16,7 @@ import StdlibUnittest
 import Foundation
 import SlurpFastEnumeration
 
+// REQUIRES: rdar88637598
 
 struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
   class RaceData {

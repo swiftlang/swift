@@ -22,37 +22,44 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
-#if SWIFT_RUNTIME
+#if defined(NDEBUG) || defined (SWIFT_RUNTIME)
 
-// In the runtime, DEMANGLER_ASSERT() returns an error
+// In the runtime and non-asserts builds, DEMANGLER_ASSERT() returns an error.
 #define DEMANGLER_ASSERT(expr, node)                                           \
   do {                                                                         \
     if (!(expr))                                                               \
       return ManglingError(ManglingError::AssertionFailed, (node), __LINE__);  \
   } while (0)
 
-#elif !defined(NDEBUG)
+#else
 
-// If NDEBUG is not defined, DEMANGLER_ASSERT() works like assert()
+// Except in unittests, assert builds cause DEMANGLER_ASSERT() to assert()
 #define DEMANGLER_ASSERT(expr, node)                                           \
+  do {                                                                         \
+    if (!(expr)) {                                                             \
+      if (Factory.disableAssertionsForUnitTest)                                \
+        return ManglingError(ManglingError::AssertionFailed, (node),           \
+                             __LINE__);                                        \
+      else                                                                     \
+        swift::Demangle::failAssert(__FILE__, __LINE__, node, #expr);          \
+    }                                                                          \
+  } while (0)
+
+#endif
+
+// DEMANGLER_ALWAYS_ASSERT() *always* fails the program, even in the runtime
+#define DEMANGLER_ALWAYS_ASSERT(expr, node)                                    \
   do {                                                                         \
     if (!(expr))                                                               \
       swift::Demangle::failAssert(__FILE__, __LINE__, node, #expr);            \
   } while (0)
 
-#else
-
-// Otherwise, DEMANGLER_ASSERT() does nothing
-#define DEMANGLER_ASSERT(expr, node)
-
-#endif // SWIFT_RUNTIME
-
 namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
 
-LLVM_ATTRIBUTE_NORETURN void failAssert(const char *file, unsigned line,
-                                        NodePointer node, const char *expr);
+[[noreturn]] void failAssert(const char *file, unsigned line, NodePointer node,
+                             const char *expr);
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle

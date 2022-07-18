@@ -162,4 +162,27 @@
 #define SWIFT_ASM_LABEL_WITH_PREFIX(STRING) \
   SWIFT_ASM_LABEL_RAW(SWIFT_SYMBOL_PREFIX_STRING STRING)
 
+// SWIFT_FORMAT(fmt,first) marks a function as taking a format string argument
+// at argument `fmt`, with the first argument for the format string as `first`.
+#if __has_attribute(format)
+#define SWIFT_FORMAT(fmt, first) __attribute__((format(printf, fmt, first)))
+#else
+#define SWIFT_FORMAT(fmt, first)
+#endif
+
+// SWIFT_VFORMAT(fmt) marks a function as taking a format string argument at
+// argument `fmt`, with the arguments in a `va_list`.
+#if __has_attribute(format)
+#define SWIFT_VFORMAT(fmt) __attribute__((format(printf, fmt, 0)))
+#else
+#define SWIFT_VFORMAT(fmt)
+#endif
+
+// Tells Swift's ClangImporter to import a C++ type as a foreign reference type.
+#if __has_attribute(swift_attr)
+#define SWIFT_IMPORT_REFERENCE __attribute__((swift_attr("import_as_ref")))
+#else
+#define SWIFT_IMPORT_REFERENCE
+#endif
+
 #endif // SWIFT_BASIC_COMPILER_H

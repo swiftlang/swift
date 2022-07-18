@@ -73,6 +73,7 @@ namespace swift {
   class PrefixOperatorDecl;
   class ProtocolConformance;
   class ValueDecl;
+  class VarDecl;
   class Initializer;
   class ClassDecl;
   class SerializedAbstractClosureExpr;
@@ -200,6 +201,7 @@ struct FragileFunctionKind {
     AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer,
+    BackDeploy,
     None
   };
 
@@ -210,6 +212,9 @@ struct FragileFunctionKind {
     return (lhs.kind == rhs.kind &&
             lhs.allowUsableFromInline == rhs.allowUsableFromInline);
   }
+
+  /// Casts to `unsigned` for diagnostic %selects.
+  unsigned getSelector() { return static_cast<unsigned>(kind); }
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -354,6 +359,11 @@ public:
   /// If this DeclContext is a protocol extension, return the extended protocol.
   LLVM_READONLY
   ProtocolDecl *getExtendedProtocolDecl() const;
+
+  /// If this DeclContext is the initializer expression of a global or instance
+  /// property, return the VarDecl, otherwise return null.
+  LLVM_READONLY
+  VarDecl *getNonLocalVarDecl() const;
 
   /// Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.

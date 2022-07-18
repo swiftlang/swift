@@ -25,7 +25,7 @@
 /// threads from growing without limit.
 /// 
 /// Second, executors may own dedicated threads, or they may schedule
-/// work onto some some underlying executor.  Dedicated threads can
+/// work onto some underlying executor.  Dedicated threads can
 /// improve the responsiveness of a subsystem *locally*, but they impose
 /// substantial costs which can drive down performance *globally*
 /// if not used carefully.  When an executor relies on running work
@@ -71,6 +71,15 @@ void (*swift::swift_task_enqueueGlobalWithDelay_hook)(
     swift_task_enqueueGlobalWithDelay_original original) = nullptr;
 
 SWIFT_CC(swift)
+void (*swift::swift_task_enqueueGlobalWithDeadline_hook)(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, Job *job,
+    swift_task_enqueueGlobalWithDeadline_original original) = nullptr;
+
+SWIFT_CC(swift)
 void (*swift::swift_task_enqueueMainExecutor_hook)(
     Job *job, swift_task_enqueueMainExecutor_original original) = nullptr;
 
@@ -85,6 +94,8 @@ void (*swift::swift_task_enqueueMainExecutor_hook)(
 void swift::swift_task_enqueueGlobal(Job *job) {
   _swift_tsan_release(job);
 
+  concurrency::trace::job_enqueue_global(job);
+
   if (swift_task_enqueueGlobal_hook)
     swift_task_enqueueGlobal_hook(job, swift_task_enqueueGlobalImpl);
   else
@@ -92,6 +103,8 @@ void swift::swift_task_enqueueGlobal(Job *job) {
 }
 
 void swift::swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job) {
+  concurrency::trace::job_enqueue_global_with_delay(delay, job);
+
   if (swift_task_enqueueGlobalWithDelay_hook)
     swift_task_enqueueGlobalWithDelay_hook(
         delay, job, swift_task_enqueueGlobalWithDelayImpl);
@@ -99,7 +112,21 @@ void swift::swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job) {
     swift_task_enqueueGlobalWithDelayImpl(delay, job);
 }
 
+void swift::swift_task_enqueueGlobalWithDeadline(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, Job *job) {
+  if (swift_task_enqueueGlobalWithDeadline_hook)
+    swift_task_enqueueGlobalWithDeadline_hook(
+        sec, nsec, tsec, tnsec, clock, job, swift_task_enqueueGlobalWithDeadlineImpl);
+  else
+    swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock, job);
+}
+
 void swift::swift_task_enqueueMainExecutor(Job *job) {
+  concurrency::trace::job_enqueue_main_executor(job);
   if (swift_task_enqueueMainExecutor_hook)
     swift_task_enqueueMainExecutor_hook(job,
                                         swift_task_enqueueMainExecutorImpl);

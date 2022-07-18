@@ -58,6 +58,20 @@ enum class CopyPropagationOption : uint8_t {
   On
 };
 
+enum class DestroyHoistingOption : uint8_t {
+  // Do not run SSADestroyHoisting.
+  Off = 0,
+
+  // Run SSADestroyHoisting pass after AllocBoxToStack in the function passes.
+  On = 1
+};
+
+enum class CrossModuleOptimizationMode : uint8_t {
+  Off = 0,
+  Default = 1,
+  Aggressive = 2
+};
+
 class SILModule;
 
 class SILOptions {
@@ -74,16 +88,20 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
-  /// Enable experimental support for emitting defined borrow scopes.
-  LexicalLifetimesOption LexicalLifetimes =
-      LexicalLifetimesOption::DiagnosticMarkersOnly;
+  /// Both emit lexical markers and use them to extend object lifetime to the
+  /// observable end of lexical scope.
+  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::On;
 
   /// Whether to run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
   ///
-  /// When this is 'RequestedPassesOnly' the pipeline has default behavior.
-  CopyPropagationOption CopyPropagation =
-      CopyPropagationOption::RequestedPassesOnly;
+  /// When this is 'On' the pipeline has default behavior.
+  CopyPropagationOption CopyPropagation = CopyPropagationOption::On;
+
+  /// Whether to run the SSADestroyHoisting pass.
+  ///
+  /// When this 'On' the pipeline has the default behavior.
+  DestroyHoistingOption DestroyHoisting = DestroyHoistingOption::On;
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
@@ -105,7 +123,7 @@ public:
   bool DisableSILPerfOptimizations = false;
 
   /// Controls whether cross module optimization is enabled.
-  bool CrossModuleOptimization = false;
+  CrossModuleOptimizationMode CMOMode = CrossModuleOptimizationMode::Off;
 
   /// Enables experimental performance annotations.
   bool EnablePerformanceAnnotations = false;
@@ -141,6 +159,9 @@ public:
   /// If this is disabled we do not serialize in OSSA form when optimizing.
   bool EnableOSSAModules = false;
 
+  /// If set to true, compile with the SIL Opaque Values enabled.
+  bool EnableSILOpaqueValues = false;
+
   // The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
 
@@ -172,6 +193,8 @@ public:
 
   /// Emit a mapping of profile counters for use in coverage.
   bool EmitProfileCoverageMapping = false;
+
+  bool emitTBD = false;
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
@@ -206,7 +229,7 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = true;
 
-  /// Emit extra exclusvity markers for memory access and verify coverage.
+  /// Emit extra exclusivity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
   /// When building the stdlib with opts should we lower ownership after

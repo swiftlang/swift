@@ -235,6 +235,11 @@ protected:
   /// set to match the behavior of Clang.
   virtual bool shouldStoreInvocationInDebugInfo() const { return false; }
 
+  /// Specific toolchains should override this to provide additional
+  /// -debug-prefix-map entries. For example, Darwin has an RC_DEBUG_PREFIX_MAP
+  /// environment variable that is also understood by Clang.
+  virtual std::string getGlobalDebugPathRemapping() const { return {}; }
+  
   /// Gets the response file path and command line argument for an invocation
   /// if the tool supports response files and if the command line length would
   /// exceed system limits.

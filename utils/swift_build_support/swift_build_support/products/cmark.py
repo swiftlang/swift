@@ -27,7 +27,7 @@ class CMark(cmake_product.CMakeProduct):
     def is_before_build_script_impl_product(cls):
         """is_before_build_script_impl_product -> bool
 
-        Whether this product is build before any build-script-impl products.
+        Whether this product is built before any build-script-impl products.
         """
         return True
 
@@ -51,6 +51,8 @@ class CMark(cmake_product.CMakeProduct):
         """
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
                                   self.args.cmark_build_variant)
+
+        self.cmake_options.define('CMARK_THREADING', 'ON')
 
         (platform, arch) = host_target.split('-')
 
@@ -92,8 +94,14 @@ class CMark(cmake_product.CMakeProduct):
             # Xcode generator uses "RUN_TESTS" instead of "test".
             results_targets = ['RUN_TESTS']
 
+        test_env = {
+            "CTEST_OUTPUT_ON_FAILURE": "ON"
+        }
+
+        # see the comment in cmake_product.py if you want to copy this code to pass
+        # environment variables to tests
         self.test_with_cmake(executable_target, results_targets,
-                             self.args.cmark_build_variant, [])
+                             self.args.cmark_build_variant, [], test_env)
 
     def should_install(self, host_target):
         """should_install() -> Bool

@@ -40,7 +40,7 @@ arrayWrapper(overloadedReturn()).#^SKIP_DUPLICATES^#
 let x: (inout Int, Int) -> () = arrayWrapper(overloadedReturn()).#^SKIP_COMPOUND_DUPLICATES^#
 
 // SKIP_COMPOUND_DUPLICATES: Begin completions
-// SKIP_COMPOUND_DUPLICATES: Decl[InstanceMethod]/Super/IsSystem/TypeRelation[Identical]: formIndex(_:offsetBy:)[#(inout Int, Int) -> ()#]{{; name=.+$}}
+// SKIP_COMPOUND_DUPLICATES: Decl[InstanceMethod]/Super/IsSystem/TypeRelation[Convertible]: formIndex(_:offsetBy:)[#(inout Int, Int) -> ()#]{{; name=.+$}}
 // SKIP_COMPOUND_DUPLICATES-NOT: formIndex(_:offsetBy:)[#(inout Int, Int) -> ()#]
 // SKIP_COMPOUND_DUPLICATES: End completions
 
@@ -72,7 +72,7 @@ let x: A = overloadedReturn(1).#^RELATED_EXTRAARG?check=RELATED^#
 
 // RELATED: Begin completions, 4 items
 // RELATED-DAG: Keyword[self]/CurrNominal:          self[#A#]{{; name=.+$}}
-// RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: doAThings()[#A#]{{; name=.+$}}
+// RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: doAThings()[#A#]{{; name=.+$}}
 // RELATED-DAG: Keyword[self]/CurrNominal:          self[#B#]{{; name=.+$}}
 // RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings()[#Void#]{{; name=.+$}}
 // RELATED: End completions
@@ -89,9 +89,9 @@ overloadedArg(.#^UNRESOLVED_AMBIGUOUS^#)
 
 // UNRESOLVED_AMBIGUOUS: Begin completions, 4 items
 // UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal: doAThings({#(self): A#})[#() -> A#]{{; name=.+$}}
-// UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#A#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#A#]{{; name=.+$}}
 // UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings({#(self): B#})[#() -> Void#]{{; name=.+$}}
-// UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#B#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#B#]{{; name=.+$}}
 // UNRESOLVED_AMBIGUOUS: End completions
 
 // Make sure we still offer A and B members as the user may intend to add a member on the end of the overloadedArg call later that has type B.
@@ -105,7 +105,7 @@ takesB(overloadedArg2(.#^UNRESOLVED_UNAMBIGUOUS^#))
 
 // UNRESOLVED_UNAMBIGUOUS: Begin completions, 2 items
 // UNRESOLVED_UNAMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings({#(self): B#})[#() -> Void#]{{; name=.+$}}
-// UNRESOLVED_UNAMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#B#]{{; name=.+$}}
+// UNRESOLVED_UNAMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#B#]{{; name=.+$}}
 // UNRESOLVED_UNAMBIGUOUS: End completions
 
 
@@ -149,7 +149,7 @@ takesAnonClosure { $1.#^UNAMBIGUOUSCLOSURE_ARG^# }
 takesAnonClosure { $0.#^AMBIGUOUSCLOSURE_ARG^# }
 // AMBIGUOUSCLOSURE_ARG: Begin completions, 4 items
 // AMBIGUOUSCLOSURE_ARG-DAG: Keyword[self]/CurrNominal: self[#A#]{{; name=.+$}}
-// AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: doAThings()[#A#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: doAThings()[#A#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG-DAG: Keyword[self]/CurrNominal: self[#B#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal: doBThings()[#Void#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG: End completions
@@ -158,9 +158,9 @@ takesAnonClosure { TestRelations.#^AMBIGUOUSCLOSURE_ARG_RETURN^# }
 // AMBIGUOUSCLOSURE_ARG_RETURN: Begin completions, 6 items
 // AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Keyword[self]/CurrNominal: self[#TestRelations.Type#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Keyword/CurrNominal: Type[#TestRelations.Type#]{{; name=.+$}}
-// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: a[#A#]{{; name=.+$}}
-// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: b[#B#]{{; name=.+$}}
-// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: ab[#(A, B)#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: a[#A#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: b[#B#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: ab[#(A, B)#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG_RETURN: End completions
 
@@ -186,7 +186,7 @@ func arrayLiteralDictionaryMismatch<T>(a: inout T) where T: ExpressibleByDiction
 // PARSED_AS_ARRAY_KEY: Begin completions, 6 items
 // PARSED_AS_ARRAY_KEY-DAG: Keyword[self]/CurrNominal: self[#TestRelations.Type#]{{; name=.+$}}
 // PARSED_AS_ARRAY_KEY-DAG: Keyword/CurrNominal: Type[#TestRelations.Type#]{{; name=.+$}}
-// PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: a[#A#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: a[#A#]{{; name=.+$}}
 // PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal: b[#B#]{{; name=.+$}}
 // PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal: ab[#(A, B)#]{{; name=.+$}}
 // PARSED_AS_ARRAY_KEY-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
@@ -199,7 +199,7 @@ let _: [(A, B)] = [TestRelations.#^PARSED_AS_ARRAY_ARRAY?check=PARSED_AS_ARRAY_T
 // PARSED_AS_ARRAY_TUPLE-DAG: Keyword/CurrNominal: Type[#TestRelations.Type#]{{; name=.+$}}
 // PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal: a[#A#]{{; name=.+$}}
 // PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal: b[#B#]{{; name=.+$}}
-// PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: ab[#(A, B)#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: ab[#(A, B)#]{{; name=.+$}}
 // PARSED_AS_ARRAY_TUPLE-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
 // PARSED_AS_ARRAY_TUPLE: End completions
 
@@ -230,7 +230,7 @@ func testMissingArgs() {
   // OVERLOADEDFUNC_FOO: Begin completions, 5 items
   // OVERLOADEDFUNC_FOO-DAG: Keyword[self]/CurrNominal: self[#Test.Type#]{{; name=.+$}}
   // OVERLOADEDFUNC_FOO-DAG: Keyword/CurrNominal: Type[#Test.Type#]{{; name=.+$}}
-  // OVERLOADEDFUNC_FOO-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: foo[#Foo#]{{; name=.+$}}
+  // OVERLOADEDFUNC_FOO-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: foo[#Foo#]{{; name=.+$}}
   // OVERLOADEDFUNC_FOO-DAG: Decl[StaticVar]/CurrNominal: bar[#Bar#]{{; name=.+$}}
   // OVERLOADEDFUNC_FOO-DAG: Decl[Constructor]/CurrNominal: init()[#Test#]{{; name=.+$}}
   // OVERLOADEDFUNC_FOO: End completions
@@ -240,7 +240,7 @@ func testMissingArgs() {
   // OVERLOADEDFUNC_BAR-DAG: Keyword[self]/CurrNominal: self[#Test.Type#]{{; name=.+$}}
   // OVERLOADEDFUNC_BAR-DAG: Keyword/CurrNominal: Type[#Test.Type#]{{; name=.+$}}
   // OVERLOADEDFUNC_BAR-DAG: Decl[StaticVar]/CurrNominal: foo[#Foo#]{{; name=.+$}}
-  // OVERLOADEDFUNC_BAR-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: bar[#Bar#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BAR-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: bar[#Bar#]{{; name=.+$}}
   // OVERLOADEDFUNC_BAR-DAG: Decl[Constructor]/CurrNominal: init()[#Test#]{{; name=.+$}}
   // OVERLOADEDFUNC_BAR: End completions
 
@@ -259,8 +259,8 @@ func testMissingArgs() {
   // OVERLOADEDFUNC_BOTH: Begin completions, 5 items
   // OVERLOADEDFUNC_BOTH-DAG: Keyword[self]/CurrNominal: self[#Test.Type#]{{; name=.+$}}
   // OVERLOADEDFUNC_BOTH-DAG: Keyword/CurrNominal: Type[#Test.Type#]{{; name=.+$}}
-  // OVERLOADEDFUNC_BOTH-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: foo[#Foo#]{{; name=.+$}}
-  // OVERLOADEDFUNC_BOTH-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: bar[#Bar#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BOTH-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: foo[#Foo#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BOTH-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: bar[#Bar#]{{; name=.+$}}
   // OVERLOADEDFUNC_BOTH-DAG: Decl[Constructor]/CurrNominal: init()[#Test#]{{; name=.+$}}
   // OVERLOADEDFUNC_BOTH: End completions
 
@@ -286,32 +286,32 @@ func testMissingArgs() {
   trailing(x: 2) { .#^MISSINGARG_TRAILING^# }
 
   // MISSINGARG_INLINE: Begin completions, 14 items
-  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: foo[#Foo#]; name=foo
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: foo[#Foo#]; name=foo
   // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Foo#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bar[#Bar#]; name=bar
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: bar[#Bar#]; name=bar
   // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bar#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bop[#Bop#]; name=bop
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: bop[#Bop#]; name=bop
   // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bop#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bix[#Bix#]; name=bix
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: bix[#Bix#]; name=bix
   // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bix#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: boy[#Boy#]; name=boy
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: boy[#Boy#]; name=boy
   // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Boy#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: blu[#Blu#]; name=blu
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: blu[#Blu#]; name=blu
   // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Blu#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: baz[#Baz#]; name=baz
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: baz[#Baz#]; name=baz
   // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Baz#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_INLINE: End completions
 
   // MISSINGARG_TRAILING: Begin completions, 10 items
-  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: foo[#Foo#]; name=foo
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: foo[#Foo#]; name=foo
   // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Foo#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bar[#Bar#]; name=bar
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: bar[#Bar#]; name=bar
   // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bar#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bop[#Bop#]; name=bop
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: bop[#Bop#]; name=bop
   // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bop#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bix[#Bix#]; name=bix
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: bix[#Bix#]; name=bix
   // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bix#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: boy[#Boy#]; name=boy
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: boy[#Boy#]; name=boy
   // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Boy#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_TRAILING: End completions
 }
@@ -383,6 +383,10 @@ _ = testing([Point(4, 89)]) { arg in
 
 struct Thing {
     init(_ block: (Point) -> Void) {}
+
+    enum ThingEnum { case first, second }
+    func doStuff(_ x: ThingEnum, _ y: Int) -> Thing { return self }
+    func takesRef(_ ref: () -> ()) -> Thing { return self }
 }
 @resultBuilder
 struct ThingBuilder {
@@ -429,6 +433,20 @@ CreateThings {
     Thing. // ErrorExpr
 }
 
+struct TestFuncBodyBuilder {
+  func someFunc() {}
+
+  @ThingBuilder func foo() -> [Thing] {
+    Thing()
+      .doStuff(.#^FUNCBUILDER_FUNCBODY^#, 3)
+      .takesRef(someFunc)
+  }
+}
+// FUNCBUILDER_FUNCBODY: Begin completions, 3 items
+// FUNCBUILDER_FUNCBODY-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: first[#Thing.ThingEnum#];
+// FUNCBUILDER_FUNCBODY-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: second[#Thing.ThingEnum#];
+// FUNCBUILDER_FUNCBODY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Thing.ThingEnum#})[#(into: inout Hasher) -> Void#];
+// FUNCBUILDER_FUNCBODY: End completions
 
 func takesClosureOfPoint(_: (Point)->()) {}
 func overloadedWithDefaulted(_: ()->()) {}
@@ -455,9 +473,9 @@ func testBestSolutionFilter() {
 // BEST_SOLUTION_FILTER: Begin completions
 // BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: enumElem[#Enum123#]{{; name=.+$}}
 // BEST_SOLUTION_FILTER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Enum123#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
-// BEST_SOLUTION_FILTER-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#Enum123?#]{{; name=.+$}}
-// BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<Enum123>#]{{; name=.+$}}
-// BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#Enum123#})[#Optional<Enum123>#]{{; name=.+$}}
+// BEST_SOLUTION_FILTER-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Convertible]: nil[#Enum123?#]{{; name=.+$}}
+// BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: none[#Optional<Enum123>#]{{; name=.+$}}
+// BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: some({#Enum123#})[#Optional<Enum123>#]{{; name=.+$}}
 // BEST_SOLUTION_FILTER: End completions
 
 func testBestSolutionGeneric() {
@@ -473,3 +491,89 @@ func testBestSolutionGeneric() {
 // BEST_SOLUTION_FILTER_GEN-DAG: Keyword[self]/CurrNominal:     self[#Test1#]; name=self
 // BEST_SOLUTION_FILTER_GEN: End completions
 
+func testAmbiguousArgs() {
+  struct A {
+    func someFunc(a: Int, b: Int) -> A { return self }
+    func variadic(y: Int, x: Int...)
+  }
+
+  struct B {
+    func someFunc(a: Int, c: String = "", d: String = "") {}
+  }
+
+  func overloaded() -> A { return A() }
+  func overloaded() -> B { return B() }
+
+  let localInt = 10
+  let localString = "Hello"
+
+  overloaded().someFunc(a: 2, #^ARG_NO_LABEL^#)
+
+  // ARG_NO_LABEL: Begin completions, 3 items
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#b: Int#}[#Int#]; name=b:
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c:
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d:
+  // ARG_NO_LABEL: End completions
+
+  overloaded().someFunc(a: 2, b: #^ARG_LABEL^#)
+
+  // ARG_LABEL: Begin completions
+  // ARG_LABEL-DAG: Decl[LocalVar]/Local:                          localString[#String#]; name=localString
+  // ARG_LABEL-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]:  localInt[#Int#]; name=localInt
+  // ARG_LABEL: End completions
+
+  overloaded().someFunc(a: 2, c: "Foo", #^ARG_NO_LABEL2^#)
+
+  // ARG_NO_LABEL2: Begin completions, 1 item
+  // ARG_NO_LABEL2: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d:
+  // ARG_NO_LABEL2: End completions
+
+  overloaded().someFunc(a: 2, wrongLabel: "Foo", #^ARG_NO_LABEL_PREV_WRONG^#)
+
+  // ARG_NO_LABEL_PREV_WRONG: Begin completions, 3 items
+  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#b: Int#}[#Int#]; name=b:
+  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c:
+  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d:
+  // ARG_NO_LABEL_PREV_WRONG: End completions
+
+  overloaded().someFunc(a: 2, d: "Foo", #^ARG_NO_LABEL_OUT_OF_ORDER^#)
+  // ARG_NO_LABEL_OUT_OF_ORDER: Begin completions
+  // ARG_NO_LABEL_OUT_OF_ORDER-NOT: name=d: String
+  // ARG_NO_LABEL_OUT_OF_ORDER: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c:
+  // ARG_NO_LABEL_OUT_OF_ORDER-NOT: name=d: String
+  // ARG_NO_LABEL_OUT_OF_ORDER: End completions
+
+  func noArgs() {}
+  noArgs(12, #^ARG_EXTRANEOUS^#)
+  // ARG_EXTRANEOUS: Begin completions
+  // ARG_EXTRANEOUS-DAG: localInt
+  // ARG_EXTRANEOUS-DAG: localString
+  // ARG_EXTRANEOUS: End completions
+
+  overloaded().someFunc(a: 2, #^LATER_ARGS^#, d: "foo")
+  // LATER_ARGS: Begin completions, 2 items
+
+  // LATER_ARGS-DAG: Pattern/Local/Flair[ArgLabels]:     {#b: Int#}[#Int#]; name=b:
+  // LATER_ARGS-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c:
+  // LATER_ARGS: End completions
+
+  overloaded().someFunc(a: 2, #^LATER_ARGS_WRONG^#, k: 4.5)
+  // LATER_ARGS_WRONG: Begin completions, 3 items
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#b: Int#}[#Int#]; name=b:
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#c: String#}[#String#]; name=c:
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#d: String#}[#String#]; name=d:
+  // LATER_ARGS_WRONG-DAG: End completions
+
+
+  overloaded().variadic(y: 2, #^INITIAL_VARARG^#, 4)
+  // INITIAL_VARARG: Begin completions, 1 item
+  // INITIAL_VARARG: Pattern/Local/Flair[ArgLabels]: {#x: Int...#}[#Int#]; name=x:
+  // INITIAL VARARG: End completions
+
+  overloaded().variadic(y: 2, x: 2, #^NONINITIAL_VARARG^#)
+  // NONINITIAL_VARARG: Begin completions
+  // NONINITIAL_VARARG-NOT: name=x:
+  // NONINITIAL_VARARG: Decl[LocalVar]/Local/TypeRelation[Convertible]:  localInt[#Int#]; name=localInt
+  // NONINITIAL_VARARG-NOT: name=x:
+  // NONINITIAL_VARARG: End completions
+}

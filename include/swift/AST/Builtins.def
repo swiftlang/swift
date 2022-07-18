@@ -699,7 +699,7 @@ BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 /// zeroInitializer has type <T> () -> T
 BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
-/// once has type (Builtin.RawPointer, () -> ())
+/// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 /// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
 BUILTIN_MISC_OPERATION(OnceWithContext, "onceWithContext", "", Special)
@@ -893,6 +893,16 @@ BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 /// Returns an AsyncLet* that must be passed to endAsyncLetLifetime for
 /// destruction.
 BUILTIN_MISC_OPERATION(StartAsyncLetWithLocalBuffer, "startAsyncLetWithLocalBuffer", "", Special)
+
+/// taskRunInline()<T>: (
+///     () async -> T
+/// ) -> T
+///
+/// Create an async context inline in the current synchronous context and run
+/// the specified closure.
+///
+/// This is only supported under the task-to-thread concurrency model.
+BUILTIN_MISC_OPERATION(TaskRunInline, "taskRunInline", "", Special)
 
 /// endAsyncLet(): (Builtin.RawPointer) -> Void
 ///

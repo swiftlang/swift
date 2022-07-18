@@ -111,12 +111,12 @@ func protocol_concrete_casts(_ p1: P1, p2: P2, p12: P1 & P2) {
 
   _ = p1 as! P1 & P2
 
-  _ = p2 as! S1 // expected-warning {{cast from 'P2' to unrelated type 'S1' always fails}}
+  _ = p2 as! S1 // expected-warning {{cast from 'any P2' to unrelated type 'S1' always fails}}
 
-  _ = p12 as! S1 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S1' always fails}}
-  _ = p12 as! S2 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S2' always fails}}
+  _ = p12 as! S1 // expected-warning {{cast from 'any P1 & P2' to unrelated type 'S1' always fails}}
+  _ = p12 as! S2 // expected-warning {{cast from 'any P1 & P2' to unrelated type 'S2' always fails}}
   _ = p12 as! S12
-  _ = p12 as! S3 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S3' always fails}}
+  _ = p12 as! S3 // expected-warning {{cast from 'any P1 & P2' to unrelated type 'S3' always fails}}
 
   // Type queries.
   var _:Bool = p1 is S1
@@ -126,12 +126,12 @@ func protocol_concrete_casts(_ p1: P1, p2: P2, p12: P1 & P2) {
 
   var _:Bool = p1 is P1 & P2
 
-  var _:Bool = p2 is S1 // expected-warning {{cast from 'P2' to unrelated type 'S1' always fails}}
+  var _:Bool = p2 is S1 // expected-warning {{cast from 'any P2' to unrelated type 'S1' always fails}}
 
-  var _:Bool = p12 is S1 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S1' always fails}}
-  var _:Bool = p12 is S2 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S2' always fails}}
+  var _:Bool = p12 is S1 // expected-warning {{cast from 'any P1 & P2' to unrelated type 'S1' always fails}}
+  var _:Bool = p12 is S2 // expected-warning {{cast from 'any P1 & P2' to unrelated type 'S2' always fails}}
   var _:Bool = p12 is S12
-  var _:Bool = p12 is S3 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S3' always fails}}
+  var _:Bool = p12 is S3 // expected-warning {{cast from 'any P1 & P2' to unrelated type 'S3' always fails}}
 }
 
 func conditional_cast(_ b: B) -> D? {
@@ -280,7 +280,7 @@ func test_coercions_with_overloaded_operator(str: String, optStr: String?, veryO
 
 func id<T>(_ x: T) -> T { x }
 
-func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [String: Int], _ set: Set<Int>) {
+func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [String: Int], _ set: Set<Int>, _ i: Int, _ stringAnyDict: [String: Any]) {
   // Successful coercions don't raise a warning.
   _ = arr as [Any]?
   _ = dict as [String: Int]?
@@ -337,6 +337,24 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // The array can also be inferred to be [Any].
   _ = ([] ?? []) as Array // expected-warning {{left side of nil coalescing operator '??' has non-optional type '[Any]', so the right side is never used}}
+
+  // rdar://88334481 – Don't apply the compatibility logic for collection literals.
+  typealias Magic<T> = T
+  _ = [i] as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = [i] as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = ([i]) as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _  = [i: i] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+  _  = ([i: i]) as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+  _  = [i: stringAnyDict] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+
+  // These are currently not peepholed.
+  _ = [i].self as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  _ = (try [i]) as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+
+  // These are wrong, but make sure we don't warn about the value cast always succeeding.
+  _  = [i: i] as! [String: Any]
+  _  = [i: stringAnyDict] as! [String: Any]
 }
 
 // SR-13088
@@ -460,15 +478,15 @@ func protocol_composition(_ c: ProtocolP & ProtocolQ, _ c1: ProtocolP & Composit
   _ = c as? ConcreteCPQ // Ok
   _ = c as? ConcreteP // Ok
   _ = c as? NotConforms // Ok
-  _ = c as? StructNotComforms // expected-warning {{cast from 'ProtocolP & ProtocolQ' to unrelated type 'StructNotComforms' always fails}}
-  _ = c as? NotConformsFinal // expected-warning {{cast from 'ProtocolP & ProtocolQ' to unrelated type 'NotConformsFinal' always fails}}
+  _ = c as? StructNotComforms // expected-warning {{cast from 'any ProtocolP & ProtocolQ' to unrelated type 'StructNotComforms' always fails}}
+  _ = c as? NotConformsFinal // expected-warning {{cast from 'any ProtocolP & ProtocolQ' to unrelated type 'NotConformsFinal' always fails}}
   _ = c1 as? ConcreteP // Ok
   _ = c1 as? ConcreteP1 // OK
   _ = c1 as? ConcretePQ1 // OK
   _ = c1 as? ConcretePPQ1 // Ok
   _ = c1 as? NotConforms // Ok
-  _ = c1 as? StructNotComforms // expected-warning {{cast from 'ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'StructNotComforms' always fails}}
-  _ = c1 as? NotConformsFinal // expected-warning {{cast from 'ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'NotConformsFinal' always fails}}
+  _ = c1 as? StructNotComforms // expected-warning {{cast from 'any ProtocolP & Composition' (aka 'any ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'StructNotComforms' always fails}}
+  _ = c1 as? NotConformsFinal // expected-warning {{cast from 'any ProtocolP & Composition' (aka 'any ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'NotConformsFinal' always fails}}
 }
 
 // SR-13899
@@ -661,4 +679,30 @@ func test_SR_15562() {
     foo[baz] as! Int += 1 // expected-warning{{forced cast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
     // expected-error@-1{{left side of mutating operator has immutable type 'Int'}}
   }
+}
+
+// SR-16058
+extension Dictionary {
+  func SR16058(_: Key) -> Value?? { nil }
+}
+func SR_16058_tests() { 
+  let dict: [Int: String?] = [:]
+  let foo: Int? = 1
+  let _: String? = foo.flatMap { dict[$0] } as? String  // OK
+
+  // More than one optionality wrapping
+  let _: String? = foo.flatMap { dict.SR16058(_: $0) } as? String // OK
+}
+
+// https://github.com/apple/swift/issues/59405
+func isHashable(_ error: Error) -> Bool {
+  (error as? AnyHashable) != nil // OK
+}
+
+func isHashable_is(_ error: Error) -> Bool {
+  error is AnyHashable // OK
+}
+
+func isHashable_composition(_ error: Error & AnyObject) -> Bool {
+  error is AnyHashable // OK
 }

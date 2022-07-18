@@ -24,9 +24,6 @@ set(sources
   _SwiftConcurrency.h
   _SwiftDistributed.h
 
-  DispatchOverlayShims.h
-  XCTestOverlayShims.h
-
   module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
@@ -155,7 +152,7 @@ if(NOT SWIFT_BUILT_STANDALONE)
   endforeach()
 endif()
 
-if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
+if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   foreach(bootstrapping "0" "1")
     get_bootstrapping_path(outdir ${SWIFTLIB_DIR} ${bootstrapping})
     set(target_name "symlink-headers-bootstrapping${bootstrapping}")
@@ -203,16 +200,26 @@ if(SWIFT_BUILD_STATIC_STDLIB)
                              PATTERN "*.h")
 endif()
 
+if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
+  # This will still link against the Swift-forked clang headers if the Swift
+  # toolchain was built with SWIFT_INCLUDE_TOOLS.
+  set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default ${clang_headers_location})
+else()
+  set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default "../clang/${CLANG_VERSION}")
+endif()
+
+set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET
+  ${SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default} CACHE STRING "The target of the installed symlink at lib/swift/clang")
 
 swift_install_symlink_component(clang-resource-dir-symlink
   LINK_NAME clang
-  TARGET ../clang/${CLANG_VERSION}
+  TARGET ${SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET}
   DESTINATION "lib/swift")
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   swift_install_symlink_component(clang-resource-dir-symlink
     LINK_NAME clang
-    TARGET ../clang/${CLANG_VERSION}
+    TARGET ${SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET}
     DESTINATION "lib/swift_static")
 endif()
 

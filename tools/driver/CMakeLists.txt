@@ -1,54 +1,56 @@
 # The swift-frontend tool
 
-if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
+if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
 
   # Bootstrapping - level 0
-  # For more information on how bootstrapping works, see libswift/README.md.
+  # For more information on how bootstrapping works, see docs/SwiftInTheCompiler.md
 
   add_swift_host_tool(swift-frontend-bootstrapping0
     driver.cpp
     SWIFT_COMPONENT no_component
-    HAS_LIBSWIFT
+    HAS_SWIFT_MODULES
     BOOTSTRAPPING 0
+    THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
   )
   target_link_libraries(swift-frontend-bootstrapping0
                         PRIVATE
                           swiftDriverTool
-                          libswiftStub)
+                          swiftCompilerStub)
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping0
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping0/bin")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping0/${CMAKE_CFG_INTDIR}/bin")
 
   # Bootstrapping - level 1
 
   add_swift_host_tool(swift-frontend-bootstrapping1
     driver.cpp
     SWIFT_COMPONENT no_component
-    HAS_LIBSWIFT
+    HAS_SWIFT_MODULES
     BOOTSTRAPPING 1
+    THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
   )
   target_link_libraries(swift-frontend-bootstrapping1
                         PRIVATE
                           swiftDriverTool
-                          libswift-bootstrapping1)
+                          swiftCompilerModules-bootstrapping1)
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping1
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/bin")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/${CMAKE_CFG_INTDIR}/bin")
 endif()
 
 add_swift_host_tool(swift-frontend
   driver.cpp
   SWIFT_COMPONENT compiler
-  HAS_LIBSWIFT
+  HAS_SWIFT_MODULES
 )
 target_link_libraries(swift-frontend
                       PUBLIC
                         swiftDriverTool
-                        libswift)
+                        swiftCompilerModules)
 
 # Create a `swift-driver` executable adjacent to the `swift-frontend` executable
 # to ensure that `swiftc` forwards to the standalone driver when invoked.

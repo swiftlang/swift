@@ -91,7 +91,7 @@ class C {
     super.init()
   }
 
-  func implictMember() {
+  func implicitMember() {
     _ = .foo
     _ = .foo(x: 12)
     _ = .foo() { 12 }

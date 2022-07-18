@@ -36,6 +36,19 @@ const void *const _swift_concurrency_debug_asyncTaskMetadata;
 SWIFT_EXPORT_FROM(swift_Concurrency)
 const void *const _swift_concurrency_debug_asyncTaskSlabMetadata;
 
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const void *const _swift_concurrency_debug_non_future_adapter;
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const void *const _swift_concurrency_debug_future_adapter;
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const void *const _swift_concurrency_debug_task_wait_throwing_resume_adapter;
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const void *const _swift_concurrency_debug_task_future_wait_resume_adapter;
+
+/// Whether the runtime we are inspecting supports priority escalation
+SWIFT_EXPORT_FROM(swift_Concurrency)
+bool _swift_concurrency_debug_supportsPriorityEscalation;
+
 } // namespace swift
 
 #endif

@@ -4,6 +4,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// Temporarily disable for backdeployment (rdar://89821303)
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 import Foundation
 

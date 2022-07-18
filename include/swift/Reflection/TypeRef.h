@@ -38,22 +38,13 @@ enum class TypeRefKind {
 #undef TYPEREF
 };
 
-// MSVC reports an error if we use "template"
-// Clang reports an error if we don't use "template"
-#if defined(__clang__) || defined(__GNUC__)
-#  define DEPENDENT_TEMPLATE template
-#else
-#  define DEPENDENT_TEMPLATE
-#endif
-
 #define FIND_OR_CREATE_TYPEREF(Allocator, TypeRefTy, ...)                      \
   auto ID = Profile(__VA_ARGS__);                                              \
-  const auto Entry = Allocator.TypeRefTy##s.find(ID);      \
-  if (Entry != Allocator.TypeRefTy##s.end())               \
+  const auto Entry = Allocator.TypeRefTy##s.find(ID);                          \
+  if (Entry != Allocator.TypeRefTy##s.end())                                   \
     return Entry->second;                                                      \
-  const auto TR =                                                              \
-      Allocator.DEPENDENT_TEMPLATE makeTypeRef<TypeRefTy>(__VA_ARGS__);        \
-  Allocator.TypeRefTy##s.insert({ID, TR});                 \
+  const auto TR = Allocator.template makeTypeRef<TypeRefTy>(__VA_ARGS__);      \
+  Allocator.TypeRefTy##s.insert({ID, TR});                                     \
   return TR;
 
 /// An identifier containing the unique bit pattern made up of all of the
@@ -572,6 +563,51 @@ public:
   }
 };
 
+class ConstrainedExistentialTypeRef final : public TypeRef {
+  const ProtocolCompositionTypeRef *Base;
+  std::vector<TypeRefRequirement> Requirements;
+
+  static TypeRefID Profile(const ProtocolCompositionTypeRef *Protocol,
+                           std::vector<TypeRefRequirement> Requirements) {
+    TypeRefID ID;
+    ID.addPointer(Protocol);
+    for (auto reqt : Requirements) {
+      ID.addPointer(reqt.getFirstType());
+      if (reqt.getKind() != RequirementKind::Layout)
+        ID.addPointer(reqt.getSecondType());
+      else
+        ID.addInteger(
+            unsigned(0)); // FIXME: Layout constraints aren't implemented yet
+      ID.addInteger(unsigned(reqt.getKind()));
+    }
+    return ID;
+  }
+
+public:
+  ConstrainedExistentialTypeRef(const ProtocolCompositionTypeRef *Protocol,
+                                std::vector<TypeRefRequirement> Requirements)
+      : TypeRef(TypeRefKind::ConstrainedExistential), Base(Protocol),
+        Requirements(Requirements) {}
+
+  template <typename Allocator>
+  static const ConstrainedExistentialTypeRef *
+  create(Allocator &A, const ProtocolCompositionTypeRef *Protocol,
+         std::vector<TypeRefRequirement> Requirements) {
+    FIND_OR_CREATE_TYPEREF(A, ConstrainedExistentialTypeRef, Protocol,
+                           Requirements);
+  }
+
+  const ProtocolCompositionTypeRef *getBase() const { return Base; }
+
+  const std::vector<TypeRefRequirement> &getRequirements() const {
+    return Requirements;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::ConstrainedExistential;
+  }
+};
+
 class MetatypeTypeRef final : public TypeRef {
   const TypeRef *InstanceType;
   bool WasAbstract;
@@ -711,6 +747,37 @@ public:
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::DependentMember;
+  }
+};
+
+/// A representation of a dynamically-constructed generic signature.
+///
+/// \note This class is not a \c TypeRef.
+class GenericSignatureRef final {
+  std::vector<const GenericTypeParameterTypeRef *> Params;
+  std::vector<TypeRefRequirement> Requirements;
+
+public:
+  GenericSignatureRef(
+      llvm::ArrayRef<const GenericTypeParameterTypeRef *> Params,
+      llvm::ArrayRef<TypeRefRequirement> Requirements)
+      : Params(Params.begin(), Params.end()),
+        Requirements(Requirements.begin(), Requirements.end()) {}
+
+  template <typename Allocator>
+  static const GenericSignatureRef *
+  create(Allocator &A,
+         llvm::ArrayRef<const GenericTypeParameterTypeRef *> Params,
+         llvm::ArrayRef<TypeRefRequirement> Requirements) {
+    return A.makeGenericSignatureRef(Params, Requirements);
+  }
+
+  const llvm::ArrayRef<const GenericTypeParameterTypeRef *> getParams() const {
+    return Params;
+  }
+
+  const llvm::ArrayRef<TypeRefRequirement> getRequirements() const {
+    return Requirements;
   }
 };
 

@@ -185,8 +185,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
 #undef LOADABLE_REF_STORAGE_HELPER
   case SILInstructionKind::ConvertFunctionInst:
   case SILInstructionKind::ConvertEscapeToNoEscapeInst:
-  case SILInstructionKind::ThinFunctionToPointerInst:
-  case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:
@@ -195,7 +193,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ObjCToThickMetatypeInst:
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
@@ -205,6 +202,9 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
@@ -274,8 +274,8 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DynamicMethodBranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:
-  case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocBoxInst:
@@ -405,8 +405,6 @@ void updateOpaqueArchetypes(SILFunction &F) {
 /// pipeline.
 class SerializeSILPass : public SILModuleTransform {
     
-  bool onlyForCrossModuleOptimization;
-    
   /// Removes [serialized] from all functions. This allows for more
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
@@ -438,9 +436,7 @@ class SerializeSILPass : public SILModuleTransform {
   }
 
 public:
-  SerializeSILPass(bool onlyForCrossModuleOptimization)
-    : onlyForCrossModuleOptimization(onlyForCrossModuleOptimization)
-  { }
+  SerializeSILPass() {}
   
   void run() override {
     auto &M = *getModule();
@@ -448,10 +444,6 @@ public:
     if (M.isSerialized())
       return;
     
-    if (onlyForCrossModuleOptimization &&
-        !M.getOptions().CrossModuleOptimization)
-      return;
-
     LLVM_DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
     M.serialize();
 
@@ -460,9 +452,5 @@ public:
 };
 
 SILTransform *swift::createSerializeSILPass() {
-  return new SerializeSILPass(/* onlyForCrossModuleOptimization */ false);
-}
-
-SILTransform *swift::createCMOSerializeSILPass() {
-  return new SerializeSILPass(/* onlyForCrossModuleOptimization */ true);
+  return new SerializeSILPass();
 }

@@ -35,6 +35,7 @@ ATTRIBUTE_NODES = [
     #                | specialize-attr-spec-list
     #                | implements-attr-arguments
     #                | named-attribute-string-argument
+    #                | back-deploy-attr-spec-list
     #              )? ')'?
     Node('Attribute', kind='Syntax',
          description='''
@@ -66,6 +67,12 @@ ATTRIBUTE_NODES = [
                              kind='DerivativeRegistrationAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
+                       Child('BackDeployArguments',
+                             kind='BackDeployAttributeSpecList'),
+                       # TokenList for custom effects which are parsed by
+                       # `FunctionEffects.parse()` in swift.
+                       Child('TokenList', kind='TokenList',
+                             collection_element_name='Token'),
                    ], description='''
                    The arguments of the attribute. In case the attribute
                    takes multiple arguments, they are gather in the
@@ -155,7 +162,7 @@ ATTRIBUTE_NODES = [
                    description='The label of the argument'),
              Child('Colon', kind='ColonToken',
                    description='The colon separating the label and the value'),
-             Child('Delcname', kind='DeclName',
+             Child('Declname', kind='DeclName',
                    description='The value for this argument'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True, description='''
@@ -229,7 +236,7 @@ ATTRIBUTE_NODES = [
     # objc-selector-piece -> identifier? ':'?
     Node('ObjCSelectorPiece', kind='Syntax',
          description='''
-         A piece of an Objective-C selector. Either consisiting of just an
+         A piece of an Objective-C selector. Either consisting of just an
          identifier for a nullary selector, an identifier and a colon for a
          labeled argument or just a colon for an unlabeled argument
          ''',
@@ -412,4 +419,45 @@ ATTRIBUTE_NODES = [
                    specified.
                    '''),
          ]),
+
+    # The arguments of '@_backDeploy(...)'
+    # back-deploy-attr-spec-list -> 'before' ':' back-deploy-version-list
+    Node('BackDeployAttributeSpecList', kind='Syntax',
+         description='''
+         A collection of arguments for the `@_backDeploy` attribute
+         ''',
+         children=[
+             Child('BeforeLabel', kind='IdentifierToken',
+                   text_choices=['before'], description='The "before" label.'),
+             Child('Colon', kind='ColonToken', description='''
+                   The colon separating "before" and the parameter list.
+                   '''),
+             Child('VersionList', kind='BackDeployVersionList',
+                   collection_element_name='Availability', description='''
+                   The list of OS versions in which the declaration became ABI
+                   stable.
+                   '''),
+         ]),
+
+    # back-deploy-version-list ->
+    #   back-deploy-version-entry back-deploy-version-list?
+    Node('BackDeployVersionList', kind='SyntaxCollection',
+         element='BackDeployVersionArgument'),
+
+    # back-deploy-version-entry -> availability-version-restriction ','?
+    Node('BackDeployVersionArgument', kind='Syntax',
+         description='''
+         A single platform/version pair in a `@_backDeploy` attribute,
+         e.g. `iOS 10.1`.
+         ''',
+         children=[
+             Child('AvailabilityVersionRestriction',
+                   kind='AvailabilityVersionRestriction'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True,
+                   description='''
+                   A trailing comma if the argument is followed by another
+                   argument
+                   '''),
+         ]),
+
 ]

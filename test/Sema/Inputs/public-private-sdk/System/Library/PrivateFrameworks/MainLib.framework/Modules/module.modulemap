@@ -1,0 +1,6 @@
+framework module MainLib {
+  umbrella header "MainLib.h"
+
+  export *
+  module * { export * }
+}

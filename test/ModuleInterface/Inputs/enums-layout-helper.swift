@@ -46,6 +46,12 @@ public enum FutureproofEnum: Int {
   case d
 }
 
+// CHECK-LABEL: public enum FutureproofUnicodeScalarEnum : Swift.Unicode.Scalar
+public enum FutureproofUnicodeScalarEnum: Unicode.Scalar {
+  // CHECK-NEXT: case a{{$}}
+  case a = "A"
+}
+
 // CHECK-LABEL: indirect public enum FutureproofIndirectEnum
 public indirect enum FutureproofIndirectEnum {
   // CHECK-NEXT: case a{{$}}

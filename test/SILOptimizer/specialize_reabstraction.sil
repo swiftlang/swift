@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -34,6 +35,8 @@ public struct Val<T> : ValProto {
   public var me: Val<T> { get }
   init()
 }
+
+class X {}
 
 sil @coerce : $@convention(thin) <T, U, V> (@owned @callee_owned (@owned Ref<T>) -> @owned @callee_owned (@owned Ref<U>) -> @owned Ref<V>) -> @owned @callee_owned (Val<U>) -> Val<V>
 
@@ -131,3 +134,35 @@ bb0(%0 : $Bool):
   %rv = tuple ()
   return %rv : $()
 }
+
+// CHECK-LABEL: sil shared [escapes %0 => %r] @$s21arg_escapes_to_return4main1XC_Tg5
+sil [escapes %1 => %0] @arg_escapes_to_return : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr %1 to [initialization] %0 : $*T
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil shared [escapes %1 => %0] @$s015arg_escapes_to_A04main1XC_Tg5
+sil [escapes %1 => %0] @arg_escapes_to_arg : $@convention(thin) <T> (@inout T, @in_guaranteed T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr %1 to %0 : $*T
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil @test_escape_effects : $@convention(thin) (@guaranteed X) -> @owned X {
+bb0(%0 : $X):
+  %2 = alloc_stack $X
+  %3 = alloc_stack $X
+  store %0 to %3 : $*X
+  %5 = function_ref @arg_escapes_to_return : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %6 = apply %5<X>(%2, %3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %7 = function_ref @arg_escapes_to_arg : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in_guaranteed τ_0_0) -> ()
+  %8 = apply %7<X>(%2, %3) : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in_guaranteed τ_0_0) -> ()
+  dealloc_stack %3 : $*X
+  %10 = load %2 : $*X
+  dealloc_stack %2 : $*X
+  return %10 : $X
+}
+

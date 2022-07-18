@@ -20,6 +20,7 @@
 #include "swift/Runtime/Config.h"
 #include <assert.h>
 #include <atomic>
+#include <cstdlib>
 #if defined(_WIN64)
 #include <intrin.h>
 #endif
@@ -43,13 +44,12 @@
 
 namespace swift {
 namespace impl {
-
 /// The default implementation for swift::atomic<T>, which just wraps
 /// std::atomic with minor differences.
 ///
 /// TODO: should we make this use non-atomic operations when the runtime
 /// is single-threaded?
-template <class Value, size_t Size = sizeof(Value)>
+template <class Value, std::size_t Size = sizeof(Value)>
 class alignas(Size) atomic_impl {
   std::atomic<Value> value;
 public:
@@ -71,6 +71,13 @@ public:
                              std::memory_order failureOrder) {
     return value.compare_exchange_weak(oldValue, newValue, successOrder,
                                        failureOrder);
+  }
+
+  bool compare_exchange_strong(Value &oldValue, Value newValue,
+                               std::memory_order successOrder,
+                               std::memory_order failureOrder) {
+    return value.compare_exchange_strong(oldValue, newValue, successOrder,
+                                         failureOrder);
   }
 };
 
@@ -128,11 +135,14 @@ public:
   bool compare_exchange_weak(Value &oldValue, Value newValue,
                              std::memory_order successOrder,
                              std::memory_order failureOrder) {
-    assert(failureOrder == std::memory_order_relaxed ||
-           failureOrder == std::memory_order_acquire ||
-           failureOrder == std::memory_order_consume);
-    assert(successOrder == std::memory_order_relaxed ||
-           successOrder == std::memory_order_release);
+    // We do not have weak CAS intrinsics, fallback to strong
+    return compare_exchange_strong(oldValue, newValue, successOrder,
+                                   failureOrder);
+  }
+
+  bool compare_exchange_strong(Value &oldValue, Value newValue,
+                               std::memory_order successOrder,
+                               std::memory_order failureOrder) {
 #if SWIFT_HAS_MSVC_ARM_ATOMICS
     if (successOrder == std::memory_order_relaxed &&
         failureOrder != std::memory_order_acquire) {
@@ -171,7 +181,7 @@ public:
 } // end namespace swift::impl
 
 /// A simple wrapper for std::atomic that provides the most important
-/// interfaces and fixes the API bug where all of the orderings dafault
+/// interfaces and fixes the API bug where all of the orderings default
 /// to sequentially-consistent.
 ///
 /// It also sometimes uses a different implementation in cases where
@@ -180,7 +190,7 @@ public:
 template <class T>
 class atomic : public impl::atomic_impl<T> {
 public:
-  atomic(T value) : impl::atomic_impl<T>(value) {}
+  constexpr atomic(T value) : impl::atomic_impl<T>(value) {}
 };
 
 } // end namespace swift

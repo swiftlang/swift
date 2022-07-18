@@ -134,7 +134,7 @@ namespace {
     SILValue emitBridged(SILGenFunction &SGF, SILLocation loc,
                          CanType bridgedErrorProto) const override {
       auto nativeErrorType = NativeError->getType().getASTType();
-      assert(nativeErrorType == SGF.SGM.getASTContext().getExceptionType());
+      assert(nativeErrorType == SGF.SGM.getASTContext().getErrorExistentialType());
 
       SILValue bridgedError = SGF.emitNativeToBridgedError(loc,
                                 SGF.emitManagedRValueWithCleanup(NativeError),

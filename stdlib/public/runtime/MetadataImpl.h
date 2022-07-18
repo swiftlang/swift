@@ -51,6 +51,7 @@
 #include "EnumImpl.h"
 
 #include <cstring>
+#include <new>
 #include <type_traits>
 
 namespace swift {
@@ -99,11 +100,11 @@ struct NativeBox {
   }
   
   static T *initializeWithCopy(T *dest, T *src) {
-    return new (dest) T(*src);
+    return ::new (dest) T(*src);
   }
 
   static T *initializeWithTake(T *dest, T *src) {
-    T *result = new (dest) T(std::move(*src));
+    T *result = ::new (dest) T(std::move(*src));
     src->T::~T();
     return result;
   }
@@ -136,7 +137,7 @@ template <class Impl, class T> struct RetainableBoxBase {
   static constexpr size_t stride = sizeof(T);
   static constexpr bool isPOD = false;
   static constexpr bool isBitwiseTakable = true;
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   static constexpr bool isAtomic = false;
 #else
   static constexpr bool isAtomic = true;

@@ -85,6 +85,9 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type
 
+  CTP_ExprPattern,      ///< `~=` operator application associated with expression
+                        /// pattern.
+
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
@@ -187,6 +190,11 @@ public:
 
     bool isClosureResult() const {
       return getKind() == PathElementKind::ClosureResult;
+    }
+
+    void dump(raw_ostream &out) const LLVM_ATTRIBUTE_USED;
+    SWIFT_DEBUG_DUMP {
+      dump(llvm::errs());
     }
   };
 
@@ -641,6 +649,32 @@ public:
   }
 };
 
+class LocatorPathElt::PackType : public StoredPointerElement<TypeBase> {
+public:
+  PackType(Type type)
+      : StoredPointerElement(PathElementKind::PackType, type.getPointer()) {
+    assert(type->getDesugaredType()->is<swift::PackType>());
+  }
+
+  Type getType() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::PackType;
+  }
+};
+
+class LocatorPathElt::PackElement final : public StoredIntegerElement<1> {
+public:
+  PackElement(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::PackElement, index) {}
+
+  unsigned getIndex() const { return getValue<0>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PackElement;
+  }
+};
+
 class LocatorPathElt::KeyPathComponent final : public StoredIntegerElement<1> {
 public:
   KeyPathComponent(unsigned index)
@@ -757,6 +791,10 @@ public:
 
   GenericTypeParamType *getType() const {
     return getStoredPointer();
+  }
+    
+  bool isTypeSequence() const {
+    return getType()->isTypeSequence();
   }
 
   static bool classof(const LocatorPathElt *elt) {
@@ -979,11 +1017,11 @@ public:
   }
 };
 
-class LocatorPathElt::ClosureBodyElement final
+class LocatorPathElt::SyntacticElement final
     : public StoredPointerElement<void> {
 public:
-  ClosureBodyElement(ASTNode element)
-      : StoredPointerElement(PathElementKind::ClosureBodyElement,
+  SyntacticElement(ASTNode element)
+      : StoredPointerElement(PathElementKind::SyntacticElement,
                              element.getOpaqueValue()) {
     assert(element);
   }
@@ -1006,7 +1044,7 @@ public:
     if (auto *repr = node.dyn_cast<TypeRepr *>())
       return repr;
 
-    if (auto *cond = node.dyn_cast<StmtCondition *>())
+    if (auto *cond = node.dyn_cast<StmtConditionElement *>())
       return cond;
 
     if (auto *caseItem = node.dyn_cast<CaseLabelItem *>())
@@ -1021,7 +1059,20 @@ public:
   }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == PathElementKind::ClosureBodyElement;
+    return elt->getKind() == PathElementKind::SyntacticElement;
+  }
+};
+
+class LocatorPathElt::PatternBindingElement final
+    : public StoredIntegerElement<1> {
+public:
+  PatternBindingElement(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::PatternBindingElement, index) {}
+
+  unsigned getIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PatternBindingElement;
   }
 };
 
@@ -1210,6 +1261,12 @@ public:
 
     return None;
   }
+
+  /// Produce a debugging dump of this locator.
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
+
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
 } // end namespace constraints

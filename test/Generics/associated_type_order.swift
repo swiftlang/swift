@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -requirement-machine=on | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 protocol P1 {
   associatedtype B

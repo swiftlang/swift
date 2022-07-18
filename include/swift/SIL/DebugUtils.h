@@ -237,24 +237,26 @@ bool hasNonTrivialNonDebugTransitiveUsers(
 /// operators to access functionality from the underlying instruction when
 /// needed.
 struct DebugVarCarryingInst {
-  enum class Kind {
+  enum class Kind : uint8_t {
     Invalid = 0,
     DebugValue,
     AllocStack,
     AllocBox,
   };
 
-  Kind kind;
   SILInstruction *inst;
+  Kind kind;
+  uintptr_t spareBits : (sizeof(uintptr_t) - sizeof(Kind)) * 8;
 
-  DebugVarCarryingInst() : kind(Kind::Invalid), inst(nullptr) {}
+  DebugVarCarryingInst() : inst(nullptr), kind(Kind::Invalid), spareBits(0) {}
   DebugVarCarryingInst(DebugValueInst *dvi)
-      : kind(Kind::DebugValue), inst(dvi) {}
+      : inst(dvi), kind(Kind::DebugValue), spareBits(0) {}
   DebugVarCarryingInst(AllocStackInst *asi)
-      : kind(Kind::AllocStack), inst(asi) {}
-  DebugVarCarryingInst(AllocBoxInst *abi) : kind(Kind::AllocBox), inst(abi) {}
+      : inst(asi), kind(Kind::AllocStack), spareBits(0) {}
+  DebugVarCarryingInst(AllocBoxInst *abi)
+      : inst(abi), kind(Kind::AllocBox), spareBits(0) {}
   DebugVarCarryingInst(SILInstruction *newInst)
-      : kind(Kind::Invalid), inst(nullptr) {
+      : inst(nullptr), kind(Kind::Invalid), spareBits(0) {
     switch (newInst->getKind()) {
     default:
       return;
@@ -279,6 +281,15 @@ struct DebugVarCarryingInst {
   /// Enable one to access the methods of the wrapped instruction using
   /// '->'. This keeps the wrapper light weight.
   SILInstruction *operator->() const { return inst; }
+
+  bool operator==(const DebugVarCarryingInst &other) const {
+    return kind == other.kind && inst == other.inst &&
+           spareBits == other.spareBits;
+  }
+
+  bool operator!=(const DebugVarCarryingInst &other) const {
+    return !(*this == other);
+  }
 
   /// Add support for this struct in `if` statement.
   explicit operator bool() const { return bool(kind); }
@@ -325,34 +336,95 @@ struct DebugVarCarryingInst {
       llvm_unreachable("Not implemented");
     }
   }
+
+  void markAsMoved() {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      cast<DebugValueInst>(inst)->markAsMoved();
+      break;
+    case Kind::AllocStack:
+      cast<AllocStackInst>(inst)->markAsMoved();
+      break;
+    case Kind::AllocBox:
+      llvm_unreachable("Not implemented");
+    }
+  }
+
+  /// Returns true if this DebugVarCarryingInst was moved.
+  bool getWasMoved() const {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(inst)->getWasMoved();
+    case Kind::AllocStack:
+      return cast<AllocStackInst>(inst)->getWasMoved();
+    case Kind::AllocBox:
+      // We do not support moving alloc box today, so we always return false.
+      return false;
+    }
+  }
+
+  /// If we are attempting to create a "debug_value" clone of this debug var
+  /// carrying inst, return the appropriate SILValue to use as the operand of
+  /// that debug value.
+  ///
+  /// For a debug_value, we just return the actual operand, otherwise we return
+  /// the pointer address.
+  SILValue getOperandForDebugValueClone() const {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(inst)->getOperand();
+    case Kind::AllocStack:
+      return cast<AllocStackInst>(inst);
+    case Kind::AllocBox:
+      llvm_unreachable("Not implemented");
+    }
+  }
+
+  /// If \p value is an alloc_stack, alloc_box use that. Otherwise, see if \p
+  /// value has a single debug user, return that. Otherwise return the invalid
+  /// DebugVarCarryingInst.
+  static DebugVarCarryingInst getFromValue(SILValue value);
+
+  /// Take in \p inst, a potentially invalid DebugVarCarryingInst, and returns a
+  /// name for it. If we have an invalid value or don't find var info or a decl,
+  /// return "unknown".
+  ///
+  /// The reason this isn't a method is that in all the other parts of
+  /// DebugVarCarryingInst, we use Invalid to signal early error.
+  static StringRef getName(DebugVarCarryingInst inst) {
+    if (!inst)
+      return "unknown";
+    StringRef varName = "unknown";
+    if (auto varInfo = inst.getVarInfo()) {
+      varName = varInfo->Name;
+    } else if (auto *decl = inst.getDecl()) {
+      varName = decl->getBaseName().userFacingName();
+    }
+    return varName;
+  }
 };
+
+inline DebugVarCarryingInst DebugVarCarryingInst::getFromValue(SILValue value) {
+  if (isa<AllocStackInst>(value) || isa<AllocBoxInst>(value))
+    return DebugVarCarryingInst(cast<SingleValueInstruction>(value));
+
+  if (auto *use = getSingleDebugUse(value))
+    return DebugVarCarryingInst(use->getUser());
+
+  return DebugVarCarryingInst();
+}
 
 /// Attempt to discover a StringRef varName for the value \p value. If we fail,
 /// we return the name "unknown".
 inline StringRef getDebugVarName(SILValue value) {
-  if (auto *asi = dyn_cast<AllocStackInst>(value)) {
-    DebugVarCarryingInst debugVar(asi);
-    if (auto varInfo = debugVar.getVarInfo()) {
-      return varInfo->Name;
-    } else {
-      if (auto *decl = debugVar.getDecl()) {
-        return decl->getBaseName().userFacingName();
-      }
-    }
-  }
-
-  StringRef varName = "unknown";
-  if (auto *use = getSingleDebugUse(value)) {
-    DebugVarCarryingInst debugVar(use->getUser());
-    if (auto varInfo = debugVar.getVarInfo()) {
-      varName = varInfo->Name;
-    } else {
-      if (auto *decl = debugVar.getDecl()) {
-        varName = decl->getBaseName().userFacingName();
-      }
-    }
-  }
-  return varName;
+  auto inst = DebugVarCarryingInst::getFromValue(value);
+  return DebugVarCarryingInst::getName(inst);
 }
 
 } // end namespace swift

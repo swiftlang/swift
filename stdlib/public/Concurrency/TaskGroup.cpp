@@ -16,29 +16,35 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 
-#include "swift/ABI/TaskGroup.h"
-#include "swift/ABI/Task.h"
-#include "swift/ABI/Metadata.h"
-#include "swift/ABI/HeapObject.h"
-#include "TaskPrivate.h"
+#include "Debug.h"
 #include "TaskGroupPrivate.h"
+#include "TaskPrivate.h"
+#include "bitset"
+#include "queue" // TODO: remove and replace with usage of our mpsc queue
+#include "string"
+#include "swift/ABI/HeapObject.h"
+#include "swift/ABI/Metadata.h"
+#include "swift/ABI/Task.h"
+#include "swift/ABI/TaskGroup.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
-#include "Debug.h"
-#include "bitset"
-#include "string"
-#include "queue" // TODO: remove and replace with usage of our mpsc queue
+#include "swift/Threading/Mutex.h"
 #include <atomic>
+#include <new>
+
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+#include <mutex>
+#endif
+
 #include <assert.h>
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
 #endif
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 #endif
 
@@ -278,8 +284,7 @@ public:
   };
 
 private:
-
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
   // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
   mutable std::mutex mutex_;
 
@@ -457,6 +462,10 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
   return reinterpret_cast<TaskGroup*>(group);
 }
 
+TaskGroupTaskStatusRecord * TaskGroup::getTaskRecord() {
+    return asImpl(this)->getTaskRecord();
+}
+
 // =============================================================================
 // ==== initialize -------------------------------------------------------------
 
@@ -465,23 +474,26 @@ SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
   SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
 
-  TaskGroupImpl *impl = new (group) TaskGroupImpl(T);
+  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
-  bool notCancelled = swift_task_addStatusRecord(record);
-
-  // If the task has already been cancelled, reflect that immediately in
-  // the group status.
-  if (!notCancelled) impl->statusCancel();
+  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+    // If the task has already been cancelled, reflect that immediately in
+    // the group's status.
+    if (parentStatus.isCancelled()) {
+      impl->statusCancel();
+    }
+    return true;
+  });
 }
 
 // =============================================================================
 // ==== add / attachChild ------------------------------------------------------
 
 void TaskGroup::addChildTask(AsyncTask *child) {
-  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, group);
+  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, this);
 
   // The counterpart of this (detachChild) is performed by the group itself,
   // when it offers the completed (child) task's value to a waiting task -
@@ -501,7 +513,7 @@ void TaskGroupImpl::destroy() {
   SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
 
   // First, remove the group from the task and deallocate the record
-  swift_task_removeStatusRecord(getTaskRecord());
+  removeStatusRecord(getTaskRecord());
 
   // No need to drain our queue here, as by the time we call destroy,
   // all tasks inside the group must have been awaited on already.
@@ -615,7 +627,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
         // TODO: allow the caller to suggest an executor
-        swift_task_enqueueGlobal(waitingTask);
+        waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
         return;
       } // else, try again
     }

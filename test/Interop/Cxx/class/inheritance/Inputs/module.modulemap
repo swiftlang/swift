@@ -1,0 +1,15 @@
+module Functions {
+  header "functions.h"
+}
+
+module Fields {
+  header "fields.h"
+}
+
+module SubTypes {
+  header "sub-types.h"
+}
+
+module TypeAliases {
+  header "type-aliases.h"
+}

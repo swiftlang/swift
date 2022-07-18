@@ -1,8 +1,5 @@
 // This file tests that we emit cross-imports into module interfaces.
 
-// FIXME: Fix the path normalization issue and get rid of this.
-// UNSUPPORTED: OS=windows-msvc
-
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/lib-templates/* %t/
 

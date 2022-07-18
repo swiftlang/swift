@@ -28,11 +28,11 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Indenting.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -612,7 +612,12 @@ struct SwiftSemanticToken {
     return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
   }
 };
+#if !defined(_MSC_VER)
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
+// FIXME: MSVC doesn't pack bitfields with different underlying types.
+// Giving up to check this in MSVC for now, becasue static_assert is only for
+// keeping low memory usage.
+#endif
 
 class SwiftDocumentSemanticInfo :
     public ThreadSafeRefCountedBase<SwiftDocumentSemanticInfo> {
@@ -977,7 +982,7 @@ public:
 
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
-    auto Kind = CodeCompletionResult::getCodeCompletionDeclKind(D);
+    auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
     bool IsSystem = D->getModuleContext()->isSystemModule();
     SemaToks.emplace_back(Kind, ByteOffset, Length, IsRef, IsSystem);
   }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberwiseInitializer -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberwiseInitializer -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK:      struct StructPrivateOnly {
 // CHECK-NEXT:   init()

@@ -19,9 +19,7 @@
 #define SWIFT_C_DEPENDENCY_SCAN_H
 
 #include "DependencyScanMacros.h"
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "swift-c/CommonString/CommonString.h"
 
 /// The version constants for the SwiftDependencyScan C API.
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
@@ -32,21 +30,6 @@
 SWIFTSCAN_BEGIN_DECLS
 
 //=== Public Scanner Data Types -------------------------------------------===//
-
-/**
- * A character string used to pass around dependency scan result metadata.
- * Lifetime of the string is strictly tied to the object whose field it
- * represents. When the owning object is released, string memory is freed.
- */
-typedef struct {
-  const void *data;
-  size_t length;
-} swiftscan_string_ref_t;
-
-typedef struct {
-  swiftscan_string_ref_t *strings;
-  size_t count;
-} swiftscan_string_set_t;
 
 typedef enum {
   // This dependency info encodes two ModuleDependencyKind types:

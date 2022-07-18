@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
+# Copyright (c) 2019 - 2022 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -14,27 +14,32 @@ set(swift_distributed_link_libraries
   swiftCore)
 
 
-add_swift_target_library(swift_Distributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-  AssertDistributed.swift
+add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  DistributedActor.cpp
   DistributedActor.swift
   DistributedActorSystem.swift
-  HeterogeneousBuffer.swift
+  DistributedMetadata.swift
+  LocalTestingDistributedActorSystem.swift
 
+  SWIFT_MODULE_DEPENDS_IOS Darwin
+  SWIFT_MODULE_DEPENDS_OSX Darwin
+  SWIFT_MODULE_DEPENDS_TVOS Darwin
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
-  SWIFT_MODULE_DEPENDS_WINDOWS CRT
+  SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
 
   LINK_LIBRARIES ${swift_distributed_link_libraries}
 
   C_COMPILE_FLAGS
-    -Dswift_Distributed_EXPORTS
+    -DswiftDistributed_EXPORTS
+    -I${SWIFT_SOURCE_DIR}/stdlib/include
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
-    -Xfrontend -enable-experimental-distributed
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS _Concurrency

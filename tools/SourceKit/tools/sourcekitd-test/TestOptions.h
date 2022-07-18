@@ -68,6 +68,8 @@ enum class SourceKitRequest {
   GlobalConfiguration,
   DependencyUpdated,
   Diagnostics,
+  Compile,
+  CompileClose,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
@@ -124,6 +126,7 @@ struct TestOptions {
   bool timeRequest = false;
   bool measureInstructions = false;
   bool DisableImplicitConcurrencyModuleImport = false;
+  bool DisableImplicitStringProcessingModuleImport = false;
   llvm::Optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;
   struct VFSFile {

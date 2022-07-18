@@ -144,8 +144,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     case 1: {
       assert(AACI->getErrorBB());
       auto &C = AACI->getFunction()->getASTContext();
-      auto errorTy = C.getErrorDecl()->getDeclaredType();
-      auto errorSILTy = SILType::getPrimitiveObjectType(errorTy->getCanonicalType());
+      auto errorTy = C.getErrorExistentialType();
+      auto errorSILTy = SILType::getPrimitiveObjectType(errorTy);
       // error BB. this takes the error value argument
       args.push_back(
           newEdgeBB->createPhiArgument(errorSILTy, OwnershipKind::Owned));
@@ -206,16 +206,6 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     auto CBI = cast<CheckedCastAddrBranchInst>(T);
-    auto succBB = edgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
-    if (!succBB->getNumArguments())
-      return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(),
-        succBB->getArgument(0)->getOwnershipKind()));
-    return;
-  }
-  case SILInstructionKind::CheckedCastValueBranchInst: {
-    auto CBI = cast<CheckedCastValueBranchInst>(T);
     auto succBB = edgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!succBB->getNumArguments())
       return;

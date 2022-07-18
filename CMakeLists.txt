@@ -66,6 +66,95 @@ else()
                   any compiler host sources written in Swift")
 endif()
 
+# A convenience pattern to match Darwin platforms. Example:
+#  if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
+#     ...
+#  endif()
+set(SWIFT_DARWIN_VARIANTS "^(macosx|iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
+set(SWIFT_DARWIN_EMBEDDED_VARIANTS "^(iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
+
+# A convenient list to match Darwin SDKs. Example:
+#  if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+#    ...
+#  endif()
+set(SWIFT_DARWIN_PLATFORMS "IOS" "IOS_SIMULATOR" "TVOS" "TVOS_SIMULATOR" "WATCHOS" "WATCHOS_SIMULATOR" "OSX")
+
+set(SWIFT_APPLE_PLATFORMS ${SWIFT_DARWIN_PLATFORMS})
+if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple")
+  list(APPEND SWIFT_APPLE_PLATFORMS "FREESTANDING")
+  if(SWIFT_FREESTANDING_IS_DARWIN)
+    list(APPEND SWIFT_DARWIN_PLATFORMS "FREESTANDING")
+  endif()
+endif()
+
+# If SWIFT_HOST_VARIANT_SDK not given, try to detect from the CMAKE_SYSTEM_NAME.
+if(SWIFT_HOST_VARIANT_SDK)
+  set(SWIFT_HOST_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
+else()
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+    set(SWIFT_HOST_VARIANT_SDK_default "FREEBSD")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
+    set(SWIFT_HOST_VARIANT_SDK_default "OPENBSD")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+    set(SWIFT_HOST_VARIANT_SDK_default "CYGWIN")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    set(SWIFT_HOST_VARIANT_SDK_default "WINDOWS")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Haiku")
+    set(SWIFT_HOST_VARIANT_SDK_default "HAIKU")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
+    set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    set(SWIFT_HOST_VARIANT_SDK_default "OSX")
+  else()
+    message(FATAL_ERROR "Unable to detect SDK for host system: ${CMAKE_SYSTEM_NAME}")
+  endif()
+endif()
+
+# If SWIFT_HOST_VARIANT_ARCH not given, try to detect from the CMAKE_SYSTEM_PROCESSOR.
+if(SWIFT_HOST_VARIANT_ARCH)
+  set(SWIFT_HOST_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+else()
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
+    if(SWIFT_HOST_VARIANT_SDK_default STREQUAL OSX)
+      set(SWIFT_HOST_VARIANT_ARCH_default "arm64")
+    else()
+      set(SWIFT_HOST_VARIANT_ARCH_default "aarch64")
+    endif()
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc")
+    set(SWIFT_HOST_VARIANT_ARCH_default "powerpc")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
+    set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64le")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "s390x")
+    set(SWIFT_HOST_VARIANT_ARCH_default "s390x")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "armv5|armv5te")
+    set(SWIFT_HOST_VARIANT_ARCH_default "armv5")
+  # FIXME: Only matches v6l/v7l - by far the most common variants
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
+    set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "armv7l|armv7-a")
+    set(SWIFT_HOST_VARIANT_ARCH_default "armv7")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "IA64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "itanium")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "(x86|i686)")
+    set(SWIFT_HOST_VARIANT_ARCH_default "i686")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "wasm32")
+    set(SWIFT_HOST_VARIANT_ARCH_default "wasm32")
+  else()
+    message(FATAL_ERROR "Unrecognized architecture on host system: ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+endif()
+
+set(SWIFT_HOST_VARIANT_SDK "${SWIFT_HOST_VARIANT_SDK_default}" CACHE STRING
+    "Deployment sdk for Swift host tools (the compiler).")
+set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
+    "Deployment arch for Swift host tools (the compiler).")
+
 #
 # User-configurable options that control the inclusion and default build
 # behavior for components which may not strictly be necessary (tools, examples,
@@ -97,6 +186,11 @@ option(SWIFT_BUILD_STATIC_STDLIB
 option(SWIFT_STDLIB_STATIC_PRINT
     "Build compile-time evaluated vprintf()"
     FALSE)
+    
+option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
+    "Include Unicode data files in the standard library.
+    NOTE: Disabling this will cause many String methods to crash."
+    TRUE)
 
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
@@ -131,6 +225,10 @@ endif()
 option(SWIFT_BUILD_PERF_TESTSUITE
     "Create in-tree targets for building swift performance benchmarks."
     FALSE)
+
+option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
+    "Build the Swift regex parser as part of the compiler."
+    TRUE)
 
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 
@@ -170,7 +268,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.6")
+set(SWIFT_VERSION "5.8")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -187,18 +285,25 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     option only affects the tools that run on the host (the compiler), and has
     no effect on the target libraries (the standard library and the runtime).")
 
-# NOTE: We do not currently support building libswift with the Xcode generator.
-cmake_dependent_option(LIBSWIFT_BUILD_MODE "How to build libswift. Possible values are
-    OFF:           the compiler is built without libswift
-    HOSTTOOLS:     libswift is built with a pre-installed toolchain
-    BOOTSTRAPPING: libswift is built with a 2-stage bootstrapping process
-    BOOTSTRAPPING-WITH-HOSTLIBS:   libswift is built with a 2-stage bootstrapping process,
+option(SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS
+    "When building ThinLTO using ld64 on Darwin, controls whether to opt out of
+    LLVM IR optimizations when linking targets that will get
+    little benefit from it (e.g. tools for bootstrapping or
+    debugging Swift)"
+    FALSE)
+
+option(BOOTSTRAPPING_MODE [=[
+How to build the swift compiler modules. Possible values are
+    OFF:           build without swift modules
+    HOSTTOOLS:     build with a pre-installed toolchain
+    BOOTSTRAPPING: build with a 2-stage bootstrapping process
+    BOOTSTRAPPING-WITH-HOSTLIBS:   build with a 2-stage bootstrapping process,
                    but the compiler links against the host system swift libs (macOS only)
-    CROSSCOMPILE:  libswift is cross-compiled with a native host compiler, provided in
+    CROSSCOMPILE:  cross-compiledwith a native host compiler, provided in
                    `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
-    CROSSCOMPILE-WITH-HOSTLIBS:    libswift is built with a bootstrapping-with-hostlibs compiled
-                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`"
-  OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
+    CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
+                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
+]=] OFF)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
@@ -299,27 +404,10 @@ set(SWIFT_ANDROID_API_LEVEL "" CACHE STRING
 
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
-set(SWIFT_ANDROID_NDK_CLANG_VERSION "12.0.8" CACHE STRING
+set(SWIFT_ANDROID_NDK_CLANG_VERSION "12.0.9" CACHE STRING
   "The Clang version to use when building for Android.")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
-
-#
-# User-configurable ICU specific options for Android, FreeBSD, Linux, Haiku, and WASI.
-#
-
-foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU;WASI)
-  foreach(arch aarch64;armv6;armv7;i686;powerpc64;powerpc64le;s390x;wasm32;x86_64)
-    set(SWIFT_${sdk}_${arch}_ICU_UC "" CACHE STRING
-        "Path to a directory containing the icuuc library for ${sdk}")
-    set(SWIFT_${sdk}_${arch}_ICU_UC_INCLUDE "" CACHE STRING
-        "Path to a directory containing headers for icuuc for ${sdk}")
-    set(SWIFT_${sdk}_${arch}_ICU_I18N "" CACHE STRING
-        "Path to a directory containing the icui18n library for ${sdk}")
-    set(SWIFT_${sdk}_${arch}_ICU_I18N_INCLUDE "" CACHE STRING
-        "Path to a directory containing headers icui18n for ${sdk}")
-  endforeach()
-endforeach()
 
 #
 # User-configurable Darwin-specific options.
@@ -332,9 +420,15 @@ option(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS
   "If non-empty, when embedding the LLVM bitcode binary sections into the relevant binaries, pass in -bitcode_hide_symbols. Does nothing if SWIFT_EMBED_BITCODE_SECTION is set to false."
   FALSE)
 
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
+  set(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT_default TRUE)
+else()
+  set(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT_default FALSE)
+endif()
+
 option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
-    FALSE)
+    "${SWIFT_RUNTIME_CRASH_REPORTER_CLIENT_default}")
 
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
     "The name of the toolchain to pass to 'xcrun'")
@@ -366,6 +460,10 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING
 
 option(SWIFT_SIL_VERIFY_ALL
     "Run SIL verification after each transform when building Swift files in the build process"
+    FALSE)
+
+option(SWIFT_SIL_VERIFY_ALL_MACOS_ONLY
+    "Run SIL verification after each transform when building the macOS stdlib"
     FALSE)
 
 option(SWIFT_EMIT_SORTED_SIL_OUTPUT
@@ -435,6 +533,10 @@ option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
   "Build stdlibCore with exclusivity checking enabled"
   FALSE)
 
+option(SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  "Enable _debugPrecondition checks in the stdlib in Release configurations"
+  FALSE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
   "Enable experimental Swift differentiable programming features"
   FALSE)
@@ -476,6 +578,12 @@ cmake_dependent_option(SWIFT_BUILD_SOURCEKIT
 cmake_dependent_option(SWIFT_ENABLE_SOURCEKIT_TESTS
   "Enable running SourceKit tests" TRUE
   "SWIFT_BUILD_SOURCEKIT" FALSE)
+
+option(SWIFT_THREADING_PACKAGE
+  "Override the threading package used for the build.  This can either be a
+   single package name, or a semicolon separated sequence of sdk:package pairs.
+   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
+   or the empty string for the SDK default.")
 
 #
 # End of user-configurable options.
@@ -541,7 +649,12 @@ include(CMakePushCheckState)
 
 # Print out path and version of any installed commands
 message(STATUS "CMake (${CMAKE_COMMAND}) Version: ${CMAKE_VERSION}")
-execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} --version
+if(XCODE)
+  set(version_flag -version)
+else()
+  set(version_flag --version)
+endif()
+execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} ${version_flag}
   OUTPUT_VARIABLE _CMAKE_MAKE_PROGRAM_VERSION
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
@@ -613,25 +726,32 @@ set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  # This is the normal case. We are not cross-compiling.
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-  set(SWIFT_EXEC_FOR_LIBSWIFT "${CMAKE_Swift_COMPILER}")
-elseif(LIBSWIFT_BUILD_MODE MATCHES "BOOTSTRAPPING.*")
-  # If cross-compiling we don't have to bootstrap. We can just use the previously
-  # built native swiftc to build libswift.
-  message(STATUS "Building libswift with previously built tools instead of bootstrapping")
-  set(SWIFT_EXEC_FOR_LIBSWIFT "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
-  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-    set(LIBSWIFT_BUILD_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
-  elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
-    set(LIBSWIFT_BUILD_MODE "CROSSCOMPILE")
+  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
+elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+  # If cross-compiling, we don't have to bootstrap. We can just use the previously
+  # built native swiftc to build the swift compiler modules.
+  message(STATUS "Building swift modules with previously built tools instead of bootstrapping")
+  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
+  if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+    set(BOOTSTRAPPING_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
+  elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+    set(BOOTSTRAPPING_MODE "CROSSCOMPILE")
   else()
-    set(LIBSWIFT_BUILD_MODE "HOSTTOOLS")
+    set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
+elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+  # We are building using a pre-installed host toolchain but not bootstrapping
+  # the Swift modules. This happens when building using 'build-tooling-libs'
+  # where we haven't built a new Swift compiler. Use the Swift compiler from the
+  # pre-installed host toolchain to build the Swift modules.
+  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
 endif()
 
-if(LIBSWIFT_BUILD_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
+if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
   if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
-    message(STATUS "array COW checks disabled when building libswift with host libraries")
+    message(STATUS "array COW checks disabled when building the swift modules with host libraries")
     set(SWIFT_ENABLE_ARRAY_COW_CHECKS FALSE)
   endif()
 endif()
@@ -653,27 +773,6 @@ include_directories(BEFORE
   ${SWIFT_INCLUDE_DIR}
   )
 
-# A convenience pattern to match Darwin platforms. Example:
-#  if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
-#     ...
-#  endif()
-set(SWIFT_DARWIN_VARIANTS "^(macosx|iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
-set(SWIFT_DARWIN_EMBEDDED_VARIANTS "^(iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
-
-# A convenient list to match Darwin SDKs. Example:
-#  if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
-#    ...
-#  endif()
-set(SWIFT_DARWIN_PLATFORMS "IOS" "IOS_SIMULATOR" "TVOS" "TVOS_SIMULATOR" "WATCHOS" "WATCHOS_SIMULATOR" "OSX")
-
-set(SWIFT_APPLE_PLATFORMS ${SWIFT_DARWIN_PLATFORMS})
-if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple")
-  list(APPEND SWIFT_APPLE_PLATFORMS "FREESTANDING")
-  if(SWIFT_FREESTANDING_IS_DARWIN)
-    list(APPEND SWIFT_DARWIN_PLATFORMS "FREESTANDING")
-  endif()
-endif()
-
 # Configuration flags passed to all of our invocations of gyb.  Try to
 # avoid making up new variable names here if you can find a CMake
 # variable that will do the job.
@@ -689,70 +788,6 @@ set(SWIFT_MODULE_CACHE_PATH
 if(XCODE)
   swift_common_xcode_cxx_config()
 endif()
-
-# If SWIFT_HOST_VARIANT_SDK not given, try to detect from the CMAKE_SYSTEM_NAME.
-if(SWIFT_HOST_VARIANT_SDK)
-  set(SWIFT_HOST_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
-else()
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-    set(SWIFT_HOST_VARIANT_SDK_default "FREEBSD")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
-    set(SWIFT_HOST_VARIANT_SDK_default "OPENBSD")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
-    set(SWIFT_HOST_VARIANT_SDK_default "CYGWIN")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    set(SWIFT_HOST_VARIANT_SDK_default "WINDOWS")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Haiku")
-    set(SWIFT_HOST_VARIANT_SDK_default "HAIKU")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
-    set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    set(SWIFT_HOST_VARIANT_SDK_default "OSX")
-  else()
-    message(FATAL_ERROR "Unable to detect SDK for host system: ${CMAKE_SYSTEM_NAME}")
-  endif()
-endif()
-
-# If SWIFT_HOST_VARIANT_ARCH not given, try to detect from the CMAKE_SYSTEM_PROCESSOR.
-if(SWIFT_HOST_VARIANT_ARCH)
-  set(SWIFT_HOST_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
-else()
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-    set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
-    if(SWIFT_HOST_VARIANT_SDK_default STREQUAL OSX)
-      set(SWIFT_HOST_VARIANT_ARCH_default "arm64")
-    else()
-      set(SWIFT_HOST_VARIANT_ARCH_default "aarch64")
-    endif()
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
-    set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
-    set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64le")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "s390x")
-    set(SWIFT_HOST_VARIANT_ARCH_default "s390x")
-  # FIXME: Only matches v6l/v7l - by far the most common variants
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
-    set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "armv7l|armv7-a")
-    set(SWIFT_HOST_VARIANT_ARCH_default "armv7")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "IA64")
-    set(SWIFT_HOST_VARIANT_ARCH_default "itanium")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "(x86|i686)")
-    set(SWIFT_HOST_VARIANT_ARCH_default "i686")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "wasm32")
-    set(SWIFT_HOST_VARIANT_ARCH_default "wasm32")
-  else()
-    message(FATAL_ERROR "Unrecognized architecture on host system: ${CMAKE_SYSTEM_PROCESSOR}")
-  endif()
-endif()
-
-set(SWIFT_HOST_VARIANT_SDK "${SWIFT_HOST_VARIANT_SDK_default}" CACHE STRING
-    "Deployment sdk for Swift host tools (the compiler).")
-set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
-    "Deployment arch for Swift host tools (the compiler).")
 
 # Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
 # our own defaults. This should only be possible in a unified (not stand alone)
@@ -779,6 +814,32 @@ swift_common_cxx_warnings()
 # Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
   set(SWIFT_COMPILER_IS_MSVC_LIKE TRUE)
+endif()
+
+#
+# Display a message if the threading package has been overridden
+#
+
+if(SWIFT_THREADING_PACKAGE)
+  message(STATUS "")
+  message(STATUS "Threading package override enabled")
+  foreach(elt ${SWIFT_THREADING_PACKAGE})
+    string(REPLACE ":" ";" elt_list "${elt}")
+    list(LENGTH elt_list elt_list_len)
+    if(elt_list_len EQUAL 1)
+      set(elt_sdk "Global")
+      list(GET elt_list 0 elt_package)
+    elseif(elt_list_len EQUAL 2)
+      list(GET elt_list 0 elt_sdk)
+      list(GET elt_list 1 elt_package)
+      string(TOUPPER "${elt_sdk}" elt_sdk)
+    else()
+      message(FATAL_ERROR "Bad threading override \"${elt}\" - SWIFT_THREADING_PACKAGE must be a semicolon separated list of package or sdk:package pairs.")
+    endif()
+    string(TOLOWER "${elt_package}" elt_package)
+    message(STATUS "  ${elt_sdk}: ${elt_package}")
+  endforeach()
+  message(STATUS "")
 endif()
 
 #
@@ -998,7 +1059,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-  message(STATUS "  libswift:       ${LIBSWIFT_BUILD_MODE}")
+  message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
@@ -1016,9 +1077,10 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "")
 
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
-  message(STATUS "Concurrency Support: ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
-  message(STATUS "Distributed Support: ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
-  message(STATUS "String Processing Support: ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
+  message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
+  message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
+  message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
+  message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1092,6 +1154,9 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
+  # Some of the things below depend on the threading library
+  add_subdirectory(stdlib/public/Threading)
+
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)
   endif()
@@ -1117,12 +1182,10 @@ add_subdirectory(include)
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(lib)
 
-  # "libswift" must come before "tools".
-  # It adds libswift module names to the global property "libswift_modules"
+  # SwiftCompilerSources must come before "tools".
+  # It adds swift module names to the global property "swift_compiler_modules"
   # which is used in add_swift_host_tool for the lldb workaround.
-  #
-  # NOTE: We do not currently support libswift with the Xcode generator.
-  add_subdirectory(libswift)
+  add_subdirectory(SwiftCompilerSources)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.

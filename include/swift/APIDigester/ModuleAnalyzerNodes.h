@@ -1,4 +1,4 @@
-//===--- ModuleAnaluzerNodes.h - Nodes for API differ tool ---------------====//
+//===--- ModuleAnalyzerNodes.h - Nodes for API differ tool ---------------====//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -63,8 +63,10 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 6; // Add initkind for constructors
+const uint8_t DIGESTER_JSON_VERSION = 8; // add isFromExtension
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
+const StringRef ABIRootKey = "ABIRoot";
+const StringRef ConstValuesKey = "ConstValues";
 
 class SDKNode;
 typedef SDKNode* NodePtr;
@@ -140,7 +142,7 @@ public:
 };
 
 // Describing some attributes with ABI/API impact. The addition or removal of these
-// attributes is considerred breakage.
+// attributes is considered breakage.
 struct BreakingAttributeInfo {
   const DeclAttrKind Kind;
   const StringRef Content;
@@ -155,10 +157,12 @@ struct CheckerOptions {
   bool PrintModule;
   bool SwiftOnly;
   bool SkipOSCheck;
+  bool SkipRemoveDeprecatedCheck;
   bool CompilerStyle;
   bool Migrator;
   StringRef LocationFilter;
   std::vector<std::string> ToolArgs;
+  llvm::StringSet<> SPIGroupNamesToIgnore;
 };
 
 class SDKContext {
@@ -344,6 +348,7 @@ class SDKNodeDecl: public SDKNode {
   StringRef Location;
   StringRef ModuleName;
   std::vector<DeclAttrKind> DeclAttributes;
+  std::vector<StringRef> SPIGroups;
   bool IsImplicit;
   bool IsStatic;
   bool IsDeprecated;
@@ -352,10 +357,11 @@ class SDKNodeDecl: public SDKNode {
   bool IsOpen;
   bool IsInternal;
   bool IsABIPlaceholder;
+  bool IsFromExtension;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   // In ABI mode, this field is populated as a user-friendly version of GenericSig.
-  // Dignostic preferes the sugared versions if they differ as well.
+  // Diagnostic preferes the sugared versions if they differ as well.
   StringRef SugaredGenericSig;
   Optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
@@ -370,6 +376,7 @@ public:
   StringRef getModuleName() const {return ModuleName;}
   StringRef getHeaderName() const;
   ArrayRef<DeclAttrKind> getDeclAttributes() const;
+  ArrayRef<StringRef> getSPIGroups() const { return SPIGroups; }
   bool hasAttributeChange(const SDKNodeDecl &Another) const;
   swift::ReferenceOwnership getReferenceOwnership() const {
     return swift::ReferenceOwnership(ReferenceOwnership);
@@ -390,6 +397,7 @@ public:
   bool isOpen() const { return IsOpen; }
   bool isInternal() const { return IsInternal; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
+  bool isFromExtension() const { return IsFromExtension; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getSugaredGenericSignature() const { return SugaredGenericSig; }
   StringRef getScreenInfo() const;
@@ -410,6 +418,12 @@ public:
     if (Ctx.getOpts().SwiftOnly) {
       if (isObjc())
         return;
+    }
+    // Don't emit SPIs if the group name is out-out.
+    for (auto spi: getSPIGroups()) {
+      if (Ctx.getOpts().SPIGroupNamesToIgnore.contains(spi)) {
+        return;
+      }
     }
     Ctx.getDiags(Loc).diagnose(Loc, ID, getScreenInfo(), std::move(Args)...);
   }
@@ -569,7 +583,7 @@ public:
 
   Optional<SDKNodeDeclType*> getSuperclass() const;
 
-  /// Finding the node through all children, including the inheritted ones,
+  /// Finding the node through all children, including the inherited ones,
   /// whose printed name matches with the given name.
   Optional<SDKNodeDecl*> lookupChildByPrintedName(StringRef Name) const;
   SDKNodeType *getRawValueType() const;
@@ -708,6 +722,7 @@ public:
   void jsonize(json::Output &Out) override;
 };
 
+// Note: Accessor doesn't have Parent pointer.
 class SDKNodeDeclAccessor: public SDKNodeDeclAbstractFunc {
   SDKNodeDecl *Owner;
   AccessorKind AccKind;
@@ -736,6 +751,8 @@ struct TypeInitInfo {
   StringRef ValueOwnership;
 };
 
+struct PayLoad;
+
 class SwiftDeclCollector: public VisibleDeclConsumer {
   SDKContext &Ctx;
   SDKNode *RootNode;
@@ -756,7 +773,7 @@ public:
 
   // Serialize the content of all roots to a given file using JSON format.
   void serialize(StringRef Filename);
-  static void serialize(StringRef Filename, SDKNode *Root);
+  static void serialize(StringRef Filename, SDKNode *Root, PayLoad otherInfo);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -793,25 +810,26 @@ public:
 
 void detectRename(SDKNode *L, SDKNode *R);
 
-int dumpSwiftModules(const CompilerInvocation &InitInvok,
+int dumpSwiftModules(const CompilerInvocation &InitInvoke,
                      const llvm::StringSet<> &ModuleNames,
                      StringRef OutputDir,
                      const std::vector<std::string> PrintApis,
                      CheckerOptions Opts);
 
 SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
-                            const CompilerInvocation &InitInvok,
+                            const CompilerInvocation &InitInvoke,
                             const llvm::StringSet<> &ModuleNames);
 
 SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
 
+void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, StringRef OutputFile);
 void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
-int dumpSDKContent(const CompilerInvocation &InitInvok,
+int dumpSDKContent(const CompilerInvocation &InitInvoke,
                    const llvm::StringSet<> &ModuleNames,
                    StringRef OutputFile, CheckerOptions Opts);
 
-void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI);
+void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI, bool Empty);
 
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,
@@ -823,8 +841,19 @@ int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
 
 void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
   NodeVector &LeftMinusRight, NodeVector &RightMinusLeft);
+
+bool hasValidParentPtr(SDKNodeKind kind);
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace
+
+namespace swift {
+namespace json {
+template <> struct ObjectTraits<ide::api::SDKNodeRoot> {
+  static void mapping(Output &out, ide::api::SDKNodeRoot &contents) {
+    contents.jsonize(out);
+  }
+};
+}}
 
 #endif

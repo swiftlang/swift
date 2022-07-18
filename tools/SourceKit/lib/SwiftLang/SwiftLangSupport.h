@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/CancellableResult.h"
+#include "swift/IDE/CompileInstance.h"
 #include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/Indenting.h"
 #include "swift/IDE/Refactoring.h"
@@ -57,7 +58,7 @@ namespace ide {
   class CompletionInstance;
   class OnDiskCodeCompletionCache;
   class SourceEditConsumer;
-  enum class CodeCompletionDeclKind;
+  enum class CodeCompletionDeclKind : uint8_t;
   enum class SyntaxNodeKind : uint8_t;
   enum class SyntaxStructureKind : uint8_t;
   enum class SyntaxStructureElementKind : uint8_t;
@@ -296,6 +297,51 @@ public:
                         const swift::DiagnosticInfo &Info) override;
 };
 
+namespace compile {
+class Session {
+  swift::ide::CompileInstance Compiler;
+
+public:
+  Session(const std::string &RuntimeResourcePath,
+          const std::string &DiagnosticDocumentationPath)
+  : Compiler(RuntimeResourcePath, DiagnosticDocumentationPath) {}
+
+  bool
+  performCompile(llvm::ArrayRef<const char *> Args,
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+                 swift::DiagnosticConsumer *DiagC,
+                 std::shared_ptr<std::atomic<bool>> CancellationFlag) {
+    return Compiler.performCompile(Args, FileSystem, DiagC, CancellationFlag);
+  }
+};
+
+class SessionManager {
+  const std::string &RuntimeResourcePath;
+  const std::string &DiagnosticDocumentationPath;
+
+  llvm::StringMap<std::shared_ptr<Session>> sessions;
+  WorkQueue compileQueue{WorkQueue::Dequeuing::Concurrent,
+                         "sourcekit.swift.Compile"};
+  mutable llvm::sys::Mutex mtx;
+
+public:
+  SessionManager(std::string &RuntimeResourcePath,
+                 std::string &DiagnosticDocumentationPath)
+      : RuntimeResourcePath(RuntimeResourcePath),
+        DiagnosticDocumentationPath(DiagnosticDocumentationPath) {}
+
+  std::shared_ptr<Session> getSession(StringRef name);
+
+  void clearSession(StringRef name);
+
+  void performCompileAsync(
+      StringRef Name, ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
+      std::function<void(const RequestResult<CompilationResult> &)> Receiver);
+};
+} // namespace compile
+
 struct SwiftStatistics {
 #define SWIFT_STATISTIC(VAR, UID, DESC)                                        \
   Statistic VAR{UIdent{"source.statistic." #UID}, DESC};
@@ -304,6 +350,9 @@ struct SwiftStatistics {
 
 class SwiftLangSupport : public LangSupport {
   std::shared_ptr<NotificationCenter> NotificationCtr;
+  /// The path of the swift-frontend executable.
+  /// Used to find clang relative to it.
+  std::string SwiftExecutablePath;
   std::string RuntimeResourcePath;
   std::string DiagnosticDocumentationPath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
@@ -317,6 +366,7 @@ class SwiftLangSupport : public LangSupport {
   std::shared_ptr<SwiftStatistics> Stats;
   llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
   std::shared_ptr<swift::ide::CompletionInstance> CompletionInst;
+  compile::SessionManager CompileManager;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
@@ -681,6 +731,15 @@ public:
                                SourceKitCancellationToken CancellationToken,
                                ConformingMethodListConsumer &Consumer,
                                Optional<VFSOptions> vfsOptions) override;
+
+  void
+  performCompile(StringRef Name, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> vfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<CompilationResult> &)>
+                     Receiver) override;
+
+  void closeCompile(StringRef Name) override;
 
   void getStatistics(StatisticsReceiver) override;
 

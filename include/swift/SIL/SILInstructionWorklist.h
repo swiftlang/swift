@@ -67,19 +67,12 @@ template <typename VectorT = std::vector<SILInstruction *>,
 class SILInstructionWorklist : SILInstructionWorklistBase {
   BlotSetVector<SILInstruction *, VectorT, MapT> worklist;
 
-  /// For invoking Swift instruction passes in libswift.
-  LibswiftPassInvocation *libswiftPassInvocation = nullptr;
-
   void operator=(const SILInstructionWorklist &rhs) = delete;
   SILInstructionWorklist(const SILInstructionWorklist &worklist) = delete;
 
 public:
   SILInstructionWorklist(const char *loggingName = "InstructionWorklist")
       : SILInstructionWorklistBase(loggingName) {}
-
-  void setLibswiftPassInvocation(LibswiftPassInvocation *invocation) {
-    libswiftPassInvocation = invocation;
-  }
 
   /// Returns true if the worklist is empty.
   bool isEmpty() const { return worklist.empty(); }

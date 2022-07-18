@@ -24,7 +24,7 @@ namespace file_types {
   enum ID : uint8_t;
 }
 
-/// Spceifies how to load modules when both a module interface and serialized
+/// Specifies how to load modules when both a module interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.
 enum class ModuleLoadingMode {
   PreferInterface,
@@ -36,7 +36,7 @@ enum class ModuleLoadingMode {
 /// Helper type used to pass and compute the sets of related filenames used by
 /// \c SerializedModuleLoader subclasses.
 struct SerializedModuleBaseName {
-  /// The base filename, wtihout any extension.
+  /// The base filename, without any extension.
   SmallString<256> baseName;
 
   /// Creates a \c SerializedModuleBaseName.
@@ -168,7 +168,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(ImportPath::Element named,
+  virtual bool canImportModule(ImportPath::Module named,
                                llvm::VersionTuple version,
                                bool underlyingVersion) override;
 
@@ -190,7 +190,7 @@ public:
                               unsigned previousGeneration) override;
 
   virtual void loadObjCMethods(
-                 ClassDecl *classDecl,
+                 NominalTypeDecl *typeDecl,
                  ObjCSelector selector,
                  bool isInstanceMethod,
                  unsigned previousGeneration,
@@ -287,7 +287,7 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
-  bool canImportModule(ImportPath::Element named, llvm::VersionTuple version,
+  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
                        bool underlyingVersion) override;
   ModuleDecl *
   loadModule(SourceLoc importLoc,
@@ -433,7 +433,7 @@ public:
   virtual void
   getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &results) const override;
 
-  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const override;
 
   virtual void
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,

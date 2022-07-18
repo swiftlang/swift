@@ -740,7 +740,7 @@ private:
   /// Extensions redeclare all generic parameters of their extended type to add
   /// their additional restrictions. There are two issues with this model for
   /// indexing:
-  ///  - The generic paramter declarations of the extension are implicit so we
+  ///  - The generic parameter declarations of the extension are implicit so we
   ///    wouldn't report them in the index. Any usage of the generic param in
   ///    the extension references this implicit declaration so we don't include
   ///    it in the index either.
@@ -749,7 +749,7 @@ private:
   ///    declaration of the param in the extended type.
   ///
   /// To fix these issues, we replace the reference to the implicit generic
-  /// parameter defined in the extension by a reference to the generic paramter
+  /// parameter defined in the extension by a reference to the generic parameter
   /// defined in the extended type.
   ///
   /// \returns the canonicalized replaced generic param decl if it can be found
@@ -759,7 +759,7 @@ private:
     auto Extension = dyn_cast_or_null<ExtensionDecl>(
         GenParam->getDeclContext()->getAsDecl());
     if (!Extension) {
-      // We are not referencing a generic paramter defined in an extension.
+      // We are not referencing a generic parameter defined in an extension.
       // Nothing to do.
       return GenParam;
     }
@@ -767,7 +767,7 @@ private:
            "Generic param decls in extension should always be implicit and "
            "shadow a generic param in the extended type.");
     assert(Extension->getExtendedNominal() &&
-           "The implict generic types on the extension should only be created "
+           "The implicit generic types on the extension should only be created "
            "if the extended type was found");
 
     auto ExtendedTypeGenSig =
@@ -922,6 +922,7 @@ private:
   }
   bool reportPseudoAccessor(AbstractStorageDecl *D, AccessorKind AccKind,
                             bool IsRef, SourceLoc Loc);
+  bool reportIsDynamicRef(ValueDecl *D, IndexSymbol &Info);
 
   bool finishCurrentEntity() {
     Entity CurrEnt = EntitiesStack.pop_back_val();
@@ -1157,7 +1158,7 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
 
     // Ignore self-conformances; they're not interesting to show to users.
     auto normal = dyn_cast<NormalProtocolConformance>(conf->getRootConformance());
-    if (!normal)
+    if (!normal || !shouldIndex(normal->getProtocol(), /*IsRef=*/true))
       continue;
 
     normal->forEachValueWitness([&](ValueDecl *req, Witness witness) {
@@ -1241,8 +1242,8 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
       return false;
   }
 
-  for (auto Overriden: collectAllOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
-    addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overriden);
+  for (auto Overridden: collectAllOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
+    addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overridden);
   }
 
   if (auto Parent = getParentDecl()) {
@@ -1336,24 +1337,6 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
   return true;
 }
 
-static bool isDynamicVarAccessorOrFunc(ValueDecl *D, SymbolInfo symInfo) {
-  if (auto NTD = D->getDeclContext()->getSelfNominalTypeDecl()) {
-    bool isClassOrProtocol = isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD);
-    bool isInternalAccessor =
-      symInfo.SubKind == SymbolSubKind::SwiftAccessorWillSet ||
-      symInfo.SubKind == SymbolSubKind::SwiftAccessorDidSet ||
-      symInfo.SubKind == SymbolSubKind::SwiftAccessorAddressor ||
-      symInfo.SubKind == SymbolSubKind::SwiftAccessorMutableAddressor;
-    if (isClassOrProtocol &&
-        symInfo.Kind != SymbolKind::StaticMethod &&
-        !isInternalAccessor &&
-        !D->isFinal()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
                                                AccessorKind AccKind, bool IsRef,
                                                SourceLoc Loc) {
@@ -1377,7 +1360,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     Info.symInfo.SubKind = getSubKindForAccessor(AccKind);
     Info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
     Info.group = "";
-    if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+    if (ide::isDeclOverridable(D)) {
       Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
     }
     return false;
@@ -1532,7 +1515,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   if (!shouldIndex(D, /*IsRef=*/true))
     return true; // keep walking
 
-  if (isa<AbstractFunctionDecl>(D)) {
+  if (isa<AbstractFunctionDecl>(D) || isa<EnumElementDecl>(D)) {
     if (initFuncRefIndexSymbol(D, Loc, Info))
       return true;
   } else if (isa<AbstractStorageDecl>(D)) {
@@ -1567,6 +1550,27 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   }
 
   return finishCurrentEntity();
+}
+
+bool IndexSwiftASTWalker::reportIsDynamicRef(ValueDecl *D, IndexSymbol &Info) {
+  Expr *BaseE = ide::getBase(ExprStack);
+  if (!BaseE)
+    return false;
+
+  if (!ide::isDynamicRef(BaseE, D))
+    return false;
+
+  Info.roles |= (unsigned)SymbolRole::Dynamic;
+
+  SmallVector<NominalTypeDecl *, 1> Types;
+  ide::getReceiverType(BaseE, Types);
+  for (auto *ReceiverTy : Types) {
+    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy,
+                    ReceiverTy))
+      return true;
+  }
+
+  return false;
 }
 
 bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDecl *requirement,
@@ -1658,7 +1662,7 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   if (initIndexSymbol(D, D->getLoc(/*SerializedOK*/false), /*IsRef=*/false, Info))
     return true;
 
-  if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+  if (ide::isDeclOverridable(D)) {
     Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
   }
 
@@ -1702,20 +1706,9 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
       return true;
   }
 
-  Expr *BaseE = ide::getBase(ExprStack);
-  if (!BaseE)
-    return false;
+  if (reportIsDynamicRef(D, Info))
+    return true;
 
-  if (ide::isDynamicCall(BaseE, D))
-    Info.roles |= (unsigned)SymbolRole::Dynamic;
-
-  SmallVector<NominalTypeDecl *, 1> Types;
-  ide::getReceiverType(BaseE, Types);
-  for (auto *ReceiverTy : Types) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy,
-                    ReceiverTy))
-      return true;
-  }
   return false;
 }
 
@@ -1739,6 +1732,9 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D,
   case swift::AccessKind::Write:
     Info.roles |= (unsigned)SymbolRole::Write;
   }
+
+  if (reportIsDynamicRef(D, Info))
+    return true;
 
   return false;
 }

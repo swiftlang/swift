@@ -9,7 +9,7 @@ public enum MyState : String {
 
 // CHECK-LABEL: sil [ossa] @$s4main11check_stateySiAA7MyStateOF : $@convention(thin) (MyState) -> Int {
 public func check_state(_ state : MyState) -> Int {
-  // FRAGILE: function_ref @$s4main7MyStateO21__derived_enum_equalsySbAC_ACtFZ
+  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   return state == .opened ? 1 : 0
 }
@@ -22,7 +22,7 @@ public enum GenericMyState<T> : String {
 
 // CHECK-LABEL: sil [ossa] @$s4main19check_generic_stateySiAA14GenericMyStateOySiGF : $@convention(thin) (GenericMyState<Int>) -> Int {
 public func check_generic_state(_ state : GenericMyState<Int>) -> Int {
-  // FRAGILE: function_ref @$s4main14GenericMyStateO21__derived_enum_equalsySbACyxG_AEtFZ
+  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   return state == .opened ? 1 : 0
 }
@@ -35,7 +35,7 @@ public enum Regular {
 
 // CHECK-LABEL: sil [ossa] @$s4main13check_regularySiAA7RegularOF : $@convention(thin) (Regular) -> Int {
 public func check_regular(_ state : Regular) -> Int {
-  // FRAGILE: function_ref @$s4main7RegularO21__derived_enum_equalsySbAC_ACtFZ
+  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   return state == .closed ? 1 : 0
 }
@@ -47,14 +47,14 @@ public enum Alphabet : String {
 
 // CHECK-LABEL: sil [ossa] @$s4main14check_alphabetySiAA8AlphabetOF : $@convention(thin) (Alphabet) -> Int {
 public func check_alphabet(_ state : Alphabet) -> Int {
-  // FRAGILE: function_ref @$s4main8AlphabetO21__derived_enum_equalsySbAC_ACtFZ
+  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   return state == .E ? 1 : 0
 }
 
 // CHECK-LABEL: sil [ossa] @$s4main9compareItySbAA8AlphabetO_ADtF : $@convention(thin) (Alphabet, Alphabet) -> Bool {
 public func compareIt(_ state : Alphabet, _ rhs: Alphabet) -> Bool {
-  // FRAGILE: function_ref @$s4main8AlphabetO21__derived_enum_equalsySbAC_ACtFZ
+  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   return state == rhs
 }
@@ -66,14 +66,14 @@ public enum AlphabetInt : Int {
 
 // CHECK-LABEL: sil [ossa] @$s4main18check_alphabet_intySiAA11AlphabetIntOF : $@convention(thin) (AlphabetInt) -> Int {
 public func check_alphabet_int(_ state : AlphabetInt) -> Int {
-  // FRAGILE: function_ref @$s4main11AlphabetIntO21__derived_enum_equalsySbAC_ACtFZ
+  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   return state == .E ? 1 : 0
 }
 
 // CHECK-LABEL: sil [ossa] @$s4main9compareItySbAA11AlphabetIntO_ADtF : $@convention(thin) (AlphabetInt, AlphabetInt) -> Bool {
 public func compareIt(_ state : AlphabetInt, _ rhs: AlphabetInt) -> Bool {
-  // FRAGILE: function_ref @$s4main11AlphabetIntO21__derived_enum_equalsySbAC_ACtFZ
+  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   return state == rhs
 }

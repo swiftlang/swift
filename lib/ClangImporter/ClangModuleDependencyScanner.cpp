@@ -87,12 +87,12 @@ llvm::ErrorOr<StringRef> ClangModuleDependenciesCacheImpl::getImportHackFile(Str
 static void addSearchPathInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
-  for (const auto &framepath : searchPathOpts.FrameworkSearchPaths) {
+  for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
     invocationArgStrs.push_back(framepath.IsSystem ? "-iframework" : "-F");
     invocationArgStrs.push_back(framepath.Path);
   }
 
-  for (auto path : searchPathOpts.ImportSearchPaths) {
+  for (const auto &path : searchPathOpts.getImportSearchPaths()) {
     invocationArgStrs.push_back("-I");
     invocationArgStrs.push_back(path);
   }
@@ -276,10 +276,12 @@ void ClangImporter::recordModuleDependencies(
     // the clang invocation to build PCMs because transitive headers can only
     // be found via search paths. Passing these headers as explicit inputs can
     // be quite challenging.
-    for (auto &path: Impl.SwiftContext.SearchPathOpts.ImportSearchPaths) {
+    for (const auto &path :
+         Impl.SwiftContext.SearchPathOpts.getImportSearchPaths()) {
       addClangArg("-I" + path);
     }
-    for (auto &path: Impl.SwiftContext.SearchPathOpts.FrameworkSearchPaths) {
+    for (const auto &path :
+         Impl.SwiftContext.SearchPathOpts.getFrameworkSearchPaths()) {
       addClangArg((path.IsSystem ? "-Fsystem": "-F") + path.Path);
     }
 

@@ -43,11 +43,11 @@ use(c as! CP.Type)
 use(c as! CP.Protocol) // expected-warning{{always fails}}
 use(c as! Int.Type) // expected-warning{{always fails}}
 
-use(C.self as AnyObject.Protocol) // expected-error{{cannot convert value of type 'C.Type' to type 'AnyObject.Protocol' in coercion}}
+use(C.self as AnyObject.Protocol) // expected-error{{cannot convert value of type 'C.Type' to type '(any AnyObject).Type' in coercion}}
 use(C.self as AnyObject.Type)
-use(C.self as P.Type) // expected-error{{cannot convert value of type 'C.Type' to type 'P.Type' in coercion}} 
+use(C.self as P.Type) // expected-error{{cannot convert value of type 'C.Type' to type 'any P.Type' in coercion}}
 
-use(E.self as P.Protocol) // expected-error{{cannot convert value of type 'E.Type' to type 'P.Protocol' in coercion}}
+use(E.self as P.Protocol) // expected-error{{cannot convert value of type 'E.Type' to type '(any P).Type' in coercion}}
 use(E.self as P.Type)
 
 // SR-12946

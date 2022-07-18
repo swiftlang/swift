@@ -586,10 +586,23 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     auto emitBasicError = [&] {
-      Context.Diags
-          .diagnose(Loc, diag::cannot_find_in_scope, Name,
-                    Name.isOperator())
-          .highlight(UDRE->getSourceRange());
+      
+      if (Name.isSimpleName(Context.Id_self)) {
+        // `self` gets diagnosed with a different error when it can't be found.
+        Context.Diags
+            .diagnose(Loc, diag::cannot_find_self_in_scope)
+            .highlight(UDRE->getSourceRange());
+      } else {
+        Context.Diags
+            .diagnose(Loc, diag::cannot_find_in_scope, Name,
+                      Name.isOperator())
+            .highlight(UDRE->getSourceRange());
+      }
+
+      if (!Context.LangOpts.DisableExperimentalClangImporterDiagnostics) {
+        Context.getClangModuleLoader()->diagnoseTopLevelValue(
+            Name.getFullName());
+      }
     };
 
     if (!isConfused) {
@@ -663,7 +676,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (UDRE->isImplicit()) {
       return TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), D, LookupDC,
-          LookupDC->mapTypeIntoContext(D->getInterfaceType()));
+          // It might happen that LookupDC is null if this is checking
+          // synthesized code, in that case, don't map the type into context,
+          // but return as is -- the synthesis should ensure the type is correct.
+          LookupDC ? LookupDC->mapTypeIntoContext(D->getInterfaceType())
+                   : D->getInterfaceType());
     } else {
       return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
     }
@@ -965,6 +982,9 @@ namespace {
 
     /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
     /// the type conforms to the expected literal protocol.
+    ///
+    /// \returns Either a transformed expression, or `ErrorExpr` upon type
+    /// resolution failure, or `nullptr` if transformation is not applicable.
     Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
     /// Whether the current expression \p E is in a context that might turn out
@@ -1162,7 +1182,7 @@ namespace {
       // attempt to type-check whole expression `s.bar()` - is going
       // to have a base which points directly to declaration of `S`.
       // But when diagnostics attempts to type-check `s.bar()` standalone
-      // its base would be tranformed into `InOutExpr -> DeclRefExr`,
+      // its base would be transformed into `InOutExpr -> DeclRefExr`,
       // and `InOutType` is going to be recorded in constraint system.
       // One possible way to fix this (if diagnostics still use typecheck)
       // might be to make it so self is not wrapped into `InOutExpr`
@@ -1435,8 +1455,9 @@ namespace {
         return KPE;
       }
 
-      if (auto *simplified = simplifyTypeConstructionWithLiteralArg(expr))
-        return simplified;
+      if (auto *result = simplifyTypeConstructionWithLiteralArg(expr)) {
+        return isa<ErrorExpr>(result) ? nullptr : result;
+      }
 
       // If we find an unresolved member chain, wrap it in an
       // UnresolvedMemberChainResultExpr (unless this has already been done).
@@ -1456,12 +1477,10 @@ namespace {
     bool walkToDeclPre(Decl *D) override { return isa<PatternBindingDecl>(D); }
 
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
-      // With multi-statement closure inference enabled, constraint generation
-      // is responsible for pattern verification and type-checking in the body
-      // of the closure, so there is no need to walk into patterns.
-      bool walkIntoPatterns =
-          !(isa<ClosureExpr>(DC) &&
-            Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference);
+      // Constraint generation is responsible for pattern verification and
+      // type-checking in the body of the closure, so there is no need to
+      // walk into patterns.
+      bool walkIntoPatterns = !isa<ClosureExpr>(DC);
       return {walkIntoPatterns, pattern};
     }
   };
@@ -1473,9 +1492,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // If we won't be checking the body of the closure, don't walk into it here.
   if (!closure->hasSingleExpressionBody()) {
     if (LeaveClosureBodiesUnchecked)
-      return false;
-
-    if (!Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
       return false;
   }
 
@@ -2090,12 +2106,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (auto precheckedTy = typeExpr->getInstanceType()) {
     castTy = precheckedTy;
   } else {
-    const auto options =
-        TypeResolutionOptions(TypeResolverContext::InExpression) |
-        TypeResolutionFlags::SilenceErrors;
-
     const auto result = TypeResolution::resolveContextualType(
-        typeExpr->getTypeRepr(), DC, options,
+        typeExpr->getTypeRepr(), DC, TypeResolverContext::InExpression,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -2106,7 +2118,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         PlaceholderType::get);
 
     if (result->hasError())
-      return nullptr;
+      return new (getASTContext())
+          ErrorExpr(typeExpr->getSourceRange(), result, typeExpr);
+
     castTy = result;
   }
 
@@ -2125,6 +2139,48 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())
              : nullptr;
+}
+
+bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
+                                      bool replaceInvalidRefsWithErrors,
+                                      bool leaveClosureBodiesUnchecked) {
+  auto *DC = target.getDeclContext();
+
+  bool hadErrors = false;
+
+  if (auto *expr = target.getAsExpr()) {
+    hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors,
+                                    leaveClosureBodiesUnchecked);
+    // Even if the pre-check fails, expression still has to be re-set.
+    target.setExpr(expr);
+  }
+
+  if (target.isForEachStmt()) {
+    auto *stmt = target.getAsForEachStmt();
+
+    auto *sequenceExpr = stmt->getParsedSequence();
+    auto *whereExpr = stmt->getWhere();
+
+    hadErrors |= preCheckExpression(sequenceExpr, DC,
+                                    /*replaceInvalidRefsWithErrors=*/true,
+                                    /*leaveClosureBodiesUnchecked=*/false);
+
+    if (whereExpr) {
+      hadErrors |= preCheckExpression(whereExpr, DC,
+                                      /*replaceInvalidRefsWithErrors=*/true,
+                                      /*leaveClosureBodiesUnchecked=*/false);
+    }
+
+    // Update sequence and where expressions to pre-checked versions.
+    if (!hadErrors) {
+      stmt->setParsedSequence(sequenceExpr);
+
+      if (whereExpr)
+        stmt->setWhere(whereExpr);
+    }
+  }
+
+  return hadErrors;
 }
 
 /// Pre-check the expression, validating any types that occur in the

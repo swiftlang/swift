@@ -604,7 +604,7 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
   magic = *(uint32_t *)buffer;
   if (magic == FAT_MAGIC || magic == FAT_CIGAM) {
     struct fat_header *fh;
-    uint32_t fat_magic, fat_nfat_arch;
+    uint32_t fat_nfat_arch;
     struct fat_arch *archs;
     uint32_t i;
 
@@ -613,7 +613,6 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
     }
 
     fh = (struct fat_header *)buffer;
-    fat_magic = OSSwapBigToHostInt32(fh->magic);
     fat_nfat_arch = OSSwapBigToHostInt32(fh->nfat_arch);
 
     size_t fat_arch_size;
@@ -645,14 +644,10 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
 
     for (i = 0; i < fat_nfat_arch; i++) {
       int ret;
-      uint32_t arch_cputype, arch_cpusubtype, arch_offset, arch_size,
-          arch_align;
+      uint32_t arch_offset, arch_size;
 
-      arch_cputype = OSSwapBigToHostInt32(archs[i].cputype);
-      arch_cpusubtype = OSSwapBigToHostInt32(archs[i].cpusubtype);
       arch_offset = OSSwapBigToHostInt32(archs[i].offset);
       arch_size = OSSwapBigToHostInt32(archs[i].size);
-      arch_align = OSSwapBigToHostInt32(archs[i].align);
 
       /* Check that slice data is after all fat headers and archs */
       if (arch_offset < fat_arch_size) {
@@ -726,6 +721,11 @@ std::string filename(std::string path) {
   char filename[MAXPATHLEN];
 
   return basename_r(pathCstr, filename) ? filename : pathCstr;
+}
+
+bool directory_exists(const std::string &path) {
+  struct stat st;
+  return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
 }
 
 // This executable's own path.
@@ -953,7 +953,21 @@ std::vector<uint8_t> query_code_signature(std::string file) {
 }
 
 template <typename F>
-void enumerateDirectory(std::string directory, F &&func) {
+void listDirectoryContents(std::string directory, F &&func) {
+  DIR *dir = opendir(directory.c_str());
+  if (dir == NULL) {
+    return;
+  }
+
+  struct dirent *entry;
+  while ((entry = readdir(dir))) {
+    func(directory + "/" + entry->d_name);
+  }
+  closedir(dir);
+}
+
+template <typename F>
+void recursivelyListFiles(std::string directory, F &&func) {
   DIR *dir = opendir(directory.c_str());
   if (dir == NULL) {
     return;
@@ -975,7 +989,7 @@ void enumerateDirectory(std::string directory, F &&func) {
   }
   closedir(dir);
   for (const auto &path : subpaths) {
-    enumerateDirectory(path, func);
+    recursivelyListFiles(path, func);
   }
 }
 
@@ -1021,56 +1035,41 @@ int main(int argc, const char *argv[]) {
   bool copy = false;
   bool stripBitcode = false;
   for (int i = 1; i < argc; i++) {
-    if (0 == strcmp(argv[i], "--print"))
+    if (0 == strcmp(argv[i], "--print")) {
       print = true;
-    if (0 == strcmp(argv[i], "--copy"))
+    } else if (0 == strcmp(argv[i], "--copy")) {
       copy = true;
-    if (0 == strcmp(argv[i], "--verbose"))
+    } else if (0 == strcmp(argv[i], "--verbose")) {
       Verbose++;
-    if (0 == strcmp(argv[i], "--help")) {
+    } else if (0 == strcmp(argv[i], "--help")) {
       printUsage();
       exit(0);
-    }
-
-    if (0 == strcmp(argv[i], "--scan-executable")) {
+    } else if (0 == strcmp(argv[i], "--scan-executable")) {
       executables.emplace_back(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--scan-folder")) {
+    } else if (0 == strcmp(argv[i], "--scan-folder")) {
       embedDirs.emplace_back(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--source-libraries")) {
+    } else if (0 == strcmp(argv[i], "--source-libraries")) {
       src_dirs.emplace_back(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--platform")) {
+    } else if (0 == strcmp(argv[i], "--platform")) {
       platform = std::string(argv[++i]);
-    }
-
-    if (0 == strcmp(argv[i], "--destination")) {
+    } else if (0 == strcmp(argv[i], "--destination")) {
       dst_dir = std::string(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--unsigned-destination")) {
+    } else if (0 == strcmp(argv[i], "--unsigned-destination")) {
       unsigned_dst_dir = std::string(argv[++i]);
-    }
-
-    if (0 == strcmp(argv[i], "--sign")) {
+    } else if (0 == strcmp(argv[i], "--sign")) {
       ident = std::string(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--keychain")) {
+    } else if (0 == strcmp(argv[i], "--keychain")) {
       keychain = std::string(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--Xcodesign")) {
+    } else if (0 == strcmp(argv[i], "--Xcodesign")) {
       otherCodesignFlags.push_back(std::string(argv[++i]));
-    }
-
-    if (0 == strcmp(argv[i], "--strip-bitcode")) {
+    } else if (0 == strcmp(argv[i], "--strip-bitcode")) {
       stripBitcode = true;
-    }
-
-    if (0 == strcmp(argv[i], "--resource-destination")) {
+    } else if (0 == strcmp(argv[i], "--resource-destination")) {
       resource_dst_dir = std::string(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--resource-library")) {
+    } else if (0 == strcmp(argv[i], "--resource-library")) {
       resourceLibraries.push_back(std::string(argv[++i]));
+    } else {
+      fail("Unknown argument: %s", argv[i]);
     }
   }
 
@@ -1085,7 +1084,7 @@ int main(int argc, const char *argv[]) {
     std::string root_path =
         parentPath(parentPath(self_executable)) + "/" + "lib";
 
-    enumerateDirectory(root_path, [&](std::string entry) {
+    listDirectoryContents(root_path, [&](std::string entry) {
       if (filename(entry).compare(0, strlen("swift-"), "swift-") == 0) {
         src_dirs.push_back(entry + "/" + platform);
       }
@@ -1099,6 +1098,11 @@ int main(int argc, const char *argv[]) {
     // src_dirs is set but platform is not.
     // Pick platform from any src_dirs's name.
     platform = filename(src_dirs.front());
+  }
+
+  for (const auto &src_dir : src_dirs) {
+    if (!directory_exists(src_dir))
+      fail("Source directory does not exist: %s", src_dir.c_str());
   }
 
   // Add the platform to unsigned_dst_dir if it is not already present.
@@ -1119,7 +1123,7 @@ int main(int argc, const char *argv[]) {
 
   // Collect executables from the --scan-folder locations.
   for (const auto &embedDir : embedDirs) {
-    enumerateDirectory(embedDir, [&](std::string entry) {
+    recursivelyListFiles(embedDir, [&](std::string entry) {
       if (0 == access(entry.c_str(), X_OK)) {
         executables.push_back(entry);
       } else {

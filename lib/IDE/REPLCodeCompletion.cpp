@@ -22,7 +22,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -122,11 +121,12 @@ static void toDisplayString(CodeCompletionResult *Result,
     }
     if (C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) ||
         C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
-      if (Result->getKind() == CodeCompletionResult::ResultKind::Declaration) {
+      if (Result->getKind() == CodeCompletionResultKind::Declaration) {
         switch (Result->getAssociatedDeclKind()) {
         case CodeCompletionDeclKind::Module:
         case CodeCompletionDeclKind::PrecedenceGroup:
         case CodeCompletionDeclKind::Class:
+        case CodeCompletionDeclKind::Actor:
         case CodeCompletionDeclKind::Struct:
         case CodeCompletionDeclKind::Enum:
           continue;
@@ -178,9 +178,9 @@ public:
       : Completions(Completions) {}
 
   void handleResults(CodeCompletionContext &context) override {
-    MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
-    CodeCompletionContext::sortCompletionResults(Results);
-    for (auto Result : Results) {
+    auto SortedResults = CodeCompletionContext::sortCompletionResults(
+        context.getResultSink().Results);
+    for (auto Result : SortedResults) {
       std::string InsertableString = toInsertableString(Result);
       if (StringRef(InsertableString).startswith(Completions.Prefix)) {
         llvm::SmallString<128> PrintedResult;

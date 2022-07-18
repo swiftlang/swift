@@ -230,3 +230,30 @@ bb3:
   %3 = builtin "int_trap"() : $()
   unreachable
 }
+
+// CHECK-LABEL: sil @dont_hoist_with_availability_checks
+// CHECK-NOT: alloc_stack
+// CHECK:     cond_br
+// CHECK:   bb1:
+// CHECK:     alloc_stack
+// CHECK: } // end sil function 'dont_hoist_with_availability_checks'
+sil @dont_hoist_with_availability_checks : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  %5 = integer_literal $Builtin.Int32, 15
+  %7 = builtin "targetOSVersionAtLeast"(%5 : $Builtin.Int32, %5 : $Builtin.Int32, %5 : $Builtin.Int32) : $Builtin.Int32
+  %8 = builtin "cmp_eq_Int32"(%7 : $Builtin.Int32, %5 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb1, bb2
+bb1:
+  %2 = alloc_stack $T
+  copy_addr [take] %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  br bb3
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}
+

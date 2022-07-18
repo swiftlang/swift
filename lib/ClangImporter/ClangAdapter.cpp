@@ -396,6 +396,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::Float16:
     case clang::BuiltinType::Float128:
     case clang::BuiltinType::NullPtr:
+    case clang::BuiltinType::Ibm128:
       return OmissionTypeName();
 
     // Objective-C types that aren't mapped directly; rather, pointers to
@@ -710,7 +711,8 @@ bool importer::isObjCId(const clang::Decl *decl) {
 }
 
 bool importer::isUnavailableInSwift(
-    const clang::Decl *decl, const PlatformAvailability &platformAvailability,
+    const clang::Decl *decl,
+    const PlatformAvailability *platformAvailability,
     bool enableObjCInterop) {
   // 'id' is always unavailable in Swift.
   if (enableObjCInterop && isObjCId(decl))
@@ -723,7 +725,10 @@ bool importer::isUnavailableInSwift(
     if (attr->getPlatform()->getName() == "swift")
       return true;
 
-    if (!platformAvailability.isPlatformRelevant(
+    if (!platformAvailability)
+      continue;
+
+    if (!platformAvailability->isPlatformRelevant(
             attr->getPlatform()->getName())) {
       continue;
     }
@@ -732,7 +737,7 @@ bool importer::isUnavailableInSwift(
     llvm::VersionTuple version = attr->getDeprecated();
     if (version.empty())
       continue;
-    if (platformAvailability.treatDeprecatedAsUnavailable(
+    if (platformAvailability->treatDeprecatedAsUnavailable(
             decl, version, /*isAsync=*/false)) {
       return true;
     }

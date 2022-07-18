@@ -170,8 +170,28 @@ func tuple_splat2(_ q : (a : Int, b : Int)) {
 }
 
 // SR-1612: Type comparison of foreign types is always true.
-func is_foreign(a: AnyObject) -> Bool {
+protocol SR1612_P {}
+class SR1612: NSObject, SR1612_P {}
+// Existentials
+func is_foreign_anyobject(a: AnyObject) -> Bool {
   return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
+}
+
+func is_foreign_any(a: Any) -> Bool {
+  return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
+}
+
+func is_foreign_p(a: SR1612_P) -> Bool {
+  return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
+}
+
+// Concrete type.
+func is_foreign_concrete(a: SR1612) -> Bool {
+  return a is CGColor // False at runtime
+}
+// Concrete foundation.
+func is_foreign_s(a: NSString) -> Bool {
+  return a is CGColor // False at runtime
 }
 
 func test_implicit_cgfloat_conversion() {
@@ -187,14 +207,14 @@ func test_implicit_cgfloat_conversion() {
   test_to(d + d) // Ok (Double -> CGFloat for both arguments)
   test_to(d + cgf) // Ok
   test_to(d + cgf - d) // Ok (prefer CGFloat -> Double for `cgf`), it's a better solution than trying to convert `d`s to `CGFloat`
-  test_to(d + cgf - cgf) // Ok (only one choice here to conver `d` to CGFloat)
+  test_to(d + cgf - cgf) // Ok (only one choice here to convert `d` to CGFloat)
 
   test_from(cgf) // Ok (CGFloat -> Double)
   test_from(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'Double'}}
   test_from(cgf + cgf) // Ok (CGFloat -> Double for both arguments)
   test_from(d + cgf) // Ok
   test_from(cgf + d - cgf) // (prefer Double -> CGFloat for `d`), it's a better solution than trying to convert `cgf`s to `Double`
-  test_from(cgf + d - d) // Ok (only one choice here to conver `cgf` to Double)
+  test_from(cgf + d - d) // Ok (only one choice here to convert `cgf` to Double)
 
   func test_returns_double(_: CGFloat) -> Double {
     42.0

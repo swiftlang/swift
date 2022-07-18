@@ -1,0 +1,12 @@
+enum Foo {
+  case primary(with: Int)
+  case second
+}
+
+func test() {
+  let _ = Foo.primary(with: 1)
+  let _ = Foo.primary
+  let _ = Foo.second
+}
+
+

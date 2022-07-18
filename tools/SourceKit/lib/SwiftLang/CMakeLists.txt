@@ -1,6 +1,7 @@
 add_sourcekit_library(SourceKitSwiftLang
   CodeCompletionOrganizer.cpp
   SwiftASTManager.cpp
+  SwiftCompile.cpp
   SwiftCompletion.cpp
   SwiftConformingMethodList.cpp
   SwiftDocSupport.cpp
@@ -43,7 +44,7 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftSyntax
   swiftOption
   swiftSymbolGraphGen
-  libcmark_static
+  libcmark-gfm_static
   # Clang dependencies.
   clangIndex
   clangFormat

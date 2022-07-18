@@ -100,7 +100,7 @@ extension Task {
   /// depending on the executor's scheduling details.
   ///
   /// If the task throws an error, this property propagates that error.
-  /// Tasks that respond to cancellation by throwing `Task.CancellationError`
+  /// Tasks that respond to cancellation by throwing `CancellationError`
   /// have that error propagated here upon cancellation.
   ///
   /// - Returns: The task's result.
@@ -289,12 +289,26 @@ extension Task where Success == Never, Failure == Never {
   public static var currentPriority: TaskPriority {
     withUnsafeCurrentTask { task in
       // If we are running on behalf of a task, use that task's priority.
-      if let task = task {
-        return task.priority
+      if let unsafeTask = task {
+         return TaskPriority(rawValue: _taskCurrentPriority(unsafeTask._task))
       }
 
       // Otherwise, query the system.
       return TaskPriority(rawValue: UInt8(_getCurrentThreadPriority()))
+    }
+  }
+
+  /// The current task's base priority.
+  ///
+  /// If you access this property outside of any task, this returns nil
+  @available(SwiftStdlib 5.7, *)
+  public static var basePriority: TaskPriority? {
+    withUnsafeCurrentTask { task in
+      // If we are running on behalf of a task, use that task's priority.
+      if let unsafeTask = task {
+         return TaskPriority(rawValue: _taskBasePriority(unsafeTask._task))
+      }
+      return nil
     }
   }
 }
@@ -449,6 +463,17 @@ func taskCreateFlags(
 // ==== Task Creation ----------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model.")
+  }
+#else
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
   ///
@@ -493,10 +518,22 @@ extension Task where Failure == Never {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Error {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
   ///
@@ -542,11 +579,23 @@ extension Task where Failure == Error {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 // ==== Detached Tasks ---------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func detached(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
   ///
@@ -588,10 +637,22 @@ extension Task where Failure == Never {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Error {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func detached(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task.
   ///
@@ -636,6 +697,7 @@ extension Task where Failure == Error {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
@@ -681,9 +743,12 @@ extension Task where Success == Never, Failure == Never {
 /// Storing an unsafe reference doesn't affect the task's actual life cycle,
 /// and the behavior of accessing an unsafe task reference
 /// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
-/// Instead, use the `task` property of `UnsafeCurrentTask`
-/// to access an instance of `Task` that you can store long-term
-/// and interact with outside of the closure body.
+/// There's no safe way to retrieve a reference to the current task
+/// and save it for long-term use.
+/// To query the current task without saving a reference to it,
+/// use properties like `currentPriority`.
+/// If you need to store a reference to a task,
+/// create an unstructured task using `Task.detached(priority:operation:)` instead.
 ///
 /// - Parameters:
 ///   - body: A closure that takes an `UnsafeCurrentTask` parameter.
@@ -752,8 +817,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `TaskPriority`
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
-    getJobFlags(_task).priority ?? TaskPriority(
-        rawValue: UInt8(_getCurrentThreadPriority()))
+    TaskPriority(rawValue: _taskCurrentPriority(_task))
   }
 
   /// Cancel the current task.
@@ -800,6 +864,13 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
+@available(SwiftStdlib 5.7, *)
+@_silgen_name("swift_task_enqueueGlobalWithDeadline")
+@usableFromInline
+func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
+                                   _ toleranceSec: Int64, _ toleranceNSec: Int64,
+                                   _ clock: Int32, _ task: Builtin.Job)
+
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_asyncMainDrainQueue")
@@ -810,8 +881,19 @@ internal func _asyncMainDrainQueue() -> Never
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
 
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
-public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+@usableFromInline
+@preconcurrency
+internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
+  fatalError("Unavailable in task-to-thread concurrency model")
+}
+#else
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@preconcurrency
+internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
   Task.detached {
     do {
 #if !os(Windows)
@@ -829,6 +911,7 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
   }
   _asyncMainDrainQueue()
 }
+#endif
 
 // FIXME: both of these ought to take their arguments _owned so that
 //        we can do a move out of the future in the common case where it's
@@ -849,6 +932,12 @@ func _taskCancel(_ task: Builtin.NativeObject)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
+
+@_silgen_name("swift_task_currentPriority")
+internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8
+
+@_silgen_name("swift_task_basePriority")
+internal func _taskBasePriority(_ task: Builtin.NativeObject) -> UInt8
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_createNullaryContinuationJob")
@@ -871,6 +960,67 @@ func _reportUnexpectedExecutor(_ _filenameStart: Builtin.RawPointer,
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrentThreadPriority")
 func _getCurrentThreadPriority() -> Int
+
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.8, *)
+@usableFromInline
+@_unavailableFromAsync(message: "Use _taskRunInline from a sync context to begin an async context.")
+internal func _taskRunInline<T>(_ body: () async -> T) -> T {
+#if compiler(>=5.5) && $BuiltinTaskRunInline
+  return Builtin.taskRunInline(body)
+#else
+  fatalError("Unsupported Swift compiler")
+#endif
+}
+
+@available(SwiftStdlib 5.8, *)
+extension Task where Failure == Never {
+  /// Start an async context within the current sync context and run the
+  /// provided async closure, returning the value it produces.
+  @available(SwiftStdlib 5.8, *)
+  @_spi(_TaskToThreadModel)
+  @_unavailableFromAsync(message: "Use Task.runInline from a sync context to begin an async context.")
+  public static func runInline(_ body: () async -> Success) -> Success {
+    return _taskRunInline(body)
+  }
+}
+
+@available(SwiftStdlib 5.8, *)
+extension Task where Failure == Error {
+  @available(SwiftStdlib 5.8, *)
+  @_alwaysEmitIntoClient
+  @usableFromInline
+  internal static func _runInlineHelper<T>(
+    body: () async -> Result<T, Error>,
+    rescue: (Result<T, Error>) throws -> T
+  ) rethrows -> T {
+    return try rescue(
+      _taskRunInline(body)
+    )
+  }
+
+  /// Start an async context within the current sync context and run the
+  /// provided async closure, returning or throwing the value or error it
+  /// produces.
+  @available(SwiftStdlib 5.8, *)
+  @_spi(_TaskToThreadModel)
+  @_unavailableFromAsync(message: "Use Task.runInline from a sync context to begin an async context.")
+  public static func runInline(_ body: () async throws -> Success) rethrows -> Success {
+    return try _runInlineHelper(
+      body: {
+        do { 
+          let value = try await body() 
+          return Result.success(value)
+        }
+        catch let error {
+          return Result.failure(error)
+        }
+    },
+      rescue: { try $0.get() }
+    )
+  }
+}
+#endif
 
 #if _runtime(_ObjC)
 

@@ -108,8 +108,8 @@ func produce(fn: () -> Int?, default d: () -> Int) -> Int { // expected-note {{d
   return fn() ?? d()
 }
 // TODO: The diagnostics here are perhaps a little overboard.
-_ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'default' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}} expected-error {{top-level statement cannot begin with a closure expression}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
-_ = produce { 2 } `default`: { 3 }
+_ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'default' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}}
+_ = produce { 2 } `default`: { 3 } // expected-error {{labeled block needs 'do'}} expected-warning {{integer literal is unused}}
 
 func f() -> Int { 42 }
 

@@ -75,7 +75,7 @@ public extension GeneralAdjacencyList {
   }
 }
 
-// CHECK-LABEL: Generic signature: <Spine, VertexIDToIndex where Spine : RangeReplaceableCollection, VertexIDToIndex == IdentityVertexIDToIndex<Spine>, Spine.Element : AdjacencyVertex_, Spine.Index == Spine.Element.Edges.Element.VertexID, Spine.Element.Edges : BidirectionalCollection, Spine.Element.Edges : RangeReplaceableCollection>
+// CHECK-LABEL: Generic signature: <Spine, VertexIDToIndex where Spine : RangeReplaceableCollection, VertexIDToIndex == IdentityVertexIDToIndex<Spine>, Spine.[Sequence]Element : AdjacencyVertex_, Spine.[Collection]Index == Spine.[Sequence]Element.[AdjacencyVertex_]Edges.[Sequence]Element.[AdjacencyEdge_]VertexID, Spine.[Sequence]Element.[AdjacencyVertex_]Edges : BidirectionalCollection, Spine.[Sequence]Element.[AdjacencyVertex_]Edges : RangeReplaceableCollection>
 public extension GeneralAdjacencyList
   where VertexIDToIndex == IdentityVertexIDToIndex<Spine>,
         Spine: RangeReplaceableCollection,

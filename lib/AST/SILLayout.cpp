@@ -72,8 +72,10 @@ static void verifyFields(CanGenericSignature Sig, ArrayRef<SILField> Fields) {
 #endif
 
 SILLayout::SILLayout(CanGenericSignature Sig,
-                     ArrayRef<SILField> Fields)
-  : GenericSigAndFlags(Sig, getFlagsValue(anyMutable(Fields))),
+                     ArrayRef<SILField> Fields,
+                     bool CapturesGenericEnvironment)
+  : GenericSigAndFlags(Sig,
+                 getFlagsValue(anyMutable(Fields), CapturesGenericEnvironment)),
     NumFields(Fields.size())
 {
 #ifndef NDEBUG
@@ -87,8 +89,10 @@ SILLayout::SILLayout(CanGenericSignature Sig,
 
 void SILLayout::Profile(llvm::FoldingSetNodeID &id,
                         CanGenericSignature Generics,
-                        ArrayRef<SILField> Fields) {
+                        ArrayRef<SILField> Fields,
+                        bool CapturesGenericEnvironment) {
   id.AddPointer(Generics.getPointer());
+  id.AddBoolean(CapturesGenericEnvironment);
   for (auto &field : Fields) {
     id.AddPointer(field.getLoweredType().getPointer());
     id.AddBoolean(field.isMutable());

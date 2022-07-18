@@ -19,7 +19,9 @@
 #ifndef SWIFT_RUNTIME_ATOMICWAITQUEUE_H
 #define SWIFT_RUNTIME_ATOMICWAITQUEUE_H
 
-#include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Heap.h"
+#include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Mutex.h"
 #include <assert.h>
 
 namespace swift {
@@ -74,7 +76,7 @@ class AtomicWaitQueue {
   Mutex WaitQueueLock;
 
   /// Add a reference to this queue.  Must be called while holding the
-  /// globaal lock.
+  /// global lock.
   void retain_locked() {
     referenceCount++;
   }
@@ -83,7 +85,7 @@ class AtomicWaitQueue {
   /// global lock and while *not* holding the wait queue lock.
   void release_locked() {
     if (referenceCount == 1) {
-      delete &asImpl();
+      swift_cxx_deleteObject(&asImpl());
     } else {
       referenceCount--;
     }
@@ -210,7 +212,7 @@ public:
       // If we created the queue but never published it, destroy it.
       if (CurrentQueue) {
         CurrentQueue->WaitQueueLock.unlock();
-        delete CurrentQueue;
+        swift_cxx_deleteObject(CurrentQueue);
       }
     }
 
@@ -424,7 +426,7 @@ public:
   private:
     template <class... Args>
     static Impl *createNewQueue(Args &&...args) {
-      auto queue = new Impl(std::forward<Args>(args)...);
+      auto queue = swift_cxx_newObject<Impl>(std::forward<Args>(args)...);
       queue->WaitQueueLock.lock();
       return queue;
     }

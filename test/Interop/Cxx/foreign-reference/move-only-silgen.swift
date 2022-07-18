@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+//
+// XFAIL: OS=linux-android, OS=linux-androideabi
 
 import MoveOnly
 
@@ -18,8 +20,8 @@ import MoveOnly
 // CHECK: [[TMP:%.*]] = alloc_stack $MoveOnly
 // CHECK: store [[X_1]] to [trivial] [[TMP]]
 
-// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(c) (@in_guaranteed MoveOnly) -> Int32
-// CHECK: apply [[TEST_FN]]([[TMP]]) : $@convention(c) (@in_guaranteed MoveOnly) -> Int32
+// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed MoveOnly) -> Int32
+// CHECK: apply [[TEST_FN]]([[TMP]]) : $@convention(cxx_method) (@in_guaranteed MoveOnly) -> Int32
 
 // CHECK: return
 // CHECK-LABEL: end sil function '$s4main4testyyF'
@@ -30,4 +32,4 @@ public func test() {
 
 // CHECK-LABEL: sil [clang MoveOnly.create] @{{_ZN8MoveOnly6createEv|\?create\@MoveOnly\@\@SAPEAU1\@XZ}} : $@convention(c) () -> MoveOnly
 
-// CHECK-LABEL: sil [clang MoveOnly.test] @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(c) (@in_guaranteed MoveOnly) -> Int32
+// CHECK-LABEL: sil [clang MoveOnly.test] @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed MoveOnly) -> Int32

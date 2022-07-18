@@ -1,4 +1,11 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -Onone -enable-copy-propagation -enable-lexical-borrow-scopes=false | %FileCheck %s -DINT=i%target-ptrsize
+//
+// This test is currently disabled because mandatory copy propagation
+// is not part of the pipeline. It may be re-added to the pipeline,
+// but it isn't clear if we'll still need to emit poison references by
+// that time.
+//
+// REQUIRES: mandatory_copy_propagation
 
 // Test debug_value [poison] emission
 

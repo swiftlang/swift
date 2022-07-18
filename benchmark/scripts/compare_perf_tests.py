@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # ===--- compare_perf_tests.py -------------------------------------------===//
@@ -22,12 +22,10 @@ class `PerformanceTestSamples` is collection of `Sample`s and their statistics.
 class `PerformanceTestResult` is a summary of performance test execution.
 class `LogParser` converts log files into `PerformanceTestResult`s.
 class `ResultComparison` compares new and old `PerformanceTestResult`s.
-class `TestComparator` analyzes changes betweeen the old and new test results.
+class `TestComparator` analyzes changes between the old and new test results.
 class `ReportFormatter` creates the test comparison report in specified format.
 
 """
-
-from __future__ import print_function
 
 import argparse
 import functools
@@ -48,7 +46,7 @@ class Sample(namedtuple("Sample", "i num_iters runtime")):
     """
 
     def __repr__(self):
-        """Shorter Sample formating for debugging purposes."""
+        """Shorter Sample formatting for debugging purposes."""
         return "s({0.i!r}, {0.num_iters!r}, {0.runtime!r})".format(self)
 
 
@@ -113,7 +111,7 @@ class PerformanceTestSamples(object):
 
         Experimentally, this rule seems to perform well-enough on the
         benchmark runtimes in the microbenchmark range to filter out
-        the environment noise caused by preemtive multitasking.
+        the environment noise caused by preemptive multitasking.
         """
         lo = (
             0
@@ -207,7 +205,7 @@ class PerformanceTestSamples(object):
 
     @property
     def cv(self):
-        """Coeficient of Variation (%)."""
+        """Coefficient of Variation (%)."""
         return (self.sd / self.mean) if self.mean else 0
 
     @property
@@ -227,12 +225,12 @@ class PerformanceTestResult(object):
     Reported by the test driver (Benchmark_O, Benchmark_Onone, Benchmark_Osize
     or Benchmark_Driver).
 
-    It suppors 2 log formats emitted by the test driver. Legacy format with
+    It supports 2 log formats emitted by the test driver. Legacy format with
     statistics for normal distribution (MEAN, SD):
         #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
     And new quantiles format with variable number of columns:
-        #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
-        #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
+        #,TEST,SAMPLES,QMIN(μs),MEDIAN(μs),MAX(μs)
+        #,TEST,SAMPLES,QMIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
     The number of columns between MIN and MAX depends on the test driver's
     `--quantile`parameter. In both cases, the last column, MAX_RSS is optional.
     """
@@ -246,9 +244,10 @@ class PerformanceTestResult(object):
         self.name = csv_row[1]  # Name of the performance test
         self.num_samples = int(csv_row[2])  # Number of measurements taken
 
+        mem_index = (-1 if memory else 0) + (-3 if meta else 0)
         if quantiles:  # Variable number of columns representing quantiles
-            mem_index = (-1 if memory else 0) + (-3 if meta else 0)
             runtimes = csv_row[3:mem_index] if memory or meta else csv_row[3:]
+            last_runtime_index = mem_index - 1
             if delta:
                 runtimes = [int(x) if x else 0 for x in runtimes]
                 runtimes = functools.reduce(
@@ -279,19 +278,20 @@ class PerformanceTestResult(object):
                 sams.mean,
                 sams.sd,
             )
-            self.max_rss = (  # Maximum Resident Set Size (B)
-                int(csv_row[mem_index]) if memory else None
-            )
         else:  # Legacy format with statistics for normal distribution.
             self.min = int(csv_row[3])  # Minimum runtime (μs)
             self.max = int(csv_row[4])  # Maximum runtime (μs)
             self.mean = float(csv_row[5])  # Mean (average) runtime (μs)
             self.sd = float(csv_row[6])  # Standard Deviation (μs)
             self.median = int(csv_row[7])  # Median runtime (μs)
-            self.max_rss = (  # Maximum Resident Set Size (B)
-                int(csv_row[8]) if len(csv_row) > 8 else None
-            )
+            last_runtime_index = 7
             self.samples = None
+
+        self.max_rss = (  # Maximum Resident Set Size (B)
+            int(csv_row[mem_index]) if (
+                memory and len(csv_row) > (last_runtime_index + 1)
+            ) else None
+        )
 
         # Optional measurement metadata. The number of:
         # memory pages used, involuntary context switches and voluntary yields
@@ -313,7 +313,7 @@ class PerformanceTestResult(object):
         """Merge two results.
 
         Recomputes min, max and mean statistics. If all `samples` are
-        avaliable, it recomputes all the statistics.
+        available, it recomputes all the statistics.
         The use case here is comparing test results parsed from concatenated
         log files from multiple runs of benchmark driver.
         """
@@ -429,7 +429,7 @@ class LogParser(object):
         self.mem_pages = int(mem_pages)
 
     def _configure_format(self, header):
-        self.quantiles = "MEAN" not in header
+        self.quantiles = "QMIN" in header
         self.memory = "MAX_RSS" in header
         self.meta = "PAGES" in header
         self.delta = "𝚫" in header
@@ -455,7 +455,7 @@ class LogParser(object):
                 Yield(len(self.samples), int(since_last_yield))
             )
         ),
-        re.compile(r"( *#[, \t]+TEST[, \t]+SAMPLES[, \t]+MIN.*)"): _configure_format,
+        re.compile(r"( *#[, \t]+TEST[, \t]+SAMPLES[, \t].*)"): _configure_format,
         # Environmental statistics: memory usage and context switches
         re.compile(
             r"\s+MAX_RSS \d+ - \d+ = (\d+) \((\d+) pages\)"
@@ -516,12 +516,12 @@ class LogParser(object):
 
 
 class TestComparator(object):
-    """Analyzes changes betweeen the old and new test results.
+    """Analyzes changes between the old and new test results.
 
     It determines which tests were `added`, `removed` and which can be
     compared. It then splits the `ResultComparison`s into 3 groups according to
     the `delta_threshold` by the change in performance: `increased`,
-    `descreased` and `unchanged`. Whole computaion is performed during
+    `descreased` and `unchanged`. Whole computation is performed during
     initialization and results are provided as properties on this object.
 
     The lists of `added`, `removed` and `unchanged` tests are sorted
@@ -578,7 +578,7 @@ class TestComparator(object):
 
 
 class ReportFormatter(object):
-    """Creates the report from perfromance test comparison in specified format.
+    """Creates the report from performance test comparison in specified format.
 
     `ReportFormatter` formats the `PerformanceTestResult`s and
     `ResultComparison`s provided by `TestComparator` into report table.

@@ -18,7 +18,6 @@
 #if SWIFT_ENABLE_REFLECTION
 
 #include "swift/Reflection/TypeRefBuilder.h"
-
 #include "swift/Demangling/Demangle.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Reflection/TypeLowering.h"
@@ -26,12 +25,16 @@
 #include "swift/Remote/MetadataReader.h"
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 
 using namespace swift;
 using namespace reflection;
+using ReadBytesResult = swift::remote::MemoryReader::ReadBytesResult;
 
-TypeRefBuilder::BuiltType TypeRefBuilder::decodeMangledType(Node *node) {
-  return swift::Demangle::decodeMangledType(*this, node).getType();
+TypeRefBuilder::BuiltType
+TypeRefBuilder::decodeMangledType(Node *node, bool forRequirement) {
+  return swift::Demangle::decodeMangledType(*this, node, forRequirement)
+      .getType();
 }
 
 RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {
@@ -105,7 +108,7 @@ TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
       if (!mangling.isSuccess()) {
         return {};
       }
-      return mangling.result();
+      return std::move(mangling.result());
     }
   }
 
@@ -190,40 +193,93 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
   return Unsubstituted->subst(*this, *SubstMap);
 }
 
-RemoteRef<FieldDescriptor>
-TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
-  std::string MangledName;
-  if (auto N = dyn_cast<NominalTypeRef>(TR))
-    MangledName = N->getMangledName();
-  else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
-    MangledName = BG->getMangledName();
-  else
+static llvm::Optional<StringRef> FindOutermostModuleName(NodePointer Node) {
+  if (!Node)
+    return {};
+  // Breadth first search until we find the module name so we find the outermost
+  // one.
+  llvm::SmallVector<NodePointer, 8> Queue;
+  Queue.push_back(Node);
+  // Instead of removing items from the front of the queue we just iterate over
+  // them.
+  for (size_t i = 0; i < Queue.size(); ++i) {
+    NodePointer Current = Queue[i];
+    if (Current->getKind() == Node::Kind::Module) {
+      if (Current->hasText())
+        return Current->getText();
+      else
+        return {};
+    }
+    for (auto Child : *Current)
+      Queue.push_back(Child);
+  }
+  return {};
+}
+
+void TypeRefBuilder::populateFieldTypeInfoCacheWithReflectionAtIndex(
+    size_t Index) {
+  if (ProcessedReflectionInfoIndexes.contains(Index))
+    return;
+
+  const auto &Info = ReflectionInfos[Index];
+  for (auto FD : Info.Field) {
+    if (!FD->hasMangledTypeName())
+      continue;
+    auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
+    if (auto NormalizedName = normalizeReflectionName(CandidateMangledName)) {
+      FieldTypeInfoCache[std::move(*NormalizedName)] = FD;
+    }
+  }
+
+  ProcessedReflectionInfoIndexes.insert(Index);
+}
+
+llvm::Optional<RemoteRef<FieldDescriptor>>
+TypeRefBuilder::findFieldDescriptorAtIndex(size_t Index,
+                                           const std::string &MangledName) {
+  populateFieldTypeInfoCacheWithReflectionAtIndex(Index);
+  auto Found = FieldTypeInfoCache.find(MangledName);
+  if (Found != FieldTypeInfoCache.end()) {
+    return Found->second;
+  }
+  return llvm::None;
+}
+
+RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
+  const std::string *MangledName;
+  NodePointer Node;
+  Demangler Dem;
+  if (auto N = dyn_cast<NominalTypeRef>(TR)) {
+    Node = N->getDemangling(Dem);
+    MangledName = &N->getMangledName();
+  } else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
+    Node = BG->getDemangling(Dem);
+    MangledName = &BG->getMangledName();
+  } else
     return nullptr;
 
   // Try the cache.
-  auto Found = FieldTypeInfoCache.find(MangledName);
+  auto Found = FieldTypeInfoCache.find(*MangledName);
   if (Found != FieldTypeInfoCache.end())
     return Found->second;
 
-  // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
-  // until we find the field desciptor we're looking for.
-  while (FirstUnprocessedReflectionInfoIndex < ReflectionInfos.size()) {
-    auto &Info = ReflectionInfos[FirstUnprocessedReflectionInfoIndex];
-    for (auto FD : Info.Field) {
-      if (!FD->hasMangledTypeName())
-        continue;
-      auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
-      if (auto NormalizedName = normalizeReflectionName(CandidateMangledName))
-        FieldTypeInfoCache[*NormalizedName] = FD;
-    }
+  // Heuristic: find the outermost Module node available, and try to parse the
+  // ReflectionInfos with a matching name first.
+  auto ModuleName = FindOutermostModuleName(Node);
+  // If we couldn't find a module name or the type is imported (__C module) we
+  // don't any useful information on which image to look for the type.
+  if (ModuleName && ModuleName != llvm::StringRef("__C"))
+    for (size_t i = 0; i < ReflectionInfos.size(); ++i)
+      if (llvm::is_contained(ReflectionInfos[i].PotentialModuleNames,
+                             ModuleName))
+        if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
+          return *FD;
 
-    // Since we're done with the current ReflectionInfo, increment early in
-    // case we get a cache hit.
-    ++FirstUnprocessedReflectionInfoIndex;
-    Found = FieldTypeInfoCache.find(MangledName);
-    if (Found != FieldTypeInfoCache.end())
-      return Found->second;
-  }
+  // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
+  // until we find the field descriptor we're looking for.
+  for (size_t i = 0; i < ReflectionInfos.size(); ++i)
+    if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
+      return *FD;
 
   return nullptr;
 }
@@ -301,6 +357,47 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
       if (!reflectionNameMatches(CandidateMangledName, MangledName))
         continue;
       return BuiltinTypeDescriptor;
+    }
+  }
+
+  return nullptr;
+}
+
+RemoteRef<MultiPayloadEnumDescriptor>
+TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
+  std::string MangledName;
+  if (auto B = dyn_cast<BuiltinTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else if (auto N = dyn_cast<NominalTypeRef>(TR))
+    MangledName = N->getMangledName();
+  else if (auto B = dyn_cast<BoundGenericTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else
+    return nullptr;
+
+  for (auto Info : ReflectionInfos) {
+    for (auto MultiPayloadEnumDescriptor : Info.MultiPayloadEnum) {
+
+      // Assert that descriptor size is sane...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() >= 1);
+      // We're limited to 64k of spare bits mask...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() < 16384);
+      assert(MultiPayloadEnumDescriptor->getSizeInBytes() ==
+             4 + MultiPayloadEnumDescriptor->getContentsSizeInWords() * 4);
+      // Must have a non-empty spare bits mask iff spare bits are used...
+      assert(MultiPayloadEnumDescriptor->usesPayloadSpareBits()
+             == (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() != 0));
+      // BitMask must fit within the advertised size...
+      if (MultiPayloadEnumDescriptor->usesPayloadSpareBits()) {
+        assert(MultiPayloadEnumDescriptor->getContentsSizeInWords()
+               >= 2 + (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() + 3) / 4);
+      }
+
+      auto CandidateMangledName =
+        readTypeRef(MultiPayloadEnumDescriptor, MultiPayloadEnumDescriptor->TypeName);
+      if (!reflectionNameMatches(CandidateMangledName, MangledName))
+        continue;
+      return MultiPayloadEnumDescriptor;
     }
   }
 
@@ -388,56 +485,73 @@ void TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
   stream << "\n";
 }
 
-void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
+FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
+    llvm::Optional<std::string> forMangledTypeName) {
+  FieldTypeCollectionResult result;
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Field) {
-      auto TypeDemangling =
-          demangleTypeRef(readTypeRef(descriptor, descriptor->MangledTypeName));
-      auto TypeName = nodeToString(TypeDemangling);
+      auto typeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
+      auto typeName = nodeToString(demangleTypeRef(typeRef));
+      auto optionalMangledTypeName = normalizeReflectionName(typeRef);
       clearNodeFactory();
-      stream << TypeName.c_str() << "\n";
-      for (size_t i = 0; i < TypeName.size(); ++i)
-        stream << "-";
-      stream << "\n";
-      for (auto &fieldRef : *descriptor.getLocalBuffer()) {
-        auto field = descriptor.getField(fieldRef);
-        auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
-        stream.write(fieldName.data(), fieldName.size());
-        if (field->hasMangledTypeName()) {
-          stream << ": ";
-          dumpTypeRef(readTypeRef(field, field->MangledTypeName), stream);
-        } else {
-          stream << "\n\n";
+      if (optionalMangledTypeName.hasValue()) {
+        auto mangledTypeName =
+          optionalMangledTypeName.getValue();
+        if (forMangledTypeName.hasValue()) {
+          if (mangledTypeName != forMangledTypeName.getValue())
+            continue;
         }
+
+        std::vector<PropertyTypeInfo> properties;
+        std::vector<EnumCaseInfo> enumCases;
+        for (auto &fieldRef : *descriptor.getLocalBuffer()) {
+          auto field = descriptor.getField(fieldRef);
+          auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
+          if (field->hasMangledTypeName()) {
+            std::string mangledFieldTypeName =
+                std::string(field->MangledTypeName);
+            auto fieldTypeRef = readTypeRef(field, field->MangledTypeName);
+            auto optionalMangledfieldTypeName =
+                normalizeReflectionName(fieldTypeRef);
+            if (optionalMangledfieldTypeName.hasValue()) {
+              mangledFieldTypeName = optionalMangledfieldTypeName.getValue();
+            }
+            auto fieldTypeDemangleTree = demangleTypeRef(fieldTypeRef);
+            auto fieldTypeName = nodeToString(fieldTypeDemangleTree);
+            std::stringstream OS;
+            dumpTypeRef(fieldTypeRef, OS);
+            properties.emplace_back(PropertyTypeInfo{fieldName.str(),
+                                                     mangledFieldTypeName,
+                                                     fieldTypeName, OS.str()});
+          } else {
+            enumCases.emplace_back(EnumCaseInfo{fieldName.str()});
+          }
+        }
+        result.FieldInfos.emplace_back(FieldMetadata{
+            mangledTypeName, typeName, properties, enumCases});
       }
     }
   }
+
+  return result;
 }
 
-void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &stream) {
-  for (const auto &sections : ReflectionInfos) {
-    for (auto descriptor : sections.AssociatedType) {
-      auto conformingTypeNode = demangleTypeRef(
-          readTypeRef(descriptor, descriptor->ConformingTypeName));
-      auto conformingTypeName = nodeToString(conformingTypeNode);
-      auto protocolNode = demangleTypeRef(
-          readTypeRef(descriptor, descriptor->ProtocolTypeName));
-      auto protocolName = nodeToString(protocolNode);
-      clearNodeFactory();
-
-      stream << "- " << conformingTypeName << " : " << protocolName << "\n";
-
-      for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
-        auto associatedType = descriptor.getField(associatedTypeRef);
-
-        std::string name =
-            getTypeRefString(readTypeRef(associatedType, associatedType->Name))
-                .str();
-        stream << "typealias " << name << " = ";
-        dumpTypeRef(
-            readTypeRef(associatedType, associatedType->SubstitutedTypeName),
-            stream);
-      }
+void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
+  auto fieldInfoCollectionResult =
+      collectFieldTypes(llvm::Optional<std::string>());
+  for (const auto &info : fieldInfoCollectionResult.FieldInfos) {
+    stream << info.FullyQualifiedName << "\n";
+    for (size_t i = 0; i < info.FullyQualifiedName.size(); ++i)
+      stream << "-";
+    stream << "\n";
+    for (const auto &field : info.Properties) {
+      stream << field.Label;
+      stream << ": ";
+      stream << field.TypeDiagnosticPrintName;
+    }
+    for (const auto &field : info.EnumCases) {
+      stream << field.Label;
+      stream << "\n\n";
     }
   }
 }
@@ -494,23 +608,38 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
   }
 }
 
-void TypeRefBuilder::dumpAllSections(std::ostream &stream) {
-  stream << "FIELDS:\n";
-  stream << "=======\n";
-  dumpFieldSection(stream);
-  stream << "\n";
-  stream << "ASSOCIATED TYPES:\n";
-  stream << "=================\n";
-  dumpAssociatedTypeSection(stream);
-  stream << "\n";
-  stream << "BUILTIN TYPES:\n";
-  stream << "==============\n";
-  dumpBuiltinTypeSection(stream);
-  stream << "\n";
-  stream << "CAPTURE DESCRIPTORS:\n";
-  stream << "====================\n";
-  dumpCaptureSection(stream);
-  stream << "\n";
+void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
+  for (const auto &sections : ReflectionInfos) {
+    for (const auto descriptor : sections.MultiPayloadEnum) {
+      auto typeNode =
+          demangleTypeRef(readTypeRef(descriptor, descriptor->TypeName));
+      auto typeName = nodeToString(typeNode);
+      clearNodeFactory();
+
+      stream << "\n- " << typeName << ":\n";
+      stream << "  Descriptor Size: " << descriptor->getSizeInBytes() << "\n";
+      stream << "  Flags: " << std::hex << descriptor->getFlags() << std::dec;
+      if (descriptor->usesPayloadSpareBits()) {
+        stream << " usesPayloadSpareBits";
+      }
+      stream << "\n";
+      auto maskBytes = descriptor->getPayloadSpareBitMaskByteCount();
+      auto maskOffset = descriptor->getPayloadSpareBitMaskByteOffset();
+      if (maskBytes > 0) {
+        if (maskOffset > 0) {
+          stream << "  Spare bit mask: (offset " << maskOffset << " bytes) 0x";
+        } else {
+          stream << "  Spare bit mask: 0x";
+        }
+        const uint8_t *p = descriptor->getPayloadSpareBits();
+        for (unsigned i = 0; i < maskBytes; i++) {
+          stream << std::hex << std::setw(2) << std::setfill('0') << p[i];
+        }
+        stream << std::dec << "\n";
+      }
+      stream << "\n";
+    }
+  }
 }
 
 #endif

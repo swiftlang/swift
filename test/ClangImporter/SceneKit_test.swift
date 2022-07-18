@@ -7,7 +7,7 @@ import SceneKit
 import Foundation
 
 // Test out some explicit renames of typedefs and globals, which are now new
-// wrapper types with nestest values.
+// wrapper types with nested values.
 @available(macOS 10.11, *)
 func testNestingRenames() {
   let _ = SCNGeometrySourceSemantic.self

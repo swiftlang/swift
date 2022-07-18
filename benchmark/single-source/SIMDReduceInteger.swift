@@ -85,7 +85,7 @@ let int32Data: UnsafeBufferPointer<Int32> = {
   let untyped = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int32>.size * count, alignment: 16
   )
-  // Intialize the memory as Int32 and fill with random values.
+  // Initialize the memory as Int32 and fill with random values.
   let typed = untyped.initializeMemory(as: Int32.self, repeating: 0)
   var g = SplitMix64(seed: 0)
   for i in 0 ..< typed.count {
@@ -120,7 +120,7 @@ public func run_SIMDReduceInt32x4_init(_ n: Int) {
 @inline(never)
 public func run_SIMDReduceInt32x4_cast(_ n: Int) {
   // Morally it seems like we "should" be able to use withMemoryRebound
-  // to SIMD4<Int32>, but that function requries that the sizes match in
+  // to SIMD4<Int32>, but that function requires that the sizes match in
   // debug builds, so this is pretty ugly. The following "works" for now,
   // but is probably in violation of the formal model (the exact rules
   // for "assumingMemoryBound" are not clearly documented). We need a
@@ -172,7 +172,7 @@ let int8Data: UnsafeBufferPointer<Int8> = {
   let untyped = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int8>.size * count, alignment: 16
   )
-  // Intialize the memory as Int8 and fill with random values.
+  // Initialize the memory as Int8 and fill with random values.
   let typed = untyped.initializeMemory(as: Int8.self, repeating: 0)
   var g = SplitMix64(seed: 0)
   for i in 0 ..< typed.count {

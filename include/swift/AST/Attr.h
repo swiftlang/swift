@@ -287,12 +287,13 @@ public:
     /// Whether this attribute is only valid when concurrency is enabled.
     ConcurrencyOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 16),
 
-    /// Whether this attribute is only valid when distributed is enabled.
-    DistributedOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
-
     /// Whether this attribute is valid on additional decls in ClangImporter.
-    OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 18),
+    OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
   };
+
+  static_assert(
+      (unsigned(DeclKindIndex::Last_Decl) + 17) < 64,
+      "Overflow decl attr options bitfields");
 
   LLVM_READNONE
   static uint64_t getOptions(DeclAttrKind DK);
@@ -384,10 +385,6 @@ public:
 
   static bool isConcurrencyOnly(DeclAttrKind DK) {
     return getOptions(DK) & ConcurrencyOnly;
-  }
-
-  static bool isDistributedOnly(DeclAttrKind DK) {
-    return getOptions(DK) & DistributedOnly;
   }
 
   static bool isUserInaccessible(DeclAttrKind DK) {
@@ -491,7 +488,7 @@ public:
       Name(Name) {}
 
   SILGenNameAttr(StringRef Name, bool Implicit)
-    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -509,7 +506,7 @@ public:
       Name(Name) {}
 
   CDeclAttr(StringRef Name, bool Implicit)
-    : CDeclAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+    : CDeclAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -528,7 +525,7 @@ public:
   Value(Value) {}
 
   SemanticsAttr(StringRef Value, bool Implicit)
-  : SemanticsAttr(Value, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+  : SemanticsAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The semantics tag value.
   const StringRef Value;
@@ -614,6 +611,8 @@ enum class PlatformAgnosticAvailabilityKind {
   PackageDescriptionVersionSpecific,
   /// The declaration is unavailable for other reasons.
   Unavailable,
+  /// The declaration is unavailable from asynchronous contexts
+  NoAsync,
 };
 
 /// Defines the @available attribute.
@@ -632,14 +631,16 @@ public:
                    const llvm::VersionTuple &Obsoleted,
                    SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
-                   bool Implicit)
+                   bool Implicit,
+                   bool IsSPI)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename), RenameDecl(RenameDecl),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
       PlatformAgnostic(PlatformAgnostic),
-      Platform(Platform)
+      Platform(Platform),
+      IsSPI(IsSPI)
   {}
 
 #undef INIT_VER_TUPLE
@@ -685,6 +686,9 @@ public:
   /// The platform of the availability.
   const PlatformKind Platform;
 
+  /// Whether this is available as SPI.
+  const bool IsSPI;
+
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
 
@@ -696,6 +700,9 @@ public:
 
   /// Whether this is an unconditionally deprecated entity.
   bool isUnconditionallyDeprecated() const;
+
+  /// Whether this is a noasync attribute.
+  bool isNoAsync() const;
 
   /// Returns the platform-agnostic availability.
   PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
@@ -1149,6 +1156,8 @@ public:
                                       SourceRange range,
                                       ArrayRef<Identifier> spiGroups);
 
+  SPIAccessControlAttr *clone(ASTContext &C, bool implicit) const;
+
   /// Name of SPIs declared by the attribute.
   ///
   /// Note: A single SPI name per attribute is currently supported but this
@@ -1199,20 +1208,75 @@ public:
   }
 };
 
+/// Represents the exclusivity attribute.
+class ExclusivityAttr : public DeclAttribute {
+public:
+  enum Mode {
+    Checked,
+    Unchecked
+  };
+
+private:
+  Mode mode;
+
+public:
+  ExclusivityAttr(SourceLoc atLoc, SourceRange range, Mode mode)
+     : DeclAttribute(DAK_Exclusivity, atLoc, range, /*Implicit=*/false),
+       mode(mode) {}
+
+  ExclusivityAttr(Mode mode)
+    : ExclusivityAttr(SourceLoc(), SourceRange(), mode) {}
+
+  Mode getMode() const { return mode; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Exclusivity;
+  }
+};
+
 /// Represents the side effects attribute.
 class EffectsAttr : public DeclAttribute {
+  StringRef customString;
+  SourceLoc customStringLoc;
+
 public:
   EffectsAttr(SourceLoc atLoc, SourceRange range, EffectsKind kind)
       : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false) {
     Bits.EffectsAttr.kind = unsigned(kind);
   }
 
+  EffectsAttr(SourceLoc atLoc, SourceRange range, StringRef customString,
+              SourceLoc customStringLoc)
+      : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false),
+        customString(customString), customStringLoc(customStringLoc) {
+    Bits.EffectsAttr.kind = unsigned(EffectsKind::Custom);
+  }
+
   EffectsAttr(EffectsKind kind)
   : EffectsAttr(SourceLoc(), SourceRange(), kind) {}
+
+  EffectsAttr(StringRef customString)
+  : EffectsAttr(SourceLoc(), SourceRange(), customString, SourceLoc()) {}
+
+  StringRef getCustomString() const {
+    assert(getKind() == EffectsKind::Custom);
+    return customString;
+  }
+  
+  SourceLoc getCustomStringLocation() const {
+    return customStringLoc;
+  }
 
   EffectsKind getKind() const { return EffectsKind(Bits.EffectsAttr.kind); }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Effects;
+  }
+
+  EffectsAttr *clone(ASTContext &ctx) const {
+    if (getKind() == EffectsKind::Custom) {
+      return new (ctx) EffectsAttr(customString);
+    }
+    return new (ctx) EffectsAttr(getKind());
   }
 };
 
@@ -1657,12 +1721,15 @@ public:
   }
 };
 
-/// Describe a symbol was originally defined in another module. For example, given
+/// Describes a symbol that was originally defined in another module. For
+/// example, given the following declaration:
+///
 /// \code
 /// @_originallyDefinedIn(module: "Original", OSX 10.15) var foo: Int
 /// \endcode
 ///
-/// Where variable Foo has originally defined in another module called Original prior to OSX 10.15
+/// The variable \p foo was originally defined in another module called
+/// \p Original prior to OSX 10.15
 class OriginallyDefinedInAttr: public DeclAttribute {
 public:
   OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
@@ -1674,6 +1741,8 @@ public:
       OriginalModuleName(OriginalModuleName),
       Platform(Platform),
       MovedVersion(MovedVersion) {}
+
+  OriginallyDefinedInAttr *clone(ASTContext &C, bool implicit) const;
 
   // The original module name.
   const StringRef OriginalModuleName;
@@ -1883,6 +1952,10 @@ class DerivativeAttr final
   friend TrailingObjects;
   friend class DerivativeAttrOriginalDeclRequest;
 
+  /// The declaration on which the `@derivative` attribute is declared.
+  /// May not be a valid declaration for `@derivative` attributes.
+  /// Resolved during parsing and deserialization.
+  Decl *OriginalDeclaration = nullptr;
   /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
@@ -1935,6 +2008,12 @@ public:
                                 TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
                                 IndexSubset *parameterIndices);
+
+  Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
+
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
 
   TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
@@ -2124,6 +2203,30 @@ public:
   }
 };
 
+/// The @_backDeploy(...) attribute, used to make function declarations available
+/// for back deployment to older OSes via emission into the client binary.
+class BackDeployAttr: public DeclAttribute {
+public:
+  BackDeployAttr(SourceLoc AtLoc, SourceRange Range,
+                 PlatformKind Platform,
+                 const llvm::VersionTuple Version,
+                 bool Implicit)
+    : DeclAttribute(DAK_BackDeploy, AtLoc, Range, Implicit),
+      Platform(Platform),
+      Version(Version) {}
+
+  /// The platform the symbol is available for back deployment on.
+  const PlatformKind Platform;
+
+  /// The earliest platform version that may use the back deployed implementation.
+  const llvm::VersionTuple Version;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_BackDeploy;
+  }
+};
+
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -2184,6 +2287,11 @@ public:
   /// a declaration will be deprecated in the future, or null otherwise.
   const AvailableAttr *getSoftDeprecated(const ASTContext &ctx) const;
 
+  /// Returns the first @available attribute that indicates
+  /// a declaration is unavailable from asynchronous contexts, or null
+  /// otherwise.
+  const AvailableAttr *getNoAsync(const ASTContext &ctx) const;
+
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;
@@ -2207,6 +2315,13 @@ public:
   void add(DeclAttribute *Attr) {
     Attr->Next = DeclAttrs;
     DeclAttrs = Attr;
+  }
+
+  /// Add multiple constructed DeclAttributes to this list.
+  void add(DeclAttributes &Attrs) {
+    for (auto attr : Attrs) {
+      add(attr);
+    }
   }
 
   // Iterator interface over DeclAttribute objects.

@@ -5,6 +5,7 @@ sil_stage canonical
 
 import Builtin
 import Swift
+import SwiftShims
 
 ///////////////////////
 // Type Declarations //
@@ -1348,6 +1349,29 @@ bb0(%0 : $*Int):
 }
 // CHECK-LABEL: } // end sil function 'test_rle_in_guaranteed_entry'
 
+sil shared [clang _swift_stdlib_has_malloc_size] @_swift_stdlib_has_malloc_size : $@convention(c) () -> Bool
+sil shared [clang _swift_stdlib_malloc_size] @_swift_stdlib_malloc_size : $@convention(c) (UnsafeRawPointer) -> Int
+
+// CHECK-LABEL: sil [ossa] @ignoreMallocSize :
+// CHECK:         [[VAL:%.*]] = load
+// CHECK:         [[UI:%.*]] = function_ref @use_Int
+// CHECK:         apply [[UI]]([[VAL]])
+// CHECK:         return [[VAL]]
+// CHECK-LABEL: } // end sil function 'ignoreMallocSize'
+sil [ossa] @ignoreMallocSize : $@convention(thin) (@guaranteed AB, UnsafeRawPointer) -> Int {
+bb0(%0 : @guaranteed $AB, %1 : $UnsafeRawPointer):
+  %2 = ref_element_addr %0 : $AB, #AB.value
+  %3 = load [trivial] %2 : $*Int
+  %4 = function_ref @_swift_stdlib_has_malloc_size : $@convention(c) () -> Bool
+  %5 = apply %4() : $@convention(c) () -> Bool
+  %6 = function_ref @_swift_stdlib_malloc_size : $@convention(c) (UnsafeRawPointer) -> Int
+  %7 = apply %6(%1) : $@convention(c) (UnsafeRawPointer) -> Int
+  %8 = load [trivial] %2 : $*Int
+  %9 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %9(%3) : $@convention(thin) (Int) -> ()
+  return %8 : $Int
+}
+
 // Check that begin_access, end_access, strong_release, set_deallocating, and dealloc_ref don't prevent optimization.
 // CHECK-LABEL: ignore_read_write :
 // CHECK: bb0
@@ -1364,7 +1388,8 @@ bb0:
   %5 = load [trivial] %4 : $*Int32
   end_borrow %borrow1 : $AX
   set_deallocating %1 : $AX
-  dealloc_ref [stack] %1 : $AX
+  dealloc_ref %1 : $AX
+  dealloc_stack_ref %1 : $AX
   return %5 : $Int32
 }
 

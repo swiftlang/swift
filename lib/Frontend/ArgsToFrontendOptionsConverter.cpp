@@ -69,8 +69,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_bridging_header_directory_for_print)) {
     Opts.BridgingHeaderDirForPrint = A->getValue();
   }
+  Opts.IndexIgnoreClangModules |= Args.hasArg(OPT_index_ignore_clang_modules);
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
+  Opts.IndexIncludeLocals |= Args.hasArg(OPT_index_include_locals);
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
@@ -169,7 +171,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
-  // None here means error, not just "no inputs". Propagage unconditionally.
+  // None here means error, not just "no inputs". Propagate unconditionally.
   if (!inputsAndOutputs)
     return true;
 
@@ -274,6 +276,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
+  Opts.ExposePublicDeclsInClangHeader =
+      Args.hasArg(OPT_clang_header_expose_public_decls);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
@@ -297,6 +301,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     auto SplitMap = StringRef(A).split('=');
     Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
   }
+  Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
   return false;
 }
 
@@ -478,6 +483,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpTypeInfo;
   if (Opt.matches(OPT_print_ast))
     return FrontendOptions::ActionType::PrintAST;
+  if (Opt.matches(OPT_print_ast_decl))
+    return FrontendOptions::ActionType::PrintASTDecl;
   if (Opt.matches(OPT_emit_pcm))
     return FrontendOptions::ActionType::EmitPCM;
   if (Opt.matches(OPT_dump_pcm))
@@ -621,8 +628,8 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
                    diag::error_mode_cannot_emit_reference_dependencies);
     return true;
   }
-  if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+  if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return true;
   }

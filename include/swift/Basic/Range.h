@@ -134,7 +134,7 @@ public:
       return *this;
     }
     iterator operator+(difference_type i) const {
-      return iterator(Traits::adddOfset(Value, i));
+      return iterator(Traits::addOffset(Value, i));
     }
     friend iterator operator+(difference_type i, iterator base) {
       return iterator(Traits::addOffset(base.Value, i));

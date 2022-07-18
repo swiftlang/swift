@@ -158,11 +158,15 @@ private:
   const TypeInfo *convertBoxType(SILBoxType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertInOutType(InOutType *T);
+  const TypeInfo *convertSILMoveOnlyWrappedType(SILMoveOnlyWrappedType *T) {
+    return convertType(T->getInnerType());
+  }
   const TypeInfo *convertExistentialMetatypeType(ExistentialMetatypeType *T);
   const TypeInfo *convertMetatypeType(MetatypeType *T);
   const TypeInfo *convertModuleType(ModuleType *T);
   const TypeInfo *convertProtocolType(ProtocolType *T);
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
+  const TypeInfo *convertParameterizedProtocolType(ParameterizedProtocolType *T);
   const TypeInfo *convertExistentialType(ExistentialType *T);
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
@@ -304,6 +308,10 @@ public:
 /// If a type is visibly a singleton aggregate (a tuple with one element, a
 /// struct with one field, or an enum with a single payload case), return the
 /// type of its field, which it is guaranteed to have identical layout to.
+///
+/// This can use more concrete type layout information than
+/// SILType::getSingletonAggregateFieldType, because we have full access to the
+/// LLVM-level layout of types in IRGen.
 SILType getSingletonAggregateFieldType(IRGenModule &IGM,
                                        SILType t,
                                        ResilienceExpansion expansion);

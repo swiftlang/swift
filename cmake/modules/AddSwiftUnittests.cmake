@@ -37,7 +37,7 @@ function(add_swift_unittest test_dirname)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
       target_compile_options(${test_dirname} PRIVATE
         -march=core2)
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv6|armv7|i686")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv5|armv6|armv7|i686")
       set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_LIBRARIES
         "atomic")
     endif()
@@ -47,11 +47,16 @@ function(add_swift_unittest test_dirname)
   endif()
 
   # some headers switch their inline implementations based on
-  # SWIFT_STDLIB_SINGLE_THREADED_RUNTIME definition
-  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  # SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY and
+  # SWIFT_THREADING_PACKAGE definitions
+  if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
     target_compile_definitions("${test_dirname}" PRIVATE
-      SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+      SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
   endif()
+
+  string(TOUPPER "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_THREADING_PACKAGE}" _threading_package)
+  target_compile_definitions("${test_dirname}" PRIVATE
+    "SWIFT_THREADING_${_threading_package}")
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     if(SWIFT_USE_LINKER)

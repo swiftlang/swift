@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -11,6 +11,7 @@ class C {
     weak var d: D?
 }
 class D {}
+struct S {}
 class DBox {
   var d: D
 }
@@ -28,8 +29,28 @@ class PointerWrapper {
 
 enum OneOfThree { case one, two, three }
 
+final class Object {
+  init()
+}
+
+public struct ClassStorage {
+  var ref: C
+}
+public struct ClassWrapper {
+  var storage: ClassStorage
+}
+
+sil @returnUnmanagedC : $@convention(method) (@guaranteed C) -> @sil_unmanaged C
+
 sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @get_owned_c : $@convention(thin) () -> (@owned C)
+sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
 sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Optional<D>) -> ()
+sil [ossa] @synchronization_point : $@convention(thin) () -> ()
+sil [ossa] @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
+sil [ossa] @barrier : $@convention(thin) () -> ()
+sil [ossa] @failable : $@convention(thin) () -> @error Error
+
 
 // =============================================================================
 // = DECLARATIONS                                                             }}
@@ -42,8 +63,10 @@ sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Option
 // Hoist over br.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_1 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[INSTANCE]]
@@ -62,8 +85,10 @@ bl1:
 // Hoist over cond_br.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_2 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
 // CHECK:       [[BL1]]:
 // CHECK:         br [[EXIT:bb[0-9]+]]
@@ -91,8 +116,10 @@ exit:
 // Hoist over two brs.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_3 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
 // CHECK:       [[BL1]]:
 // CHECK:         br [[EXIT:bb[0-9]+]]
@@ -119,12 +146,15 @@ exit:
 // Don't hoist over 1 / 2 brs.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_4 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]]] = begin_borrow [[INSTANCE]]
 // CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
 // CHECK:       [[BL1]]:
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[BL2]]:
+// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[INSTANCE]]
@@ -147,8 +177,10 @@ exit:
 // Hoist over switch_enum destinations.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_5 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C, [[CASE:%[^,]+]] : $OneOfThree):
+// CHECK:         [[LIFETIME:%[^,]]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[0-9]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         {{%[0-9]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         switch_enum [[CASE]] : $OneOfThree, case #OneOfThree.one!enumelt: [[ONE_DEST:bb[0-9]+]], case #OneOfThree.two!enumelt: [[TWO_DEST:bb[0-9]+]], case #OneOfThree.three!enumelt: [[THREE_DEST:bb[0-9]+]]
 // CHECK:       [[ONE_DEST]]:
 // CHECK:         br [[EXIT:bb[0-9]+]]
@@ -217,11 +249,11 @@ exit:
 // CHECK:         switch_enum [[MAYBE]] : $Optional<C>, case #Optional.some!enumelt: [[SOME_DEST:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_DEST:bb[0-9]+]] 
 // CHECK:       [[SOME_DEST]]([[LIFETIME_2:%[^,]+]] : @guaranteed $C):
 // CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         br [[BASIC_BLOCK3:bb[0-9]+]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[NONE_DEST]]:
 // CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         br [[BASIC_BLOCK3]]
-// CHECK:       [[BASIC_BLOCK3]]:
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
 // CHECK:         return [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_over_terminator_2'
 sil [ossa] @hoist_over_terminator_2 : $@convention(thin) (@owned C) -> @owned C {
@@ -241,9 +273,10 @@ exit:
     return %instance_c : $C
 }
 
-// Hoist over transformation terminator which forwards ownership of guaranteed
-// value which itself had forwarding ownership of the original borrow.
-// CHECK-LABEL: sil [ossa] @hoist_over_terminator_3 : {{.*}} {
+// Don't hoist over transformation terminator which forwards ownership of
+// guaranteed value which itself had forwarding ownership of the original
+// borrow.
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_terminator_3 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[MAYBE:%[^,]+]] = enum $Optional<C>, #Optional.some!enumelt, [[LIFETIME]]
@@ -256,8 +289,8 @@ exit:
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[INSTANCE]]
-// CHECK-LABEL: } // end sil function 'hoist_over_terminator_3'
-sil [ossa] @hoist_over_terminator_3 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_terminator_3'
+sil [ossa] @dont_hoist_over_terminator_3 : $@convention(thin) (@owned C) -> @owned C {
 entry(%instance_c : @owned $C):
     %lifetime_c = begin_borrow %instance_c : $C
     %maybe_c = enum $Optional<C>, #Optional.some!enumelt, %lifetime_c : $C
@@ -268,6 +301,45 @@ some_dest(%lifetime_c_2 : @guaranteed $C):
     br exit
 
 none_dest:
+    end_borrow %lifetime_c : $C
+    br exit
+
+exit:
+    return %instance_c : $C
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_terminator_3__barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[MAYBE_C:%[^,]+]] = enum $Optional<C>, #Optional.some!enumelt, [[LIFETIME]]
+// CHECK:         switch_enum [[MAYBE_C]] : $Optional<C>, case #Optional.some!enumelt: [[SOME_DEST:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_DEST:bb[0-9]+]]
+// CHECK:       [[SOME_DEST]]({{%[^,]+}} :
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         tuple ()
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[NONE_DEST]]:
+// CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
+// CHECK:         apply [[BARRIER]]()
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         tuple ()
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_terminator_3__barrier'
+sil [ossa] @dont_hoist_over_terminator_3__barrier : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance_c : @owned $C):
+    %lifetime_c = begin_borrow %instance_c : $C
+    %maybe_c = enum $Optional<C>, #Optional.some!enumelt, %lifetime_c : $C
+    switch_enum %maybe_c : $Optional<C>, case #Optional.some!enumelt: some_dest, case #Optional.none!enumelt: none_dest
+
+some_dest(%lifetime_c_2 : @guaranteed $C):
+    %tuple = tuple ()
+    end_borrow %lifetime_c : $C
+    br exit
+
+none_dest:
+    %barrier = function_ref @barrier : $@convention(thin) () -> ()
+    apply %barrier() : $@convention(thin) () -> ()
+    %tuple_2 = tuple ()
     end_borrow %lifetime_c : $C
     br exit
 
@@ -311,6 +383,72 @@ exit:
     return %instance_c : $C
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_some_barred_blocks : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]] : $C
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         br [[EXIT:bb[0-9]+]](undef : $C)
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]] : $C
+// CHECK:         br [[EXIT]]([[COPY]] : $C)
+// CHECK:       [[EXIT]]
+// CHECK:           end_borrow [[LIFETIME]] : $C
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_some_barred_blocks'
+sil [ossa] @dont_hoist_over_some_barred_blocks : $(@owned C) -> () {
+entry(%instance : @owned $C):
+    %borrow = begin_borrow %instance : $C
+    cond_br undef, left, right
+
+left:
+    br exit(undef : $C)
+
+right:
+    %copy = copy_value %borrow : $C
+    br exit(%copy : $C)
+
+exit(%thing : @owned $C):
+    end_borrow %borrow : $C
+    destroy_value %thing : $C
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_some_barred_blocks__2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] : $C
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         br [[TRAMPOLINE:bb[0-9]+]](undef : $C)
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]] : $C
+// CHECK:         br [[TRAMPOLINE]]([[COPY]] : $C)
+// CHECK:       [[TRAMPOLINE]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_some_barred_blocks__2'
+sil [ossa] @dont_hoist_over_some_barred_blocks__2 : $@convention(thin) (@owned C) -> () {
+entry(%instance: @owned $C):
+    %lifetime = begin_borrow [lexical] %instance : $C
+    cond_br undef, left, right
+
+left:
+    br trampoline(undef : $C)
+
+right:
+    %copy = copy_value %lifetime : $C
+    br trampoline(%copy : $C)
+
+trampoline(%copy_1 : @owned $C):
+    br exit
+
+exit:
+    end_borrow %lifetime : $C
+    %retval = tuple ()
+    destroy_value %copy_1 : $C
+    destroy_value %instance : $C
+    return %retval : $()
+}
+
 // =============================================================================
 // branching tests                                                            }}
 // =============================================================================
@@ -319,13 +457,14 @@ exit:
 // loop tests                                                                 {{
 // =============================================================================
 
-// Don't hoist over loop without uses.
-// TODO: Eventually, we should hoist over such loops.
+// Hoist over loop without uses.
+//
 // CHECK-LABEL: sil [ossa] @hoist_over_loop_1 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
 // CHECK:       [[LOOP_HEADER]]:
 // CHECK:         br [[LOOP_BODY:bb[0-9]+]]
@@ -336,7 +475,6 @@ exit:
 // CHECK:       [[LOOP_BACKEDGE]]:
 // CHECK:         br [[LOOP_HEADER]]
 // CHECK:       [[EXIT]]:
-// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         return [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_over_loop_1'
 sil [ossa] @hoist_over_loop_1 : $@convention(thin) (@owned C) -> @owned C {
@@ -408,12 +546,13 @@ exit:
 // CHECK-LABEL: sil [ossa] @hoist_over_struct : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE_C:%[^,]+]] : @owned $C, [[INSTANCE_D:%[^,]+]] : @owned $D):
 // CHECK:         [[LIFETIME_C:%[^,]+]] = begin_borrow [[INSTANCE_C]]
+// CHECK:         [[COPY_C:%[^,]+]] = copy_value [[LIFETIME_C]]
 // CHECK:         [[LIFETIME_D:%[^,]+]] = begin_borrow [[INSTANCE_D]]
-// CHECK:         [[REGISTER_4:%[^,]+]] = struct $CDCase ([[LIFETIME_C]] : $C, [[LIFETIME_D]] : $D)
+// CHECK:         struct $CDCase ([[LIFETIME_C]] : $C, [[LIFETIME_D]] : $D)
 // CHECK:         end_borrow [[LIFETIME_C]]
 // CHECK:         end_borrow [[LIFETIME_D]]
 // CHECK:         destroy_value [[INSTANCE_D]]
-// CHECK:         return [[INSTANCE_C]]
+// CHECK:         return [[COPY_C]]
 // CHECK-LABEL: } // end sil function 'hoist_over_struct'
 sil [ossa] @hoist_over_struct : $@convention(thin) (@owned C, @owned D) -> @owned C {
 entry(%instance_c: @owned $C, %instance_d: @owned $D):
@@ -456,18 +595,21 @@ entry(%instance_c: @owned $C, %instance_d: @owned $D):
     return %instance_c : $C
 }
 
-// Don't hoist over store to an address which itself is (earlier) stored into a
-// field of the object being borrowed.
-// TODO: Eventually, we should be able to hoist over such a store.
-// CHECK-LABEL: sil [ossa] @hoist_over_load : $@convention(thin) () -> () {
-// CHECK:        [[D:%[^,]+]] = alloc_ref $PointerWrapper                  
-// CHECK:        [[LIFETIME:%[^,]+]] = begin_borrow [[D]] : $PointerWrapper          
-// CHECK:        [[ADDR:%[^,]+]] = alloc_stack $PointedTo                     
-// CHECK:        [[C:%[^,]+]] = alloc_ref $PointedTo                       
-// CHECK:        store [[C]] to [init] [[ADDR]] : $*PointedTo             
-// CHECK-NEXT:    end_borrow [[LIFETIME]] : $PointerWrapper                 
-// CHECK-LABEL: } // end sil function 'hoist_over_load'
-sil [ossa] @hoist_over_load : $@convention(thin) () -> () {
+// Hoist over store to unrelated stack address.  Do not hoist over store to
+// field of lifetime.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_store : $@convention(thin) () -> () {
+// CHECK:        [[D:%[^,]+]] = alloc_ref $PointerWrapper
+// CHECK:        [[LIFETIME:%[^,]+]] = begin_borrow [[D]] : $PointerWrapper
+// CHECK:        [[ADDR:%[^,]+]] = alloc_stack $PointedTo
+// CHECK:        [[PTR:%[^,]+]] = address_to_pointer [[ADDR]]
+// CHECK:        [[FIELD:%[^,]+]] = ref_element_addr [[LIFETIME]]
+// CHECK:        store [[PTR]] to [trivial] [[FIELD]]
+// CHECK:        end_borrow [[LIFETIME]] : $PointerWrapper
+// CHECK:        [[C:%[^,]+]] = alloc_ref $PointedTo
+// CHECK:        store [[C]] to [init] [[ADDR]] : $*PointedTo
+// CHECK-LABEL: } // end sil function 'hoist_over_store'
+sil [ossa] @hoist_over_store : $@convention(thin) () -> () {
 bb0:
   %d = alloc_ref $PointerWrapper
   %lifetime = begin_borrow %d : $PointerWrapper
@@ -500,7 +642,6 @@ bb0:
 // CHECK:         load_weak
 // CHECK:         end_borrow
 // CHECK-LABEL: } // end sil function 'dont_hoist_over_load_weak'
-
 sil [ossa] @dont_hoist_over_load_weak : $@convention(thin) (@owned DBox) -> () {
 entry(%instance : @owned $DBox):
   %lifetime = begin_borrow [lexical] %instance : $DBox
@@ -530,6 +671,502 @@ entry(%instance : @owned $DBox):
 // before the deinit that would dealocated the pointed-to object, it must always
 // remain first.
 
+// Hoist over and rewrite copy of borrow.
+//
+// Everything in this test case except the copy_value and end_borrow is here in
+// order to obstruct other optimizations from kicking in that obfuscate that the
+// fact that the end_borrow was hoisted over the copy_value.
+// CHECK-LABEL: sil [ossa] @hoist_over_copy_of_borrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         {{%[^,]+}} = copy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_copy_of_borrow'
+sil [ossa] @hoist_over_copy_of_borrow : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  %lifetime = begin_borrow [lexical] %instance : $C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %copy = copy_value %instance : $C
+  end_borrow %lifetime : $C
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %2 = apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
+  %result = tuple ()
+  return %result : $()
+}
+
+// Don't hoist over an apply that uses a copy of the borrow.
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_apply_at_copy : {{.*}} {
+// CHECK:         begin_borrow
+// CHECK:         copy_value
+// CHECK:         apply
+// CHECK:         end_borrow
+// CHECK:         destroy_value
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_apply_at_copy'
+sil [ossa] @dont_hoist_over_apply_at_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime = begin_borrow %instance : $C
+  %copy = copy_value %lifetime : $C
+  %1 = apply %callee_guaranteed(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %2 = apply %callee_guaranteed(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  destroy_value %copy : $C
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// Don't hoist over an apply that uses the borrow.
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_at_borrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         apply {{%[^,]+}}([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_at_borrow'
+sil [ossa] @hoist_over_apply_at_borrow : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime = begin_borrow %instance : $C
+  %copy = copy_value %lifetime : $C
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %1 = apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %2 = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// Hoist over a begin_borrow of a copy_value of the original begin_borrow.
+//
+// Most of the test's contents are just to obstruct optimization.
+// CHECK-LABEL: sil [ossa] @hoist_over_borrow_of_copy : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         begin_borrow [[COPY]]
+// CHECK-LABEL: } // end sil function 'hoist_over_borrow_of_copy'
+sil [ossa] @hoist_over_borrow_of_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_1 = begin_borrow %instance : $C
+  %copy_1 = copy_value %lifetime_1 : $C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %1 = apply %callee_guaranteed(%copy_1) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %lifetime_2 = begin_borrow %copy_1 : $C
+  end_borrow %lifetime_1 : $C
+  %copy_2 = copy_value %lifetime_2 : $C
+  %2 = apply %callee_guaranteed(%copy_2) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronized2 = apply %synchronization_point() : $@convention(thin) () -> ()
+  end_borrow %lifetime_2 : $C
+  destroy_value %copy_1 : $C
+  destroy_value %copy_2 : $C
+  destroy_value %instance : $C
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// Hoist over copy_value of %copy, a copy_value of %borrow.
+// CHECK-LABEL: sil [ossa] @hoist_over_copy_of_copy : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]] : $C
+// CHECK:         [[COPY_1:%[^,]+]] = copy_value [[LIFETIME]] : $C
+// CHECK:         end_borrow [[LIFETIME]] : $C
+// CHECK:         copy_value [[INSTANCE]] : $C
+// CHECK-LABEL: } // end sil function 'hoist_over_copy_of_copy'
+sil [ossa] @hoist_over_copy_of_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %lifetime_1 = begin_borrow %instance : $C
+  %copy_1 = copy_value %lifetime_1 : $C
+  %_ = apply %callee_guaranteed(%lifetime_1) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %copy_2 = copy_value %copy_1 : $C
+  end_borrow %lifetime_1 : $C
+  %0 = apply %callee_owned(%instance) : $@convention(thin) (@owned C) -> ()
+  %1 = apply %callee_owned(%copy_1) : $@convention(thin) (@owned C) -> ()
+  %2 = apply %callee_owned(%copy_2) : $@convention(thin) (@owned C) -> ()
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_try_apply_at_borrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         try_apply undef([[LIFETIME]]) : {{.*}}, normal [[GOOD:bb[0-9]+]], error [[BAD:bb[0-9]+]] 
+// CHECK:       [[GOOD]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:       [[BAD]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_try_apply_at_borrow'
+sil [ossa] @dont_hoist_over_try_apply_at_borrow : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+  %lifetime = begin_borrow %instance : $C
+  try_apply undef(%lifetime) : $@convention(thin) (@guaranteed C) -> @error Error, normal good, error bad
+
+good(%8 : $()):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  %13 = tuple ()
+  return %13 : $()
+
+bad(%15 : @owned $Error):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  throw %15 : $Error
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_try_apply_barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         try_apply undef() : {{.*}}, normal [[GOOD:bb[0-9]+]], error [[BAD:bb[0-9]+]]
+// CHECK:       [[GOOD]]({{%[^,]+}} : $()):
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:       [[BAD]]([[ERROR:%[^,]+]] : @owned $Error):
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         throw [[ERROR]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_try_apply_barrier'
+sil [ossa] @dont_hoist_over_try_apply_barrier : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+  %lifetime = begin_borrow %instance : $C
+  %_ = apply undef(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  try_apply undef() : $@convention(thin) () -> @error Error, normal good, error bad
+
+good(%8 : $()):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  %13 = tuple ()
+  return %13 : $()
+
+bad(%15 : @owned $Error):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  throw %15 : $Error
+}
+
+// Hoist up to two parallel barrier applies from a block with two predecessors.
+//
+// CHECK-LABEL: sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'hoist_up_to_two_barrier_applies'
+sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime = begin_borrow [lexical] %instance : $C
+  %_ = apply undef(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, left, right
+
+left:
+  %result_left = apply undef() : $@convention(thin) () -> ()
+  br exit
+
+right:
+  %result_right = apply undef() : $@convention(thin) () -> ()
+  br exit
+
+exit:
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Don't hoist over end_apply.  These are lowered to calls to continuations
+// which can have the same sorts of side-effects as function calls.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_end_apply : {{.*}} {
+// CHECK:       end_apply
+// CHECK:       end_borrow
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_end_apply'
+sil [ossa] @dont_hoist_over_end_apply : $@convention(thin) (@owned C, S) -> () {
+entry(%instance : @owned $C, %input : $S):
+    %lifetime = begin_borrow [lexical] %instance : $C
+    %modify_s = function_ref @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
+    (%addr, %continuation) = begin_apply %modify_s() : $@yield_once @convention(thin) () -> @yields @inout S
+    store %input to [trivial] %addr : $*S
+    end_apply %continuation
+    end_borrow %lifetime : $C
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't hoist over abort_apply.  These are lowered to calls to continuations
+// which can have the same sorts of side-effects as function calls.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_abort_apply : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[REGISTER_1:%[^,]+]] : $Error):
+// CHECK:         abort_apply
+// CHECK:         end_borrow
+// CHECK:         destroy_value
+// CHECK:         tuple
+// CHECK:         throw
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_abort_apply'
+sil [ossa] @dont_hoist_over_abort_apply : $@convention(thin) (@owned C, S) -> @error Error {
+entry(%instance : @owned $C, %input : $S):
+    %lifetime = begin_borrow [lexical] %instance : $C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    %modify_s = function_ref @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
+    (%addr, %continuation) = begin_apply %modify_s() : $@yield_once @convention(thin) () -> @yields @inout S
+    %failable = function_ref @failable : $@convention(thin) () -> @error Error
+    try_apply %failable() : $@convention(thin) () -> @error Error, normal success, error failure
+success(%retval : $()):
+    store %input to [trivial] %addr : $*S
+    end_apply %continuation
+    end_borrow %lifetime : $C
+    destroy_value %instance : $C
+    return %retval : $()
+failure(%error : $Error):
+    abort_apply %continuation
+    %blah = tuple ()
+    end_borrow %lifetime : $C
+    destroy_value %instance : $C
+    throw %error : $Error
+}
+
+// Don't hoist out of a block when one of its predecessors has a terminator that
+// is a use of the end_borrow.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_user_br__other_br_multiple_preds : {{.*}} {
+// CHECK: {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:   cond_br undef, {{bb[0-9]+}}, [[RIGHT:bb[0-9]+]]
+// CHECK: [[RIGHT]]:
+// CHECK:   [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:   br [[EXIT:bb[0-9]+]]([[COPY]] :
+// CHECK: [[EXIT]]({{%[^,]+}} :
+// CHECK:   end_borrow [[LIFETIME]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_user_br__other_br_multiple_preds'
+sil [ossa] @dont_hoist_over_user_br__other_br_multiple_preds : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+    %lifetime = begin_borrow [lexical] %instance : $C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    cond_br undef, left1, right
+
+left1:
+    cond_br undef, left2, left3
+
+left2:
+    br left4
+
+left3:
+    br left4
+
+left4:
+    %get_owned_c = function_ref @get_owned_c : $@convention(thin) () -> (@owned C)
+    %owned_c = apply %get_owned_c() : $@convention(thin) () -> (@owned C)
+    br exit(%owned_c : $C)
+
+right:
+    %barrier = function_ref @barrier : $@convention(thin) () -> ()
+    apply %barrier() : $@convention(thin) () -> ()
+    %copy = copy_value %lifetime : $C
+    br exit(%copy : $C)
+
+exit(%value : @owned $C):
+    destroy_value %value : $C
+    end_borrow %lifetime : $C
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't hoist over begin_borrows of copies.
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_begin_borrow_copy : {{.*}} {
+// CHECK:         begin_borrow
+// CHECK:         copy_value
+// CHECK:         begin_borrow
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_begin_borrow_copy'
+sil [ossa] @dont_hoist_over_begin_borrow_copy : $@convention(thin) (@owned C) -> (@owned C) {
+entry(%owned_in : @owned $C):
+  %borrow_1 = begin_borrow [lexical] %owned_in : $C
+  apply undef(%borrow_1) : $@convention(thin) (@guaranteed C) -> ()
+  %copy_1_1 = copy_value %borrow_1 : $C
+  %borrow_out = begin_borrow [lexical] %copy_1_1 : $C
+  %copy_2 = copy_value %borrow_out : $C
+  end_borrow %borrow_1 : $C
+  destroy_value %owned_in : $C
+  apply undef(%borrow_out) : $@convention(thin) (@guaranteed C) -> ()
+  br exit(%copy_1_1 : $C, %borrow_out : $C, %copy_2 : $C)
+exit(%copy_1_2 : @owned $C, %borrow_in : @guaranteed $C, %copy_2_2 : @owned $C):
+  end_borrow %borrow_in : $C
+  destroy_value %copy_1_2 : $C
+  return %copy_2_2 : $C
+}
+
+// Do not hoist the end_borrow (or destroy_value) of Storage above the
+// string_copy_unmanaged_value of the BridgeObject. Here, the initial
+// ref_to_unmanaged is hidden by a call.
+//
+// rdar://90909833 (Extend deinit barriers to handle conversion to strong reference)
+//
+// CHECK-LABEL: sil [ossa] @testCopyUnmanagedCall : $@convention(method) (@inout ClassWrapper) -> () {
+// CHECK:   [[STORAGE:%.*]] = load [take] %1 : $*ClassStorage
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[STORAGE]] : $ClassStorage
+// CHECK:   [[CALL:%.*]] = apply %{{.*}} : $@convention(method) (@guaranteed C) -> @sil_unmanaged C
+// CHECK:   strong_copy_unmanaged_value [[CALL]] : $@sil_unmanaged C
+// CHECK:   end_borrow [[BORROW]] : $ClassStorage
+// CHECK:   destroy_value [[STORAGE]] : $ClassStorage
+// CHECK-LABEL: } // end sil function
+sil [ossa] @testCopyUnmanagedCall : $@convention(method) (@inout ClassWrapper) -> () {
+bb0(%0 : $*ClassWrapper):
+  %1 = struct_element_addr %0 : $*ClassWrapper, #ClassWrapper.storage
+  %2 = load [take] %1 : $*ClassStorage
+  %4 = begin_borrow %2 : $ClassStorage
+  %5 = struct_extract %4 : $ClassStorage, #ClassStorage.ref
+  %f = function_ref @returnUnmanagedC : $@convention(method) (@guaranteed C) -> @sil_unmanaged C
+  %call = apply %f(%5) : $@convention(method) (@guaranteed C) -> @sil_unmanaged C
+  %7 = strong_copy_unmanaged_value %call : $@sil_unmanaged C
+  end_borrow %4 : $ClassStorage
+  destroy_value %2 : $ClassStorage
+  %10 = struct $ClassStorage (%7 : $C)
+  %11 = struct $ClassWrapper (%10 : $ClassStorage)
+  store %11 to [init] %0 : $*ClassWrapper
+  %23 = tuple ()
+  return %23 : $()
+}
+
+// Do not hoist the end_borrow (or destroy_value) of Storage above the
+// string_copy_unmanaged_value of the BridgeObject. Here, the initial
+// ref_to_unmanaged is hidden by a call.
+//
+// rdar://90909833 (Extend deinit barriers to handle conversion to strong reference)
+//
+// The inlined case was already handled because the ref_to_unmanaged
+// was considered a pointer escape. But in the future, this might not be considered a pointer escape.
+//
+// CHECK-LABEL: sil [ossa] @testCopyUnmanagedInlined : $@convention(method) (@inout ClassWrapper) -> () {
+// CHECK:   [[STORAGE:%.*]] = load [take] %1 : $*ClassStorage
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[STORAGE]] : $ClassStorage
+// CHECK:   strong_copy_unmanaged_value
+// CHECK:   end_borrow [[BORROW]] : $ClassStorage
+// CHECK:   destroy_value [[STORAGE]] : $ClassStorage
+// CHECK-LABEL: } // end sil function
+sil [ossa] @testCopyUnmanagedInlined : $@convention(method) (@inout ClassWrapper) -> () {
+bb0(%0 : $*ClassWrapper):
+  %1 = struct_element_addr %0 : $*ClassWrapper, #ClassWrapper.storage
+  %2 = load [take] %1 : $*ClassStorage
+  %4 = begin_borrow %2 : $ClassStorage
+  %5 = struct_extract %4 : $ClassStorage, #ClassStorage.ref
+  %6 = ref_to_unmanaged %5 : $C to $@sil_unmanaged C
+  %7 = strong_copy_unmanaged_value %6 : $@sil_unmanaged C
+  end_borrow %4 : $ClassStorage
+  destroy_value %2 : $ClassStorage
+  %10 = struct $ClassStorage (%7 : $C)
+  %11 = struct $ClassWrapper (%10 : $ClassStorage)
+  store %11 to [init] %0 : $*ClassWrapper
+  %23 = tuple ()
+  return %23 : $()
+}
+
 // =============================================================================
 // instruction tests                                                          }}
+// =============================================================================
+
+// =============================================================================
+// access scope tests                                                         {{
+// =============================================================================
+
+// Don't hoist into an access scope that contains a barrier.
+//
+// CHECK-LABEL: sil [ossa] @nofold_scoped_load_barrier : {{.*}} {
+// CHECK: end_access
+// CHECK: end_access
+// CHECK: end_borrow
+// CHECK-LABEL: // end sil function 'nofold_scoped_load_barrier'
+sil [ossa] @nofold_scoped_load_barrier : $@convention(thin) (@owned C, @owned C) -> (@owned C) {
+entry(%instance : @owned $C, %other : @owned $C):
+  %lifetime = begin_borrow [lexical] %instance : $C
+  apply undef(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %addr = alloc_stack $C
+  %store_scope = begin_access [modify] [static] %addr : $*C
+  store %other to [init] %store_scope : $*C
+  end_access %store_scope : $*C
+  %load_scope = begin_access [read] [static] %addr : $*C
+  %value = load [copy] %load_scope : $*C
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  apply %barrier() : $@convention(thin) () -> ()
+  end_access %load_scope : $*C
+  destroy_addr %addr : $*C
+  dealloc_stack %addr : $*C
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  return %value : $C
+}
+
+// Access scopes that are open at barrier blocks are barriers.  Otherwise, we
+// would hoist end_borrows into the scopes when the end_borrows are hoisted up
+// to the begin of blocks whose predecessor is the barrier block.
+//
+// CHECK-LABEL: sil [ossa] @nohoist_into_access_scope_barred_by_barrier_block : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C, [[INOUT:%[^,]+]] : $*C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[SCOPE:%[^,]+]] = begin_access [modify] [static] [[INOUT]] : $*C
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]],
+// CHECK:       [[LEFT]]:
+// CHECK:         end_access [[SCOPE]] : $*C
+// CHECK-NEXT:    end_borrow [[LIFETIME]] : $C
+// CHECK-LABEL: } // end sil function 'nohoist_into_access_scope_barred_by_barrier_block'
+sil [ossa] @nohoist_into_access_scope_barred_by_barrier_block : $@convention(thin) (@owned C, @inout C) -> () {
+entry(%instance : @owned $C, %second : $*C):
+    %lifetime = begin_borrow [lexical] %instance : $C
+    %scope = begin_access [modify] [static] %second : $*C
+    cond_br undef, left, right
+
+left:
+    end_access %scope : $*C
+    %ignore = tuple ()
+    end_borrow %lifetime : $C
+    destroy_value %instance : $C
+    br exit
+
+right:
+    end_access %scope : $*C
+    apply undef(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    end_borrow %lifetime : $C
+    destroy_value %instance : $C
+    br exit
+
+exit:
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// =============================================================================
+// access scope tests                                                         }}
 // =============================================================================

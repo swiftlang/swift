@@ -83,7 +83,7 @@ public:
 
   ///  Construct with a `SourceFile`. `getInterfaceHashIncludingTypeMembers()`,
   ///  `getInterfaceHashExcludingTypeMembers()`, `getLastModified()` and
-  /// `getFileSize()` are laizily populated when accessed.
+  /// `getFileSize()` are lazily populated when accessed.
   BasicSourceFileInfo(const SourceFile *SF);
 
   bool isFromSourceFile() const;

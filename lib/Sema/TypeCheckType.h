@@ -19,6 +19,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/Basic/LangOptions.h"
 #include "llvm/ADT/None.h"
 
 namespace swift {
@@ -60,6 +61,12 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Make internal @usableFromInline and @inlinable decls visible.
   AllowUsableFromInline = 1 << 8,
+
+  /// Forbid \c some types from resolving as opaque types.
+  ///
+  /// Needed to enforce that \c any P<some Q> does not resolve to a
+  /// parameterized existential with an opaque type constraint.
+  DisallowOpaqueTypes = 1 << 9,
 };
 
 /// Type resolution contexts that require special handling.
@@ -122,7 +129,10 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are checking the underlying type of a generic typealias.
   GenericTypeAliasDecl,
 
-  /// Whether we are in a requirement of a generic declaration
+  /// Whether we are in the constraint type of an existential type.
+  ExistentialConstraint,
+
+  /// Whether we are in the constraint type of a conformance requirement.
   GenericRequirement,
 
   /// Whether we are in a same-type requirement of a generic
@@ -225,6 +235,7 @@ public:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
     case Context::SameTypeRequirement:
     case Context::ProtocolMetatypeBase:
     case Context::MetatypeBase:
@@ -246,6 +257,7 @@ public:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
     case Context::MetatypeBase:
       return false;
     case Context::None:
@@ -268,6 +280,40 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
       return true;
+    }
+  }
+
+  /// Whether parameterized protocol types are supported in this context.
+  bool isParameterizedProtocolSupported() const {
+    switch (context) {
+    case Context::Inherited:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+      return true;
+    case Context::None:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::FunctionInput:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::EnumPatternPayload:
+    case Context::SameTypeRequirement:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+      return false;
     }
   }
 

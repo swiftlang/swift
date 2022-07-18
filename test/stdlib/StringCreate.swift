@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// rdar://91405760
+// UNSUPPORTED: use_os_stdlib, back_deployment_runtime
+
 import StdlibUnittest
 defer { runAllTests() }
 

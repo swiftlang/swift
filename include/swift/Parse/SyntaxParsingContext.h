@@ -116,8 +116,8 @@ private:
   /// Indicates what action should be performed on the destruction of
   ///  SyntaxParsingContext
   enum class AccumulationMode {
-    // Coerece the result to one of ContextKind.
-    // E.g. for ContextKind::Expr, passthroug if the result is CallExpr, whereas
+    // Coerce the result to one of ContextKind.
+    // E.g. for ContextKind::Expr, passthrough if the result is CallExpr, whereas
     // <UnknownExpr><SomeDecl /></UnknownDecl> for non Exprs.
     CoerceKind,
 
@@ -154,7 +154,7 @@ private:
 
   RootContextData *RootData;
 
-  // Offet for 'Storage' this context owns from.
+  // Offset for 'Storage' this context owns from.
   const size_t Offset;
 
   // Operation on destruction.
@@ -304,7 +304,7 @@ public:
   /// collection kind. If there're no nodes that can fit into the collection kind,
   /// this function does nothing. Otherwise, it creates a collection node in place
   /// to contain all sequential suitable nodes from back.
-  void collectNodesInPlace(SyntaxKind ColletionKind,
+  void collectNodesInPlace(SyntaxKind CollectionKind,
        SyntaxNodeCreationKind nodeCreateK = SyntaxNodeCreationKind::Recorded);
 
   /// On destruction, construct a specified kind of syntax node consuming the

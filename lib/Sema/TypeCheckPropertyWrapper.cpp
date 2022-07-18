@@ -89,7 +89,6 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   // The property must not be isolated to an actor instance.
   switch (auto isolation = getActorIsolation(var)) {
   case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
     var->diagnose(
         diag::actor_instance_property_wrapper, var->getName(),
         nominal->getName());
@@ -798,4 +797,15 @@ Expr *swift::buildPropertyWrapperInitCall(
   innermostInitCallback(innermostInit);
 
   return initializer;
+}
+
+bool swift::isWrappedValueOfPropWrapper(VarDecl *var) {
+  if (!var->isStatic())
+    if (auto *dc = var->getDeclContext())
+      if (auto *nominal = dc->getSelfNominalTypeDecl())
+        if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())
+          if (var->getName() == var->getASTContext().Id_wrappedValue)
+            return true;
+
+  return false;
 }

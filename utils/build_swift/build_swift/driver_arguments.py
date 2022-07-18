@@ -6,9 +6,6 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-
-from __future__ import absolute_import, unicode_literals
-
 import multiprocessing
 import os
 
@@ -89,6 +86,15 @@ def _apply_default_arguments(args):
 
     if args.libicu_build_variant is None:
         args.libicu_build_variant = args.build_variant
+
+    if args.libxml2_build_variant is None:
+        args.libxml2_build_variant = args.build_variant
+
+    if args.zlib_build_variant is None:
+        args.zlib_build_variant = args.build_variant
+
+    if args.curl_build_variant is None:
+        args.curl_build_variant = args.build_variant
 
     # Assertions are enabled by default.
     if args.assertions is None:
@@ -515,6 +521,14 @@ def create_argument_parser():
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')
 
+    option('--swift-tools-ld64-lto-codegen-only-for-supporting-targets',
+           toggle_true,
+           default=False,
+           help='When building ThinLTO using ld64 on Darwin, controls whether '
+                'to opt out of LLVM IR optimizations when linking targets that '
+                'will get little benefit from it (e.g. tools for '
+                'bootstrapping or debugging Swift)')
+
     option('--dsymutil-jobs', store_int,
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
@@ -544,9 +558,12 @@ def create_argument_parser():
            default=defaults.llvm_install_components(),
            help='A semi-colon split list of llvm components to install')
 
-    option('--libswift', store('libswift_mode'),
+    option('--bootstrapping', store('bootstrapping_mode'),
            choices=['off', 'hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
-           help='The libswift build mode. For details see libswift/README.md')
+           help='The bootstrapping build mode for swift compiler modules. '
+                'Available modes: `off`, `hosttools`, `bootstrapping`, '
+                '`bootstrapping-with-hostlibs`, `crosscompile`, and '
+                '`crosscompile-with-hostlibs`')
 
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
@@ -567,6 +584,12 @@ def create_argument_parser():
            help='The path to a directory that contains prebuilt cross-compiled '
                 'library dependencies of the corelibs and other Swift repos, '
                 'such as the libcurl dependency of FoundationNetworking')
+
+    option('--cross-compile-append-host-target-to-destdir', toggle_true,
+           default=True,
+           help="Append each cross-compilation host target's name as a subdirectory "
+                "for each cross-compiled toolchain's destdir, useful when building "
+                "multiple toolchains and can be disabled if only cross-compiling one.")
 
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
@@ -692,6 +715,15 @@ def create_argument_parser():
     option('--libicu', toggle_true('build_libicu'),
            help='build libicu')
 
+    option('--static-libxml2', toggle_true('build_libxml2'), default=False,
+           help='build static libxml2')
+
+    option('--static-zlib', toggle_true('build_zlib'), default=False,
+           help='build static zlib')
+
+    option('--static-curl', toggle_true('build_curl'), default=False,
+           help='build static curl libraries')
+
     option('--playgroundsupport', toggle_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
     option('--install-playgroundsupport',
@@ -703,6 +735,9 @@ def create_argument_parser():
 
     option(['--build-libparser-only'], toggle_true('build_libparser_only'),
            help='build only libParser for SwiftSyntax')
+
+    option(['--build-lld'], toggle_true('build_lld'),
+           help='build lld as part of llvm')
 
     option('--skip-build-clang-tools-extra',
            toggle_false('build_clang_tools_extra'),
@@ -802,6 +837,18 @@ def create_argument_parser():
     option('--debug-libicu', store('libicu_build_variant'),
            const='Debug',
            help='build the Debug variant of libicu')
+
+    option('--debug-libxml2', store('libxml2_build_variant'),
+           const='Debug',
+           help='build the Debug variant of libxml2')
+
+    option('--debug-zlib', store('zlib_build_variant'),
+           const='Debug',
+           help='build the Debug variant of zlib')
+
+    option('--debug-curl', store('curl_build_variant'),
+           const='Debug',
+           help='build the Debug variant of libcurl')
 
     # -------------------------------------------------------------------------
     # Assertions group
@@ -984,7 +1031,12 @@ def create_argument_parser():
            help='Build optional StdlibUnittest components')
 
     option('--build-swift-stdlib-static-print', toggle_true,
-           help='Build constant_vprintf support')
+           help='Build constant-folding print() support')
+
+    option('--build-swift-stdlib-unicode-data', toggle_true,
+           default=True,
+           help='Include Unicode data in the standard library.'
+                'Note: required for full String functionality')
 
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
@@ -1057,7 +1109,7 @@ def create_argument_parser():
            help='skip testing iOS 32 bit simulator targets')
     option('--skip-test-watchos-32bit-simulator',
            toggle_false('test_watchos_32bit_simulator'),
-           default=True,
+           default=False,
            help='skip testing watchOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),
@@ -1176,16 +1228,6 @@ def create_argument_parser():
            help='The Android API level to target when building for Android. '
                 'Currently only 21 or above is supported')
 
-    option('--android-icu-uc', store_path,
-           help='Path to libicuuc.so')
-    option('--android-icu-uc-include', store_path,
-           help='Path to a directory containing headers for libicuuc')
-    option('--android-icu-i18n', store_path,
-           help='Path to libicui18n.so')
-    option('--android-icu-i18n-include', store_path,
-           help='Path to a directory containing headers libicui18n')
-    option('--android-icu-data', store_path,
-           help='Path to libicudata.so')
     option('--android-deploy-device-path', store_path,
            default=android.adb.commands.DEVICE_TEMP_DIR,
            help='Path on an Android device to which built Swift stdlib '
@@ -1240,6 +1282,12 @@ def create_argument_parser():
            help='skip building llvm')
     option('--skip-build-swift', toggle_false('build_swift'),
            help='skip building swift')
+    option('--skip-build-libxml2', toggle_false('build_libxml2'),
+           help='skip building libxml2')
+    option('--skip-build-zlib', toggle_false('build_zlib'),
+           help='skip building zlib')
+    option('--skip-build-curl', toggle_false('build_curl'),
+           help='skip building curl')
 
     # We need to list --skip-test-swift explicitly because otherwise argparse
     # will auto-expand arguments like --skip-test-swift to the only known
@@ -1318,6 +1366,9 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /swift-corelibs-foundation  (optional)
                      /swift-corelibs-libdispatch (optional)
                      /icu                        (optional)
+                     /libxml2                    (optional)
+                     /zlib                       (optional)
+                     /curl                       (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".

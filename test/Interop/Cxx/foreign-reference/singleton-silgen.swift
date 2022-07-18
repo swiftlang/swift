@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+//
+// XFAIL: OS=linux-android, OS=linux-androideabi
 
 import Singleton
 
@@ -18,8 +20,8 @@ import Singleton
 // CHECK: [[TMP:%.*]] = alloc_stack $DeletedSpecialMembers
 // CHECK: store [[X_1]] to [trivial] [[TMP]]
 
-// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(c) (@in_guaranteed DeletedSpecialMembers) -> Int32
-// CHECK: apply [[TEST_FN]]([[TMP]]) : $@convention(c) (@in_guaranteed DeletedSpecialMembers) -> Int32
+// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed DeletedSpecialMembers) -> Int32
+// CHECK: apply [[TEST_FN]]([[TMP]]) : $@convention(cxx_method) (@in_guaranteed DeletedSpecialMembers) -> Int32
 // CHECK: [[ACCESS_2:%.*]] = begin_access [read] [unknown] [[BOX]] : $*DeletedSpecialMembers
 // CHECK: [[X_2:%.*]] = load [trivial] [[ACCESS_2]] : $*DeletedSpecialMembers
 
@@ -36,6 +38,6 @@ public func test() {
 
 // CHECK-LABEL: sil [clang DeletedSpecialMembers.create] @{{_ZN21DeletedSpecialMembers6createEv|\?create\@DeletedSpecialMembers\@\@SAPEAU1\@XZ}} : $@convention(c) () -> DeletedSpecialMembers
 
-// CHECK-LABEL: sil [clang DeletedSpecialMembers.test] @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(c) (@in_guaranteed DeletedSpecialMembers) -> Int32
+// CHECK-LABEL: sil [clang DeletedSpecialMembers.test] @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed DeletedSpecialMembers) -> Int32
 
-// CHECK-LABEL: sil [serializable] [clang mutateIt] @{{_Z8mutateItR21DeletedSpecialMembers|\?mutateIt\@\@YAXAEAUDeletedSpecialMembers\@\@\@Z}} : $@convention(c) (DeletedSpecialMembers) -> ()
+// CHECK-LABEL: sil [serialized] [clang mutateIt] @{{_Z8mutateItR21DeletedSpecialMembers|\?mutateIt\@\@YAXAEAUDeletedSpecialMembers\@\@\@Z}} : $@convention(c) (DeletedSpecialMembers) -> ()

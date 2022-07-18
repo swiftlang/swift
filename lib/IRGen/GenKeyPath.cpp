@@ -70,7 +70,6 @@ enum KeyPathAccessor {
 
 static void
 bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
-                                     const KeyPathPatternComponent &component,
                                      GenericEnvironment *genericEnv,
                                      ArrayRef<GenericRequirement> requirements,
                                      llvm::Value *args,
@@ -188,22 +187,22 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   case Getter:
     // Original accessor's args should be @in or @out, meaning they won't be
     // captured or aliased.
-    accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
-    accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
-    accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
-    accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
+    accessorThunk->addParamAttr(0, llvm::Attribute::NoCapture);
+    accessorThunk->addParamAttr(0, llvm::Attribute::NoAlias);
+    accessorThunk->addParamAttr(1, llvm::Attribute::NoCapture);
+    accessorThunk->addParamAttr(1, llvm::Attribute::NoAlias);
     // Output is sret.
-    accessorThunk->addAttribute(
-        1, llvm::Attribute::getWithStructRetType(
+    accessorThunk->addParamAttr(
+        0, llvm::Attribute::getWithStructRetType(
                IGM.getLLVMContext(), thunkParams[0]->getPointerElementType()));
     break;
   case Setter:
     // Original accessor's args should be @in or @out, meaning they won't be
     // captured or aliased.
-    accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
-    accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
-    accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
-    accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
+    accessorThunk->addParamAttr(0, llvm::Attribute::NoCapture);
+    accessorThunk->addParamAttr(0, llvm::Attribute::NoAlias);
+    accessorThunk->addParamAttr(1, llvm::Attribute::NoCapture);
+    accessorThunk->addParamAttr(1, llvm::Attribute::NoAlias);
     break;
   case Equals:
   case Hash:
@@ -238,7 +237,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
       break;
     }
     auto componentArgsBufSize = params.claimNext();
-    bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+    bindPolymorphicArgumentsFromComponentIndices(IGF,
                                                  genericEnv, requirements,
                                                  componentArgsBuf,
                                                  componentArgsBufSize,
@@ -268,7 +267,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   return accessorThunk;
 }
 
-static llvm::Constant *
+static llvm::Function *
 getLayoutFunctionForComputedComponent(IRGenModule &IGM,
                                     const KeyPathPatternComponent &component,
                                     GenericEnvironment *genericEnv,
@@ -395,7 +394,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       auto params = IGF.collectParameters();
       auto componentArgsBuf = params.claimNext();
       auto componentArgsBufSize = params.claimNext();
-      bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+      bindPolymorphicArgumentsFromComponentIndices(IGF,
                                      genericEnv, requirements,
                                      componentArgsBuf,
                                      componentArgsBufSize,
@@ -449,7 +448,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       auto sourceArgsBuf = params.claimNext();
       auto destArgsBuf = params.claimNext();
       auto componentArgsBufSize = params.claimNext();
-      bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+      bindPolymorphicArgumentsFromComponentIndices(IGF,
                                      genericEnv, requirements,
                                      sourceArgsBuf,
                                      componentArgsBufSize,
@@ -548,7 +547,7 @@ struct KeyPathIndexOperand {
   const KeyPathPatternComponent *LastUser;
 };
 
-static llvm::Constant *
+static llvm::Function *
 getInitializerForComputedComponent(IRGenModule &IGM,
            const KeyPathPatternComponent &component,
            ArrayRef<KeyPathIndexOperand> operands,
@@ -954,7 +953,11 @@ emitKeyPathComponent(IRGenModule &IGM,
       // instantiation time.
       idResolution = idRef.isIndirect()
         ? KeyPathComponentHeader::IndirectPointer
-        : KeyPathComponentHeader::Resolved;
+        // Compute absolute reference from relative reference if target supports it.
+        // Otherwise, embed absolute reference directly.
+        : (IGM.getOptions().CompactAbsoluteFunctionPointer
+          ? KeyPathComponentHeader::ResolvedAbsolute
+          : KeyPathComponentHeader::Resolved);
       break;
     }
     case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
@@ -1089,8 +1092,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     fields.addInt32(header.getData());
     switch (idKind) {
     case KeyPathComponentHeader::Pointer:
-      // Use a relative offset to the referent.
-      fields.addRelativeAddress(idValue);
+      // Use a relative offset to the referent if value is not absolute.
+      if (idResolution == KeyPathComponentHeader::ResolvedAbsolute) {
+        fields.add(idValue);
+      } else {
+        fields.addRelativeAddress(idValue);
+      }
       break;
 
     case KeyPathComponentHeader::VTableOffset:
@@ -1101,12 +1108,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     }
 
     // Push the accessors, possibly thunked to marshal generic environment.
-    fields.addRelativeAddress(
+    fields.addCompactFunctionReference(
       getAccessorForComputedComponent(IGM, component, Getter,
                                       genericEnv, requirements,
                                       hasSubscriptIndices));
     if (settable)
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getAccessorForComputedComponent(IGM, component, Setter,
                                         genericEnv, requirements,
                                         hasSubscriptIndices));
@@ -1116,7 +1123,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       // arguments in the component. Thunk the SIL-level accessors to give the
       // runtime implementation a polymorphically-callable interface.
 
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getLayoutFunctionForComputedComponent(IGM, component,
                                               genericEnv, requirements));
       
@@ -1136,7 +1143,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       
       // Add an initializer function that copies generic arguments out of the
       // pattern argument buffer into the instantiated object.
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getInitializerForComputedComponent(IGM, component, operands,
                                            genericEnv, requirements));
     }
@@ -1352,7 +1359,9 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                                            TheTrivialPropertyDescriptor);
       ApplyIRLinkage({linkInfo.getLinkage(),
                       linkInfo.getVisibility(),
-                      llvm::GlobalValue::DLLExportStorageClass})
+                      IRGen.Opts.InternalizeSymbols
+                          ? llvm::GlobalValue::DefaultStorageClass
+                          : llvm::GlobalValue::DLLExportStorageClass})
           .to(GA, linkInfo.isForDefinition());
     }
     return;

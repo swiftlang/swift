@@ -51,7 +51,8 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   var obj = obj
   // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
+  // CHECK: [[OBJLIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJBOX]]
+  // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJLIFETIME]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
@@ -61,6 +62,7 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]]) AnyObject).Type
   // CHECK-NEXT: [[METHOD:%[0-9]+]] = objc_method [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
   // CHECK: apply [[METHOD]]([[OPENMETA]]) : $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
+  // CHECK: end_borrow [[OBJLIFETIME]]
   // CHECK: destroy_value [[OBJBOX]]
   type(of: obj).staticF!()
 }
@@ -71,11 +73,13 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   var obj = obj
   // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box ${ var AnyObject } 
-  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[EXISTBOX]]
+  // CHECK:   [[EXISTLIFETIME:%[^,]+]] = begin_borrow [lexical] [[EXISTBOX]]
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[EXISTLIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[PBOBJ]]
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
-  // CHECK:   [[PBOPT:%.*]] = project_box [[OPTBOX]]
+  // CHECK:   [[OPTLIFETIME:%[^,]+]] = begin_borrow [lexical] [[OPTBOX]]
+  // CHECK:   [[PBOPT:%.*]] = project_box [[OPTLIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXISTVAL]]
@@ -105,10 +109,29 @@ func opt_to_class(_ obj: AnyObject) {
 
   // Exit
   // CHECK:   destroy_value [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
+  // CHECK:   end_borrow [[OPTLIFETIME]]
   // CHECK:   destroy_value [[OPTBOX]] : ${ var Optional<@callee_guaranteed () -> ()> }
+  // CHECK:   end_borrow [[EXISTLIFETIME]]
   // CHECK:   destroy_value [[EXISTBOX]] : ${ var AnyObject }
   // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK:   return [[RESULT]] : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup20opt_to_class_unboundyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   metatype $@thin AnyObject.Protocol
+// CHECK:   function_ref @$[[THUNK_NAME:[_a-zA-Z0-9]+]]
+// CHECK: } // end sil function '$s14dynamic_lookup20opt_to_class_unboundyyF'
+//
+// CHECK: sil private [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed AnyObject) -> @owned Optional<@callee_guaranteed () -> ()> {
+// CHECK: bb0(%0 : @guaranteed $AnyObject):
+// CHECK:   [[OPENED:%[0-9]+]] = open_existential_ref %0 : $AnyObject to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) AnyObject]]
+// CHECK:   [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]
+// CHECK:   alloc_stack $Optional<@callee_guaranteed () -> ()>
+// CHECK:   dynamic_method_br [[OPENED_COPY]] : $[[OPENED_TY]], #X.f!foreign, bb1, bb2
+// CHECK: } // end sil function '$[[THUNK_NAME]]'
+func opt_to_class_unbound() {
+  let f = AnyObject.f
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup20forced_without_outer{{[_0-9a-zA-Z]*}}F
@@ -122,11 +145,13 @@ func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
+  // CHECK:   [[OBJLIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJBOX]]
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJLIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
-  // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
+  // CHECK:   [[OPTLIFETIME:%[^,]+]] = begin_borrow [lexical] [[OPTBOX]]
+  // CHECK:   [[PBO:%.*]] = project_box [[OPTLIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
@@ -142,11 +167,13 @@ func opt_to_property(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   project_box [[INT_BOX]]
+  // CHECK:   [[INT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INT_BOX]]
+  // CHECK:   project_box [[INT_LIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -171,11 +198,13 @@ func opt_to_property(_ obj: AnyObject) {
 // GUARANTEED-LABEL: sil hidden [ossa] @$s14dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F
   // GUARANTEED: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // GUARANTEED:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // GUARANTEED:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // GUARANTEED:   project_box [[INT_BOX]]
+  // GUARANTEED:   [[INT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INT_BOX]]
+  // GUARANTEED:   project_box [[INT_LIFETIME]]
   // GUARANTEED:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // GUARANTEED:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // GUARANTEED:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -200,11 +229,13 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // CHECK:   [[I_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[I_BOX]]
+  // CHECK:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   alloc_box ${ var Int }
   // CHECK:   project_box
@@ -234,11 +265,13 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
 // GUARANTEED-LABEL: sil hidden [ossa] @$s14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
   // GUARANTEED: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // GUARANTEED:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // GUARANTEED:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // GUARANTEED:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // GUARANTEED:   [[I_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[I_BOX]]
+  // GUARANTEED:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
   // GUARANTEED:   store [[I]] to [trivial] [[PBI]] : $*Int
   // GUARANTEED:   alloc_box ${ var Int }
   // GUARANTEED:   project_box
@@ -268,11 +301,13 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // CHECK:   [[I_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[I_BOX]]
+  // CHECK:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
@@ -301,12 +336,14 @@ func downcast(_ obj: AnyObject) -> X {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to X
+  // CHECK:   end_borrow [[OBJ_LIFETIME]]
   // CHECK:   destroy_value [[OBJ_BOX]] : ${ var AnyObject }
   // CHECK:   return [[X]] : $X
   return obj as! X

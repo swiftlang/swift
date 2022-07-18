@@ -60,7 +60,7 @@ func is_archetype<T : B>(b: B, _: T) -> Bool {
   // CHECK:   integer_literal {{.*}} -1
   // CHECK:   destroy_value [[CASTED_ARG]]
   // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : @owned $B):
-  // CHCEK:   destroy_value [[CASTED_ARG]]
+  // CHECK:   destroy_value [[ORIGINAL_VALUE]]
   // CHECK:   integer_literal {{.*}} 0
   return b is T
 }

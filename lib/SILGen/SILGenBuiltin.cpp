@@ -297,7 +297,9 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
 
   // If the argument is existential, open it.
   if (argTy->isClassExistentialType()) {
-    auto openedTy = OpenedArchetypeType::get(argTy);
+    auto openedTy =
+        OpenedArchetypeType::get(argTy->getCanonicalType(),
+                                 SGF.F.getGenericSignature());
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     arg = SGF.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
   }
@@ -790,7 +792,8 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
   
   // If the argument is existential, open it.
   if (sourceType->isClassExistentialType()) {
-    auto openedTy = OpenedArchetypeType::get(sourceType);
+    auto openedTy = OpenedArchetypeType::get(sourceType->getCanonicalType(),
+                                             SGF.F.getGenericSignature());
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     ref = SGF.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
   }
@@ -1564,8 +1567,7 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
 
     Scope errorScope(SGF, loc);
 
-    auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
-      ->getCanonicalType();
+    auto errorTy = SGF.getASTContext().getErrorExistentialType();
     auto errorVal = SGF.B.createTermResult(
         SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
 

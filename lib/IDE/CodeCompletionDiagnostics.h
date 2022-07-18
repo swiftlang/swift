@@ -13,7 +13,7 @@
 #ifndef SWIFT_IDE_CODECOMPLETIONDIAGNOSTICS_H
 #define SWIFT_IDE_CODECOMPLETIONDIAGNOSTICS_H
 
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResult.h"
 
 namespace swift {
 
@@ -21,12 +21,21 @@ class ValueDecl;
 
 namespace ide {
 
-/// Populate \p severity and \p Out with the diagnostics for \p D.
+/// Populate \p severity and \p Out with the context-free diagnostics for \p D.
+/// See \c NotRecommendedReason for an explaination of context-free vs.
+/// contextual diagnostics.
 /// Returns \c true if it fails to generate the diagnostics.
-bool getCompletionDiagnostics(CodeCompletionResult::NotRecommendedReason reason,
-                              const ValueDecl *D,
-                              CodeCompletionDiagnosticSeverity &severity,
-                              llvm::raw_ostream &Out);
+bool getContextFreeCompletionDiagnostics(
+    ContextFreeNotRecommendedReason reason, const ValueDecl *D,
+    CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out);
+
+/// Populate \p severity and \p Out with the contextual diagnostics for \p D.
+/// See \c NotRecommendedReason for an explaination of context-free vs.
+/// contextual diagnostics.
+/// Returns \c true if it fails to generate the diagnostics.
+bool getContextualCompletionDiagnostics(
+    ContextualNotRecommendedReason reason, const ValueDecl *D,
+    CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out);
 
 } // namespace ide
 } // namespace swift

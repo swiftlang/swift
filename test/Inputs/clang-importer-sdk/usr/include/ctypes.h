@@ -324,4 +324,13 @@ typedef double real_t __attribute__((availability(swift,unavailable,message="use
 
 extern real_t realSin(real_t value);
 
+struct PartialImport {
+  int a;
+  int b;
+  int _Complex c;
+  int _Complex d;
+};
+
+struct PartialImport partialImport = {1, 2, 3, 4};
+
 #endif

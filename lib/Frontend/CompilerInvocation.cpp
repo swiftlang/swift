@@ -160,38 +160,48 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
+  // If this is set, we don't want any runtime import paths.
+  if (SearchPathOpts.SkipRuntimeLibraryImportPaths) {
+    SearchPathOpts.setRuntimeLibraryImportPaths({});
+    return;
+  }
+
   // Set up the import paths containing the swiftmodules for the libraries in
   // RuntimeLibraryPath.
-  SearchPathOpts.RuntimeLibraryImportPaths.clear();
-
-  // If this is set, we don't want any runtime import paths.
-  if (SearchPathOpts.SkipRuntimeLibraryImportPaths)
-    return;
-
-  SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+  std::vector<std::string> RuntimeLibraryImportPaths;
+  RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
 
   // This is compatibility for <=5.3
   if (!Triple.isOSDarwin()) {
     llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+    RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
 
-  if (!SearchPathOpts.SDKPath.empty()) {
+  if (!SearchPathOpts.getSDKPath().empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
-      LibPath = SearchPathOpts.SDKPath;
+      LibPath = SearchPathOpts.getSDKPath();
       llvm::sys::path::append(LibPath, "System", "iOSSupport");
       llvm::sys::path::append(LibPath, "usr", "lib", "swift");
-      SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+      RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
     }
 
-    LibPath = SearchPathOpts.SDKPath;
+    LibPath = SearchPathOpts.getSDKPath();
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
     if (!Triple.isOSDarwin()) {
+      // Use the non-architecture suffixed form with directory-layout
+      // swiftmodules.
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+      RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+
+      // Compatibility with older releases - use the architecture suffixed form
+      // for pre-directory-layout multi-architecture layout.  Note that some
+      // platforms (e.g. Windows) will use this even with directory layout in
+      // older releases.
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+    RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
+  SearchPathOpts.setRuntimeLibraryImportPaths(RuntimeLibraryImportPaths);
 }
 
 static void
@@ -259,7 +269,7 @@ void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
-  SearchPathOpts.SDKPath = Path;
+  SearchPathOpts.setSDKPath(Path);
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
@@ -358,6 +368,9 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
       Opts.PrintSPIs = true;
     }
   }
+  for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
+    Opts.ModulesToSkipInPublicInterface.push_back(val);
+  }
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -434,39 +447,30 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
                                             OPT_serialize_diagnostics_path);
 
-  Opts.EnableExperimentalStaticAssert |=
-    Args.hasArg(OPT_enable_experimental_static_assert);
-
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
-
-  Opts.EnableExperimentalNamedOpaqueTypes |=
-      Args.hasArg(OPT_enable_experimental_named_opaque_types);
-
-  Opts.EnableExplicitExistentialTypes |=
-      Args.hasArg(OPT_enable_explicit_existential_types);
-
-  Opts.EnableExperimentalDistributed |=
-    Args.hasArg(OPT_enable_experimental_distributed);
-
-  Opts.EnableExperimentalMoveOnly |=
-    Args.hasArg(OPT_enable_experimental_move_only);
 
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
                  false);
-  Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
-    Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
+
+  Opts.DisableExperimentalClangImporterDiagnostics |=
+      Args.hasArg(OPT_disable_experimental_clang_importer_diagnostics);
+
+  Opts.EnableExperimentalEagerClangModuleDiagnostics |=
+      !Args.hasArg(OPT_disable_experimental_clang_importer_diagnostics) &&
+      Args.hasArg(OPT_enable_experimental_eager_clang_module_diagnostics);
 
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 
-  /// experimental distributed also implicitly enables experimental concurrency
-  Opts.EnableExperimentalDistributed |=
-    Args.hasArg(OPT_enable_experimental_distributed);
-  Opts.EnableExperimentalConcurrency |=
-    Args.hasArg(OPT_enable_experimental_distributed);
+  Opts.DisableImplicitStringProcessingModuleImport |=
+    Args.hasArg(OPT_disable_implicit_string_processing_module_import);
+
+  if (Args.hasArg(OPT_enable_experimental_async_top_level))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-enable-experimental-async-top-level");
 
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
@@ -477,14 +481,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
-  // Experimental string processing
-  Opts.EnableExperimentalStringProcessing |=
-      Args.hasArg(OPT_enable_experimental_string_processing);
-
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   Opts.CheckAPIAvailabilityOnly |=
       Args.hasArg(OPT_check_api_availability_only);
+  Opts.EnableAdHocAvailability |=
+      Args.hasArg(OPT_enable_ad_hoc_availability);
 
   if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
                                OPT_disable_conformance_availability_errors)) {
@@ -538,12 +540,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
-
-  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
-    Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
-
-  Opts.EnableExperimentalForwardModeDifferentiation |=
-      Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -605,6 +601,63 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
 
+  // Determine whether string processing is enabled
+  Opts.EnableExperimentalStringProcessing =
+    Args.hasFlag(OPT_enable_experimental_string_processing,
+                 OPT_disable_experimental_string_processing);
+
+  // Add a future feature if it is not already implied by the language version.
+  auto addFutureFeatureIfNotImplied = [&](Feature feature) {
+    // Check if this feature was introduced already in this language version.
+    if (auto firstVersion = getFeatureLanguageVersion(feature)) {
+      if (Opts.isSwiftVersionAtLeast(*firstVersion))
+        return;
+    }
+
+    Opts.Features.insert(feature);
+  };
+
+  // Map historical flags over to future features.
+  if (Args.hasArg(OPT_enable_experimental_concise_pound_file))
+    addFutureFeatureIfNotImplied(Feature::ConciseMagicFile);
+  if (Args.hasArg(OPT_enable_bare_slash_regex))
+    addFutureFeatureIfNotImplied(Feature::BareSlashRegexLiterals);
+
+  for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
+    // If this is a known experimental feature, allow it in +Asserts
+    // (non-release) builds for testing purposes.
+    if (auto feature = getExperimentalFeature(A->getValue())) {
+#ifdef NDEBUG
+      Diags.diagnose(SourceLoc(),
+                     diag::error_experimental_feature_not_available,
+                     A->getValue());
+#endif
+
+      Opts.Features.insert(*feature);
+    }
+  }
+
+  // Map historical flags over to experimental features. We do this for all
+  // compilers because that's how existing experimental feature flags work.
+  if (Args.hasArg(OPT_enable_experimental_variadic_generics))
+    Opts.Features.insert(Feature::VariadicGenerics);
+  if (Args.hasArg(OPT_enable_experimental_static_assert))
+    Opts.Features.insert(Feature::StaticAssert);
+  if (Args.hasArg(OPT_enable_experimental_named_opaque_types))
+    Opts.Features.insert(Feature::NamedOpaqueTypes);
+  if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
+    Opts.Features.insert(Feature::FlowSensitiveConcurrencyCaptures);
+  if (Args.hasArg(OPT_enable_experimental_move_only))
+    Opts.Features.insert(Feature::MoveOnly);
+  if (Args.hasArg(OPT_experimental_one_way_closure_params))
+    Opts.Features.insert(Feature::OneWayClosureParameters);
+  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
+    Opts.Features.insert(Feature::TypeWitnessSystemInference);
+  if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
+    Opts.Features.insert(Feature::ForwardModeDifferentiation);
+  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
+    Opts.Features.insert(Feature::AdditiveArithmeticDerivedConformances);
+
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
   Opts.EnableSwift3ObjCInference =
@@ -643,7 +696,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.WarnConcurrency |= Args.hasArg(OPT_warn_concurrency);
+  // Swift 6+ uses the strictest concurrency level.
+  if (Opts.isSwiftVersionAtLeast(6)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+  } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
+    auto value = llvm::StringSwitch<Optional<StrictConcurrency>>(A->getValue())
+      .Case("minimal", StrictConcurrency::Minimal)
+      .Case("targeted", StrictConcurrency::Targeted)
+      .Case("complete", StrictConcurrency::Complete)
+      .Default(None);
+
+    if (value)
+      Opts.StrictConcurrencyLevel = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+
+  } else if (Args.hasArg(OPT_warn_concurrency)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+  } else {
+    // Default to "limited" checking in Swift 5.x.
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Targeted;
+  }
 
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
@@ -680,10 +754,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
-  Opts.EnableConcisePoundFile =
-      Args.hasArg(OPT_enable_experimental_concise_pound_file) ||
-      Opts.EffectiveLanguageVersion.isVersionAtLeast(6);
-
   Opts.EnableCrossImportOverlays =
       Args.hasFlag(OPT_enable_cross_import_overlays,
                    OPT_disable_cross_import_overlays,
@@ -719,7 +789,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Collect -clang-target value if specified in the front-end invocation.
   // Usually, the driver will pass down a clang target with the
-  // exactly same value as the main target, so we could dignose the usage of
+  // exactly same value as the main target, so we could diagnose the usage of
   // unavailable APIs.
   // The reason we cannot infer clang target from -target is that not all
   // front-end invocation will include a -target to start with. For instance,
@@ -731,11 +801,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
-  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
+  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
-  Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
+
+  Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
@@ -767,29 +838,61 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 
-  // Parse the SDK version.
-  if (Arg *A = Args.getLastArg(options::OPT_target_sdk_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue()) {
-      Opts.SDKVersion = *vers;
-    } else {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    }
-  }
+  // First, set up default minimum inlining target versions.
+  auto getDefaultMinimumInliningTargetVersion =
+      [&](const llvm::Triple &triple) -> llvm::VersionTuple {
+    // FIXME: Re-enable with rdar://91387029
+#if SWIFT_DEFAULT_API_TARGET_MIN_INLINING_VERSION_TO_MIN
+    // In API modules, default to the version when Swift first became available.
+    if (Opts.LibraryLevel == LibraryLevel::API)
+      if (auto minTriple = minimumAvailableOSVersionForTriple(triple))
+        return *minTriple;
+#endif
 
-  // Parse the target variant SDK version.
-  if (Arg *A = Args.getLastArg(options::OPT_target_variant_sdk_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue()) {
-      Opts.VariantSDKVersion = *vers;
-    } else {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    }
-  }
+    // In other modules, assume that availability is used less consistently
+    // and that library clients will generally raise deployment targets as the
+    // library evolves so the min inlining version should be the deployment
+    // target by default.
+    unsigned major, minor, patch;
+    if (triple.isMacOSX())
+      triple.getMacOSXVersion(major, minor, patch);
+    else
+      triple.getOSVersion(major, minor, patch);
+    return llvm::VersionTuple(major, minor, patch);
+  };
+
+  Opts.MinimumInliningTargetVersion =
+      getDefaultMinimumInliningTargetVersion(Opts.Target);
+
+  // Parse OS version number arguments.
+  auto parseVersionArg = [&](OptSpecifier opt) -> Optional<llvm::VersionTuple> {
+    Arg *A = Args.getLastArg(opt);
+    if (!A)
+      return None;
+
+    if (StringRef(A->getValue()) == "min")
+      return minimumAvailableOSVersionForTriple(Opts.Target);
+    if (StringRef(A->getValue()) == "target")
+      return Opts.getMinPlatformVersion();
+
+    if (auto vers = version::Version::parseVersionString(A->getValue(),
+                                                         SourceLoc(), &Diags))
+      return (llvm::VersionTuple)*vers;
+
+    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                   A->getAsString(Args), A->getValue());
+    return None;
+  };
+
+  if (auto vers = parseVersionArg(OPT_min_inlining_target_version))
+    // FIXME: Should we diagnose if it's below the default?
+    Opts.MinimumInliningTargetVersion = *vers;
+
+  if (auto vers = parseVersionArg(OPT_target_sdk_version))
+    Opts.SDKVersion = *vers;
+
+  if (auto vers = parseVersionArg(OPT_target_variant_sdk_version))
+    Opts.VariantSDKVersion = *vers;
 
   // Get the SDK name.
   if (Arg *A = Args.getLastArg(options::OPT_target_sdk_name)) {
@@ -846,68 +949,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
-  if (auto A = Args.getLastArg(OPT_requirement_machine_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Default(None);
-
-    if (value)
-      Opts.EnableRequirementMachine = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
-
-  if (auto A = Args.getLastArg(OPT_requirement_machine_protocol_signatures_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Default(None);
-
-    if (value)
-      Opts.RequirementMachineProtocolSignatures = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
-
-  if (auto A = Args.getLastArg(OPT_requirement_machine_abstract_signatures_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Default(None);
-
-    if (value)
-      Opts.RequirementMachineAbstractSignatures = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
-
-  if (auto A = Args.getLastArg(OPT_requirement_machine_inferred_signatures_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Default(None);
-
-    if (value)
-      Opts.RequirementMachineInferredSignatures = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
-
-  if (auto A = Args.getLastArg(OPT_enable_requirement_machine_merged_associated_types,
-                               OPT_disable_requirement_machine_merged_associated_types)) {
-    Opts.RequirementMachineMergedAssociatedTypes
-      = A->getOption().matches(OPT_enable_requirement_machine_merged_associated_types);
-  }
-
   Opts.DumpRequirementMachine = Args.hasArg(
       OPT_dump_requirement_machine);
   Opts.AnalyzeRequirementMachine = Args.hasArg(
@@ -916,26 +957,73 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_debug_requirement_machine))
     Opts.DebugRequirementMachine = A->getValue();
 
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_step_limit)) {
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_rule_count)) {
     unsigned limit;
     if (StringRef(A->getValue()).getAsInteger(10, limit)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     } else {
-      Opts.RequirementMachineStepLimit = limit;
+      Opts.RequirementMachineMaxRuleCount = limit;
     }
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_depth_limit)) {
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_rule_length)) {
     unsigned limit;
     if (StringRef(A->getValue()).getAsInteger(10, limit)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     } else {
-      Opts.RequirementMachineDepthLimit = limit;
+      Opts.RequirementMachineMaxRuleLength = limit;
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_concrete_nesting)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineMaxConcreteNesting = limit;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_split_concrete_equiv_class_attempts)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineMaxSplitConcreteEquivClassAttempts = limit;
+    }
+  }
+
+  if (Args.hasArg(OPT_disable_requirement_machine_concrete_contraction))
+    Opts.EnableRequirementMachineConcreteContraction = false;
+
+  if (Args.hasArg(OPT_disable_requirement_machine_loop_normalization))
+    Opts.EnableRequirementMachineLoopNormalization = false;
+
+  if (Args.hasArg(OPT_disable_requirement_machine_reuse))
+    Opts.EnableRequirementMachineReuse = false;
+
+  if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
+    Opts.EnableRequirementMachineOpaqueArchetypes = true;
+
+  if (Args.hasArg(OPT_warn_redundant_requirements))
+    Opts.WarnRedundantRequirements = true;
+
+  Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
+
+  if (const Arg *A = Args.getLastArg(options::OPT_concurrency_model)) {
+    Opts.ActiveConcurrencyModel =
+        llvm::StringSwitch<ConcurrencyModel>(A->getValue())
+            .Case("standard", ConcurrencyModel::Standard)
+            .Case("task-to-thread", ConcurrencyModel::TaskToThread)
+            .Default(ConcurrencyModel::Standard);
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;
@@ -1022,12 +1110,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
 
-  Opts.EnableOneWayClosureParameters |=
-      Args.hasArg(OPT_experimental_one_way_closure_params);
-
-  Opts.EnableMultiStatementClosureInference |=
-      Args.hasArg(OPT_experimental_multi_statement_closures);
-
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
 
@@ -1089,14 +1171,23 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
-  for (auto A : Args.getAllArgValues(OPT_debug_prefix_map)) {
+  for (const Arg *A : Args.filtered(OPT_file_prefix_map,
+                                    OPT_debug_prefix_map)) {
+    std::string Val(A->getValue());
     // Forward -debug-prefix-map arguments from Swift to Clang as
-    // -fdebug-prefix-map. This is required to ensure DIFiles created there,
-    // like "<swift-imported-modules>", have their paths remapped properly.
+    // -fdebug-prefix-map= and -file-prefix-map as -ffile-prefix-map=.
+    //
+    // This is required to ensure DIFiles created there, like
+    /// "<swift-imported-modules>", as well as index data, have their paths
+    // remapped properly.
+    //
     // (Note, however, that Clang's usage of std::map means that the remapping
     // may not be applied in the same order, which can matter if one mapping is
     // a prefix of another.)
-    Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + A);
+    if (A->getOption().matches(OPT_file_prefix_map))
+      Opts.ExtraArgs.push_back("-ffile-prefix-map=" + Val);
+    else
+      Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
   }
 
   if (!workingDirectory.empty()) {
@@ -1120,7 +1211,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
-  Opts.EnableClangSPI |= Args.hasArg(OPT_enable_clang_spi);
+  if (Args.hasArg(OPT_disable_clang_spi)) {
+    Opts.EnableClangSPI = false;
+  }
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
 
@@ -1173,6 +1266,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.PrettyPrint = false;
   Opts.EmitSynthesizedMembers = true;
   Opts.PrintMessages = false;
+  Opts.IncludeClangDocs = false;
 }
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts,
@@ -1191,14 +1285,20 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     return std::string(fullPath.str());
   };
 
+  std::vector<std::string> ImportSearchPaths(Opts.getImportSearchPaths());
   for (const Arg *A : Args.filtered(OPT_I)) {
-    Opts.ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
+    ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
+  Opts.setImportSearchPaths(ImportSearchPaths);
 
+  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths(
+      Opts.getFrameworkSearchPaths());
   for (const Arg *A : Args.filtered(OPT_F, OPT_Fsystem)) {
-    Opts.FrameworkSearchPaths.push_back({resolveSearchPath(A->getValue()),
-                           /*isSystem=*/A->getOption().getID() == OPT_Fsystem});
+    FrameworkSearchPaths.push_back(
+        {resolveSearchPath(A->getValue()),
+         /*isSystem=*/A->getOption().getID() == OPT_Fsystem});
   }
+  Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
@@ -1209,7 +1309,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
 
   if (const Arg *A = Args.getLastArg(OPT_sdk))
-    Opts.SDKPath = A->getValue();
+    Opts.setSDKPath(A->getValue());
 
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
@@ -1466,6 +1566,15 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
+  Optional<DestroyHoistingOption> specifiedDestroyHoistingOption;
+  if (Arg *A = Args.getLastArg(OPT_enable_destroy_hoisting)) {
+    specifiedDestroyHoistingOption = 
+        llvm::StringSwitch<Optional<DestroyHoistingOption>>(A->getValue())
+          .Case("true", DestroyHoistingOption::On)
+          .Case("false", DestroyHoistingOption::Off)
+          .Default(None);
+  }
+
   Optional<CopyPropagationOption> specifiedCopyPropagationOption;
   if (Arg *A = Args.getLastArg(OPT_copy_propagation_state_EQ)) {
     specifiedCopyPropagationOption =
@@ -1510,6 +1619,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
             .Case("false", false)
             .Default(None);
   }
+
+  // Allow command line flags to override the default value of
+  // Opts.LexicalLifetimes. If no explicit flags are passed, then
+  // Opts.LexicalLifetimes retains its initial value.
   Optional<bool> enableLexicalLifetimesFlag;
   if (Arg *A = Args.getLastArg(OPT_enable_lexical_lifetimes)) {
     enableLexicalLifetimesFlag =
@@ -1563,13 +1676,17 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // Unless overridden below, enabling copy propagation means enabling lexical
   // lifetimes.
-  if (Opts.CopyPropagation == CopyPropagationOption::On)
+  if (Opts.CopyPropagation == CopyPropagationOption::On) {
     Opts.LexicalLifetimes = LexicalLifetimesOption::On;
+    Opts.DestroyHoisting = DestroyHoistingOption::On;
+  }
 
   // Unless overridden below, disable copy propagation means disabling lexical
   // lifetimes.
-  if (Opts.CopyPropagation == CopyPropagationOption::Off)
+  if (Opts.CopyPropagation == CopyPropagationOption::Off) {
     Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
+    Opts.DestroyHoisting = DestroyHoistingOption::Off;
+  }
 
   // If move-only is enabled, always enable lexical lifetime as well.  Move-only
   // depends on lexical lifetimes.
@@ -1590,16 +1707,23 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
     }
   }
+  if (specifiedDestroyHoistingOption)
+    Opts.DestroyHoisting = *specifiedDestroyHoistingOption;
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
+  Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
-  Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
+  if (Args.hasArg(OPT_CrossModuleOptimization)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Aggressive;
+  } else if (Args.hasArg(OPT_EnbaleDefaultCMO)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Default;  
+  }
   Opts.EnablePerformanceAnnotations |=
       Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
@@ -1626,6 +1750,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
   Opts.ParseStdlib = FEOpts.ParseStdlib;
+
+  Opts.emitTBD = FEOpts.InputsAndOutputs.hasTBDPath();
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_EQ)) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
@@ -1808,10 +1934,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                                           RenderedArgs, SDKPath,
                                           ResourceDir);
     }
-    // TODO: Should we support -fdebug-compilation-dir?
-    llvm::SmallString<256> cwd;
-    llvm::sys::fs::current_path(cwd);
-    Opts.DebugCompilationDir = std::string(cwd.str());
+
+    if (const Arg *A = Args.getLastArg(OPT_file_compilation_dir))
+      Opts.DebugCompilationDir = A->getValue();
+    else {
+      llvm::SmallString<256> cwd;
+      llvm::sys::fs::current_path(cwd);
+      Opts.DebugCompilationDir = std::string(cwd.str());
+    }
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
@@ -1841,6 +1971,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                    Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
                      ? "-gline-tables-only"
                      : "-gdwarf_types");
+  }
+
+  for (auto A : Args.getAllArgValues(options::OPT_file_prefix_map)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.FilePrefixMap.addMapping(SplitMap.first, SplitMap.second);
+    Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);
+    Opts.CoveragePrefixMap.addMapping(SplitMap.first, SplitMap.second);
   }
 
   for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
@@ -1896,6 +2033,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.StackPromotionSizeLimit = limit;
   }
 
+  if (Args.hasArg(OPT_trap_function))
+    Opts.TrapFuncName = Args.getLastArgValue(OPT_trap_function).str();
+
   Opts.FunctionSections = Args.hasArg(OPT_function_sections);
 
   if (Args.hasArg(OPT_autolink_force_load))
@@ -1905,6 +2045,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_no_clang_module_breadcrumbs))
     Opts.DisableClangModuleSkeletonCUs = true;
+
+  if (auto A = Args.getLastArg(OPT_enable_round_trip_debug_types,
+                               OPT_disable_round_trip_debug_types)) {
+    Opts.DisableRoundTripDebugTypes =
+        Args.hasArg(OPT_disable_round_trip_debug_types);
+  }
 
   if (Args.hasArg(OPT_disable_debugger_shadow_copies))
     Opts.DisableDebuggerShadowCopies = true;
@@ -1954,7 +2100,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.UseTypeLayoutValueHandling
       = A->getOption().matches(OPT_enable_type_layouts);
   } else if (Opts.OptMode == OptimizationMode::NoOptimization) {
-    // Disable type layouts at Onone except if explictly requested.
+    // Disable type layouts at Onone except if explicitly requested.
     Opts.UseTypeLayoutValueHandling = false;
   }
 
@@ -2025,8 +2171,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_disable_reflection_metadata)) {
-    Opts.EnableReflectionMetadata = false;
+    Opts.ReflectionMetadata = ReflectionMetadataMode::None;
     Opts.EnableReflectionNames = false;
+  }
+
+  if (Args.hasArg(OPT_reflection_metadata_for_debugger_only)) {
+    Opts.ReflectionMetadata = ReflectionMetadataMode::DebuggerOnly;
+    Opts.EnableReflectionNames = true;
   }
 
   if (Args.hasArg(OPT_enable_anonymous_context_mangled_names))
@@ -2053,6 +2204,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // AsyncFunctionPointer data block.  Force the use of indirect
   // AsyncFunctionPointer access.
   Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
+
+  // On some Harvard architectures that allow sliding code and data address space
+  // offsets independently, it's impossible to make direct relative reference to
+  // code from data because the relative offset between them is not representable.
+  // Use absolute function references instead of relative ones on such targets.
+  // TODO(katei): This is a short-term solution until the WebAssembly target stabilizes
+  // PIC and 64-bit specifications and toolchain support.
+  Opts.CompactAbsoluteFunctionPointer = Triple.isOSBinFormatWasm();
 
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
@@ -2141,6 +2300,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      "-num-threads");
     }
   }
+  Opts.UseSingleModuleLLVMEmission =
+      Opts.NumThreads != 0 &&
+      Args.hasArg(OPT_enable_single_module_llvm_emission);
 
   if (SWIFT_ENABLE_GLOBAL_ISEL_ARM64 &&
       Triple.getArch() == llvm::Triple::aarch64 &&
@@ -2164,6 +2326,16 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.InternalizeAtLink = true;
   }
 
+  Opts.InternalizeSymbols = FrontendOpts.Static;
+
+  if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
+    Opts.NoPreallocatedInstantiationCaches = true;
+  }
+
+  if (Args.hasArg(OPT_disable_readonly_static_objects)) {
+    Opts.DisableReadonlyStaticObjects = true;
+  }
+
   // Default to disabling swift async extended frame info on anything but
   // darwin. Other platforms are unlikely to have support for extended frame
   // pointer information.
@@ -2185,7 +2357,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (Triple.isWatchOS() && !Triple.isSimulatorEnvironment()) {
     // watchOS does not support auto async frame pointers due to bitcode, so
     // silently override "auto" to "never" when back-deploying. This approach
-    // sacrifies async backtraces when back-deploying but prevents crashes in
+    // sacrifices async backtraces when back-deploying but prevents crashes in
     // older tools that cannot handle the async frame bit in the frame pointer.
     unsigned major, minor, micro;
     Triple.getWatchOSVersion(major, minor, micro);
@@ -2386,7 +2558,7 @@ serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
   serialization::ValidationInfo info = serialization::validateSerializedAST(
-      data, getSILOptions().EnableOSSAModules, &extendedInfo);
+      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName, &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -2422,7 +2594,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
-      &extendedInfo);
+      LangOpts.SDKName, &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

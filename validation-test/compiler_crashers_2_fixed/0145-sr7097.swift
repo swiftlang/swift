@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -o -
 
@@ -9,11 +9,10 @@ protocol P2 {
 }
 
 // CHECK-LABEL: .P3@
-// CHECK-NEXT: Requirement signature: <Self where Self : P2, Self.Assoc == ConformsToP1>
+// CHECK-NEXT: Requirement signature: <Self where Self : P2, Self.[P2]Assoc == ConformsToP1>
 protocol P3 : P2 { }
 
 struct S0<M: P3> where M.Assoc: P1 { } // expected-warning{{redundant conformance constraint 'M.Assoc' : 'P1'}}
-// expected-note@-1{{conformance constraint 'M.Assoc' : 'P1' implied here}}
 
 struct ConformsToP1: P1 { }
 

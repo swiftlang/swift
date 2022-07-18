@@ -64,6 +64,9 @@ set CUSTOM_CLANG_MODULE_CACHE=%build_root%\tmp\org.llvm.clang.9999
 md %build_root%\tmp\org.swift.package-manager
 set SWIFTPM_MODULECACHE_OVERRIDE=%build_root%\tmp\org.swift.package-manager
 
+set RunTest=1
+if "%1"=="-notest" set RunTest=0
+
 call :clone_repositories %exitOnError%
 call :download_icu %exitOnError%
 :: TODO: Disabled until we need LLBuild/SwiftPM in this build script.
@@ -83,8 +86,11 @@ path %PATH%;C:\Program Files\Git\usr\bin
 call :build_libdispatch %exitOnError%
 
 path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
-call :test_swift %exitOnError%
-call :test_libdispatch %exitOnError%
+
+if %RunTest%==1 (
+  call :test_swift %exitOnError%
+  call :test_libdispatch %exitOnError%
+)
 
 goto :end
 endlocal
@@ -164,8 +170,8 @@ setlocal enableextensions enabledelayedexpansion
 
 copy /y "%source_root%\swift\stdlib\public\Platform\ucrt.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" %exitOnError%
 copy /y "%source_root%\swift\stdlib\public\Platform\winsdk.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" %exitOnError%
-copy /y "%source_root%\swift\stdlib\public\Platform\visualc.modulemap" "%VCToolsInstallDir%\include\module.modulemap" %exitOnError%
-copy /y "%source_root%\swift\stdlib\public\Platform\visualc.apinotes" "%VCToolsInstallDir%\include\visualc.apinotes" %exitOnError%
+copy /y "%source_root%\swift\stdlib\public\Platform\vcruntime.modulemap" "%VCToolsInstallDir%\include\module.modulemap" %exitOnError%
+copy /y "%source_root%\swift\stdlib\public\Platform\vcruntime.apinotes" "%VCToolsInstallDir%\include\vcruntime.apinotes" %exitOnError%
 
 goto :eof
 endlocal
@@ -257,10 +263,6 @@ cmake^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DSWIFT_INCLUDE_DOCS:BOOL=NO^
-    -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE:PATH=%source_root%\icu-%icu_version%\include\unicode^
-    -DSWIFT_WINDOWS_x86_64_ICU_UC:PATH=%source_root%\icu-%icu_version%\lib64\icuuc.lib^
-    -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE:PATH=%source_root%\icu-%icu_version%\include^
-    -DSWIFT_WINDOWS_x86_64_ICU_I18N:PATH=%source_root%\icu-%icu_version%\lib64\icuin.lib^
     -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=YES^
     -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=YES^
     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=NO^

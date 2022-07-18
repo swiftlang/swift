@@ -25,27 +25,27 @@ import Builtin
 // Some functions are marked transparent to prevent ExternalDefsToDecls opt from
 // converting them into declarations.
 
-sil public_external @pe : $@convention(thin) () -> () {
+sil public_external [serialized] @pe : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public_external [transparent] @transparent_pe : $@convention(thin) () -> () {
+sil public_external [serialized] [transparent] @transparent_pe : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden_external @he : $@convention(thin) () -> () {
+sil hidden @he : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden_external [transparent] @tranparent_he : $@convention(thin) () -> () {
+sil hidden [transparent] @tranparent_he : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared_external @se : $@convention(thin) () -> () {
+sil shared @se : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
@@ -53,35 +53,35 @@ sil shared_external @se : $@convention(thin) () -> () {
 // Check that external non-shared functions are serialized only
 // if they are referenced from something reachable from non-external functions.
 // Since all these fN functions are referenced only from an external function,
-// do not serialize even their declrations.
+// do not serialize even their declarations.
 
 // CHECK-NOT: sil{{.*}}@fn1 : $@convention(thin) () -> ()
-sil public_external [noinline] @fn1 : $@convention(thin) () -> () {
+sil public_external [serialized] [noinline] @fn1 : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
 // CHECK-NOT: sil{{.*}}@fn2: $@convention(thin) () -> ()
-sil public_external [noinline] @fn2 : $@convention(thin) () -> () {
+sil public_external [serialized] [noinline] @fn2 : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
 // CHECK-NOT: sil{{.*}}@fn3 : $@convention(thin) () -> ()
-sil public_external [noinline] @fn3 : $@convention(thin) () -> () {
+sil public_external [serialized] [noinline] @fn3 : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
 // CHECK-NOT: sil{{.*}}@fn4 : $@convention(thin) () -> ()
-sil public_external [noinline] @fn4 : $@convention(thin) () -> () {
+sil public_external [serialized] [noinline] @fn4 : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
 // Emit the declaration of this function, because it is referenced from serialized
 // function use_external_functions.
-sil public_external [noinline] @used_external_fn : $@convention(thin) () -> () {
+sil public_external [serialized] [noinline] @used_external_fn : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
@@ -94,7 +94,7 @@ sil public_external [noinline] @used_external_fn : $@convention(thin) () -> () {
 // CHECK-NOT: sil{{.*}}@public_external_fn : $@convention(thin) () -> () {
 // But declaration should be present.
 // CHECK: sil{{.*}}@public_external_fn : $@convention(thin) () -> ()
-sil public_external [noinline] @public_external_fn : $@convention(thin) () -> () {
+sil public_external [serialized] [noinline] @public_external_fn : $@convention(thin) () -> () {
   %0 = function_ref @fn1 : $@convention(thin) () -> ()
   %1 = apply %0 () : $@convention(thin) () -> ()
   %2 = function_ref @fn2 : $@convention(thin) () -> ()

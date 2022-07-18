@@ -154,11 +154,14 @@ public:
 };
 
 /// Initialize the service. Must be called before attempting to handle requests.
+/// \param swiftExecutablePath The path of the swift-frontend executable.
+///                            Used to find clang relative to it.
 /// \param runtimeLibPath The path to the toolchain's library directory.
 /// \param diagnosticDocumentationPath The path to diagnostics documentation.
 /// \param postNotification Callback to post a notification.
 void initializeService(
-    llvm::StringRef runtimeLibPath, llvm::StringRef diagnosticDocumentationPath,
+    llvm::StringRef swiftExecutablePath, llvm::StringRef runtimeLibPath,
+    llvm::StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification);
 /// Shutdown the service.
 void shutdownService();
@@ -193,8 +196,6 @@ sourcekitd_response_t createErrorRequestCancelled();
 // The client & service have their own implementations for these.
 sourcekitd_uid_t SKDUIDFromUIdent(SourceKit::UIdent UID);
 SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
-
-void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
 
 static inline sourcekitd_variant_t makeNullVariant() {
   return {{ 0, 0, 0 }};

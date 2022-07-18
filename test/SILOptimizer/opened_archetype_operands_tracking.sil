@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all %s -O | %FileCheck %s
 // RUN: %target-sil-opt -jumpthread-simplify-cfg -enable-sil-verify-all %s -O | %FileCheck --check-prefix=CHECK-SIMPLIFY-CFG %s
 
+// REQUIRES: swift_in_compiler
+
 // Check some corner cases related to tracking of opened archetypes.
 // For example, the compiler used to crash compiling the "process" function (rdar://28024272)
 
@@ -34,7 +36,7 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @process
+// CHECK-LABEL: sil {{.*}}@process
 // CHECK: bb0
 // CHECK-NOT: try_apply
 // CHECK-NOT: unreachable
@@ -215,7 +217,7 @@ sil hidden_external @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 // CHECK: function_ref @use 
 // CHECK-NOT: function_ref
 // CHECK: strong_release{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
-// CHECK: dealloc_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: dealloc_stack_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
 // CHECK: end sil function 'bar' 
 sil @bar : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
@@ -241,7 +243,7 @@ bb0(%0 : $Int32):
 // was not aware of the opened archetype definition that becomes unused and gets removed
 // after the inlining.
 //
-// CHECK-LABEL: sil @check_removal_of_unregistered_archetype_def
+// CHECK-LABEL: sil {{.*}}@check_removal_of_unregistered_archetype_def
 // CHECK-NOT: init_existential
 // CHECK-NOT: open_existential
 // CHECK-NOT: function_ref
@@ -274,7 +276,7 @@ class C {
   init()
 }
 
-// CHECK-SIMPLIFY-CFG-LABEL: sil @test_infinite_loop_in_unreachable_block
+// CHECK-SIMPLIFY-CFG-LABEL: sil {{.*}}@test_infinite_loop_in_unreachable_block
 // CHECK-SIMPLIFY-CFG: bb0
 // CHECK-SIMPLIFY-CFG-NOT: bb1
 // CHECK-SIMPLIFY-CFG: end sil function 'test_infinite_loop_in_unreachable_block'

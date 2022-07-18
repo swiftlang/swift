@@ -167,6 +167,11 @@ enum class SILFunctionTypeRepresentation : uint8_t {
 
   /// A closure invocation function that has not been bound to a context.
   Closure,
+
+  /// A C++ method that takes a "this" argument (not a static C++ method or
+  /// constructor). Except for
+  /// handling the "this" argument, has the same behavior as "CFunctionPointer".
+  CXXMethod,
 };
 
 /// Returns true if the function with this convention doesn't carry a context.
@@ -196,6 +201,7 @@ isThinRepresentation(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return true;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
@@ -232,6 +238,7 @@ convertRepresentation(SILFunctionTypeRepresentation rep) {
     return {FunctionTypeRepresentation::Block};
   case SILFunctionTypeRepresentation::Thin:
     return {FunctionTypeRepresentation::Thin};
+  case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     return {FunctionTypeRepresentation::CFunctionPointer};
   case SILFunctionTypeRepresentation::Method:
@@ -252,6 +259,7 @@ constexpr bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return false;
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Method:
@@ -269,6 +277,7 @@ template <typename Repr> constexpr bool shouldStoreClangType(Repr repr) {
   switch (static_cast<SILFunctionTypeRepresentation>(repr)) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return true;
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Thick:
@@ -349,8 +358,6 @@ public:
 
   constexpr Representation getRepresentation() const {
     unsigned rawRep = bits & RepresentationMask;
-    assert(rawRep <= unsigned(Representation::Last) &&
-           "unexpected SIL representation");
     return Representation(rawRep);
   }
 
@@ -392,6 +399,7 @@ public:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::WitnessMethod:
+    case SILFunctionTypeRepresentation::CXXMethod:
       return true;
     }
     llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
@@ -618,6 +626,7 @@ SILFunctionLanguage getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return SILFunctionLanguage::C;
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
@@ -750,6 +759,7 @@ public:
     case Representation::ObjCMethod:
     case Representation::Method:
     case Representation::WitnessMethod:
+    case SILFunctionTypeRepresentation::CXXMethod:
       return true;
     }
     llvm_unreachable("Unhandled Representation in switch.");
@@ -767,6 +777,7 @@ public:
     case Representation::Method:
     case Representation::WitnessMethod:
     case Representation::Closure:
+    case SILFunctionTypeRepresentation::CXXMethod:
       return false;
     }
     llvm_unreachable("Unhandled Representation in switch.");

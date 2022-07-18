@@ -12,12 +12,14 @@
 
 #include "SILGenBuilder.h"
 #include "ArgumentSource.h"
+#include "Cleanup.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/DynamicCasts.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -249,7 +251,7 @@ ManagedValue SILGenBuilder::createAllocRefDynamic(
                   [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
   AllocRefDynamicInst *i =
-      createAllocRefDynamic(loc, operand.getValue(), refType, objc,
+      createAllocRefDynamic(loc, operand.getValue(), refType, objc, false,
                             elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }
@@ -408,7 +410,8 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
       lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsTake);
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(result);
-  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  assert((!lowering.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
+         "cannot retain an unloadable type");
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
@@ -448,6 +451,9 @@ static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
   case SILArgumentConvention::Direct_Unowned:
     // Unowned parameters are only guaranteed at the instant of the call, so we
     // must retain them even if we're in a context that can accept a +0 value.
+    //
+    // NOTE: If we have a trivial value, the copy will do nothing, so this is
+    // just a convenient way to avoid writing conditional code.
     return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
 
   case SILArgumentConvention::Direct_Owned:
@@ -509,16 +515,6 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
-ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
-    SILLocation loc, ManagedValue op, CanType srcFormalTy,
-    SILType destLoweredTy, CanType destFormalTy) {
-  SILValue result =
-      createUnconditionalCheckedCastValue(loc, op.forward(SGF),
-                                          srcFormalTy, destLoweredTy,
-                                          destFormalTy);
-  return SGF.emitManagedRValueWithCleanup(result);
-}
-
 ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
     SILLocation loc, ManagedValue op,
     SILType destLoweredTy, CanType destFormalTy) {
@@ -536,28 +532,15 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             SILBasicBlock *falseBlock,
                                             ProfileCounter Target1Count,
                                             ProfileCounter Target2Count) {
-  // Check if our source type is AnyObject. In such a case, we need to ensure
-  // plus one our operand since SIL does not support guaranteed casts from an
-  // AnyObject.
-  if (op.getType().isAnyObject()) {
+  // Casting a guaranteed value requires ownership preservation.
+  if (!doesCastPreserveOwnershipForTypes(SGF.SGM.M, op.getType().getASTType(),
+                                         destFormalTy)) {
     op = op.ensurePlusOne(SGF, loc);
   }
   createCheckedCastBranch(loc, isExact, op.forward(SGF),
                           destLoweredTy, destFormalTy,
                           trueBlock, falseBlock,
                           Target1Count, Target2Count);
-}
-
-void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
-                                                 ManagedValue op,
-                                                 CanType srcFormalTy,
-                                                 SILType destLoweredTy,
-                                                 CanType destFormalTy,
-                                                 SILBasicBlock *trueBlock,
-                                                 SILBasicBlock *falseBlock) {
-  createCheckedCastValueBranch(loc, op.forward(SGF), srcFormalTy,
-                               destLoweredTy, destFormalTy,
-                               trueBlock, falseBlock);
 }
 
 ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
@@ -901,5 +884,62 @@ ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
   CleanupCloner cloner(*this, value);
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
                                    base.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
+
+ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
+                                              ManagedValue value,
+                                              bool isLexical) {
+  auto *newValue =
+      SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical);
+  SGF.emitManagedBorrowedRValueWithCleanup(newValue);
+  return ManagedValue::forUnmanaged(newValue);
+}
+
+ManagedValue SILGenBuilder::createMoveValue(SILLocation loc,
+                                            ManagedValue value) {
+  assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = createMoveValue(loc, value.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
+
+ManagedValue
+SILGenBuilder::createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,
+                                                         ManagedValue value) {
+  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = createOwnedMoveOnlyWrapperToCopyableValue(
+      loc, value.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
+
+ManagedValue SILGenBuilder::createGuaranteedMoveOnlyWrapperToCopyableValue(
+    SILLocation loc, ManagedValue value) {
+  auto *mdi =
+      createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value.getValue());
+  assert(mdi->getOperand()->getType().isObject() && "Expected an object?!");
+  return ManagedValue::forUnmanaged(mdi);
+}
+
+ManagedValue
+SILGenBuilder::createCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                    ManagedValue value) {
+  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  CleanupCloner cloner(*this, value);
+  SILValue v = value.forward(getSILGenFunction());
+  auto *mdi = SILBuilder::createCopyableToMoveOnlyWrapperValue(loc, v);
+  if (v->getType().isTrivial(getFunction()))
+    return SGF.emitManagedRValueWithCleanup(mdi);
+  return cloner.clone(mdi);
+}
+
+ManagedValue
+SILGenBuilder::createMarkMustCheckInst(SILLocation loc, ManagedValue value,
+                                       MarkMustCheckInst::CheckKind kind) {
+  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = SILBuilder::createMarkMustCheckInst(
+      loc, value.forward(getSILGenFunction()), kind);
   return cloner.clone(mdi);
 }

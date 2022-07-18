@@ -234,9 +234,9 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  auto genericParam = new (ctx) GenericTypeParamDecl(
+  auto genericParam = GenericTypeParamDecl::create(
       &M->getMainFile(FileUnitKind::Builtin), ident, SourceLoc(),
-      /*type sequence*/ false, 0, index);
+      /*type sequence*/ false, 0, index, /*opaque type=*/false, nullptr);
   return genericParam;
 }
 
@@ -682,7 +682,7 @@ namespace {
       if (wantsAdditionalAnyObjectRequirement) {
         Requirement req(RequirementKind::Conformance,
                         TheGenericParamList->getParams()[0]->getInterfaceType(),
-                        ctx.getAnyObjectType());
+                        ctx.getAnyObjectConstraint());
         addedRequirements.push_back(req);
       }
       for (auto gp : TheGenericParamList->getParams()) {
@@ -1488,6 +1488,14 @@ static ValueDecl *getCreateAsyncTaskInGroup(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getTaskRunInline(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _generics(_unrestricted),
+      _parameters(
+          _function(_async(_noescape(_thick)), _typeparam(0), _parameters())),
+      _typeparam(0));
+}
+
 static ValueDecl *getConvertTaskToJob(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id,
                             _thin,
@@ -1834,17 +1842,14 @@ static ValueDecl *getUnreachableOperation(ASTContext &Context,
 static ValueDecl *getOnceOperation(ASTContext &Context,
                                    Identifier Id,
                                    bool withContext) {
-  // (RawPointer, @convention(c) ([Context]) -> ()[, Context]) -> ()
+  // (RawPointer, @convention(c) (Context) -> ()[, Context]) -> ()
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
   SmallVector<AnyFunctionType::Param, 1> CFuncParams;
-  swift::CanType ContextTy;
-  if (withContext) {
-    ContextTy = Context.TheRawPointerType;
-    auto ContextArg = FunctionType::Param(ContextTy);
-    CFuncParams.push_back(ContextArg);
-  }
+  swift::CanType ContextTy = Context.TheRawPointerType;
+  auto ContextArg = FunctionType::Param(ContextTy);
+  CFuncParams.push_back(ContextArg);
   auto Rep = FunctionTypeRepresentation::CFunctionPointer;
   auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
   auto Thin =
@@ -2208,18 +2213,17 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
       return false;
     ArgElts.push_back(ArgTy);
   }
-  
+
   // Translate LLVM function attributes to Swift function attributes.
   IntrinsicInfo II;
   II.ID = ID;
   auto attrs = II.getOrCreateAttributes(Context);
-  if (attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::NoReturn)) {
+  if (attrs.hasFnAttr(llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
     if (!ResultTy)
       return false;
   }
-  
+
   return true;
 }
 
@@ -2841,6 +2845,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTaskInGroup:
     return getCreateAsyncTaskInGroup(Context, Id);
+
+  case BuiltinValueKind::TaskRunInline:
+    return getTaskRunInline(Context, Id);
 
   case BuiltinValueKind::TargetOSVersionAtLeast:
     return getTargetOSVersionAtLeast(Context, Id);

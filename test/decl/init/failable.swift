@@ -1,4 +1,8 @@
-// RUN: %target-typecheck-verify-swift
+// Run in compatibility modes that disable and enable optional flattening
+// in 'try?' to verify that initializer delegation diagnostics that are related
+// to 'try?' are stable.
+// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 // REQUIRES: objc_interop
 import Foundation
@@ -60,7 +64,7 @@ class Sub : Super {
   }
 
   convenience init(forceNonfail: Int) {
-    self.init(nonfail: forceNonfail)! // expected-error{{cannot force unwrap value of non-optional type 'Sub'}} {{37-38=}}
+    self.init(nonfail: forceNonfail)! // expected-error{{cannot force unwrap value of non-optional type}} {{37-38=}}
   }
 
   init(nonfail2: Int) { // okay, traps on nil
@@ -143,16 +147,115 @@ extension Super {
 }
 
 struct SomeStruct {
-   init(nonFail: Int) { // expected-note{{propagate the failure with 'init?'}}{{8-8=?}}
-    self.init(fail: nonFail) // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
-    // expected-note@-1{{force potentially-failing result with '!'}}{{29-29=!}}
+  init?(failable: Void) {}
+  init!(failableIUO: Void) {}
+  init(throws: Void) throws {}
+  init?(failableAndThrows: Void) throws {}
+  init!(failableIUOAndThrows: Void) throws {}
+
+  init(delegationOk1: Void) {
+    self.init(failable: ())!
   }
 
-   init(nonFail2: Int) {
-    self.init(fail: nonFail2)!
+  init(delegationOk2: Void) {
+    try! self.init(throws: ())
   }
 
-  init?(fail: Int) {}
+  init(delegationOk3: Void) {
+    try! self.init(failableAndThrows: ())!
+  }
+
+  init(delegationOk4: Void) {
+    try! self.init(failableIUOAndThrows: ())
+  }
+
+  init(nonFailable: Void) { // expected-note{{propagate the failure with 'init?'}}{{7-7=?}}
+    self.init(failable: ()) // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(failable:)' written with 'init?'}}
+    // expected-note@-1{{force potentially-failing result with '!'}}{{28-28=!}}
+  }
+
+  init(delegationBad1: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    try? self.init(nonFailable: ())
+    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+    // expected-error@-2 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-3 {{force potentially-failing result with 'try!'}}{{5-9=try!}}
+  }
+
+  init(delegationBad2: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    try? self.init(failableIUO: ())
+    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+    // expected-error@-2 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-3 {{force potentially-failing result with 'try!'}}{{5-9=try!}}
+  }
+
+  init(delegationBad3: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    try? self.init(throws: ())
+    // expected-error@-1 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-2 {{force potentially-failing result with 'try!'}}{{5-9=try!}}
+  }
+
+  init(delegationBad4: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    try! try? self.init(throws: ())
+    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+    // expected-error@-2 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-3 {{force potentially-failing result with 'try!'}}{{10-14=try!}}
+  }
+
+  init(delegationBad5: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    try try? self.init(throws: ())
+    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+    // expected-error@-2 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-3 {{force potentially-failing result with 'try!'}}{{9-13=try!}}
+  }
+
+  init(delegationBad6: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    try? self.init(failableAndThrows: ())!
+    // expected-error@-1 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-2 {{force potentially-failing result with 'try!'}}{{5-9=try!}}
+  }
+
+  init(delegationBad7: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    try! self.init(failableAndThrows: ())
+    // expected-error@-1 {{a non-failable initializer cannot delegate to failable initializer 'init(failableAndThrows:)' written with 'init?'}}
+    // expected-note@-2 {{force potentially-failing result with '!'}}{{42-42=!}}
+  }
+
+  init(delegationBad8: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    try? self.init(failableIUOAndThrows: ())
+    // expected-error@-1 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-2 {{force potentially-failing result with 'try!'}}{{5-9=try!}}
+  }
+
+  init(delegationBad9: Void) { // expected-note 2 {{propagate the failure with 'init?'}}{{7-7=?}}
+    try? self.init(failableAndThrows: ())
+    // expected-error@-1 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-error@-2 {{a non-failable initializer cannot delegate to failable initializer 'init(failableAndThrows:)' written with 'init?'}}
+    // expected-note@-3 {{force potentially-failing result with '!'}}{{42-42=!}}
+    // expected-note@-4 {{force potentially-failing result with 'try!'}}{{5-9=try!}}
+  }
+}
+
+extension Optional {
+  init(delegationOk1: Void) {
+    self.init(nonFailable: ())
+  }
+
+  init?(delegationOk2: Void) {
+    self.init(nonFailable: ())
+  }
+
+  init?(delegationOk3: Void) {
+    self.init(failable: ())
+  }
+
+  init(delegationBad1: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
+    self.init(failable: ())
+    // expected-error@-1 {{a non-failable initializer cannot delegate to failable initializer 'init(failable:)' written with 'init?'}}
+    // expected-note@-2 {{force potentially-failing result with '!'}}{{28-28=!}}
+  }
+
+  init(nonFailable: Void) {}
+  init?(failable: Void) {}
 }
 
 // ----------------------------------------------------------------------------

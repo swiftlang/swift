@@ -64,6 +64,7 @@ endif()
 
 add_subdirectory(SwiftShims)
 add_subdirectory(CommandLineSupport)
+add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftReflection
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
@@ -77,7 +78,17 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Errors.cpp")
+  set(swiftDemanglingCRSources
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
+
+  set(swift_demangling_cflags)
+
+  if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
+  list(APPEND swift_demangling_cflags
+      "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
+  endif()
 
   # The old mangling support is only needed on platforms with ObjC.
   if(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
@@ -85,14 +96,30 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
       "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
       "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
       )
-    set(swift_demangling_cflags -DSWIFT_SUPPORT_OLD_MANGLING=1)
+    list(APPEND swift_demangling_cflags -DSWIFT_SUPPORT_OLD_MANGLING=1)
   else()
-    set(swift_demangling_cflags -DSWIFT_SUPPORT_OLD_MANGLING=0)
+    list(APPEND swift_demangling_cflags -DSWIFT_SUPPORT_OLD_MANGLING=0)
   endif()
 
+  if(SWIFT_STDLIB_HAS_TYPE_PRINTING)
+    list(APPEND swift_demangling_cflags -DSWIFT_STDLIB_HAS_TYPE_PRINTING)
+  endif()
+
+  # Gold LTO is unsupported. To prevent tests from failing when building
+  # with LTO, force swiftDemangling library to compile without LTO for Linux.
   add_swift_target_library(swiftDemangling OBJECT_LIBRARY
     ${swiftDemanglingSources}
-    C_COMPILE_FLAGS -DswiftCore_EXPORTS ${swift_demangling_cflags}
+    C_COMPILE_FLAGS
+      -DswiftCore_EXPORTS
+      ${swift_demangling_cflags}
+    C_COMPILE_FLAGS_LINUX -fno-lto
+    INSTALL_IN_COMPONENT never_install)
+
+  add_swift_target_library(swiftDemanglingCR OBJECT_LIBRARY
+    ${swiftDemanglingCRSources}
+    C_COMPILE_FLAGS
+      -DswiftCore_EXPORTS
+      ${swift_demangling_cflags}
     INSTALL_IN_COMPONENT never_install)
 endif()
 
@@ -117,8 +144,9 @@ if(SWIFT_BUILD_STDLIB)
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-    add_subdirectory(MatchingEngine)
+    add_subdirectory(RegexParser)
     add_subdirectory(StringProcessing)
+    add_subdirectory(RegexBuilder)
   endif()
 endif()
 
@@ -129,6 +157,7 @@ endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
   add_subdirectory(Platform)
+  add_subdirectory(Cxx)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)

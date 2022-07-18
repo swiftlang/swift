@@ -270,7 +270,7 @@ func rdar_60185506() {
 func rdar60727310() {
   func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
   var e: Error? = nil
-  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two 'Error?' operands}}
+  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two '(any Error)?' operands}}
 }
 
 // FIXME(SR-12438): Bad diagnostic.
@@ -296,3 +296,13 @@ postfix operator ^^^
 postfix func ^^^ (lhs: Int) -> Int! { 0 }
 
 let x: Int = 1^^^
+
+// https://github.com/apple/swift/issues/44672 - DiagnosticsQoI
+do {
+  enum TestEnum: Int {
+    case First, Second
+  }
+
+  let number = 1
+  let test = true || number == .First.rawValue // expected-error {{type 'Int' has no member 'First'}}
+}

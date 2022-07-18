@@ -531,7 +531,7 @@ struct StructLoweringState {
   llvm::MapVector<SILValue, SILValue> argsToLoadedValueMap;
   // All applies for which we did an alloc
   llvm::MapVector<SILInstruction *, SILValue> applyRetToAllocMap;
-  // recerse map of the one above
+  // reverse map of the one above
   llvm::MapVector<SILInstruction *, SILInstruction *> allocToApplyRetMap;
   // All call sites with SILArgument that needs to be re-written
   // Calls are removed from the set when rewritten.
@@ -1079,7 +1079,7 @@ static AllocStackInst *allocate(StructLoweringState &pass, SILType type) {
   // Insert an alloc_stack at the beginning of the function.
   SILBuilderWithScope allocBuilder(&*pass.F->begin());
   // Don't put any variable debug info into the alloc_stack, there will be a
-  // debug_value insterted later. TODO: It may be more elegant to insert
+  // debug_value inserted later. TODO: It may be more elegant to insert
   // the variable info into the alloc_stack instead of additionally generating a
   // debug_value.
   AllocStackInst *alloc = allocBuilder.createAllocStack(
@@ -1205,7 +1205,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
   optimizableLoad->getParent()->erase(optimizableLoad);
 }
 
-static bool isYieldUseRewriteable(StructLoweringState &pass,
+static bool isYieldUseRewritable(StructLoweringState &pass,
                                   YieldInst *inst, Operand *operand) {
   assert(inst == operand->getUser());
   return pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
@@ -1236,7 +1236,7 @@ static bool hasMandatoryRewriteUse(StructLoweringState &pass,
       return true;
     }
     case SILInstructionKind::YieldInst:
-      if (isYieldUseRewriteable(pass, cast<YieldInst>(userIns), user))
+      if (isYieldUseRewritable(pass, cast<YieldInst>(userIns), user))
         return true;
       break;
     default:
@@ -1291,7 +1291,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       break;
     }
     case SILInstructionKind::YieldInst: {
-      if (isYieldUseRewriteable(pass, cast<YieldInst>(userIns), use))
+      if (isYieldUseRewritable(pass, cast<YieldInst>(userIns), use))
         usesToMod.push_back(use);
       break;
     }
@@ -1840,7 +1840,7 @@ static bool allUsesAreReplaceable(StructLoweringState &pass,
       break;
     }
     case SILInstructionKind::YieldInst:
-      if (!isYieldUseRewriteable(pass, cast<YieldInst>(userIns), user))
+      if (!isYieldUseRewritable(pass, cast<YieldInst>(userIns), user))
         return false;
       break;
     case SILInstructionKind::StructExtractInst:
@@ -1894,8 +1894,8 @@ static void allocateAndSetAll(StructLoweringState &pass,
   }
 }
 
-static void castTupleInstr(SingleValueInstruction *instr, IRGenModule &Mod,
-                           LargeSILTypeMapper &Mapper) {
+static void retypeTupleInstr(SingleValueInstruction *instr, IRGenModule &Mod,
+                             LargeSILTypeMapper &Mapper) {
   SILType currSILType = instr->getType();
   auto funcType = getInnerFunctionType(currSILType);
   assert(funcType && "Expected a function Type");
@@ -1910,25 +1910,31 @@ static void castTupleInstr(SingleValueInstruction *instr, IRGenModule &Mod,
 
   auto II = instr->getIterator();
   ++II;
-  SILBuilderWithScope castBuilder(II);
-  SingleValueInstruction *castInstr = nullptr;
+  SILBuilderWithScope Builder(II);
+  SingleValueInstruction *newInstr = nullptr;
   switch (instr->getKind()) {
   // Add cast to the new sil function type:
   case SILInstructionKind::TupleExtractInst: {
-    castInstr = castBuilder.createUncheckedReinterpretCast(
-        instr->getLoc(), instr, newSILType.getObjectType());
+    auto extractInst = cast<TupleExtractInst>(instr);
+    newInstr = Builder.createTupleExtract(
+      extractInst->getLoc(), extractInst->getOperand(),
+      extractInst->getFieldIndex(),
+      newSILType.getObjectType());
     break;
   }
   case SILInstructionKind::TupleElementAddrInst: {
-    castInstr = castBuilder.createUncheckedAddrCast(
-        instr->getLoc(), instr, newSILType.getAddressType());
+    auto elementAddrInst = cast<TupleElementAddrInst>(instr);
+    newInstr = Builder.createTupleElementAddr(
+      elementAddrInst->getLoc(), elementAddrInst->getOperand(),
+      elementAddrInst->getFieldIndex(),
+      newSILType.getAddressType());
     break;
   }
   default:
     llvm_unreachable("Unexpected instruction inside tupleInstsToMod");
   }
-  instr->replaceAllUsesWith(castInstr);
-  castInstr->setOperand(0, instr);
+  instr->replaceAllUsesWith(newInstr);
+  instr->eraseFromParent();
 }
 
 static SILValue createCopyOfEnum(StructLoweringState &pass,
@@ -2064,16 +2070,16 @@ static void rewriteFunction(StructLoweringState &pass,
                         applySite.getArgumentOperands());
     }
 
+    while (!pass.modYieldInsts.empty()) {
+      YieldInst *inst = pass.modYieldInsts.pop_back_val();
+      allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
+    }
+
     repeat = !pass.switchEnumInstsToMod.empty() ||
              !pass.structExtractInstsToMod.empty();
     assert(pass.applies.empty());
     pass.applies.append(currentModApplies.begin(), currentModApplies.end());
   } while (repeat);
-
-  while (!pass.modYieldInsts.empty()) {
-    YieldInst *inst = pass.modYieldInsts.pop_back_val();
-    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
-  }
 
   for (SILInstruction *instr : pass.instsToMod) {
     for (Operand &operand : instr->getAllOperands()) {
@@ -2090,7 +2096,7 @@ static void rewriteFunction(StructLoweringState &pass,
   }
 
   for (SingleValueInstruction *instr : pass.tupleInstsToMod) {
-    castTupleInstr(instr, pass.Mod, pass.Mapper);
+    retypeTupleInstr(instr, pass.Mod, pass.Mapper);
   }
 
   while (!pass.allocStackInstsToMod.empty()) {
@@ -2362,7 +2368,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
     }
 
     auto NewTy = SILFunctionType::get(
-        loweredTy->getSubstGenericSignature(),
+        loweredTy->getInvocationGenericSignature(),
         loweredTy->getExtInfo(),
         loweredTy->getCoroutineKind(),
         loweredTy->getCalleeConvention(),
@@ -2782,9 +2788,6 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   IRGenModule *currIRMod =
       getIRGenModule()->IRGen.getGenModule(convInstr->getFunction());
   SILType currSILType = convInstr->getType();
-  if (auto *thinToPointer = dyn_cast<ThinFunctionToPointerInst>(convInstr)) {
-    currSILType = thinToPointer->getOperand()->getType();
-  }
   auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
   GenericEnvironment *genEnv =
     getSubstGenericEnvironment(convInstr->getFunction());
@@ -2810,14 +2813,6 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   case SILInstructionKind::ThinToThickFunctionInst: {
     auto instr = cast<ThinToThickFunctionInst>(convInstr);
     newInstr = convBuilder.createThinToThickFunction(
-        instr->getLoc(), instr->getOperand(), newType);
-    break;
-  }
-  case SILInstructionKind::ThinFunctionToPointerInst: {
-    auto instr = cast<ThinFunctionToPointerInst>(convInstr);
-    newType =
-        MapperCache.getNewSILType(genEnv, instr->getType(), *getIRGenModule());
-    newInstr = convBuilder.createThinFunctionToPointer(
         instr->getLoc(), instr->getOperand(), newType);
     break;
   }
@@ -2956,7 +2951,6 @@ void LoadableByAddress::run() {
               case SILInstructionKind::ConvertFunctionInst:
               case SILInstructionKind::ConvertEscapeToNoEscapeInst:
               case SILInstructionKind::MarkDependenceInst:
-              case SILInstructionKind::ThinFunctionToPointerInst:
               case SILInstructionKind::ThinToThickFunctionInst:
               case SILInstructionKind::DifferentiableFunctionInst:
               case SILInstructionKind::LinearFunctionInst:

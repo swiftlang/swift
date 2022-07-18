@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SILGEN_EXECUTORBREADCRUMB_H
+#define SWIFT_SILGEN_EXECUTORBREADCRUMB_H
+
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -23,21 +26,28 @@ class SILGenFunction;
 /// Represents the information necessary to return to a caller's own
 /// active executor after making a hop to an actor for actor-isolated calls.
 class ExecutorBreadcrumb {
-  SILValue Executor;
+  bool mustReturnToExecutor;
   
 public:
   // An empty breadcrumb, indicating no hop back is necessary.
-  ExecutorBreadcrumb() : Executor() {}
+  ExecutorBreadcrumb() : mustReturnToExecutor(false) {}
   
-  // A breadcrumb representing the need to hop back to the executor
-  // represented by the given value.
-  explicit ExecutorBreadcrumb(SILValue executor)
-    : Executor(executor) {}
+  // A breadcrumb representing the need to hop back to the expected
+  // executor of the current function.
+  explicit ExecutorBreadcrumb(bool mustReturnToExecutor)
+    : mustReturnToExecutor(mustReturnToExecutor) {}
   
   // Emits the hop back sequence, if any, necessary to get back to
   // the executor represented by this breadcrumb.
   void emit(SILGenFunction &SGF, SILLocation loc);
+
+#ifndef NDEBUG
+  // FOR ASSERTS ONLY: returns true if calling `emit` will emit a hop-back.
+  bool needsEmit() const { return mustReturnToExecutor; }
+#endif
 };
 
 } // namespace Lowering
 } // namespace swift
+
+#endif

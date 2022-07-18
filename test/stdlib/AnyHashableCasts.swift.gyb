@@ -250,19 +250,19 @@ AnyHashableCasts.test("Wrappers around bridged strings") {
   expectTrue(stringHello.base is String)
   expectTrue(nsStringHello.base is NSString) // Through bridging
 
-  // Swift wrapper's AnyHashable form doesn't enfore type identity.
+  // Swift wrapper's AnyHashable form doesn't enforce type identity.
   expectNotNil(wrapper1Hello as? StringWrapper1)
   expectNotNil(wrapper1Hello as? StringWrapper2)
   expectNotNil(wrapper1Hello as? String)
   expectNotNil(wrapper1Hello as? NSString)
 
-  // String's AnyHashable form doesn't enfore type identity.
+  // String's AnyHashable form doesn't enforce type identity.
   expectNotNil(stringHello as? StringWrapper1)
   expectNotNil(stringHello as? StringWrapper2)
   expectNotNil(stringHello as? String)
   expectNotNil(stringHello as? NSString)
 
-  // NSString's AnyHashable form doesn't enfore type identity.
+  // NSString's AnyHashable form doesn't enforce type identity.
   expectNotNil(nsStringHello as? StringWrapper1)
   expectNotNil(nsStringHello as? StringWrapper2)
   expectNotNil(nsStringHello as? String)

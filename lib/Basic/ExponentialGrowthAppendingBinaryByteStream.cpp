@@ -16,7 +16,7 @@ using namespace llvm;
 using namespace swift;
 
 Error ExponentialGrowthAppendingBinaryByteStream::readBytes(
-    uint32_t Offset, uint32_t Size, ArrayRef<uint8_t> &Buffer) {
+    uint64_t Offset, uint64_t Size, ArrayRef<uint8_t> &Buffer) {
   if (auto Error = checkOffsetForRead(Offset, Size)) {
     return Error;
   }
@@ -26,7 +26,7 @@ Error ExponentialGrowthAppendingBinaryByteStream::readBytes(
 }
 
 Error ExponentialGrowthAppendingBinaryByteStream::readLongestContiguousChunk(
-    uint32_t Offset, ArrayRef<uint8_t> &Buffer) {
+    uint64_t Offset, ArrayRef<uint8_t> &Buffer) {
   if (auto Error = checkOffsetForRead(Offset, 0)) {
     return Error;
   }
@@ -40,7 +40,7 @@ void ExponentialGrowthAppendingBinaryByteStream::reserve(size_t Size) {
 }
 
 Error ExponentialGrowthAppendingBinaryByteStream::writeBytes(
-    uint32_t Offset, ArrayRef<uint8_t> Buffer) {
+    uint64_t Offset, ArrayRef<uint8_t> Buffer) {
   if (Buffer.empty())
     return Error::success();
 
@@ -49,7 +49,7 @@ Error ExponentialGrowthAppendingBinaryByteStream::writeBytes(
   }
   
   // Resize the internal buffer if needed.
-  uint32_t RequiredSize = Offset + Buffer.size();
+  uint64_t RequiredSize = Offset + Buffer.size();
   if (RequiredSize > Data.size()) {
     Data.resize(RequiredSize);
   }

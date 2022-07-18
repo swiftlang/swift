@@ -38,7 +38,8 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F : 
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo<Int, Int>):
 // CHECK:   [[XBOX:%.*]] = alloc_box ${ var Foo<Int, Int> }, var, name "x"
-// CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]] : ${ var Foo<Int, Int> }, 0
+// CHECK:   [[XBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+// CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX_LIFETIME]] : ${ var Foo<Int, Int> }, 0
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   store [[ARG_COPY]] to [init] [[XBOX_PB]]
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[XBOX_PB]] : $*Foo<Int, Int>
@@ -56,6 +57,7 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK:   [[F_ORIG:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_FN]]([[F_SUBST_OUT]])
 // CHECK:   [[F_CONV:%.*]] = convert_function [[F_ORIG]]
 // CHECK:   assign [[F_CONV]] to [[F_ADDR]]
+// CHECK:   end_borrow [[XBOX_LIFETIME]]
 // CHECK:   destroy_value [[XBOX]]
 // CHECK: } // end sil function '$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F'
 func inOutF(_ x: Foo<Int, Int>) {

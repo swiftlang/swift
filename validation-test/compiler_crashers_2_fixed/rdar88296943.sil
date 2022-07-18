@@ -1,0 +1,12 @@
+// RUN: %target-swift-frontend -emit-ir %s
+
+import Swift
+
+class C {}
+sil_vtable C {}
+
+sil @repo: $@convention(c) @pseudogeneric <S, I where S : AnyObject, S : Hashable, I : C> (@inout_aliasable @block_storage @callee_guaranteed (@guaranteed S, Int, UnsafeMutablePointer<Bool>) -> (), S, Int, UnsafeMutablePointer<Bool>) -> () {
+bb0(%0 : $*@block_storage @callee_guaranteed (@guaranteed S, Int, UnsafeMutablePointer<Bool>) -> (), %1 : $S, %2 : $Int, %3 : $UnsafeMutablePointer<Bool>):
+  %9 = tuple ()                                   // user: %10
+  return %9 : $()                                 // id: %10
+}

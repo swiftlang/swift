@@ -62,6 +62,12 @@ class CursorInfoResolver : public SourceEntityWalker {
   Type ContainerType;
   Expr *OutermostCursorExpr;
   llvm::SmallVector<Expr*, 8> ExprStack;
+  /// If a decl shadows another decl using shorthand syntax (`[foo]` or
+  /// `if let foo {`), this maps the re-declared variable to the one that is
+  /// being shadowed.
+  /// The transitive closure of shorthand shadowed decls should be reported as
+  /// additional results in cursor info.
+  llvm::DenseMap<ValueDecl *, ValueDecl *> ShorthandShadowedDecls;
 
 public:
   explicit CursorInfoResolver(SourceFile &SrcFile) :
@@ -119,9 +125,9 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     }
   }
 
-  if (isBeingCalled(ExprStack)) {
-    if (Expr *BaseE = getBase(ExprStack)) {
-      CursorInfo.IsDynamic = isDynamicCall(BaseE, D);
+  if (Expr *BaseE = getBase(ExprStack)) {
+    if (isDynamicRef(BaseE, D)) {
+      CursorInfo.IsDynamic = true;
       ide::getReceiverType(BaseE, CursorInfo.ReceiverTypes);
     }
   }
@@ -166,7 +172,18 @@ ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
   assert(Loc.isValid());
   LocToResolve = Loc;
   CursorInfo.Loc = Loc;
+
   walk(SrcFile);
+
+  if (!CursorInfo.IsRef) {
+    // If we have a definition, add any decls that it potentially shadows
+    auto ShorthandShadowedDecl = ShorthandShadowedDecls[CursorInfo.ValueD];
+    while (ShorthandShadowedDecl) {
+      CursorInfo.ShorthandShadowedDecls.push_back(ShorthandShadowedDecl);
+      ShorthandShadowedDecl = ShorthandShadowedDecls[ShorthandShadowedDecl];
+    }
+  }
+
   return CursorInfo;
 }
 
@@ -198,6 +215,14 @@ bool CursorInfoResolver::walkToStmtPre(Stmt *S) {
   // with begin/end locations pointing at the beginning of the string, so if
   // there is a token location inside the string, it will seem as if it is out
   // of the source range, unless we convert to character range.
+
+  if (auto CondStmt = dyn_cast<LabeledConditionalStmt>(S)) {
+    for (auto ShorthandShadow : getShorthandShadows(CondStmt)) {
+      assert(ShorthandShadowedDecls.count(ShorthandShadow.first) == 0);
+      ShorthandShadowedDecls[ShorthandShadow.first] =
+          ShorthandShadow.second;
+    }
+  }
 
   // FIXME: Even implicit Stmts should have proper ranges that include any
   // non-implicit Stmts (fix Stmts created for lazy vars).
@@ -249,6 +274,14 @@ static bool isCursorOn(Expr *E, SourceLoc Loc) {
 bool CursorInfoResolver::walkToExprPre(Expr *E) {
   if (isDone())
     return true;
+
+  if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
+    for (auto ShorthandShadows : getShorthandShadows(CaptureList)) {
+      assert(ShorthandShadowedDecls.count(ShorthandShadows.first) == 0);
+      ShorthandShadowedDecls[ShorthandShadows.first] =
+          ShorthandShadows.second;
+    }
+  }
 
   if (auto SAE = dyn_cast<SelfApplyExpr>(E)) {
     if (SAE->getFn()->getStartLoc() == LocToResolve) {

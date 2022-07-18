@@ -1,319 +1,455 @@
+//=====-- ShrinkBorrowScope.cpp - Hoist end_borrows to deinit barriers. -=====//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
+//===----------------------------------------------------------------------===//
+/// Shrink borrow scopes by hoisting end_borrows up to deinit barriers.  After
+/// this is done, CanonicalOSSALifetime is free to hoist the destroys of the
+/// owned value up to the end_borrow.  In this way, the lexical lifetime of
+/// guaranteed values is preserved.
+//===----------------------------------------------------------------------===//
 
 #include "swift/AST/Builtins.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/Reachability.h"
+#include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "llvm/ADT/STLExtras.h"
 
 #define DEBUG_TYPE "copy-propagation"
 
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                           MARK: Local utilities
-//===----------------------------------------------------------------------===//
-
-// TODO: Move to be member function on SILInstruction.
-static SILInstruction *getPreviousInstruction(SILInstruction *inst) {
-  auto pos = inst->getIterator();
-  return pos == inst->getParent()->begin() ? nullptr
-                                           : &*std::prev(inst->getIterator());
-}
-
-// TODO: Move to be member function on SILInstruction.
-static SILInstruction *getNextInstruction(SILInstruction *inst) {
-  auto nextPos = std::next(inst->getIterator());
-  return nextPos == inst->getParent()->end() ? nullptr : &*nextPos;
-}
-
-//===----------------------------------------------------------------------===//
 //                       MARK: ShrinkBorrowScope
 //===----------------------------------------------------------------------===//
 
-class ShrinkBorrowScope {
-  // The instruction that begins this borrow scope.
-  BeginBorrowInst *introducer;
+namespace ShrinkBorrowScope {
+
+/// The environment within which to hoist.
+struct Context final {
+  /// The instruction that begins the borrow scope.
+  BeginBorrowInst const &introducer;
+
+  /// BorrowedValue(introducer)
+  BorrowedValue const borrowedValue;
+
+  /// The value whose lifetime is guaranteed by the lexical borrow scope.
+  ///
+  /// introducer->getOperand()
+  SILValue const borrowee;
+
+  SILBasicBlock *defBlock;
+
+  SILFunction &function;
+
+  /// The copy_value instructions that the utility creates or changes.
+  ///
+  /// Clients provide this so that they can update worklists in respons.
+  SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts;
 
   InstructionDeleter &deleter;
 
-  SmallPtrSet<SILInstruction *, 16> users;
-  llvm::SmallVector<std::pair<SILBasicBlock *, SILInstruction *>>
-      barrierInstructions;
-
-  SmallPtrSet<SILBasicBlock *, 8> blocksWithReachedTops;
-  SmallPtrSet<SILBasicBlock *, 8> blocksToEndAtTop;
-
-  llvm::SmallDenseMap<ApplySite, size_t> transitiveUsesPerApplySite;
-
-  // The list of blocks to look for new points at which to insert end_borrows
-  // in.  A block must not be processed if all of its successors have not yet
-  // been.  For that reason, it is necessary to allow the same block to be
-  // visited multiple times, at most once for each successor.
-  SmallVector<SILBasicBlock *, 8> worklist;
-  // The instructions from which the shrinking starts, the scope ending
-  // instructions, keyed off the block in which they appear.
-  llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *> startingInstructions;
-
-public:
-  ShrinkBorrowScope(BeginBorrowInst *bbi, InstructionDeleter &deleter)
-      : introducer(bbi), deleter(deleter) {}
-
-  bool run();
-
-  bool populateUsers();
-  bool initializeWorklist();
-  void findBarriers();
-  void rewrite();
-  void createEndBorrow(SILInstruction *insertionPoint);
-
-  bool reachedTopOfAllSuccessors(SILBasicBlock *block) {
-    return llvm::all_of(block->getSuccessorBlocks(), [=](auto *successor) {
-      return blocksWithReachedTops.contains(successor);
-    });
-  }
-
-  bool isBarrierApply(SILInstruction *instruction) {
-    // For now, treat every apply (that doesn't use the borrowed value) as a
-    // barrier.
-    return isa<ApplySite>(instruction);
-  }
-
-  bool mayAccessPointer(SILInstruction *instruction) {
-    if (!instruction->mayReadOrWriteMemory())
-      return false;
-    bool fail = false;
-    visitAccessedAddress(instruction, [&fail](Operand *operand) {
-      auto accessStorage = AccessStorage::compute(operand->get());
-      if (accessStorage.getKind() != AccessRepresentation::Kind::Unidentified)
-        fail = true;
-    });
-    return fail;
-  }
-
-  bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
-    // TODO: It is possible to do better here by looking at the address that is
-    //       being loaded.
-    return isa<LoadWeakInst>(instruction) || isa<LoadUnownedInst>(instruction);
-  }
-
-  bool isDeinitBarrier(SILInstruction *instruction) {
-    return isBarrierApply(instruction) || instruction->maySynchronize() ||
-           mayAccessPointer(instruction) || mayLoadWeakOrUnowned(instruction);
-  }
-
-  bool canReplaceValueWithBorrowedValue(SILValue value) {
-    while (true) {
-      auto *instruction = value.getDefiningInstruction();
-      if (!instruction)
-        return false;
-      if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
-        value = cvi->getOperand();
-        continue;
-      } else if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
-        if (bbi == introducer) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
-
-  size_t usesInApply(ApplySite apply) {
-    if (auto count = transitiveUsesPerApplySite.lookup(apply))
-      return count;
-    return 0;
-  }
-
-  bool tryHoistOverInstruction(SILInstruction *instruction) {
-    if (users.contains(instruction)) {
-      if (auto apply = ApplySite::isa(instruction)) {
-        SmallVector<int, 2> rewritableArgumentIndices;
-        auto count = apply.getNumArguments();
-        for (unsigned index = 0; index < count; ++index) {
-          auto argument = apply.getArgument(index);
-          if (canReplaceValueWithBorrowedValue(argument)) {
-            rewritableArgumentIndices.push_back(index);
-          }
-        }
-        if (rewritableArgumentIndices.size() != usesInApply(apply)) {
-          return false;
-        }
-        // We can rewrite all the arguments which are transitive uses of the
-        // borrow.
-        for (auto index : rewritableArgumentIndices) {
-          auto argument = apply.getArgument(index);
-          auto borrowee = introducer->getOperand();
-          if (auto *cvi = dyn_cast<CopyValueInst>(argument)) {
-            cvi->setOperand(borrowee);
-          } else {
-            apply.setArgument(index, borrowee);
-          }
-        }
-        return true;
-      } else if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
-        if (bbi->isLexical() &&
-            canReplaceValueWithBorrowedValue(bbi->getOperand())) {
-          auto borrowee = introducer->getOperand();
-          bbi->setOperand(borrowee);
-          return true;
-        }
-      }
-      return false;
-    }
-    return !isDeinitBarrier(instruction);
-  }
+  Context(BeginBorrowInst const &introducer,
+          SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts,
+          InstructionDeleter &deleter)
+      : introducer(introducer), borrowedValue(BorrowedValue(&introducer)),
+        borrowee(introducer.getOperand()), defBlock(introducer.getParent()),
+        function(*introducer.getFunction()),
+        modifiedCopyValueInsts(modifiedCopyValueInsts), deleter(deleter) {}
+  Context(Context const &) = delete;
+  Context &operator=(Context const &) = delete;
 };
 
-//===----------------------------------------------------------------------===//
-//                        MARK: Rewrite borrow scopes
-//===----------------------------------------------------------------------===//
+/// How %lifetime gets used.
+struct Usage final {
+  /// Instructions which are users of the simple (i.e. not reborrowed) extended
+  /// i.e. copied lifetime of the introducer.
+  SmallPtrSet<SILInstruction *, 16> users;
+  // The instructions from which the shrinking starts, the scope ending
+  // instructions.
+  llvm::SmallSetVector<SILInstruction *, 4> ends;
 
-bool ShrinkBorrowScope::run() {
-  if (!BorrowedValue(introducer).isLocalScope())
-    return false;
-  if (!populateUsers())
-    return false;
-  if (!initializeWorklist())
-    return false;
+  Usage(){};
+  Usage(Usage const &) = delete;
+  Usage &operator=(Usage const &) = delete;
+};
 
-  findBarriers();
+/// Identify scope ending uses and extended users of %lifetime.
+///
+/// returns true if all uses were found
+///         false otherwise
+bool findUsage(Context const &context, Usage &usage) {
+  llvm::SmallVector<SILInstruction *, 16> scopeEndingInsts;
+  context.borrowedValue.getLocalScopeEndingInstructions(scopeEndingInsts);
 
-  rewrite();
+  // Add all the end_borrows to the collection of ends.
+  for (auto *instruction : scopeEndingInsts) {
+    // If a scope ending instruction is not an end_borrow, bail out.
+    if (!isa<EndBorrowInst>(instruction))
+      return false;
+    usage.ends.insert(instruction);
+  }
 
-  return true;
-}
-
-bool ShrinkBorrowScope::populateUsers() {
-  SmallVector<Operand *, 16> usePoints;
-  if (!findInnerTransitiveGuaranteedUsesOfBorrowedValue(
-          BorrowedValue(introducer), &usePoints)) {
+  SmallVector<Operand *, 16> uses;
+  if (!findExtendedUsesOfSimpleBorrowedValue(context.borrowedValue, &uses)) {
     // If the value produced by begin_borrow escapes, don't shrink the borrow
     // scope.
     return false;
   }
-  for (auto *usePoint : usePoints) {
-    auto *user = usePoint->getUser();
-    users.insert(user);
-    if (auto apply = ApplySite::isa(user)) {
-      ++transitiveUsesPerApplySite[apply];
-    }
+  for (auto *use : uses) {
+    usage.users.insert(use->getUser());
   }
   return true;
 }
 
-bool ShrinkBorrowScope::initializeWorklist() {
-  llvm::SmallVector<SILInstruction *, 16> scopeEndingInsts;
-  BorrowedValue(introducer).getLocalScopeEndingInstructions(scopeEndingInsts);
+/// How end_borrow hoisting is obstructed.
+struct DeinitBarriers final {
+  /// Copies to be rewritten as copies of %borrowee.
+  SmallVector<CopyValueInst *, 4> copies;
 
-  // Form a map of the scopeEndingInsts, keyed off the block they occur in.  If
-  // a scope ending instruction is not an end_borrow, bail out.
-  for (auto *instruction : scopeEndingInsts) {
-    if (!isa<EndBorrowInst>(instruction))
+  /// Instructions above which end_borrows cannot be hoisted.
+  SmallVector<SILInstruction *, 4> instructions;
+
+  /// Blocks one of whose phis is a barrier and consequently out of which
+  /// end_borrows cannot be hoisted.
+  SmallVector<SILBasicBlock *, 4> phis;
+
+  /// Blocks whose single predecessors has another successor to the top of which
+  /// end_borrows cannot be hoisted.
+  SmallVector<SILBasicBlock *, 4> blocks;
+
+  DeinitBarriers(Context &context) {}
+  DeinitBarriers(DeinitBarriers const &) = delete;
+  DeinitBarriers &operator=(DeinitBarriers const &) = delete;
+};
+
+class BarrierAccessScopeFinder;
+
+/// Works backwards from the current location of end_borrows to the earliest
+/// place they can be hoisted to.
+///
+/// Implements IterativeBackwardReachability::Effects.
+/// Implements IterativeBackwardReachability::findBarrier::Visitor.
+/// Implements VisitBarrierAccessScopes::Effects
+class Dataflow final {
+public:
+  using Reachability = IterativeBackwardReachability<Dataflow>;
+  using Effect = Reachability::Effect;
+
+private:
+  Context const &context;
+  Usage const &uses;
+  DeinitBarriers &barriers;
+  Reachability::Result result;
+  Reachability reachability;
+  SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
+  bool recordCopies = false;
+
+  enum class Classification { Barrier, Copy, Other };
+
+public:
+  Dataflow(Context const &context, Usage const &uses, DeinitBarriers &barriers)
+      : context(context), uses(uses), barriers(barriers),
+        result(&context.function),
+        reachability(&context.function, context.defBlock, *this, result) {}
+  Dataflow(Dataflow const &) = delete;
+  Dataflow &operator=(Dataflow const &) = delete;
+
+  void run();
+
+private:
+  friend Reachability;
+  friend class BarrierAccessScopeFinder;
+  friend class VisitBarrierAccessScopes<Dataflow, BarrierAccessScopeFinder>;
+
+  Classification classifyInstruction(SILInstruction *);
+
+  bool classificationIsBarrier(Classification);
+
+  /// IterativeBackwardReachability::Effects
+  /// VisitBarrierAccessScopes::Effects
+
+  auto gens() { return uses.ends; }
+
+  Effect effectForInstruction(SILInstruction *);
+
+  Effect effectForPhi(SILBasicBlock *);
+
+  /// VisitBarrierAccessScopes::Effects
+
+  auto localGens() { return result.localGens; }
+
+  bool isLocalGen(SILInstruction *instruction) {
+    return result.localGens.contains(instruction);
+  }
+
+  /// IterativeBackwardReachability::findBarrier::Visitor.
+
+  void visitBarrierInstruction(SILInstruction *instruction) {
+    barriers.instructions.push_back(instruction);
+  }
+
+  void visitBarrierPhi(SILBasicBlock *block) { barriers.phis.push_back(block); }
+
+  void visitBarrierBlock(SILBasicBlock *block) {
+    barriers.blocks.push_back(block);
+  }
+};
+
+/// Whether the specified value is %lifetime or its iterated copy_value.
+///
+/// In other words, it has to be a simple extended def of %lifetime.
+bool isSimpleExtendedIntroducerDef(Context const &context, SILValue value) {
+  while (true) {
+    auto *instruction = value.getDefiningInstruction();
+    if (!instruction)
       return false;
-    auto *block = instruction->getParent();
-    worklist.push_back(block);
-    startingInstructions[block] = instruction;
+    if (instruction == &context.introducer)
+      return true;
+    if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+      value = cvi->getOperand();
+      continue;
+    }
+    return false;
   }
-
-  return true;
 }
 
-void ShrinkBorrowScope::findBarriers() {
-  // Walk the cfg backwards from the blocks containing scope ending
-  // instructions, visiting only the initial blocks (which contained those
-  // instructions) and those blocks all of whose successors have already been
-  // visited.
+Dataflow::Classification
+Dataflow::classifyInstruction(SILInstruction *instruction) {
+  if (instruction == &context.introducer) {
+    return Classification::Barrier;
+  }
+  if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+    if (isSimpleExtendedIntroducerDef(context, cvi->getOperand())) {
+      return Classification::Copy;
+    }
+  }
+  if (uses.users.contains(instruction)) {
+    return Classification::Barrier;
+  }
+  if (auto *eai = dyn_cast<EndAccessInst>(instruction)) {
+    return barrierAccessScopes.contains(eai->getBeginAccess())
+               ? Classification::Barrier
+               : Classification::Other;
+  }
+  if (isDeinitBarrier(instruction)) {
+    return Classification::Barrier;
+  }
+  return Classification::Other;
+}
+
+bool Dataflow::classificationIsBarrier(Classification classification) {
+  switch (classification) {
+  case Classification::Barrier:
+    return true;
+  case Classification::Copy:
+  case Classification::Other:
+    return false;
+  }
+  llvm_unreachable("exhaustive switch not exhaustive?!");
+}
+
+Dataflow::Effect Dataflow::effectForInstruction(SILInstruction *instruction) {
+  if (uses.ends.contains(instruction))
+    return Effect::Gen();
+  auto classification = classifyInstruction(instruction);
+  if (recordCopies && classification == Classification::Copy)
+    barriers.copies.push_back(cast<CopyValueInst>(instruction));
+  return classificationIsBarrier(classification) ? Effect::Kill()
+                                                 : Effect::NoEffect();
+}
+
+Dataflow::Effect Dataflow::effectForPhi(SILBasicBlock *block) {
+  assert(llvm::all_of(block->getArguments(),
+                      [&](auto argument) { return PhiValue(argument); }));
+
+  bool isBarrier =
+      llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
+        return classificationIsBarrier(
+            classifyInstruction(predecessor->getTerminator()));
+      });
+  return isBarrier ? Effect::Kill() : Effect::NoEffect();
+}
+
+/// Finds end_access instructions which are barriers to hoisting because the
+/// access scopes they contain barriers to hoisting.  Hoisting end_borrows into
+/// such access scopes could introduce exclusivity violations.
+///
+/// Implements BarrierAccessScopeFinder::Visitor
+class BarrierAccessScopeFinder final {
+  using Impl = VisitBarrierAccessScopes<Dataflow, BarrierAccessScopeFinder>;
+  Impl impl;
+  Dataflow &dataflow;
+
+public:
+  BarrierAccessScopeFinder(Context const &context, Dataflow &dataflow)
+      : impl(&context.function, dataflow, *this), dataflow(dataflow) {}
+
+  void find() { impl.visit(); }
+
+private:
+  friend Impl;
+
+  bool isInRegion(SILBasicBlock *block) {
+    return dataflow.result.discoveredBlocks.contains(block);
+  }
+
+  void visitBarrierAccessScope(BeginAccessInst *bai) {
+    dataflow.barrierAccessScopes.insert(bai);
+    for (auto *eai : bai->getEndAccesses()) {
+      dataflow.reachability.addKill(eai);
+    }
+  }
+};
+
+void Dataflow::run() {
+  reachability.initialize();
+  BarrierAccessScopeFinder finder(context, *this);
+  finder.find();
+  reachability.solve();
+  recordCopies = true;
+  reachability.findBarriers(*this);
+}
+
+/// Hoist the scope ends of %lifetime, rewriting copies and borrows along the
+/// way.
+class Rewriter final {
+  Context &context;
+  Usage const &uses;
+  DeinitBarriers const &barriers;
+
+  // The end _borrow instructions for this borrow scope that existed before
+  // ShrinkBorrowScope ran and which were not modified.
+  llvm::SmallPtrSet<SILInstruction *, 8> reusedEndBorrowInsts;
+
+public:
+  Rewriter(Context &context, Usage const &uses, DeinitBarriers const &barriers)
+      : context(context), uses(uses), barriers(barriers) {}
+  Rewriter(Rewriter const &) = delete;
+  Rewriter &operator=(Rewriter const &) = delete;
+
+  bool run();
+
+private:
+  bool createEndBorrow(SILInstruction *insertionPoint);
+};
+
+bool Rewriter::run() {
+  bool madeChange = false;
+
+  for (auto *cvi : barriers.copies) {
+    cvi->setOperand(context.borrowee);
+    context.modifiedCopyValueInsts.push_back(cvi);
+    madeChange = true;
+  }
+
+  // Add end_borrows for phi barrier boundaries.
   //
-  // TODO: Handle loops.
-  while (!worklist.empty()) {
-    auto *block = worklist.pop_back_val();
-    auto *startingInstruction = startingInstructions.lookup(block);
-    if (!startingInstruction && !reachedTopOfAllSuccessors(block)) {
-      continue;
-    }
-    if (!startingInstruction &&
-        !tryHoistOverInstruction(block->getTerminator())) {
-      // This block was walked to--it was not one containing one of the initial
-      // end_borrow instructions.  Check whether it forwards the ownership of
-      // the borrowed value (either directly or indirectly).  If it does, we
-      // must not hoist the end_borrow above it.
-      continue;
-    }
-    for (auto *successor : block->getSuccessorBlocks()) {
-      blocksToEndAtTop.erase(successor);
-    }
+  // A block is a phi barrier iff any of its predecessors' terminators get
+  // classified as barriers.  That happens when a copy of %lifetime is passed
+  // to a phi.
+  for (auto *block : barriers.phis) {
+    madeChange |= createEndBorrow(&block->front());
+  }
 
-    // We either have processed all successors of block or else it is a block
-    // which contained one of the original scope-ending instructions.  Scan the
-    // block backwards, looking for the first deinit barrier.  If we've visited
-    // all successors, start scanning from the terminator.  If the block
-    // contained an original scope-ending instruction, start scanning from it.
-    SILInstruction *instruction =
-        startingInstruction ? startingInstruction : block->getTerminator();
-    SILInstruction *barrier = nullptr;
-    while ((instruction = getPreviousInstruction(instruction))) {
-      if (instruction == introducer) {
-        barrier = instruction;
-        break;
+  // Add end_borrows for barrier boundaries.
+  //
+  // Insert end_borrows after every non-terminator barrier.
+  //
+  // For terminator barriers, add end_borrows at the beginning of the successor
+  // blocks.  In order to reach a terminator and classify it as a barrier, all
+  // of a block P's successors B had reachable beginnings.  If any of them
+  // didn't, then BackwardReachability::meetOverSuccessors would never have
+  // returned true for P, so none of its instructions would ever have been
+  // classified (except for via effectForPhi, which doesn't record terminator
+  // barriers).
+  for (auto instruction : barriers.instructions) {
+    if (auto *terminator = dyn_cast<TermInst>(instruction)) {
+      auto successors = terminator->getParentBlock()->getSuccessorBlocks();
+      for (auto *successor : successors) {
+        madeChange |= createEndBorrow(&successor->front());
       }
-      if (!tryHoistOverInstruction(instruction)) {
-        barrier = instruction;
-        break;
-      }
-    }
-
-    if (barrier) {
-      barrierInstructions.push_back({block, barrier});
     } else {
-      blocksWithReachedTops.insert(block);
-      blocksToEndAtTop.insert(block);
-      for (auto *predecessor : block->getPredecessorBlocks()) {
-        worklist.push_back(predecessor);
-      }
+      auto *next = instruction->getNextInstruction();
+      assert(next);
+      madeChange |= createEndBorrow(next);
     }
   }
+
+  // Add end_borrows for control-flow boundaries.
+  //
+  // Insert end_borrows at the beginning of blocks which were preceded by a
+  // control flow branch (and which, thanks to the lack of critical edges,
+  // don't have multiple predecessors) whose end was not reachable (because
+  // reachability was not able to make it to the top of some other successor).
+  //
+  // In other words, a control flow boundary is the target edge from a block B
+  // to its single predecessor P not all of whose successors S in succ(P) had
+  // reachable beginnings.  We witness that fact about P's successors by way of
+  // P not having a reachable end--see BackwardReachability::meetOverSuccessors.
+  //
+  // control-flow-boundary(B) := beginning-reachable(B) && !end-reachable(P)
+  for (auto *block : barriers.blocks) {
+    madeChange |= createEndBorrow(&block->front());
+  }
+
+  if (madeChange) {
+    // Remove all the original end_borrow instructions.
+    for (auto *end : uses.ends) {
+      if (reusedEndBorrowInsts.contains(end)) {
+        continue;
+      }
+      context.deleter.forceDelete(end);
+    }
+  }
+
+  return madeChange;
 }
 
-void ShrinkBorrowScope::rewrite() {
-  // Remove all the original end_borrow instructions.
-  for (auto pair : startingInstructions) {
-    deleter.forceDelete(pair.getSecond());
+bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
+  if (auto *ebi = dyn_cast<EndBorrowInst>(insertionPoint)) {
+    if (llvm::find(uses.ends, insertionPoint) != uses.ends.end()) {
+      reusedEndBorrowInsts.insert(insertionPoint);
+      return false;
+    }
   }
-
-  // Insert the new end_borrow instructions that occur after deinit barriers.
-  for (auto pair : barrierInstructions) {
-    auto *insertionPoint = getNextInstruction(pair.second);
-    createEndBorrow(insertionPoint);
-  }
-
-  // Insert the new end_borrow instructions that occur at the beginning of
-  // blocks which we couldn't hoist out of.
-  for (auto *block : blocksToEndAtTop) {
-    auto *insertionPoint = &*block->begin();
-    createEndBorrow(insertionPoint);
-  }
-}
-
-void ShrinkBorrowScope::createEndBorrow(SILInstruction *insertionPoint) {
   auto builder = SILBuilderWithScope(insertionPoint);
   builder.createEndBorrow(
       RegularLocation::getAutoGeneratedLocation(insertionPoint->getLoc()),
-      introducer);
+      &context.introducer);
+  return true;
 }
 
-bool swift::shrinkBorrowScope(BeginBorrowInst *bbi,
-                              InstructionDeleter &deleter) {
-  ShrinkBorrowScope borrowShrinker(bbi, deleter);
-  return borrowShrinker.run();
+bool run(Context &context) {
+  Usage usage;
+  if (!findUsage(context, usage))
+    return false;
+
+  DeinitBarriers barriers(context);
+  Dataflow flow(context, usage, barriers);
+  flow.run();
+
+  Rewriter rewriter(context, usage, barriers);
+
+  return rewriter.run();
+}
+} // end namespace ShrinkBorrowScope
+
+bool swift::shrinkBorrowScope(
+    BeginBorrowInst const &bbi, InstructionDeleter &deleter,
+    SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts) {
+  ShrinkBorrowScope::Context context(bbi, modifiedCopyValueInsts, deleter);
+  return ShrinkBorrowScope::run(context);
 }

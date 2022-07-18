@@ -39,23 +39,24 @@ extension AsyncSequence {
   ///                 return Counter(howHigh: value)
   ///             }
   ///         for try await number in stream {
-  ///             print ("\(number)", terminator: " ")
+  ///             print(number, terminator: " ")
   ///         }
   ///     } catch {
   ///         print(error)
   ///     }
-  ///     // Prints: 1 1 2 1 2 3 MyError()
+  ///     // Prints "1 1 2 1 2 3 MyError()"
   ///
   /// - Parameter transform: An error-throwing mapping closure. `transform`
   ///   accepts an element of this sequence as its parameter and returns an
   ///   `AsyncSequence`. If `transform` throws an error, the sequence ends.
   /// - Returns: A single, flattened asynchronous sequence that contains all
-  ///   elements in all the asychronous sequences produced by `transform`. The
-  ///   sequence ends either when the the last sequence created from the last
+  ///   elements in all the asynchronous sequences produced by `transform`. The
+  ///   sequence ends either when the last sequence created from the last
   ///   element from base sequence ends, or when `transform` throws an error.
+  @preconcurrency
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
-    _ transform: @escaping (Element) async throws -> SegmentOfResult
+    _ transform: @Sendable @escaping (Element) async throws -> SegmentOfResult
   ) -> AsyncThrowingFlatMapSequence<Self, SegmentOfResult> {
     return AsyncThrowingFlatMapSequence(self, transform: transform)
   }
@@ -169,3 +170,18 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingFlatMapSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        SegmentOfResult: Sendable, 
+        SegmentOfResult.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingFlatMapSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        SegmentOfResult: Sendable, 
+        SegmentOfResult.Element: Sendable, 
+        SegmentOfResult.AsyncIterator: Sendable { }

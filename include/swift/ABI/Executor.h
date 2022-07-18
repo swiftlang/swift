@@ -124,6 +124,9 @@ public:
   /// Is this executor the main executor?
   bool isMainExecutor() const;
 
+  /// Get the raw value of the Implementation field, for tracing.
+  uintptr_t getRawImplementation() { return Implementation; }
+
   bool operator==(ExecutorRef other) const {
     return Identity == other.Identity;
   }
@@ -214,7 +217,7 @@ struct AsyncContinuationTypeImpl<
   AsyncSignature<void(ArgTys...), /*throws=*/true>> {
 
   using type = SWIFT_CC(swiftasync) void(SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                         SWIFT_CONTEXT void *);
+                                         SWIFT_CONTEXT SwiftError *);
 };
 
 template <class... ArgTys>
@@ -238,7 +241,7 @@ template <class AsyncSignature>
 class AsyncFunctionPointer {
 public:
   /// The function to run.
-  RelativeDirectPointer<AsyncFunctionType<AsyncSignature>,
+  TargetCompactFunctionPointer<InProcess, AsyncFunctionType<AsyncSignature>,
                         /*nullable*/ false,
                         int32_t> Function;
 

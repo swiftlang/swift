@@ -12,7 +12,6 @@
 
 from . import cmark
 from . import libcxx
-from . import libicu
 from . import llvm
 from . import product
 from . import swift
@@ -31,7 +30,7 @@ class LibDispatch(product.Product):
     def is_before_build_script_impl_product(cls):
         """is_before_build_script_impl_product -> bool
 
-        Whether this product is build before any build-script-impl products.
+        Whether this product is built before any build-script-impl products.
         """
         return False
 
@@ -52,5 +51,4 @@ class LibDispatch(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift]

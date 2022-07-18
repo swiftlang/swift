@@ -84,6 +84,7 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return true;
   case SILFunctionTypeRepresentation::WitnessMethod:
     return OptForPartialApply;
@@ -645,6 +646,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
+                     F->getReferencedAdHocRequirementWitnessFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;

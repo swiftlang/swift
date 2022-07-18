@@ -14,6 +14,10 @@ if(SWIFT_ENABLE_REFLECTION)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_ENABLE_REFLECTION")
 endif()
 
+if(SWIFT_STDLIB_STATIC_PRINT)
+  list(APPEND swift_stdlib_unittest_compile_flags "-D" "SWIFT_STDLIB_STATIC_PRINT")
+endif()
+
 set(swift_stdlib_unittest_link_libraries "")
 set(swift_stdlib_unittest_modules "")
 if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
@@ -38,6 +42,7 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   Statistics.swift
   StdlibCoreExtras.swift
   StringConvertible.swift
+  StringTestHelpers.swift
   SymbolLookup.swift
   TestHelpers.swift
   TypeIndexed.swift

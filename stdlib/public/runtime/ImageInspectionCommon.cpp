@@ -24,51 +24,91 @@
 #include "../SwiftShims/Visibility.h"
 #include "../SwiftShims/MetadataSections.h"
 #include "ImageInspection.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Concurrent.h"
 
+#include <algorithm>
+#include <atomic>
+#include <cstdlib>
 
 namespace swift {
 
-static swift::MetadataSections *registered = nullptr;
+static Lazy<ConcurrentReadableArray<swift::MetadataSections *>> registered;
 
-void record(swift::MetadataSections *sections) {
-  if (registered == nullptr) {
-    registered = sections;
-    sections->next = sections->prev = sections;
-  } else {
-    registered->prev->next = sections;
-    sections->next = registered;
-    sections->prev = registered->prev;
-    registered->prev = sections;
+/// Adjust the \c baseAddress field of a metadata sections structure.
+///
+/// \param sections A pointer to a valid \c swift::MetadataSections structure.
+///
+/// This function should be called at least once before the structure or its
+/// address is passed to code outside this file to ensure that the structure's
+/// \c baseAddress field correctly points to the base address of the image it
+/// is describing.
+static void fixupMetadataSectionBaseAddress(swift::MetadataSections *sections) {
+  bool fixupNeeded = false;
+
+#if defined(__ELF__)
+  // If the base address was set but the image is an ELF image, it is going to
+  // be __dso_handle which is not the value we expect (Dl_info::dli_fbase), so
+  // we need to fix it up.
+  fixupNeeded = true;
+#elif !defined(__MACH__)
+  // For non-ELF, non-Apple platforms, if the base address is nullptr, it
+  // implies that this image was built against an older version of the runtime
+  // that did not capture any value for the base address.
+  auto oldBaseAddress = sections->baseAddress.load(std::memory_order_relaxed);
+  if (!oldBaseAddress) {
+    fixupNeeded = true;
+  }
+#endif
+
+  if (fixupNeeded) {
+    // We need to fix up the base address. We'll need a known-good address in
+    // the same image: `sections` itself will work nicely.
+    swift::SymbolInfo symbolInfo;
+    if (lookupSymbol(sections, &symbolInfo) && symbolInfo.baseAddress) {
+        sections->baseAddress.store(symbolInfo.baseAddress,
+                                    std::memory_order_relaxed);
+    }
   }
 }
 }
 
 SWIFT_RUNTIME_EXPORT
-void swift_addNewDSOImage(const void *addr) {
-  // We cast off the const in order to update the linked list
-  // data structure. This is safe to do since we don't touch 
-  // any other fields.
-  swift::MetadataSections *sections =
-      static_cast<swift::MetadataSections *>(const_cast<void *>(addr));
-
-  record(sections);
+void swift_addNewDSOImage(swift::MetadataSections *sections) {
+#if 0
+  // Ensure the base address of the sections structure is correct.
+  //
+  // Currently disabled because none of the registration functions below
+  // actually do anything with the baseAddress field. Instead,
+  // swift_enumerateAllMetadataSections() is called by other individual
+  // functions, lower in this file, that yield metadata section pointers.
+  //
+  // If one of these registration functions starts needing the baseAddress
+  // field, this call should be enabled and the calls elsewhere in the file can
+  // be removed.
+  swift::fixupMetadataSectionBaseAddress(sections);
+#endif
+  auto baseAddress = sections->baseAddress.load(std::memory_order_relaxed);
 
   const auto &protocols_section = sections->swift5_protocols;
   const void *protocols = reinterpret_cast<void *>(protocols_section.start);
   if (protocols_section.length)
-    swift::addImageProtocolsBlockCallback(protocols, protocols_section.length);
+    swift::addImageProtocolsBlockCallback(baseAddress,
+                                          protocols, protocols_section.length);
 
   const auto &protocol_conformances = sections->swift5_protocol_conformances;
   const void *conformances =
       reinterpret_cast<void *>(protocol_conformances.start);
   if (protocol_conformances.length)
-    swift::addImageProtocolConformanceBlockCallback(conformances,
+    swift::addImageProtocolConformanceBlockCallback(baseAddress, conformances,
                                              protocol_conformances.length);
 
   const auto &type_metadata = sections->swift5_type_metadata;
   const void *metadata = reinterpret_cast<void *>(type_metadata.start);
   if (type_metadata.length)
-    swift::addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+    swift::addImageTypeMetadataRecordBlockCallback(baseAddress,
+                                                   metadata,
+                                                   type_metadata.length);
 
   const auto &dynamic_replacements = sections->swift5_replace;
   const auto *replacements =
@@ -77,7 +117,7 @@ void swift_addNewDSOImage(const void *addr) {
     const auto &dynamic_replacements_some = sections->swift5_replac2;
     const auto *replacements_some =
       reinterpret_cast<void *>(dynamic_replacements_some.start);
-    swift::addImageDynamicReplacementBlockCallback(
+    swift::addImageDynamicReplacementBlockCallback(baseAddress,
         replacements, dynamic_replacements.length, replacements_some,
         dynamic_replacements_some.length);
   }
@@ -87,95 +127,71 @@ void swift_addNewDSOImage(const void *addr) {
       reinterpret_cast<void *>(accessible_funcs_section.start);
   if (accessible_funcs_section.length)
     swift::addImageAccessibleFunctionsBlockCallback(
-        functions, accessible_funcs_section.length);
+        baseAddress, functions, accessible_funcs_section.length);
+
+  // Register this section for future enumeration by clients. This should occur
+  // after this function has done all other relevant work to avoid a race
+  // condition when someone calls swift_enumerateAllMetadataSections() on
+  // another thread.
+  swift::registered->push_back(sections);
+}
+
+SWIFT_RUNTIME_EXPORT
+void swift_enumerateAllMetadataSections(
+  bool (* body)(const swift::MetadataSections *sections, void *context),
+  void *context
+) {
+  auto snapshot = swift::registered->snapshot();
+  for (swift::MetadataSections *sections : snapshot) {
+    // Ensure the base address is fixed up before yielding the pointer.
+    swift::fixupMetadataSectionBaseAddress(sections);
+
+    // Yield the pointer and (if the callback returns false) break the loop.
+    if (!(* body)(sections, context)) {
+      return;
+    }
+  }
 }
 
 void swift::initializeProtocolLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSectionRange &protocols =
-      sections->swift5_protocols;
-    if (protocols.length)
-      addImageProtocolsBlockCallbackUnsafe(
-          reinterpret_cast<void *>(protocols.start), protocols.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
 }
 
 void swift::initializeProtocolConformanceLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSectionRange &conformances =
-        sections->swift5_protocol_conformances;
-    if (conformances.length)
-      addImageProtocolConformanceBlockCallbackUnsafe(
-          reinterpret_cast<void *>(conformances.start), conformances.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
 }
 
 void swift::initializeTypeMetadataRecordLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSectionRange &type_metadata =
-        sections->swift5_type_metadata;
-    if (type_metadata.length)
-      addImageTypeMetadataRecordBlockCallbackUnsafe(
-          reinterpret_cast<void *>(type_metadata.start), type_metadata.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
 }
 
 void swift::initializeDynamicReplacementLookup() {
 }
 
 void swift::initializeAccessibleFunctionsLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSectionRange &functions =
-        sections->swift5_accessible_functions;
-    if (functions.length)
-      addImageAccessibleFunctionsBlockCallbackUnsafe(
-          reinterpret_cast<void *>(functions.start), functions.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
 }
 
 #ifndef NDEBUG
 
 SWIFT_RUNTIME_EXPORT
 const swift::MetadataSections *swift_getMetadataSection(size_t index) {
-  if (swift::registered == nullptr) {
-    return nullptr;
+  swift::MetadataSections *result = nullptr;
+
+  auto snapshot = swift::registered->snapshot();
+  if (index < snapshot.count()) {
+    result = snapshot[index];
   }
 
-  auto selected = swift::registered;
-  while (index > 0) {
-    selected = selected->next;
-    if (selected == swift::registered) {
-      return nullptr;
-    }
-    --index;
+  if (result) {
+    // Ensure the base address is fixed up before returning it.
+    swift::fixupMetadataSectionBaseAddress(result);
   }
-  return selected;
+
+  return result;
 }
 
 SWIFT_RUNTIME_EXPORT
-const char *swift_getMetadataSectionName(void *metadata_section) {
+const char *
+swift_getMetadataSectionName(const swift::MetadataSections *section) {
   swift::SymbolInfo info;
-  if (lookupSymbol(metadata_section, &info)) {
+  if (lookupSymbol(section, &info)) {
     if (info.fileName) {
       return info.fileName;
     }
@@ -184,15 +200,26 @@ const char *swift_getMetadataSectionName(void *metadata_section) {
 }
 
 SWIFT_RUNTIME_EXPORT
+void swift_getMetadataSectionBaseAddress(const swift::MetadataSections *section,
+                                         void const **out_actual,
+                                         void const **out_expected) {
+  swift::SymbolInfo info;
+  if (lookupSymbol(section, &info)) {
+    *out_actual = info.baseAddress;
+  } else {
+    *out_actual = nullptr;
+  }
+
+  // fixupMetadataSectionBaseAddress() was already called by
+  // swift_getMetadataSection(), presumably on the same thread, so we don't need
+  // to call it again here.
+  *out_expected = section->baseAddress.load(std::memory_order_relaxed);
+}
+
+SWIFT_RUNTIME_EXPORT
 size_t swift_getMetadataSectionCount() {
-  if (swift::registered == nullptr)
-    return 0;
-
-  size_t count = 1;
-  for (const auto *current = swift::registered->next;
-       current != swift::registered; current = current->next, ++count);
-
-  return count;
+  auto snapshot = swift::registered->snapshot();
+  return snapshot.count();
 }
 
 #endif // NDEBUG

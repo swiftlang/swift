@@ -64,7 +64,7 @@ protocol Subscriptable {
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$sSo7NSArrayC14objc_witnesses13SubscriptableA2cDPyypSicigTW :
 // CHECK:         function_ref @$sSo7NSArrayCyypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo7NSArrayCyypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo7NSArrayCyypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
 // CHECK:         objc_method {{%.*}} : $NSArray, #NSArray.subscript!getter.foreign
 extension NSArray: Subscriptable {}
 
@@ -79,10 +79,10 @@ class Electron : Orbital {
 }
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s14objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s14objc_witnesses8ElectronC13quantumNumberSivgTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s14objc_witnesses8ElectronC13quantumNumberSivgTD
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s14objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivsTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s14objc_witnesses8ElectronC13quantumNumberSivsTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s14objc_witnesses8ElectronC13quantumNumberSivsTD
 
 // witness is a dynamic thunk and is public:
 
@@ -95,7 +95,7 @@ public class Positron : Lepton {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s14objc_witnesses8PositronCAA6LeptonA2aDP4spinSfvgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s14objc_witnesses8PositronC4spinSfvgTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s14objc_witnesses8PositronC4spinSfvgTD
 
 // Override of property defined in @objc extension
 

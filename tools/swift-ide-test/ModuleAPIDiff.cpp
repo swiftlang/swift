@@ -932,7 +932,7 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
   }
   CI.performSema();
 
-  PrintOptions Options = PrintOptions::printEverything();
+  PrintOptions Options = PrintOptions::printDeclarations();
 
   ModuleDecl *M = CI.getMainModule();
   M->getMainSourceFile().print(llvm::outs(), Options);

@@ -10,13 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_STDLIB_ENABLE_UNICODE_DATA
+
 #if defined(__APPLE__)
 #include "Apple/NormalizationData.h"
 #else
 #include "Common/NormalizationData.h"
 #endif
 
-#include "../SwiftShims/UnicodeData.h"
+#else
+#include "swift/Runtime/Debug.h"
+#endif
+
+#include "SwiftShims/UnicodeData.h"
 #include <limits>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -26,7 +32,10 @@ __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar) {
   if (scalar < 0xC0) {
     return 0;
   }
-
+  
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
                                                     _swift_stdlib_normData,
                                                   _swift_stdlib_normData_ranks);
@@ -39,13 +48,22 @@ __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar) {
 
   auto scalarDataIdx = _swift_stdlib_normData_data_indices[dataIdx];
   return _swift_stdlib_normData_data[scalarDataIdx];
+#endif
 }
 
+#if SWIFT_STDLIB_ENABLE_UNICODE_DATA
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const __swift_uint8_t * const _swift_stdlib_nfd_decompositions = _swift_stdlib_nfd_decomp;
+#else
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const __swift_uint8_t * const _swift_stdlib_nfd_decompositions = nullptr;
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint32_t _swift_stdlib_getDecompositionEntry(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto levelCount = NFD_DECOMP_LEVEL_COUNT;
   __swift_intptr_t decompIdx = _swift_stdlib_getMphIdx(scalar, levelCount,
                                                   _swift_stdlib_nfd_decomp_keys,
@@ -53,11 +71,15 @@ __swift_uint32_t _swift_stdlib_getDecompositionEntry(__swift_uint32_t scalar) {
                                                   _swift_stdlib_nfd_decomp_sizes);
 
   return _swift_stdlib_nfd_decomp_indices[decompIdx];
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
                                             __swift_uint32_t y) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto levelCount = NFC_COMP_LEVEL_COUNT;
   __swift_intptr_t compIdx = _swift_stdlib_getMphIdx(y, levelCount,
                                                   _swift_stdlib_nfc_comp_keys,
@@ -113,4 +135,5 @@ __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
   // array.
   // Return the max here to indicate that we couldn't find one.
   return std::numeric_limits<__swift_uint32_t>::max();
+#endif
 }

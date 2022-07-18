@@ -15,6 +15,8 @@ import SwiftShims
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif os(WASI)
+  import WASILibc
 #elseif os(Windows)
   import CRT
   import WinSDK
@@ -519,7 +521,7 @@ Runtime.test("abstraction barrier on casting generic param bound to existential"
        dynamicWithErasedType,
        dynamicExistentialWithErasedType,
        dynamicDoubleWrappedExistentialWithErasedType)
-    = castWithAbstractionBarrier(x)
+    = castWithAbstractionBarrier(x as SomeProtocol)
 
   expectTrue(staticWithConcreteType == SomeProtocol.self)
   expectTrue(dynamicWithConcreteType == SomeProtocol.self)
@@ -684,7 +686,7 @@ Reflection.test("multiprotocolTypes") {
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 BitTwiddlingTestSuite.test("_pointerSize") {
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(8, MemoryLayout<Optional<AnyObject>>.size)
@@ -708,7 +710,7 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
   expectTrue(_isPowerOf2(asInt(2)))
   expectFalse(_isPowerOf2(asInt(3)))
   expectTrue(_isPowerOf2(asInt(1024)))
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
   // Not applicable to 32-bit architectures.
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectTrue(_isPowerOf2(asInt(0x8000_0000)))

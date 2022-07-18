@@ -11,17 +11,17 @@
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_RUNTIME_CONCURRENTUTILS_H
 #define SWIFT_RUNTIME_CONCURRENTUTILS_H
-#include <iterator>
+#include "Atomic.h"
+#include "Debug.h"
+#include "swift/Threading/Mutex.h"
+#include "llvm/ADT/Hashing.h"
+#include "llvm/Support/Allocator.h"
 #include <algorithm>
 #include <atomic>
 #include <functional>
+#include <iterator>
 #include <stdint.h>
 #include <vector>
-#include "llvm/ADT/Hashing.h"
-#include "llvm/Support/Allocator.h"
-#include "Atomic.h"
-#include "Debug.h"
-#include "Mutex.h"
 
 #if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)
 #include <stdio.h>
@@ -520,10 +520,14 @@ public:
     // These are marked as ref-qualified (the &) to make sure they can't be
     // called on temporaries, since the temporary would be destroyed before the
     // return value can be used, making it invalid.
-    const ElemTy *begin() & { return Start; }
-    const ElemTy *end() & { return Start + Count; }
+    const ElemTy *begin() const& { return Start; }
+    const ElemTy *end() const& { return Start + Count; }
+    const ElemTy& operator [](size_t index) const& {
+      assert(index < count() && "out-of-bounds access to snapshot element");
+      return Start[index];
+    }
 
-    size_t count() { return Count; }
+    size_t count() const { return Count; }
   };
 
   // This type cannot be safely copied or moved.
@@ -620,7 +624,7 @@ using llvm::hash_value;
 /// process. It has no destructor, to avoid generating useless global destructor
 /// calls. The memory it allocates can be freed by calling clear() with no
 /// outstanding readers, but this won't destroy the static mutex it uses.
-template <class ElemTy, class MutexTy = StaticMutex>
+template <class ElemTy, class MutexTy = LazyMutex>
 struct ConcurrentReadableHashMap {
   // We don't call destructors. Make sure the elements will put up with this.
   static_assert(std::is_trivially_destructible<ElemTy>::value,
@@ -812,7 +816,7 @@ private:
   /// the first element of a variable-length array, whose size is determined by
   /// the allocation.
   struct ElementStorage {
-    uint32_t Capacity;
+    uintptr_t Capacity : 32;
     ElemTy Elem;
 
     static ElementStorage *allocate(size_t capacity) {
@@ -881,7 +885,7 @@ private:
     auto *newElements = ElementStorage::allocate(newCapacity);
 
     if (elements) {
-      if constexpr (std::is_trivially_copyable<ElemTy>::value) {
+      if (std::is_trivially_copyable<ElemTy>::value) {
         memcpy(newElements->data(), elements->data(),
                elementCount * sizeof(ElemTy));
       } else {
@@ -1167,7 +1171,7 @@ template <class ElemTy> struct HashMapElementWrapper {
 /// by allocating them separately and storing pointers to them. The elements of
 /// the hash table are instances of HashMapElementWrapper. A new getOrInsert
 /// method is provided that directly returns the stable element pointer.
-template <class ElemTy, class Allocator, class MutexTy = StaticMutex>
+template <class ElemTy, class Allocator, class MutexTy = LazyMutex>
 struct StableAddressConcurrentReadableHashMap
     : public ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>, MutexTy> {
   // Implicitly trivial destructor.
