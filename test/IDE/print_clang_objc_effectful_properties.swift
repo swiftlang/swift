@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-implicit-attrs -source-filename %s -module-to-print=EffectfulProperties -function-definitions=false > %t/EffectfulProperties.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-implicit-attrs -source-filename %s -module-to-print=EffectfulProperties -function-definitions=false -enable-experimental-feature SendableCompletionHandlers > %t/EffectfulProperties.printed.txt
 // RUN: %FileCheck -input-file %t/EffectfulProperties.printed.txt %s
 
 // REQUIRES: concurrency
