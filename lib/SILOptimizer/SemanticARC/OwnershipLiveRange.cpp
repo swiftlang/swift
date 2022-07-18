@@ -124,9 +124,14 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
         continue;
 
       for (auto *succArg : succBlock->getSILPhiArguments()) {
-        // If we have an any value, just continue.
-        if (succArg->getOwnershipKind() == OwnershipKind::None)
+        // Owned values can get transformed to None values, currently we bail
+        // out computing OwnershipLiveRange in this case, because it can lead to
+        // incorrect results in the presence of dead edges on the non-trivial
+        // paths of switch_enum.
+        if (succArg->getOwnershipKind() == OwnershipKind::None) {
+          tmpUnknownConsumingUses.push_back(op);
           continue;
+        }
 
         // Otherwise add all users of this BBArg to the worklist to visit
         // recursively.

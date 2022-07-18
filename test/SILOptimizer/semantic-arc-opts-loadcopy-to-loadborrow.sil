@@ -27,6 +27,7 @@ sil @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
 sil @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
 sil @inout_user : $@convention(thin) (@inout FakeOptional<NativeObjectPair>) -> ()
 sil @get_native_object : $@convention(thin) () -> @owned Builtin.NativeObject
+sil [ossa] @get_enum : $@convention(thin) () -> @owned EnumA
 
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
@@ -104,6 +105,18 @@ struct StructWithEnumWithIndirectCaseField {
   var field : EnumWithIndirectCase
 }
 
+struct TrivialStruct {
+}
+
+enum EnumA {
+case none
+case sometrivial(TrivialStruct)
+case somenontrivial(NonTrivialStruct)
+}
+
+struct StructWithEnum {
+  var val: EnumA
+}
 sil @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
 sil @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
 
@@ -1514,3 +1527,28 @@ bb0(%0 : $*NonTrivialStruct, %1 : $*NonTrivialStruct):
   return %9999 : $()
 } 
 
+// CHECK-LABEL: sil [ossa] @switch_enum_test :
+// CHECK: load [copy]
+// CHECK: } //  end sil function 'switch_enum_test'
+sil [ossa] @switch_enum_test : $@convention(thin) (@inout StructWithEnum) -> () {
+bb0(%0 : $*StructWithEnum):
+  %1 = struct_element_addr %0 : $*StructWithEnum, #StructWithEnum.val
+  %2 = struct_element_addr %0 : $*StructWithEnum, #StructWithEnum.val
+  %3 = load [copy] %2 : $*EnumA
+  destroy_addr %1 : $*EnumA
+  switch_enum %3 : $EnumA, case #EnumA.sometrivial!enumelt: bb1, case #EnumA.somenontrivial!enumelt:bb2, case #EnumA.none!enumelt: bb3
+
+bb1(%6 : $TrivialStruct):
+  %f = function_ref @get_enum : $@convention(thin) () -> @owned EnumA
+  %r = apply %f() : $@convention(thin) () -> @owned EnumA
+  %ele = struct_element_addr %0 : $*StructWithEnum, #StructWithEnum.val
+  store %r to [init] %ele :$*EnumA
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2(%7 : @owned $NonTrivialStruct):
+ unreachable
+
+bb3:
+ unreachable
+}
