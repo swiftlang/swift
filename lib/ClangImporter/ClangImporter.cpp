@@ -5942,16 +5942,13 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (!hasRequiredValueTypeOperations(decl)) {
     if (hasUnsafeAPIAttr(decl))
       desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                                            "import_unsafe",
-                                            decl->getNameAsString());
+                              "import_unsafe", decl->getNameAsString());
     if (hasOwnedValueAttr(decl))
       desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                                            "import_owned",
-                                            decl->getNameAsString());
+                              "import_owned", decl->getNameAsString());
     if (hasIteratorAPIAttr(decl))
       desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                                            "import_iterator",
-                                            decl->getNameAsString());
+                              "import_iterator", decl->getNameAsString());
 
     return CxxRecordSemanticsKind::MissingLifetimeOperation;
   }
@@ -5990,8 +5987,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
     if (hasUnsafeAPIAttr(method))
       return true;
 
-    if (method->isOverloadedOperator() ||
-        method->isStatic() ||
+    if (method->isOverloadedOperator() || method->isStatic() ||
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
@@ -6004,8 +6000,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       if (auto cxxRecordReturnType =
               dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
         auto semanticsKind = evaluateOrDefault(
-            evaluator,
-            CxxRecordSemantics({cxxRecordReturnType, desc.ctx}), {});
+            evaluator, CxxRecordSemantics({cxxRecordReturnType, desc.ctx}), {});
 
         if (semanticsKind == CxxRecordSemanticsKind::UnsafePointerMember ||
             // Pretend all methods that return iterators are unsafe so protocol
@@ -6023,9 +6018,8 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
     llvm_unreachable("decl must be a C++ method or C++ record.");
   }
 
-  auto semanticsKind =
-      evaluateOrDefault(evaluator,
-                        CxxRecordSemantics({recordDecl, desc.ctx}), {});
+  auto semanticsKind = evaluateOrDefault(
+      evaluator, CxxRecordSemantics({recordDecl, desc.ctx}), {});
 
   // Always unsafe.
   if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||

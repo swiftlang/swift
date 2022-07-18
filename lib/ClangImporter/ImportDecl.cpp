@@ -1986,8 +1986,8 @@ namespace {
       if (!decl->getDefinition()) {
         Impl.addImportDiagnostic(
             decl,
-            Diagnostic(diag::incomplete_record,
-                       Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+            Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
+                                                    decl->getNameAsString())));
       }
 
       // FIXME: Figure out how to deal with incomplete types, since that
@@ -2001,18 +2001,18 @@ namespace {
       // TODO(SR-13809): fix this once we support dependent types.
       if (decl->getTypeForDecl()->isDependentType()) {
         Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::record_is_dependent,
-                       Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+            decl, Diagnostic(
+                      diag::record_is_dependent,
+                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
         return nullptr;
       }
 
       // Don't import nominal types that are over-aligned.
       if (Impl.isOverAligned(decl)) {
         Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::record_over_aligned,
-                       Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+            decl, Diagnostic(
+                      diag::record_over_aligned,
+                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
         return nullptr;
       }
 
@@ -2031,9 +2031,9 @@ namespace {
         // referencing the name, which would sidestep our availability
         // diagnostics.
         Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::record_non_trivial_copy_destroy,
-                       Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+            decl, Diagnostic(
+                      diag::record_non_trivial_copy_destroy,
+                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
         return nullptr;
       }
 
@@ -2054,9 +2054,9 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc) {
         Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::record_parent_unimportable,
-                       Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+            decl, Diagnostic(
+                      diag::record_parent_unimportable,
+                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
         return nullptr;
       }
 
@@ -2431,8 +2431,10 @@ namespace {
         return VisitRecordDecl(decl);
 
       if (!decl->getDefinition()) {
-        Impl.addImportDiagnostic(decl, Diagnostic(diag::incomplete_record,
-                                                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+        Impl.addImportDiagnostic(
+            decl,
+            Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
+                                                    decl->getNameAsString())));
       }
 
       decl = decl->getDefinition();
@@ -2485,9 +2487,9 @@ namespace {
 
       // It is import that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      auto semanticsKind = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CxxRecordSemantics({decl, Impl.SwiftContext}), {});
+      auto semanticsKind =
+          evaluateOrDefault(Impl.SwiftContext.evaluator,
+                            CxxRecordSemantics({decl, Impl.SwiftContext}), {});
       if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation) {
         Impl.addImportDiagnostic(
             decl,
@@ -2495,12 +2497,14 @@ namespace {
                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString()),
                        "does not have a copy constructor or destructor"));
         return nullptr;
-      } else if (semanticsKind == CxxRecordSemanticsKind::UnsafeLifetimeOperation) {
+      } else if (semanticsKind ==
+                 CxxRecordSemanticsKind::UnsafeLifetimeOperation) {
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::record_not_automatically_importable,
                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString()),
-                       "has custom, potentially unsafe copy constructor or destructor"));
+                       "has custom, potentially unsafe copy constructor or "
+                       "destructor"));
         return nullptr;
       }
 
@@ -2767,7 +2771,8 @@ namespace {
                 Impl.addImportDiagnostic(
                     decl,
                     Diagnostic(diag::reference_passed_by_value,
-                               Impl.SwiftContext.AllocateCopy(recordType->getDecl()->getNameAsString()),
+                               Impl.SwiftContext.AllocateCopy(
+                                   recordType->getDecl()->getNameAsString()),
                                "a parameter"));
                 return true;
               }
@@ -2781,10 +2786,10 @@ namespace {
       if (auto recordType = dyn_cast<clang::RecordType>(
               decl->getReturnType().getCanonicalType())) {
         Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::reference_passed_by_value,
-                       Impl.SwiftContext.AllocateCopy(recordType->getDecl()->getNameAsString()),
-                       "the return"));
+            decl, Diagnostic(diag::reference_passed_by_value,
+                             Impl.SwiftContext.AllocateCopy(
+                                 recordType->getDecl()->getNameAsString()),
+                             "the return"));
         return recordHasReferenceSemantics(recordType->getDecl());
       }
 

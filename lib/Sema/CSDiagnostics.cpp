@@ -18,7 +18,6 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckProtocol.h"
 #include "TypoCorrection.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -26,8 +25,8 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -38,6 +37,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -3655,33 +3655,44 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
   return false;
 }
 
-static void diagnoseUnsafeCxxMethod(SourceLoc loc,
-                                    Type baseType,
+static void diagnoseUnsafeCxxMethod(SourceLoc loc, Type baseType,
                                     DeclName name) {
   auto &ctx = baseType->getASTContext();
 
   if (baseType->getAnyNominal() == nullptr ||
       // Don't waist time on non-cxx-methods.
-      !isa_and_nonnull<clang::CXXRecordDecl>(baseType->getAnyNominal()->getClangDecl()))
+      !isa_and_nonnull<clang::CXXRecordDecl>(
+          baseType->getAnyNominal()->getClangDecl()))
     return;
 
-  auto unsafeId = ctx.getIdentifier("__" + name.getBaseIdentifier().str().str() + "Unsafe");
-  for (auto found : baseType->getAnyNominal()->lookupDirect(DeclBaseName(unsafeId))) {
-    auto cxxMethod = dyn_cast_or_null<clang::CXXMethodDecl>(found->getClangDecl());
+  auto unsafeId =
+      ctx.getIdentifier("__" + name.getBaseIdentifier().str().str() + "Unsafe");
+  for (auto found :
+       baseType->getAnyNominal()->lookupDirect(DeclBaseName(unsafeId))) {
+    auto cxxMethod =
+        dyn_cast_or_null<clang::CXXMethodDecl>(found->getClangDecl());
     if (!cxxMethod)
       continue;
 
     if (name.getBaseIdentifier().str() == "begin" ||
         name.getBaseIdentifier().str() == "end") {
-      ctx.Diags.diagnose(loc, diag::dont_use_iterator_api, name.getBaseIdentifier().str());
+      ctx.Diags.diagnose(loc, diag::dont_use_iterator_api,
+                         name.getBaseIdentifier().str());
     } else if (cxxMethod->getReturnType()->isPointerType())
-      ctx.Diags.diagnose(loc, diag::projection_not_imported, name.getBaseIdentifier().str(), "pointer");
+      ctx.Diags.diagnose(loc, diag::projection_not_imported,
+                         name.getBaseIdentifier().str(), "pointer");
     else if (cxxMethod->getReturnType()->isReferenceType())
-      ctx.Diags.diagnose(loc, diag::projection_not_imported, name.getBaseIdentifier().str(), "reference");
+      ctx.Diags.diagnose(loc, diag::projection_not_imported,
+                         name.getBaseIdentifier().str(), "reference");
     else if (cxxMethod->getReturnType()->isRecordType()) {
-      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(cxxMethod->getReturnType()->getAsRecordDecl())) {
-        assert(evaluateOrDefault(ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx}), {}) == CxxRecordSemanticsKind::UnsafePointerMember);
-        ctx.Diags.diagnose(loc, diag::projection_not_imported, name.getBaseIdentifier().str(), cxxRecord->getNameAsString());
+      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
+              cxxMethod->getReturnType()->getAsRecordDecl())) {
+        assert(evaluateOrDefault(ctx.evaluator,
+                                 CxxRecordSemantics({cxxRecord, ctx}), {}) ==
+               CxxRecordSemanticsKind::UnsafePointerMember);
+        ctx.Diags.diagnose(loc, diag::projection_not_imported,
+                           name.getBaseIdentifier().str(),
+                           cxxRecord->getNameAsString());
       }
     }
   }
