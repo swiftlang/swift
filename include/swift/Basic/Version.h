@@ -191,8 +191,11 @@ StringRef getSwiftRevision();
 
 /// Is the running compiler built with a version tag for distribution?
 /// When true, \c Version::getCurrentCompilerVersion returns a valid version
-/// and \c getSwiftRevision returns the version tuple in string format.
+/// and \c getCurrentCompilerTag returns the version tuple in string format.
 bool isCurrentCompilerTagged();
+
+/// Retrieves the distribtion tag of the running compiler, if any.
+StringRef getCurrentCompilerTag();
 
 } // end namespace version
 } // end namespace swift
