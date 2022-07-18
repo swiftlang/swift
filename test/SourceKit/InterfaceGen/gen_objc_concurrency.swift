@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %sourcekitd-test -req=interface-gen %S/../Inputs/concurrency/gen_concurrency.swift -- %S/../Inputs/concurrency/gen_concurrency.swift -target %target-triple -I %t | %FileCheck %s --check-prefix=SWIFT-GEN-INTERFACE
+// RUN: %sourcekitd-test -req=interface-gen %S/../Inputs/concurrency/gen_concurrency.swift -- %S/../Inputs/concurrency/gen_concurrency.swift -target %target-triple -I %t -enable-experimental-feature SendableCompletionHandlers | %FileCheck %s --check-prefix=SWIFT-GEN-INTERFACE
 
 // Make sure we print @available when it was explicitly written by the user.
 // SWIFT-GEN-INTERFACE-LABEL: class ClassWithAsyncAndHandler {
@@ -14,7 +14,7 @@
 // SWIFT-GEN-INTERFACE:         @MainActor internal func mainActorMethod()
 
 
-// RUN: %sourcekitd-test -req=interface-gen -using-swift-args -header %S/../Inputs/concurrency/header_concurrency.h -- %s -Xfrontend -enable-objc-interop -import-objc-header %S/../Inputs/concurrency/header_concurrency.h -sdk %clang-importer-sdk | %FileCheck %s --check-prefix=OBJC-GEN-INTERFACE
+// RUN: %sourcekitd-test -req=interface-gen -using-swift-args -header %S/../Inputs/concurrency/header_concurrency.h -- %s -Xfrontend -enable-objc-interop -import-objc-header %S/../Inputs/concurrency/header_concurrency.h -sdk %clang-importer-sdk -enable-experimental-feature SendableCompletionHandlers | %FileCheck %s --check-prefix=OBJC-GEN-INTERFACE
 
 // But don't print @available if it was implicitly added to an imported Clang decl (rdar://76685011).
 // OBJC-GEN-INTERFACE-LABEL: class ClassWithHandlerMethod {

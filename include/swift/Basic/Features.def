@@ -113,6 +113,10 @@ EXPERIMENTAL_FEATURE(ForwardModeDifferentiation)
 /// conformances.
 EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances)
 
+/// Whether Objective-C completion handler parameters are imported as
+/// @Sendable.
+EXPERIMENTAL_FEATURE(SendableCompletionHandlers)
+
 #undef EXPERIMENTAL_FEATURE
 #undef FUTURE_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
