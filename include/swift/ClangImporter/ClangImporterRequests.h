@@ -188,9 +188,6 @@ enum class CxxRecordSemanticsKind {
   ExplicitlyUnsafe,
   // A record that is either not copyable or not destructible.
   MissingLifetimeOperation,
-  // A record that has custom lifetime operations which we cannot prove are
-  // safe.
-  UnsafeLifetimeOperation,
   // A record that contains a pointer (aka non-trivial type).
   UnsafePointerMember
 };

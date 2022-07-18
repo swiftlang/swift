@@ -1,9 +1,7 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -g)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
 //
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
-//
-// XFAIL: *
 
 import StdlibUnittest
 import std

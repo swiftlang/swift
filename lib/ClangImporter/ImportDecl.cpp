@@ -2497,15 +2497,6 @@ namespace {
                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString()),
                        "does not have a copy constructor or destructor"));
         return nullptr;
-      } else if (semanticsKind ==
-                 CxxRecordSemanticsKind::UnsafeLifetimeOperation) {
-        Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::record_not_automatically_importable,
-                       Impl.SwiftContext.AllocateCopy(decl->getNameAsString()),
-                       "has custom, potentially unsafe copy constructor or "
-                       "destructor"));
-        return nullptr;
       }
 
       return VisitRecordDecl(decl);
@@ -2686,8 +2677,7 @@ namespace {
         auto semanticsKind = evaluateOrDefault(
             Impl.SwiftContext.evaluator,
             CxxRecordSemantics({parent, Impl.SwiftContext}), {});
-        if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
-            semanticsKind == CxxRecordSemanticsKind::UnsafeLifetimeOperation)
+        if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation)
           return nullptr;
       }
 

@@ -19,10 +19,6 @@ struct __attribute__((swift_attr("import_unsafe"))) B {
     B(const B&) = delete;
 };
 
-struct C {
-        C(const C&) {}
-};
-
 //--- test.swift
 
 import Test
@@ -34,5 +30,3 @@ public func test(x: X) { }
 public func test(x: A) { }
 // CHECK: note: record 'B' is not automatically importable: does not have a copy constructor or destructor. Refer to the C++ Interop User Manual to classify this type.
 public func test(x: B) { }
-// CHECK: note: record 'C' is not automatically importable: has custom, potentially unsafe copy constructor or destructor. Refer to the C++ Interop User Manual to classify this type.
-public func test(x: C) { }

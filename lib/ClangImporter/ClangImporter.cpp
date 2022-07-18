@@ -5965,15 +5965,15 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Iterator;
   }
 
-  if (!isSufficientlyTrivial(decl)) {
-    return CxxRecordSemanticsKind::UnsafeLifetimeOperation;
-  }
-
   if (hasPointerInSubobjects(decl)) {
     return CxxRecordSemanticsKind::UnsafePointerMember;
   }
 
-  return CxxRecordSemanticsKind::Trivial;
+  if (isSufficientlyTrivial(decl)) {
+    return CxxRecordSemanticsKind::Trivial;
+  }
+
+  return CxxRecordSemanticsKind::Owned;
 }
 
 bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
@@ -6022,8 +6022,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       evaluator, CxxRecordSemantics({recordDecl, desc.ctx}), {});
 
   // Always unsafe.
-  if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
-      semanticsKind == CxxRecordSemanticsKind::UnsafeLifetimeOperation)
+  if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation)
     return false;
 
   // Always OK.
