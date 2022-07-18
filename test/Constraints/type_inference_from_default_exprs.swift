@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/InferViaDefaults.swiftmodule -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift
-// RUN: %target-swift-frontend -module-name main -typecheck -verify -I %t %s %S/Inputs/type_inference_via_defaults_other_module.swift
+// RUN: %target-build-swift -parse-as-library -emit-library -emit-module-path %t/InferViaDefaults.swiftmodule -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift -o %t/%target-library-name(InferViaDefaults)
+// RUN: %target-swift-frontend -typecheck -verify -lInferViaDefaults -module-name main -I %t -L %t %s
+
+import InferViaDefaults
 
 func testInferFromResult<T>(_: T = 42) -> T { fatalError() } // Ok
 
@@ -136,8 +138,8 @@ func main() {
   testMultiple(a: 0.0, b: "a")  // Ok
 
   // From a different module
-  with_defaults() // Ok
-  with_defaults("") // Ok
+  InferViaDefaults.with_defaults() // Ok
+  InferViaDefaults.with_defaults("") // Ok
 
   _ = S()[] // Ok
   _ = S()[B()] // Ok
