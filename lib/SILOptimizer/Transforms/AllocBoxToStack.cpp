@@ -53,9 +53,9 @@ static llvm::cl::opt<bool> AllocBoxToStackAnalyzeApply(
 //                 SIL Utilities for alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
-static SILValue stripOffCopyValue(SILValue V) {
-  while (auto *CVI = dyn_cast<CopyValueInst>(V)) {
-    V = CVI->getOperand();
+static SILValue stripOffCopyAndBorrow(SILValue V) {
+  while (isa<CopyValueInst>(V) || isa<BeginBorrowInst>(V)) {
+    V = cast<SingleValueInstruction>(V)->getOperand(0);
   }
   return V;
 }
@@ -127,7 +127,7 @@ static bool addLastRelease(SILValue V, SILBasicBlock *BB,
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
     if (isa<StrongReleaseInst>(*I) || isa<DeallocBoxInst>(*I) ||
         isa<DestroyValueInst>(*I)) {
-      if (stripOffCopyValue(I->getOperand(0)) != V)
+      if (stripOffCopyAndBorrow(I->getOperand(0)) != V)
         continue;
 
       Releases.push_back(&*I);
