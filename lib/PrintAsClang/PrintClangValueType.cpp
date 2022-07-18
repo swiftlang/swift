@@ -125,9 +125,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
      << "::";
   printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
   os << ";\n";
-  os << "    auto *vwTable = ";
-  printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
-  os << ";\n";
+  printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
   os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
   os << "  }\n";
 
@@ -140,9 +138,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
      << "::";
   printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
   os << ";\n";
-  os << "    auto *vwTable = ";
-  printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
-  os << ";\n";
+  printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
   if (isOpaqueLayout) {
     os << "    _storage = ";
     printer.printSwiftImplQualifier();
@@ -184,11 +180,10 @@ void ClangValueTypePrinter::printValueTypeDecl(
        << "::";
     printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
     os << ";\n";
+    printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
     os << "    return ";
     printer.printBaseName(typeDecl);
-    os << "(";
-    printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
-    os << ");\n  }\n";
+    os << "(vwTable);\n  }\n";
   } else {
     os << " return ";
     printer.printBaseName(typeDecl);
@@ -213,9 +208,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
        << "::";
     printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
     os << ";\n";
-    os << "    auto *vwTable = ";
-    printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
-    os << ";\n";
+    printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
     os << "    const auto *enumVWTable = reinterpret_cast<";
     ClangSyntaxPrinter(os).printSwiftImplQualifier();
     os << "EnumValueWitnessTable";
