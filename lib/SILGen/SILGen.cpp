@@ -735,12 +735,21 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     return emitted;
   }
 
+  auto getBestLocation = [](SILDeclRef ref) -> SILLocation {
+    if (ref.hasDecl())
+      return ref.getDecl();
+    if (ref.loc.isNull())
+      return {(Decl *)nullptr};
+    if (auto *ace = ref.getAbstractClosureExpr())
+      return {ace};
+    return {(Decl *)nullptr};
+  };
+
   // Note: Do not provide any SILLocation. You can set it afterwards.
   SILGenFunctionBuilder builder(*this);
   auto &IGM = *this;
   auto *F = builder.getOrCreateFunction(
-      constant.hasDecl() ? constant.getDecl() : (Decl *)nullptr, constant,
-      forDefinition,
+      getBestLocation(constant), constant, forDefinition,
       [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
         return IGM.getFunction(constant, NotForDefinition);
       });
@@ -1830,6 +1839,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:
   case AccessStrategy::MaterializeToTemporary:
+  case AccessStrategy::DispatchToDistributedThunk:
     return false;
   }
   llvm_unreachable("unhandled strategy");
@@ -2234,7 +2244,7 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
   SILInstruction::resetInstructionCounts();
 
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
-                                             desc.opts);
+                                             desc.opts, desc.irgenOptions);
 
   // If all function bodies are being skipped there's no reason to do any
   // SIL generation.
@@ -2276,15 +2286,18 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
 
 std::unique_ptr<SILModule>
 swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
-                          const SILOptions &options) {
-  auto desc = ASTLoweringDescriptor::forWholeModule(mod, tc, options);
+                          const SILOptions &options,
+                          const IRGenOptions *irgenOptions) {
+  auto desc = ASTLoweringDescriptor::forWholeModule(mod, tc, options,
+                                                    None, irgenOptions);
   return llvm::cantFail(
       mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
 }
 
 std::unique_ptr<SILModule>
 swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
-                          const SILOptions &options) {
-  auto desc = ASTLoweringDescriptor::forFile(sf, tc, options);
+                          const SILOptions &options,
+                          const IRGenOptions *irgenOptions) {
+  auto desc = ASTLoweringDescriptor::forFile(sf, tc, options, None, irgenOptions);
   return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
 }

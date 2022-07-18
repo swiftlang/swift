@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-opened-existential-types -typecheck -dump-ast -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast -parse-as-library %s | %FileCheck %s
 
 protocol P { }
 extension Optional: P where Wrapped: P { }

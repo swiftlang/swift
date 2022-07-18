@@ -30,6 +30,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Basic/Unreachable.h"
 
+#include <type_traits>
 #include <vector>
 #include <unordered_map>
 
@@ -450,13 +451,27 @@ public:
                             Node::Kind::OpaqueTypeDescriptorSymbolicReference,
                             context.getResolved().getAddressData());
         }
-          
+
         return buildContextMangling(context, dem);
       }
       case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
         // The symbolic reference points at a resolver function, but we can't
         // execute code in the target process to resolve it from here.
         return nullptr;
+      }
+      case Demangle::SymbolicReferenceKind::UniqueExtendedExistentialTypeShape: {
+        // The symbolic reference points at a unique extended
+        // existential type shape.
+        return dem.createNode(
+                          Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference,
+                          resolved.getResolvedAddress().getAddressData());
+      }
+      case Demangle::SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape: {
+        // The symbolic reference points at a non-unique extended
+        // existential type shape.
+        return dem.createNode(
+                          Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
+                          resolved.getResolvedAddress().getAddressData());
       }
       }
 
@@ -1975,8 +1990,25 @@ protected:
       }
       case MetadataKind::ExistentialMetatype:
         return _readMetadata<TargetExistentialMetatypeMetadata>(address);
-      case MetadataKind::ExtendedExistential:
-        return _readMetadata<TargetExtendedExistentialTypeMetadata>(address);
+      case MetadataKind::ExtendedExistential: {
+        // We need to read the shape in order to figure out how large
+        // the generalization arguments are.
+        StoredPointer shapeAddress = address + sizeof(StoredPointer);
+        StoredSignedPointer signedShapePtr;
+        if (!Reader->readInteger(RemoteAddress(shapeAddress), &signedShapePtr))
+          return nullptr;
+        auto shapePtr = stripSignedPointer(signedShapePtr);
+
+        auto shape = readShape(shapePtr);
+        if (!shape)
+          return nullptr;
+
+        auto totalSize =
+            sizeof(TargetExtendedExistentialTypeMetadata<Runtime>)
+          + shape->getGeneralizationSignature().getArgumentLayoutSizeInWords()
+              * sizeof(StoredPointer);
+        return _readMetadata(address, totalSize);
+      }
       case MetadataKind::ForeignClass:
         return _readMetadata<TargetForeignClassMetadata>(address);
       case MetadataKind::ForeignReferenceType:
@@ -1999,12 +2031,12 @@ protected:
           totalSize += flags.getNumParameters() * sizeof(uint32_t);
 
         if (flags.isDifferentiable())
-          totalSize = roundUpToAlignment(totalSize, sizeof(void *)) +
+          totalSize = roundUpToAlignment(totalSize, sizeof(StoredPointer)) +
               sizeof(TargetFunctionMetadataDifferentiabilityKind<
                   typename Runtime::StoredSize>);
 
         return _readMetadata(address,
-                             roundUpToAlignment(totalSize, sizeof(void *)));
+                             roundUpToAlignment(totalSize, sizeof(StoredPointer)));
       }
       case MetadataKind::HeapGenericLocalVariable:
         return _readMetadata<TargetGenericBoxHeapMetadata>(address);
@@ -2745,17 +2777,25 @@ private:
           || !*parentDescriptorResult
           || !parentDescriptorResult->isResolved())
         return nullptr;
-      
-      auto mangledNode =
-       demangleAnonymousContextName(parentDescriptorResult->getResolved(), dem);
-      if (!mangledNode)
+
+      if (parentDemangling->getKind() == Node::Kind::AnonymousContext) {
+        auto mangledNode =
+        demangleAnonymousContextName(parentDescriptorResult->getResolved(), dem);
+        if (!mangledNode)
+          return nullptr;
+        if (mangledNode->getKind() == Node::Kind::Global)
+          mangledNode = mangledNode->getChild(0);
+
+        auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
+        opaqueNode->addChild(mangledNode, dem);
+        return opaqueNode;
+      } else if (parentDemangling->getKind() == Node::Kind::Module) {
+        auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
+        opaqueNode->addChild(parentDemangling, dem);
+        return opaqueNode;
+      } else {
         return nullptr;
-      if (mangledNode->getKind() == Node::Kind::Global)
-        mangledNode = mangledNode->getChild(0);
-      
-      auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
-      opaqueNode->addChild(mangledNode, dem);
-      return opaqueNode;
+      }
     }
     
     default:
@@ -2818,8 +2858,14 @@ private:
 
   /// Given a read nominal type descriptor, attempt to build a
   /// nominal type decl from it.
-  BuiltTypeDecl
-  buildNominalTypeDecl(ContextDescriptorRef descriptor) {
+  template <
+      typename T = BuilderType,
+      typename std::enable_if_t<
+          !std::is_same<
+              bool,
+              decltype(T::needsToPrecomputeParentGenericContextShapes)>::value,
+          bool> = true>
+  BuiltTypeDecl buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
     Demangler dem;
     auto node = buildContextMangling(descriptor, dem);
@@ -2827,6 +2873,41 @@ private:
       return BuiltTypeDecl();
     bool typeAlias = false;
     BuiltTypeDecl decl = Builder.createTypeDecl(node, typeAlias);
+    return decl;
+  }
+
+  template <
+      typename T = BuilderType,
+      typename std::enable_if_t<
+          std::is_same<
+              bool,
+              decltype(T::needsToPrecomputeParentGenericContextShapes)>::value,
+          bool> = true>
+  BuiltTypeDecl buildNominalTypeDecl(ContextDescriptorRef descriptor) {
+    // Build the demangling tree from the context tree.
+    Demangler dem;
+    auto node = buildContextMangling(descriptor, dem);
+    if (!node || node->getKind() != Node::Kind::Type)
+      return BuiltTypeDecl();
+    std::vector<size_t> paramsPerLevel;
+    size_t runningCount = 0;
+    std::function<void(ContextDescriptorRef current, size_t &)> countLevels =
+        [&](ContextDescriptorRef current, size_t &runningCount) {
+          if (auto parentContextRef = readParentContextDescriptor(current))
+            if (parentContextRef->isResolved())
+              if (auto parentContext = parentContextRef->getResolved())
+                countLevels(parentContext, runningCount);
+
+          auto genericContext = current->getGenericContext();
+          if (!genericContext)
+            return;
+          auto contextHeader = genericContext->getGenericContextHeader();
+
+          paramsPerLevel.emplace_back(contextHeader.NumParams - runningCount);
+          runningCount += paramsPerLevel.back();
+        };
+    countLevels(descriptor, runningCount);
+    BuiltTypeDecl decl = Builder.createTypeDecl(node, paramsPerLevel);
     return decl;
   }
 

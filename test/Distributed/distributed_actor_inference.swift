@@ -42,11 +42,11 @@ protocol DP {
 }
 
 protocol DPOK: DistributedActor {
-  distributed func hello()  // ok
+  distributed func hello()
 }
 
 protocol DPOK2: DPOK {
-  distributed func again()  // ok
+  distributed func again()
 }
 
 enum SomeNotActorEnum_5 {

@@ -46,11 +46,11 @@ extension BridgedStringRef {
     let buffer = UnsafeBufferPointer<UInt8>(start: data, count: Int(length))
     return String(decoding: buffer, as: UTF8.self)
   }
+}
 
-  public func takeString() -> String {
-    let str = string
-    freeBridgedStringRef(self)
-    return str
+extension llvm.StringRef {
+  public init(_ bridged: BridgedStringRef) {
+    self.init(bridged.data, bridged.length)
   }
 }
 

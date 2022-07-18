@@ -22,3 +22,24 @@ func testOptional(obj: P) {
   // CHECK: [disabled] $T2 bound to decl overload_filtering_objc.(file).P.opt(double:)
   _ = obj.opt?(1)
 }
+
+
+func test_double_cgfloat_conversion_filtering(d: Double, cgf: CGFloat) {
+  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).CGFloat.init(_:)@{{.*}} : (CGFloat.Type) -> (Double) -> CGFloat
+  let _: CGFloat = d
+
+  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).Double extension.init(_:)@{{.*}} : (Double.Type) -> (CGFloat) -> Double
+  let _: Double = cgf
+
+  func test_optional_cgf(_: CGFloat??) {
+  }
+
+  func test_optional_double(_: Double??) {
+  }
+
+  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).CGFloat.init(_:)@{{.*}} : (CGFloat.Type) -> (Double) -> CGFloat
+  test_optional_cgf(d)
+
+  // CHECK: [favored] $T{{.*}} bound to decl CoreGraphics.(file).Double extension.init(_:)@{{.*}} : (Double.Type) -> (CGFloat) -> Double
+  test_optional_double(cgf)
+}

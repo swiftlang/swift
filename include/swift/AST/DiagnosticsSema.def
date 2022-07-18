@@ -288,8 +288,11 @@ FIXIT(insert_closure_return_type_placeholder,
 NOTE(use_of_anon_closure_param,none,
      "anonymous closure parameter %0 is used here", (Identifier))
 
-ERROR(incorrect_explicit_closure_result,none,
+ERROR(incorrect_explicit_closure_result_vs_contextual_type,none,
       "declared closure result %0 is incompatible with contextual type %1",
+      (Type, Type))
+ERROR(incorrect_explicit_closure_result_vs_return_type,none,
+      "declared closure result %0 is incompatible with return type %1",
       (Type, Type))
 
 ERROR(unsupported_closure_attr,none,
@@ -1904,9 +1907,6 @@ ERROR(extension_access_with_conformances,none,
       "protocol conformances", (DeclAttribute))
 ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
-ERROR(extension_specialization,none,
-      "constrained extension must be declared on the unspecialized generic "
-      "type %0 with constraints specified by a 'where' clause", (Identifier))
 ERROR(extension_placeholder,none,
       "cannot extend a type that contains placeholders", ())
 ERROR(extension_stored_property,none,
@@ -2900,14 +2900,17 @@ ERROR(decl_from_hidden_module,none,
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
       "it is an SPI imported from %3|"
-      "it is SPI}4",
+      "it is SPI|"
+      "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
-      "cannot use %0 %1 %select{in SPI|as property wrapper in SPI|"
-      "as result builder in SPI|"
+      "cannot use %0 %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
-      "%select{%3 has been imported as implementation-only}4",
+      "%select{%3 has been imported as implementation-only|"
+      "<<ERROR>>|<<ERROR>>|"
+      "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -2916,7 +2919,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
-      "the conformance is declared as SPI}4",
+      "the conformance is declared as SPI|"
+      "%3 was not imported by this file}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
@@ -3252,6 +3256,10 @@ ERROR(attr_ApplicationMain_with_script,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
       "top-level code",
       (unsigned))
+
+NOTE(attr_ApplicationMain_parse_as_library,none,
+     "pass '-parse-as-library' to compiler invocation if this is intentional",
+     ())
 NOTE(attr_ApplicationMain_script_here,none,
      "top-level code defined in this source file",
      ())
@@ -3566,10 +3574,10 @@ ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
       (DeclName))
-ERROR(cfclass_designated_init_in_extension,none,
+ERROR(designated_init_in_extension_no_convenience_tip,none,
       "designated initializer cannot be declared in an extension of %0",
       (DeclName))
-ERROR(enumstruct_convenience_init,none,
+ERROR(no_convenience_keyword_init,none,
       "initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
@@ -3755,7 +3763,8 @@ ERROR(protocol_declares_unknown_primary_assoc_type,none,
 ERROR(protocol_declares_duplicate_primary_assoc_type,none,
       "duplicate primary associated type name %0", (Identifier))
 ERROR(protocol_does_not_have_primary_assoc_type,none,
-      "cannot specialize protocol type %0", (Type))
+      "protocol %0 does not have primary associated types that can be "
+      "constrained", (Type))
 ERROR(parameterized_protocol_type_argument_count_mismatch,none,
       "protocol type %0 specialized with %select{too many|too few}3 type arguments "
       "(got %1, but expected %2)",
@@ -4206,6 +4215,9 @@ NOTE(opaque_type_underlying_type_candidate_here,none,
 ERROR(opaque_type_self_referential_underlying_type,none,
       "function opaque return type was inferred as %0, which defines the "
       "opaque type in terms of itself", (Type))
+ERROR(opaque_type_cannot_contain_dynamic_self,none,
+      "function with opaque return type cannot return "
+      "the covariant 'Self' type of a class", ())
 ERROR(opaque_type_var_no_init,none,
       "property declares an opaque return type, but has no initializer "
       "expression from which to infer an underlying type", ())
@@ -4492,8 +4504,8 @@ ERROR(actor_inheritance,none,
       (bool))
 
 ERROR(actor_protocol_illegal_inheritance,none,
-      "non-actor type %0 cannot conform to the 'Actor' protocol",
-      (DeclName))
+      "non-actor type %0 cannot conform to the %1 protocol",
+      (DeclName, DeclName))
 ERROR(distributed_actor_conformance_missing_system_type,none,
       "distributed actor %0 does not declare ActorSystem it can be used with.",
       (DeclName))
@@ -4603,9 +4615,6 @@ ERROR(distributed_actor_isolated_method,none,
       ())
 ERROR(distributed_local_cannot_be_used,none,
       "'local' cannot be used in user-defined code currently",
-      ())
-ERROR(distributed_thunk_cannot_be_used,none,
-      "'distributed_thunk' cannot be used in user-defined code",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
@@ -4866,6 +4875,9 @@ ERROR(string_processing_lib_missing,none,
 ERROR(regex_capture_types_failed_to_decode,none,
       "failed to decode capture types for regular expression literal; this may "
       "be a compiler bug", ())
+
+ERROR(must_import_regex_builder_module,none,
+      "regex builder requires the 'RegexBuilder' module be imported'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
@@ -5778,7 +5790,15 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
       "because %select{%3 was imported implementation-only|"
       "it is an SPI imported from %3|"
-      "it is SPI}4",
+      "it is SPI|"
+      "%3 was not imported by this file}4",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+
+WARNING(inlinable_decl_ref_from_hidden_module_warn,
+      none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
+      "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|"
+      "%3 was not imported by this file}4"
+      "; this is an error in Swift 6",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 ERROR(availability_macro_in_inlinable, none,
@@ -6363,6 +6383,18 @@ NOTE(candidate_result_requires_explicit_coercion,none,
      "inferred result type %0 requires explicit coercion due to "
      "loss of generic requirements",
      (Type))
+
+ERROR(concurrency_task_to_thread_model_custom_executor,none,
+      "custom executors are not permitted within %0", (StringRef))
+ERROR(concurrency_task_to_thread_model_async_main,none,
+      "async main functions are not permitted within %0", (StringRef))
+ERROR(concurrency_task_to_thread_model_main_actor,none,
+      "MainActor is not permitted within %0", (StringRef))
+ERROR(concurrency_task_to_thread_model_global_actor,none,
+      "globalActor is not permitted within %0", (StringRef))
+ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
+      "annotating a type with a global actor %0 is not permitted within %1",
+      (TypeRepr*, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

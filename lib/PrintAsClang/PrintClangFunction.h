@@ -25,6 +25,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class AccessorDecl;
 class FuncDecl;
+class ModuleDecl;
 class NominalTypeDecl;
 class ParamDecl;
 class ParameterList;
@@ -52,7 +53,7 @@ public:
 
   /// Information about any additional parameters.
   struct AdditionalParam {
-    enum class Role { Self };
+    enum class Role { Self, Error };
 
     Role role;
     Type type;
@@ -81,9 +82,11 @@ public:
 
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
-  void printCxxThunkBody(StringRef swiftSymbolName, Type resultTy,
+  void printCxxThunkBody(StringRef swiftSymbolName,
+                         const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params,
-                         ArrayRef<AdditionalParam> additionalParams = {});
+                         ArrayRef<AdditionalParam> additionalParams = {},
+                         bool hasThrows = false);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
@@ -99,8 +102,11 @@ public:
 
 private:
   void printCxxToCFunctionParameterUse(
-      Type type, StringRef name, bool isInOut, bool isIndirect = false,
+      Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
+      bool isIndirect = false,
       llvm::Optional<AdditionalParam::Role> paramRole = None);
+
+  bool hasKnownOptionalNullableCxxMapping(Type type);
 
   raw_ostream &os;
   raw_ostream &cPrologueOS;

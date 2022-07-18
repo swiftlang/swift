@@ -450,11 +450,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
-  Opts.EnableOpenedExistentialTypes =
-    Args.hasFlag(OPT_enable_experimental_opened_existential_types,
-                 OPT_disable_experimental_opened_existential_types,
-                 true);
-
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
@@ -490,6 +485,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_disable_availability_checking);
   Opts.CheckAPIAvailabilityOnly |=
       Args.hasArg(OPT_check_api_availability_only);
+  Opts.EnableAdHocAvailability |=
+      Args.hasArg(OPT_enable_ad_hoc_availability);
 
   if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
                                OPT_disable_conformance_availability_errors)) {
@@ -656,8 +653,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::OneWayClosureParameters);
   if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
     Opts.Features.insert(Feature::TypeWitnessSystemInference);
-  if (Args.hasArg(OPT_enable_experimental_bound_generic_extensions))
-    Opts.Features.insert(Feature::BoundGenericExtensions);
   if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
     Opts.Features.insert(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
@@ -1022,6 +1017,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.WarnRedundantRequirements = true;
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
+
+  if (const Arg *A = Args.getLastArg(options::OPT_concurrency_model)) {
+    Opts.ActiveConcurrencyModel =
+        llvm::StringSwitch<ConcurrencyModel>(A->getValue())
+            .Case("standard", ConcurrencyModel::Standard)
+            .Case("task-to-thread", ConcurrencyModel::TaskToThread)
+            .Default(ConcurrencyModel::Standard);
+  }
 
   return HadError || UnsupportedOS || UnsupportedArch;
 }
@@ -2327,6 +2330,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;
+  }
+
+  if (Args.hasArg(OPT_disable_readonly_static_objects)) {
+    Opts.DisableReadonlyStaticObjects = true;
   }
 
   // Default to disabling swift async extended frame info on anything but

@@ -15,6 +15,7 @@
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangFunction.h"
 #include "PrintClangValueType.h"
+#include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -31,6 +32,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
@@ -41,6 +43,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
+#include "SwiftToClangInteropContext.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -384,8 +387,70 @@ private:
     os << "@end\n";
   }
 
+  void visitEnumDeclCxx(EnumDecl *ED) {
+    // FIXME: Print enum's availability
+    ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
+                                  owningPrinter.typeMapping,
+                                  owningPrinter.interopContext);
+    printer.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
+      ClangSyntaxPrinter syntaxPrinter(os);
+      auto elementTagMapping =
+          owningPrinter.interopContext.getIrABIDetails().getEnumTagMapping(ED);
+      // Sort cases based on their assigned tag indices
+      llvm::stable_sort(elementTagMapping, [](const auto &p1, const auto &p2) {
+        return p1.second < p2.second;
+      });
+
+      if (elementTagMapping.empty()) {
+        os << "\n";
+        return;
+      }
+
+      os << "  enum class cases {\n";
+      for (const auto &pair : elementTagMapping) {
+        os << "    ";
+        syntaxPrinter.printIdentifier(pair.first->getNameStr());
+        os << ",\n";
+      }
+      os << "  };\n"; // enum class cases' closing bracket
+
+      // Printing operator cases()
+      os << "  inline operator cases() const {\n";
+      os << "    switch (_getEnumTag()) {\n";
+      for (const auto &pair : elementTagMapping) {
+        os << "      case " << pair.second << ": return cases::";
+        syntaxPrinter.printIdentifier(pair.first->getNameStr());
+        os << ";\n";
+      }
+      // TODO: change to Swift's fatalError when it's available in C++
+      os << "      default: abort();\n";
+      os << "    }\n"; // switch's closing bracket
+      os << "  }\n";   // operator cases()'s closing bracket
+
+      // Printing predicates
+      for (const auto &pair : elementTagMapping) {
+        os << "  inline bool is";
+        auto name = pair.first->getNameStr().str();
+        name[0] = std::toupper(name[0]);
+        os << name << "() const {\n";
+        os << "    return *this == cases::";
+        syntaxPrinter.printIdentifier(pair.first->getNameStr());
+        os << ";\n  }\n";
+      }
+      os << "\n";
+    });
+    os << outOfLineDefinitions;
+    outOfLineDefinitions.clear();
+  }
+
   void visitEnumDecl(EnumDecl *ED) {
     printDocumentationComment(ED);
+
+    if (outputLang == OutputLanguageMode::Cxx) {
+      visitEnumDeclCxx(ED);
+      return;
+    }
+
     os << "typedef ";
     StringRef customName = getNameForObjC(ED, CustomNamesOnly);
     if (customName.empty()) {
@@ -873,6 +938,28 @@ private:
     StringRef symbolName;
   };
 
+  // Converts the array of ABIAdditionalParam into an array of AdditionalParam
+  void convertABIAdditionalParams(
+      AbstractFunctionDecl *FD, Type resultTy,
+      llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1> ABIparams,
+      llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
+          &params) {
+    for (auto param : ABIparams) {
+      if (param.role ==
+          IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self)
+        params.push_back(
+            {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
+             resultTy->getASTContext().getOpaquePointerType(),
+             /*isIndirect=*/
+             isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
+      if (param.role ==
+          IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Error)
+        params.push_back(
+            {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Error,
+             resultTy->getASTContext().getOpaquePointerType()});
+    }
+  }
+
   // Print out the extern C Swift ABI function signature.
   FuncionSwiftABIInformation printSwiftABIFunctionSignatureAsCxxFunction(
       AbstractFunctionDecl *FD, Optional<FunctionType *> givenFuncType = None,
@@ -898,7 +985,9 @@ private:
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
                                                 owningPrinter.typeMapping,
                                                 owningPrinter.interopContext);
-    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 1>
+    auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
+                         .getFunctionABIAdditionalParams(FD);
+    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
         additionalParams;
     if (selfTypeDeclContext && !isa<ConstructorDecl>(FD)) {
       additionalParams.push_back(
@@ -907,6 +996,9 @@ private:
            /*isIndirect=*/
            isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
     }
+    if (funcTy->isThrowing() && !ABIparams.empty())
+      convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
+
     funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto,
@@ -914,7 +1006,9 @@ private:
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
-    os << " SWIFT_NOEXCEPT";
+    // FIXME: Support throwing exceptions for Swift errors.
+    if (!funcTy->isThrowing())
+      os << " SWIFT_NOEXCEPT";
     if (!funcABI.useCCallingConvention())
       os << " SWIFT_CALL";
     printAvailability(FD);
@@ -949,16 +1043,25 @@ private:
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
                                                 owningPrinter.typeMapping,
                                                 owningPrinter.interopContext);
+    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
+        additionalParams;
+    auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
+                         .getFunctionABIAdditionalParams(FD);
+    if (funcTy->isThrowing() && !ABIparams.empty())
+      convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
+
     funcPrinter.printFunctionSignature(
         FD, FD->getName().getBaseIdentifier().get(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
     // FIXME: Support throwing exceptions for Swift errors.
-    os << " noexcept";
+    if (!funcTy->isThrowing())
+      os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
-    funcPrinter.printCxxThunkBody(funcABI.getSymbolName(), resultTy,
-                                  FD->getParameters());
+    funcPrinter.printCxxThunkBody(
+        funcABI.getSymbolName(), FD->getModuleContext(), resultTy,
+        FD->getParameters(), additionalParams, funcTy->isThrowing());
     os << "}\n";
   }
 
@@ -1218,6 +1321,9 @@ private:
   /// Returns whether \p ty is the C type \c CFTypeRef, or some typealias
   /// thereof.
   bool isCFTypeRef(Type ty) {
+    if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
+      ty = existential->getConstraintType();
+
     const TypeAliasDecl *TAD = nullptr;
     while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
@@ -1909,8 +2015,7 @@ private:
 
   void visitExistentialType(ExistentialType *ET,
                             Optional<OptionalTypeKind> optionalKind) {
-    visitExistentialType(ET, optionalKind,
-        /*isMetatype=*/ET->getConstraintType()->is<AnyMetatypeType>());
+    visitPart(ET->getConstraintType(), optionalKind);
   }
 
   void visitExistentialMetatypeType(ExistentialMetatypeType *MT,

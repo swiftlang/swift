@@ -514,7 +514,10 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public func callerArgIndex(calleeArgIndex: Int) -> Int? {
     let firstIdx = PartialApply_getCalleeArgIndexOfFirstAppliedArg(bridged)
     if calleeArgIndex >= firstIdx {
-      return calleeArgIndex - firstIdx
+      let callerIdx = calleeArgIndex - firstIdx
+      if callerIdx < numArguments {
+        return callerIdx
+      }
     }
     return nil
   }

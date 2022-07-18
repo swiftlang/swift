@@ -36,7 +36,12 @@ void tryLockable(M &mutex) {
 
   // We cannot lock a locked lock
   ret = mutex.try_lock();
+#if SWIFT_THREADING_NONE
+  // Noop since none threading mode always succeeds getting lock
+  (void)ret;
+#else
   ASSERT_FALSE(ret);
+#endif
 
   mutex.unlock();
 }
@@ -61,6 +66,12 @@ void basicLockableThreaded(M &mutex) {
   ASSERT_EQ(count2, 500);
 }
 
+#if SWIFT_THREADING_NONE
+template <typename M>
+void lockableThreaded(M &mutex) {
+  // Noop since none threading mode always succeeds getting lock
+}
+#else
 // More extensive tests
 template <typename M>
 void lockableThreaded(M &mutex) {
@@ -90,6 +101,7 @@ void lockableThreaded(M &mutex) {
   ASSERT_EQ(count1, 500);
   ASSERT_EQ(count2, 500);
 }
+#endif
 
 // Test a scoped lock implementation
 template <typename SL, typename M>

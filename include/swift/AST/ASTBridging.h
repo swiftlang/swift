@@ -15,12 +15,9 @@
 
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include <stdbool.h>
 #include <stddef.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -42,45 +39,12 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
 } BridgedDiagID;
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticArgumentKind {
-  BridgedDiagnosticArgumentKind_StringRef,
-  BridgedDiagnosticArgumentKind_Int,
-} BridgedDiagnosticArgumentKind;
-
-typedef struct {
-  BridgedDiagnosticArgumentKind kind;
-  union {
-    BridgedStringRef stringRefValue;
-    SwiftInt intValue;
-  } value;
-} BridgedDiagnosticArgument;
-
-typedef struct {
-  BridgedSourceLoc start;
-  SwiftInt byteLength;
-  BridgedStringRef text;
-} BridgedDiagnosticFixIt;
-
-typedef struct {
-  void * _Nonnull object;
-} BridgedDiagnosticEngine;
-
-typedef struct {
-  void *_Nullable object;
-} BridgedOptionalDiagnosticEngine;
-
 // FIXME: Can we bridge InFlightDiagnostic?
-void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
+void DiagnosticEngine_diagnose(swift::DiagnosticEngine &, swift::SourceLoc loc,
                                BridgedDiagID diagID, BridgedArrayRef arguments,
-                               BridgedCharSourceRange highlight,
+                               swift::CharSourceRange highlight,
                                BridgedArrayRef fixIts);
 
-bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
-
 SWIFT_END_NULLABILITY_ANNOTATIONS
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif // SWIFT_AST_ASTBRIDGING_H

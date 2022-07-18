@@ -21,6 +21,7 @@
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "../../SILGen/SILGen.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -35,8 +36,6 @@
 
 using namespace swift;
 using namespace Lowering;
-
-STATISTIC(MaxBitfieldID, "Max value of SILFunction::currentBitfieldID");
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
@@ -229,10 +228,10 @@ SILFunction::~SILFunction() {
 
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
-  assert(!newestAliveBitfield &&
+  assert(!newestAliveBlockBitfield &&
          "Not all BasicBlockBitfields deleted at function destruction");
-  if (currentBitfieldID > MaxBitfieldID)
-    MaxBitfieldID = currentBitfieldID;
+  assert(!newestAliveNodeBitfield &&
+         "Not all NodeBitfields deleted at function destruction");
 
   if (destroyFunction)
     destroyFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
@@ -385,9 +384,13 @@ bool SILFunction::isWeakImported() const {
   if (Availability.isAlwaysAvailable())
     return false;
 
-  auto fromContext = AvailabilityContext::forDeploymentTarget(
-      getASTContext());
-  return !fromContext.isContainedIn(Availability);
+  auto deploymentTarget =
+      AvailabilityContext::forDeploymentTarget(getASTContext());
+
+  if (getASTContext().LangOpts.EnableAdHocAvailability)
+    return !Availability.isSupersetOf(deploymentTarget);
+
+  return !deploymentTarget.isContainedIn(Availability);
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {
@@ -704,6 +707,13 @@ SILFunction::isPossiblyUsedExternally() const {
   if (isDistributed() && isThunk())
     return true;
 
+  // Declaration marked as `@_alwaysEmitIntoClient` that
+  // returns opaque result type with availability conditions
+  // has to be kept alive to emit opaque type metadata descriptor.
+  if (markedAsAlwaysEmitIntoClient() &&
+      hasOpaqueResultTypeWithAvailabilityConditions())
+    return true;
+
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
@@ -864,4 +874,9 @@ visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const {
     c(idx, (flags & EffectsFlagDerived) != 0, kind);
     idx++;
   }
+}
+
+SILFunction *SILFunction::getFunction(SILDeclRef ref, SILModule &M) {
+  swift::Lowering::SILGenModule SILGenModule(M, ref.getModuleContext());
+  return SILGenModule.getFunction(ref, swift::NotForDefinition);
 }

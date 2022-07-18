@@ -244,7 +244,7 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Parameter other: The typed pointer to convert.
   @_transparent
   public init<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
-   _rawValue = other._rawValue
+    _rawValue = other._rawValue
   }
 
   /// Creates a new raw pointer from the given typed pointer.
@@ -257,8 +257,8 @@ public struct UnsafeRawPointer: _Pointer {
   ///   result is `nil`.
   @_transparent
   public init?<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
-   guard let unwrapped = other else { return nil }
-   _rawValue = unwrapped._rawValue
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
   }
 
   /// Deallocates the previously allocated memory block referenced by this pointer.
@@ -429,7 +429,7 @@ public struct UnsafeRawPointer: _Pointer {
                               MemoryLayout<T>.alignment._builtinWordValue)
     return Builtin.loadRaw(alignedPointer)
 #else
-  return Builtin.loadRaw(rawPointer)
+    return Builtin.loadRaw(rawPointer)
 #endif
   }
 
@@ -455,13 +455,25 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
+  @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     _debugPrecondition(_isPOD(T.self))
-    return Builtin.loadRaw((self + offset)._rawValue)
+    return withUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+      let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        temporary._rawValue,
+        (self + offset)._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+      return temporary.pointee
+    }
+    //FIXME: reimplement with `loadRaw` when supported in SIL (rdar://96956089)
+    // e.g. Builtin.loadRaw((self + offset)._rawValue)
   }
 }
 
@@ -1180,13 +1192,25 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
+  @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     _debugPrecondition(_isPOD(T.self))
-    return Builtin.loadRaw((self + offset)._rawValue)
+    return withUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+      let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        temporary._rawValue,
+        (self + offset)._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+      return temporary.pointee
+    }
+    //FIXME: reimplement with `loadRaw` when supported in SIL (rdar://96956089)
+    // e.g. Builtin.loadRaw((self + offset)._rawValue)
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.
@@ -1226,6 +1250,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   - type: The type of `value`.
   @inlinable
   @_alwaysEmitIntoClient
+  // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0349_UnsafeMutableRawPointer_storeBytes")
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
@@ -1245,9 +1270,9 @@ public struct UnsafeMutableRawPointer: _Pointer {
 
   // This unavailable implementation uses the expected mangled name
   // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
-  // any binary compiled against the stlib binary for Swift 5.6 and older.
+  // any binary compiled against the stdlib binary for Swift 5.6 and older.
   @available(*, unavailable)
-  @_silgen_name("sSv10storeBytes2of12toByteOffset2asyx_SixmtlF")
+  @_silgen_name("$sSv10storeBytes2of12toByteOffset2asyx_SixmtlF")
   @usableFromInline func _legacy_se0349_storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {

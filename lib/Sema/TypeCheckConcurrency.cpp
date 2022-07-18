@@ -188,9 +188,18 @@ bool IsDefaultActorRequest::evaluate(
   // If we synthesized the unownedExecutor property, we should've
   // added a semantics attribute to it (if it was actually a default
   // actor).
-  if (auto executorProperty = classDecl->getUnownedExecutorProperty())
-    return executorProperty->getAttrs()
-             .hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
+  if (auto executorProperty = classDecl->getUnownedExecutorProperty()) {
+    bool isDefaultActor =
+        executorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
+    if (!isDefaultActor &&
+        classDecl->getASTContext().LangOpts.isConcurrencyModelTaskToThread() &&
+        !AvailableAttr::isUnavailable(classDecl)) {
+      classDecl->diagnose(
+          diag::concurrency_task_to_thread_model_custom_executor,
+          "task-to-thread concurrency model");
+    }
+    return isDefaultActor;
+  }
 
   return true;
 }
@@ -433,16 +442,8 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 
     // If it's distributed, generally variable access is not okay...
     if (auto nominalParent = var->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (nominalParent->isDistributedActor()) {
-        // Unless the variable itself is a distributed computed property,
-        // which are allowed, but subject to the same implicit throws/async
-        // as all other distributed function declarations.
-        if (var->isDistributed()) {
-          return true;
-        }
-
+      if (nominalParent->isDistributedActor())
         return false;
-      }
     }
 
     // If it's actor-isolated but in the same module, then it's OK too.
@@ -497,13 +498,21 @@ static Optional<PartialApplyThunkInfo> decomposePartialApplyThunk(
 
 /// Find the immediate member reference in the given expression.
 static Optional<std::pair<ConcreteDeclRef, SourceLoc>>
-findMemberReference(Expr *expr) {
+findReference(Expr *expr) {
+  // Look through a function conversion.
+  if (auto fnConv = dyn_cast<FunctionConversionExpr>(expr))
+    expr = fnConv->getSubExpr();
+
   if (auto declRef = dyn_cast<DeclRefExpr>(expr))
     return std::make_pair(declRef->getDeclRef(), declRef->getLoc());
 
   if (auto otherCtor = dyn_cast<OtherConstructorDeclRefExpr>(expr)) {
     return std::make_pair(otherCtor->getDeclRef(), otherCtor->getLoc());
   }
+
+  Expr *inner = expr->getValueProvidingExpr();
+  if (inner != expr)
+    return findReference(inner);
 
   return None;
 }
@@ -544,6 +553,10 @@ static bool isSendableClosure(
     if (forActorIsolation && explicitClosure->inheritsActorContext()) {
       return false;
     }
+
+    if (explicitClosure->isIsolatedByPreconcurrency() &&
+        !shouldDiagnoseExistingDataRaces(closure->getParent()))
+      return false;
   }
 
   if (auto type = closure->getType()) {
@@ -605,6 +618,9 @@ static void addSendableFixIt(const GenericTypeParamDecl *genericArgument,
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return contextRequiresStrictConcurrencyChecking(dc, [](const AbstractClosureExpr *) {
     return Type();
+  },
+  [](const ClosureExpr *closure) {
+    return closure->isIsolatedByPreconcurrency();
   });
 }
 
@@ -1661,6 +1677,11 @@ namespace {
         return recordMutableVarParent(parent, inout->getSubExpr());
       }
 
+      // Look through an expression that opens an existential
+      if (auto openExist = dyn_cast<OpenExistentialExpr>(subExpr)) {
+        return recordMutableVarParent(parent, openExist->getSubExpr());
+      }
+
       return false;
     }
 
@@ -1730,7 +1751,9 @@ namespace {
     ///
     /// and we reach up to mark the CallExpr.
     void markNearestCallAsImplicitly(
-        Optional<ImplicitActorHopTarget> setAsync) {
+        Optional<ImplicitActorHopTarget> setAsync,
+        bool setThrows = false,
+        bool setDistributedThunk = false) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
       const auto End = applyStack.rend();
@@ -1738,6 +1761,14 @@ namespace {
         if (auto call = dyn_cast<CallExpr>(*I)) {
           if (setAsync) {
             call->setImplicitlyAsync(*setAsync);
+          }
+          if (setThrows) {
+            call->setImplicitlyThrows(true);
+          }else {
+            call->setImplicitlyThrows(false);
+          }
+          if (setDistributedThunk) {
+            call->setShouldApplyDistributedThunk(true);
           }
           return;
         }
@@ -1839,7 +1870,7 @@ namespace {
         // like based on the original written syntax, e.g., "self.method".
         if (auto partialApply = decomposePartialApplyThunk(
                 apply, Parent.getAsExpr())) {
-          if (auto memberRef = findMemberReference(partialApply->fn)) {
+          if (auto memberRef = findReference(partialApply->fn)) {
             // NOTE: partially-applied thunks are never annotated as
             // implicitly async, regardless of whether they are escaping.
             checkReference(
@@ -1860,7 +1891,7 @@ namespace {
       // NOTE: SelfApplyExpr is a subtype of ApplyExpr
       if (auto call = dyn_cast<SelfApplyExpr>(expr)) {
         Expr *fn = call->getFn()->getValueProvidingExpr();
-        if (auto memberRef = findMemberReference(fn)) {
+        if (auto memberRef = findReference(fn)) {
           checkReference(
               call->getBase(), memberRef->first, memberRef->second,
               /*partialApply=*/None, call);
@@ -2095,6 +2126,8 @@ namespace {
 
         if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
           expr = conversion->getSubExpr();
+        if (auto fnConv = dyn_cast<FunctionConversionExpr>(expr))
+          expr = fnConv->getSubExpr();
       } while (prior != expr);
 
       if (auto call = dyn_cast<DotSyntaxCallExpr>(expr)) {
@@ -2248,47 +2281,55 @@ namespace {
     /// isolated to a distributed actor from a location that is potentially not
     /// local to this process.
     ///
-    /// \returns true if the access is from outside of actors isolation
-    /// context and false otherwise.
-    bool isDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
-                             Expr *context) {
+    /// \returns the (setThrows, isDistributedThunk) bits to implicitly
+    /// mark the access/call with on success, or emits an error and returns
+    /// \c None.
+    Optional<std::pair<bool, bool>>
+    checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
+                           Expr *context) {
       // If base of the call is 'local' we permit skip distributed checks.
       if (auto baseSelf = findReferencedBaseSelf(context)) {
-        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>())
-          return false;
-      }
-
-      // Cannot reference subscripts, or stored properties.
-      auto var = dyn_cast<VarDecl>(decl);
-      if (isa<SubscriptDecl>(decl) || var) {
-        // But computed distributed properties are okay,
-        // and treated the same as a distributed func.
-        if (var && var->isDistributed())
-          return true;
-
-        // otherwise, it was a normal property or subscript and therefore illegal
-        ctx.Diags.diagnose(
-            declLoc, diag::distributed_actor_isolated_non_self_reference,
-            decl->getDescriptiveKind(), decl->getName());
-        noteIsolatedActorMember(decl, context);
-        return false;
+        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+        return std::make_pair(
+            /*setThrows=*/false,
+            /*isDistributedThunk=*/false);
+        }
       }
 
       // Check that we have a distributed function or computed property.
       if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (!afd->isDistributed()) {
-          ctx.Diags.diagnose(declLoc,
-                             diag::distributed_actor_isolated_method)
-              .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
+          ctx.Diags.diagnose(declLoc, diag::distributed_actor_isolated_method)
+              .fixItInsert(decl->getAttributeInsertionLoc(true),
+                           "distributed ");
 
           noteIsolatedActorMember(decl, context);
-          return false;
+          return None;
         }
 
-        return true;
+        return std::make_pair(
+            /*setThrows=*/!afd->hasThrows(),
+            /*isDistributedThunk=*/true);
       }
 
-      return false;
+      if (auto *var = dyn_cast<VarDecl>(decl)) {
+        if (var->isDistributed()) {
+          bool explicitlyThrowing = false;
+          if (auto getter = var->getAccessor(swift::AccessorKind::Get)) {
+            explicitlyThrowing = getter->hasThrows();
+          }
+          return std::make_pair(
+              /*setThrows*/ !explicitlyThrowing,
+              /*isDistributedThunk=*/true);
+        }
+      }
+
+      // This is either non-distributed variable, subscript, or something else.
+      ctx.Diags.diagnose(declLoc,
+                         diag::distributed_actor_isolated_non_self_reference,
+                         decl->getDescriptiveKind(), decl->getName());
+      noteIsolatedActorMember(decl, context);
+      return None;
     }
 
     /// Attempts to identify and mark a valid cross-actor use of a synchronous
@@ -2306,8 +2347,25 @@ namespace {
       if (isPropOrSubscript(decl)) {
         // Cannot reference properties or subscripts of distributed actors.
         if (isDistributed) {
-          if (!isDistributedAccess(declLoc, decl, context))
+          bool setThrows = false;
+          bool usesDistributedThunk = false;
+          if (auto access = checkDistributedAccess(declLoc, decl, context)) {
+            std::tie(setThrows, usesDistributedThunk) = *access;
+          } else {
             return AsyncMarkingResult::NotDistributed;
+          }
+
+          // distributed computed property access, mark it throws + async
+          if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
+            if (auto memberRef = dyn_cast<MemberRefExpr>(lookupExpr)) {
+              memberRef->setImplicitlyThrows(true);
+              memberRef->setAccessViaDistributedThunk();
+            } else {
+              llvm_unreachable("expected distributed prop to be a MemberRef");
+            }
+          } else {
+            llvm_unreachable("expected distributed prop to have LookupExpr");
+          }
         }
 
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
@@ -2346,7 +2404,9 @@ namespace {
         // and the fact that the reference may be just an argument to an apply
         ApplyExpr *apply = applyStack.back();
         Expr *fn = apply->getFn()->getValueProvidingExpr();
-        if (auto memberRef = findMemberReference(fn)) {
+        if (auto fnConv = dyn_cast<FunctionConversionExpr>(fn))
+          fn = fnConv->getSubExpr()->getValueProvidingExpr();
+        if (auto memberRef = findReference(fn)) {
           auto concDecl = memberRef->first;
           if (decl == concDecl.getDecl() && !apply->isImplicitlyAsync()) {
 
@@ -2363,13 +2423,20 @@ namespace {
       if (isAsyncCall) {
         // If we're calling to a distributed actor, make sure the function
         // is actually 'distributed'.
+        bool setThrows = false;
+        bool usesDistributedThunk = false;
         if (isDistributed) {
-          if (!isDistributedAccess(declLoc, decl, context))
+          if (auto access = checkDistributedAccess(declLoc, decl, context)) {
+            std::tie(setThrows, usesDistributedThunk) = *access;
+          } else {
             return AsyncMarkingResult::NotDistributed;
+          }
         }
 
-        // Mark call as implicitly 'async'.
-        markNearestCallAsImplicitly(/*setAsync=*/target);
+        // Mark call as implicitly 'async', and also potentially as
+        // throwing and using a distributed thunk.
+        markNearestCallAsImplicitly(
+            /*setAsync=*/target, setThrows, usesDistributedThunk);
         result = AsyncMarkingResult::FoundAsync;
       }
 
@@ -2457,7 +2524,8 @@ namespace {
 
       // If we are not in an asynchronous context, complain.
       if (!getDeclContext()->isAsyncContext()) {
-        if (auto calleeDecl = apply->getCalledValue()) {
+        if (auto calleeDecl = apply->getCalledValue(
+                /*skipFunctionConversions=*/true)) {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
@@ -2819,13 +2887,18 @@ namespace {
           }
         }
 
+        // Does the reference originate from a @preconcurrency context?
+        bool preconcurrencyContext =
+          result.options.contains(ActorReferenceResult::Flags::Preconcurrency);
+
         ctx.Diags.diagnose(
             loc, diag::actor_isolated_non_self_reference,
             decl->getDescriptiveKind(),
             decl->getName(),
             useKind,
             refKind + 1, refGlobalActor,
-            result.isolation);
+            result.isolation)
+          .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
 
         noteIsolatedActorMember(decl, context);
 
@@ -3833,8 +3906,9 @@ bool HasIsolatedSelfRequest::evaluate(
     return false;
 
   // For accessors, consider the storage declaration.
-  if (auto accessor = dyn_cast<AccessorDecl>(value))
+  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
     value = accessor->getStorage();
+  }
 
   // Check whether this member can be isolated to an actor at all.
   auto memberIsolation = getMemberIsolationPropagation(value);
@@ -3934,7 +4008,8 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 
 bool swift::contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
   switch (dc->getASTContext().LangOpts.StrictConcurrencyLevel) {
   case StrictConcurrency::Complete:
     return true;
@@ -3947,11 +4022,18 @@ bool swift::contextRequiresStrictConcurrencyChecking(
 
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      // A closure with an explicit global actor or nonindependent
+      // A closure with an explicit global actor, async, or Sendable
       // uses concurrency features.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
         if (getExplicitGlobalActor(const_cast<ClosureExpr *>(explicitClosure)))
           return true;
+
+        // Don't take any more cues if this only got its type information by
+        // being provided to a `@preconcurrency` operation.
+        if (isolatedByPreconcurrency(explicitClosure)) {
+          dc = dc->getParent();
+          continue;
+        }
 
         if (auto type = getType(closure)) {
           if (auto fnType = type->getAs<AnyFunctionType>())
@@ -4245,23 +4327,37 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
   ASTContext &ctx = nominal->getASTContext();
   llvm::VersionTuple noVersion;
 
-  // Add platform-version-specific @available attributes.
-  for (auto available : nominal->getAttrs().getAttributes<AvailableAttr>()) {
-    if (available->Platform == PlatformKind::none)
-      continue;
+  // Add platform-version-specific @available attributes. Search from nominal
+  // type declaration through its enclosing declarations to find the first one
+  // with platform-specific attributes.
+  for (Decl *enclosing = nominal;
+       enclosing;
+       enclosing = enclosing->getDeclContext()
+           ? enclosing->getDeclContext()->getAsDecl()
+           : nullptr) {
+    bool anyPlatformSpecificAttrs = false;
+    for (auto available: enclosing->getAttrs().getAttributes<AvailableAttr>()) {
+      if (available->Platform == PlatformKind::none)
+        continue;
 
-    auto attr = new (ctx) AvailableAttr(
-        SourceLoc(), SourceRange(),
-        available->Platform,
-        available->Message,
-        "", nullptr,
-        available->Introduced.getValueOr(noVersion), SourceRange(),
-        available->Deprecated.getValueOr(noVersion), SourceRange(),
-        available->Obsoleted.getValueOr(noVersion), SourceRange(),
-        PlatformAgnosticAvailabilityKind::Unavailable,
-        /*implicit=*/true,
-        available->IsSPI);
-    ext->getAttrs().add(attr);
+      auto attr = new (ctx) AvailableAttr(
+          SourceLoc(), SourceRange(),
+          available->Platform,
+          available->Message,
+          "", nullptr,
+          available->Introduced.getValueOr(noVersion), SourceRange(),
+          available->Deprecated.getValueOr(noVersion), SourceRange(),
+          available->Obsoleted.getValueOr(noVersion), SourceRange(),
+          PlatformAgnosticAvailabilityKind::Unavailable,
+          /*implicit=*/true,
+          available->IsSPI);
+      ext->getAttrs().add(attr);
+      anyPlatformSpecificAttrs = true;
+    }
+
+    // If we found any platform-specific availability attributes, we're done.
+    if (anyPlatformSpecificAttrs)
+      break;
   }
 
   // Add the blanket "unavailable".
@@ -4492,11 +4588,13 @@ static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
 
 Type swift::adjustVarTypeForConcurrency(
     Type type, VarDecl *var, DeclContext *dc,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
   if (!var->preconcurrency())
     return type;
 
-  if (contextRequiresStrictConcurrencyChecking(dc, getType))
+  if (contextRequiresStrictConcurrencyChecking(
+          dc, getType, isolatedByPreconcurrency))
     return type;
 
   bool isLValue = false;
@@ -4526,7 +4624,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     return fnType;
 
   AnyFunctionType *outerFnType = nullptr;
-  if (func && func->hasImplicitSelfDecl()) {
+  if ((subscript && numApplies > 1) || (func && func->hasImplicitSelfDecl())) {
     outerFnType = fnType;
     fnType = outerFnType->getResult()->castTo<AnyFunctionType>();
 
@@ -4556,7 +4654,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     if (addSendable || addMainActor) {
       newParamType = applyUnsafeConcurrencyToParameterType(
         param.getPlainType(), addSendable, addMainActor);
-    } else if (stripConcurrency) {
+    } else if (stripConcurrency && numApplies == 0) {
       newParamType = param.getPlainType()->stripConcurrency(
           /*recurse=*/false, /*dropGlobalActor=*/numApplies == 0);
     }
@@ -4616,9 +4714,12 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
 AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency,
+    llvm::function_ref<Type(Type)> openType) {
   // Apply unsafe concurrency features to the given function type.
-  bool strictChecking = contextRequiresStrictConcurrencyChecking(dc, getType);
+  bool strictChecking = contextRequiresStrictConcurrencyChecking(
+      dc, getType, isolatedByPreconcurrency);
   fnType = applyUnsafeConcurrencyToFunctionType(
       fnType, decl, strictChecking, numApplies, isMainDispatchQueue);
 
@@ -4639,7 +4740,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
       LLVM_FALLTHROUGH;
 
     case ActorIsolation::GlobalActor:
-      globalActorType = isolation.getGlobalActor();
+      globalActorType = openType(isolation.getGlobalActor());
       break;
     }
   }
@@ -4678,7 +4779,10 @@ bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
   return contextRequiresStrictConcurrencyChecking(
       dc, [](const AbstractClosureExpr *) {
         return Type();
-      });
+      },
+    [](const ClosureExpr *closure) {
+      return closure->isIsolatedByPreconcurrency();
+    });
 }
 
 AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(
@@ -4787,6 +4891,9 @@ static ActorIsolation getActorIsolationForReference(
             fromDC,
             [](const AbstractClosureExpr *closure) {
               return closure->getType();
+            },
+            [](const ClosureExpr *closure) {
+              return closure->isIsolatedByPreconcurrency();
             })) {
       declIsolation = ActorIsolation::forGlobalActor(
           declIsolation.getGlobalActor(), /*unsafe=*/false);
@@ -4981,7 +5088,9 @@ ActorReferenceResult ActorReferenceResult::forReference(
   if (!declIsolation.isActorIsolated()) {
     // If the declaration is asynchronous and we are in an actor-isolated
     // context (of any kind), then we exit the actor to the nonisolated context.
-    if (isAsyncDecl(declRef) && contextIsolation.isActorIsolated())
+    if (isAsyncDecl(declRef) && contextIsolation.isActorIsolated() &&
+        !declRef.getDecl()->getAttrs()
+            .hasAttribute<UnsafeInheritExecutorAttr>())
       return forExitsActorToNonisolated(contextIsolation);
 
     // Otherwise, we stay in the same concurrency domain, whether on an actor
@@ -5042,6 +5151,10 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // This is a cross-actor reference, so determine what adjustments we need
   // to perform.
   Options options = None;
+
+  // Note if the reference originates from a @preconcurrency-isolated context.
+  if (contextIsolation.preconcurrency())
+    options |= Flags::Preconcurrency;
 
   // If the declaration isn't asynchronous, promote to async.
   if (!isAsyncDecl(declRef))

@@ -781,7 +781,7 @@ namespace swift {
 
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
-  class DiagnosticEngine {
+  class SWIFT_IMPORT_REFERENCE DiagnosticEngine {
   public:
     /// The source manager used to interpret source locations and
     /// display diagnostics.
@@ -1390,7 +1390,7 @@ namespace swift {
     DiagnosticEngine &getDiags() { return QueueEngine; }
 
     /// Retrieve the underlying engine which will receive the diagnostics.
-    DiagnosticEngine &getUnderlyingDiags() { return UnderlyingEngine; }
+    DiagnosticEngine &getUnderlyingDiags() const { return UnderlyingEngine; }
 
     /// Clear this queue and erase all diagnostics recorded.
     void clear() {

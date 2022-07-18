@@ -1559,7 +1559,11 @@ void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
   switch (state) {
     case ActorIsolation::ActorInstance:
-      out << "actor-isolated to instance of " << state.getActor()->getName();
+      out << "actor-isolated to instance of ";
+      if (state.isDistributedActor()) {
+        out << "distributed ";
+      }
+      out << "actor " << state.getActor()->getName();
       break;
 
     case ActorIsolation::Independent:

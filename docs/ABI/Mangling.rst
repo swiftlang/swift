@@ -102,6 +102,11 @@ The following symbolic reference kinds are currently implemented:
      metadata-access-function ::= '\x09' .{4}  // Reference points directly to metadata access function that can be invoked to produce referenced object
    #endif
 
+   #if SWIFT_RUNTIME_VERISON >= 5.7
+     symbolic-extended-existential-type-shape ::= '\x0A' .{4} // Reference points directly to an ExtendedExistentialTypeShape
+     symbolic-extended-existential-type-shape ::= '\x0B' .{4} // Reference points directly to a NonUniqueExtendedExistentialTypeShape
+   #endif
+
 A mangled name may also include ``\xFF`` bytes, which are only used for
 alignment padding. They do not affect what the mangled name references and can
 be skipped over and ignored.
@@ -638,7 +643,7 @@ Types
   type ::= protocol-list 'p'                 // existential type
   type ::= protocol-list superclass 'Xc'     // existential type with superclass
   type ::= protocol-list 'Xl'                // existential type with AnyObject
-  type ::= protocol-list 'y' (type* '_')* type* retroactive-conformance* 'XP'   // parameterized protocol type
+  type ::= protocol-list requirement* '_' 'XP'   // constrained existential type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -652,6 +657,10 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.2
     type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
     type ::= type assoc-type-list 'QX' // associated type relative to base `type`
+  #endif
+
+  #if SWIFT_RUNTIME_VERSION >= 5.7
+    type ::= symbolic-extended-existential-type-shape type* retroactive-conformance* 'Xj'
   #endif
 
   protocol-list ::= protocol '_' protocol*
@@ -879,6 +888,7 @@ now codified into the ABI; the index 0 is therefore reserved.
   GENERIC-PARAM-INDEX ::= 'z'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
   GENERIC-PARAM-INDEX ::= 'd' INDEX INDEX    // depth = M+1, idx = N
+  GENERIC-PARAM-INDEX ::= 's'                // depth = 0,   idx = 0; Constrained existential 'Self' type
 
   LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject
   LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject
@@ -1123,7 +1133,7 @@ Some kinds need arguments, which precede ``Tf``.
   spec-arg ::= identifier
   spec-arg ::= type
 
-  SPEC-INFO ::= FRAGILE? PASSID
+  SPEC-INFO ::= MT-REMOVED? FRAGILE? PASSID
 
   PASSID ::= '0'                             // AllocBoxToStack,
   PASSID ::= '1'                             // ClosureSpecializer,
@@ -1131,6 +1141,8 @@ Some kinds need arguments, which precede ``Tf``.
   PASSID ::= '3'                             // CapturePropagation,
   PASSID ::= '4'                             // FunctionSignatureOpts,
   PASSID ::= '5'                             // GenericSpecializer,
+
+  MT-REMOVED ::= 'm'                         // non-generic metatype arguments are removed in the specialized function
 
   FRAGILE ::= 'q'
 

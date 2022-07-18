@@ -29,6 +29,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
@@ -627,6 +628,16 @@ public:
       return fn;
     }
     case Kind::WitnessMethod: {
+      if (auto func = constant->getFuncDecl()) {
+        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
+          // If we're calling cross-actor, we must always use a distributed thunk
+          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
+            // We must adjust the constant to use a distributed thunk.
+            constant = constant->asDistributed();
+          }
+        }
+      }
+
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
 
@@ -700,6 +711,16 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::WitnessMethod: {
+      if (auto func = constant->getFuncDecl()) {
+        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
+          // If we're calling cross-actor, we must always use a distributed thunk
+          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
+            /// We must adjust the constant to use a distributed thunk.
+            constant = constant->asDistributed();
+          }
+        }
+      }
+
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -1125,8 +1146,10 @@ public:
     SILDeclRef constant = SILDeclRef(e->getDecl());
 
     /// Some special handling may be necessary for thunks:
-    if (callSite && callSite->usesDistributedThunk()) {
-      constant = SILDeclRef(e->getDecl()).asDistributed();
+    if (callSite && callSite->shouldApplyDistributedThunk()) {
+      if (auto distributedThunk = cast<AbstractFunctionDecl>(e->getDecl())->getDistributedThunk()) {
+        constant = SILDeclRef(distributedThunk).asDistributed();
+      }
     } else if (afd->isBackDeployed()) {
       // If we're calling a back deployed function then we need to call a
       // thunk instead that will handle the fallback when the original
@@ -1280,7 +1303,10 @@ public:
     CanType superFormalType = arg->getType()->getCanonicalType();
 
     // The callee for a super call has to be either a method or constructor.
+    // There might be one level of conversion in between.
     Expr *fn = apply->getFn();
+    if (auto fnConv = dyn_cast<FunctionConversionExpr>(fn))
+      fn = fnConv->getSubExpr();
     SubstitutionMap substitutions;
     SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
@@ -1784,8 +1810,33 @@ static void emitRawApply(SILGenFunction &SGF,
 
   // Gather the arguments.
   for (auto i : indices(args)) {
-    auto argValue = (inputParams[i].isConsumed() ? args[i].forward(SGF)
-                                                 : args[i].getValue());
+    SILValue argValue;
+    if (inputParams[i].isConsumed()) {
+      argValue = args[i].forward(SGF);
+      if (argValue->getType().isMoveOnlyWrapped()) {
+        argValue =
+            SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, argValue);
+      }
+    } else {
+      ManagedValue arg = args[i];
+
+      // Move only is not represented in the Swift level type system, so if we
+      // have a move only value, convert it to a non-move only value. The
+      // move/is no escape checkers will ensure that it is legal to do this or
+      // will error. At this point we just want to make sure that the emitted
+      // types line up.
+      if (arg.getType().isMoveOnlyWrapped()) {
+        // We need to borrow so that we can convert from $@moveOnly T -> $T. Use
+        // a formal access borrow to ensure that we have tight scopes like we do
+        // when we borrow fn.
+        if (!arg.isPlusZero())
+          arg = arg.formalAccessBorrow(SGF, loc);
+        arg = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, arg);
+      }
+
+      argValue = arg.getValue();
+    }
+
 #ifndef NDEBUG
     auto inputTy =
         substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
@@ -3057,6 +3108,18 @@ private:
 
       // If it's not already in memory, put it there.
       if (!result.getType().isAddress()) {
+        // If we have a move only wrapped type, we need to unwrap before we
+        // materialize. We will forward as appropriate so it will show up as a
+        // consuming use or a guaranteed use as appropriate.
+        if (result.getType().isMoveOnlyWrapped()) {
+          if (result.isPlusOne(SGF)) {
+            result =
+                SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, result);
+          } else {
+            result = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                loc, result);
+          }
+        }
         result = result.materialize(SGF, loc);
       }
 
@@ -5766,13 +5829,15 @@ SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
 }
 
 /// Emit a call to a getter.
-RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
-                                       SubstitutionMap substitutions,
-                                       ArgumentSource &&selfValue, bool isSuper,
-                                       bool isDirectUse,
-                                       PreparedArguments &&subscriptIndices,
-                                       SGFContext c,
-                                       bool isOnSelfParameter) {
+RValue SILGenFunction::emitGetAccessor(
+    SILLocation loc, SILDeclRef get,
+    SubstitutionMap substitutions,
+    ArgumentSource &&selfValue, bool isSuper,
+    bool isDirectUse,
+    PreparedArguments &&subscriptIndices,
+    SGFContext c,
+    bool isOnSelfParameter,
+    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5783,6 +5848,9 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
+  if (implicitActorHopTarget)
+    emission.setImplicitlyAsync(implicitActorHopTarget);
+
   // Self ->
   if (hasSelf) {
     emission.addSelfParam(loc, std::move(selfValue),

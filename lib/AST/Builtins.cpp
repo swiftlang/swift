@@ -682,7 +682,7 @@ namespace {
       if (wantsAdditionalAnyObjectRequirement) {
         Requirement req(RequirementKind::Conformance,
                         TheGenericParamList->getParams()[0]->getInterfaceType(),
-                        ctx.getAnyObjectType());
+                        ctx.getAnyObjectConstraint());
         addedRequirements.push_back(req);
       }
       for (auto gp : TheGenericParamList->getParams()) {
@@ -1486,6 +1486,14 @@ static ValueDecl *getCreateAsyncTaskInGroup(ASTContext &ctx, Identifier id) {
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
 
   return builder.build(id);
+}
+
+static ValueDecl *getTaskRunInline(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _generics(_unrestricted),
+      _parameters(
+          _function(_async(_noescape(_thick)), _typeparam(0), _parameters())),
+      _typeparam(0));
 }
 
 static ValueDecl *getConvertTaskToJob(ASTContext &ctx, Identifier id) {
@@ -2837,6 +2845,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTaskInGroup:
     return getCreateAsyncTaskInGroup(Context, Id);
+
+  case BuiltinValueKind::TaskRunInline:
+    return getTaskRunInline(Context, Id);
 
   case BuiltinValueKind::TargetOSVersionAtLeast:
     return getTargetOSVersionAtLeast(Context, Id);

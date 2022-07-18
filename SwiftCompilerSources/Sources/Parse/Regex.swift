@@ -46,7 +46,7 @@ private func _RegexLiteralLexingFn(
   _ curPtrPtr: UnsafeMutablePointer<UnsafePointer<CChar>>,
   _ bufferEndPtr: UnsafePointer<CChar>,
   _ mustBeRegex: CBool,
-  _ bridgedDiagnosticEngine: BridgedOptionalDiagnosticEngine
+  _ bridgedDiagnosticEngine: swift.DiagnosticEngine?
 ) -> /*CompletelyErroneous*/ CBool {
   let inputPtr = curPtrPtr.pointee
 
@@ -62,7 +62,8 @@ private func _RegexLiteralLexingFn(
 
   if let error = error {
     // Emit diagnostic if diagnostics are enabled.
-    if let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine) {
+    if let bridged = bridgedDiagnosticEngine {
+      let diagEngine = DiagnosticEngine(bridged: bridged)
       let startLoc = SourceLoc(
         locationInFile: error.location.assumingMemoryBound(to: UInt8.self))!
       diagEngine.diagnose(startLoc, .regex_literal_parsing_error, error.message)
@@ -92,8 +93,8 @@ public func _RegexLiteralParsingFn(
   _ versionOut: UnsafeMutablePointer<CUnsignedInt>,
   _ captureStructureOut: UnsafeMutableRawPointer,
   _ captureStructureSize: CUnsignedInt,
-  _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
-  _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
+  _ bridgedDiagnosticBaseLoc: swift.SourceLoc,
+  _ bridgedDiagnosticEngine: swift.DiagnosticEngine
 ) -> Bool {
   let str = String(cString: inputPtr)
   let captureBuffer = UnsafeMutableRawBufferPointer(

@@ -399,7 +399,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
       auto conformance = module->lookupConformance(substFirstType, proto,
                                                    allowMissing);
 
-      if (proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+      if (!allowMissing &&
+          proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
           conformance.hasUnavailableConformance()) {
         conformance = ProtocolConformanceRef::forInvalid();
       }

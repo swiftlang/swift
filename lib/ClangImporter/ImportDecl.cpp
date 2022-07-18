@@ -2116,6 +2116,15 @@ namespace {
           continue;
         }
 
+        if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
+          if (friendDecl->getFriendDecl()) {
+            m = friendDecl->getFriendDecl();
+            auto lookupTable = Impl.findLookupTable(m->getOwningModule());
+            addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
+                                  Impl.getNameImporter());
+          }
+        }
+
         auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.
@@ -2145,6 +2154,7 @@ namespace {
         }
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
+
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
@@ -2189,12 +2199,27 @@ namespace {
 
               Impl.markUnavailable(MD, "use .pointee property");
               MD->overwriteAccess(AccessLevel::Private);
+            } else if (cxxOperatorKind ==
+                       clang::OverloadedOperatorKind::OO_PlusPlus) {
+              if (cxxMethod->param_empty()) {
+                // This is a pre-increment operator. We synthesize a
+                // non-mutating function called `successor() -> Self`.
+                FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(MD);
+                result->addMember(successorFunc);
+
+                Impl.markUnavailable(MD, "use .successor()");
+              } else {
+                Impl.markUnavailable(MD, "unable to create .successor() func");
+              }
+              MD->overwriteAccess(AccessLevel::Private);
             }
             // Check if this method _is_ an overloaded operator but is not a
-            // call / subscript / dereference. Those 3 operators do not need
-            // static versions.
+            // call / subscript / dereference / increment. Those
+            // operators do not need static versions.
             else if (cxxOperatorKind !=
                          clang::OverloadedOperatorKind::OO_None &&
+                     cxxOperatorKind !=
+                         clang::OverloadedOperatorKind::OO_PlusPlus &&
                      cxxOperatorKind !=
                          clang::OverloadedOperatorKind::OO_Call &&
                      cxxOperatorKind !=
@@ -2209,6 +2234,9 @@ namespace {
 
               // Make the actual member operator private.
               MD->overwriteAccess(AccessLevel::Private);
+
+              // Make sure the synthesized decl can be found by lookupDirect.
+              result->addMemberToLookupTable(opFuncDecl);
             }
 
             if (cxxMethod->getDeclName().isIdentifier()) {
@@ -2445,53 +2473,7 @@ namespace {
       if (!isCxxRecordImportable(decl))
         return nullptr;
 
-      auto result = VisitRecordDecl(decl);
-      if (!result)
-        return nullptr;
-
-      // If this struct is a C++ input iterator, we try to synthesize a
-      // conformance to the UnsafeCxxInputIterator protocol (which is defined in
-      // the std overlay). We consider a struct to be an input iterator if it
-      // has this member: `using iterator_category = std::input_iterator_tag`.
-      for (clang::Decl *member : decl->decls()) {
-        if (auto typeDecl = dyn_cast<clang::TypeDecl>(member)) {
-          if (!typeDecl->getIdentifier())
-            continue;
-
-          if (typeDecl->getName() == "iterator_category") {
-            // If this is a typedef or a using-decl, retrieve the underlying
-            // struct decl.
-            clang::CXXRecordDecl *underlyingDecl = nullptr;
-            if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(typeDecl)) {
-              auto type = typedefDecl->getUnderlyingType();
-              underlyingDecl = type->getAsCXXRecordDecl();
-            } else {
-              underlyingDecl = dyn_cast<clang::CXXRecordDecl>(typeDecl);
-            }
-            if (underlyingDecl) {
-              auto isInputIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-                return base->isInStdNamespace() && base->getIdentifier() &&
-                       base->getName() == "input_iterator_tag";
-              };
-
-              // Traverse all transitive bases of `underlyingDecl` to check if
-              // it inherits from `std::input_iterator_tag`.
-              bool isInputIterator = isInputIteratorDecl(underlyingDecl);
-              underlyingDecl->forallBases(
-                  [&](const clang::CXXRecordDecl *base) {
-                    if (isInputIteratorDecl(base)) {
-                      isInputIterator = true;
-                      return false;
-                    }
-                    return true;
-                  });
-              llvm::errs();
-            }
-          }
-        }
-      }
-
-      return result;
+      return VisitRecordDecl(decl);
     }
 
     bool isSpecializationDepthGreaterThan(
@@ -2517,8 +2499,16 @@ namespace {
       // deep/complex template, or we've run into an infinite loop. In either
       // case, its not worth the compile time, so bail.
       // TODO: this could be configurable at some point.
-      if (llvm::size(decl->getSpecializedTemplate()->specializations()) > 10000)
+      if (llvm::size(decl->getSpecializedTemplate()->specializations()) >
+          1000) {
+        std::string name;
+        llvm::raw_string_ostream os(name);
+        decl->printQualifiedName(os);
+        // Emit a warning if we haven't warned about this decl yet.
+        if (Impl.tooDeepTemplateSpecializations.insert(name).second)
+          Impl.diagnose({}, diag::too_many_class_template_instantiations, name);
         return nullptr;
+      }
 
       // `Sema::isCompleteType` will try to instantiate the class template as a
       // side-effect and we rely on this here. `decl->getDefinition()` can
@@ -2798,6 +2788,13 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
+
+      // We may have already imported this function decl before we imported the
+      // parent record. In such a case it's important we don't re-import.
+      auto known = Impl.ImportedDecls.find({decl, getVersion()});
+      if (known != Impl.ImportedDecls.end()) {
+        return known->second;
+      }
 
       bool isOperator = decl->getDeclName().getNameKind() ==
                         clang::DeclarationName::CXXOperatorName;
@@ -4780,12 +4777,6 @@ namespace {
       return nullptr;
     }
 
-    Decl *VisitFriendDecl(const clang::FriendDecl *decl) {
-      // Friends are not imported; Swift has a different access control
-      // mechanism.
-      return nullptr;
-    }
-
     Decl *VisitFriendTemplateDecl(const clang::FriendTemplateDecl *decl) {
       // Friends are not imported; Swift has a different access control
       // mechanism.
@@ -6520,7 +6511,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
     }
     if (inherited.empty()) {
       inherited.push_back(
-        TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectType()));
+        TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectConstraint()));
     }
     genericParamDecl->setInherited(Impl.SwiftContext.AllocateCopy(inherited));
 

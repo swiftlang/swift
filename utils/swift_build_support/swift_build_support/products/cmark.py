@@ -94,8 +94,14 @@ class CMark(cmake_product.CMakeProduct):
             # Xcode generator uses "RUN_TESTS" instead of "test".
             results_targets = ['RUN_TESTS']
 
+        test_env = {
+            "CTEST_OUTPUT_ON_FAILURE": "ON"
+        }
+
+        # see the comment in cmake_product.py if you want to copy this code to pass
+        # environment variables to tests
         self.test_with_cmake(executable_target, results_targets,
-                             self.args.cmark_build_variant, [])
+                             self.args.cmark_build_variant, [], test_env)
 
     def should_install(self, host_target):
         """should_install() -> Bool

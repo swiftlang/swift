@@ -183,7 +183,7 @@ collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
     auto conformance =
-      M->lookupConformance(fromType, proto);
+      M->lookupConformance(fromType, proto, /*allowMissing=*/true);
     assert(conformance);
     conformances.push_back(conformance);
   }
@@ -4352,7 +4352,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
                       SILLocation loc) {
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
-    if (auto *derivativeId = witness.getDerivativeFunctionIdentifier()) {
+    if (auto *derivativeId = witness.getDerivativeFunctionIdentifier()) { // TODO Maybe we need check here too
       auto originalFn =
           SGF.emitGlobalFunctionRef(loc, witness.asAutoDiffOriginalFunction());
       auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
@@ -4439,16 +4439,7 @@ void SILGenFunction::emitProtocolWitness(
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
 
-  // If the witness is isolated to a distributed actor, but the requirement is
-  // not, go through the distributed thunk.
-  if (witness.hasDecl() &&
-      getActorIsolation(witness.getDecl()).isDistributedActor() &&
-      requirement.hasDecl() &&
-      !getActorIsolation(requirement.getDecl()).isDistributedActor()) {
-    witness = SILDeclRef(
-        cast<AbstractFunctionDecl>(witness.getDecl())->getDistributedThunk())
-          .asDistributed();
-  } else if (enterIsolation) {
+  if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
     Optional<ManagedValue> actorSelf;

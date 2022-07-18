@@ -144,7 +144,7 @@ SwiftDeclSynthesizer::createVarWithPattern(DeclContext *dc, Identifier name,
                                            VarDecl::Introducer introducer,
                                            bool isImplicit, AccessLevel access,
                                            AccessLevel setterAccess) {
-  ASTContext &ctx = ImporterImpl.SwiftContext;
+  ASTContext &ctx = dc->getASTContext();
 
   // Create a variable to store the underlying value.
   auto var = new (ctx) VarDecl(
@@ -1720,6 +1720,97 @@ VarDecl *SwiftDeclSynthesizer::makeDereferencedPointeeProperty(
   return result;
 }
 
+// MARK: C++ increment operator
+
+/// Synthesizer callback for a successor function.
+///
+/// \code
+/// var __copy: Self
+/// __copy = self
+/// __copy.__operatorPlusPlus()
+/// return __copy
+/// \endcode
+static std::pair<BraceStmt *, bool>
+synthesizeSuccessorFuncBody(AbstractFunctionDecl *afd, void *context) {
+  auto successorDecl = cast<FuncDecl>(afd);
+  auto incrementImpl = static_cast<FuncDecl *>(context);
+
+  ASTContext &ctx = successorDecl->getASTContext();
+  auto emptyTupleTy = TupleType::getEmpty(ctx);
+  auto returnTy = successorDecl->getResultInterfaceType();
+
+  auto selfDecl = successorDecl->getImplicitSelfDecl();
+  auto selfRefExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                           /*implicit*/ true);
+  selfRefExpr->setType(selfDecl->getInterfaceType());
+
+  // Create a `__copy` variable.
+  VarDecl *copyDecl = nullptr;
+  PatternBindingDecl *patternDecl = nullptr;
+  std::tie(copyDecl, patternDecl) = SwiftDeclSynthesizer::createVarWithPattern(
+      successorDecl, ctx.getIdentifier("__copy"), returnTy,
+      VarDecl::Introducer::Var,
+      /*isImplicit*/ true, AccessLevel::Public, AccessLevel::Public);
+
+  auto copyRefLValueExpr = new (ctx) DeclRefExpr(copyDecl, DeclNameLoc(),
+                                                 /*implicit*/ true);
+  copyRefLValueExpr->setType(LValueType::get(copyDecl->getInterfaceType()));
+
+  auto inoutCopyExpr = new (ctx) InOutExpr(
+      SourceLoc(), copyRefLValueExpr,
+      successorDecl->mapTypeIntoContext(copyDecl->getValueInterfaceType()),
+      /*isImplicit*/ true);
+  inoutCopyExpr->setType(InOutType::get(copyDecl->getInterfaceType()));
+
+  // Copy `self` to `__copy`.
+  auto copyAssignExpr = new (ctx) AssignExpr(copyRefLValueExpr, SourceLoc(),
+                                             selfRefExpr, /*implicit*/ true);
+  copyAssignExpr->setType(emptyTupleTy);
+
+  // Call `operator++`.
+  auto incrementExpr = createAccessorImplCallExpr(incrementImpl, inoutCopyExpr);
+
+  auto copyRefRValueExpr = new (ctx) DeclRefExpr(copyDecl, DeclNameLoc(),
+                                                 /*implicit*/ true);
+  copyRefRValueExpr->setType(copyDecl->getInterfaceType());
+
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), copyRefRValueExpr,
+                                         /*implicit*/ true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(),
+                                {
+                                    copyDecl,
+                                    patternDecl,
+                                    copyAssignExpr,
+                                    incrementExpr,
+                                    returnStmt,
+                                },
+                                SourceLoc());
+  return {body, /*isTypeChecked*/ true};
+}
+
+FuncDecl *SwiftDeclSynthesizer::makeSuccessorFunc(FuncDecl *incrementFunc) {
+  auto &ctx = ImporterImpl.SwiftContext;
+  auto dc = incrementFunc->getDeclContext();
+
+  auto returnTy = incrementFunc->getImplicitSelfDecl()->getInterfaceType();
+
+  auto nameId = ctx.getIdentifier("successor");
+  auto *params = ParameterList::createEmpty(ctx);
+  DeclName name(ctx, DeclBaseName(nameId), params);
+
+  auto result = FuncDecl::createImplicit(
+      ctx, StaticSpellingKind::None, name, SourceLoc(),
+      /*Async*/ false, /*Throws*/ false,
+      /*GenericParams*/ nullptr, params, returnTy, dc);
+
+  result->setAccess(AccessLevel::Public);
+  result->setIsDynamic(false);
+  result->setBodySynthesizer(synthesizeSuccessorFuncBody, incrementFunc);
+
+  return result;
+}
+
 // MARK: C++ arithmetic operators
 
 static std::pair<BraceStmt *, bool>
@@ -1790,9 +1881,13 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 FuncDecl *
 SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
                                    clang::CXXMethodDecl *clangOperator) {
+  clang::OverloadedOperatorKind opKind = clangOperator->getOverloadedOperator();
+
+  assert(opKind != clang::OverloadedOperatorKind::OO_None &&
+         "expected a C++ operator");
+
   auto &ctx = ImporterImpl.SwiftContext;
-  auto opName =
-      clang::getOperatorSpelling(clangOperator->getOverloadedOperator());
+  auto opName = clang::getOperatorSpelling(opKind);
   auto paramList = operatorMethod->getParameters();
   auto genericParamList = operatorMethod->getGenericParams();
 
@@ -1843,6 +1938,11 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   topLevelStaticFuncDecl->setStatic();
   topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody,
                                              operatorMethod);
+
+  // If this is a unary prefix operator (e.g. `!`), add a `prefix` attribute.
+  if (clangOperator->param_empty()) {
+    topLevelStaticFuncDecl->getAttrs().add(new (ctx) PrefixAttr(SourceLoc()));
+  }
 
   return topLevelStaticFuncDecl;
 }

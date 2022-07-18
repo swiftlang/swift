@@ -841,6 +841,15 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TaskRunInlineAvailability(ASTContext &context) {
+    if (context.LangOpts.isConcurrencyModelTaskToThread()) {
+      return RuntimeAvailability::AlwaysAvailable;
+    }
+    // swift_task_run_inline is only available under task-to-thread execution
+    // model.
+    return RuntimeAvailability::ConditionallyAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -1783,6 +1792,19 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
          deploymentAvailability.isContainedIn(
              context.getPrespecializedGenericMetadataAvailability()) &&
          canPrespecializeTarget;
+}
+
+bool IRGenModule::canMakeStaticObjectsReadOnly() {
+  if (getOptions().DisableReadonlyStaticObjects)
+    return false;
+
+  // TODO: Support constant static arrays on other platforms, too.
+  // See also the comment in GlobalObjects.cpp.
+  if (!Triple.isOSDarwin())
+    return false;
+
+  return getAvailabilityContext().isContainedIn(
+          Context.getImmortalRefCountSymbolsAvailability());
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {

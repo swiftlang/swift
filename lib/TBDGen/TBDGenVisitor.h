@@ -68,7 +68,8 @@ public:
   virtual void addSymbol(StringRef name, llvm::MachO::SymbolKind kind,
                          SymbolSource source) {}
   virtual void addObjCInterface(const ClassDecl *decl) {}
-  virtual void addObjCMethod(const ClassDecl *cls, SILDeclRef method) {}
+  virtual void addObjCCategory(const ExtensionDecl *decl) {}
+  virtual void addObjCMethod(const GenericContext *ctx, SILDeclRef method) {}
 };
 
 class SimpleAPIRecorder final : public APIRecorder {

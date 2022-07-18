@@ -158,7 +158,10 @@ bool TypeBase::isStructurallyUninhabited() {
 }
 
 bool TypeBase::isAny() {
-  return isEqual(getASTContext().TheAnyType);
+  Type constraint = this;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+  return constraint->isEqual(getASTContext().TheAnyType);
 }
 
 bool TypeBase::isPlaceholder() {
@@ -189,9 +192,10 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::DynamicSelf:
     return isReferenceTypeImpl(cast<DynamicSelfType>(type).getSelfType(),
                                sig, functionsCount);
-  case TypeKind::SILMoveOnly:
-    return isReferenceTypeImpl(cast<SILMoveOnlyType>(type)->getInnerType(), sig,
-                               functionsCount);
+  case TypeKind::SILMoveOnlyWrapped:
+    return isReferenceTypeImpl(
+        cast<SILMoveOnlyWrappedType>(type)->getInnerType(), sig,
+        functionsCount);
 
   // Archetypes and existentials are only class references if class-bounded.
   case TypeKind::PrimaryArchetype:
@@ -306,7 +310,9 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
       protoDecl = parameterized->getProtocol();
       containsParameterized = true;
     }
-    containsNonObjCProtocol |= !protoDecl->isObjC();
+    containsNonObjCProtocol |=
+        !protoDecl->isObjC() &&
+        !protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable);
     protocols.push_back(protoDecl);
   }
 }
@@ -325,7 +331,7 @@ ExistentialLayout CanType::getExistentialLayout() {
   CanType ty = *this;
 
   // Always remove one layer of move only ness.
-  if (auto mv = dyn_cast<SILMoveOnlyType>(ty))
+  if (auto mv = dyn_cast<SILMoveOnlyWrappedType>(ty))
     ty = mv->getInnerType();
 
   if (auto existential = dyn_cast<ExistentialType>(ty))
@@ -958,6 +964,67 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
       return Type(this);
 
     return newFnType;
+  }
+
+  if (auto existentialType = getAs<ExistentialType>()) {
+    auto newConstraintType = existentialType->getConstraintType()
+        ->stripConcurrency(recurse, dropGlobalActor);
+    if (newConstraintType.getPointer() ==
+            existentialType->getConstraintType().getPointer())
+      return Type(this);
+
+    return ExistentialType::get(newConstraintType);
+  }
+
+  if (auto protocolType = getAs<ProtocolType>()) {
+    if (protocolType->getDecl()->isSpecificProtocol(
+            KnownProtocolKind::Sendable))
+      return ProtocolCompositionType::get(getASTContext(), { }, false);
+
+    return Type(this);
+  }
+
+  if (auto protocolCompositionType = getAs<ProtocolCompositionType>()) {
+    SmallVector<Type, 4> newMembers;
+    auto members = protocolCompositionType->getMembers();
+    for (unsigned i : indices(members)) {
+      auto memberType = members[i];
+      auto newMemberType =
+          memberType->stripConcurrency(recurse, dropGlobalActor);
+      if (!newMembers.empty()) {
+        newMembers.push_back(newMemberType);
+        continue;
+      }
+
+      if (memberType.getPointer() != newMemberType.getPointer()) {
+        newMembers.append(members.begin(), members.begin() + i);
+        newMembers.push_back(newMemberType);
+        continue;
+      }
+    }
+
+    if (!newMembers.empty()) {
+      return ProtocolCompositionType::get(
+          getASTContext(), newMembers,
+          protocolCompositionType->hasExplicitAnyObject());
+    }
+
+    return Type(this);
+  }
+
+  if (auto existentialMetatype = getAs<ExistentialMetatypeType>()) {
+    auto instanceType = existentialMetatype->getExistentialInstanceType();
+    auto newInstanceType =
+        instanceType->stripConcurrency(recurse, dropGlobalActor);
+    if (instanceType.getPointer() != newInstanceType.getPointer()) {
+      Optional<MetatypeRepresentation> repr;
+      if (existentialMetatype->hasRepresentation())
+        repr = existentialMetatype->getRepresentation();
+      return ExistentialMetatypeType::get(
+          newInstanceType, repr, getASTContext());
+    }
+
+    return Type(this);
   }
 
   return Type(this);
@@ -1619,7 +1686,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
-  case TypeKind::SILMoveOnly:
+  case TypeKind::SILMoveOnlyWrapped:
     llvm_unreachable("SIL-only types are always canonical!");
 
   case TypeKind::ProtocolComposition: {
@@ -5083,15 +5150,15 @@ case TypeKind::Id:
     return storageTy;
   }
 
-  case TypeKind::SILMoveOnly: {
-    auto *storageTy = cast<SILMoveOnlyType>(base);
+  case TypeKind::SILMoveOnlyWrapped: {
+    auto *storageTy = cast<SILMoveOnlyWrappedType>(base);
     Type transCap = storageTy->getInnerType().transformWithPosition(
         TypePosition::Invariant, fn);
     if (!transCap)
       return Type();
     CanType canTransCap = transCap->getCanonicalType();
     if (canTransCap != storageTy->getInnerType())
-      return SILMoveOnlyType::get(canTransCap);
+      return SILMoveOnlyWrappedType::get(canTransCap);
     return storageTy;
   }
 
@@ -6005,8 +6072,10 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
         ->getReferenceCounting();
-  case TypeKind::SILMoveOnly:
-    return cast<SILMoveOnlyType>(type)->getInnerType()->getReferenceCounting();
+  case TypeKind::SILMoveOnlyWrapped:
+    return cast<SILMoveOnlyWrappedType>(type)
+        ->getInnerType()
+        ->getReferenceCounting();
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:

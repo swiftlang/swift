@@ -621,8 +621,12 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
     if (assocTypes.empty()) {
       diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
-                     protoType);
-
+                     protoType)
+           .fixItRemove(generic->getAngleBrackets());
+      if (!protoDecl->isImplicit()) {
+        diags.diagnose(protoDecl, diag::decl_declared_here,
+                       protoDecl->getName());
+      }
       return ErrorType::get(ctx);
     }
 
@@ -2332,8 +2336,16 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // Diagnose custom attributes that haven't been processed yet.
   for (auto customAttr : attrs.getCustomAttrs()) {
     // If this was the global actor we matched, ignore it.
-    if (globalActorAttr == customAttr)
+    if (globalActorAttr == customAttr) {
+      Decl *decl = nullptr;
+      if (getASTContext().LangOpts.isConcurrencyModelTaskToThread() &&
+          (decl = getDeclContext()->getAsDecl()) &&
+          !AvailableAttr::isUnavailable(decl))
+        diagnose(customAttr->getLocation(),
+                 diag::concurrency_task_to_thread_model_global_actor_annotation,
+                 customAttr->getTypeRepr(), "task-to-thread concurrency model");
       continue;
+    }
 
     // If this attribute was marked invalid, ignore it.
     if (customAttr->isInvalid())
@@ -2853,7 +2865,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
   // In SIL *only*, allow @moveOnly to specify a moveOnly type.
   if ((options & TypeResolutionFlags::SILType) && attrs.has(TAK_moveOnly)) {
-    ty = SILMoveOnlyType::get(ty->getCanonicalType());
+    ty = SILMoveOnlyWrappedType::get(ty->getCanonicalType());
     attrs.clearAttribute(TAK_moveOnly);
   }
 
@@ -3589,7 +3601,27 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     auto *typeAlias = dyn_cast<TypeAliasType>(result.getPointer());
     if (typeAlias && typeAlias->is<ExistentialType>() &&
         typeAlias->getDecl()->hasClangNode()) {
-      return typeAlias->getAs<ExistentialType>()->getConstraintType();
+      auto constraint = typeAlias->getAs<ExistentialType>()->getConstraintType();
+
+      // FIXME: Hack! CFTypeRef, which is a typealias to AnyObject,
+      // has special handling when printing as ObjC, so the typealias
+      // sugar needs to be preserved. See `isCFTypeRef` in PrintAsClang.cpp.
+      //
+      // We can eliminate this hack by fixing the issues with PR #41147,
+      // which added logic to the ClangImporter for when to import as an
+      // existential versus a constraint, but it was reverted in #41207
+      // because it was missing some cases of wrapping in ExistentialType.
+      auto module = typeAlias->getDecl()->getDeclContext()->getParentModule();
+      if ((module->getName().is("Foundation") ||
+          module->getName().is("CoreFoundation")) &&
+          typeAlias->getDecl()->getName() == getASTContext().getIdentifier("CFTypeRef")) {
+        return TypeAliasType::get(typeAlias->getDecl(),
+                                  typeAlias->getParent(),
+                                  typeAlias->getSubstitutionMap(),
+                                  constraint);
+      }
+
+      return constraint;
     }
   }
 
@@ -3790,6 +3822,19 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
     // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
     if (getASTContext().isSwiftVersionAtLeast(5)) {
+      // Mark this repr as invalid. This is the only way to indicate that
+      // something went wrong without supressing checking other reprs in
+      // the same type. For example:
+      //
+      // struct S<T, U> { ... }
+      //
+      // _ = S<Int!, String!>(...)
+      //
+      // Compiler should diagnose both `Int!` and `String!` as invalid,
+      // but returning `ErrorType` from here would stop type resolution
+      // after `Int!`.
+      repr->setInvalid();
+
       diagnose(repr->getStartLoc(),
                diag::implicitly_unwrapped_optional_in_illegal_position)
           .fixItReplace(repr->getExclamationLoc(), "?");

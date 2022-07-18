@@ -236,7 +236,8 @@ STMT_NODES = [
              Child('Pattern', kind='Pattern'),
              Child('TypeAnnotation', kind='TypeAnnotation',
                    is_optional=True),
-             Child('Initializer', kind='InitializerClause'),
+             Child('Initializer', kind='InitializerClause',
+                   is_optional=True),
          ]),
 
     # unavailability-condition -> '#unavailable' '(' availability-spec ')'

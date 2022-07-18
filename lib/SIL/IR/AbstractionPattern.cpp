@@ -426,7 +426,7 @@ AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
   case Kind::Opaque:
   case Kind::Tuple:
   case Kind::Type:
-    if (auto mvi = dyn_cast<SILMoveOnlyType>(getType())) {
+    if (auto mvi = dyn_cast<SILMoveOnlyWrappedType>(getType())) {
       return AbstractionPattern(getGenericSignature(), mvi->getInnerType());
     }
     return *this;
@@ -460,10 +460,10 @@ AbstractionPattern AbstractionPattern::addingMoveOnlyWrapper() const {
   case Kind::Opaque:
   case Kind::Tuple:
   case Kind::Type:
-    if (isa<SILMoveOnlyType>(getType()))
+    if (isa<SILMoveOnlyWrappedType>(getType()))
       return *this;
     return AbstractionPattern(getGenericSignature(),
-                              SILMoveOnlyType::get(getType()));
+                              SILMoveOnlyWrappedType::get(getType()));
   }
 
   llvm_unreachable("bad kind");
@@ -1878,7 +1878,8 @@ const {
       if (conformingReplacementType->isTypeParameter())
         return ProtocolConformanceRef(conformedProtocol);
     
-      return TC.M.lookupConformance(conformingReplacementType, conformedProtocol);
+      return TC.M.lookupConformance(conformingReplacementType, conformedProtocol,
+                                    /*allowMissing*/ true);
     });
 
   auto yieldType = visitor.substYieldType;

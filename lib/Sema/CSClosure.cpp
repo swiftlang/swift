@@ -26,10 +26,10 @@ using namespace swift::constraints;
 namespace {
 
 // Produce an implicit empty tuple expression.
-Expr *getVoidExpr(ASTContext &ctx) {
+Expr *getVoidExpr(ASTContext &ctx, SourceLoc contextLoc = SourceLoc()) {
   auto *voidExpr = TupleExpr::createEmpty(ctx,
-                                          /*LParenLoc=*/SourceLoc(),
-                                          /*RParenLoc=*/SourceLoc(),
+                                          /*LParenLoc=*/contextLoc,
+                                          /*RParenLoc=*/contextLoc,
                                           /*Implicit=*/true);
   voidExpr->setType(ctx.TheEmptyTupleType);
   return voidExpr;
@@ -885,7 +885,9 @@ private:
     } else {
       // If this is simplify `return`, let's create an empty tuple
       // which is also useful if contextual turns out to be e.g. `Void?`.
-      resultExpr = getVoidExpr(cs.getASTContext());
+      // Also, attach return stmt source location so if there is a contextual
+      // mismatch we can produce a diagnostic in a valid source location.
+      resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
     }
 
     SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
@@ -1655,6 +1657,9 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
       if (param->getDeclContext() == closure)
         param->setIsolated(true);
     }
+
+    if (llvm::is_contained(solution.preconcurrencyClosures, closure))
+      closure->setIsolatedByPreconcurrency();
 
     // Coerce the result type, if it was written explicitly.
     if (closure->hasExplicitResultType()) {

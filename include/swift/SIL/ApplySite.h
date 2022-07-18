@@ -297,6 +297,11 @@ public:
     getArgumentOperands()[i].set(V);
   }
 
+  void setCallee(SILValue V) const {
+    unsigned calleeIndex = getCalleeOperand()->getOperandNumber();
+    getInstruction()->getAllOperands()[calleeIndex].set(V);
+  }
+
   /// Return the operand index of the first applied argument.
   unsigned getOperandIndexOfFirstArgument() const {
     FOREACH_IMPL_RETURN(getArgumentOperandNumber());

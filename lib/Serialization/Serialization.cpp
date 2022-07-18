@@ -3891,6 +3891,7 @@ public:
                            fn->needsNewVTableEntry(),
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
                            fn->isUserAccessible(),
+                           fn->isDistributedThunk(),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -4002,6 +4003,7 @@ public:
                                rawAccessLevel,
                                fn->needsNewVTableEntry(),
                                fn->isTransparent(),
+                               fn->isDistributedThunk(),
                                dependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -4721,9 +4723,10 @@ public:
         storageTy->getCaptureType());
   }
 
-  void visitSILMoveOnlyType(const SILMoveOnlyType *moveOnlyTy) {
+  void visitSILMoveOnlyWrappedType(const SILMoveOnlyWrappedType *moveOnlyTy) {
     using namespace decls_block;
-    serializeSimpleWrapper<SILMoveOnlyTypeLayout>(moveOnlyTy->getInnerType());
+    serializeSimpleWrapper<SILMoveOnlyWrappedTypeLayout>(
+        moveOnlyTy->getInnerType());
   }
 
   void visitSILBoxType(const SILBoxType *boxTy) {

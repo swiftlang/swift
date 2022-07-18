@@ -70,7 +70,6 @@ enum KeyPathAccessor {
 
 static void
 bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
-                                     const KeyPathPatternComponent &component,
                                      GenericEnvironment *genericEnv,
                                      ArrayRef<GenericRequirement> requirements,
                                      llvm::Value *args,
@@ -238,7 +237,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
       break;
     }
     auto componentArgsBufSize = params.claimNext();
-    bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+    bindPolymorphicArgumentsFromComponentIndices(IGF,
                                                  genericEnv, requirements,
                                                  componentArgsBuf,
                                                  componentArgsBufSize,
@@ -395,7 +394,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       auto params = IGF.collectParameters();
       auto componentArgsBuf = params.claimNext();
       auto componentArgsBufSize = params.claimNext();
-      bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+      bindPolymorphicArgumentsFromComponentIndices(IGF,
                                      genericEnv, requirements,
                                      componentArgsBuf,
                                      componentArgsBufSize,
@@ -449,7 +448,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       auto sourceArgsBuf = params.claimNext();
       auto destArgsBuf = params.claimNext();
       auto componentArgsBufSize = params.claimNext();
-      bindPolymorphicArgumentsFromComponentIndices(IGF, component,
+      bindPolymorphicArgumentsFromComponentIndices(IGF,
                                      genericEnv, requirements,
                                      sourceArgsBuf,
                                      componentArgsBufSize,

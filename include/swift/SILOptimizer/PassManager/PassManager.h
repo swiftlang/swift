@@ -13,6 +13,7 @@
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -65,8 +66,12 @@ class SwiftPassInvocation {
   static constexpr int BlockSetCapacity = 8;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
-
   int numBlockSetsAllocated = 0;
+
+  static constexpr int NodeSetCapacity = 8;
+  char nodeSetStorage[sizeof(NodeSet) * NodeSetCapacity];
+  bool aliveNodeSets[NodeSetCapacity];
+  int numNodeSetsAllocated = 0;
 
   void endPassRunChecks();
 
@@ -91,6 +96,10 @@ public:
   BasicBlockSet *allocBlockSet();
 
   void freeBlockSet(BasicBlockSet *set);
+
+  NodeSet *allocNodeSet();
+
+  void freeNodeSet(NodeSet *set);
 
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst);

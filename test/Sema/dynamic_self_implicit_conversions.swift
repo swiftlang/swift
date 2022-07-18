@@ -74,3 +74,10 @@ extension Generic where T == Never {
     _ = Generic()[]
   }
 }
+
+final class Final {
+  static func useSelf(_ body: (Self) -> ()) {}
+}
+func testNoErasure(_ body: (Final) -> ()) {
+  return Final.useSelf(body)
+}

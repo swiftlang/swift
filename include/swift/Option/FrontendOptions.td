@@ -317,10 +317,6 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
-
-def enable_experimental_bound_generic_extensions :
-  Flag<["-"], "enable-experimental-bound-generic-extensions">,
-  HelpText<"Enable experimental support for extensions of bound generic types">;
 }
 
 // HIDDEN FLAGS
@@ -640,6 +636,10 @@ def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
 def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Avoid preallocating metadata instantiation caches in globals">;
+
+def disable_readonly_static_objects : Flag<["-"], "disable-readonly-static-objects">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Avoid allocating static objects in a read-only data section">;
 
 def trap_function
   : Separate<["-"], "trap-function">, MetaVarName<"<name>">,
@@ -1060,5 +1060,16 @@ def clang_header_expose_public_decls:
   Flag<["-"], "clang-header-expose-public-decls">,
   HelpText<"Expose all public declarations in the generated clang header">,
   Flags<[FrontendOption, HelpHidden]>;
+  
+def enable_ad_hoc_availability :
+  Flag<["-"], "enable-ad-hoc-availability">,
+  HelpText<"Enable experimental support for ad hoc availability">;
 
+def concurrency_model :
+    Separate<["-"], "concurrency-model">,
+    HelpText<"Which concurrency model is used.  Defaults to standard.">,
+    MetaVarName<"standard|task-to-thread">;
+def concurrency_model_EQ :
+    Joined<["-"], "concurrency-model=">,
+    Alias<concurrency_model>;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

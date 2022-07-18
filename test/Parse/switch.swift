@@ -314,7 +314,7 @@ func enumElementSyntaxOnTuple() {
   }
 }
 
-// sr-176
+// https://github.com/apple/swift/issues/42798
 enum Whatever { case Thing }
 func f0(values: [Whatever]) { // expected-note {{'values' declared here}}
     switch value { // expected-error {{cannot find 'value' in scope; did you mean 'values'?}}
@@ -323,7 +323,8 @@ func f0(values: [Whatever]) { // expected-note {{'values' declared here}}
     }
 }
 
-// sr-720
+// https://github.com/apple/swift/issues/43334
+// https://github.com/apple/swift/issues/43335
 enum Whichever {
   case Thing
   static let title = "title"
@@ -335,7 +336,8 @@ func f1(x: String, y: Whichever) {
         break
     case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
         break
-    case Whichever.alias: // expected-error {{referencing operator function '~=' on 'RegexComponent' requires that 'Whichever' conform to 'RegexComponent'}}
+    case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+    // expected-note@-1 {{overloads for '~=' exist}}
         break
     default:
       break
@@ -347,6 +349,12 @@ func f1(x: String, y: Whichever) {
         break
     case Whichever.title: // expected-error {{expression pattern of type 'String' cannot match values of type 'Whichever'}}
         break
+  }
+  switch y {
+    case .alias:
+      break
+    default:
+      break
   }
 }
 

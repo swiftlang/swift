@@ -894,6 +894,16 @@ BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 /// destruction.
 BUILTIN_MISC_OPERATION(StartAsyncLetWithLocalBuffer, "startAsyncLetWithLocalBuffer", "", Special)
 
+/// taskRunInline()<T>: (
+///     () async -> T
+/// ) -> T
+///
+/// Create an async context inline in the current synchronous context and run
+/// the specified closure.
+///
+/// This is only supported under the task-to-thread concurrency model.
+BUILTIN_MISC_OPERATION(TaskRunInline, "taskRunInline", "", Special)
+
 /// endAsyncLet(): (Builtin.RawPointer) -> Void
 ///
 /// DEPRECATED. The swift_asyncLet_finish intrinsic and endAsyncLetLifetime

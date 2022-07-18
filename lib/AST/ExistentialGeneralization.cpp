@@ -175,7 +175,7 @@ private:
   INVALID_TO_GENERALIZE(SILBox)
   INVALID_TO_GENERALIZE(SILFunction)
   INVALID_TO_GENERALIZE(SILToken)
-  INVALID_TO_GENERALIZE(SILMoveOnly)
+  INVALID_TO_GENERALIZE(SILMoveOnlyWrapped)
 #undef INVALID_TO_GENERALIZE
 
   /// Generalize the generic arguments of the given generic type.s
@@ -267,11 +267,15 @@ private:
 
 ExistentialTypeGeneralization
 ExistentialTypeGeneralization::get(Type rawType) {
-  assert(rawType->isExistentialType());
-  assert(!rawType->hasTypeParameter());
+  assert(rawType->isAnyExistentialType());
 
   // Canonicalize.  We need to generalize the canonical shape of the
   // type or else generalization parameters won't match up.
+  //
+  // TODO: in full generality, do we need to do *contextual*
+  // canonicalization in order to avoid introducing non-canonical
+  // parameters?  (That is, do we need a contextual generic
+  // signature if given an interface type?)
   CanType type = rawType->getCanonicalType();
 
   Generalizer generalizer(type->getASTContext());

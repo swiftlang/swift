@@ -3320,6 +3320,7 @@ public:
     bool overriddenAffectsABI, needsNewVTableEntry, isTransparent;
     DeclID opaqueReturnTypeID;
     bool isUserAccessible;
+    bool isDistributedThunk;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -3338,6 +3339,7 @@ public:
                                           needsNewVTableEntry,
                                           opaqueReturnTypeID,
                                           isUserAccessible,
+                                          isDistributedThunk,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3355,6 +3357,7 @@ public:
                                               rawAccessLevel,
                                               needsNewVTableEntry,
                                               isTransparent,
+                                              isDistributedThunk,
                                               nameAndDependencyIDs);
     }
 
@@ -3530,6 +3533,8 @@ public:
 
     if (!isAccessor)
       fn->setUserAccessible(isUserAccessible);
+
+    fn->setDistributedThunk(isDistributedThunk);
 
     return fn;
   }
@@ -5942,8 +5947,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_BLOCK_STORAGE_TYPE)(
 Expected<Type> DESERIALIZE_TYPE(SIL_MOVE_ONLY_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   TypeID innerType;
-  decls_block::SILMoveOnlyTypeLayout::readRecord(scratch, innerType);
-  return SILMoveOnlyType::get(MF.getType(innerType)->getCanonicalType());
+  decls_block::SILMoveOnlyWrappedTypeLayout::readRecord(scratch, innerType);
+  return SILMoveOnlyWrappedType::get(MF.getType(innerType)->getCanonicalType());
 }
 
 Expected<Type> DESERIALIZE_TYPE(SIL_BOX_TYPE)(

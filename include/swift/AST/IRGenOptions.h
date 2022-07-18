@@ -402,6 +402,8 @@ public:
   /// and protocol conformance caches.
   unsigned NoPreallocatedInstantiationCaches : 1;
 
+  unsigned DisableReadonlyStaticObjects : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -470,7 +472,8 @@ public:
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
-        NoPreallocatedInstantiationCaches(false), CmdArgs(),
+        NoPreallocatedInstantiationCaches(false),
+        DisableReadonlyStaticObjects(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {
 #ifndef NDEBUG

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 694; // add @objc protocol methods to objc method tables
+const uint16_t SWIFTMODULE_VERSION_MINOR = 696; // `distributed thunk` bit on `AbstractFunctionDecl`
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1208,7 +1208,7 @@ namespace decls_block {
     TypeIDField // capture type
   );
 
-  TYPE_LAYOUT(SILMoveOnlyTypeLayout,
+  TYPE_LAYOUT(SILMoveOnlyWrappedTypeLayout,
     SIL_MOVE_ONLY_TYPE,
     TypeIDField            // inner type
   );
@@ -1451,6 +1451,7 @@ namespace decls_block {
     BCFixed<1>,   // requires a new vtable slot
     DeclIDField,  // opaque result type decl
     BCFixed<1>,   // isUserAccessible?
+    BCFixed<1>,   // is distributed thunk
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1502,6 +1503,7 @@ namespace decls_block {
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // is transparent
+    BCFixed<1>,   // is distributed thunk
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:

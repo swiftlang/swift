@@ -22,6 +22,8 @@
 //  1.  "\(x, format: .hex, privacy: .private, align: .right\)"
 //  2.  "\(x, format: .hex(minDigits: 10), align: .right(columns: 10)\)"
 
+import ObjectiveC
+
 extension OSLogInterpolation {
 
   /// Defines interpolation for expressions of type Int.

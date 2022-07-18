@@ -5002,32 +5002,33 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
 
-class SILMoveOnlyType;
+class SILMoveOnlyWrappedType;
 class SILModule; // From SIL
-typedef CanTypeWrapper<SILMoveOnlyType> CanMoveOnlyType;
+typedef CanTypeWrapper<SILMoveOnlyWrappedType> CanSILMoveOnlyWrappedType;
 
 /// A wrapper type that marks an inner type as being a move only value. Can not
 /// be written directly at the Swift level, instead it is triggered by adding
 /// the type attribute @_moveOnly to a different type. We transform these in
 /// TypeLowering into a moveOnly SILType on the inner type.
-class SILMoveOnlyType final : public TypeBase, public llvm::FoldingSetNode {
+class SILMoveOnlyWrappedType final : public TypeBase,
+                                     public llvm::FoldingSetNode {
   CanType innerType;
 
-  SILMoveOnlyType(CanType innerType)
-      : TypeBase(TypeKind::SILMoveOnly, &innerType->getASTContext(),
+  SILMoveOnlyWrappedType(CanType innerType)
+      : TypeBase(TypeKind::SILMoveOnlyWrapped, &innerType->getASTContext(),
                  innerType->getRecursiveProperties()),
         innerType(innerType) {}
 
 public:
   CanType getInnerType() const { return innerType; }
 
-  static CanMoveOnlyType get(CanType innerType);
+  static CanSILMoveOnlyWrappedType get(CanType innerType);
 
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::SILMoveOnly;
+    return T->getKind() == TypeKind::SILMoveOnlyWrapped;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILMoveOnlyType, Type)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILMoveOnlyWrappedType, Type)
 
 class SILBlockStorageType;
 typedef CanTypeWrapper<SILBlockStorageType> CanSILBlockStorageType;
@@ -5451,16 +5452,34 @@ struct ExistentialTypeGeneralization {
 class ExistentialType final : public TypeBase {
   Type ConstraintType;
 
+  /// Whether to print this existential type with the 'any' keyword,
+  /// e.g. in diagnostics.
+  ///
+  /// Any and AnyObject need not use 'any', and they are printed
+  /// in diagnostics without 'any' unless wrapped in MetatypeType.
+  /// This field should only be used by TypePrinter.
+  bool PrintWithAny;
+
   ExistentialType(Type constraintType,
+                  bool printWithAny,
                   const ASTContext *canonicalContext,
                   RecursiveTypeProperties properties)
       : TypeBase(TypeKind::Existential, canonicalContext, properties),
-        ConstraintType(constraintType) {}
+        ConstraintType(constraintType), PrintWithAny(printWithAny) {}
 
 public:
-  static Type get(Type constraint, bool forceExistential = false);
+  static Type get(Type constraint);
 
   Type getConstraintType() const { return ConstraintType; }
+
+  bool shouldPrintWithAny() const { return PrintWithAny; }
+
+  void forcePrintWithAny(llvm::function_ref<void(Type)> print) {
+    bool oldValue = PrintWithAny;
+    PrintWithAny = true;
+    print(this);
+    PrintWithAny = oldValue;
+  }
 
   bool requiresClass() const {
     if (auto protocol = ConstraintType->getAs<ProtocolType>())
@@ -6566,6 +6585,8 @@ inline bool TypeBase::isClassExistentialType() {
     return pt->requiresClass();
   if (auto pct = dyn_cast<ProtocolCompositionType>(T))
     return pct->requiresClass();
+  if (auto ppt = dyn_cast<ParameterizedProtocolType>(T))
+    return ppt->requiresClass();
   if (auto existential = dyn_cast<ExistentialType>(T))
     return existential->requiresClass();
   return false;

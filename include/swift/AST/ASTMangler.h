@@ -16,6 +16,7 @@
 #include "swift/Basic/Mangler.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/TaggedUnion.h"
 
 namespace clang {
 class NamedDecl;
@@ -79,8 +80,50 @@ protected:
   bool RespectOriginallyDefinedIn = true;
 
 public:
-  using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
-                                              const OpaqueTypeDecl *>;
+  class SymbolicReferent {
+  public:
+    enum Kind {
+      NominalType,
+      OpaqueType,
+      ExtendedExistentialTypeShape,
+    };
+  private:
+    // TODO: make a TaggedUnion variant that works with an explicit
+    // kind instead of requiring this redundant kind storage.
+    TaggedUnion<const NominalTypeDecl *,
+                const OpaqueTypeDecl *,
+                Type>
+      storage;
+    Kind kind;
+
+    SymbolicReferent(Kind kind, Type type) : storage(type), kind(kind) {}
+  public:
+    SymbolicReferent(const NominalTypeDecl *decl)
+       : storage(decl), kind(NominalType) {}
+    SymbolicReferent(const OpaqueTypeDecl *decl)
+       : storage(decl), kind(OpaqueType) {}
+    static SymbolicReferent forExtendedExistentialTypeShape(Type type) {
+      return SymbolicReferent(ExtendedExistentialTypeShape, type);
+    }
+
+    Kind getKind() const { return kind; }
+
+    bool isNominalType() const { return kind == NominalType; }
+    const NominalTypeDecl *getNominalType() const {
+      assert(kind == NominalType);
+      return storage.get<const NominalTypeDecl *>();
+    }
+
+    const OpaqueTypeDecl *getOpaqueType() const {
+      assert(kind == OpaqueType);
+      return storage.get<const OpaqueTypeDecl *>();
+    }
+
+    Type getType() const {
+      assert(kind == ExtendedExistentialTypeShape);
+      return storage.get<Type>();
+    }
+  };
 protected:
 
   /// If set, the mangler calls this function to determine whether to symbolic
@@ -90,8 +133,8 @@ protected:
   
   bool canSymbolicReference(SymbolicReferent referent) {
     // Marker protocols cannot ever be symbolically referenced.
-    if (auto nominal = referent.dyn_cast<const NominalTypeDecl *>()) {
-      if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+    if (referent.isNominalType()) {
+      if (auto proto = dyn_cast<ProtocolDecl>(referent.getNominalType())) {
         if (proto->isMarkerProtocol())
           return false;
       }
@@ -343,7 +386,8 @@ protected:
                                         bool &isAssocTypeAtDepth);
 
   void appendOpWithGenericParamIndex(StringRef,
-                                     const GenericTypeParamType *paramTy);
+                                     const GenericTypeParamType *paramTy,
+                                     bool baseIsProtocolSelf = false);
 
   /// Mangles a sugared type iff we are mangling for the debugger.
   template <class T> void appendSugaredType(Type type,
@@ -444,8 +488,17 @@ protected:
   bool appendGenericSignature(GenericSignature sig,
                               GenericSignature contextSig = nullptr);
 
-  void appendRequirement(const Requirement &reqt,
-                         GenericSignature sig);
+  /// Append a requirement to the mangling.
+  ///
+  /// \param reqt The requirement to mangle
+  /// \param sig  The generic signature.
+  /// \param lhsBaseIsProtocolSelf If \c true, mangle the base of the left-hand
+  /// side of the constraint with a special protocol 'Self' sentinel node. This
+  /// supports distinguishing requirements rooted at 'Self' in constrained
+  /// existentials from ambient generic parameters that would otherwise be
+  /// at e.g. (0, 0) as well.
+  void appendRequirement(const Requirement &reqt, GenericSignature sig,
+                         bool lhsBaseIsProtocolSelf = false);
 
   void appendGenericSignatureParts(GenericSignature sig,
                                    ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
@@ -511,6 +564,10 @@ protected:
                                           GenericSignature sig);
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
+  void appendSymbolicExtendedExistentialType(SymbolicReferent shapeReferent,
+                                             Type type,
+                                             GenericSignature sig,
+                                             const ValueDecl *forDecl);
   void appendSymbolicReference(SymbolicReferent referent);
   
   void appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl);
@@ -521,6 +578,9 @@ protected:
                                    Demangle::AutoDiffFunctionKind kind,
                                    const AutoDiffConfig &config);
   void appendIndexSubset(IndexSubset *indexSubset);
+
+  void appendConstrainedExistential(Type base, GenericSignature sig,
+                                    const ValueDecl *forDecl);
 };
 
 } // end namespace Mangle

@@ -250,21 +250,6 @@ func test_watchingDA_any(da: any TerminationWatchingDA) async throws {
 }
 
 // ==== ------------------------------------------------------------------------
-// MARK: Error cases
-
-protocol ErrorCases: DistributedActor {
-  distributed func unexpectedAsyncThrows() -> String
-  // expected-note@-1{{protocol requires function 'unexpectedAsyncThrows()' with type '() -> String'; do you want to add a stub?}}
-}
-
-distributed actor BadGreeter: ErrorCases {
-  // expected-error@-1{{type 'BadGreeter' does not conform to protocol 'ErrorCases'}}
-
-  distributed func unexpectedAsyncThrows() async throws -> String { "" }
-  // expected-note@-1{{candidate is 'async', but protocol requirement is not}}
-}
-
-// ==== ------------------------------------------------------------------------
 // MARK: Distributed Actor requiring protocol witnessing async throws requirements
 
 struct Salsa: Codable, Sendable {}

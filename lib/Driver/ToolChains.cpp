@@ -575,6 +575,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     if (!context.Args.hasArg(options::OPT_index_ignore_system_modules))
       Arguments.push_back("-index-system-modules");
     context.Args.AddLastArg(Arguments, options::OPT_index_ignore_clang_modules);
+    context.Args.AddLastArg(Arguments, options::OPT_index_include_locals);
   }
 
   if (context.Args.hasArg(options::OPT_debug_info_store_invocation) ||

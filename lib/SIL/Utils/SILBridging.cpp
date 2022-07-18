@@ -383,11 +383,12 @@ BridgedOwnership SILValue_getOwnership(BridgedValue value) {
 //                            SILType
 //===----------------------------------------------------------------------===//
 
-BridgedStringRef SILType_debugDescription(BridgedType type) {
+std::string SILType_debugDescription(BridgedType type) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToSILType(type).print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 SwiftInt SILType_isAddress(BridgedType type) {

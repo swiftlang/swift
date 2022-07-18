@@ -643,7 +643,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
     }
 
     if (auto enumDecl = dyn_cast<clang::EnumDecl>(decl)) {
-      // Intentionally don't get the cannonical type here.
+      // Intentionally don't get the canonical type here.
       if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
@@ -1781,7 +1781,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // If this enum inherits from a typedef we can compute the name from the
     // typedef (even if it's an anonymous enum).
     if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
-      // Intentionally don't get the cannonical type here.
+      // Intentionally don't get the canonical type here.
       if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
@@ -1854,6 +1854,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_LessLess:
     case clang::OverloadedOperatorKind::OO_GreaterGreater:
     case clang::OverloadedOperatorKind::OO_EqualEqual:
+    case clang::OverloadedOperatorKind::OO_PlusPlus:
     case clang::OverloadedOperatorKind::OO_ExclaimEqual:
     case clang::OverloadedOperatorKind::OO_LessEqual:
     case clang::OverloadedOperatorKind::OO_GreaterEqual:

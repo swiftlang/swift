@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "Callee.h"
 #include "FixedTypeInfo.h"
+#include "GenEnum.h"
 #include "GenType.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
@@ -20,7 +22,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Subsystems.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -122,6 +126,43 @@ public:
     return {returnTy, {paramTy}};
   }
 
+  llvm::MapVector<EnumElementDecl *, unsigned> getEnumTagMapping(EnumDecl *ED) {
+    llvm::MapVector<EnumElementDecl *, unsigned> elements;
+    auto &enumImplStrat =
+        getEnumImplStrategy(IGM, ED->getDeclaredType()->getCanonicalType());
+
+    for (auto *element : ED->getAllElements()) {
+      auto tagIdx = enumImplStrat.getTagIndex(element);
+      elements.insert({element, tagIdx});
+    }
+
+    return elements;
+  }
+
+  llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1>
+  getFunctionABIAdditionalParams(AbstractFunctionDecl *afd) {
+    llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1> params;
+
+    auto function = SILFunction::getFunction(SILDeclRef(afd), *silMod);
+
+    auto silFuncType = function->getLoweredFunctionType();
+    auto funcPointerKind =
+        FunctionPointerKind(FunctionPointerKind::BasicKind::Function);
+    auto signature = Signature::getUncached(IGM, silFuncType, funcPointerKind);
+
+    for (auto attrSet : signature.getAttributes()) {
+      if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftSelf))
+        params.push_back(
+            {IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self,
+             typeConverter.Context.getOpaquePointerDecl()});
+      if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftError))
+        params.push_back(
+            {IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Error,
+             typeConverter.Context.getOpaquePointerDecl()});
+    }
+    return params;
+  }
+
 private:
   Lowering::TypeConverter typeConverter;
   // Default silOptions are sufficient, as we don't need to generated SIL.
@@ -144,6 +185,12 @@ IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
 }
 
+llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1>
+IRABIDetailsProvider::getFunctionABIAdditionalParams(
+    AbstractFunctionDecl *afd) {
+  return impl->getFunctionABIAdditionalParams(afd);
+}
+
 bool IRABIDetailsProvider::shouldPassIndirectly(Type t) {
   return impl->shouldPassIndirectly(t);
 }
@@ -161,4 +208,9 @@ bool IRABIDetailsProvider::enumerateDirectPassingRecordMembers(
 IRABIDetailsProvider::FunctionABISignature
 IRABIDetailsProvider::getTypeMetadataAccessFunctionSignature() {
   return impl->getTypeMetadataAccessFunctionSignature();
+}
+
+llvm::MapVector<EnumElementDecl *, unsigned>
+IRABIDetailsProvider::getEnumTagMapping(EnumDecl *ED) {
+  return impl->getEnumTagMapping(ED);
 }

@@ -942,3 +942,26 @@ do {
     }
   }
 }
+
+// https://github.com/apple/swift/issues/43527
+do {
+  struct Box<Contents, U> {}
+
+  class Sweets {}
+  class Chocolate {}
+
+  struct Gift<Contents> {
+    // expected-note@-1 2 {{arguments to generic parameter 'Contents' ('Chocolate' and 'Sweets') are expected to be equal}}
+
+    init(_: Box<[Contents], Never>) {}
+  }
+
+  let box = Box<[Chocolate], Never>()
+
+  var g1: Gift<Sweets>
+  g1 = Gift<Chocolate>(box)
+  // expected-error@-1 {{cannot assign value of type 'Gift<Chocolate>' to type 'Gift<Sweets>'}}
+
+  let g2: Gift<Sweets> = Gift<Chocolate>(box)
+  // expected-error@-1 {{cannot assign value of type 'Gift<Chocolate>' to type 'Gift<Sweets>'}}
+}

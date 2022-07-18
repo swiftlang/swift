@@ -470,11 +470,15 @@ public:
 
   void appendExtendedExistentialTypeShape(CanGenericSignature genSig,
                                           CanType shapeType);
+  void appendExtendedExistentialTypeShapeSymbol(CanGenericSignature genSig,
+                                                CanType shapeType,
+                                                bool isUnique);
 
   /// Mangle the symbol name for an extended existential type shape.
-  std::string mangleExtendedExistentialTypeShape(bool isUnique,
-                                                 CanGenericSignature genSig,
-                                                 CanType shapeType);
+  std::string mangleExtendedExistentialTypeShapeSymbol(
+                                                CanGenericSignature genSig,
+                                                CanType shapeType,
+                                                bool isUnique);
 
   std::string mangleCoroutineContinuationPrototype(CanSILFunctionType type) {
     return mangleTypeSymbol(type, "TC");

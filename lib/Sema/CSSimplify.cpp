@@ -467,6 +467,35 @@ static bool matchCallArgumentsImpl(
         return;
       }
 
+      // Let's consider current closure to be extraneous if:
+      //
+      // - current parameter has a default value and doesn't accept a trailing
+      //   closure; and
+      // - no other free parameter after this one accepts a trailing closure via
+      //   forward or backward scan. This check makes sure that it's safe to
+      //   reject and push it to the next parameter without affecting backward
+      //   scan logic.
+      //
+      // In other words - let's push the closure argument through defaulted
+      // parameters until it can be considered extraneous if no parameters
+      // could possibly match it.
+      if (!paramInfo.acceptsUnlabeledTrailingClosureArgument(paramIdx) &&
+          !parameterRequiresArgument(params, paramInfo, paramIdx)) {
+        if (llvm::none_of(
+                range(paramIdx + 1, params.size()), [&](unsigned idx) {
+                  return parameterBindings[idx].empty() &&
+                         (paramInfo.acceptsUnlabeledTrailingClosureArgument(
+                              idx) ||
+                          backwardScanAcceptsTrailingClosure(params[idx]));
+                })) {
+          haveUnfulfilledParams = true;
+          return;
+        }
+
+        // If one or more parameters can match the closure, let's check
+        // whether backward scan is applicable here.
+      }
+
       // If this parameter does not require an argument, consider applying a
       // backward-match rule that skips this parameter if doing so is the only
       // way to successfully match arguments to parameters.
@@ -1076,8 +1105,10 @@ constraints::getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
 class ArgumentFailureTracker : public MatchCallArgumentListener {
 protected:
   ConstraintSystem &CS;
+  NullablePtr<ValueDecl> Callee;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
+  Optional<unsigned> UnlabeledTrailingClosureArgIndex;
   ConstraintLocatorBuilder Locator;
 
 private:
@@ -1109,11 +1140,14 @@ protected:
   }
 
 public:
-  ArgumentFailureTracker(ConstraintSystem &cs,
+  ArgumentFailureTracker(ConstraintSystem &cs, ValueDecl *callee,
                          SmallVectorImpl<AnyFunctionType::Param> &args,
                          ArrayRef<AnyFunctionType::Param> params,
+                         Optional<unsigned> unlabeledTrailingClosureArgIndex,
                          ConstraintLocatorBuilder locator)
-      : CS(cs), Arguments(args), Parameters(params), Locator(locator) {}
+      : CS(cs), Callee(callee), Arguments(args), Parameters(params),
+        UnlabeledTrailingClosureArgIndex(unlabeledTrailingClosureArgIndex),
+        Locator(locator) {}
 
   ~ArgumentFailureTracker() override {
     if (!MissingArguments.empty()) {
@@ -1142,6 +1176,19 @@ public:
   bool extraArgument(unsigned argIdx) override {
     if (!CS.shouldAttemptFixes())
       return true;
+
+    // If this is a trailing closure, let's check if the call is
+    // to an init of a callable type. If so, let's not record it
+    // as extraneous since it would be matched against implicitly
+    // injected `.callAsFunction` call.
+    if (UnlabeledTrailingClosureArgIndex &&
+        argIdx == *UnlabeledTrailingClosureArgIndex && Callee) {
+      if (auto *ctor = dyn_cast<ConstructorDecl>(Callee.get())) {
+        auto resultTy = ctor->getResultInterfaceType();
+        if (resultTy->isCallableNominalType(CS.DC))
+          return true;
+      }
+    }
 
     ExtraArguments.push_back(std::make_pair(argIdx, Arguments[argIdx]));
     return false;
@@ -1251,12 +1298,15 @@ class CompletionArgumentTracker : public ArgumentFailureTracker {
   struct CompletionArgInfo ArgInfo;
 
 public:
-  CompletionArgumentTracker(ConstraintSystem &cs,
+  CompletionArgumentTracker(ConstraintSystem &cs, ValueDecl *callee,
                             SmallVectorImpl<AnyFunctionType::Param> &args,
                             ArrayRef<AnyFunctionType::Param> params,
+                            Optional<unsigned> unlabeledTrailingClosureArgIndex,
                             ConstraintLocatorBuilder locator,
                             struct CompletionArgInfo ArgInfo)
-      : ArgumentFailureTracker(cs, args, params, locator), ArgInfo(ArgInfo) {}
+      : ArgumentFailureTracker(cs, callee, args, params,
+                               unlabeledTrailingClosureArgIndex, locator),
+        ArgInfo(ArgInfo) {}
 
   Optional<unsigned> missingArgument(unsigned paramIdx,
                                      unsigned argInsertIdx) override {
@@ -1418,6 +1468,7 @@ namespace {
   enum class OpenedExistentialAdjustmentFlags {
     /// The argument should be made inout after opening.
     InOut = 0x01,
+    LValue = 0x02,
   };
 
   using OpenedExistentialAdjustments =
@@ -1469,10 +1520,6 @@ shouldOpenExistentialCallArgument(
   if (isa_and_nonnull<clang::FunctionTemplateDecl>(callee->getClangDecl()))
     return None;
 
-  ASTContext &ctx = callee->getASTContext();
-  if (!ctx.LangOpts.EnableOpenedExistentialTypes)
-    return None;
-
   // The actual parameter type needs to involve a type variable, otherwise
   // type inference won't be possible.
   if (!paramTy->hasTypeVariable())
@@ -1494,6 +1541,12 @@ shouldOpenExistentialCallArgument(
   }
 
   OpenedExistentialAdjustments adjustments;
+
+  // The argument may be a "var" instead of a "let".
+  if (auto lv = argTy->getAs<LValueType>()) {
+    argTy = lv->getObjectType();
+    adjustments |= OpenedExistentialAdjustmentFlags::LValue;
+  }
 
   // If the argument is inout, strip it off and we can add it back.
   if (auto inOutArg = argTy->getAs<InOutType>()) {
@@ -1666,14 +1719,16 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (cs.isForCodeCompletion()) {
       if (auto completionInfo = getCompletionArgInfo(locator.getAnchor(), cs)) {
         listener = std::make_unique<CompletionArgumentTracker>(
-            cs, argsWithLabels, params, locator, *completionInfo);
+            cs, callee, argsWithLabels, params,
+            argList->getFirstTrailingClosureIndex(), locator, *completionInfo);
       }
     }
     if (!listener) {
       // We didn't create an argument tracker for code completion. Create a
       // normal one.
-      listener = std::make_unique<ArgumentFailureTracker>(cs, argsWithLabels,
-                                                          params, locator);
+      listener = std::make_unique<ArgumentFailureTracker>(
+          cs, callee, argsWithLabels, params,
+          argList->getFirstTrailingClosureIndex(), locator);
     }
     auto callArgumentMatch = constraints::matchCallArguments(
         argsWithLabels, params, paramInfo,
@@ -1895,6 +1950,9 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         OpenedArchetypeType *opened;
         std::tie(argTy, opened) = cs.openExistentialType(
             existentialType, cs.getConstraintLocator(loc));
+
+        if (adjustments.contains(OpenedExistentialAdjustmentFlags::LValue))
+          argTy = LValueType::get(argTy);
 
         if (adjustments.contains(OpenedExistentialAdjustmentFlags::InOut))
           argTy = InOutType::get(argTy);
@@ -2475,7 +2533,7 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     if (auto *typeVar = requirementType->getAs<TypeVariableType>()) {
       unsigned choiceImpact = 0;
       if (auto choice = cs.findSelectedOverloadFor(ODRE)) {
-        choice->openedType.visit([&](Type type) {
+        choice->adjustedOpenedType.visit([&](Type type) {
           if (type->isEqual(typeVar))
             ++choiceImpact;
         });
@@ -2607,14 +2665,10 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
       /*impact=*/numExtraneous * 2);
 }
 
-bool hasPreconcurrencyCallee(ConstraintSystem *cs,
-                             ConstraintLocatorBuilder locator) {
-  if (cs->getASTContext().isSwiftVersionAtLeast(6))
-    // Swift 6 mode does not reduce errors to warnings.
-    return false;
-
-  auto calleeLocator = cs->getCalleeLocator(cs->getConstraintLocator(locator));
-  auto calleeOverload = cs->findSelectedOverloadFor(calleeLocator);
+bool ConstraintSystem::hasPreconcurrencyCallee(
+    ConstraintLocatorBuilder locator) {
+  auto calleeLocator = getCalleeLocator(getConstraintLocator(locator));
+  auto calleeOverload = findSelectedOverloadFor(calleeLocator);
   if (!calleeOverload || !calleeOverload->choice.isDecl())
     return false;
 
@@ -2668,37 +2722,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync);
   }
 
-  /// Whether to downgrade to a concurrency warning.
-  auto isConcurrencyWarning = [&](bool forSendable) {
-    // Except for Sendable warnings, don't downgrade to an error in strict
-    // contexts without a preconcurrency callee.
-    if (!forSendable &&
-        contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}) &&
-        !hasPreconcurrencyCallee(this, locator))
-      return false;
-
-    // We can only handle the downgrade for conversions.
-    switch (kind) {
-    case ConstraintKind::Conversion:
-    case ConstraintKind::ArgumentConversion:
-      return true;
-
-    default:
-      return false;
-    }
-  };
-
   // A @Sendable function can be a subtype of a non-@Sendable function.
   if (func1->isSendable() != func2->isSendable()) {
     // Cannot add '@Sendable'.
     if (func2->isSendable() || kind < ConstraintKind::Subtype) {
-      if (!shouldAttemptFixes())
-        return getTypeMatchFailure(locator);
-
-      auto *fix = AddSendableAttribute::create(
-          *this, func1, func2, getConstraintLocator(locator),
-          isConcurrencyWarning(true));
-      if (recordFix(fix))
+      if (AddSendableAttribute::attempt(*this, kind, func1, func2, locator))
         return getTypeMatchFailure(locator);
     }
   }
@@ -2727,14 +2755,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
     } else if (func1->getGlobalActor() && !func2->isAsync()) {
       // Cannot remove a global actor from a synchronous function.
-      if (!shouldAttemptFixes())
-        return getTypeMatchFailure(locator);
-
-      auto *fix = MarkGlobalActorFunction::create(
-          *this, func1, func2, getConstraintLocator(locator),
-          isConcurrencyWarning(false));
-
-      if (recordFix(fix))
+      if (MarkGlobalActorFunction::attempt(*this, kind, func1, func2, locator))
         return getTypeMatchFailure(locator);
     } else if (kind < ConstraintKind::Subtype) {
       return getTypeMatchFailure(locator);
@@ -4275,7 +4296,7 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
   if (!(overload && overload->choice.isDecl()))
     return false;
 
-  auto *fnType = overload->openedType->getAs<FunctionType>();
+  auto *fnType = overload->adjustedOpenedType->getAs<FunctionType>();
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 
@@ -5231,7 +5252,7 @@ bool ConstraintSystem::repairFailures(
           auto callee = getCalleeLocator(loc);
           if (auto overload = findSelectedOverloadFor(callee)) {
             auto fnType =
-                simplifyType(overload->openedType)->castTo<FunctionType>();
+                simplifyType(overload->adjustedOpenedType)->castTo<FunctionType>();
             auto paramIdx = argToParamElt->getParamIdx();
             auto paramType = fnType->getParams()[paramIdx].getParameterType();
             if (auto paramFnType = paramType->getAs<FunctionType>()) {
@@ -9779,6 +9800,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
+  // Note if this closure is isolated by preconcurrency.
+  if (hasPreconcurrencyCallee(locator))
+    preconcurrencyClosures.insert(closure);
+
   // Let's look through all optionals associated with contextual
   // type to make it possible to infer parameter/result type of
   // the closure faster e.g.:
@@ -10749,8 +10774,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   if (keyPathTy->isAnyKeyPath()) {
     // Read-only keypath, whose projected value is upcast to `Any?`.
     // The root type can be anything.
-    Type resultTy = ProtocolCompositionType::get(getASTContext(), {},
-                                                /*explicit AnyObject*/ false);
+    Type resultTy = getASTContext().getAnyExistentialType();
     resultTy = OptionalType::get(resultTy);
     return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
                       subflags, locator);
@@ -10790,8 +10814,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 
     if (bgt->isPartialKeyPath()) {
       // Read-only keypath, whose projected value is upcast to `Any`.
-      auto resultTy = ProtocolCompositionType::get(getASTContext(), {},
-                                                  /*explicit AnyObject*/ false);
+      auto resultTy = getASTContext().getAnyExistentialType();
 
       if (!matchRoot(ConstraintKind::Conversion))
         return SolutionKind::Error;
@@ -11031,9 +11054,19 @@ retry_after_fail:
           return true;
         }
 
-        // If types lined up exactly, let's favor this overload choice.
-        if (Type(argFnType)->isEqual(choiceType))
-          constraint->setFavored();
+        // If types of arguments/parameters and result lined up exactly,
+        // let's favor this overload choice.
+        //
+        // Note this check ignores `ExtInfo` on purpose and only compares
+        // types, if there are overloads that differ only in effects then
+        // all of them are going to be considered and filtered as part of
+        // "favored" group after forming a valid partial solution.
+        if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
+          if (FunctionType::equalParams(argFnType->getParams(),
+                                        choiceFnType->getParams()) &&
+              argFnType->getResult()->isEqual(choiceFnType->getResult()))
+            constraint->setFavored();
+        }
 
         // Account for any optional unwrapping/binding
         for (unsigned i : range(numOptionalUnwraps)) {
@@ -11389,7 +11422,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
             FunctionType::get(trailingClosureTypes, callAsFunctionResultTy,
                               FunctionType::ExtInfo());
 
-        increaseScore(SK_DisfavoredOverload);
         // Form an unsolved constraint to apply trailing closures to a
         // callable type produced by `.init`. This constraint would become
         // active when `callableType` is bound.
@@ -11839,7 +11871,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
 
   // Argument type can default to `Any`.
   addConstraint(ConstraintKind::Defaultable, argumentType,
-                ctx.TheAnyType, locator);
+                ctx.getAnyExistentialType(), locator);
 
   auto *baseArgLoc = getConstraintLocator(
       loc->getAnchor(),
@@ -12392,8 +12424,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (worseThanBestSolution())
       return SolutionKind::Error;
 
-    auto *conversionLoc = getConstraintLocator(
-        /*anchor=*/ASTNode(), LocatorPathElt::ImplicitConversion(restriction));
+    auto *conversionLoc =
+        getImplicitValueConversionLocator(locator, restriction);
 
     auto *applicationLoc =
         getConstraintLocator(conversionLoc, ConstraintLocator::ApplyFunction);
@@ -12401,19 +12433,17 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto *memberLoc = getConstraintLocator(
         applicationLoc, ConstraintLocator::ConstructorMember);
 
-    // Conversion has been already attempted for this direction
-    // and constructor choice has been recorded.
-    if (findSelectedOverloadFor(memberLoc))
-      return SolutionKind::Solved;
-
     // Allocate a single argument info to cover all possible
     // Double <-> CGFloat conversion locations.
-    if (!ArgumentLists.count(memberLoc)) {
+    auto *argumentsLoc =
+        getConstraintLocator(conversionLoc, ConstraintLocator::ApplyArgument);
+
+    if (!ArgumentLists.count(argumentsLoc)) {
       auto *argList = ArgumentList::createImplicit(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
           /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
-      ArgumentLists.insert({memberLoc, argList});
+      ArgumentLists.insert({argumentsLoc, argList});
     }
 
     auto *memberTypeLoc = getConstraintLocator(
@@ -12642,10 +12672,9 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   // Record the fix.
 
-  // If this is just a warning, it shouldn't affect the solver. Otherwise,
-  // increase the score.
-  if (!fix->isWarning())
-    increaseScore(SK_Fix, impact);
+  // If this should affect the solution score, do so.
+  if (auto impactScoreKind = fix->impact())
+    increaseScore(*impactScoreKind, impact);
 
   // If we've made the current solution worse than the best solution we've seen
   // already, stop now.
@@ -12665,10 +12694,10 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // its sub-expressions.
   llvm::SmallDenseSet<ASTNode> anchors;
   for (const auto *fix : Fixes) {
-    // Warning fixes shouldn't be considered because even if
-    // such fix is recorded at that anchor this should not
+    // Fixes that don't affect the score shouldn't be considered because even
+    // if such a fix is recorded at that anchor this should not
     // have any affect in the recording of any other fix.
-    if (fix->isWarning())
+    if (!fix->impact())
       continue;
 
     anchors.insert(fix->getAnchor());
@@ -13385,7 +13414,7 @@ void ConstraintSystem::addConstraint(Requirement req,
   }
 
   if (conformsToAnyObject) {
-    auto anyObject = getASTContext().getAnyObjectType();
+    auto anyObject = getASTContext().getAnyObjectConstraint();
     addConstraint(ConstraintKind::ConformsTo, firstType, anyObject, locator);
   }
 }

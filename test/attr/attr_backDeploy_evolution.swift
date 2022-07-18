@@ -151,6 +151,10 @@ do {
   // CHECK-ABI: library: [5, 43, 3]
   // CHECK-BD: client: [5, 43, 3]
   array.print()
+  
+  // CHECK-ABI: library: [5, 43, 3]
+  // CHECK-BD: client: [5, 43, 3]
+  print(array.rawValues.print())
 }
 
 do {
@@ -179,4 +183,8 @@ do {
   // CHECK-ABI: library: [7, 40, 1]
   // CHECK-BD: client: [7, 40, 1]
   array.print()
+  
+  // CHECK-ABI: library: [7, 40, 1]
+  // CHECK-BD: client: [7, 40, 1]
+  print(array.rawValues.print())
 }

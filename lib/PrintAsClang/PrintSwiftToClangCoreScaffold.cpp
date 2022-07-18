@@ -62,13 +62,14 @@ static void printKnownType(
   printKnownStruct(typeMapping, os, name, typeRecord);
 }
 
-static void printValueWitnessTableFunctionType(raw_ostream &os, StringRef name,
-                                               StringRef returnType,
-                                               std::string paramTypes,
-                                               uint16_t ptrauthDisc) {
-  os << "using ValueWitness" << name << "Ty = " << returnType
+static void
+printValueWitnessTableFunctionType(raw_ostream &os, StringRef prefix,
+                                   StringRef name, StringRef returnType,
+                                   std::string paramTypes,
+                                   uint16_t ptrauthDisc) {
+  os << "using " << prefix << name << "Ty = " << returnType
      << "(* __ptrauth_swift_value_witness_function_pointer(" << ptrauthDisc
-     << "))(" << paramTypes << ");\n";
+     << "))(" << paramTypes << ") SWIFT_NOEXCEPT_FUNCTION_PTR;\n";
 }
 
 static std::string makeParams(const char *arg) { return arg; }
@@ -82,12 +83,19 @@ static void printValueWitnessTable(raw_ostream &os) {
   std::string members;
   llvm::raw_string_ostream membersOS(members);
 
+  // C++ only supports noexcept on `using` function types in C++17.
+  os << "#if __cplusplus > 201402L\n";
+  os << "#  define SWIFT_NOEXCEPT_FUNCTION_PTR noexcept\n";
+  os << "#else\n";
+  os << "#  define SWIFT_NOEXCEPT_FUNCTION_PTR\n";
+  os << "#endif\n\n";
+
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define DATA_VALUE_WITNESS(lowerId, upperId, type)                             \
   membersOS << "  " << type << " " << #lowerId << ";\n";
 #define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
   printValueWitnessTableFunctionType(                                          \
-      os, #upperId, returnType, makeParams paramTypes,                         \
+      os, "ValueWitness", #upperId, returnType, makeParams paramTypes,         \
       SpecialPointerAuthDiscriminators::upperId);                              \
   membersOS << "  ValueWitness" << #upperId << "Ty _Nonnull " << #lowerId      \
             << ";\n";
@@ -102,7 +110,34 @@ static void printValueWitnessTable(raw_ostream &os) {
 #define VOID_TYPE "void"
 #include "swift/ABI/ValueWitness.def"
 
-  os << "\nstruct ValueWitnessTable {\n" << membersOS.str() << "};\n";
+  os << "\nstruct ValueWitnessTable {\n" << membersOS.str() << "};\n\n";
+  membersOS.str().clear();
+
+#define WANT_ONLY_ENUM_VALUE_WITNESSES
+#define DATA_VALUE_WITNESS(lowerId, upperId, type)                             \
+  membersOS << "  " << type << " " << #lowerId << ";\n";
+#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
+  printValueWitnessTableFunctionType(                                          \
+      os, "EnumValueWitness", #upperId, returnType, makeParams paramTypes,     \
+      SpecialPointerAuthDiscriminators::upperId);                              \
+  membersOS << "  EnumValueWitness" << #upperId << "Ty _Nonnull " << #lowerId  \
+            << ";\n";
+#define MUTABLE_VALUE_TYPE "void * _Nonnull"
+#define IMMUTABLE_VALUE_TYPE "const void * _Nonnull"
+#define MUTABLE_BUFFER_TYPE "void * _Nonnull"
+#define IMMUTABLE_BUFFER_TYPE "const void * _Nonnull"
+#define TYPE_TYPE "void * _Nonnull"
+#define SIZE_TYPE "size_t"
+#define INT_TYPE "int"
+#define UINT_TYPE "unsigned"
+#define VOID_TYPE "void"
+#include "swift/ABI/ValueWitness.def"
+
+  os << "\nstruct EnumValueWitnessTable {\n"
+     << "  ValueWitnessTable vwTable;\n"
+     << membersOS.str() << "};\n\n";
+
+  os << "#undef SWIFT_NOEXCEPT_FUNCTION_PTR\n\n";
 }
 
 static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
@@ -119,7 +154,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
 }
 
 static void printOpaqueAllocFee(raw_ostream &os) {
-  os << R"text(inline void * _Nonnull opaqueAlloc(size_t size, size_t align) {
+  os << R"text(inline void * _Nonnull opaqueAlloc(size_t size, size_t align) noexcept {
 #if defined(_WIN32)
   void *r = _aligned_malloc(size, align);
 #else
@@ -130,7 +165,7 @@ static void printOpaqueAllocFee(raw_ostream &os) {
 #endif
   return r;
 }
-inline void opaqueFree(void * _Nonnull p) {
+inline void opaqueFree(void * _Nonnull p) noexcept {
 #if defined(_WIN32)
   _aligned_free(p);
 #else

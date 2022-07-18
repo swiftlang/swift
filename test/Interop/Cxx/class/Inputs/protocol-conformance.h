@@ -28,4 +28,28 @@ struct Trivial {
   char test3(int, unsigned) { return 42; }
 };
 
+struct ReturnsNullableValue {
+  const int *returnPointer() { return nullptr; }
+};
+
+struct ReturnsNonNullValue {
+  const int *returnPointer() __attribute__((returns_nonnull)) {
+    return (int *)this;
+  }
+};
+
+struct HasOperatorExclaim {
+  int value;
+
+  HasOperatorExclaim operator!() const { return {-value}; }
+};
+
+struct HasOperatorEqualEqual {
+  int value;
+  
+  bool operator==(const HasOperatorEqualEqual &other) const {
+    return value == other.value;
+  }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_PROTOCOL_CONFORMANCE_H

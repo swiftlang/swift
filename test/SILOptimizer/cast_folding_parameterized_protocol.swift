@@ -49,7 +49,7 @@ public func concrete_to_existential<T>(_ x: X, _ yt: Y<T>, _ yi: Y<Int>) {
   use(yi as! any Q)
 }
 
-// CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol23existential_to_concreteyyxm_AA1P_pyxXPtlF : $@convention(thin) <T> (@thick T.Type, @in_guaranteed P<T>) -> ()
+// CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol23existential_to_concreteyyxm_AA1P_px1TRts_XPtlF : $@convention(thin) <T> (@thick T.Type, @in_guaranteed P<T>) -> ()
 public func existential_to_concrete<T>(_: T.Type, _ p: any P<T>) {
   // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to X in {{%.*}} : $*X
   _ = p as! X
@@ -61,7 +61,7 @@ public func existential_to_concrete<T>(_: T.Type, _ p: any P<T>) {
   _ = p as! Y<String>
 }
 
-// CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol015existential_to_E0yyAA1P_pyxXP_AA1Q_ptlF : $@convention(thin) <T> (@in_guaranteed P<T>, @in_guaranteed Q) -> ()
+// CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol015existential_to_E0yyAA1P_px1TRts_XP_AA1Q_ptlF : $@convention(thin) <T> (@in_guaranteed P<T>, @in_guaranteed Q) -> ()
 public func existential_to_existential<T>(_ p: any P<T>, _ q: any Q) {
   // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to Q in {{%.*}} : $*Q
   _ = p as! any Q

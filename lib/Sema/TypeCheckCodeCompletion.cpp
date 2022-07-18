@@ -109,13 +109,11 @@ namespace {
 /// FIXME: Remove this.
 class SanitizeExpr : public ASTWalker {
   ASTContext &C;
-  bool ShouldReusePrecheckedType;
   llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
 
 public:
-  SanitizeExpr(ASTContext &C,
-               bool shouldReusePrecheckedType)
-    : C(C), ShouldReusePrecheckedType(shouldReusePrecheckedType) { }
+  SanitizeExpr(ASTContext &C)
+    : C(C) { }
 
   std::pair<bool, ArgumentList *>
   walkToArgumentListPre(ArgumentList *argList) override {
@@ -126,12 +124,6 @@ public:
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     while (true) {
-
-      // If we should reuse pre-checked types, don't sanitize the expression
-      // if it's already type-checked.
-      if (ShouldReusePrecheckedType && expr->getType())
-        return { false, expr };
-
       // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
       if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
         auto archetypeVal = OOE->getOpaqueValue();
@@ -301,8 +293,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                  FreeTypeVariableBinding allowFreeTypeVariables) {
   auto &Context = dc->getASTContext();
 
-  expr = expr->walk(SanitizeExpr(Context,
-                                 /*shouldReusePrecheckedType=*/false));
+  expr = expr->walk(SanitizeExpr(Context));
 
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-expr-no-apply", expr);
@@ -400,12 +391,10 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
                                   "typecheck-completion-operator", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
-  expr = expr->walk(SanitizeExpr(Context,
-                                 /*shouldReusePrecheckedType=*/true));
+  expr = expr->walk(SanitizeExpr(Context));
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
-  options |= ConstraintSystemFlags::ReusePrecheckedType;
   options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   // Construct a constraint system from this expression.
@@ -482,6 +471,11 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   // Build temporary expression to typecheck.
   // We allocate these expressions on the stack because we know they can't
   // escape and there isn't a better way to allocate scratch Expr nodes.
+
+  // Use a placeholder expr for the LHS argument to avoid sending
+  // a pre-type-checked AST through the constraint system.
+  OpaqueValueExpr argExpr(LHS->getSourceRange(), LHSTy,
+                          /*isPlaceholder=*/true);
   UnresolvedDeclRefExpr UDRE(DeclNameRef(opName), refKind, DeclNameLoc(Loc));
   auto *opExpr = TypeChecker::resolveDeclRefExpr(
       &UDRE, DC, /*replaceInvalidRefsWithErrors=*/true);
@@ -493,7 +487,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //   (declref_expr name=<opName>)
     //   (argument_list
     //     (<LHS>)))
-    auto *postfixExpr = PostfixUnaryExpr::create(ctx, opExpr, LHS);
+    auto *postfixExpr = PostfixUnaryExpr::create(ctx, opExpr, &argExpr);
     return getTypeOfCompletionOperatorImpl(DC, postfixExpr, referencedDecl);
   }
 
@@ -504,7 +498,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //     (<LHS>)
     //     (code_completion_expr)))
     CodeCompletionExpr dummyRHS(Loc);
-    auto *binaryExpr = BinaryExpr::create(ctx, LHS, opExpr, &dummyRHS,
+    auto *binaryExpr = BinaryExpr::create(ctx, &argExpr, opExpr, &dummyRHS,
                                           /*implicit*/ true);
     return getTypeOfCompletionOperatorImpl(DC, binaryExpr, referencedDecl);
   }
@@ -572,8 +566,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     return false;
 
   if (auto *expr = getAsExpr(node)) {
-    node = expr->walk(SanitizeExpr(Context,
-                                   /*shouldReusePrecheckedType=*/false));
+    node = expr->walk(SanitizeExpr(Context));
   }
 
   CompletionContextFinder contextAnalyzer(node, DC);
@@ -769,7 +762,7 @@ swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
 
-  parsedExpr = parsedExpr->walk(SanitizeExpr(ctx, /*shouldReusePrecheckedType=*/false));
+  parsedExpr = parsedExpr->walk(SanitizeExpr(ctx));
 
   DiagnosticSuppression suppression(ctx.Diags);
   auto resultTy = TypeChecker::typeCheckExpression(

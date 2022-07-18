@@ -95,6 +95,11 @@ namespace swift {
     ErrorOnFailureRemarkOnSuccess
   };
 
+  enum class ConcurrencyModel : uint8_t {
+    Standard,
+    TaskToThread,
+  };
+
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -163,6 +168,10 @@ namespace swift {
 
     /// Only check the availability of the API, ignore function bodies.
     bool CheckAPIAvailabilityOnly = false;
+
+    /// Causes the compiler to treat declarations available at the current
+    /// runtime OS version as potentially unavailable.
+    bool EnableAdHocAvailability = false;
 
     /// Should conformance availability violations be diagnosed as errors?
     bool EnableConformanceAvailabilityErrors = false;
@@ -312,10 +321,6 @@ namespace swift {
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
-
-    /// Enable support for implicitly opening existential argument types
-    /// in calls to generic functions.
-    bool EnableOpenedExistentialTypes = false;
 
     /// Disable experimental ClangImporter diagnostics.
     bool DisableExperimentalClangImporterDiagnostics = false;
@@ -509,6 +514,13 @@ namespace swift {
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
+
+    /// The model of concurrency to be used.
+    ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
+
+    bool isConcurrencyModelTaskToThread() const {
+      return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
+    }
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

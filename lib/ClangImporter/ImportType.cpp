@@ -229,7 +229,7 @@ namespace {
 
     // TODO: Add support for dependent types (SR-13809).
 #define DEPENDENT_TYPE(Class, Base)                                            \
-  ImportResult Visit##Class##Type(const clang::Class##Type *) { return Impl.SwiftContext.TheAnyType; }
+  ImportResult Visit##Class##Type(const clang::Class##Type *) { return Impl.SwiftContext.getAnyExistentialType(); }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.inc"
 
@@ -909,7 +909,7 @@ namespace {
       if (type->isSugared())                                                   \
         return Visit(type->desugar());                                         \
       if (type->isDependentType())                                             \
-        return Impl.SwiftContext.TheAnyType;                                   \
+        return Impl.SwiftContext.getAnyExistentialType();                      \
       return Type();                                                           \
     }
     MAYBE_SUGAR_TYPE(TypeOfExpr)
@@ -1253,7 +1253,7 @@ namespace {
       if (type->isObjCIdType()) {
         return { Impl.SwiftContext.getAnyObjectType(),
                  ImportHint(ImportHint::ObjCBridged,
-                            Impl.SwiftContext.TheAnyType)};
+                            Impl.SwiftContext.getAnyExistentialType())};
       }
 
       return { importedType, ImportHint::ObjCPointer };
@@ -1920,7 +1920,7 @@ private:
   NEVER_VISIT(SILBlockStorageType)
   NEVER_VISIT(SILBoxType)
   NEVER_VISIT(SILTokenType)
-  NEVER_VISIT(SILMoveOnlyType)
+  NEVER_VISIT(SILMoveOnlyWrappedType)
 
   VISIT(ProtocolCompositionType, compose)
 
@@ -2386,7 +2386,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   if (isVariadic) {
     auto paramTy =
         BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
-                              {SwiftContext.TheAnyType});
+                              {SwiftContext.getAnyExistentialType()});
     auto name = SwiftContext.getIdentifier("varargs");
     auto param = new (SwiftContext) ParamDecl(SourceLoc(), SourceLoc(),
                                               Identifier(), SourceLoc(),

@@ -164,7 +164,6 @@ public:
   }
 
   void initializeDefBlock(SILBasicBlock *defBB) {
-    assert(!seenUse && "cannot initialize more defs with partial liveness");
     markBlockLive(defBB, LiveWithin);
   }
 
@@ -181,9 +180,16 @@ public:
 protected:
   void markBlockLive(SILBasicBlock *bb, IsLive isLive) {
     assert(isLive != Dead && "erasing live blocks isn't implemented.");
-    liveBlocks[bb] = (isLive == LiveOut);
-    if (discoveredBlocks)
-      discoveredBlocks->push_back(bb);
+    bool isLiveOut = (isLive == LiveOut);
+    auto iterAndInserted =
+      liveBlocks.insert(std::make_pair(bb, isLiveOut));
+    if (iterAndInserted.second) {
+      if (discoveredBlocks)
+        discoveredBlocks->push_back(bb);
+    } else if (isLiveOut) {
+      // Update the existing entry to be live-out.
+      iterAndInserted.first->getSecond() = true;
+    }
   }
 
   void computeUseBlockLiveness(SILBasicBlock *userBB);
@@ -228,6 +234,15 @@ class PrunedLiveness {
   /// blocks. This is used to enable our callers to emit errors on non-lifetime
   /// ending uses that extend liveness into a loop body.
   SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut;
+
+private:
+  bool isWithinBoundaryHelper(SILInstruction *inst, SILValue def) const;
+
+  bool areUsesWithinBoundaryHelper(ArrayRef<Operand *> uses, SILValue def,
+                                   DeadEndBlocks *deadEndBlocks) const;
+
+  bool areUsesOutsideBoundaryHelper(ArrayRef<Operand *> uses, SILValue def,
+                                    DeadEndBlocks *deadEndBlocks) const;
 
 public:
   PrunedLiveness(SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr,
@@ -341,6 +356,25 @@ public:
   /// \p deadEndBlocks is optional.
   bool areUsesOutsideBoundary(ArrayRef<Operand *> uses,
                               DeadEndBlocks *deadEndBlocks) const;
+
+  /// PrunedLiveness utilities can be used with multiple defs. This api can be
+  /// used to check if \p inst occurs in between the definition \p def and the
+  /// liveness boundary.
+  // This api varies from isWithinBoundary(SILInstruction *inst) which cannot
+  // distinguish when \p inst is a use before definition in the same block as
+  // the definition.
+  bool isWithinBoundaryOfDef(SILInstruction *inst, SILValue def) const;
+
+  /// Returns true when all \p uses are between \p def and the liveness boundary
+  /// \p deadEndBlocks is optional.
+  bool areUsesWithinBoundaryOfDef(ArrayRef<Operand *> uses, SILValue def,
+                                  DeadEndBlocks *deadEndBlocks) const;
+
+  /// Returns true if any of the \p uses are before the \p def or after the
+  /// liveness boundary
+  /// \p deadEndBlocks is optional.
+  bool areUsesOutsideBoundaryOfDef(ArrayRef<Operand *> uses, SILValue def,
+                                   DeadEndBlocks *deadEndBlocks) const;
 
   /// Compute liveness for a single SSA definition.
   void computeSSALiveness(SILValue def);

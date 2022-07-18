@@ -23,14 +23,20 @@
 // CHECK-NEXT: // Swift type metadata request type.
 // CHECK-NEXT: typedef uint{{.*}}_t MetadataRequestTy;
 // CHECK-EMPTY:
-// CHECK-NEXT: using ValueWitnessInitializeBufferWithCopyOfBufferTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(55882))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
-// CHECK-NEXT: using ValueWitnessDestroyTy = void(* __ptrauth_swift_value_witness_function_pointer(1272))(void * _Nonnull, void * _Nonnull);
-// CHECK-NEXT: using ValueWitnessInitializeWithCopyTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(58298))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
-// CHECK-NEXT: using ValueWitnessAssignWithCopyTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(34641))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
-// CHECK-NEXT: using ValueWitnessInitializeWithTakeTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(18648))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
-// CHECK-NEXT: using ValueWitnessAssignWithTakeTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(61402))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
-// CHECK-NEXT: using ValueWitnessGetEnumTagSinglePayloadTy = unsigned(* __ptrauth_swift_value_witness_function_pointer(24816))(const void * _Nonnull, unsigned, void * _Nonnull);
-// CHECK-NEXT: using ValueWitnessStoreEnumTagSinglePayloadTy = void(* __ptrauth_swift_value_witness_function_pointer(41169))(void * _Nonnull, unsigned, unsigned, void * _Nonnull);
+// CHECK-NEXT: #if __cplusplus > 201402L
+// CHECK-NEXT: #  define SWIFT_NOEXCEPT_FUNCTION_PTR noexcept
+// CHECK-NEXT: #else
+// CHECK-NEXT: #  define SWIFT_NOEXCEPT_FUNCTION_PTR
+// CHECK-NEXT: #endif
+// CHECK-EMPTY:
+// CHECK-NEXT: using ValueWitnessInitializeBufferWithCopyOfBufferTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(55882))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using ValueWitnessDestroyTy = void(* __ptrauth_swift_value_witness_function_pointer(1272))(void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using ValueWitnessInitializeWithCopyTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(58298))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using ValueWitnessAssignWithCopyTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(34641))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using ValueWitnessInitializeWithTakeTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(18648))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using ValueWitnessAssignWithTakeTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(61402))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using ValueWitnessGetEnumTagSinglePayloadTy = unsigned(* __ptrauth_swift_value_witness_function_pointer(24816))(const void * _Nonnull, unsigned, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using ValueWitnessStoreEnumTagSinglePayloadTy = void(* __ptrauth_swift_value_witness_function_pointer(41169))(void * _Nonnull, unsigned, unsigned, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
 // CHECK-EMPTY:
 // CHECK-NEXT: struct ValueWitnessTable {
 // CHECK-NEXT:  ValueWitnessInitializeBufferWithCopyOfBufferTy _Nonnull initializeBufferWithCopyOfBuffer;
@@ -47,11 +53,25 @@
 // CHECK-NEXT:  unsigned extraInhabitantCount;
 // CHECK-NEXT: };
 // CHECK-EMPTY:
+// CHECK-NEXT: using EnumValueWitnessGetEnumTagTy = int(* __ptrauth_swift_value_witness_function_pointer(41909))(const void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using EnumValueWitnessDestructiveProjectEnumDataTy = void(* __ptrauth_swift_value_witness_function_pointer(1053))(void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-NEXT: using EnumValueWitnessDestructiveInjectEnumTagTy = void(* __ptrauth_swift_value_witness_function_pointer(45796))(void * _Nonnull, unsigned, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// CHECK-EMPTY:
+// CHECK-NEXT: struct EnumValueWitnessTable {
+// CHECK-NEXT:   ValueWitnessTable vwTable;
+// CHECK-NEXT:   EnumValueWitnessGetEnumTagTy _Nonnull getEnumTag;
+// CHECK-NEXT:   EnumValueWitnessDestructiveProjectEnumDataTy _Nonnull destructiveProjectEnumData;
+// CHECK-NEXT:   EnumValueWitnessDestructiveInjectEnumTagTy _Nonnull destructiveInjectEnumTag;
+// CHECK-NEXT: };
+// CHECK-EMPTY:
+// CHECK-NEXT: #undef SWIFT_NOEXCEPT_FUNCTION_PTR
+// CHECK-EMPTY:
+// CHECK-EMPTY:
 // CHECK-NEXT: #ifdef __cplusplus
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 // CHECK-EMPTY:
-// CHECK-NEXT: inline void * _Nonnull opaqueAlloc(size_t size, size_t align) {
+// CHECK-NEXT: inline void * _Nonnull opaqueAlloc(size_t size, size_t align) noexcept {
 // CHECK-NEXT: #if defined(_WIN32)
 // CHECK-NEXT:   void *r = _aligned_malloc(size, align);
 // CHECK-NEXT: #else
@@ -62,7 +82,7 @@
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   return r;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline void opaqueFree(void * _Nonnull p) {
+// CHECK-NEXT: inline void opaqueFree(void * _Nonnull p) noexcept {
 // CHECK-NEXT: #if defined(_WIN32)
 // CHECK-NEXT:   _aligned_free(p);
 // CHECK-NEXT: #else

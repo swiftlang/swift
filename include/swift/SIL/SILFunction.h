@@ -36,6 +36,7 @@ class SILModule;
 class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
+class NodeBitfield;
 
 namespace Lowering {
 class TypeLowering;
@@ -169,7 +170,9 @@ private:
   friend class SILModule;
   friend class SILFunctionBuilder;
   template <typename, unsigned> friend class BasicBlockData;
+  template <class, class> friend class SILBitfield;
   friend class BasicBlockBitfield;
+  friend class NodeBitfield;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -226,14 +229,15 @@ private:
   Identifier ObjCReplacementFor;
 
   /// The head of a single-linked list of currently alive BasicBlockBitfield.
-  BasicBlockBitfield *newestAliveBitfield = nullptr;
+  BasicBlockBitfield *newestAliveBlockBitfield = nullptr;
+
+  /// The head of a single-linked list of currently alive NodeBitfield.
+  NodeBitfield *newestAliveNodeBitfield = nullptr;
 
   /// A monotonically increasing ID which is incremented whenever a
-  /// BasicBlockBitfield is constructed.
-  /// Usually this stays below 100000, so a 32-bit unsigned is more than
-  /// sufficient.
-  /// For details see BasicBlockBitfield::bitfieldID;
-  unsigned currentBitfieldID = 1;
+  /// BasicBlockBitfield or NodeBitfield is constructed.
+  /// For details see SILBitfield::bitfieldID;
+  uint64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.
   /// May be reused when zombie functions are recovered.
@@ -468,6 +472,9 @@ public:
   SILFunction *getDynamicallyReplacedFunction() const {
     return ReplacedFunction;
   }
+
+  static SILFunction *getFunction(SILDeclRef ref, SILModule &M);
+
   void setDynamicallyReplacedFunction(SILFunction *f) {
     assert(ReplacedFunction == nullptr && "already set");
     assert(!hasObjCReplacement());
@@ -1118,6 +1125,32 @@ public:
     if (auto *dc = getDeclContext())
       if (auto *decl = dyn_cast_or_null<FuncDecl>(dc->getAsDecl()))
         return decl->isDeferBody();
+    return false;
+  }
+
+  /// Returns true if this function belongs to a declaration that
+  /// has `@_alwaysEmitIntoClient` attribute.
+  bool markedAsAlwaysEmitIntoClient() const {
+    if (!hasLocation())
+      return false;
+
+    auto *V = getLocation().getAsASTNode<ValueDecl>();
+    return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+  }
+
+  /// Returns true if this function belongs to a declaration that returns
+  /// an opaque result type with one or more availability conditions that are
+  /// allowed to produce a different underlying type at runtime.
+  bool hasOpaqueResultTypeWithAvailabilityConditions() const {
+    if (!hasLocation())
+      return false;
+
+    if (auto *V = getLocation().getAsASTNode<ValueDecl>()) {
+      auto *opaqueResult = V->getOpaqueResultTypeDecl();
+      return opaqueResult &&
+             opaqueResult->hasConditionallyAvailableSubstitutions();
+    }
+
     return false;
   }
 

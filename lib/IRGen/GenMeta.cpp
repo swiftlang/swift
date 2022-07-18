@@ -50,6 +50,7 @@
 #include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "EnumMetadataVisitor.h"
+#include "ExtendedExistential.h"
 #include "Field.h"
 #include "FixedTypeInfo.h"
 #include "ForeignClassMetadataVisitor.h"
@@ -5770,6 +5771,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Identifiable:
+  case KnownProtocolKind::AnyActor:
   case KnownProtocolKind::Actor:
   case KnownProtocolKind::DistributedActor:
   case KnownProtocolKind::DistributedActorSystem:
@@ -6047,8 +6049,8 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
 }
 
 static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,
-                                                CanExistentialType type) {
-  auto typeLinkage = getTypeLinkage_correct(type);
+                                                CanType shapeType) {
+  auto typeLinkage = getTypeLinkage_correct(shapeType);
   if (typeLinkage == FormalLinkage::Private)
     return FormalLinkage::Private;
 
@@ -6063,25 +6065,50 @@ static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,
   return FormalLinkage::PublicNonUnique;
 }
 
-std::pair<llvm::Constant *, /*unique*/ bool>
-irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
-                                 const ExistentialTypeGeneralization &info,
-                                        unsigned metatypeDepth) {
-  CanGenericSignature genSig;
-  if (info.Generalization)
-    genSig = info.Generalization.getGenericSignature()
-                                .getCanonicalSignature();
-  CanExistentialType existentialType =
-    cast<ExistentialType>(info.Shape->getCanonicalType());
+ExtendedExistentialTypeShapeInfo
+ExtendedExistentialTypeShapeInfo::get(CanType existentialType) {
+  assert(isa<ExistentialType>(existentialType) ||
+         isa<ExistentialMetatypeType>(existentialType));
 
-  CanType shapeType = existentialType;
+  unsigned metatypeDepth = 0;
+  while (auto metatype = dyn_cast<ExistentialMetatypeType>(existentialType)) {
+    metatypeDepth++;
+    existentialType = metatype.getInstanceType();
+  }
+
+  auto genInfo = ExistentialTypeGeneralization::get(existentialType);
+
+  auto result = get(genInfo, metatypeDepth);
+  result.genSubs = genInfo.Generalization;
+  return result;
+}
+
+ExtendedExistentialTypeShapeInfo
+ExtendedExistentialTypeShapeInfo::get(
+                                const ExistentialTypeGeneralization &genInfo,
+                                      unsigned metatypeDepth) {
+  auto shapeType = genInfo.Shape->getCanonicalType();
   for (unsigned i = 0; i != metatypeDepth; ++i)
     shapeType = CanExistentialMetatypeType::get(shapeType);
 
-  auto linkage = getExistentialShapeLinkage(genSig, existentialType);
+  CanGenericSignature genSig;
+  if (genInfo.Generalization)
+    genSig = genInfo.Generalization.getGenericSignature()
+                                   .getCanonicalSignature();
+
+  auto linkage = getExistentialShapeLinkage(genSig, shapeType);
   assert(linkage != FormalLinkage::PublicUnique);
-  bool isUnique = (linkage != FormalLinkage::PublicNonUnique);
-  bool isShared = (linkage != FormalLinkage::Private);
+
+  return { genSig, shapeType, SubstitutionMap(), linkage };
+}
+
+llvm::Constant *
+irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
+                              const ExtendedExistentialTypeShapeInfo &info) {
+  CanGenericSignature genSig = info.genSig;
+  CanType shapeType = info.shapeType;
+  bool isUnique = info.isUnique();
+  bool isShared = info.isShared();
 
   auto entity =
     LinkEntity::forExtendedExistentialTypeShape(genSig, shapeType,
@@ -6104,6 +6131,13 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
       b.addRelativeAddress(cache);
     }
 
+    CanType existentialType = shapeType;
+    unsigned metatypeDepth = 0;
+    while (auto emt = dyn_cast<ExistentialMetatypeType>(existentialType)) {
+      existentialType = emt.getInstanceType();
+      metatypeDepth++;
+    }
+
     CanGenericSignature reqSig =
       IGM.Context.getOpenedArchetypeSignature(existentialType, genSig);
 
@@ -6118,7 +6152,7 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     SpecialKind specialKind = [&] {
       if (metatypeDepth > 0)
         return SpecialKind::Metatype;
-      if (existentialType->requiresClass())
+      if (existentialType->isClassExistentialType())
         return SpecialKind::Class;
       return SpecialKind::None;
     }();
@@ -6210,8 +6244,5 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     IGM.setTrueConstGlobal(var);
   });
 
-  return {
-    llvm::ConstantExpr::getBitCast(shape, IGM.Int8PtrTy),
-    isUnique
-  };
+  return llvm::ConstantExpr::getBitCast(shape, IGM.Int8PtrTy);
 }

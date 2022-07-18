@@ -981,21 +981,9 @@ class ModuleInterfaceLoaderImpl {
                            diag::rebuilding_module_from_interface, moduleName,
                            interfacePath);
     };
-    // Diagnose only for the standard library; it should be prebuilt in typical
-    // workflows, but if it isn't, building it may take several minutes and a
-    // lot of memory, so users may think the compiler is busy-hung.
-    auto remarkRebuildStdlib = [&]() {
-      if (moduleName != "Swift")
-        return;
-      
-      auto moduleTriple = getTargetSpecificModuleTriple(ctx.LangOpts.Target);
-      rebuildInfo.diagnose(ctx, diags, prebuiltCacheDir, SourceLoc(),
-                           diag::rebuilding_stdlib_from_interface,
-                           moduleTriple.str());
-    };
     auto remarkRebuild = Opts.remarkOnRebuildFromInterface
                        ? llvm::function_ref<void()>(remarkRebuildAll)
-                       : remarkRebuildStdlib;
+                       : nullptr;
 
     bool failed = false;
     std::string backupPath = getBackupPublicModuleInterfacePath();
@@ -1867,6 +1855,8 @@ bool ExplicitSwiftModuleLoader::canImportModule(ImportPath::Module path,
                                                 llvm::VersionTuple version,
                                                 bool underlyingVersion) {
   // FIXME: Swift submodules?
+  if (path.hasSubmodule())
+    return false;
   ImportPath::Element mID = path.front();
   // Look up the module with the real name (physical name on disk);
   // in case `-module-alias` is used, the name appearing in source files

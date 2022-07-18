@@ -732,3 +732,22 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
         }
     }
 }
+
+// https://github.com/apple/swift/issues/59716
+// FIXME: Diagnostic should be tailored for closure result
+["foo"].map { s in
+    if s == "1" { return } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    return s.isEmpty
+}.filter { $0 }
+
+["foo"].map { s in
+    if s == "1" { return } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    if s == "2" { return }
+    if s == "3" { return }
+    return s.isEmpty
+}.filter { $0 }
+
+["foo"].map { s in
+    if s == "1" { return () } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    return s.isEmpty
+}.filter { $0 }

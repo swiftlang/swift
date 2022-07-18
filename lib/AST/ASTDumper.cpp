@@ -255,6 +255,7 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
     case AccessSemantics::Ordinary: return "ordinary";
     case AccessSemantics::DirectToStorage: return "direct_to_storage";
     case AccessSemantics::DirectToImplementation: return "direct_to_impl";
+    case AccessSemantics::DistributedThunk: return "distributed_thunk";
   }
 
   llvm_unreachable("Unhandled AccessSemantics in switch.");
@@ -1353,10 +1354,6 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     os << " known-to-be-local";
   }
 
-  if (getAttrs().hasAttribute<DistributedThunkAttr>()) {
-    os << " distributed-thunk";
-  }
-
   // Print location.
   auto &srcMgr = getASTContext().SourceMgr;
   if (getLoc().isValid()) {
@@ -2012,15 +2009,7 @@ public:
       << E->getDecls()[0]->getBaseName();
     PrintWithColorRAII(OS, ExprModifierColor)
       << " number_of_decls=" << E->getDecls().size()
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind())
-      << " decls=[\n";
-    interleave(E->getDecls(),
-               [&](ValueDecl *D) {
-                 OS.indent(Indent + 2);
-                 D->dumpRef(PrintWithColorRAII(OS, DeclModifierColor).getOS());
-               },
-               [&] { PrintWithColorRAII(OS, DeclModifierColor) << ",\n"; });
-    PrintWithColorRAII(OS, ExprModifierColor) << "]";
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -2598,12 +2587,6 @@ public:
     }
     Indent -= 2;
 
-    // If we printed any args, then print the closing ')' on a new line,
-    // otherwise print inline with the '(argument_list'.
-    if (!argList->empty()) {
-      OS << '\n';
-      OS.indent(Indent);
-    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
 
     if (indent)
@@ -3944,7 +3927,8 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void visitSILMoveOnlyType(SILMoveOnlyType *T, StringRef label) {
+    void visitSILMoveOnlyWrappedType(SILMoveOnlyWrappedType *T,
+                                     StringRef label) {
       printCommon(label, "sil_move_only_type");
       printRec(T->getInnerType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';

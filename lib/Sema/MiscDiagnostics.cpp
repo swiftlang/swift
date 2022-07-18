@@ -1790,7 +1790,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       }
 
       if (hasExplicitAnyObject)
-        members.push_back(typeDecl->getASTContext().getAnyObjectType());
+        members.push_back(typeDecl->getASTContext().getAnyObjectConstraint());
 
       auto type = ProtocolCompositionType::get(typeDecl->getASTContext(),
                                                members, hasExplicitAnyObject);
@@ -2846,16 +2846,22 @@ public:
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
-      auto key =
-          underlyingToOpaque->substitutions.getCanonical().getOpaqueValue();
+      auto subMap = underlyingToOpaque->substitutions;
 
+      auto key = subMap.getCanonical().getOpaqueValue();
       auto isUnique = UniqueSignatures.insert(key).second;
 
       auto candidate =
-          std::make_tuple(underlyingToOpaque->getSubExpr(),
-                          underlyingToOpaque->substitutions, isUnique);
+          std::make_tuple(underlyingToOpaque->getSubExpr(), subMap, isUnique);
 
       if (isSelfReferencing(candidate)) {
+        HasInvalidReturn = true;
+        return {false, nullptr};
+      }
+
+      if (subMap.hasDynamicSelf()) {
+        Ctx.Diags.diagnose(E->getLoc(),
+                           diag::opaque_type_cannot_contain_dynamic_self);
         HasInvalidReturn = true;
         return {false, nullptr};
       }

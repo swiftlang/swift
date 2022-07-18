@@ -250,8 +250,9 @@ void MoveKillsCopyableValuesChecker::emitDiagnosticForMove(
 
   // Then we do a bit of work to figure out where /all/ of the later uses than
   // mvi are so we can emit notes to the user telling them this is a problem
-  // use. We can do a little more work here since we are going to be emitting a
-  // fatalError ending the program.
+  // use. We can do a little more work here since we already know that we are
+  // going to be emitting a diagnostic and thus later parts of the compiler are
+  // not going to run. First we look for uses in the same block as our move.
   auto *mviBlock = mvi->getParent();
   auto mviBlockLiveness = livenessInfo.liveness.getBlockLiveness(mviBlock);
   switch (mviBlockLiveness) {
@@ -259,8 +260,14 @@ void MoveKillsCopyableValuesChecker::emitDiagnosticForMove(
     llvm_unreachable("We should never see this");
   case PrunedLiveBlocks::LiveWithin: {
     // The boundary was within our block. We need to search for uses later than
-    // us and emit a diagnostic upon them. Then we return. We leave the rest of
+    // us and emit a diagnostic upon them and then return. We leave the rest of
     // the function for the implementation of the LiveOutCase.
+    //
+    // NOTE: This does mean that once the user fixes this use, they will get
+    // additional errors that we did not diagnose before. We do this to simplify
+    // the implementation noting that the program in either case will not
+    // compile meaning correctness will be maintained despite this
+    // implementation choice.
     for (SILInstruction &inst :
          make_range(std::next(mvi->getIterator()), mviBlock->end())) {
       switch (livenessInfo.liveness.isInterestingUser(&inst)) {
@@ -268,6 +275,7 @@ void MoveKillsCopyableValuesChecker::emitDiagnosticForMove(
         break;
       case PrunedLiveness::NonLifetimeEndingUse:
       case PrunedLiveness::LifetimeEndingUse:
+        LLVM_DEBUG(llvm::dbgs() << "Emitting note for in block use: " << inst);
         diagnose(astContext, inst.getLoc().getSourceLoc(),
                  diag::sil_movekillscopyablevalue_use_here);
         break;
@@ -287,73 +295,97 @@ void MoveKillsCopyableValuesChecker::emitDiagnosticForMove(
          "We are handling only the live out case here. The rest of the cases "
          "were handled in the switch above and return early upon success");
 
+  // Ok, our boundary was later, so we need to search the CFG along successor
+  // edges starting at the successors's of our move function block
   BasicBlockWorklist worklist(mvi->getFunction());
   for (auto *succBlock : mvi->getParent()->getSuccessorBlocks()) {
     worklist.pushIfNotVisited(succBlock);
   }
 
   // In order to make sure that we do not miss uses that are within loops, we
-  // maintain a list of all user sets. The issue is that a block at a deeper
-  // loop level than our def, even if it contained the use that triggered the
-  // issue will be LiveOut. So when we see a live out block, we perform this
-  // extra check and emit a diagnostic if needed.
+  // maintain a list of all user sets.
+  //
+  // DISCUSSION: The issue is that a block at a deeper loop level than our def,
+  // even if it contained the use that triggered the issue will be LiveOut. So
+  // when we see a live out block, we perform this extra check and emit a
+  // diagnostic if needed.
   BasicBlockSet usesToCheckForInLiveOutBlocks(mvi->getFunction());
   for (auto *user : livenessInfo.nonLifetimeEndingUsesInLiveOut)
     usesToCheckForInLiveOutBlocks.insert(user->getParent());
-  for (auto *consumingUse : livenessInfo.consumingUse)
-    usesToCheckForInLiveOutBlocks.insert(consumingUse->getParentBlock());
+  for (auto *consumingUse : livenessInfo.consumingUse) {
+    // We ignore consuming uses that are destroy_value since in our model they
+    // do not provide liveness.
+    if (!isa<DestroyValueInst>(consumingUse->getUser()))
+      usesToCheckForInLiveOutBlocks.insert(consumingUse->getParentBlock());
+  }
 
   while (auto *block = worklist.pop()) {
-    if (PrunedLiveBlocks::LiveOut ==
+    // First do a quick check if we are not a live out block. If so, the
+    // boundary was within the block. We need to search for interesting uses in
+    // the block and then emit diagnostics upon them. We then continue without
+    // adding successors since we do not need to look further than the pruned
+    // liveness boundary for uses.
+    if (PrunedLiveBlocks::LiveOut !=
         livenessInfo.liveness.getBlockLiveness(block)) {
-      // Make sure that if we have a liveout block that is at a lower level in
-      // the loop nest than our def and we have a use in that block, that we
-      // emit an error. We know it is after the move since we are visiting
-      // instructions in successors of move.
-      if (usesToCheckForInLiveOutBlocks.contains(block)) {
-        for (SILInstruction &inst : *block) {
-          if (livenessInfo.nonLifetimeEndingUsesInLiveOut.contains(&inst)) {
-            diagnose(astContext, inst.getLoc().getSourceLoc(),
-                     diag::sil_movekillscopyablevalue_use_here);
-            continue;
-          }
-          for (auto &op : inst.getAllOperands()) {
-            if (livenessInfo.consumingUse.contains(&op)) {
-              // If one of our in loop moves is ourselves, then we know that our
-              // original value is outside of the loop and thus we have a loop
-              // carry dataflow violation.
-              if (mvi == &inst) {
-                diagnose(
-                    astContext, inst.getLoc().getSourceLoc(),
-                    diag::sil_movekillscopyablevalue_value_consumed_in_loop);
-                continue;
-              }
-
-              diagnose(astContext, inst.getLoc().getSourceLoc(),
-                       diag::sil_movekillscopyablevalue_use_here);
-              continue;
-            }
-          }
+      for (SILInstruction &inst : *block) {
+        switch (livenessInfo.liveness.isInterestingUser(&inst)) {
+        case PrunedLiveness::NonUser:
+          break;
+        case PrunedLiveness::NonLifetimeEndingUse:
+        case PrunedLiveness::LifetimeEndingUse:
+          LLVM_DEBUG(llvm::dbgs()
+                     << "(3) Emitting diagnostic for user: " << inst);
+          diagnose(astContext, inst.getLoc().getSourceLoc(),
+                   diag::sil_movekillscopyablevalue_use_here);
+          break;
         }
-      }
-
-      for (auto *succBlock : block->getSuccessorBlocks()) {
-        worklist.pushIfNotVisited(succBlock);
       }
       continue;
     }
 
-    // The boundary was within the block. We need to search for interesting uses
-    // in the block and then emit diagnostics upon them.
+    // Otherwise, we have a live out block. First before we do anything, add the
+    // successors of this block to the worklist.
+    for (auto *succBlock : block->getSuccessorBlocks())
+      worklist.pushIfNotVisited(succBlock);
+
+    // Then check if we have any of those deeper loop nest uses. If not, we are
+    // done with this block and continue...
+    if (!usesToCheckForInLiveOutBlocks.contains(block))
+      continue;
+
+    // Ok! This is a live out block with a use we need to emit an error for . We
+    // know it is reachable from the move since we are walking successors from
+    // the move block. Of course, if we do not have any such uses... just
+    // continue.
     for (SILInstruction &inst : *block) {
-      switch (livenessInfo.liveness.isInterestingUser(&inst)) {
-      case PrunedLiveness::NonUser:
-        break;
-      case PrunedLiveness::NonLifetimeEndingUse:
-      case PrunedLiveness::LifetimeEndingUse:
+      if (livenessInfo.nonLifetimeEndingUsesInLiveOut.contains(&inst)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "(1) Emitting diagnostic for user: " << inst);
         diagnose(astContext, inst.getLoc().getSourceLoc(),
                  diag::sil_movekillscopyablevalue_use_here);
-        break;
+        continue;
+      }
+
+      for (auto &op : inst.getAllOperands()) {
+        if (livenessInfo.consumingUse.contains(&op)) {
+          // If one of our in loop moves is ourselves, then we know that our
+          // original value is outside of the loop and thus we have a loop
+          // carry dataflow violation.
+          if (mvi == &inst) {
+            diagnose(astContext, inst.getLoc().getSourceLoc(),
+                     diag::sil_movekillscopyablevalue_value_consumed_in_loop);
+            continue;
+          }
+          // We ignore consuming uses that are destroy_value since in our model
+          // they do not provide liveness.
+          if (isa<DestroyValueInst>(inst))
+            continue;
+
+          LLVM_DEBUG(llvm::dbgs()
+                     << "(2) Emitting diagnostic for user: " << inst);
+          diagnose(astContext, inst.getLoc().getSourceLoc(),
+                   diag::sil_movekillscopyablevalue_use_here);
+        }
       }
     }
   }

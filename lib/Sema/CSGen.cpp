@@ -88,20 +88,12 @@ namespace {
   class LinkedExprCollector : public ASTWalker {
     
     llvm::SmallVectorImpl<Expr*> &LinkedExprs;
-    ConstraintSystem &CS;
 
   public:
-    LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs,
-                        ConstraintSystem &cs)
-        : LinkedExprs(linkedExprs), CS(cs) {}
+    LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs)
+        : LinkedExprs(linkedExprs) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-
-      if (CS.shouldReusePrecheckedType() &&
-          !CS.getType(expr)->hasTypeVariable()) {
-        return { false, expr };
-      }
-
       if (isa<ClosureExpr>(expr))
         return {false, expr};
 
@@ -161,12 +153,6 @@ namespace {
         LTI(lti), CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-
-      if (CS.shouldReusePrecheckedType() &&
-          !CS.getType(expr)->hasTypeVariable()) {
-        return { false, expr };
-      }
-
       if (isa<LiteralExpr>(expr)) {
         LTI.hasLiteral = true;
         return { false, expr };
@@ -790,11 +776,6 @@ namespace {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         return {false, expr};
-      }
-
-      if (CS.shouldReusePrecheckedType() &&
-          !CS.getType(expr)->hasTypeVariable()) {
-        return { false, expr };
       }
       
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
@@ -1558,7 +1539,7 @@ namespace {
       auto &ctx = CS.getASTContext();
       auto typeOperation = getTypeOperation(expr, ctx);
       if (typeOperation != TypeOperation::None)
-        return ctx.TheAnyType;
+        return ctx.getAnyExistentialType();
 
       // If this is `Builtin.trigger_fallback_diagnostic()`, fail
       // without producing any diagnostics, in order to test fallback error.
@@ -1719,9 +1700,48 @@ namespace {
       if (!optTy)
         return Type();
 
-      // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
-      // even if the sub-expression was already optional.
-      if (CS.getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
+      bool isDelegationToOptionalInit = false;
+      {
+        Expr *e = expr->getSubExpr();
+        while (true) {
+          e = e->getSemanticsProvidingExpr();
+
+          // Look through force-value expressions.
+          if (auto *FVE = dyn_cast<ForceValueExpr>(e)) {
+            e = FVE->getSubExpr();
+            continue;
+          }
+
+          break;
+        }
+
+        if (auto *CE = dyn_cast<CallExpr>(e)) {
+          if (auto *UDE = dyn_cast<UnresolvedDotExpr>(CE->getFn())) {
+            if (!CS.getType(UDE->getBase())->is<AnyMetatypeType>()) {
+              auto overload =
+                  CS.findSelectedOverloadFor(CS.getConstraintLocator(
+                      UDE, ConstraintLocator::ConstructorMember));
+              if (overload) {
+                auto *decl = overload->choice.getDeclOrNull();
+                if (decl && isa<ConstructorDecl>(decl) &&
+                    decl->getDeclContext()
+                        ->getSelfNominalTypeDecl()
+                        ->isOptionalDecl())
+                  isDelegationToOptionalInit = true;
+              }
+            }
+          }
+        }
+      }
+
+      // Prior to Swift 5, 'try?' always adds an additional layer of
+      // optionality, even if the sub-expression was already optional.
+      //
+      // NB Keep adding the additional layer in Swift 5 and on if this 'try?'
+      // applies to a delegation to an 'Optional' initializer, or else we won't
+      // discern the difference between a failure and a constructed value.
+      if (CS.getASTContext().LangOpts.isSwiftVersionAtLeast(5) &&
+          !isDelegationToOptionalInit) {
         CS.addConstraint(ConstraintKind::Conversion,
                          CS.getType(expr->getSubExpr()), optTy,
                          CS.getConstraintLocator(expr));
@@ -1901,7 +1921,7 @@ namespace {
 
       // The array element type defaults to 'Any'.
       CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
-                       CS.getASTContext().TheAnyType, locator);
+                       CS.getASTContext().getAnyExistentialType(), locator);
 
       return arrayTy;
     }
@@ -2065,7 +2085,7 @@ namespace {
       // The dictionary value type defaults to 'Any'.
       if (dictionaryValueTy->isTypeVariableOrMember()) {
         CS.addConstraint(ConstraintKind::Defaultable, dictionaryValueTy,
-                         ctx.TheAnyType, locator);
+                         ctx.getAnyExistentialType(), locator);
       }
 
       return dictionaryTy;
@@ -3613,7 +3633,7 @@ namespace {
           llvm_unreachable("Unexpected result from join - it should not have been computable!");
 
         // The return value is unimportant.
-        return MetatypeType::get(ctx.TheAnyType)->getCanonicalType();
+        return MetatypeType::get(ctx.getAnyExistentialType())->getCanonicalType();
       }
       }
       llvm_unreachable("unhandled operation");
@@ -3652,15 +3672,6 @@ namespace {
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         CG.setTypeForArgumentIgnoredForCompletion(expr);
         return {false, expr};
-      }
-
-      if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
-        if (expr->getType()) {
-          assert(!expr->getType()->hasTypeVariable());
-          assert(!expr->getType()->hasPlaceholder());
-          CG.getConstraintSystem().cacheType(expr);
-          return { false, expr };
-        }
       }
 
       // Note that the subexpression of a #selector expression is
@@ -3944,8 +3955,20 @@ generateForEachStmtConstraints(
     forEachStmtInfo.makeIteratorVar = PB;
 
     // Type of sequence expression has to conform to Sequence protocol.
+    //
+    // Note that the following emulates having `$generator` separately
+    // type-checked by introducing a `TVO_PrefersSubtypeBinding` type
+    // variable that would make sure that result of `.makeIterator` would
+    // get ranked standalone.
     {
-      cs.addConstraint(ConstraintKind::ConformsTo, cs.getType(sequenceExpr),
+      auto *externalIteratorType = cs.createTypeVariable(
+          cs.getConstraintLocator(sequenceExpr), TVO_PrefersSubtypeBinding);
+
+      cs.addConstraint(ConstraintKind::Equal, externalIteratorType,
+                       cs.getType(sequenceExpr),
+                       externalIteratorType->getImpl().getLocator());
+
+      cs.addConstraint(ConstraintKind::ConformsTo, externalIteratorType,
                        sequenceProto->getDeclaredInterfaceType(),
                        contextualLocator);
 
@@ -4424,7 +4447,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   SmallVector<Expr *, 16> linkedExprs;
   
   // Collect any linked expressions.
-  LinkedExprCollector collector(linkedExprs, *this);
+  LinkedExprCollector collector(linkedExprs);
   e->walk(collector);
   
   // Favor types, as appropriate.

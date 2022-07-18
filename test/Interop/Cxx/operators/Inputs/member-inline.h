@@ -1,9 +1,6 @@
 #ifndef TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_INLINE_H
 #define TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_INLINE_H
 
-template <class From, class To>
-To __swift_interopStaticCast(From from) { return from; }
-
 struct LoadableIntWrapper {
   int value;
   LoadableIntWrapper operator-(LoadableIntWrapper rhs) {
@@ -18,6 +15,21 @@ struct LoadableIntWrapper {
   }
   int operator()(int x, int y) {
     return value + x * y;
+  }
+
+  LoadableIntWrapper &operator++() {
+    value++;
+    return *this;
+  }
+
+  // Friend functions
+  friend bool operator==(const LoadableIntWrapper lhs,
+                         const LoadableIntWrapper &rhs) {
+    return lhs.value == rhs.value;
+  }
+
+  friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
+    return LoadableIntWrapper{.value = -obj.value};
   }
 };
 
@@ -43,6 +55,34 @@ struct AddressOnlyIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
+
+  AddressOnlyIntWrapper operator-(AddressOnlyIntWrapper rhs) const {
+    return AddressOnlyIntWrapper(value - rhs.value);
+  }
+  AddressOnlyIntWrapper &operator++() {
+    value++;
+    return *this;
+  }
+  AddressOnlyIntWrapper operator++(int) {
+    // This shouldn't be called, since we only support pre-increment operators.
+    return AddressOnlyIntWrapper(-777);
+  }
+};
+
+struct HasPostIncrementOperator {
+  HasPostIncrementOperator operator++(int) {
+    return HasPostIncrementOperator();
+  }
+};
+
+struct HasPreIncrementOperatorWithAnotherReturnType {
+  int value = 0;
+  const int &operator++() { return ++value; }
+};
+
+struct HasPreIncrementOperatorWithVoidReturnType {
+  int value = 0;
+  void operator++() { ++value; }
 };
 
 struct HasDeletedOperator {

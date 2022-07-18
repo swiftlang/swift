@@ -5,6 +5,7 @@
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: threading_none
 
 import Dispatch
 

@@ -359,6 +359,7 @@ $S18resilient_protocol21ResilientBaseProtocolTL ---> protocol requirements base 
 $S1t1PP10AssocType2_AA1QTn ---> associated conformance descriptor for t.P.AssocType2: t.Q
 $S1t1PP10AssocType2_AA1QTN ---> default associated conformance accessor for t.P.AssocType2: t.Q
 $s4Test6testityyxlFAA8MystructV_TB5 ---> generic specialization <Test.Mystruct> of Test.testit<A>(A) -> ()
+$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTgm5 ---> generic specialization <Swift.UInt, Swift.Int> of (extension in Swift):Swift.UnsignedInteger< where A: Swift.FixedWidthInteger>.init<A where A1: Swift.BinaryInteger>(A1) -> A
 $sSD5IndexVy__GD ---> $sSD5IndexVy__GD
 $s4test3StrCACycfC ---> {T:$s4test3StrCACycfc} test.Str.__allocating_init() -> test.Str
 $s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq  ---> key path getter for keypaths_inlinable.KeypathStruct.computed : Swift.String : keypaths_inlinable.KeypathStruct, serialized
@@ -428,9 +429,8 @@ $s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
 $s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
 $s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
 $s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
-$s4test3FooVAAyyAA1P_pyxqd__XPlF ---> test.Foo.test<A>(test.P<A, A1>) -> ()
-$s4test3FooVAAyyAA1P_pyxXPF ---> test.Foo.test(test.P<A>) -> ()
+$s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
+$s4test3fooyyAA1P_pSS1TAaCPRts_Si1UAERtsXPF ---> test.foo(any test.P<Self.test.P.T == Swift.String, Self.test.P.U == Swift.Int>) -> ()
 $s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()
-$s4test3FooVAAyyAA1P_pyqd__XPAaDRd__lF ---> test.Foo.test<A where A1: test.P>(test.P<A1>) -> ()
 $sxxxIxzCXxxxesy -> $sxxxIxzCXxxxesy
 $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x -> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x

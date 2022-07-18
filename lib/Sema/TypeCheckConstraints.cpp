@@ -54,7 +54,27 @@ using namespace constraints;
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
-  getTypeVariable()->print(OS, PrintOptions());
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  getTypeVariable()->print(OS, PO);
+  
+  SmallVector<TypeVariableOptions, 4> bindingOptions;
+  if (canBindToLValue())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
+  if (canBindToInOut())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToInOut);
+  if (canBindToNoEscape())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToNoEscape);
+  if (canBindToHole())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
+  if (!bindingOptions.empty()) {
+    OS << " [allows bindings to: ";
+    interleave(bindingOptions, OS,
+               [&](TypeVariableOptions option) {
+                  (OS << getTypeVariableOptions(option));},
+               ", ");
+               OS << "]";
+  }
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
@@ -1260,7 +1280,7 @@ void Solution::dump(raw_ostream &out) const {
         out << choice.getBaseType()->getString(PO) << ".";
 
       out << choice.getDecl()->getBaseName() << ": "
-          << ovl.second.openedType->getString(PO) << "\n";
+          << ovl.second.adjustedOpenedType->getString(PO) << "\n";
       break;
 
     case OverloadChoiceKind::KeyPathApplication:
@@ -1386,6 +1406,7 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
   };
 
   E->dump(out, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent);
+  out << "\n";
 }
 
 void ConstraintSystem::print(raw_ostream &out) const {
@@ -1414,15 +1435,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
              });
   for (auto tv : typeVariables) {
     out.indent(2);
-    Type(tv).print(out, PO);
-    if (tv->getImpl().canBindToLValue())
-      out << " [lvalue allowed]";
-    if (tv->getImpl().canBindToInOut())
-      out << " [inout allowed]";
-    if (tv->getImpl().canBindToNoEscape())
-      out << " [noescape allowed]";
-    if (tv->getImpl().canBindToHole())
-      out << " [hole allowed]";
+    tv->getImpl().print(out);
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
@@ -1484,7 +1497,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
           out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "
             << resolved.boundType->getString(PO) << " == "
-            << resolved.openedType->getString(PO);
+            << resolved.adjustedOpenedType->getString(PO);
         break;
 
       case OverloadChoiceKind::KeyPathApplication:

@@ -91,6 +91,18 @@ UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
       UseDLLStorage(useDllStorage(triple)), Internalize(isStaticLibrary),
       HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls) {}
 
+LinkEntity LinkEntity::forSILGlobalVariable(SILGlobalVariable *G,
+                                            IRGenModule &IGM) {
+  LinkEntity entity;
+  entity.Pointer = G;
+  entity.SecondaryPointer = nullptr;
+  auto kind = (G->isInitializedObject() && IGM.canMakeStaticObjectsReadOnly() ?
+                Kind::ReadOnlyGlobalObject : Kind::SILGlobalVariable);
+  entity.Data = unsigned(kind) << KindShift;
+  return entity;
+}
+
+
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream stream(buffer);
@@ -454,6 +466,9 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getName().str();
 
+  case Kind::ReadOnlyGlobalObject:
+    return getSILGlobalVariable()->getName().str() + "r";
+
   case Kind::ReflectionBuiltinDescriptor:
     return mangler.mangleReflectionBuiltinDescriptor(getType());
   case Kind::ReflectionFieldDescriptor:
@@ -518,8 +533,8 @@ std::string LinkEntity::mangleAsString() const {
     auto existentialType = getExtendedExistentialTypeShapeType();
     auto isUnique = isExtendedExistentialTypeShapeUnique();
 
-    return mangler.mangleExtendedExistentialTypeShape(
-                     isUnique, genSig, existentialType);
+    return mangler.mangleExtendedExistentialTypeShapeSymbol(
+                     genSig, existentialType, isUnique);
   }
   }
   llvm_unreachable("bad entity kind!");
@@ -708,6 +723,23 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(getDeclLinkage(getterDecl), forDefinition);
   }
 
+  case Kind::OpaqueTypeDescriptor: {
+    auto *opaqueType = cast<OpaqueTypeDecl>(getDecl());
+
+    // The opaque result type descriptor with availability conditions
+    // has to be emitted into a client module when associated with
+    // `@_alwaysEmitIntoClient` declaration which means it's linkage
+    // has to be "shared".
+    if (opaqueType->hasConditionallyAvailableSubstitutions()) {
+      if (auto *srcDecl = opaqueType->getNamingDecl()) {
+        if (srcDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+          return SILLinkage::Shared;
+      }
+    }
+
+    return getSILLinkage(getDeclLinkage(opaqueType), forDefinition);
+  }
+
   case Kind::AssociatedConformanceDescriptor:
   case Kind::BaseConformanceDescriptor:
   case Kind::ObjCClass:
@@ -720,7 +752,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ProtocolDescriptorRecord:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
-  case Kind::OpaqueTypeDescriptor:
   case Kind::OpaqueTypeDescriptorRecord:
   case Kind::OpaqueTypeDescriptorAccessor:
   case Kind::OpaqueTypeDescriptorAccessorImpl:
@@ -750,7 +781,13 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable: {
-    auto *nominal = getType().getAnyNominal();
+    auto ty = getType();
+    ValueDecl *nominal = nullptr;
+    if (auto *otat = ty->getAs<OpaqueTypeArchetypeType>()) {
+      nominal = otat->getDecl();
+    } else {
+      nominal = ty->getAnyNominal();
+    }
     assert(nominal);
     if (getDeclLinkage(nominal) == FormalLinkage::Private ||
         getLinkageAsConformance() == SILLinkage::Private) {
@@ -787,6 +824,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::SILGlobalVariable:
+  case Kind::ReadOnlyGlobalObject:
     return getSILGlobalVariable()->getLinkage();
 
   case Kind::ReflectionBuiltinDescriptor:
@@ -882,6 +920,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::DefaultAssociatedConformanceAccessor:
   case Kind::SILFunction:
   case Kind::SILGlobalVariable:
+  case Kind::ReadOnlyGlobalObject:
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
@@ -1129,6 +1168,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
 bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   switch (getKind()) {
   case Kind::SILGlobalVariable:
+  case Kind::ReadOnlyGlobalObject:
     if (getSILGlobalVariable()->getDecl()) {
       return getSILGlobalVariable()->getDecl()->isWeakImported(module);
     }
@@ -1317,6 +1357,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     return getSILFunction()->getDeclContext();
   
   case Kind::SILGlobalVariable:
+  case Kind::ReadOnlyGlobalObject:
     if (auto decl = getSILGlobalVariable()->getDecl())
       return decl->getDeclContext();
 

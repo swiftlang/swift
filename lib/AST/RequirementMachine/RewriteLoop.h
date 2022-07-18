@@ -435,15 +435,6 @@ public:
                 const RewriteSystem &system) const;
 };
 
-/// Information about protocol conformance rules appearing in a rewrite loop.
-///
-/// This is the return value of RewriteLoop::findProtocolConformanceRules().
-struct ProtocolConformanceRules {
-  SmallVector<unsigned, 2> RulesInEmptyContext;
-  SmallVector<std::pair<MutableTerm, unsigned>, 2> RulesInContext;
-  bool SawIdentityConformance = false;
-};
-
 /// A loop (3-cell) that rewrites the basepoint back to the basepoint.
 class RewriteLoop {
 public:
@@ -517,11 +508,6 @@ public:
   unsigned getDecomposeCount(const RewriteSystem &system) const;
 
   bool hasConcreteTypeAliasRule(const RewriteSystem &system) const;
-
-  void findProtocolConformanceRules(
-      llvm::SmallDenseMap<const ProtocolDecl *,
-                          ProtocolConformanceRules, 2> &result,
-      const RewriteSystem &system) const;
 
   void computeNormalForm(const RewriteSystem &system);
 

@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
 
+// REQUIRES: rdar95219987
+
 // Check -emit-ir and -c are invalid when skipping function bodies
 // RUN: not %target-swift-frontend -emit-ir %s -experimental-skip-non-inlinable-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
 // RUN: not %target-swift-frontend -c %s -experimental-skip-non-inlinable-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR

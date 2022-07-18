@@ -463,7 +463,7 @@ func testGlobalActorClosures() {
     return 17
   }
 
-  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
+  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-warning{{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -861,14 +861,14 @@ actor SomeActorWithInits {
     self.nonisolated()
   }
 
-  convenience init(i3: Bool) {
+  convenience init(i3: Bool) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{3-15=}}
     self.init(i1: i3)
     _ = mutableState    // expected-error{{actor-isolated property 'mutableState' can not be referenced from a non-isolated context}}
     self.isolated()     // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
     self.nonisolated()
   }
 
-  convenience init(i4: Bool) async {
+  convenience init(i4: Bool) async { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{3-15=}}
     self.init(i1: i4)
     _ = mutableState
     self.isolated()
@@ -894,14 +894,14 @@ actor SomeActorWithInits {
     _ = mutableState // will be caught by flow-isolation
   }
 
-  @MainActor convenience init(i7: Bool) {
+  @MainActor convenience init(i7: Bool) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{14-26=}}
     self.init(i1: i7)
     _ = mutableState    // expected-error{{actor-isolated property 'mutableState' can not be referenced from the main actor}}
     self.isolated()     // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from the main actor}}
     self.nonisolated()
   }
 
-  @MainActor convenience init(i8: Bool) async {
+  @MainActor convenience init(i8: Bool) async { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{14-26=}}
     self.init(i1: i8)
     _ = await mutableState
     await self.isolated()
@@ -1053,7 +1053,8 @@ actor A: Actor { // ok
 @available(SwiftStdlib 5.1, *)
 class C: Actor, UnsafeSendable {
   // expected-error@-1{{non-actor type 'C' cannot conform to the 'Actor' protocol}}
-  // expected-warning@-2{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+  // expected-error@-2{{non-actor type 'C' cannot conform to the 'AnyActor' protocol}}
+  // expected-warning@-3{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
@@ -1243,9 +1244,9 @@ actor Counter {
 
   }
 
-  convenience init(material: Int) async {
+  init(material: Int) async {
     self.init()
-    self.counter = 10 // FIXME: this should work, and also needs to work in definite initialization by injecting hops
+    self.counter = 10
   }
 }
 
@@ -1272,17 +1273,17 @@ actor Butterfly {
 
   nonisolated init(async: Void) async {}
 
-  nonisolated convenience init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+  nonisolated init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
     self.init()
     self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
   }
 
-  nonisolated convenience init(cookies: Void) async {
+  nonisolated init(cookies: Void) async {
     self.init()
     self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
   }
 
-  convenience init(brownies: Void) {
+  init(brownies: Void) {
     self.init()
     self.flapsPerSec = 0 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
   }

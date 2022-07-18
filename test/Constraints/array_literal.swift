@@ -145,10 +145,13 @@ func defaultToAny(i: Int, s: String) {
   let _: [Any] = [1, "a", 3.5]
   let _: [Any] = [1, "a", [3.5, 3.7, 3.9]]
   let _: [Any] = [1, "a", [3.5, "b", 3]]
+  let _: [Any] = [1, [2, [3]]]
   
   let _: [Any?] = [1, "a", nil, 3.5]
   let _: [Any?] = [1, "a", nil, [3.5, 3.7, 3.9]]
   let _: [Any?] = [1, "a", nil, [3.5, "b", nil]]
+  let _: [Any?] = [1, [2, [3]]]
+  let _: [Any?] = [1, nil, [2, nil, [3]]]
 
   let a6 = [B(), C()]
   let _: Int = a6 // expected-error{{value of type '[A]'}}
