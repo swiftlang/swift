@@ -6277,11 +6277,9 @@ private:
   DerivativeFunctionConfigurationList *DerivativeFunctionConfigs = nullptr;
 
 public:
-  /// Get all derivative function configurations. If `lookInNonPrimarySources`
-  /// is true then lookup is done in non-primary sources as well. Note that
-  /// such lookup might end in cycles if done during sema stages.
+  /// Get all derivative function configurations.
   ArrayRef<AutoDiffConfig>
-  getDerivativeFunctionConfigurations(bool lookInNonPrimarySources = true);
+  getDerivativeFunctionConfigurations();
 
   /// Add the given derivative function configuration.
   void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);
