@@ -184,7 +184,12 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums9CLikeEnumOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
@@ -210,7 +215,12 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums19CharOrSectionMarkerOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
@@ -228,7 +238,12 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums8DataCaseOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
@@ -254,7 +269,12 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums17IntDoubleOrBignumOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
@@ -280,7 +300,12 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums13IntOrInfinityOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
@@ -318,7 +343,12 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums12TerminalCharOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSyntaxPrinter.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/Module.h"
 
 using namespace swift;
@@ -145,9 +146,22 @@ void ClangSyntaxPrinter::printSwiftTypeMetadataAccessFunctionCall(
   os << name << "(0)";
 }
 
-void ClangSyntaxPrinter::printValueWitnessTableAccessFromTypeMetadata(
+void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
     StringRef metadataVariable) {
-  os << "*(reinterpret_cast<";
+  os << "    auto *vwTableAddr = ";
+  os << "reinterpret_cast<";
   printSwiftImplQualifier();
-  os << "ValueWitnessTable **>(" << metadataVariable << "._0) - 1)";
+  os << "ValueWitnessTable **>(" << metadataVariable << "._0) - 1;\n";
+  os << "#ifdef __arm64e__\n";
+  os << "    auto *vwTable = ";
+  os << "reinterpret_cast<";
+  printSwiftImplQualifier();
+  os << "ValueWitnessTable *>(ptrauth_auth_data(";
+  os << "reinterpret_cast<void *>(*vwTableAddr), "
+        "ptrauth_key_process_independent_data, ";
+  os << "ptrauth_blend_discriminator(vwTableAddr, "
+     << SpecialPointerAuthDiscriminators::ValueWitnessTable << ")));\n";
+  os << "#else\n";
+  os << "    auto *vwTable = *vwTableAddr;\n";
+  os << "#endif\n";
 }

@@ -90,9 +90,10 @@ public:
   /// Print the call expression to the Swift type metadata access function.
   void printSwiftTypeMetadataAccessFunctionCall(StringRef name);
 
-  /// Print the expression to access the value witness table pointer from the
-  /// given type metadata variable.
-  void printValueWitnessTableAccessFromTypeMetadata(StringRef metadataVariable);
+  /// Print the set of statements to access the value witness table pointer
+  /// ('vwTable') from the given type metadata variable.
+  void printValueWitnessTableAccessSequenceFromTypeMetadata(
+      StringRef metadataVariable);
 
 protected:
   raw_ostream &os;
