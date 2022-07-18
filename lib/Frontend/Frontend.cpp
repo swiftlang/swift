@@ -1185,9 +1185,29 @@ bool CompilerInstance::forEachFileToTypeCheck(
   return false;
 }
 
+bool CompilerInstance::forEachSourceFile(
+    llvm::function_ref<bool(SourceFile &)> fn) {
+  for (auto fileName : getMainModule()->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(fileName);
+    if (!SF) {
+      continue;
+    }
+    if (fn(*SF))
+      return true;
+    ;
+  }
+
+  return false;
+}
+
 void CompilerInstance::finishTypeChecking() {
   forEachFileToTypeCheck([](SourceFile &SF) {
     performWholeModuleTypeChecking(SF);
+    return false;
+  });
+
+  forEachSourceFile([](SourceFile &SF) {
+    loadDerivativeConfigurations(SF);
     return false;
   });
 }
