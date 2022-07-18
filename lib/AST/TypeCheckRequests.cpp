@@ -1230,10 +1230,7 @@ Optional<Type> DefaultArgumentTypeRequest::getCachedResult() const {
   if (!defaultInfo)
     return None;
 
-  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
-    return None;
-
-  return defaultInfo->ExprType;
+  return defaultInfo->ExprType ? defaultInfo->ExprType : Optional<Type>();
 }
 
 void DefaultArgumentTypeRequest::cacheResult(Type type) const {
