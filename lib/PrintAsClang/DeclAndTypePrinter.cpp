@@ -1372,6 +1372,8 @@ private:
         return;
       auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
       printAbstractFunctionAsMethod(getter, /*isStatic=*/false);
+      if (auto *setter = VD->getOpaqueAccessor(AccessorKind::Set))
+        printAbstractFunctionAsMethod(setter, /*isStatic=*/false);
       return;
     }
 
