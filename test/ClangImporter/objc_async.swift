@@ -386,12 +386,10 @@ extension SomeWrapper: Sendable where T: Sendable {}
 // rdar://96830159
 @MainActor class SendableCompletionHandler {
   var isolatedThing: [String] = []
-  // expected-note@-1 {{property declared here}}
 
   func makeCall(slowServer: SlowServer) {
     slowServer.doSomethingSlow("churn butter") { (_ : Int) in
       let _ = self.isolatedThing
-      // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure; this is an error in Swift 6}}
     }
   }
 }
