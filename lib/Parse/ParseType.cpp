@@ -723,11 +723,9 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType,
       SourceLoc LAngle, RAngle;
       SmallVector<TypeRepr*, 8> GenericArgs;
       if (startsWithLess(Tok)) {
-        // Only attempt to parse a generic argument list in a cast destination type if the token text is just "<", because it can be an operator, for example:
-        // "1 as Int16 << 7".
-        if (Tok.isAnyOperator() &&
-            (Tok.getText().str() == "<" ||
-             reason != ParseTypeReason::CastDestination)) {
+        // Only attempt to parse a generic argument list in a cast destination type if the token text is just "<", because it can be an operator, for example: "1 as Int16 << 7".
+        if (Tok.getText().str() == "<" ||
+             reason != ParseTypeReason::CastDestination) {
           auto genericArgsStatus =
               parseGenericArguments(GenericArgs, LAngle, RAngle);
           if (genericArgsStatus.isErrorOrHasCompletion())
