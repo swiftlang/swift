@@ -822,6 +822,11 @@ std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
   AllowNamelessEntities = true;
   OptimizeProtocolNames = false;
 
+  // Local types are not ABI anyway. To avoid problems with the ASTDemangler,
+  // don't respect @_originallyDefinedIn here, since we don't respect it
+  // when mangling DWARF types for debug info.
+  RespectOriginallyDefinedIn = false;
+
   if (auto GTD = dyn_cast<GenericTypeDecl>(type)) {
     appendAnyGenericType(GTD);
   } else {
