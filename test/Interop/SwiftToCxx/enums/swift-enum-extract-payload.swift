@@ -87,14 +87,24 @@ public func makeUvw(_ x: Int) -> Uvw {
 // CHECK: class _impl_Bar {
 // CHECK:      static inline void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums3BarVMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT: }
 
 // CHECK: class _impl_Foo {
 // CHECK:      static inline void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums3FooVMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT: }
 
@@ -126,7 +136,12 @@ public func makeUvw(_ x: Int) -> Uvw {
 // CHECK: private:
 // CHECK:      inline char * _Nonnull _destructiveProjectEnumData() {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums16PrimitivePayloadOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT:   return _getOpaquePointer();
@@ -134,14 +149,24 @@ public func makeUvw(_ x: Int) -> Uvw {
 // CHECK: class _impl_PrimitivePayload {
 // CHECK:      static inline void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums16PrimitivePayloadOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT: }
 
 // CHECK: class _impl_Uvw {
 // CHECK:      static inline void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums3UvwOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT: }
 
@@ -165,7 +190,12 @@ public func makeUvw(_ x: Int) -> Uvw {
 // CHECK: private:
 // CHECK:      inline char * _Nonnull _destructiveProjectEnumData() {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums3XyzOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT:   return _getOpaquePointer();
@@ -173,6 +203,11 @@ public func makeUvw(_ x: Int) -> Uvw {
 // CHECK: class _impl_Xyz {
 // CHECK:      static inline void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums3XyzOMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT: }
