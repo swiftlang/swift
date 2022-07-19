@@ -702,10 +702,11 @@ private:
     // non-generic score indicates that there were no forced
     // unwrappings of optional(s), no unavailable overload
     // choices present in the solution, no fixes required,
-    // and there are no non-trivial function conversions.
+    // and there are no non-trivial user or function conversions.
     auto &score = BestNonGenericScore->Data;
     return (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-            score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0);
+            score[SK_Fix] == 0 && score[SK_UserConversion] == 0 &&
+            score[SK_FunctionConversion] == 0);
   }
 
   /// Attempt to apply given disjunction choice to constraint system.
