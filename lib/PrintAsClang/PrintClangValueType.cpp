@@ -65,7 +65,8 @@ void ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
     StringRef metadataVarName, StringRef vwTableVarName) {
   ClangSyntaxPrinter printer(os);
   printMetadataAccessAsVariable(os, metadataFuncName, indent, metadataVarName);
-  printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
+  printer.printValueWitnessTableAccessSequenceFromTypeMetadata(
+      metadataVarName, vwTableVarName, indent);
 }
 
 static void
