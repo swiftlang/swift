@@ -79,13 +79,19 @@ A<(B) throws -> D>(x: 0) // expected-warning{{unused}}
 
 // https://github.com/apple/swift/issues/43053
 do {
-  1 as! A<B>.F << 2 // expected-warning{{cast from 'Int' to unrelated type 'A<B>.F' always fails}} // expected-error {{referencing operator function '<<' on 'BinaryInteger' requires that 'A<B>.F' conform to 'BinaryInteger'}}
-  1 as! A<B> << 2 // expected-warning{{cast from 'Int' to unrelated type 'A<B>' always fails}} expected-error{{referencing operator function '<<' on 'BinaryInteger' requires that 'A<B>' conform to 'BinaryInteger'}}
+  1 as! A<B>.F << 2 // expected-warning {{cast from 'Int' to unrelated type 'A<B>.F' always fails}}
+  // expected-error@-1 {{referencing operator function '<<' on 'BinaryInteger' requires that 'A<B>.F' conform to 'BinaryInteger'}}
+  1 as! A<B> << 2 // expected-warning {{cast from 'Int' to unrelated type 'A<B>' always fails}}
+  // expected-error@-1 {{referencing operator function '<<' on 'BinaryInteger' requires that 'A<B>' conform to 'BinaryInteger'}}
   let _ = 1 as Int16 << 7
-  let _ = 1 as? Int16 << 7 // expected-error{{value of optional type 'Int16?' must be unwrapped to a value of type 'Int16'}} expected-warning{{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}} expected-note{{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-  let _ = 1 is Int16 << 7 // expected-warning{{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}} expected-error{{binary operator '<<' cannot be applied to operands of type 'Bool' and 'Int'}}
-  let _ = 1 as! Int16 << 7 // expected-warning{{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}}
+  let _ = 1 as? Int16 << 7 // expected-error {{value of optional type 'Int16?' must be unwrapped to a value of type 'Int16'}}
+  // expected-warning@-1 {{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  let _ = 1 is Int16 << 7 // expected-warning {{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}}
+  // expected-error@-1 {{binary operator '<<' cannot be applied to operands of type 'Bool' and 'Int'}}
+  let _ = 1 as! Int16 << 7 // expected-warning {{conditional downcast from literal to 'Int16' always fails; consider using 'as' coercion}}
   let _ = 1 as Int16 <= 7
   // FIXME: this should not produce any errors.
-  let _ = 1 as Int16 < 7 // expected-error{{expected type}}
+  let _ = 1 as Int16 < 7 // expected-error {{expected type}}
 }
