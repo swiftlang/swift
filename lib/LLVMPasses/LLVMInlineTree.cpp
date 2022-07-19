@@ -370,3 +370,12 @@ bool InlineTreePrinter::runOnModule(Module &M) {
   Tree.print(outs());
   return false;
 }
+
+llvm::PreservedAnalyses
+swift::InlineTreePrinterPass::run(llvm::Module &M,
+                                  llvm::ModuleAnalysisManager &AM) {
+  InlineTree Tree;
+  Tree.build(&M);
+  Tree.print(outs());
+  return llvm::PreservedAnalyses::all();
+}
