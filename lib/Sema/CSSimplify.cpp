@@ -5703,6 +5703,9 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::OptionalPayload: {
+    recordAnyTypeVarAsPotentialHole(lhs);
+    recordAnyTypeVarAsPotentialHole(rhs);
+    
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
