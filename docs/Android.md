@@ -7,8 +7,9 @@ device running Android or an emulator. This guide explains:
 1. How to run a simple "Hello, world" program on your Android device.
 2. How to run the Swift test suite on an Android device.
 
-If you encounter any problems following the instructions below, please file a
-bug using https://bugs.swift.org/.
+If you encounter any problems following the instructions below, please
+[file an issue](https://github.com/apple/swift/issues) and apply the "Android"
+label.
 
 ## FAQ
 

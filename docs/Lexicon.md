@@ -574,11 +574,11 @@ for flow-sensitive diagnostics, optimization, and LLVM IR generation.
 
 ## SR
 
-An issue reported on [bugs.swift.org](https://bugs.swift.org). A
-backronym for "Swift Report"; really the name is derived from LLVM's
-idiomatic use of "PR" ("Problem Report") for its bugs. We didn't go with
-"PR" for Swift because we wanted to be able to unambiguously reference
-LLVM bugs.
+An issue that was originally reported on the now-retired Jira instance that used
+to be located at [bugs.swift.org](https://bugs.swift.org). A backronym for
+"Swift Report"; really the name is derived from LLVM's idiomatic use of "PR"
+("Problem Report") for its bugs. We didn't go with "PR" for Swift because we
+wanted to be able to unambiguously reference LLVM bugs.
 
 ## stdlib
 
