@@ -257,3 +257,10 @@ func rdar79672230() {
   var t: MyType = MyType()
   test(&t) // expected-error {{no exact matches in call to local function 'test'}}
 }
+
+// https://github.com/apple/swift/issues/60029
+for (key, values) in oldName { // expected-error{{cannot find 'oldName' in scope}}
+  for (idx, value) in values.enumerated() {
+    print(key, idx, value)
+  }
+}
