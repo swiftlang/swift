@@ -55,6 +55,9 @@ public struct FirstSmallStruct {
 // CHECK:      inline uint32_t FirstSmallStruct::getX() const {
 // CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvg(_getOpaquePointer());
 // CHECK-NEXT: }
+// CHECK:      inline void FirstSmallStruct::setX(uint32_t value) {
+// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvs(value, _getOpaquePointer());
+// CHECK-NEXT: }
 // CHECK-NEXT: inline void FirstSmallStruct::dump() const {
 // CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }
