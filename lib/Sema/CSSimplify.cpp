@@ -1468,6 +1468,7 @@ namespace {
   enum class OpenedExistentialAdjustmentFlags {
     /// The argument should be made inout after opening.
     InOut = 0x01,
+    LValue = 0x02,
   };
 
   using OpenedExistentialAdjustments =
@@ -1540,6 +1541,12 @@ shouldOpenExistentialCallArgument(
   }
 
   OpenedExistentialAdjustments adjustments;
+
+  // The argument may be a "var" instead of a "let".
+  if (auto lv = argTy->getAs<LValueType>()) {
+    argTy = lv->getObjectType();
+    adjustments |= OpenedExistentialAdjustmentFlags::LValue;
+  }
 
   // If the argument is inout, strip it off and we can add it back.
   if (auto inOutArg = argTy->getAs<InOutType>()) {
@@ -1945,6 +1952,9 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         OpenedArchetypeType *opened;
         std::tie(argTy, opened) = cs.openExistentialType(
             existentialType, cs.getConstraintLocator(loc));
+
+        if (adjustments.contains(OpenedExistentialAdjustmentFlags::LValue))
+          argTy = LValueType::get(argTy);
 
         if (adjustments.contains(OpenedExistentialAdjustmentFlags::InOut))
           argTy = InOutType::get(argTy);
