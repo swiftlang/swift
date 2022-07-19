@@ -11,7 +11,7 @@
 // REQUIRES: executable_test
 
 #include <cassert>
-#include <iostream>
+#include <cstdio>
 #include "functions.h"
 
 int main() {
@@ -22,17 +22,17 @@ int main() {
   try {
     Functions::emptyThrowFunction();
   } catch (swift::_impl::NaiveException& e) {
-    std::cout << e.getMessage() << "\n";
+    printf("%s\n", e.getMessage());
   }
   try {
     Functions::throwFunction();
   } catch (swift::_impl::NaiveException& e) {
-    std::cout << e.getMessage() << "\n";
+    printf("%s\n", e.getMessage());
   }
   try {
     Functions::throwFunctionWithReturn();
   } catch (swift::_impl::NaiveException& e) {
-    std::cout << e.getMessage() << "\n";
+    printf("%s\n", e.getMessage());
   }
 
   return 0;
