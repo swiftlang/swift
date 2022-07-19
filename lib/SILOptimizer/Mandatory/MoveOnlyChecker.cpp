@@ -32,17 +32,38 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                            Diagnostic Utilities
+//                                 Utilities
 //===----------------------------------------------------------------------===//
 
 template <typename... T, typename... U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
+static StringRef getVariableNameForValue(MarkMustCheckInst *mmci) {
+  StringRef varName = "unknown";
+  if (auto *use = getSingleDebugUse(mmci)) {
+    DebugVarCarryingInst debugVar(use->getUser());
+    if (auto varInfo = debugVar.getVarInfo()) {
+      varName = varInfo->Name;
+    } else {
+      if (auto *decl = debugVar.getDecl()) {
+        varName = decl->getBaseName().userFacingName();
+      }
+    }
+  }
+
+  return varName;
 }
 
 //===----------------------------------------------------------------------===//
@@ -188,9 +209,9 @@ gatherBorrowsToCheckOfMovedValue(SILValue markedValue,
         foundBorrows.push_back(cast<BeginBorrowInst>(user));
         break;
       }
+      case OperandOwnership::EndBorrow:
       case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::InteriorPointer:
-      case OperandOwnership::EndBorrow:
       case OperandOwnership::Reborrow:
         llvm_unreachable("Should never see these on owned values");
       }
@@ -470,7 +491,20 @@ namespace {
 
 struct MoveOnlyChecker {
   SILFunction *fn;
+
+  /// A set of mark_must_check that we are actually going to process.
   SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
+
+  /// A per mark must check, vector of uses that copy propagation says need a
+  /// copy.
+  SmallVector<Operand *, 32> consumingUsesNeedingCopy;
+
+  /// A per mark must check, vector of uses that copy propagation says do not
+  /// need a copy. This could include lifetime extension.
+  ///
+  /// TODO: Rename this.
+  SmallVector<Operand *, 32> consumingUsesNotNeedingCopy;
+
   CopyOfBorrowedProjectionChecker copyOfBorrowedProjectionChecker;
 
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks)
@@ -485,6 +519,10 @@ struct MoveOnlyChecker {
   /// recognize after emitting the diagnostic.
   bool searchForCandidateMarkMustChecks();
 
+  /// Emits an error diagnostic for \p markedValue.
+  void emitDiagnostic(MarkMustCheckInst *markedValue,
+                      bool originalValueGuaranteed);
+
   bool check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
              DominanceInfo *domTree);
 };
@@ -498,9 +536,99 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
       ++ii;
 
-      if (!mmci || !mmci->isNoImplicitCopy())
+      if (!mmci || !mmci->hasMoveCheckerKind())
         continue;
 
+      // Handle guaranteed arguments.
+      //
+      // We are pattern matching this pattern:
+      //
+      // bb0(%0 : @guaranteed $T):
+      //   %1 = copyable_to_moveonlywrapper [guaranteed] %0
+      //   %2 = copy_value %1
+      //   %3 = mark_must_check [no_copy] %2
+      //
+      // NOTE: Unlike with owned arguments, we do not need to insert a
+      // begin_borrow lexical since the lexical value comes from the guaranteed
+      // argument itself.
+      //
+      // NOTE: When we are done checking, we will eliminate the copy_value,
+      // mark_must_check inst to leave the IR in a guaranteed state.
+      if (auto *cvi = dyn_cast<CopyValueInst>(mmci->getOperand())) {
+        if (auto *cvt = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
+                cvi->getOperand())) {
+          if (auto *arg = dyn_cast<SILFunctionArgument>(cvt->getOperand())) {
+            if (arg->isNoImplicitCopy() &&
+                arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+              moveIntroducersToProcess.insert(mmci);
+              continue;
+            }
+          }
+        }
+      }
+
+      // Handle trivial arguments and values.
+      //
+      // In the instruction stream this looks like:
+      //
+      // bb0(%0 : $Trivial):
+      //  %1 = copyable_to_moveonlywrapper [owned] %0
+      //  %2 = move_value [lexical] %1
+      //  %3 = mark_must_check [no_implicit_copy] %2
+      //
+      // *OR*
+      //
+      // bb0(%0 : $Trivial):
+      //  %1 = copyable_to_moveonlywrapper [owned] %0
+      //  %2 = move_value [lexical] %1
+      //  %3 = mark_must_check [no_copy] %2
+      //
+      // We are relying on a structural SIL requirement that %0 has only one
+      // use, %1. This is validated by the SIL verifier. In this case, we need
+      // the move_value [lexical] to ensure that we get a lexical scope for the
+      // non-trivial value.
+      if (auto *mvi = dyn_cast<MoveValueInst>(mmci->getOperand())) {
+        if (mvi->isLexical()) {
+          if (auto *cvt = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
+                  mvi->getOperand())) {
+            if (cvt->getOperand()->getType().isTrivial(*fn)) {
+              moveIntroducersToProcess.insert(mmci);
+              continue;
+            }
+          }
+        }
+      }
+
+      // Handle owned arguments.
+      //
+      // We are pattern matching this:
+      //
+      // bb0(%0 : @owned $T):
+      //   %1 = copyable_to_moveonlywrapper [owned] %0
+      //   %2 = move_value [lexical] %1
+      //   %3 = mark_must_check [no_implicit_copy_owned] %2
+      if (auto *mvi = dyn_cast<MoveValueInst>(mmci->getOperand())) {
+        if (mvi->isLexical()) {
+          if (auto *cvt = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
+                  mvi->getOperand())) {
+            if (auto *arg = dyn_cast<SILFunctionArgument>(cvt->getOperand())) {
+              if (arg->isNoImplicitCopy()) {
+                moveIntroducersToProcess.insert(mmci);
+                continue;
+              }
+            }
+          }
+        }
+      }
+
+      // Handle non-trivial values.
+      //
+      // We are looking for the following pattern:
+      //
+      //  %1 = begin_borrow [lexical] %0
+      //  %2 = copy_value %1
+      //  %3 = copyable_to_moveonlywrapper [owned] %2
+      //  %4 = mark_must_check [no_implicit_copy]
       if (auto *mvi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
               mmci->getOperand())) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
@@ -513,6 +641,13 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
         }
       }
 
+      // Handle trivial values.
+      //
+      // We pattern match:
+      //
+      // %1 = copyable_to_moveonlywrapper [owned] %0
+      // %2 = move_value [lexical] %1
+      // %3 = mark_must_check [no_implicit_copy] %2
       if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mmci->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
           if (bbi->isLexical()) {
@@ -540,6 +675,71 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
   return changed;
 }
 
+void MoveOnlyChecker::emitDiagnostic(MarkMustCheckInst *markedValue,
+                                     bool originalValueGuaranteed) {
+  auto &astContext = fn->getASTContext();
+  StringRef varName = getVariableNameForValue(markedValue);
+
+  if (originalValueGuaranteed) {
+    diagnose(astContext,
+             markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+             diag::sil_moveonlychecker_guaranteed_value_consumed, varName);
+  } else {
+    diagnose(astContext,
+             markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+             diag::sil_moveonlychecker_owned_value_consumed_more_than_once,
+             varName);
+  }
+
+  while (consumingUsesNeedingCopy.size()) {
+    auto *consumingUse = consumingUsesNeedingCopy.pop_back_val();
+
+    // See if the consuming use is an owned moveonly_to_copyable whose only
+    // user is a return. In that case, use the return loc instead. We do this
+    // b/c it is illegal to put a return value location on a non-return value
+    // instruction... so we have to hack around this slightly.
+    auto *user = consumingUse->getUser();
+    auto loc = user->getLoc();
+    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
+        loc = ri->getLoc();
+      }
+    }
+
+    diagnose(astContext, loc.getSourceLoc(),
+             diag::sil_moveonlychecker_consuming_use_here);
+  }
+
+  while (consumingUsesNotNeedingCopy.size()) {
+    auto *consumingUse = consumingUsesNotNeedingCopy.pop_back_val();
+
+    // See if the consuming use is an owned moveonly_to_copyable whose only
+    // user is a return. In that case, use the return loc instead. We do this
+    // b/c it is illegal to put a return value location on a non-return value
+    // instruction... so we have to hack around this slightly.
+    auto *user = consumingUse->getUser();
+    auto loc = user->getLoc();
+    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+      if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
+        loc = ri->getLoc();
+      }
+    }
+
+    diagnose(astContext, loc.getSourceLoc(),
+             diag::sil_moveonlychecker_consuming_use_here);
+  }
+
+  auto &foundConsumesOfBorrowedSubValues =
+      copyOfBorrowedProjectionChecker.foundConsumesOfBorrowedSubValues;
+  while (foundConsumesOfBorrowedSubValues.size()) {
+    auto *user = foundConsumesOfBorrowedSubValues.pop_back_val();
+    auto loc = user->getLoc();
+
+    diagnose(astContext, loc.getSourceLoc(),
+             diag::sil_moveonlychecker_consuming_use_here);
+  }
+}
+
 bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                             DominanceInfo *domTree) {
   bool changed = false;
@@ -564,11 +764,9 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       });
   InstructionDeleter deleter(std::move(callbacks));
 
-  SmallVector<Operand *, 32> consumingUsesNeedingCopy;
   auto foundConsumingUseNeedingCopy = [&](Operand *use) {
     consumingUsesNeedingCopy.push_back(use);
   };
-  SmallVector<Operand *, 32> consumingUsesNotNeedingCopy;
   auto foundConsumingUseNotNeedingCopy = [&](Operand *use) {
     consumingUsesNotNeedingCopy.push_back(use);
   };
@@ -577,10 +775,9 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       false /*pruneDebugMode*/, false /*poisonRefsMode*/, accessBlockAnalysis,
       domTree, deleter, foundConsumingUseNeedingCopy,
       foundConsumingUseNotNeedingCopy);
-  auto &astContext = fn->getASTContext();
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
-  bool emittedDiagnostic = false;
+  SmallPtrSet<MarkMustCheckInst *, 4> valuesWithDiagnostics;
   while (!moveIntroducers.empty()) {
     SWIFT_DEFER {
       consumingUsesNeedingCopy.clear();
@@ -588,10 +785,23 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       copyOfBorrowedProjectionChecker.clear();
     };
 
-    SILValue markedValue = moveIntroducers.front();
+    MarkMustCheckInst *markedValue = moveIntroducers.front();
     moveIntroducers = moveIntroducers.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
+
+    // First canonicalize ownership.
     changed |= canonicalizer.canonicalizeValueLifetime(markedValue);
+
+    // If we are asked to perform guaranteed checking, emit an error if we have
+    // /any/ consuming uses.
+    if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
+      if (!consumingUsesNeedingCopy.empty() ||
+          !consumingUsesNotNeedingCopy.empty()) {
+        emitDiagnostic(markedValue, true /*original value guaranteed*/);
+        valuesWithDiagnostics.insert(markedValue);
+      }
+      continue;
+    }
 
     if (consumingUsesNeedingCopy.empty()) {
       // If we don't see any situations where we need a direct copy, check if we
@@ -611,82 +821,50 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       // Otherwise, emit our diagnostic below.
     }
 
-    StringRef varName = "unknown";
-    if (auto *use = getSingleDebugUse(markedValue)) {
-      DebugVarCarryingInst debugVar(use->getUser());
-      if (auto varInfo = debugVar.getVarInfo()) {
-        varName = varInfo->Name;
-      } else {
-        if (auto *decl = debugVar.getDecl()) {
-          varName = decl->getBaseName().userFacingName();
-        }
-      }
-    }
-
-    emittedDiagnostic = true;
-    diagnose(astContext,
-             markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
-             diag::sil_moveonlychecker_value_consumed_more_than_once, varName);
-
-    while (consumingUsesNeedingCopy.size()) {
-      auto *consumingUse = consumingUsesNeedingCopy.pop_back_val();
-
-      // See if the consuming use is an owned moveonly_to_copyable whose only
-      // user is a return. In that case, use the return loc instead. We do this
-      // b/c it is illegal to put a return value location on a non-return value
-      // instruction... so we have to hack around this slightly.
-      auto *user = consumingUse->getUser();
-      auto loc = user->getLoc();
-      if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-        if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
-          loc = ri->getLoc();
-        }
-      }
-
-      diagnose(astContext, loc.getSourceLoc(),
-               diag::sil_moveonlychecker_consuming_use_here);
-    }
-
-    while (consumingUsesNotNeedingCopy.size()) {
-      auto *consumingUse = consumingUsesNotNeedingCopy.pop_back_val();
-
-      // See if the consuming use is an owned moveonly_to_copyable whose only
-      // user is a return. In that case, use the return loc instead. We do this
-      // b/c it is illegal to put a return value location on a non-return value
-      // instruction... so we have to hack around this slightly.
-      auto *user = consumingUse->getUser();
-      auto loc = user->getLoc();
-      if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
-        if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
-          loc = ri->getLoc();
-        }
-      }
-
-      diagnose(astContext, loc.getSourceLoc(),
-               diag::sil_moveonlychecker_consuming_use_here);
-    }
-
-    auto &foundConsumesOfBorrowedSubValues =
-        copyOfBorrowedProjectionChecker.foundConsumesOfBorrowedSubValues;
-    while (foundConsumesOfBorrowedSubValues.size()) {
-      auto *user = foundConsumesOfBorrowedSubValues.pop_back_val();
-      auto loc = user->getLoc();
-
-      diagnose(astContext, loc.getSourceLoc(),
-               diag::sil_moveonlychecker_consuming_use_here);
-    }
+    emitDiagnostic(markedValue, false /*original value guaranteed*/);
+    valuesWithDiagnostics.insert(markedValue);
   }
+  bool emittedDiagnostic = valuesWithDiagnostics.size();
 
-  // Ok, we have success. All of our marker instructions were proven as
-  // safe. Now we need to clean up the IR by eliminating our marker instructions
-  // to signify that the checked SIL is correct.
+  // Ok, we have success. All of our marker instructions were proven as safe or
+  // we emitted a diagnostic. Now we need to clean up the IR by eliminating our
+  // marker instructions to signify that the checked SIL is correct. We also
+  // perform some small cleanups for guaranteed values if we emitted a
+  // diagnostic on them.
   //
   // NOTE: This is enforced in the verifier by only allowing MarkMustCheckInst
-  // in Raw SIL.
+  // in Raw SIL. This ensures we do not miss any.
+  //
+  // NOTE: destroys is a separate array that we use to avoid iterator
+  // invalidation when cleaning up destroy_value of guaranteed checked values.
+  SmallVector<DestroyValueInst *, 8> destroys;
   while (!moveIntroducersToProcess.empty()) {
-    auto *mvi = moveIntroducersToProcess.pop_back_val();
-    mvi->replaceAllUsesWith(mvi->getOperand());
-    mvi->eraseFromParent();
+    auto *markedInst = moveIntroducersToProcess.pop_back_val();
+
+    // If we didn't emit a diagnostic on a non-trivial guaranteed argument,
+    // eliminate the copy_value, destroy_values, and the mark_must_check.
+    if (!valuesWithDiagnostics.count(markedInst)) {
+      if (markedInst->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand())) {
+          if (auto *arg = dyn_cast<SILFunctionArgument>(cvi->getOperand())) {
+            if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+              for (auto *use : markedInst->getConsumingUses()) {
+                destroys.push_back(cast<DestroyValueInst>(use->getUser()));
+              }
+              while (!destroys.empty())
+                destroys.pop_back_val()->eraseFromParent();
+              markedInst->replaceAllUsesWith(arg);
+              markedInst->eraseFromParent();
+              cvi->eraseFromParent();
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    markedInst->replaceAllUsesWith(markedInst->getOperand());
+    markedInst->eraseFromParent();
     changed = true;
   }
 

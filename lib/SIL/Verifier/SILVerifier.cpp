@@ -5398,7 +5398,9 @@ public:
 
   void checkCopyableToMoveOnlyWrapperValueInst(
       CopyableToMoveOnlyWrapperValueInst *cvt) {
-    require(!cvt->getOperand()->getType().isTrivial(*cvt->getFunction()),
+    require(cvt->getInitialKind() ==
+                    CopyableToMoveOnlyWrapperValueInst::Owned ||
+                !cvt->getOperand()->getType().isTrivial(*cvt->getFunction()),
             "To convert from a trivial value to a move only wrapper value use "
             "TrivialToGuaranteedMoveOnlyWrapperValueInst");
     require(cvt->getOperand()->getType().isObject(),

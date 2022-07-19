@@ -3398,6 +3398,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     using CheckKind = MarkMustCheckInst::CheckKind;
     CheckKind CKind = llvm::StringSwitch<CheckKind>(AttrName)
                           .Case("no_implicit_copy", CheckKind::NoImplicitCopy)
+                          .Case("no_copy", CheckKind::NoCopy)
                           .Default(CheckKind::Invalid);
 
     if (CKind == CheckKind::Invalid) {

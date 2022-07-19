@@ -1300,6 +1300,8 @@ public:
   CopyableToMoveOnlyWrapperValueInst *
   createGuaranteedCopyableToMoveOnlyWrapperValue(SILLocation loc,
                                                  SILValue src) {
+    assert(!src->getType().isTrivial(*F) &&
+           "trivial types can only use the owned version of this API");
     return insert(new (getModule()) CopyableToMoveOnlyWrapperValueInst(
         getSILDebugLocation(loc), src,
         CopyableToMoveOnlyWrapperValueInst::Guaranteed));

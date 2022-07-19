@@ -7570,7 +7570,16 @@ class MarkMustCheckInst
 public:
   enum class CheckKind : unsigned {
     Invalid = 0,
+
+    // A signal to the move only checker to perform no implicit copy checking on
+    // the result of this instruction. This implies that the result can be
+    // consumed at most once.
     NoImplicitCopy,
+
+    // A signal to the move only checker ot perform no copy checking. This
+    // forces the result of this instruction owned value to never be consumed
+    // (still allowing for non-consuming uses of course).
+    NoCopy,
   };
 
 private:
@@ -7589,7 +7598,15 @@ private:
 public:
   CheckKind getCheckKind() const { return kind; }
 
-  bool isNoImplicitCopy() const { return kind == CheckKind::NoImplicitCopy; }
+  bool hasMoveCheckerKind() const {
+    switch (kind) {
+    case CheckKind::Invalid:
+      return false;
+    case CheckKind::NoImplicitCopy:
+    case CheckKind::NoCopy:
+      return true;
+    }
+  }
 };
 
 /// Convert from a non-trivial copyable type to an `@moveOnly` wrapper type.
@@ -7631,7 +7648,8 @@ private:
       : UnaryInstructionBase(
             DebugLoc, operand, operand->getType().addingMoveOnlyWrapper(),
             kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
-                                            : OwnershipKind::Owned) {}
+                                            : OwnershipKind::Owned),
+        initialKind(kind) {}
 
 public:
   InitialKind getInitialKind() const { return initialKind; }

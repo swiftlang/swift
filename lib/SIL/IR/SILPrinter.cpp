@@ -1910,6 +1910,9 @@ public:
     case CheckKind::NoImplicitCopy:
       *this << "[no_implicit_copy] ";
       break;
+    case CheckKind::NoCopy:
+      *this << "[no_copy] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }

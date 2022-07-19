@@ -59,7 +59,7 @@ sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 // TRIVIAL-NEXT: } // end sil function 'simple_copy_borrow_value'
 sil [ossa] @simple_copy_borrow_value : $@convention(thin) (Trivial) -> () {
 bb0(%0 : $Trivial):
-  %1 = copyable_to_moveonlywrapper %0 : $Trivial
+  %1 = copyable_to_moveonlywrapper [owned] %0 : $Trivial
   %2 = copy_value %1 : $@moveOnly Trivial
   %3 = begin_borrow %2 : $@moveOnly Trivial
   %4 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
@@ -108,7 +108,7 @@ bb0(%0 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
 
   %alloc = alloc_stack $@moveOnly Trivial
-  %1 = copyable_to_moveonlywrapper %0 : $Trivial
+  %1 = copyable_to_moveonlywrapper [owned] %0 : $Trivial
   store %1 to [init] %alloc : $*@moveOnly Trivial
   %2 = load [copy] %alloc : $*@moveOnly Trivial
   %2a = begin_borrow %2 : $@moveOnly Trivial
@@ -163,7 +163,7 @@ bb0(%0 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
 
   %alloc = alloc_stack $@moveOnly Trivial
-  %1 = copyable_to_moveonlywrapper %0 : $Trivial
+  %1 = copyable_to_moveonlywrapper [owned] %0 : $Trivial
   %1a = begin_borrow %1 : $@moveOnly Trivial
   store_borrow %1a to %alloc : $*@moveOnly Trivial
   %2 = load [copy] %alloc : $*@moveOnly Trivial
@@ -209,8 +209,8 @@ sil [ossa] @simple_struct_aggregate_usage : $@convention(thin) (Trivial, Trivial
 bb0(%0 : $Trivial, %1 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
 
-  %0a = copyable_to_moveonlywrapper %0 : $Trivial
-  %1a = copyable_to_moveonlywrapper %1 : $Trivial
+  %0a = copyable_to_moveonlywrapper [owned] %0 : $Trivial
+  %1a = copyable_to_moveonlywrapper [owned] %1 : $Trivial
   %2 = struct $@moveOnly TrivialPair (%0a : $@moveOnly Trivial, %1a : $@moveOnly Trivial)
   %2b = begin_borrow %2 : $@moveOnly TrivialPair
   %ext = struct_extract %2b : $@moveOnly TrivialPair, #TrivialPair.lhs
@@ -277,7 +277,7 @@ sil [ossa] @simple_enum_aggregate_usage : $@convention(thin) (Trivial) -> FakeOp
 bb0(%0 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
 
-  %0a = copyable_to_moveonlywrapper %0 : $Trivial
+  %0a = copyable_to_moveonlywrapper [owned] %0 : $Trivial
 
   %2 = enum $@moveOnly FakeOptional<Trivial>, #FakeOptional.some!enumelt, %0a : $@moveOnly Trivial
 
@@ -308,7 +308,7 @@ bb0(%0 : $Trivial):
 sil [ossa] @simple_switch_enum : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
 bb0(%0 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-  %0a = copyable_to_moveonlywrapper %0 : $Trivial
+  %0a = copyable_to_moveonlywrapper [owned] %0 : $Trivial
   debug_value %0a : $@moveOnly Trivial, let, name "foo"
   %2 = enum $@moveOnly FakeOptional<Trivial>, #FakeOptional.some!enumelt, %0a : $@moveOnly Trivial
 
@@ -346,7 +346,7 @@ bb3(%result : @owned $@moveOnly FakeOptional<Trivial>):
 sil [ossa] @simple_klass_copy_borrow_value : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1aa = copy_value %0 : $Klass
-  %1 = copyable_to_moveonlywrapper %1aa : $Klass
+  %1 = copyable_to_moveonlywrapper [owned] %1aa : $Klass
   %2 = copy_value %1 : $@moveOnly Klass
   %3 = begin_borrow %2 : $@moveOnly Klass
   %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
@@ -377,7 +377,7 @@ bb0(%0 : @guaranteed $Klass):
 
   %alloc = alloc_stack $@moveOnly Klass
   %1aa = copy_value %0 : $Klass
-  %1 = copyable_to_moveonlywrapper %1aa : $Klass
+  %1 = copyable_to_moveonlywrapper [owned] %1aa : $Klass
   store %1 to [init] %alloc : $*@moveOnly Klass
   %2 = load [copy] %alloc : $*@moveOnly Klass
   %2a = begin_borrow %2 : $@moveOnly Klass
@@ -416,7 +416,7 @@ bb0(%0 : @guaranteed $Klass):
 
   %alloc = alloc_stack $@moveOnly Klass
   %1aa = copy_value %0 : $Klass
-  %1 = copyable_to_moveonlywrapper %1aa : $Klass
+  %1 = copyable_to_moveonlywrapper [owned] %1aa : $Klass
   %1a = begin_borrow %1 : $@moveOnly Klass
   store_borrow %1a to %alloc : $*@moveOnly Klass
   %2 = load [copy] %alloc : $*@moveOnly Klass
@@ -454,8 +454,8 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %0aa = copy_value %0 : $Klass
   %1aa = copy_value %1 : $Klass
-  %0a = copyable_to_moveonlywrapper %0aa : $Klass
-  %1a = copyable_to_moveonlywrapper %1aa : $Klass
+  %0a = copyable_to_moveonlywrapper [owned] %0aa : $Klass
+  %1a = copyable_to_moveonlywrapper [owned] %1aa : $Klass
   %2 = struct $@moveOnly KlassPair (%0a : $@moveOnly Klass, %1a : $@moveOnly Klass)
   %2b = begin_borrow %2 : $@moveOnly KlassPair
   %ext = struct_extract %2b : $@moveOnly KlassPair, #KlassPair.lhs
@@ -513,7 +513,7 @@ sil [ossa] @simple_klass_enum_aggregate_usage : $@convention(thin) (@guaranteed 
 bb0(%0 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %0aa = copy_value %0 : $Klass
-  %0a = copyable_to_moveonlywrapper %0aa : $Klass
+  %0a = copyable_to_moveonlywrapper [owned] %0aa : $Klass
 
   %2 = enum $@moveOnly FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $@moveOnly Klass
 
@@ -542,7 +542,7 @@ sil [ossa] @simple_klass_switch_enum : $@convention(thin) (@guaranteed Klass) ->
 bb0(%0 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %0aa = copy_value %0 : $Klass
-  %0a = copyable_to_moveonlywrapper %0aa : $Klass
+  %0a = copyable_to_moveonlywrapper [owned] %0aa : $Klass
   %notUsed = class_method %0a : $@moveOnly Klass, #Klass.foo : (Klass) -> () -> (), $@convention(method) (@guaranteed Klass) -> ()
   debug_value %0a : $@moveOnly Klass, let, name "foo"
   %2 = enum $@moveOnly FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $@moveOnly Klass
