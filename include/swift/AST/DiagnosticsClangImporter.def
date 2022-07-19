@@ -144,9 +144,9 @@ NOTE(macro_not_imported_unsupported_structure, none, "macro '%0' not imported: s
 NOTE(macro_not_imported, none, "macro '%0' not imported", (StringRef))
 
 NOTE(return_type_not_imported, none, "return type not imported", ())
-NOTE(parameter_type_not_imported, none, "parameter '%0' not imported", (const clang::NamedDecl*))
-NOTE(incomplete_interface, none, "interface '%0' is incomplete", (const clang::NamedDecl*))
-NOTE(incomplete_protocol, none, "protocol '%0' is incomplete", (const clang::NamedDecl*))
+NOTE(parameter_type_not_imported, none, "parameter %0 not imported", (const clang::NamedDecl*))
+NOTE(incomplete_interface, none, "interface %0 is incomplete", (const clang::NamedDecl*))
+NOTE(incomplete_protocol, none, "protocol %0 is incomplete", (const clang::NamedDecl*))
 NOTE(incomplete_record, none, "record '%0' is not defined (incomplete)", (StringRef))
 NOTE(record_over_aligned, none, "record '%0' is over aligned", (StringRef))
 NOTE(record_non_trivial_copy_destroy, none, "record '%0' is not trivial to copy/destroy", (StringRef))
@@ -171,13 +171,13 @@ NOTE(dont_use_iterator_api, none, "C++ method '%0' that returns an unsafe "
      (StringRef))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
-NOTE(record_field_not_imported, none, "field '%0' not imported", (const clang::NamedDecl*))
-NOTE(invoked_func_not_imported, none, "function '%0' not imported", (const clang::NamedDecl*))
-NOTE(record_method_not_imported, none, "method '%0' not imported", (const clang::NamedDecl*))
-NOTE(objc_property_not_imported, none, "property '%0' not imported", (const clang::NamedDecl*))
+NOTE(record_field_not_imported, none, "field %0 not imported", (const clang::NamedDecl*))
+NOTE(invoked_func_not_imported, none, "function %0 not imported", (const clang::NamedDecl*))
+NOTE(record_method_not_imported, none, "method %0 not imported", (const clang::NamedDecl*))
+NOTE(objc_property_not_imported, none, "property %0 not imported", (const clang::NamedDecl*))
 
-NOTE(forward_declared_interface_label, none, "interface '%0' forward declared here", (const clang::NamedDecl*))
-NOTE(forward_declared_protocol_label, none, "protocol '%0' forward declared here", (const clang::NamedDecl*))
+NOTE(forward_declared_interface_label, none, "interface %0 forward declared here", (const clang::NamedDecl*))
+NOTE(forward_declared_protocol_label, none, "protocol %0 forward declared here", (const clang::NamedDecl*))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
