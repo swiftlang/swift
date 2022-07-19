@@ -1605,6 +1605,23 @@ unsigned BindingSet::getNumViableLiteralBindings() const {
   });
 }
 
+/// Return string for atomic literal kinds (integer, string, & boolean) for
+/// printing in debug output.
+static std::string getAtomLiteralAsString(ExprKind EK) {
+#define ENTRY(Kind, String)                                                    \
+  case ExprKind::Kind:                                                         \
+    return String
+  switch (EK) {
+    ENTRY(IntegerLiteral, "integer");
+    ENTRY(StringLiteral, "string");
+    ENTRY(BooleanLiteral, "boolean");
+    ENTRY(NilLiteral, "nil");
+  default:
+    return "";
+  }
+#undef ENTRY
+}
+
 void BindingSet::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
                       unsigned indent) const {
   out.indent(indent);
