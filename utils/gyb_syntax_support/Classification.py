@@ -1,4 +1,4 @@
-from .Node import error
+from .Utils import error
 from .kinds import lowercase_first_word  # noqa: I201
 
 

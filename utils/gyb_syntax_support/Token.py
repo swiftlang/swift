@@ -1,5 +1,5 @@
 from .Classification import classification_by_name
-from .Node import error  # noqa: I201
+from .Utils import error  # noqa: I201
 from .kinds import lowercase_first_word  # noqa: I201
 
 

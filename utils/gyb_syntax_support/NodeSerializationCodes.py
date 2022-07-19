@@ -1,4 +1,4 @@
-from .Node import error
+from .Utils import error
 
 
 SYNTAX_NODE_SERIALIZATION_CODES = {
