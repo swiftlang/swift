@@ -38,6 +38,10 @@ bool swift::isExclusiveArgument(SILValue V) {
 /// Returns a found local object. If a local object was not found, returns an
 /// empty SILValue.
 static bool isLocalObject(SILValue Obj) {
+  // Check for SILUndef.
+  if (!Obj->getFunction())
+    return false;
+
   // Set of values to be checked for their locality.
   SmallVector<SILValue, 8> WorkList;
   // Set of processed values.
