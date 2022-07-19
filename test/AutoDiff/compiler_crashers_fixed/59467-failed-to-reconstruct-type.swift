@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -g -primary-file %s %S/Inputs/59467-failed-to-reconstruct-type.swift -module-name TensorFlow
+// RUN: %target-swift-frontend -emit-ir -g -primary-file %s %S/Inputs/59467-failed-to-reconstruct-type-second.swift -module-name TensorFlow
 
 import _Differentiation
 
