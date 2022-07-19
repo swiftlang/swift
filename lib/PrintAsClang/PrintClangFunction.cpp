@@ -480,34 +480,27 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
-  assert(accessor->getParameters()->size() == 0);
+  assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
   os << "  inline ";
 
-  OptionalTypeKind retKind;
-  Type objTy;
-  std::tie(objTy, retKind) =
-      DeclAndTypePrinter::getObjectTypeAndOptionality(accessor, resultTy);
-  CFunctionSignatureTypePrinter typePrinter(
-      os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx, interopContext,
-      CFunctionSignatureTypePrinterModifierDelegate(),
-      accessor->getModuleContext(), FunctionSignatureTypeUse::ReturnType);
-  typePrinter.visit(objTy, retKind, /*isInOut=*/false);
-
-  ClangSyntaxPrinter printer(os);
-  os << ' ';
-  if (isDefinition) {
-    // FIXME: Full qualifiers for nested types?
-    printer.printBaseName(typeDeclContext);
-    os << "::";
-  }
-
-  StringRef name;
+  StringRef propertyName;
   // For a getter or setter, go through the variable or subscript decl.
-  name = accessor->getStorage()->getBaseIdentifier().str();
+  propertyName = accessor->getStorage()->getBaseIdentifier().str();
 
+  std::string name;
+  llvm::raw_string_ostream nameOS(name);
   // FIXME: some names are remapped differently. (e.g. isX).
-  os << "get" << char(std::toupper(name[0])) << name.drop_front();
-  os << "() const";
+  nameOS << (accessor->isSetter() ? "set" : "get")
+         << char(std::toupper(propertyName[0])) << propertyName.drop_front();
+
+  FunctionSignatureModifiers modifiers;
+  if (isDefinition)
+    modifiers.qualifierContext = typeDeclContext;
+  printFunctionSignature(accessor, nameOS.str(), resultTy,
+                         FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
+  if (accessor->isGetter()) {
+    os << " const";
+  }
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -518,7 +511,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
                     accessor->getParameters(),
                     {AdditionalParam{AdditionalParam::Role::Self,
                                      typeDeclContext->getDeclaredType(),
-                                     /*isIndirect=*/false}});
+                                     /*isIndirect=*/accessor->isSetter()}});
   os << "  }\n";
 }
 
