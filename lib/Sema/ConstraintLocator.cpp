@@ -598,6 +598,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << '@';
       expr->getLoc().print(out, *sm);
     }
+  } else if (auto *pattern = anchor.dyn_cast<Pattern *>()) {
+    out << Pattern::getKindName(pattern->getKind()) << "Pattern";
+    if (sm) {
+      out << '@';
+      pattern->getLoc().print(out, *sm);
+    }
   }
 
   for (auto elt : getPath()) {
