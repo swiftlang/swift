@@ -201,7 +201,7 @@ private func getDominatingBlockOfAllUsePoints(context: PassContext,
   struct Visitor : EscapeInfoVisitor {
     var dominatingBlock: BasicBlock
     let domTree: DominatorTree
-    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+    mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       let defBlock = operand.value.definingBlock
       if defBlock.dominates(dominatingBlock, domTree) {
         dominatingBlock = defBlock
@@ -232,7 +232,7 @@ func computeInnerAndOuterLiferanges(instruction: SingleValueInstruction, in domB
       self.domTree = domTree
     }
     
-    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+    mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       let user = operand.instruction
       if innerRange.blockRange.begin.dominates(user.block, domTree) {
         innerRange.insert(user)

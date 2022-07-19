@@ -205,14 +205,20 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
     return (idx, newPath)
   }
 
-  /// Pops the first path component if it matches `kind` and (optionally) `index` -
-  /// also considering wildcards.
+  /// Pops the first path component if it matches `kind` and (optionally) `index`.
   ///
   /// For example:
   /// popping `s0` from `s0.c3.e1` returns `c3.e1`
   /// popping `c2` from `c*.e1` returns `e1`
   /// popping `s0` from `v**.c3.e1` return `v**.c3.e1` (because `v**` means _any_ number of value fields)
   /// popping `s0` from `c*.e1` returns nil
+  ///
+  /// Note that if `kind` is a wildcard, also the first path component must be a wildcard to popped.
+  /// For example:
+  /// popping `v**` from `s0.c1` returns nil
+  /// popping `v**` from `v**.c1` returns `v**.c1` (because `v**` means _any_ number of value fields)
+  /// popping `c*`  from `c0.e3` returns nil
+  /// popping `c*`  from `c*.e3` returns `e3`
   public func popIfMatches(_ kind: FieldKind, index: Int? = nil) -> SmallProjectionPath? {
     let (k, idx, numBits) = top
     switch k {
@@ -232,25 +238,7 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
         }
         return pop(numBits: numBits)
       default:
-        if kind == .anyValueFields && k.isValueField {
-          return pop(numBits: numBits)
-        }
-        if kind == .anyClassField && k.isClassField {
-          return pop(numBits: numBits)        
-        }
         return nil
-    }
-  }
-
-  /// Returns true if all value fields match the first component of a pattern path.
-  /// For example:
-  /// returns true for `v**.c3`
-  /// returns true for `**`
-  /// returns false for `s0.c3` (because e.g. `s1` would not match)
-  public var topMatchesAnyValueField: Bool {
-    switch top.kind {
-      case .anyValueFields, .anything: return true
-      default: return false
     }
   }
 
@@ -630,10 +618,6 @@ extension SmallProjectionPath {
     }
 
     func predicates() {
-      testPredicate("v**.c3", \.topMatchesAnyValueField, expect: true)
-      testPredicate("**",     \.topMatchesAnyValueField, expect: true)
-      testPredicate("s0.c3",  \.topMatchesAnyValueField, expect: false)
-
       testPredicate("v**", \.hasNoClassProjection, expect: true)
       testPredicate("c0",  \.hasNoClassProjection, expect: false)
       testPredicate("1",   \.hasNoClassProjection, expect: true)
@@ -665,15 +649,27 @@ extension SmallProjectionPath {
       testPath2Path("s1.ct.v**",               { $0.popLastClassAndValuesFromTail() }, expect: "s1")
       testPath2Path("c0.c1.c2",                { $0.popLastClassAndValuesFromTail() }, expect: "c0.c1")
       testPath2Path("**",                      { $0.popLastClassAndValuesFromTail() }, expect: "**")
+
+      testPath2Path("v**.c3", { $0.popIfMatches(.anyValueFields) }, expect: "v**.c3")
+      testPath2Path("**",     { $0.popIfMatches(.anyValueFields) }, expect: "**")
+      testPath2Path("s0.c3",  { $0.popIfMatches(.anyValueFields) }, expect: nil)
+      
+      testPath2Path("c0.s3",  { $0.popIfMatches(.anyClassField) }, expect: nil)
+      testPath2Path("**",     { $0.popIfMatches(.anyClassField) }, expect: "**")
+      testPath2Path("c*.e3",  { $0.popIfMatches(.anyClassField) }, expect: "e3")
     }
 
-    func testPath2Path(_ pathStr: String, _ transform: (SmallProjectionPath) -> SmallProjectionPath, expect: String) {
+    func testPath2Path(_ pathStr: String, _ transform: (SmallProjectionPath) -> SmallProjectionPath?, expect: String?) {
       var parser = StringParser(pathStr)
       let path = try! parser.parseProjectionPathFromSIL()
-      var expectParser = StringParser(expect)
-      let expectPath = try! expectParser.parseProjectionPathFromSIL()
       let result = transform(path)
-      precondition(result == expectPath)
+      if let expect = expect {
+        var expectParser = StringParser(expect)
+        let expectPath = try! expectParser.parseProjectionPathFromSIL()
+        precondition(result == expectPath)
+      } else {
+        precondition(result == nil)
+      }
     }
   }
 }
