@@ -1349,6 +1349,11 @@ namespace SpecialPointerAuthDiscriminators {
   /// Protocol conformance descriptors.
   const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
 
+  /// Pointer to value witness table stored in type metadata.
+  ///
+  /// Computed with ptrauth_string_discriminator("value_witness_table_t").
+  const uint16_t ValueWitnessTable = 0x2e3f;
+
   /// Extended existential type shapes.
   const uint16_t ExtendedExistentialTypeShape = 0x5a3d; // = 23101
   const uint16_t NonUniqueExtendedExistentialTypeShape = 0xe798; // = 59288

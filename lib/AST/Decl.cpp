@@ -8321,7 +8321,7 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 }
 
 ArrayRef<AutoDiffConfig>
-AbstractFunctionDecl::getDerivativeFunctionConfigurations(bool lookInNonPrimarySources) {
+AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   prepareDerivativeFunctionConfigurations();
 
   // Resolve derivative function configurations from `@differentiable`
@@ -8343,36 +8343,6 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations(bool lookInNonPrimaryS
     DerivativeFunctionConfigGeneration = ctx.getCurrentGeneration();
     ctx.loadDerivativeFunctionConfigurations(this, previousGeneration,
                                              *DerivativeFunctionConfigs);
-  }
-
-  class DerivativeFinder : public ASTWalker {
-    const AbstractFunctionDecl *AFD;
-  public:
-    DerivativeFinder(const AbstractFunctionDecl *afd) : AFD(afd) {}
-
-    bool walkToDeclPre(Decl *D) override {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-        for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
-          // Resolve derivative function configurations from `@derivative`
-          // attributes by type-checking them.
-          if (AFD->getName().matchesRef(
-                derAttr->getOriginalFunctionName().Name.getFullName())) {
-            (void)derAttr->getOriginalFunction(afd->getASTContext());
-            return false;
-          }
-        }
-      }
-
-      return true;
-    }
-  };
-
-  // Load derivative configurations from @derivative attributes defined in
-  // non-primary sources. Note that it might trigger lookup cycles if called
-  // from inside Sema stages.
-  if (lookInNonPrimarySources) {
-    DerivativeFinder finder(this);
-    getParent()->walkContext(finder);
   }
 
   return DerivativeFunctionConfigs->getArrayRef();

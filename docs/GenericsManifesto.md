@@ -27,7 +27,7 @@ There are a number of restrictions to the use of generics that fall out of the i
 
 ### Recursive protocol constraints (*)
 
-*This feature has been accepted in [SE-0157](https://github.com/apple/swift-evolution/blob/main/proposals/0157-recursive-protocol-constraints.md) and is tracked by [SR-1445](https://bugs.swift.org/browse/SR-1445).*
+*This feature has been accepted in [SE-0157](https://github.com/apple/swift-evolution/blob/main/proposals/0157-recursive-protocol-constraints.md) and is tracked by [#44054](https://github.com/apple/swift/issues/44054).*
 
 Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a `Sequence`:
 
@@ -43,7 +43,7 @@ The compiler currently rejects this protocol, which is unfortunate: it effective
 
 ### Nested generics
 
-*This feature was tracked by [SR-1446](https://bugs.swift.org/browse/SR-1446) and was released with Swift 3.1.*
+*This feature was tracked by [#44055](https://github.com/apple/swift/issues/44055) and was released with Swift 3.1.*
 
 Currently, a generic type cannot be nested within another generic type, e.g.
 
@@ -57,7 +57,7 @@ There isn't much to say about this: the compiler simply needs to be improved to 
 
 ### Concrete same-type requirements
 
-*This feature was tracked by [SR-1009](https://bugs.swift.org/browse/SR-1009) and was released with Swift 3.1.*
+*This feature was tracked by [#43621](https://github.com/apple/swift/issues/43621) and was released with Swift 3.1.*
 
 Currently, a constrained extension cannot use a same-type constraint to make a type parameter equivalent to a concrete type. For example:
 
@@ -114,7 +114,7 @@ Note: generic associatedtypes address many use cases also addressed by higher-ki
 
 ### Generic subscripts
 
-*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/main/proposals/0148-generic-subscripts.md), was tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and was released with Swift 4.*
+*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/main/proposals/0148-generic-subscripts.md), was tracked by [#42737](https://github.com/apple/swift/issues/42737) and was released with Swift 4.*
 
 Subscripts could be allowed to have generic parameters. For example, we could introduce a generic subscript on a `Collection` that allows us to pull out the values at an arbitrary set of indices:
 

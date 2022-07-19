@@ -2921,6 +2921,9 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
             asyncInfo->completionHandlerErrorParamIndex();
       }
 
+      bool sendableByDefault = paramIsCompletionHandler &&
+        SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers);
+
       // If this is the throws error parameter, we don't need to convert any
       // NSError** arguments to the sugared NSErrorPointer typealias form,
       // because all that is done with it is retrieving the canonical
@@ -2933,7 +2936,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
           importType(paramTy, importKind, paramAddDiag,
                      allowNSUIntegerAsIntInParam, Bridgeability::Full,
                      getImportTypeAttrs(param, /*isParam=*/true,
-                  /*sendableByDefault=*/paramIsCompletionHandler),
+                                        sendableByDefault),
                      optionalityOfParam,
                      /*resugarNSErrorPointer=*/!paramIsError,
                      completionHandlerErrorParamIndex);

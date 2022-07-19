@@ -24,7 +24,12 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: public:
 // CHECK: inline FirstSmallStruct(const FirstSmallStruct &other) {
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable);
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
@@ -32,7 +37,13 @@ public struct FirstSmallStruct {
 // CHECK-NEXT:  inline FirstSmallStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}
 // CHECK-NEXT:  static inline FirstSmallStruct _make() {
 // CHECK-NEXT:    auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
-// CHECK-NEXT:    return FirstSmallStruct(*(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1));
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
+// CHECK-NEXT:    return FirstSmallStruct(vwTable);
 // CHECK-NEXT:  }
 // CHECK-NEXT:  inline const char * _Nonnull _getOpaquePointer() const { return _storage.getOpaquePointer(); }
 // CHECK-NEXT:  inline char * _Nonnull _getOpaquePointer() { return _storage.getOpaquePointer(); }
@@ -43,6 +54,9 @@ public struct FirstSmallStruct {
 
 // CHECK:      inline uint32_t FirstSmallStruct::getX() const {
 // CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvg(_getOpaquePointer());
+// CHECK-NEXT: }
+// CHECK:      inline void FirstSmallStruct::setX(uint32_t value) {
+// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvs(value, _getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: inline void FirstSmallStruct::dump() const {
 // CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
@@ -73,7 +87,12 @@ public struct LargeStruct {
 // CHECK-NEXT: public:
 // CHECK: inline LargeStruct(const LargeStruct &other) {
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs11LargeStructVMa(0);
-// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable);
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
@@ -81,7 +100,13 @@ public struct LargeStruct {
 // CHECK-NEXT:  inline LargeStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}
 // CHECK-NEXT:  static inline LargeStruct _make() {
 // CHECK-NEXT:    auto metadata = _impl::$s7Structs11LargeStructVMa(0);
-// CHECK-NEXT:    return LargeStruct(*(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1));
+// CHECK-NEXT:    auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
+// CHECK-NEXT:    return LargeStruct(vwTable);
 // CHECK-NEXT:  }
 // CHECK-NEXT:  inline const char * _Nonnull _getOpaquePointer() const { return _storage.getOpaquePointer(); }
 // CHECK-NEXT:  inline char * _Nonnull _getOpaquePointer() { return _storage.getOpaquePointer(); }

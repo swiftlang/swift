@@ -379,6 +379,44 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   }
 }
 
+void swift::loadDerivativeConfigurations(SourceFile &SF) {
+  if (!isDifferentiableProgrammingEnabled(SF))
+    return;
+
+  auto &Ctx = SF.getASTContext();
+  FrontendStatsTracer tracer(Ctx.Stats,
+                             "load-derivative-configurations");
+
+  class DerivativeFinder : public ASTWalker {
+  public:
+    DerivativeFinder() {}
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
+          // Resolve derivative function configurations from `@derivative`
+          // attributes by type-checking them.
+          (void)derAttr->getOriginalFunction(D->getASTContext());
+        }
+      }
+
+      return true;
+    }
+  };
+
+  switch (SF.Kind) {
+  case SourceFileKind::Library:
+  case SourceFileKind::Main: {
+    DerivativeFinder finder;
+    SF.walkContext(finder);
+    return;
+  }
+  case SourceFileKind::SIL:
+  case SourceFileKind::Interface:
+    return;
+  }
+}
+
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if `AdditiveArithmetic` derived conformances are explicitly
