@@ -9628,6 +9628,34 @@ public:
     }
     llvm_unreachable("invalid derivative kind");
   }
+
+  
+  /// Returns true iff the operand corresponding to the given extractee kind
+  /// exists.
+  bool hasExtractee(NormalDifferentiableFunctionTypeComponent extractee) const {
+    switch (extractee) {
+    case NormalDifferentiableFunctionTypeComponent::Original:
+      return true;
+    case NormalDifferentiableFunctionTypeComponent::JVP:
+    case NormalDifferentiableFunctionTypeComponent::VJP:
+      return hasDerivativeFunctions();
+    }
+    llvm_unreachable("invalid extractee kind");
+  }
+
+  /// Returns the operand corresponding to the given extractee kind.
+  SILValue
+  getExtractee(NormalDifferentiableFunctionTypeComponent extractee) const {
+    switch (extractee) {
+    case NormalDifferentiableFunctionTypeComponent::Original:
+      return getOriginalFunction();
+    case NormalDifferentiableFunctionTypeComponent::JVP:
+      return getJVPFunction();
+    case NormalDifferentiableFunctionTypeComponent::VJP:
+      return getVJPFunction();
+    }
+    llvm_unreachable("invalid extractee kind");
+  }
 };
 
 /// LinearFunctionInst - given a function, its derivative and transpose functions,
@@ -9667,6 +9695,31 @@ public:
   SILValue getTransposeFunction() const {
     assert(HasTransposeFunction);
     return getOperand(1);
+  }
+
+  
+  /// Returns true iff the operand corresponding to the given extractee kind
+  /// exists.
+  bool hasExtractee(LinearDifferentiableFunctionTypeComponent extractee) const {
+    switch (extractee) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      return true;
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      return hasTransposeFunction();
+    }
+    llvm_unreachable("invalid extractee kind");
+  }
+
+  /// Returns the operand corresponding to the given extractee kind.
+  SILValue
+  getExtractee(LinearDifferentiableFunctionTypeComponent extractee) const {
+    switch (extractee) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      return getOriginalFunction();
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      return getTransposeFunction();
+    }
+    llvm_unreachable("invalid extractee kind");
   }
 };
 
