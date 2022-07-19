@@ -286,3 +286,18 @@ func look_through_parens_when_checking_inout() {
   modifyPoint((&point), 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{16-17=(}} {{15-16=&}}
   modifyPoint((&point), msg: "") // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{16-17=(}} {{15-16=&}}
 }
+
+// rdar://96631324 - compiler crash while producing diagnostics
+func test_incorrect_inout_at_assignment_source() {
+  class S {
+    var prop: String = ""
+  }
+
+  func test(s: S) {
+    let str: String = ""
+    let val: Int = 0
+
+    s.prop = &str // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+    s.prop = &val // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  }
+}
