@@ -5858,6 +5858,7 @@ static bool copyAssignOperatorIsDefaulted(const clang::CXXRecordDecl *decl) {
   auto copyAssignOp = llvm::find_if(decl->decls(), [](clang::Decl *member) {
     if (auto method = dyn_cast<clang::CXXMethodDecl>(member))
       return method->isCopyAssignmentOperator();
+    return false;
   });
 
   assert(copyAssignOp != decl->decls_end());
