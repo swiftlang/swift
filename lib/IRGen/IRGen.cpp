@@ -484,21 +484,17 @@ performOptimizationsUsingNewPassManger(const IRGenOptions &Opts,
   if (Opts.Sanitizers & SanitizerKind::Address) {
     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
                                            OptimizationLevel Level) {
-      auto Recover = bool(Opts.SanitizersWithRecoveryInstrumentation &
-                          SanitizerKind::Address);
-      bool UseAfterScope = false;
-      bool ModuleUseAfterScope = true;
-      bool UseOdrIndicator = Opts.SanitizeAddressUseODRIndicator;
-      llvm::AsanDtorKind DestructorKind = llvm::AsanDtorKind::Global;
-      llvm::AsanDetectStackUseAfterReturnMode UseAfterReturn =
-          llvm::AsanDetectStackUseAfterReturnMode::Runtime;
+      AddressSanitizerOptions ASOpts;
+      ASOpts.CompileKernel = false;
+      ASOpts.Recover = bool(Opts.SanitizersWithRecoveryInstrumentation &
+                            SanitizerKind::Address);
+      ASOpts.UseAfterScope = false;
+      ASOpts.UseAfterReturn = llvm::AsanDetectStackUseAfterReturnMode::Runtime;
       MPM.addPass(
           RequireAnalysisPass<ASanGlobalsMetadataAnalysis, llvm::Module>());
-      MPM.addPass(ModuleAddressSanitizerPass(false, Recover,
-                                             ModuleUseAfterScope,
-                                             UseOdrIndicator, DestructorKind));
-      MPM.addPass(createModuleToFunctionPassAdaptor(AddressSanitizerPass(
-          {false, Recover, UseAfterScope, UseAfterReturn})));
+      MPM.addPass(ModuleAddressSanitizerPass(
+          ASOpts, /*UseGlobalGC=*/true, Opts.SanitizeAddressUseODRIndicator,
+          /*DestructorKind=*/llvm::AsanDtorKind::Global));
     });
   }
 
