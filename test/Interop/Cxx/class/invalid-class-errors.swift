@@ -9,8 +9,6 @@ module Test {
 }
 
 //--- Inputs/test.h
-struct X;
-
 struct A {
         A(const A&) = delete;
 };
@@ -22,9 +20,6 @@ struct __attribute__((swift_attr("import_unsafe"))) B {
 //--- test.swift
 
 import Test
-
-// CHECK: note: record 'X' is not defined (incomplete)
-public func test(x: X) { }
 
 // CHECK: note: record 'A' is not automatically importable: does not have a copy constructor or destructor. Refer to the C++ Interop User Manual to classify this type.
 public func test(x: A) { }
