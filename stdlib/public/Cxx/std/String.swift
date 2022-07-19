@@ -12,12 +12,9 @@
 
 extension std.string {
   public init(_ string: String) {
-    let count = string.count
-    self.init(count, value_type(0))
-    var string = string
-    string.withUTF8 {
-      memcpy(UnsafeMutableRawPointer(mutating: UnsafeRawPointer(__dataUnsafe()!)),
-             UnsafeMutableRawPointer(mutating: $0.baseAddress), count)
+    self.init()
+    for char in string.utf8 {
+      self.push_back(value_type(char))
     }
   }
 }
