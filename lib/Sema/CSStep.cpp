@@ -346,7 +346,15 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
-  auto bestBindings = CS.determineBestBindings();
+  SmallString<64> potentialBindings;
+  llvm::raw_svector_ostream bos(potentialBindings);
+
+  auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
+    if (CS.isDebugMode() && bindings.hasViableBindings()) {
+      bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
+    }
+  });
+
   auto *disjunction = CS.selectDisjunction();
   auto *conjunction = CS.selectConjunction();
 
@@ -354,22 +362,28 @@ StepResult ComponentStep::take(bool prevFailed) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
 
+    auto &log = getDebugLogger();
+    if (!potentialBindings.empty()) {
+      log << "(Potential Binding(s): " << '\n';
+      log << potentialBindings;
+    }
+    log.indent(CS.solverState->getCurrentIndent());
+
     if (disjunction) {
-      auto &log = getDebugLogger();
       log.indent(2);
       log << "Disjunction(s) = [";
       auto constraints = disjunction->getNestedConstraints();
       log << constraints[0]->getFirstType()->getString(PO);
-      log << "])\n";
+      log << "]";
     }
     if (conjunction) {
-      auto &log = getDebugLogger();
       log.indent(2);
       log << "Conjunction(s) = [";
       auto constraints = conjunction->getNestedConstraints();
       log << constraints[0]->getFirstType()->getString(PO);
-      log << "])\n";
+      log << "]";
     }
+    log << ")\n";
   }
 
   if (CS.shouldAttemptFixes()) {

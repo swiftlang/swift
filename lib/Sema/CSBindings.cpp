@@ -742,7 +742,8 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
                          -numNonDefaultableBindings);
 }
 
-Optional<BindingSet> ConstraintSystem::determineBestBindings() {
+Optional<BindingSet> ConstraintSystem::determineBestBindings(
+    llvm::function_ref<void(const BindingSet &)> onCandidate) {
   // Look for potential type variable bindings.
   Optional<BindingSet> bestBindings;
   llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
@@ -804,9 +805,7 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
     if (!bindings || !isViable)
       continue;
 
-    if (isDebugMode()) {
-      bindings.dump(llvm::errs(), solverState->getCurrentIndent());
-    }
+    onCandidate(bindings);
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
