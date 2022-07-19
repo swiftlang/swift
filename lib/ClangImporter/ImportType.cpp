@@ -2850,7 +2850,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
           importType(paramTy, importKind, paramAddDiag,
                      allowNSUIntegerAsIntInParam, Bridgeability::Full,
                      getImportTypeAttrs(param, /*isParam=*/true,
-                  /*sendableByDefault=*/paramIsCompletionHandler),
+                                        /*sendableByDefault=*/false),
                      optionalityOfParam,
                      /*resugarNSErrorPointer=*/!paramIsError,
                      completionHandlerErrorParamIndex);
