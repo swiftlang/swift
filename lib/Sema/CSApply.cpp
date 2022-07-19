@@ -5935,8 +5935,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
     // If the argument is an existential type that has been opened, perform
     // the open operation.
-    if (argType->getRValueType()->getInOutObjectType()
-            ->isAnyExistentialType() &&
+    if (argType->getWithoutSpecifierType()->isAnyExistentialType() &&
         paramType->hasOpenedExistential()) {
       // FIXME: Look for an opened existential and use it. We need to
       // know how far out we need to go to close the existentials. Huh.
