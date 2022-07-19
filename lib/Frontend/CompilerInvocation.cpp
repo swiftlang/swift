@@ -1329,6 +1329,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_batch_scan_input_file))
     Opts.BatchScanInputFilePath = A->getValue();
 
+  if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
+    Opts.ConstGatherProtocolListFilePath = A->getValue();
+
   for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);

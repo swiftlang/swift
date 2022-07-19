@@ -524,6 +524,14 @@ def emit_parseable_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden, ArgumentIsPath,
          SupplementaryOutput]>;
 
+def emit_const_values :
+  Flag<["-"], "emit-const-values">,
+  Flags<[NoInteractiveOption, SupplementaryOutput]>;
+def emit_const_values_path : Separate<["-"], "emit-const-values-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
+  MetaVarName<"<path>">, HelpText<"Emit the extracted compile-time known values to <path>">;
+
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit an Objective-C header file">;
