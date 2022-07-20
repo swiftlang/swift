@@ -12941,6 +12941,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidASTNode: {
     return recordFix(fix, 10) ? SolutionKind::Error : SolutionKind::Solved;
   }
+  case FixKind::IgnoreInvalidNamedPattern: {
+    return recordFix(fix, 100) ? SolutionKind::Error : SolutionKind::Solved;
+  }
 
   case FixKind::ExplicitlyConstructRawRepresentable: {
     // Let's increase impact of this fix for binary operators because

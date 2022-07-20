@@ -298,6 +298,10 @@ enum class FixKind : uint8_t {
   /// Ignore `ErrorExpr` or `ErrorType` during pre-check.
   IgnoreInvalidASTNode,
 
+  /// Ignore a named pattern whose type we couldn't infer. This issue should
+  /// already have been diagnosed elsewhere.
+  IgnoreInvalidNamedPattern,
+
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
 
@@ -2739,6 +2743,31 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreInvalidASTNode;
+  }
+};
+
+class IgnoreInvalidNamedPattern final : public ConstraintFix {
+  IgnoreInvalidNamedPattern(ConstraintSystem &cs, NamedPattern *pattern,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidNamedPattern, locator) {}
+
+public:
+  std::string getName() const override {
+    return "specify type for pattern match";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidNamedPattern *create(ConstraintSystem &cs,
+                                           NamedPattern *pattern,
+                                           ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreInvalidNamedPattern;
   }
 };
 
