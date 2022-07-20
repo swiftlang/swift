@@ -9,8 +9,7 @@
 // CHECK:   static func == (lhs: ConstIterator, other: ConstIterator) -> Bool
 // CHECK: }
 
-// TODO: ConstIteratorOutOfLineEq should also conform to UnsafeCxxInputIterator.
-// CHECK: struct ConstIteratorOutOfLineEq {
+// CHECK: struct ConstIteratorOutOfLineEq : UnsafeCxxInputIterator {
 // CHECK:   var pointee: Int32 { get }
 // CHECK:   func successor() -> ConstIteratorOutOfLineEq
 // CHECK: }
@@ -54,6 +53,7 @@
 // CHECK-NOT: struct HasNoIteratorCategory : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasInvalidIteratorCategory : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoEqualEqual : UnsafeCxxInputIterator
+// CHECK-NOT: struct HasInvalidEqualEqual : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoIncrementOperator : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoPreIncrementOperator : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoDereferenceOperator : UnsafeCxxInputIterator

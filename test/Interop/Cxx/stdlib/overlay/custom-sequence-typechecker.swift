@@ -18,8 +18,7 @@ func checkSimpleSequence() {
 }
 
 // === SimpleSequenceWithOutOfLineEqualEqual ===
-// TODO: synthesize conformance to UnsafeCxxInputIterator.
-//extension SimpleSequenceWithOutOfLineEqualEqual : CxxSequence {}
+extension SimpleSequenceWithOutOfLineEqualEqual : CxxSequence {}
 
 // === SimpleArrayWrapper ===
 // No UnsafeCxxInputIterator conformance required, since the iterators are actually UnsafePointers here.
