@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
+#include "ClangDerivedConformances.h"
 #include "ClangDiagnosticConsumer.h"
 #include "ClangIncludePaths.h"
 #include "ImporterImpl.h"
@@ -3232,6 +3233,19 @@ static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
     auto *ID = createImportDecl(Ctx, ClangUnit, ImportedMod, Exported);
     Results.push_back(ID);
   }
+
+  if (Ctx.LangOpts.EnableCXXInterop && requiresCPlusPlus(M)) {
+    // Try to load the Cxx module. We don't use it directly here, but we need to
+    // make sure that ASTContext has loaded this module.
+    auto *cxxModule = Ctx.getModuleByIdentifier(Ctx.Id_Cxx);
+    if (cxxModule) {
+      ImportPath::Builder builder(Ctx.Id_Cxx);
+      auto *importCxx =
+          ImportDecl::create(Ctx, ClangUnit, SourceLoc(), ImportKind::Module,
+                             SourceLoc(), builder.get());
+      Results.push_back(importCxx);
+    }
+  }
 }
 
 void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive) const {
@@ -5962,7 +5976,7 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Owned;
   }
 
-  if (hasIteratorAPIAttr(decl)) {
+  if (hasIteratorAPIAttr(decl) || isIterator(decl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
 
