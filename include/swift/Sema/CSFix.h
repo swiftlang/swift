@@ -295,6 +295,9 @@ enum class FixKind : uint8_t {
   /// Ignore result builder body if it has `return` statements.
   IgnoreResultBuilderWithReturnStmts,
 
+  /// Ignore `ErrorExpr` or `ErrorType` during pre-check.
+  IgnoreInvalidASTNode,
+
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
 
@@ -706,6 +709,26 @@ public:
   Type getToType() const { return RHS; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool coalesceAndDiagnose(const Solution &solution,
+                           ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override {
+    // If the from type or to type is a placeholer type that corresponds to an
+    // ErrorExpr, the issue has already been diagnosed. There's no need to
+    // produce another diagnostic for the contextual mismatch complainting that
+    // a type is not convertible to a placeholder type.
+    if (auto fromPlaceholder = getFromType()->getAs<PlaceholderType>()) {
+      if (fromPlaceholder->getOriginator().is<ErrorExpr *>()) {
+        return true;
+      }
+    }
+    if (auto toPlaceholder = getToType()->getAs<PlaceholderType>()) {
+      if (toPlaceholder->getOriginator().is<ErrorExpr *>()) {
+        return true;
+      }
+    }
+    return ConstraintFix::coalesceAndDiagnose(solution, secondaryFixes, asNote);
+  }
 
   bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
@@ -2690,6 +2713,32 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreResultBuilderWithReturnStmts;
+  }
+};
+
+class IgnoreInvalidASTNode final : public ConstraintFix {
+  IgnoreInvalidASTNode(ConstraintSystem &cs, ConstraintLocator *locator)
+      : IgnoreInvalidASTNode(cs, FixKind::IgnoreInvalidASTNode, locator) {}
+
+protected:
+  IgnoreInvalidASTNode(ConstraintSystem &cs, FixKind kind,
+                       ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator) {}
+
+public:
+  std::string getName() const override { return "ignore invalid AST node"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidASTNode *create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreInvalidASTNode;
   }
 };
 

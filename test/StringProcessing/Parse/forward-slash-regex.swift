@@ -94,10 +94,11 @@ _ = /x/!.blah
 // expected-error@-2 {{value of type 'Regex<Substring>' has no member 'blah'}}
 
 do {
+  // expected-error@+2 {{cannot find operator '/?' in scope}}
+  // expected-error@+1 {{'/' is not a prefix unary operator}}
   _ = /x /?
     .blah
-  // expected-error@-2 {{cannot find operator '/?' in scope}}
-  // expected-error@-3 {{'/' is not a prefix unary operator}}
+  // expected-error@-1 {{cannot infer contextual base in reference to member 'blah'}}
 }
 _ = /x/? // expected-error {{cannot use optional chaining on non-optional value of type 'Regex<Substring>'}}
   .blah // expected-error {{value of type 'Regex<Substring>' has no member 'blah'}}
@@ -418,6 +419,7 @@ do {
   // expected-error@-1 {{'/' is not a prefix unary operator}}
   // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
   // expected-error@-3 {{expected expression}}
+  // expected-error@-4 {{cannot call value of non-function type '()'}}
 }
 do {
   _ = /[x])/

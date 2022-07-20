@@ -1945,6 +1945,16 @@ IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) IgnoreInvalidResultBuilderBody(cs, locator);
 }
 
+bool IgnoreInvalidASTNode::diagnose(const Solution &solution,
+                                    bool asNote) const {
+  return true; // Already diagnosed by the producer of ErrorExpr or ErrorType.
+}
+
+IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidASTNode(cs, locator);
+}
+
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
                                            bool asNote) const {
   MissingContextualTypeForNil failure(solution, getLocator());

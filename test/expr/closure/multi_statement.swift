@@ -337,10 +337,9 @@ func test_unknown_refs_in_tilde_operator() {
   enum E {
   }
 
-  let _: (E) -> Void = {
+  let _: (E) -> Void = { // expected-error {{unable to infer closure type in the current context}}
     if case .test(unknown) = $0 {
-      // expected-error@-1 {{type 'E' has no member 'test'}}
-      // expected-error@-2 2 {{cannot find 'unknown' in scope}}
+      // expected-error@-1 2 {{cannot find 'unknown' in scope}}
     }
   }
 }
