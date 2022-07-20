@@ -973,6 +973,9 @@ public:
       auto remainingTime = OuterTimeRemaining->second;
       CS.Timer.emplace(anchor, CS, remainingTime);
     }
+    
+    if (CS.isDebugMode())
+      getDebugLogger() << ")\n";
   }
 
   StepResult resume(bool prevFailed) override;
