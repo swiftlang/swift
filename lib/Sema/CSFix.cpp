@@ -1945,6 +1945,16 @@ IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) IgnoreInvalidResultBuilderBody(cs, locator);
 }
 
+bool IgnoreInvalidASTNode::diagnose(const Solution &solution,
+                                    bool asNote) const {
+  return true; // Already diagnosed by the producer of ErrorExpr or ErrorType.
+}
+
+IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidASTNode(cs, locator);
+}
+
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
                                            bool asNote) const {
   MissingContextualTypeForNil failure(solution, getLocator());
@@ -1992,6 +2002,20 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
                                            ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
+}
+
+bool IgnoreInvalidNamedPattern::diagnose(const Solution &solution,
+                                         bool asNote) const {
+  // Not being able to infer the type of a pattern should already have been
+  // diagnosed on the pattern's initializer or as a structural issue of the AST.
+  return true;
+}
+
+IgnoreInvalidNamedPattern *
+IgnoreInvalidNamedPattern::create(ConstraintSystem &cs, NamedPattern *pattern,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreInvalidNamedPattern(cs, pattern, locator);
 }
 
 bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(

@@ -890,6 +890,11 @@ namespace {
       // that member through the base returns a value convertible to the type
       // of this expression.
       auto baseTy = CS.getType(base);
+      if (isa<ErrorExpr>(base)) {
+        return CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::Member),
+            TVO_CanBindToHole);
+      }
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
                   TVO_CanBindToLValue | TVO_CanBindToNoEscape);
@@ -1068,19 +1073,11 @@ namespace {
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
-      if (!CS.isForCodeCompletion())
-        return nullptr;
+      CS.recordFix(
+          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(E)));
 
-      // For code completion, treat error expressions that don't contain
-      // the completion location itself as holes. If an ErrorExpr contains the
-      // code completion location, a fallback typecheck is called on the
-      // ErrorExpr's OriginalExpr (valid sub-expression) if it had one,
-      // independent of the wider expression containing the ErrorExpr, so
-      // there's no point attempting to produce a solution for it.
-      if (CS.containsCodeCompletionLoc(E))
-        return nullptr;
-
-      return PlaceholderType::get(CS.getASTContext(), E);
+      return CS.createTypeVariable(CS.getConstraintLocator(E),
+                                   TVO_CanBindToHole);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -1374,7 +1371,11 @@ namespace {
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, resCtx, genericOpener, placeholderHandler);
       if (result->hasError()) {
-        return Type();
+        CS.recordFix(
+            IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
+
+        return CS.createTypeVariable(CS.getConstraintLocator(repr),
+                                     TVO_CanBindToHole);
       }
       // Diagnose top-level usages of placeholder types.
       if (isa<PlaceholderTypeRepr>(repr->getWithoutParens())) {
@@ -1600,7 +1601,11 @@ namespace {
 
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = CS.getType(expr->getSubExpr());
-      
+
+      if (baseTy->isTypeVariableOrMember()) {
+        return baseTy;
+      }
+
       // We currently only support explicit specialization of generic types.
       // FIXME: We could support explicit function specialization.
       auto &de = CS.getASTContext().Diags;
@@ -2322,8 +2327,10 @@ namespace {
         }
 
         if (!varType) {
-          varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                          TVO_CanBindToNoEscape);
+          varType = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      LocatorPathElt::NamedPatternDecl()),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
           // If this is either a `weak` declaration or capture e.g.
           // `weak var ...` or `[weak self]`. Let's wrap type variable
