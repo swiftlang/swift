@@ -395,6 +395,26 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determine whether the given declaration is 'moveOnly'.
+class IsMoveOnlyRequest
+    : public SimpleRequest<IsMoveOnlyRequest, bool(ValueDecl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 /// Determine whether the given declaration is 'dynamic''.
 class IsDynamicRequest :
     public SimpleRequest<IsDynamicRequest,
