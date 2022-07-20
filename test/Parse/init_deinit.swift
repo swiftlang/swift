@@ -2,6 +2,7 @@
 
 struct FooStructConstructorA {
   init // expected-error {{expected '('}}
+  // expected-error@-1{{initializer requires a body}}
 }
 
 struct FooStructConstructorB {
@@ -10,10 +11,17 @@ struct FooStructConstructorB {
 
 struct FooStructConstructorC {
   init {} // expected-error {{expected '('}}{{7-7=()}}
+  // expected-note@-1{{'init()' previously declared here}}
   init<T> {} // expected-error {{expected '('}} {{10-10=()}}
+  // expected-error@-1{{generic parameter 'T' is not used in function signature}}
   init? { self.init() } // expected-error {{expected '('}} {{8-8=()}}
+  // expected-error@-1{{invalid redeclaration of 'init()'}}
 }
 
+struct FooStructConstructorD {
+  init() -> FooStructConstructorD { }
+  // expected-error@-1{{initializers cannot have a result type}}
+}
 
 struct FooStructDeinitializerA {
   deinit // expected-error {{expected '{' for deinitializer}}
