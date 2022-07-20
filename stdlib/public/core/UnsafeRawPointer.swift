@@ -455,13 +455,25 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
+  @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     _debugPrecondition(_isPOD(T.self))
-    return Builtin.loadRaw((self + offset)._rawValue)
+    return withUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+      let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        temporary._rawValue,
+        (self + offset)._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+      return temporary.pointee
+    }
+    //FIXME: reimplement with `loadRaw` when supported in SIL (rdar://96956089)
+    // e.g. Builtin.loadRaw((self + offset)._rawValue)
   }
 }
 
@@ -1180,13 +1192,25 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
+  @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     _debugPrecondition(_isPOD(T.self))
-    return Builtin.loadRaw((self + offset)._rawValue)
+    return withUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+      let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        temporary._rawValue,
+        (self + offset)._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+      return temporary.pointee
+    }
+    //FIXME: reimplement with `loadRaw` when supported in SIL (rdar://96956089)
+    // e.g. Builtin.loadRaw((self + offset)._rawValue)
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.
