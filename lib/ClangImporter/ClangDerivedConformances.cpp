@@ -28,6 +28,51 @@ getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   return dyn_cast_or_null<clang::TypeDecl>(iteratorCategory);
 }
 
+static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
+  auto id = decl->getASTContext().Id_EqualsOperator;
+
+  auto isValid = [&](ValueDecl *equalEqualOp) -> bool {
+    auto equalEqual = dyn_cast<FuncDecl>(equalEqualOp);
+    if (!equalEqual || !equalEqual->hasParameterList())
+      return false;
+    auto params = equalEqual->getParameters();
+    if (params->size() != 2)
+      return false;
+    auto lhs = params->get(0);
+    auto rhs = params->get(1);
+    if (lhs->isInOut() || rhs->isInOut())
+      return false;
+    auto lhsTy = lhs->getType();
+    auto rhsTy = rhs->getType();
+    if (!lhsTy || !rhsTy)
+      return false;
+    auto lhsNominal = lhsTy->getAnyNominal();
+    auto rhsNominal = rhsTy->getAnyNominal();
+    if (lhsNominal != rhsNominal || lhsNominal != decl)
+      return false;
+    return true;
+  };
+
+  // First look for `func ==` declared as a member.
+  auto memberResults = decl->lookupDirect(id);
+  for (const auto &member : memberResults) {
+    if (isValid(member))
+      return member;
+  }
+
+  // If no member `func ==` was found, look for out-of-class definitions in the
+  // same module.
+  auto module = decl->getModuleContext();
+  llvm::SmallVector<ValueDecl *> nonMemberResults;
+  module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
+  for (const auto &nonMember : nonMemberResults) {
+    if (isValid(nonMember))
+      return nonMember;
+  }
+
+  return nullptr;
+}
+
 bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
   return getIteratorCategoryDecl(clangDecl);
 }
@@ -103,24 +148,8 @@ void swift::conformToCxxIteratorIfNeeded(
     return;
 
   // Check if present: `func ==`
-  // FIXME: this only detects `operator==` declared as a member.
-  auto equalEquals = decl->lookupDirect(ctx.Id_EqualsOperator);
-  if (equalEquals.empty())
-    return;
-  auto equalEqual = dyn_cast<FuncDecl>(equalEquals.front());
-  if (!equalEqual || !equalEqual->hasParameterList())
-    return;
-  auto equalEqualParams = equalEqual->getParameters();
-  if (equalEqualParams->size() != 2)
-    return;
-  auto equalEqualLHS = equalEqualParams->get(0);
-  auto equalEqualRHS = equalEqualParams->get(1);
-  if (equalEqualLHS->isInOut() || equalEqualRHS->isInOut())
-    return;
-  auto equalEqualLHSTy = equalEqualLHS->getType();
-  auto equalEqualRHSTy = equalEqualRHS->getType();
-  if (!equalEqualLHSTy || !equalEqualRHSTy ||
-      equalEqualLHSTy->getAnyNominal() != equalEqualRHSTy->getAnyNominal())
+  auto equalEqual = getEqualEqualOperator(decl);
+  if (!equalEqual)
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"),

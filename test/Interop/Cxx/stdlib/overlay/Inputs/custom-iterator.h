@@ -191,6 +191,19 @@ struct HasNoEqualEqual {
   }
 };
 
+struct HasInvalidEqualEqual {
+  int value;
+  using iterator_category = std::input_iterator_tag;
+  const int &operator*() const { return value; }
+  HasInvalidEqualEqual &operator++() {
+    value++;
+    return *this;
+  }
+  bool operator==(const int &other) const { // wrong type
+    return value == other;
+  }
+};
+
 struct HasNoIncrementOperator {
   int value;
   using iterator_category = std::input_iterator_tag;
