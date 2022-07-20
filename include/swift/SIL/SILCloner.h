@@ -1788,11 +1788,18 @@ void SILCloner<ImplClass>::visitMoveOnlyWrapperToCopyableValueInst(
 
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitCopyableToMoveOnlyWrapperValueInst(
-    CopyableToMoveOnlyWrapperValueInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  auto *MVI = getBuilder().createCopyableToMoveOnlyWrapperValue(
-      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()));
-  recordClonedInstruction(Inst, MVI);
+    CopyableToMoveOnlyWrapperValueInst *inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+  CopyableToMoveOnlyWrapperValueInst *cvt;
+  if (inst->getOwnershipKind() == OwnershipKind::Owned) {
+    cvt = getBuilder().createOwnedCopyableToMoveOnlyWrapperValue(
+        getOpLocation(inst->getLoc()), getOpValue(inst->getOperand()));
+  } else {
+    assert(inst->getOwnershipKind() == OwnershipKind::Guaranteed);
+    cvt = getBuilder().createGuaranteedCopyableToMoveOnlyWrapperValue(
+        getOpLocation(inst->getLoc()), getOpValue(inst->getOperand()));
+  }
+  recordClonedInstruction(inst, cvt);
 }
 
 template <typename ImplClass>

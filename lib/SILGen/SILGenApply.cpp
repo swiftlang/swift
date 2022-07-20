@@ -1811,9 +1811,13 @@ static void emitRawApply(SILGenFunction &SGF,
   // Gather the arguments.
   for (auto i : indices(args)) {
     SILValue argValue;
+    auto inputTy =
+        substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
+
     if (inputParams[i].isConsumed()) {
       argValue = args[i].forward(SGF);
-      if (argValue->getType().isMoveOnlyWrapped()) {
+      if (argValue->getType().isMoveOnlyWrapped() &&
+          !inputTy.isMoveOnlyWrapped()) {
         argValue =
             SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, argValue);
       }
@@ -1826,26 +1830,30 @@ static void emitRawApply(SILGenFunction &SGF,
       // will error. At this point we just want to make sure that the emitted
       // types line up.
       if (arg.getType().isMoveOnlyWrapped()) {
-        // We need to borrow so that we can convert from $@moveOnly T -> $T. Use
-        // a formal access borrow to ensure that we have tight scopes like we do
-        // when we borrow fn.
-        if (!arg.isPlusZero())
-          arg = arg.formalAccessBorrow(SGF, loc);
-        arg = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, arg);
+        if (!inputTy.isMoveOnlyWrapped()) {
+          // We need to borrow so that we can convert from $@moveOnly T -> $T.
+          // Use a formal access borrow to ensure that we have tight scopes like
+          // we do when we borrow fn.
+          if (!arg.isPlusZero())
+            arg = arg.formalAccessBorrow(SGF, loc);
+
+          arg = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, arg);
+        }
       }
 
       argValue = arg.getValue();
     }
 
 #ifndef NDEBUG
-    auto inputTy =
-        substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
     if (argValue->getType() != inputTy) {
       auto &out = llvm::errs();
       out << "TYPE MISMATCH IN ARGUMENT " << i << " OF APPLY AT ";
       printSILLocationDescription(out, loc, SGF.getASTContext());
       out << "  argument value: ";
       argValue->print(out);
+      out << "  argument type: ";
+      argValue->getType().print(out);
+      out << "\n";
       out << "  parameter type: ";
       inputTy.print(out);
       out << "\n";

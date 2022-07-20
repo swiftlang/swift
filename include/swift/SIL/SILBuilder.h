@@ -1291,9 +1291,20 @@ public:
   }
 
   CopyableToMoveOnlyWrapperValueInst *
-  createCopyableToMoveOnlyWrapperValue(SILLocation loc, SILValue src) {
+  createOwnedCopyableToMoveOnlyWrapperValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) CopyableToMoveOnlyWrapperValueInst(
-        getSILDebugLocation(loc), src));
+        getSILDebugLocation(loc), src,
+        CopyableToMoveOnlyWrapperValueInst::Owned));
+  }
+
+  CopyableToMoveOnlyWrapperValueInst *
+  createGuaranteedCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                 SILValue src) {
+    assert(!src->getType().isTrivial(*F) &&
+           "trivial types can only use the owned version of this API");
+    return insert(new (getModule()) CopyableToMoveOnlyWrapperValueInst(
+        getSILDebugLocation(loc), src,
+        CopyableToMoveOnlyWrapperValueInst::Guaranteed));
   }
 
   MoveOnlyWrapperToCopyableValueInst *

@@ -22,6 +22,30 @@ Tests.test("printInt") {
     print("printInt: \(x)")
 }
 
+// CHECK: printInt: 11
+// CHECK: printInt: 6
+// CHECK: printIntArg: 5
+func printIntArg(@_noImplicitCopy _ x: Int) {
+    print2(x + x)
+    print2(x)
+    print("printIntArg: \(x)")
+}
+Tests.test("printIntArg") {
+    printIntArg(5)
+}
+
+// CHECK: printInt: 11
+// CHECK: printInt: 6
+// CHECK: printIntOwnedArg: 5
+func printIntOwnedArg(@_noImplicitCopy _ x: __owned Int) {
+    print2(x + x)
+    print2(x)
+    print("printIntOwnedArg: \(x)")
+}
+Tests.test("printIntOwnedArg") {
+    printIntOwnedArg(5)
+}
+
 class Klass {
     var i = 8
     func increment() { i += 1 }

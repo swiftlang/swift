@@ -286,26 +286,33 @@ struct ArgumentInitHelper {
         // we need to use copyable to move only to convert it to its move only
         // form.
         if (isNoImplicitCopy) {
-          bool originalValWasTrivial = false;
           if (value->getType().isTrivial(SGF.F)) {
-            originalValWasTrivial = true;
-            value = SGF.B.createCopyableToMoveOnlyWrapperValue(loc, value);
-            SGF.emitManagedRValueWithCleanup(value);
-          }
+            value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, value);
+            value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
 
-          if (value->getOwnershipKind() == OwnershipKind::Owned) {
-            value = SILValue(
-                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
-            if (originalValWasTrivial)
-              value = SGF.B.createExplicitCopyValue(loc, value);
-            else
-              value = SGF.B.emitCopyValueOperation(loc, value);
-            if (!value->getType().isMoveOnlyWrapped())
-              value = SGF.B.createCopyableToMoveOnlyWrapperValue(loc, value);
+            // If our argument was owned, we use no implicit copy. Otherwise, we
+            // use no copy.
+            auto kind = MarkMustCheckInst::CheckKind::NoCopy;
+            if (pd->isOwned())
+              kind = MarkMustCheckInst::CheckKind::NoImplicitCopy;
+            value = SGF.B.createMarkMustCheckInst(loc, value, kind);
+            SGF.emitManagedRValueWithCleanup(value);
+          } else if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+            value = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc,
+                                                                         value);
+            value = SGF.B.createCopyValue(loc, value);
+            value = SGF.B.createMarkMustCheckInst(
+                loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+            SGF.emitManagedRValueWithCleanup(value);
+          } else if (value->getOwnershipKind() == OwnershipKind::Owned) {
+            // If we have an owned value, forward it into the mark_must_check to
+            // avoid an extra destroy_value.
+            value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
+                loc, argrv.forward(SGF));
+            value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
             value = SGF.B.createMarkMustCheckInst(
                 loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
-            SGF.enterDestroyCleanup(value);
+            SGF.emitManagedRValueWithCleanup(value);
           }
         } else {
           if (value->getOwnershipKind() == OwnershipKind::Owned) {
