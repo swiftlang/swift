@@ -5,7 +5,7 @@
 #include <iterator>
 
 struct SimpleSequence {
-  struct ConstIterator {
+  struct __attribute__((swift_attr("import_iterator"))) ConstIterator {
   private:
     int value;
 

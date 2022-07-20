@@ -21,7 +21,7 @@ extension std.string {
 
 extension String {
   public init(cxxString: std.string) {
-    self.init(cString: cxxString.c_str())
+    self.init(cString: cxxString.__c_strUnsafe())
     withExtendedLifetime(cxxString) {}
   }
 }

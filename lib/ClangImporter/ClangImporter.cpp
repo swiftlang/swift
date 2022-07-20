@@ -5767,3 +5767,293 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
     }
   }
 }
+
+static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
+  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "import_reference";
+           return false;
+         });
+}
+
+static bool hasOwnedValueAttr(const clang::RecordDecl *decl) {
+  // Hard-coded special cases from the standard library (this will go away once
+  // API notes support namespaces).
+  if (decl->getNameAsString() == "basic_string" ||
+      decl->getNameAsString() == "vector")
+    return true;
+
+  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "import_owned";
+           return false;
+         });
+}
+
+static bool hasUnsafeAPIAttr(const clang::Decl *decl) {
+  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "import_unsafe";
+           return false;
+         });
+}
+
+static bool hasIteratorAPIAttr(const clang::Decl *decl) {
+  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "import_iterator";
+           return false;
+         });
+}
+
+/// Recursively checks that there are no pointers in any fields or base classes.
+/// Does not check C++ records with specific API annotations.
+static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
+  // Probably a class template that has not yet been specialized:
+  if (!decl->getDefinition())
+    return false;
+
+  auto checkType = [](clang::QualType t) {
+    if (t->isPointerType())
+      return true;
+
+    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
+      if (auto cxxRecord =
+              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
+        if (hasImportAsRefAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
+            hasUnsafeAPIAttr(cxxRecord))
+          return false;
+
+        if (hasPointerInSubobjects(cxxRecord))
+          return true;
+      }
+    }
+
+    return false;
+  };
+
+  for (auto field : decl->fields()) {
+    if (checkType(field->getType()))
+      return true;
+  }
+
+  for (auto base : decl->bases()) {
+    if (checkType(base.getType()))
+      return true;
+  }
+
+  return false;
+}
+
+static bool copyConstructorIsDefaulted(const clang::CXXRecordDecl *decl) {
+  auto ctor = llvm::find_if(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return ctor->isCopyConstructor();
+  });
+
+  assert(ctor != decl->ctor_end());
+  return ctor->isDefaulted();
+}
+
+static bool copyAssignOperatorIsDefaulted(const clang::CXXRecordDecl *decl) {
+  auto copyAssignOp = llvm::find_if(decl->decls(), [](clang::Decl *member) {
+    if (auto method = dyn_cast<clang::CXXMethodDecl>(member))
+      return method->isCopyAssignmentOperator();
+    return false;
+  });
+
+  assert(copyAssignOp != decl->decls_end());
+  return cast<clang::CXXMethodDecl>(*copyAssignOp)->isDefaulted();
+}
+
+/// Recursively checks that there are no user-provided copy constructors or
+/// destructors in any fields or base classes.
+/// Does not check C++ records with specific API annotations.
+static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
+  // Probably a class template that has not yet been specialized:
+  if (!decl->getDefinition())
+    return true;
+
+  if ((decl->hasUserDeclaredCopyConstructor() &&
+       !copyConstructorIsDefaulted(decl)) ||
+      (decl->hasUserDeclaredCopyAssignment() &&
+       !copyAssignOperatorIsDefaulted(decl)) ||
+      (decl->hasUserDeclaredDestructor() &&
+       !decl->getDestructor()->isDefaulted()))
+    return false;
+
+  auto checkType = [](clang::QualType t) {
+    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
+      if (auto cxxRecord =
+              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
+        if (hasImportAsRefAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
+            hasUnsafeAPIAttr(cxxRecord))
+          return true;
+
+        if (!isSufficientlyTrivial(cxxRecord))
+          return false;
+      }
+    }
+
+    return true;
+  };
+
+  for (auto field : decl->fields()) {
+    if (!checkType(field->getType()))
+      return false;
+  }
+
+  for (auto base : decl->bases()) {
+    if (!checkType(base.getType()))
+      return false;
+  }
+
+  return true;
+}
+
+/// Checks if a record provides the required value type lifetime operations
+/// (copy and destroy).
+static bool hasRequiredValueTypeOperations(const clang::CXXRecordDecl *decl) {
+  if (auto dtor = decl->getDestructor()) {
+    if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
+      return false;
+    }
+  }
+
+  // If we have no way of copying the type we can't import the class
+  // at all because we cannot express the correct semantics as a swift
+  // struct.
+  if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+        return ctor->isCopyConstructor() &&
+               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
+      }))
+    return false;
+
+  return true;
+}
+
+CxxRecordSemanticsKind
+CxxRecordSemantics::evaluate(Evaluator &evaluator,
+                             CxxRecordSemanticsDescriptor desc) const {
+  const auto *decl = desc.decl;
+
+  if (hasImportAsRefAttr(decl)) {
+    return CxxRecordSemanticsKind::Reference;
+  }
+
+  if (!hasRequiredValueTypeOperations(decl)) {
+    if (hasUnsafeAPIAttr(decl))
+      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                              "import_unsafe", decl->getNameAsString());
+    if (hasOwnedValueAttr(decl))
+      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                              "import_owned", decl->getNameAsString());
+    if (hasIteratorAPIAttr(decl))
+      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                              "import_iterator", decl->getNameAsString());
+
+    return CxxRecordSemanticsKind::MissingLifetimeOperation;
+  }
+
+  if (hasUnsafeAPIAttr(decl)) {
+    return CxxRecordSemanticsKind::ExplicitlyUnsafe;
+  }
+
+  if (hasOwnedValueAttr(decl)) {
+    return CxxRecordSemanticsKind::Owned;
+  }
+
+  if (hasIteratorAPIAttr(decl)) {
+    return CxxRecordSemanticsKind::Iterator;
+  }
+
+  if (hasPointerInSubobjects(decl)) {
+    return CxxRecordSemanticsKind::UnsafePointerMember;
+  }
+
+  if (isSufficientlyTrivial(decl)) {
+    return CxxRecordSemanticsKind::Trivial;
+  }
+
+  return CxxRecordSemanticsKind::Owned;
+}
+
+bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
+                                  SafeUseOfCxxDeclDescriptor desc) const {
+  const clang::Decl *decl = desc.decl;
+  const clang::CXXRecordDecl *recordDecl = nullptr;
+  bool cxxMethodIsSafe = true;
+
+  if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
+    if (hasUnsafeAPIAttr(method))
+      return true;
+
+    if (method->isOverloadedOperator() || method->isStatic() ||
+        isa<clang::CXXConstructorDecl>(decl))
+      return true;
+
+    if (method->getReturnType()->isPointerType() ||
+        method->getReturnType()->isReferenceType())
+      cxxMethodIsSafe = false;
+
+    if (auto returnType = dyn_cast<clang::RecordType>(
+            method->getReturnType().getCanonicalType())) {
+      if (auto cxxRecordReturnType =
+              dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
+        auto semanticsKind = evaluateOrDefault(
+            evaluator, CxxRecordSemantics({cxxRecordReturnType, desc.ctx}), {});
+
+        if (semanticsKind == CxxRecordSemanticsKind::UnsafePointerMember ||
+            // Pretend all methods that return iterators are unsafe so protocol
+            // conformances work.
+            semanticsKind == CxxRecordSemanticsKind::Iterator)
+          cxxMethodIsSafe = false;
+      }
+    }
+
+    recordDecl = method->getParent();
+  } else if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+    recordDecl = cxxRecordDecl;
+  } else {
+    llvm_unreachable("decl must be a C++ method or C++ record.");
+  }
+
+  auto semanticsKind = evaluateOrDefault(
+      evaluator, CxxRecordSemantics({recordDecl, desc.ctx}), {});
+
+  // Always unsafe.
+  if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation)
+    return false;
+
+  // Always OK.
+  if (semanticsKind == CxxRecordSemanticsKind::Reference)
+    return true;
+
+
+  // All other record semantics kinds are some varient of an "owned" type, so
+  // dis-allow potential projections.
+  return cxxMethodIsSafe;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           CxxRecordSemanticsDescriptor desc) {
+  out << "Matching API semantics of C++ record '"
+      << desc.decl->getNameAsString() << "'.\n";
+}
+
+SourceLoc swift::extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc) {
+  return SourceLoc();
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           SafeUseOfCxxDeclDescriptor desc) {
+  out << "Checking if '";
+  if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.decl))
+    out << namedDecl->getNameAsString();
+  else
+    out << "<invalid decl>";
+  out << "' is safe to use in context.\n";
+}
+
+SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
+  return SourceLoc();
+}

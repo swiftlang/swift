@@ -1,7 +1,8 @@
 #ifndef TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_COPY_CONSTRUCTORS_H
 #define TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_COPY_CONSTRUCTORS_H
 
-struct HasUserProvidedCopyConstructor {
+struct __attribute__((swift_attr("import_unsafe")))
+HasUserProvidedCopyConstructor {
   int numCopies;
   HasUserProvidedCopyConstructor(int numCopies = 0) : numCopies(numCopies) {}
   HasUserProvidedCopyConstructor(const HasUserProvidedCopyConstructor &other)
