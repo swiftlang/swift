@@ -99,9 +99,9 @@ struct swift::RequirementCheck {
 };
 
 swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
-  auto syntheticEnv = ReqEnv->getSyntheticEnvironment();
   return swift::Witness(this->Witness, WitnessSubstitutions,
-                        syntheticEnv, ReqEnv->getRequirementToSyntheticMap(),
+                        ReqEnv->getSyntheticSignature(),
+                        ReqEnv->getRequirementToSyntheticMap(),
                         DerivativeGenSig, None);
 }
 
@@ -1077,12 +1077,13 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
 
-    auto reqGenericEnv = reqEnvironment.getSyntheticEnvironment();
+    auto syntheticSig = reqEnvironment.getSyntheticSignature();
+    auto *syntheticEnv = syntheticSig.getGenericEnvironment();
     auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
 
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
-    if (reqGenericEnv)
-      selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
+    if (syntheticEnv)
+      selfTy = syntheticEnv->mapTypeIntoContext(selfTy);
 
     // Open up the type of the requirement.
     reqLocator = cs->getConstraintLocator(
@@ -1106,8 +1107,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       if (replacedInReq->hasError())
         continue;
 
-      if (reqGenericEnv) {
-        replacedInReq = reqGenericEnv->mapTypeIntoContext(replacedInReq);
+      if (syntheticEnv) {
+        replacedInReq = syntheticEnv->mapTypeIntoContext(replacedInReq);
       }
 
       cs->addConstraint(ConstraintKind::Bind, replacement.second, replacedInReq,

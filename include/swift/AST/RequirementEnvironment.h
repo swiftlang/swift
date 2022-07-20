@@ -72,15 +72,14 @@ class RequirementEnvironment {
   /// The witness thunk emitted by SILGen uses the synthetic signature.
   /// Therefore one invariant we preserve is that the witness thunk is
   /// ABI compatible with the requirement's function type.
-  GenericSignature syntheticSignature = GenericSignature();
-  GenericEnvironment *syntheticEnvironment = nullptr;
+  GenericSignature syntheticSig = GenericSignature();
 
   /// The generic signature of the protocol requirement member.
   GenericSignature reqSig = GenericSignature();
 
   /// A substitution map mapping the requirement signature to the
   /// generic parameters of the synthetic signature.
-  SubstitutionMap reqToSyntheticEnvMap;
+  SubstitutionMap reqToSyntheticSigMap;
 
 public:
   /// Create a new environment for matching the given requirement within a
@@ -102,20 +101,20 @@ public:
                          ClassDecl *covariantSelf,
                          ProtocolConformance *conformance);
 
-  /// Retrieve the synthetic generic environment.
-  GenericEnvironment *getSyntheticEnvironment() const {
-    return syntheticEnvironment;
-  }
-
   /// Retrieve the generic signature of the requirement.
   GenericSignature getRequirementSignature() const {
     return reqSig;
   }
 
+  /// Retrieve the generic signature of the witness thunk.
+  GenericSignature getSyntheticSignature() const {
+    return syntheticSig;
+  }
+
   /// Retrieve the substitution map that maps the interface types of the
-  /// requirement to the interface types of the synthetic environment.
+  /// requirement to the interface types of the synthetic signature.
   SubstitutionMap getRequirementToSyntheticMap() const {
-    return reqToSyntheticEnvMap;
+    return reqToSyntheticSigMap;
   }
 };
 

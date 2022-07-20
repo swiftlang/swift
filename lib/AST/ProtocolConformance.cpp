@@ -42,12 +42,12 @@ STATISTIC(NumConformanceLookupTables, "# of conformance lookup tables built");
 using namespace swift;
 
 Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
-                 GenericEnvironment *syntheticEnv,
-                 SubstitutionMap reqToSynthesizedEnvSubs,
+                 GenericSignature syntheticSig,
+                 SubstitutionMap reqToSyntheticSigSubs,
                  GenericSignature derivativeGenSig,
                  Optional<ActorIsolation> enterIsolation) {
-  if (!syntheticEnv && substitutions.empty() &&
-      reqToSynthesizedEnvSubs.empty() && !enterIsolation) {
+  if (!syntheticSig && substitutions.empty() &&
+      reqToSyntheticSigSubs.empty() && !enterIsolation) {
     storage = decl;
     return;
   }
@@ -55,15 +55,15 @@ Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
   auto &ctx = decl->getASTContext();
   auto declRef = ConcreteDeclRef(decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
-  auto stored = new (storedMem) StoredWitness{declRef, syntheticEnv,
-                                              reqToSynthesizedEnvSubs,
+  auto stored = new (storedMem) StoredWitness{declRef, syntheticSig,
+                                              reqToSyntheticSigSubs,
                                               derivativeGenSig, enterIsolation};
 
   storage = stored;
 }
 
 Witness Witness::withEnterIsolation(ActorIsolation enterIsolation) const {
-  return Witness(getDecl(), getSubstitutions(), getSyntheticEnvironment(),
+  return Witness(getDecl(), getSubstitutions(), getSyntheticSignature(),
                  getRequirementToSyntheticSubs(),
                  getDerivativeGenericSignature(), enterIsolation);
 }

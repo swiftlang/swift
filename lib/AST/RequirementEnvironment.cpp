@@ -88,7 +88,7 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
       proto->getSelfInterfaceType()->getCanonicalType());
 
-  reqToSyntheticEnvMap = SubstitutionMap::get(reqSig,
+  reqToSyntheticSigMap = SubstitutionMap::get(reqSig,
     [selfType, substConcreteType, depth, covariantSelf, &ctx]
     (SubstitutableType *type) -> Type {
       // If the conforming type is a class, the protocol 'Self' maps to
@@ -141,10 +141,7 @@ RequirementEnvironment::RequirementEnvironment(
   if (!covariantSelf &&
       reqSig.getGenericParams().size() == 1 &&
       reqSig.getRequirements().size() == 1) {
-    syntheticSignature = conformanceDC->getGenericSignatureOfContext().getCanonicalSignature();
-    syntheticEnvironment =
-      syntheticSignature.getGenericEnvironment();
-
+    syntheticSig = conformanceDC->getGenericSignatureOfContext().getCanonicalSignature();
     return;
   }
 
@@ -207,13 +204,12 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
   for (auto &rawReq : reqSig.getRequirements()) {
-    if (auto req = rawReq.subst(reqToSyntheticEnvMap))
+    if (auto req = rawReq.subst(reqToSyntheticSigMap))
       requirements.push_back(*req);
   }
 
   // Produce the generic signature and environment.
-  syntheticSignature = buildGenericSignature(ctx, GenericSignature(),
-                                             std::move(genericParamTypes),
-                                             std::move(requirements));
-  syntheticEnvironment = syntheticSignature.getGenericEnvironment();
+  syntheticSig = buildGenericSignature(ctx, GenericSignature(),
+                                       std::move(genericParamTypes),
+                                       std::move(requirements));
 }

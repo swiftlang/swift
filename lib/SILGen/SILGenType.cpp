@@ -726,10 +726,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto reqtSubMap = witness.getRequirementToSyntheticSubs();
 
   // The generic environment for the witness thunk.
-  auto *genericEnv = witness.getSyntheticEnvironment();
-  CanGenericSignature genericSig;
-  if (genericEnv)
-    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
+  auto *genericEnv = witness.getSyntheticSignature().getGenericEnvironment();
+  auto genericSig = witness.getSyntheticSignature().getCanonicalSignature();
 
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(

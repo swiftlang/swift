@@ -92,8 +92,8 @@ class Witness {
     /// The witness declaration, along with the substitutions needed to use
     /// the witness declaration from the synthetic environment.
     ConcreteDeclRef declRef;
-    GenericEnvironment *syntheticEnvironment;
-    SubstitutionMap reqToSyntheticEnvSubs;
+    GenericSignature syntheticSig;
+    SubstitutionMap reqToSyntheticSigSubs;
     /// The derivative generic signature, when the requirement is a derivative
     /// function.
     GenericSignature derivativeGenSig;
@@ -141,10 +141,10 @@ public:
   /// \param substitutions The substitutions required to use the witness from
   /// the synthetic environment.
   ///
-  /// \param syntheticEnv The synthetic environment.
+  /// \param syntheticSig The synthetic signature.
   ///
-  /// \param reqToSyntheticEnvSubs The mapping from the interface types of the
-  /// requirement into the interface types of the synthetic environment.
+  /// \param reqToSyntheticSigSubs The mapping from the interface types of the
+  /// requirement into the interface types of the synthetic signature.
   ///
   /// \param derivativeGenSig The derivative generic signature, when the
   /// requirement is a derivative function.
@@ -153,8 +153,8 @@ public:
   /// need to hop to before calling the witness.
   Witness(ValueDecl *decl,
           SubstitutionMap substitutions,
-          GenericEnvironment *syntheticEnv,
-          SubstitutionMap reqToSyntheticEnvSubs,
+          GenericSignature syntheticSig,
+          SubstitutionMap reqToSyntheticSigSubs,
           GenericSignature derivativeGenSig,
           Optional<ActorIsolation> enterIsolation);
 
@@ -183,18 +183,18 @@ public:
     return getDeclRef().getSubstitutions();
   }
 
-  /// Retrieve the synthetic generic environment.
-  GenericEnvironment *getSyntheticEnvironment() const {
+  /// Retrieve the synthetic generic signature.
+  GenericSignature getSyntheticSignature() const {
     if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
-      return storedWitness->syntheticEnvironment;
+      return storedWitness->syntheticSig;
     return nullptr;
   }
 
   /// Retrieve the substitution map that maps the interface types of the
-  /// requirement to the interface types of the synthetic environment.
+  /// requirement to the interface types of the synthetic signature.
   SubstitutionMap getRequirementToSyntheticSubs() const {
     if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
-      return storedWitness->reqToSyntheticEnvSubs;
+      return storedWitness->reqToSyntheticSigSubs;
     return {};
   }
 
