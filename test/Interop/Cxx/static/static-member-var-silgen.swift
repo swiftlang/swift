@@ -44,3 +44,18 @@ func writeSelfMember(_ m: WithIncompleteStaticMember) {
 // CHECK: [[ADDR:%.*]] = global_addr @{{_ZN26WithIncompleteStaticMember10selfMemberE|\?selfMember@WithIncompleteStaticMember@@2V1@A}} : $*WithIncompleteStaticMember
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*WithIncompleteStaticMember
 // CHECK:  store %0 to [[ACCESS]] : $*WithIncompleteStaticMember
+//TODO fix undefined reference to `WithConstStaticMember::notDefined`.
+// func readNotDefinedConstMember() -> CInt {
+//   return WithConstStaticMember.notDefined
+// }
+func readDefinedConstMember() -> CInt {
+  return WithConstStaticMember.defined
+}
+
+// CHECK: sil hidden @$s4main22readDefinedConstMembers5Int32VyF : $@convention(thin) () -> Int32
+// CHECK: [[ADDR:%.*]] = global_addr @{{_ZN21WithConstStaticMember7definedE|\?defined@WithConstStaticMember@@2HB}} : $*Int32
+// CHECK: [[VALUE:%.*]] = load [[ADDR]] : $*Int32
+// CHECK: return [[VALUE]] : $Int32
+func readDefinedOutOfLineConstMember() -> CInt {
+  return WithConstStaticMember.definedOutOfLine
+}
