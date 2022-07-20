@@ -1648,9 +1648,17 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     attributes.push_back("subtype_of_existential");
   auto literalKind = getLiteralKind();
   if (literalKind != LiteralBindingKind::None) {
-    auto literalAttrStr = ("[literal: " + getLiteralBindingKind(literalKind)
-                        + "]").str();
-    attributes.push_back(literalAttrStr);
+    std::string literalAttrStr;
+    literalAttrStr.append("[literal: ");
+    if (literalKind == LiteralBindingKind::Atom) {
+      if (auto atomKind = TypeVar->getImpl().getAtomicLiteralKind()) {
+        literalAttrStr.append(getAtomLiteralAsString(*atomKind));
+      }
+    } else {
+      literalAttrStr.append(getLiteralBindingKind(literalKind).str());
+    }
+    literalAttrStr.append("]");
+    attributes.push_back(std::move(literalAttrStr));
   }
   if (!attributes.empty()) {
     out << "[attributes: ";
