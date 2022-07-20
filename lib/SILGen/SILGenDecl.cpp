@@ -591,8 +591,8 @@ public:
               value = SGF.B.createBeginBorrow(PrologueLoc, value,
                                               /*isLexical*/ true);
               value = SGF.B.createCopyValue(PrologueLoc, value);
-              value = SGF.B.createCopyableToMoveOnlyWrapperValue(PrologueLoc,
-                                                                 value);
+              value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
+                  PrologueLoc, value);
               value = SGF.B.createMarkMustCheckInst(
                   PrologueLoc, value,
                   MarkMustCheckInst::CheckKind::NoImplicitCopy);
@@ -609,19 +609,9 @@ public:
           // We are abusing this. This should be a separate instruction just for
           // converting from copyable trivial to move only. I am abusing it
           // here by using it multiple times in different ways.
-          value =
-              SGF.B.createCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-          value = SGF.B.createBeginBorrow(PrologueLoc, value,
-                                          /*isLexical*/ true);
-          // We use an explicit copy value since:
-          //
-          // 1. We already have a move only type here. So we can't use a normal
-          // copy here due to the pattern we are creating. We could avoid this,
-          // but it is not worth fixing b/c of point 2.
-          //
-          // 2. Since this is a trivial value, when we remove their move only
-          // ness, this will become a no-op meaning no-overhead.
-          value = SGF.B.createExplicitCopyValue(PrologueLoc, value);
+          value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc,
+                                                                  value);
+          value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
           value = SGF.B.createMarkMustCheckInst(
               PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
         }
@@ -1853,7 +1843,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
   if (getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
     if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
-      if (mvi->isNoImplicitCopy()) {
+      if (mvi->hasMoveCheckerKind()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
           if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
             if (bbi->isLexical()) {
@@ -1887,6 +1877,14 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
               B.emitDestroyValueOperation(silLoc, bbi->getOperand());
               return;
             }
+          }
+        }
+
+        // Handle trivial arguments.
+        if (auto *move = dyn_cast<MoveValueInst>(mvi->getOperand())) {
+          if (move->isLexical()) {
+            B.emitDestroyValueOperation(silLoc, mvi);
+            return;
           }
         }
       }

@@ -416,12 +416,14 @@ public:
   createGuaranteedMoveOnlyWrapperToCopyableValue(SILLocation loc,
                                                  ManagedValue value);
 
-  using SILBuilder::createCopyableToMoveOnlyWrapperValue;
-  /// Create a copyable_to_moveonlywrapper. This expects a +1 value and returns
-  /// a +1 value. Semantically though the two things are different entities so
-  /// we are not forwarding ownership in the sense of the word.
-  ManagedValue createCopyableToMoveOnlyWrapperValue(SILLocation loc,
-                                                    ManagedValue value);
+  using SILBuilder::createOwnedCopyableToMoveOnlyWrapperValue;
+  ManagedValue createOwnedCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                         ManagedValue value);
+
+  using SILBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue;
+  ManagedValue
+  createGuaranteedCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                 ManagedValue value);
 
   using SILBuilder::createMarkMustCheckInst;
   ManagedValue createMarkMustCheckInst(SILLocation loc, ManagedValue value,

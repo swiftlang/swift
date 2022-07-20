@@ -4123,7 +4123,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
       return B.createOwnedMoveOnlyWrapperToCopyableValue(loc, newCopy);
     }
 
-    return B.createCopyableToMoveOnlyWrapperValue(loc, newCopy);
+    return B.createOwnedCopyableToMoveOnlyWrapperValue(loc, newCopy);
   }
 
   return emitLoadOfSemanticRValue(*this, loc, src, rvalueTL, isTake);

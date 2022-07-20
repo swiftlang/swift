@@ -474,7 +474,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(MarkMustCheckInst, mark_must_check,
                     SingleValueInstruction, None, DoesNotRelease)
   // Convert a $T to $@moveOnly T. This is the method that one uses to convert a
-  // trivial value to a non-trivial move only value.
+  // trivial value to a non-trivial move only value. Ownership is fixed at construction by
+  // frontend to express specific semantics: guaranteed for guaranteed function arguments
+  // and owned for assignment/owned function arguments.
   SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperValueInst, copyable_to_moveonlywrapper,
                     SingleValueInstruction, None, DoesNotRelease)
   // Convert a $@moveOnly T to $T. Ownership is fixed at construction by
