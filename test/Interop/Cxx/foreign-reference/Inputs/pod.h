@@ -12,7 +12,7 @@ inline void *operator new(size_t, void *p) { return p; }
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-struct __attribute__((swift_attr("import_as_ref"))) Empty {
+struct __attribute__((swift_attr("import_reference"))) Empty {
   int test() const { return 42; }
   int testMutable() { return 42; }
 
@@ -23,7 +23,7 @@ void mutateIt(Empty &) {}
 Empty passThroughByValue(Empty x) { return x; }
 
 struct __attribute__((swift_attr("@actor")))
-__attribute__((swift_attr("import_as_ref"))) MultipleAttrs {
+__attribute__((swift_attr("import_reference"))) MultipleAttrs {
   int test() const { return 42; }
   int testMutable() { return 42; }
 
@@ -32,7 +32,7 @@ __attribute__((swift_attr("import_as_ref"))) MultipleAttrs {
   }
 };
 
-struct __attribute__((swift_attr("import_as_ref"))) IntPair {
+struct __attribute__((swift_attr("import_reference"))) IntPair {
   int a = 1;
   int b = 2;
 
@@ -48,7 +48,7 @@ void mutateIt(IntPair &x) {
 }
 IntPair passThroughByValue(IntPair x) { return x; }
 
-struct __attribute__((swift_attr("import_as_ref"))) RefHoldingPair {
+struct __attribute__((swift_attr("import_reference"))) RefHoldingPair {
   // REVIEW-NOTE: I added support for this but then removed it, as this sort of
   // indicates incorrect usage of a "reference type" and has weird semantics.
   IntPair pair;
@@ -62,7 +62,7 @@ struct __attribute__((swift_attr("import_as_ref"))) RefHoldingPair {
   }
 };
 
-struct __attribute__((swift_attr("import_as_ref"))) RefHoldingPairRef {
+struct __attribute__((swift_attr("import_reference"))) RefHoldingPairRef {
   IntPair &pair;
   int otherValue;
   RefHoldingPairRef(IntPair &pair) : pair(pair), otherValue(42) {}
@@ -76,7 +76,7 @@ struct __attribute__((swift_attr("import_as_ref"))) RefHoldingPairRef {
   }
 };
 
-struct __attribute__((swift_attr("import_as_ref"))) RefHoldingPairPtr {
+struct __attribute__((swift_attr("import_reference"))) RefHoldingPairPtr {
   IntPair *pair;
   int otherValue = 42;
 
@@ -98,12 +98,13 @@ struct ValueHoldingPair {
   int test() const { return otherValue - pair.test(); }
   int testMutable() { return otherValue - pair.test(); }
 
-  static ValueHoldingPair *create() {
+  static ValueHoldingPair *create()
+      __attribute__((swift_attr("import_unsafe"))) {
     return new (malloc(sizeof(ValueHoldingPair))) ValueHoldingPair();
   }
 };
 
-struct __attribute__((swift_attr("import_as_ref"))) BigType {
+struct __attribute__((swift_attr("import_reference"))) BigType {
   int a = 1;
   int b = 2;
   char buffer[32];
@@ -120,7 +121,7 @@ void mutateIt(BigType &x) {
 }
 BigType passThroughByValue(BigType x) { return x; }
 
-struct __attribute__((swift_attr("import_as_ref"))) BaseRef {
+struct __attribute__((swift_attr("import_reference"))) BaseRef {
   int a = 1;
   int b = 2;
 
@@ -130,7 +131,7 @@ struct __attribute__((swift_attr("import_as_ref"))) BaseRef {
   static BaseRef *create() { return new (malloc(sizeof(BaseRef))) BaseRef(); }
 };
 
-struct __attribute__((swift_attr("import_as_ref"))) DerivedRef : BaseRef {
+struct __attribute__((swift_attr("import_reference"))) DerivedRef : BaseRef {
   int c = 1;
 
   int testDerived() const { return test() + c; }

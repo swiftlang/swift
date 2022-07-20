@@ -16,9 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFTypeInfo.h"
-#include "ImporterImpl.h"
 #include "ClangDiagnosticConsumer.h"
-#include "swift/Subsystems.h"
+#include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -28,8 +27,10 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Mangle.h"
@@ -1477,6 +1478,17 @@ addEmptyArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
     argumentNames.push_back(StringRef());
 }
 
+static StringRef renameUnsafeMethod(ASTContext &ctx,
+                                    const clang::NamedDecl *decl,
+                                    StringRef name) {
+  if (isa<clang::CXXMethodDecl>(decl) &&
+      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
+    return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
+  }
+
+  return name;
+}
+
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameVersion version,
                                           clang::DeclarationName givenName) {
@@ -2262,6 +2274,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       baseName = swiftPrivateScratch;
     }
   }
+
+  baseName = renameUnsafeMethod(swiftCtx, D, baseName);
 
   result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction,
                                  isInitializer);

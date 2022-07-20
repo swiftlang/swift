@@ -3,12 +3,13 @@
 
 struct DummyStruct {};
 
-struct HasUserProvidedDestructorAndDummy {
+struct __attribute__((swift_attr("import_unsafe")))
+HasUserProvidedDestructorAndDummy {
   DummyStruct dummy;
   ~HasUserProvidedDestructorAndDummy() {}
 };
 
-struct HasUserProvidedDestructor {
+struct __attribute__((swift_attr("import_unsafe"))) HasUserProvidedDestructor {
   int *value;
   ~HasUserProvidedDestructor() { *value = 42; }
 };

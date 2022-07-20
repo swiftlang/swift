@@ -15,7 +15,7 @@ module Test {
 
 inline void* operator new(unsigned long, void* p) { return p; }
 
-struct __attribute__((swift_attr("import_as_ref"))) Empty {
+struct __attribute__((swift_attr("import_reference"))) Empty {
   static Empty *create() { return new (malloc(sizeof(Empty))) Empty(); }
 };
 

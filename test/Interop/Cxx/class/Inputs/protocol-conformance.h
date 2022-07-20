@@ -11,7 +11,7 @@ struct DoesNotConformToProtocol {
 
 struct DummyStruct {};
 
-struct NonTrivial {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivial {
   ~NonTrivial() {}
   NonTrivial(DummyStruct) {}
   NonTrivial() {}
@@ -29,11 +29,14 @@ struct Trivial {
 };
 
 struct ReturnsNullableValue {
-  const int *returnPointer() { return nullptr; }
+  const int *returnPointer() __attribute__((swift_attr("import_unsafe"))) {
+    return nullptr;
+  }
 };
 
 struct ReturnsNonNullValue {
-  const int *returnPointer() __attribute__((returns_nonnull)) {
+  const int *returnPointer() __attribute__((returns_nonnull))
+  __attribute__((swift_attr("import_unsafe"))) {
     return (int *)this;
   }
 };
