@@ -23,7 +23,9 @@ public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 // CHECK: inline void emptyThrowFunction() {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* self = nullptr;
-// CHECK: return _impl::$s9Functions18emptyThrowFunctionyyKF(self, &opaqueError);
+// CHECK: _impl::$s9Functions18emptyThrowFunctionyyKF(self, &opaqueError);
+// CHECK: if (opaqueError != nullptr)
+// CHECK: throw (swift::_impl::NaiveException("Exception"));
 // CHECK: }
 
 public func throwFunction() throws {
@@ -34,5 +36,22 @@ public func throwFunction() throws {
 // CHECK: inline void throwFunction() {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* self = nullptr;
-// CHECK: return _impl::$s9Functions13throwFunctionyyKF(self, &opaqueError);
+// CHECK: _impl::$s9Functions13throwFunctionyyKF(self, &opaqueError);
+// CHECK: if (opaqueError != nullptr)
+// CHECK: throw (swift::_impl::NaiveException("Exception"));
+// CHECK: }
+
+public func throwFunctionWithReturn() throws -> Int {
+    print("passThrowFunctionWithReturn")
+    throw NaiveErrors.returnError
+    return 0
+}
+
+// CHECK: inline swift::Int throwFunctionWithReturn() SWIFT_WARN_UNUSED_RESULT {
+// CHECK: void* opaqueError = nullptr;
+// CHECK: void* self = nullptr;
+// CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(self, &opaqueError);
+// CHECK: if (opaqueError != nullptr)
+// CHECK: throw (swift::_impl::NaiveException("Exception"));
+// CHECK: return returnValue;
 // CHECK: }

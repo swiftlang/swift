@@ -106,6 +106,19 @@
 // CHECK-NEXT:   char * _Nullable storage;
 // CHECK-NEXT: };
 // CHECK-EMPTY:
+// CHECK-NEXT: /// Naive exception class that should be thrown
+// CHECK-NEXT: class NaiveException {
+// CHECK-NEXT: public:
+// CHECK-NEXT: inline NaiveException(const char * _Nonnull msg) noexcept : msg_(msg) { }
+// CHECK-NEXT: inline NaiveException(NaiveException&& other) noexcept : msg_(other.msg_) { other.msg_ = nullptr; }
+// CHECK-NEXT: inline ~NaiveException() noexcept { }
+// CHECK-NEXT: void operator =(NaiveException&& other) noexcept { auto temp = msg_; msg_ = other.msg_; other.msg_ = temp; }
+// CHECK-NEXT: void operator =(const NaiveException&) noexcept = delete;
+// CHECK-NEXT: inline const char * _Nonnull getMessage() const noexcept { return(msg_); }
+// CHECK-NEXT: private:
+// CHECK-NEXT: const char * _Nonnull msg_;
+// CHECK-NEXT: };
+// CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
 // CHECK-EMPTY:
 // CHECK-EMPTY:

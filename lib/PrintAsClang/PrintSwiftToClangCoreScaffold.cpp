@@ -210,6 +210,27 @@ static void printSwiftResilientStorageClass(raw_ostream &os) {
   os << "};\n";
 }
 
+void printCxxNaiveException(raw_ostream &os) {
+  os << "\n";
+  os << "/// Naive exception class that should be thrown\n";
+  os << "class NaiveException {\n";
+  os << "public:\n";
+  os << "  inline NaiveException(const char * _Nonnull msg) noexcept : "
+     << "msg_(msg) { }\n";
+  os << "  inline NaiveException(NaiveException&& other) noexcept : "
+        "msg_(other.msg_) { other.msg_ = nullptr; }\n";
+  os << "  inline ~NaiveException() noexcept { }\n";
+  os << "  void operator =(NaiveException&& other) noexcept { auto temp = msg_;"
+     << " msg_ = other.msg_; other.msg_ = temp; }\n";
+  os << "  void operator =(const NaiveException&) noexcept = delete;";
+  os << "\n";
+  os << "  inline const char * _Nonnull getMessage() const noexcept { "
+     << "return(msg_); }\n";
+  os << "private:\n";
+  os << "  const char * _Nonnull msg_;\n";
+  os << "};\n";
+}
+
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
@@ -226,6 +247,7 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
           printOpaqueAllocFee(os);
           os << "\n";
           printSwiftResilientStorageClass(os);
+          printCxxNaiveException(os);
         });
   });
 }
