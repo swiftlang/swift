@@ -2033,12 +2033,19 @@ static AttrOptionSwitch<R>
 parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
                       StringRef AttrName, DeclAttrKind DK) {
   bool isModifier = DeclAttribute::isDeclModifier(DK);
-  if (!P.consumeIf(tok::l_paren)) {
+  if (!P.Tok.is(tok::l_paren)) {
     AttrRange = SourceRange(Loc);
     // Create an AttrOptionSwitch with an empty value. The calls on it will
     // decide whether or not that's valid.
     return AttrOptionSwitch<R>(StringRef(), P, Loc, AttrName, isModifier);
   }
+
+  llvm::Optional<SyntaxParsingContext> ModDetailContext;
+  if (DK == DAK_ReferenceOwnership) {
+    ModDetailContext.emplace(P.SyntaxContext, SyntaxKind::DeclModifierDetail);
+  }
+
+  P.consumeToken(tok::l_paren);
 
   StringRef parsedName = P.Tok.getText();
   if (!P.consumeIf(tok::identifier)) {
@@ -2288,7 +2295,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .Case("public", AccessLevel::Public)
       .Case("open", AccessLevel::Open);
 
-    if (!consumeIf(tok::l_paren)) {
+    if (!Tok.is(tok::l_paren)) {
       // Normal access control attribute.
       AttrRange = Loc;
       DuplicateAttribute = Attributes.getAttribute<AccessControlAttr>();
@@ -2296,6 +2303,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         Attributes.add(new (Context) AccessControlAttr(AtLoc, Loc, access));
       break;
     }
+
+    SyntaxParsingContext ModDetailContext(
+        SyntaxContext, SyntaxKind::DeclModifierDetail);
+
+    consumeToken(tok::l_paren);
 
     // Parse the subject.
     if (Tok.isContextualKeyword("set")) {
@@ -4723,7 +4735,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     if (Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
       Tok.setKind(tok::contextual_keyword);
-      DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ActorDecl);
       DeclResult = parseDeclClass(Flags, Attributes);
       break;
     }
@@ -8395,13 +8407,20 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       return Status;
   }
 
-  // Parse the parameters.
   DefaultArgumentInfo DefaultArgs;
-  llvm::SmallVector<Identifier, 4> namePieces;
-  ParserResult<ParameterList> Params
-    = parseSingleParameterClause(ParameterContextKind::Initializer,
-                                 &namePieces, &DefaultArgs);
-  Status |= Params;
+  TypeRepr *FuncRetTy = nullptr;
+  DeclName FullName;
+  ParameterList *BodyParams;
+  SourceLoc asyncLoc;
+  bool reasync;
+  SourceLoc throwsLoc;
+  bool rethrows;
+  Status |= parseFunctionSignature(DeclBaseName::createConstructor(), FullName,
+                                   BodyParams,
+                                   DefaultArgs,
+                                   asyncLoc, reasync,
+                                   throwsLoc, rethrows,
+                                   FuncRetTy);
   if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
     return Status;
@@ -8413,17 +8432,23 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return nullptr;
   }
 
-  // Parse 'async' / 'reasync' / 'throws' / 'rethrows'.
-  SourceLoc asyncLoc;
-  bool reasync = false;
-  SourceLoc throwsLoc;
-  bool rethrows = false;
-  Status |= parseEffectsSpecifiers(SourceLoc(),
-                                   asyncLoc, &reasync,
-                                   throwsLoc, &rethrows);
-  if (Status.hasCodeCompletion() && !CodeCompletion) {
-    // Trigger delayed parsing, no need to continue.
-    return Status;
+  // If there was an 'async' modifier, put it in the right place for an
+  // initializer.
+  bool isAsync = asyncLoc.isValid();
+  if (auto asyncAttr = Attributes.getAttribute<AsyncAttr>()) {
+    SourceLoc insertLoc = Lexer::getLocForEndOfToken(
+        SourceMgr, BodyParams->getRParenLoc());
+
+    diagnose(asyncAttr->getLocation(), diag::async_func_modifier)
+      .fixItRemove(asyncAttr->getRange())
+      .fixItInsert(insertLoc, " async");
+    asyncAttr->setInvalid();
+    isAsync = true;
+  }
+
+  if (FuncRetTy) {
+    diagnose(FuncRetTy->getStartLoc(), diag::initializer_result_type)
+      .fixItRemove(FuncRetTy->getSourceRange());
   }
 
   if (reasync) {
@@ -8435,12 +8460,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
-  DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failable, FailabilityLoc,
-                                           asyncLoc.isValid(), asyncLoc,
+                                           isAsync, asyncLoc,
                                            throwsLoc.isValid(), throwsLoc,
-                                           Params.get(), GenericParams,
+                                           BodyParams, GenericParams,
                                            CurDeclContext);
   CD->setImplicitlyUnwrappedOptional(IUO);
   CD->getAttrs() = Attributes;
@@ -8466,7 +8490,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     CodeCompletion->setParsedDecl(CD);
   }
 
-  if (ConstructorsNotAllowed || Params.isParseErrorOrHasCompletion()) {
+  if (ConstructorsNotAllowed) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }

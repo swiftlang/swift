@@ -2716,21 +2716,6 @@ public:
             abort();
           }
 
-          // Check the witness substitutions.
-          const auto &witness = normal->getWitnessUncached(req);
-
-          if (auto *genericEnv = witness.getSyntheticEnvironment())
-            Generics.push_back(genericEnv->getGenericSignature());
-
-          verifyChecked(witness.getRequirementToSyntheticSubs());
-          verifyChecked(witness.getSubstitutions());
-
-          if (auto *genericEnv = witness.getSyntheticEnvironment()) {
-            assert(Generics.back().get<GenericSignature>().getPointer()
-                   == genericEnv->getGenericSignature().getPointer());
-            Generics.pop_back();
-          }
-
           continue;
         }
       }
