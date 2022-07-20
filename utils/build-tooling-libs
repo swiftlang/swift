@@ -235,6 +235,7 @@ class Builder(object):
             os.path.join(SWIFT_SOURCE_ROOT, 'swift'),
         ]
         cmake_args += [
+            "-DSWIFT_BUILD_SYNTAXPARSERLIB=TRUE",
             "-DSWIFT_BUILD_ONLY_SYNTAXPARSERLIB=TRUE",
             "-DSWIFT_BUILD_SYNTAXPARSERTEST=TRUE",
         ]
@@ -245,6 +246,7 @@ class Builder(object):
             "-DSWIFT_BUILD_STATIC_STDLIB=FALSE",
             "-DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE",
             "-DSWIFT_BUILD_STATIC_SDK_OVERLAY=FALSE",
+            "-DSWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT=FALSE",
         ]
         cmake_args += [
             "-DLLVM_ENABLE_LIBXML2=FALSE",
