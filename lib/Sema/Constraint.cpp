@@ -382,9 +382,11 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, bool skipLocat
       auto *patternBinding = cast<PatternBindingDecl>(element.get<Decl *>());
       Out << "pattern binding element @ ";
       Out << patternBindingElt->getIndex() << " : ";
+      Out << '\n';
       patternBinding->getPattern(patternBindingElt->getIndex())->dump(Out);
     } else {
       Out << "syntactic element ";
+      Out << '\n';
       element.dump(Out);
     }
 
