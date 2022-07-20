@@ -2269,7 +2269,7 @@ namespace {
       // location within that source file.
       SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
       SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
-      if (lhsSF == rhsSF) {
+      if (lhsSF && lhsSF == rhsSF) {
         // If only one location is valid, the valid location comes first.
         if (lhs->getLoc().isValid() != rhs->getLoc().isValid()) {
           return lhs->getLoc().isValid();
