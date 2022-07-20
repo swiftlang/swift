@@ -179,7 +179,7 @@ function(add_swift_compiler_modules_library name)
               # Bridging modules and headers.
               "-Xcc" "-I" "-Xcc" "${SWIFT_SOURCE_DIR}/include"
               # Generated C headers.
-              "-Xcc" "-I" "-Xcc" "${CMAKE_BINARY_DIR}/include"
+              "-Xcc" "-I" "-Xcc" "${CMAKE_CURRENT_BINARY_DIR}/../include"
               # Generated swift modules.
               "-I" "${build_dir}"
       COMMENT "Building swift module ${module}")
