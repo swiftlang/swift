@@ -5771,7 +5771,10 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
 static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_reference";
+             return swiftAttr->getAttribute() == "import_reference" ||
+                    // TODO: Remove this once libSwift hosttools no longer
+                    // requires it.
+                    swiftAttr->getAttribute() == "import_as_ref";
            return false;
          });
 }
