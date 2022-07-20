@@ -11231,18 +11231,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // following: $T1 -> $T2.
   auto func1 = type1->castTo<FunctionType>();
 
-  // If a type variable representing "function type" is a hole
-  // or it could be bound to some concrete type with a help of
-  // a fix, let's propagate holes to the "input" type. Doing so
-  // provides more information to upcoming argument and result matching.
-  if (shouldAttemptFixes()) {
-    if (auto *typeVar = type2->getAs<TypeVariableType>()) {
-      auto *locator = typeVar->getImpl().getLocator();
-      if (typeVar->isPlaceholder() || hasFixFor(locator))
-        recordAnyTypeVarAsPotentialHole(func1);
-    }
-  }
-
   // Before stripping lvalue-ness and optional types, save the original second
   // type for handling `func callAsFunction` and `@dynamicCallable`
   // applications. This supports the following cases:
@@ -11256,6 +11244,29 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Drill down to the concrete type on the right hand side.
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
+
+  // If a type variable representing "function type" is a hole
+  // or it could be bound to some concrete type with a help of
+  // a fix, let's propagate holes to the "input" type. Doing so
+  // provides more information to upcoming argument and result matching.
+  if (shouldAttemptFixes()) {
+    if (auto *typeVar = type2->getAs<TypeVariableType>()) {
+      auto *locator = typeVar->getImpl().getLocator();
+      if (hasFixFor(locator)) {
+        recordAnyTypeVarAsPotentialHole(func1);
+      }
+    }
+    Type underlyingType = desugar2;
+    while (auto *MT = underlyingType->getAs<AnyMetatypeType>()) {
+      underlyingType = MT->getInstanceType();
+    }
+    underlyingType =
+        getFixedTypeRecursive(underlyingType, flags, /*wantRValue=*/true);
+    if (underlyingType->isPlaceholder()) {
+      recordAnyTypeVarAsPotentialHole(func1);
+      return SolutionKind::Solved;
+    }
+  }
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
@@ -12946,6 +12957,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+  case FixKind::IgnoreInvalidASTNode: {
+    return recordFix(fix, 10) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+  case FixKind::IgnoreInvalidNamedPattern: {
+    return recordFix(fix, 100) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
   case FixKind::ExplicitlyConstructRawRepresentable: {

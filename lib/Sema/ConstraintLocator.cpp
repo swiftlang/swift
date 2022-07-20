@@ -97,6 +97,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
   case ConstraintLocator::PatternBindingElement:
+  case ConstraintLocator::NamedPatternDecl:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -441,6 +442,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
         << llvm::utostr(patternBindingElt.getIndex());
     break;
   }
+
+  case ConstraintLocator::NamedPatternDecl: {
+    out << "named pattern decl";
+    break;
+  }
   }
 }
 
@@ -591,6 +597,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     if (sm) {
       out << '@';
       expr->getLoc().print(out, *sm);
+    }
+  } else if (auto *pattern = anchor.dyn_cast<Pattern *>()) {
+    out << Pattern::getKindName(pattern->getKind()) << "Pattern";
+    if (sm) {
+      out << '@';
+      pattern->getLoc().print(out, *sm);
     }
   }
 

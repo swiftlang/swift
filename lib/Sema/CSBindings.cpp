@@ -109,6 +109,16 @@ bool BindingSet::isDelayed() const {
     if (locator->directlyAt<NilLiteralExpr>())
       return true;
 
+    // When inferring the type of a variable in a pattern, delay its resolution
+    // so that we resolve type variables inside the expression as placeholders
+    // instead of marking the type of the variable itself as a placeholder. This
+    // allows us to produce more specific errors because the type variable in
+    // the expression that introduced the placeholder might be diagnosable using
+    // fixForHole.
+    if (locator->isLastElement<LocatorPathElt::NamedPatternDecl>()) {
+      return true;
+    }
+
     // It's possible that type of member couldn't be determined,
     // and if so it would be beneficial to bind member to a hole
     // early to propagate that information down to arguments,
@@ -1977,6 +1987,20 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // no contextual information to resolve type of `nil`.
     ConstraintFix *fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
     return std::make_pair(fix, /*impact=*/(unsigned)10);
+  }
+
+  if (auto pattern = getAsPattern<NamedPattern>(dstLocator->getAnchor())) {
+    if (dstLocator->getPath().size() == 1 &&
+        dstLocator->isLastElement<LocatorPathElt::NamedPatternDecl>()) {
+      // Not being able to infer the type of a variable in a pattern binding
+      // decl is more dramatic than anything that could happen inside the
+      // expression because we want to preferrably point the diagnostic to a
+      // part of the expression that caused us to be unable to infer the
+      // variable's type.
+      ConstraintFix *fix =
+          IgnoreInvalidNamedPattern::create(cs, pattern, dstLocator);
+      return std::make_pair(fix, /*impact=*/(unsigned)100);
+    }
   }
 
   return None;

@@ -1137,7 +1137,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-1 {{could not infer type for placeholder}}
   // expected-error@-2 {{type placeholder not allowed here}}
 }
 
