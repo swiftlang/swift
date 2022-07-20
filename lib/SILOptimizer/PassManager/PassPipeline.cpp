@@ -767,6 +767,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 // - don't require IRGen information.
 static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Optimize access markers for improved IRGen after all other optimizations.
+  P.addOptimizeHopToExecutor();
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addAccessEnforcementWMO();
