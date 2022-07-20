@@ -8,7 +8,7 @@ inline void *operator new(size_t, void *p) { return p; }
 #include <new>
 #endif
 
-struct __attribute__((swift_attr("import_as_ref"))) CxxLinkedList {
+struct __attribute__((swift_attr("import_reference"))) CxxLinkedList {
   int value = 3;
 
   CxxLinkedList * _Nullable next() {
@@ -28,7 +28,7 @@ CxxLinkedList * _Nonnull makeLinkedList() {
   return buff;
 }
 
-struct __attribute__((swift_attr("import_as_ref"))) CxxSequence {
+struct __attribute__((swift_attr("import_reference"))) CxxSequence {
   CxxLinkedList * _Nullable list = nullptr;
 
   CxxLinkedList * _Nullable next() {
