@@ -96,7 +96,8 @@ var implicitGet1: X {
 
 var implicitGet2: Int {
   var zzz = 0
-  // expected-warning@-1 {{initialization of variable 'zzz' was never used; consider replacing with assignment to '_' or removing it}}
+  // expected-warning@-1 {{initialization of variable 'zzz' was never used}}
+  // expected-note@-2 {{consider replacing with '_' or removing it}}
   // For the purpose of this test, any other function attribute work as well.
   @inline(__always)
   func foo() {}
@@ -413,7 +414,8 @@ var x23: Int, x24: Int { // expected-error{{'var' declarations with multiple var
 
 var x25: Int { // expected-error{{'var' declarations with multiple variables cannot have explicit getters/setters}}
   return 42
-}, x26: Int // expected-warning{{variable 'x26' was never used; consider replacing with '_' or removing it}}
+}, x26: Int // expected-warning{{variable 'x26' was never used}}
+            // expected-note@-1 {{consider replacing with '_' or removing it}}
 
 // Properties of struct/enum/extensions
 struct S {
@@ -669,7 +671,8 @@ class SelfRefProperties {
     }
     set {
       markUsed(setter) // no-warning
-      var unused = setter + setter // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}} {{7-17=_}}
+      var unused = setter + setter // expected-warning {{initialization of variable 'unused' was never used}}
+      // expected-note@-1 {{consider replacing with '_' or removing it}} {{7-17=_}}
       setter = newValue // expected-warning {{attempting to modify 'setter' within its own setter}}
       // expected-note@-1 {{access 'self' explicitly to silence this warning}} {{7-7=self.}}
     }
@@ -1300,10 +1303,12 @@ class SR_10995 {
   func sr_10995_foo() {
     let doubleOptionalNever = makeDoubleOptionalNever() // expected-warning {{constant 'doubleOptionalNever' inferred to have type 'Never??', which may be unexpected}}
     // expected-note@-1 {{add an explicit type annotation to silence this warning}} {{28-28=: Never??}}
-    // expected-warning@-2 {{initialization of immutable value 'doubleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-2 {{initialization of immutable value 'doubleOptionalNever' was never used}}
+    // expected-note@-3 {{consider replacing with '_' or removing it}}
     let singleOptionalNever = makeSingleOptionalNever() // expected-warning {{constant 'singleOptionalNever' inferred to have type 'Never?', which may be unexpected}} 
     // expected-note@-1 {{add an explicit type annotation to silence this warning}} {{28-28=: Never?}}
-    // expected-warning@-2 {{initialization of immutable value 'singleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-2 {{initialization of immutable value 'singleOptionalNever' was never used}}
+    // expected-note@-3 {{consider replacing with '_' or removing it}}
   }
 }
 

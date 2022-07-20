@@ -28,7 +28,9 @@ func parseError4(x: Int) {
 
 func parseError5(x: Int) {
   switch x {
-  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{8-13=_}}
+  case let z // expected-error {{expected ':' after 'case'}}
+             // expected-warning@-1 {{immutable value 'z' was never used}}
+             // expected-note@-2 {{consider replacing with '_' or removing}}{{8-13=_}}
   }
 }
 
@@ -197,28 +199,33 @@ default:
 var t = (1, 2)
 
 switch t {
-case (var a, 2), (1, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, 2), (1, _): // expected-error {{'a' must be bound in every pattern}}
+                         // expected-warning@-1 {{variable 'a' was never used}} expected-note@-1 {{consider replacing with '_' or removing it}}
   ()
 
 case (_, 2), (var a, _): // expected-error {{'a' must be bound in every pattern}}
   ()
 
-case (var a, 2), (1, var b): // expected-error {{'a' must be bound in every pattern}} expected-error {{'b' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, 2), (1, var b): // expected-error {{'a' must be bound in every pattern}} expected-error {{'b' must be bound in every pattern}}
+                             // expected-warning@-1 {{variable 'a' was never used}} expected-note@-1 {{consider replacing with '_' or removing it}}
   ()
 
-case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}}
+                 // expected-warning@-1 {{variable 'a' was never used}} expected-note@-1 {{consider replacing with '_' or removing it}}
 case (1, _):
   ()
 
 case (_, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
-case (1, var a): // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (1, var a): // expected-warning {{variable 'a' was never used}} expected-note{{consider replacing with '_' or removing it}}
   ()
 
-case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
-case (1, var b): // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}}
+                 // expected-warning@-1 {{variable 'a' was never used}}
+                 // expected-note@-2 {{consider replacing with '_' or removing it}}
+case (1, var b): // expected-warning {{variable 'b' was never used}} expected-note {{consider replacing with '_' or removing it}}
   ()
 
-case (1, let b): // let bindings expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}}
+case (1, let b): // expected-warning {{immutable value 'b' was never used}} expected-note {{consider replacing with '_' or removing it}}
   ()
 
 case (_, 2), (let a, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{case is already handled by previous patterns; consider removing it}}
@@ -228,14 +235,17 @@ case (_, 2), (let a, _): // expected-error {{'a' must be bound in every pattern}
 case (_, 2), (1, _):
   ()
   
-case (_, var a), (_, var a): // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
-  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
+case (_, var a), (_, var a):
+  // expected-warning@-1 {{variable 'a' was never used}} expected-note@-1 {{consider replacing with '_' or removing it}}
   // expected-warning@-2 {{case is already handled by previous patterns; consider removing it}}
+  // expected-warning@-3 {{case is already handled by previous patterns; consider removing it}}
   ()
   
-case (var a, var b), (var b, var a): // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
-  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
-  // expected-warning@-2 {{case is already handled by previous patterns; consider removing it}}
+case (var a, var b), (var b, var a):
+  // expected-warning@-1 {{variable 'a' was never used}} expected-note@-1 {{consider replacing with '_' or removing it}}
+  // expected-warning@-2 {{variable 'b' was never used}} expected-note@-2 {{consider replacing with '_' or removing it}}
+  // expected-warning@-3 {{case is already handled by previous patterns; consider removing it}}
+  // expected-warning@-4 {{case is already handled by previous patterns; consider removing it}}
   ()
 
 case (_, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}

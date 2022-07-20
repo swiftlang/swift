@@ -3,10 +3,10 @@
 
 
 // This test verifies that the -no-warnings-as-errors option nullifies the effect of the -warnings-as-errors option
-// CHECK-WARNING-NOT: error: initialization of immutable value 'c' was never used;
-// CHECK-WARNING: warning: initialization of immutable value 'c' was never used;
-// CHECK-ERROR-NOT: warning: initialization of immutable value 'c' was never used;
-// CHECK-ERROR: error: initialization of immutable value 'c' was never used;
+// CHECK-WARNING-NOT: error: initialization of immutable value 'c' was never used
+// CHECK-WARNING: warning: initialization of immutable value 'c' was never used
+// CHECK-ERROR-NOT: warning: initialization of immutable value 'c' was never used
+// CHECK-ERROR: error: initialization of immutable value 'c' was never used
 func b() {
   let c = 2
 }

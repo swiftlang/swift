@@ -37,12 +37,14 @@ func testCallable(
 ) {
   _ = a()
   let a1 = a(1, 2, 3, 4) // expected-warning {{initialization of immutable value 'a1' was never used}}
+  // expected-note@-1 {{consider replacing}}
 
   b()
   b(1, 2, 3, 4.0)
 
   _ = try? c()
   let c1 = try! c("hello", "world") // expected-warning {{initialization of immutable value 'c1' was never used}}
+  // expected-note@-1 {{consider replacing}}
 
   d()
   d(1, 2.0, 3)

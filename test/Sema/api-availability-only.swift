@@ -45,7 +45,8 @@ public func apiFunc(s : NewProto) { // expected-error {{'NewProto' is only avail
   // expected-note @+1 {{add 'if #available' version check}}
   let _ = NewStruct() // expected-error {{'NewStruct' is only available in macOS 11.0 or newer}}
 
-  // expected-note @+2 {{add 'if #available' version check}}
+  // expected-note @+3 {{add 'if #available' version check}}
+  // expected-note @+2 {{consider replacing with '_'}}
   // expected-warning @+1 {{initialization of immutable value 'a' was never used}}
   let a = NewStruct() // expected-error {{'NewStruct' is only available in macOS 11.0 or newer}}
 

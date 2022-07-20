@@ -3095,12 +3095,25 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
             !isa<TypedPattern>(pbd->getPattern(0))) {
           unsigned varKind = var->isLet();
-          SourceRange replaceRange(
-              pbd->getStartLoc(),
-              pbd->getPattern(0)->getEndLoc());
-          Diags.diagnose(var->getLoc(), diag::pbd_never_used,
-                         var->getName(), varKind)
-            .fixItReplace(replaceRange, "_");
+
+          if (pbd->isAsyncLet()) {
+            SourceRange pbdVarNameRange(pbd->getStartLoc(),
+                                        pbd->getPattern(0)->getEndLoc());
+            Diags.diagnose(var->getLoc(), diag::pbd_never_used, var->getName(),
+                           varKind);
+
+            Diags.diagnose(var->getLoc(), diag::fixit_async_let_unused_cancel)
+                .fixItReplace(var->getLoc(), "_");
+
+            Diags.diagnose(var->getLoc(), diag::fixit_async_let_unused_run);
+          } else {
+            SourceRange replaceRange(pbd->getStartLoc(),
+                                     pbd->getPattern(0)->getEndLoc());
+            Diags.diagnose(var->getLoc(), diag::pbd_never_used, var->getName(),
+                           varKind);
+            Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
+                .fixItReplace(replaceRange, "_");
+          }
           continue;
         }
       }
@@ -3192,9 +3205,10 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
 
         if (foundVP) {
           unsigned varKind = var->isLet();
-          Diags
-              .diagnose(var->getLoc(), diag::variable_never_used,
-                        var->getName(), varKind)
+          Diags.diagnose(var->getLoc(), diag::variable_never_used,
+                         var->getName(), varKind);
+
+          Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
               .fixItReplace(foundVP->getSourceRange(), "_");
           continue;
         }
@@ -3208,10 +3222,22 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                        var->getName());
       } else {
         unsigned varKind = var->isLet();
-        // Just rewrite the one variable with a _.
-        Diags.diagnose(var->getLoc(), diag::variable_never_used,
-                       var->getName(), varKind)
-          .fixItReplace(var->getLoc(), "_");
+
+        if (var->isAsyncLet()) {
+          Diags.diagnose(var->getLoc(), diag::variable_never_used,
+                         var->getName(), varKind);
+
+          Diags.diagnose(var->getLoc(), diag::fixit_async_let_unused_cancel)
+              .fixItReplace(var->getLoc(), "_");
+          Diags.diagnose(var->getLoc(), diag::fixit_async_let_unused_run);
+        } else {
+          // Just rewrite the one variable with a _.
+          Diags.diagnose(var->getLoc(), diag::variable_never_used,
+                         var->getName(), varKind);
+
+          Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
+              .fixItReplace(var->getLoc(), "_");
+        }
       }
       continue;
     }

@@ -21,7 +21,8 @@ func foo(_ e: E2) {
     // expected-error@-1 {{switch must be exhaustive}}
     // expected-note@-2 {{add missing case: '.bar(_)'}}
 
-    case .foo(let tuple): break // expected-warning {{immutable value 'tuple' was never used; consider replacing with '_' or removing it}}
+    case .foo(let tuple): break // expected-warning {{immutable value 'tuple' was never used}}
+                                // expected-note@-1 {{consider replacing with '_' or removing it}}
     case .baz: break
   }
 }

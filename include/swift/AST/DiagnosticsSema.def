@@ -5880,18 +5880,24 @@ NOTE(fixit_for_unused_setter_parameter, none,
      "did you mean to use %0 instead of accessing the property's current value?", (Identifier))
 
 WARNING(pbd_never_used, NoUsage,
-        "initialization of %select{variable|immutable value}1 %0 was never used"
-        "; consider replacing with assignment to '_' or removing it",
+        "initialization of %select{variable|immutable value}1 %0 was never used",
         (Identifier, unsigned))
 
+NOTE(fixit_assign_to_underscore, none,
+     "consider replacing with '_' or removing it", ())
+
+NOTE(fixit_async_let_unused_cancel, none,
+     "replace with assignment to '_' to cancel and await the task", ())
+
+NOTE(fixit_async_let_unused_run, none,
+     "explicitly await the result to run task to completion", ())
 
 WARNING(capture_never_used, NoUsage,
         "capture %0 was never used",
         (Identifier))
 
 WARNING(variable_never_used, NoUsage,
-        "%select{variable|immutable value}1 %0 was never used; "
-        "consider replacing with '_' or removing it",
+        "%select{variable|immutable value}1 %0 was never used",
         (Identifier, unsigned))
 WARNING(immutable_value_never_used_but_assigned, NoUsage,
         "immutable value %0 was never used; consider removing it",

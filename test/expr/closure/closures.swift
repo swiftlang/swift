@@ -381,7 +381,8 @@ extension SomeClass {
 
 // <rdar://problem/16955318> Observed variable in a closure triggers an assertion
 var closureWithObservedProperty: () -> () = {
-  var a: Int = 42 { // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+  var a: Int = 42 { // expected-warning {{variable 'a' was never used}}
+                    // expected-note@-1 {{consider replacing with '_' or removing it}}
   willSet {
     _ = "Will set a to \(newValue)"
   }
@@ -477,7 +478,7 @@ var f = { (s: Undeclared) -> Int in 0 } // expected-error {{cannot find type 'Un
 func r21375863() {
   var width = 0 // expected-warning {{variable 'width' was never mutated}}
   var height = 0 // expected-warning {{variable 'height' was never mutated}}
-  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{cannot find type 'asdf' in scope}} expected-warning {{variable 'bufs' was never used}}
+  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{cannot find type 'asdf' in scope}} expected-warning {{variable 'bufs' was never used}} expected-note {{consider replacing with '_'}}
     [UInt8](repeating: 0, count: width*height)
   }
 }

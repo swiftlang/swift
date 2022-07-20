@@ -131,7 +131,9 @@ default:
 
 // <rdar://problem/19382878> Introduce new x? pattern
 switch Optional(42) {
-case let x?: break // expected-warning{{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
+case let x?: break
+// expected-warning@-1{{immutable value 'x' was never used}}
+// expected-note@-2 {{consider replacing with '_' or removing it}}{{10-11=_}}
 case nil: break
 }
 
@@ -189,8 +191,13 @@ case x ?? 42: break // match value
 default: break
 }
 
-for (var x) in 0...100 {} // expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
-for var x in 0...100 {}  // rdar://20167543 expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
+for (var x) in 0...100 {}
+// expected-warning@-1 {{variable 'x' was never used}}
+// expected-note@-2 {{consider replacing with '_' or removing it}}{{6-11=_}}
+
+for var x in 0...100 {}  // rdar://20167543
+// expected-warning@-1 {{variable 'x' was never used}}
+// expected-note@-2 {{consider replacing with '_' or removing it}}{{5-10=_}}
 for (let x) in 0...100 { _ = x} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
 
 var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
@@ -488,19 +495,25 @@ func rdar63510989() {
   func test(e: E) {
     if case .single(_ as Value) = e {} // Ok
     if case .single(let v as Value) = e {} // Ok
-    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'v' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}{{25-26=_}}
     if case .double(_ as Value) = e {} // Ok
     if case .double(let v as Value) = e {} // Ok
-    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'v' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}{{25-26=_}}
     if case .double(let v as Value?) = e {} // Ok
-    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'v' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}{{25-26=_}}
     if case .triple(_ as Value) = e {} // Ok
     if case .triple(let v as Value) = e {} // Ok
-    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'v' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}{{25-26=_}}
     if case .triple(let v as Value?) = e {} // Ok
-    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'v' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}{{25-26=_}}
     if case .triple(let v as Value??) = e {} // Ok
-    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'v' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}{{25-26=_}}
   }
 }
 
