@@ -100,8 +100,8 @@ struct swift::RequirementCheck {
 
 swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
   return swift::Witness(this->Witness, WitnessSubstitutions,
-                        ReqEnv->getSyntheticSignature(),
-                        ReqEnv->getRequirementToSyntheticMap(),
+                        ReqEnv->getWitnessThunkSignature(),
+                        ReqEnv->getRequirementToWitnessThunkSubs(),
                         DerivativeGenSig, None);
 }
 
@@ -950,7 +950,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
       if (auto assocType = env->mapTypeIntoContext(type))
         return missingRequirementMatch(assocType);
 
-  auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
+  auto reqSubMap = reqEnvironment.getRequirementToWitnessThunkSubs();
   auto proto = conformance->getProtocol();
   Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
   if (type->isEqual(selfTy)) {
@@ -1077,9 +1077,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
 
-    auto syntheticSig = reqEnvironment.getSyntheticSignature();
+    auto syntheticSig = reqEnvironment.getWitnessThunkSignature();
     auto *syntheticEnv = syntheticSig.getGenericEnvironment();
-    auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
+    auto reqSubMap = reqEnvironment.getRequirementToWitnessThunkSubs();
 
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
     if (syntheticEnv)
