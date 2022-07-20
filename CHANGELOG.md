@@ -3,6 +3,17 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
+## Swift 5.8
+
+* [SE-0362][]:
+
+  The compiler flag `-enable-upcoming-feature X` can now be used to enable a specific feature `X` that has been accepted by the evolution process, but whose introduction into the language is waiting for the next major version (e.g., version 6). The `X` is specified by any proposal that falls into this category:
+  * `ConciseMagicFile` enables the new `#file` semantics in [SE-0274][].
+  * `ForwardTrailingClosures` disables the "backward" scanning behavior of [SE-0286][].
+  * `BareSlashRegexLiterals` enables the regex literal syntax of [SE-0352][].
+
+  Features can be detected in source code with `#if hasFeature(X)`.
+
 ## Swift 5.7
 
 * The Swift compiler no longer warns about redundant requirements in generic declarations. For example,
@@ -9459,6 +9470,7 @@ Swift 1.0
 [SE-0267]: <https://github.com/apple/swift-evolution/blob/main/proposals/0267-where-on-contextually-generic.md>
 [SE-0268]: <https://github.com/apple/swift-evolution/blob/main/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/main/proposals/0269-implicit-self-explicit-capture.md>
+[SE-0274]: <https://github.com/apple/swift-evolution/blob/main/proposals/0274-magic-file.md>
 [SE-0276]: <https://github.com/apple/swift-evolution/blob/main/proposals/0276-multi-pattern-catch-clauses.md>
 [SE-0279]: <https://github.com/apple/swift-evolution/blob/main/proposals/0279-multiple-trailing-closures.md>
 [SE-0280]: <https://github.com/apple/swift-evolution/blob/main/proposals/0280-enum-cases-as-protocol-witnesses.md>
@@ -9509,6 +9521,7 @@ Swift 1.0
 [SE-0355]: <https://github.com/apple/swift-evolution/blob/main/proposals/0355-regex-syntax-run-time-construction.md>
 [SE-0357]: <https://github.com/apple/swift-evolution/blob/main/proposals/0357-regex-string-processing-algorithms.md>
 [SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
+[SE-0362]: <https://github.com/apple/swift-evolution/blob/main/proposals/0362-piecemeal-future-features.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

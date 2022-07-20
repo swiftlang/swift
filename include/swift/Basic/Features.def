@@ -48,8 +48,8 @@
   LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
 #endif
 
-#ifndef FUTURE_FEATURE
-#  define FUTURE_FEATURE(FeatureName, SENumber, Version)   \
+#ifndef UPCOMING_FEATURE
+#  define UPCOMING_FEATURE(FeatureName, SENumber, Version)   \
      LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName, \
                       langOpts.hasFeature(#FeatureName))
 #endif
@@ -90,9 +90,9 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated 
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 
-FUTURE_FEATURE(ConciseMagicFile, 274, 6)
-FUTURE_FEATURE(ForwardTrailingClosures, 286, 6)
-FUTURE_FEATURE(BareSlashRegexLiterals, 354, 6)
+UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
+UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
+UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert)
 EXPERIMENTAL_FEATURE(VariadicGenerics)
@@ -118,6 +118,6 @@ EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances)
 EXPERIMENTAL_FEATURE(SendableCompletionHandlers)
 
 #undef EXPERIMENTAL_FEATURE
-#undef FUTURE_FEATURE
+#undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE

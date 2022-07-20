@@ -133,6 +133,13 @@ static Expr *getSingleSubExp(ArgumentList *args, StringRef kindName,
   return nullptr;
 }
 
+/// Returns \c true if the condition is a version check.
+static bool isVersionIfConfigCondition(Expr *Condition);
+
+/// Evaluate the condition.
+/// \c true if success, \c false if failed.
+static bool evaluateIfConfigCondition(Expr *Condition, ASTContext &Context);
+
 /// The condition validator.
 class ValidateIfConfigCondition :
   public ExprVisitor<ValidateIfConfigCondition, Expr*> {
@@ -202,7 +209,7 @@ class ValidateIfConfigCondition :
 
     // We will definitely be consuming at least one operator.
     // Pull out the prospective RHS and slice off the first two elements.
-    Expr *RHS = validate(S[1]);
+    Expr *RHS = S[1];
     S = S.slice(2);
 
     while (true) {
@@ -226,7 +233,7 @@ class ValidateIfConfigCondition :
 
       OpName = NextOpName;
       Op = S[0];
-      RHS = validate(S[1]);
+      RHS = S[1];
       S = S.slice(2);
     }
 
@@ -329,6 +336,16 @@ public:
       return E;
     }
 
+    if (*KindName == "hasFeature") {
+      if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
+        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+                   "feature name");
+        return nullptr;
+      }
+
+      return E;
+    }
+
     // ( 'os' | 'arch' | '_endian' | '_runtime' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.hasValue()) {
@@ -416,14 +433,37 @@ public:
     return E;
   }
 
+  Expr *visitBinaryExpr(BinaryExpr *E) {
+    auto OpName = getDeclRefStr(E->getFn(), DeclRefKind::BinaryOperator);
+    if (auto lhs = validate(E->getLHS())) {
+      // If the left-hand side is a versioned condition, skip evaluation of
+      // the right-hand side if it won't ever affect the result.
+      if (OpName && isVersionIfConfigCondition(lhs)) {
+        assert(*OpName == "&&" || *OpName == "||");
+        bool isLHSTrue = evaluateIfConfigCondition(lhs, Ctx);
+        if (isLHSTrue && *OpName == "||")
+          return lhs;
+        if (!isLHSTrue && *OpName == "&&")
+          return lhs;
+      }
+
+      E->getArgs()->setExpr(0, lhs);
+    }
+
+    if (auto rhs = validate(E->getRHS()))
+      E->getArgs()->setExpr(1, rhs);
+
+    return E;
+  }
+
   // Fold sequence expression for non-Swift3 mode.
   Expr *visitSequenceExpr(SequenceExpr *E) {
     ArrayRef<Expr*> Elts = E->getElements();
-    Expr *foldedExpr = validate(Elts[0]);
+    Expr *foldedExpr = Elts[0];
     Elts = Elts.slice(1);
     foldedExpr = foldSequence(foldedExpr, Elts);
     assert(Elts.empty());
-    return foldedExpr;
+    return validate(foldedExpr);
   }
 
   // Other expression types are unsupported.
@@ -484,6 +524,7 @@ public:
     bool isKnownFeature = llvm::StringSwitch<bool>(Name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
         .Case("$" #FeatureName, Option)
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #include "swift/Basic/Features.def"
         .Default(false);
 
@@ -530,6 +571,9 @@ public:
       ImportPath::Module::Builder builder(Ctx, Str, /*separator=*/'.',
                                           Arg->getStartLoc());
       return Ctx.canImportModule(builder.get(), version, underlyingModule);
+    } else if (KindName == "hasFeature") {
+      auto featureName = getDeclRefStr(Arg);
+      return Ctx.LangOpts.hasFeature(featureName);
     }
 
     auto Val = getDeclRefStr(Arg);
@@ -594,7 +638,6 @@ public:
   bool visitExpr(Expr *E) { return false; }
 };
 
-/// Returns \c true if the condition is a version check.
 static bool isVersionIfConfigCondition(Expr *Condition) {
   return IsVersionIfConfigCondition().visit(Condition);
 }
