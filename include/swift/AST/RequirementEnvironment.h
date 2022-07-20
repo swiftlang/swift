@@ -35,7 +35,7 @@ namespace swift {
 /// environment are the type parameters of the conformance context
 /// (\c conformanceDC) with another (deeper) level of type parameters for
 /// generic requirements. See the \c Witness class for more information about
-/// this synthetic environment.
+/// the witness thunk signature.
 class RequirementEnvironment {
   /// A generic signature that combines the generic parameters of the
   /// concrete conforming type with the generic parameters of the
@@ -52,7 +52,7 @@ class RequirementEnvironment {
   /// <Self : P, T>
   /// <A, B, T>
   ///
-  /// The synthetic signature in this case is just the witness signature.
+  /// The witness thunk signature in this case is just the witness signature.
   ///
   /// It may be that the witness is more generic than the requirement,
   /// for example:
@@ -65,22 +65,21 @@ class RequirementEnvironment {
   /// <Self : P>
   /// <A, B, T>
   ///
-  /// The synthetic signature is just:
+  /// The witness thunk signature is just:
   ///
   /// <A, B>
   ///
-  /// The witness thunk emitted by SILGen uses the synthetic signature.
+  /// The witness thunk emitted by SILGen uses the witness thunk signature.
   /// Therefore one invariant we preserve is that the witness thunk is
   /// ABI compatible with the requirement's function type.
-  GenericSignature syntheticSignature = GenericSignature();
-  GenericEnvironment *syntheticEnvironment = nullptr;
+  GenericSignature witnessThunkSig = GenericSignature();
 
   /// The generic signature of the protocol requirement member.
   GenericSignature reqSig = GenericSignature();
 
   /// A substitution map mapping the requirement signature to the
-  /// generic parameters of the synthetic signature.
-  SubstitutionMap reqToSyntheticEnvMap;
+  /// generic parameters of the witness thunk signature.
+  SubstitutionMap reqToWitnessThunkSigMap;
 
 public:
   /// Create a new environment for matching the given requirement within a
@@ -102,20 +101,20 @@ public:
                          ClassDecl *covariantSelf,
                          ProtocolConformance *conformance);
 
-  /// Retrieve the synthetic generic environment.
-  GenericEnvironment *getSyntheticEnvironment() const {
-    return syntheticEnvironment;
-  }
-
   /// Retrieve the generic signature of the requirement.
   GenericSignature getRequirementSignature() const {
     return reqSig;
   }
 
+  /// Retrieve the generic signature of the witness thunk.
+  GenericSignature getWitnessThunkSignature() const {
+    return witnessThunkSig;
+  }
+
   /// Retrieve the substitution map that maps the interface types of the
-  /// requirement to the interface types of the synthetic environment.
-  SubstitutionMap getRequirementToSyntheticMap() const {
-    return reqToSyntheticEnvMap;
+  /// requirement to the interface types of the witness thunk signature.
+  SubstitutionMap getRequirementToWitnessThunkSubs() const {
+    return reqToWitnessThunkSigMap;
   }
 };
 

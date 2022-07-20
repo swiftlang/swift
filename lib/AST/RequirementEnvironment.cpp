@@ -44,7 +44,7 @@ RequirementEnvironment::RequirementEnvironment(
   auto conformanceSig = conformanceDC->getGenericSignatureOfContext();
 
   // This is a substitution function from the generic parameters of the
-  // conforming type to the synthetic environment.
+  // conforming type to the witness thunk environment.
   //
   // For structs, enums and protocols, this is a 1:1 mapping; for classes,
   // we increase the depth of each generic parameter by 1 so that we can
@@ -53,7 +53,7 @@ RequirementEnvironment::RequirementEnvironment(
   // This is a raw function rather than a substitution map because we need to
   // keep generic parameters as generic, even if the conformanceSig (the best
   // way to create the substitution map) equates them to concrete types.
-  auto conformanceToSyntheticTypeFn = [&](SubstitutableType *type) {
+  auto conformanceToWitnessThunkTypeFn = [&](SubstitutableType *type) {
     auto *genericParam = cast<GenericTypeParamType>(type);
     if (covariantSelf) {
       return GenericTypeParamType::get(genericParam->isTypeSequence(),
@@ -65,14 +65,14 @@ RequirementEnvironment::RequirementEnvironment(
                                      genericParam->getDepth(),
                                      genericParam->getIndex(), ctx);
   };
-  auto conformanceToSyntheticConformanceFn =
+  auto conformanceToWitnessThunkConformanceFn =
       MakeAbstractConformanceForGenericType();
 
   auto substConcreteType = concreteType.subst(
-      conformanceToSyntheticTypeFn, conformanceToSyntheticConformanceFn);
+      conformanceToWitnessThunkTypeFn, conformanceToWitnessThunkConformanceFn);
 
   // Calculate the depth at which the requirement's generic parameters
-  // appear in the synthetic signature.
+  // appear in the witness thunk signature.
   unsigned depth = 0;
   if (covariantSelf) {
     ++depth;
@@ -88,7 +88,7 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
       proto->getSelfInterfaceType()->getCanonicalType());
 
-  reqToSyntheticEnvMap = SubstitutionMap::get(reqSig,
+  reqToWitnessThunkSigMap = SubstitutionMap::get(reqSig,
     [selfType, substConcreteType, depth, covariantSelf, &ctx]
     (SubstitutableType *type) -> Type {
       // If the conforming type is a class, the protocol 'Self' maps to
@@ -136,15 +136,13 @@ RequirementEnvironment::RequirementEnvironment(
       return ProtocolConformanceRef(proto);
     });
 
-  // If the requirement itself is non-generic, the synthetic signature
+  // If the requirement itself is non-generic, the witness thunk signature
   // is that of the conformance context.
   if (!covariantSelf &&
       reqSig.getGenericParams().size() == 1 &&
       reqSig.getRequirements().size() == 1) {
-    syntheticSignature = conformanceDC->getGenericSignatureOfContext().getCanonicalSignature();
-    syntheticEnvironment =
-      syntheticSignature.getGenericEnvironment();
-
+    witnessThunkSig = conformanceDC->getGenericSignatureOfContext()
+        .getCanonicalSignature();
     return;
   }
 
@@ -164,8 +162,8 @@ RequirementEnvironment::RequirementEnvironment(
   // Now, add all generic parameters from the conforming type.
   if (conformanceSig) {
     for (auto param : conformanceSig.getGenericParams()) {
-      auto substParam = Type(param).subst(conformanceToSyntheticTypeFn,
-                                          conformanceToSyntheticConformanceFn);
+      auto substParam = Type(param).subst(conformanceToWitnessThunkTypeFn,
+                                          conformanceToWitnessThunkConformanceFn);
       genericParamTypes.push_back(substParam->castTo<GenericTypeParamType>());
     }
   }
@@ -181,8 +179,8 @@ RequirementEnvironment::RequirementEnvironment(
 
   if (conformanceSig) {
     for (auto &rawReq : conformanceSig.getRequirements()) {
-      if (auto req = rawReq.subst(conformanceToSyntheticTypeFn,
-                                  conformanceToSyntheticConformanceFn))
+      if (auto req = rawReq.subst(conformanceToWitnessThunkTypeFn,
+                                  conformanceToWitnessThunkConformanceFn))
         requirements.push_back(*req);
     }
   }
@@ -207,13 +205,11 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
   for (auto &rawReq : reqSig.getRequirements()) {
-    if (auto req = rawReq.subst(reqToSyntheticEnvMap))
+    if (auto req = rawReq.subst(reqToWitnessThunkSigMap))
       requirements.push_back(*req);
   }
 
-  // Produce the generic signature and environment.
-  syntheticSignature = buildGenericSignature(ctx, GenericSignature(),
-                                             std::move(genericParamTypes),
-                                             std::move(requirements));
-  syntheticEnvironment = syntheticSignature.getGenericEnvironment();
+  witnessThunkSig = buildGenericSignature(ctx, GenericSignature(),
+                                          std::move(genericParamTypes),
+                                          std::move(requirements));
 }
