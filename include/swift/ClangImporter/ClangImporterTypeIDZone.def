@@ -24,3 +24,9 @@ SWIFT_REQUEST(ClangImporter, CXXNamespaceMemberLookup,
 SWIFT_REQUEST(ClangImporter, ClangRecordMemberLookup,
               Decl *(ClangRecordMemberLookupDescriptor), Uncached,
               NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, CxxRecordSemantics,
+              CxxRecordSemanticsKind(const clang::CXXRecordDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, IsSafeUseOfCxxDecl,
+              bool(SafeUseOfCxxRecordDescriptor), Cached,
+              NoLocationInfo)

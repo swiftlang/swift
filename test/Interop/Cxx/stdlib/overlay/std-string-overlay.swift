@@ -24,10 +24,10 @@ extension std.string.const_iterator: UnsafeCxxInputIterator {
                         rhs: std.string.const_iterator) -> Bool {
 #if os(Linux)
     // In libstdc++, `base()` returns UnsafePointer<Optional<UnsafePointer<CChar>>>.
-    return lhs.base().pointee == rhs.base().pointee
+    return lhs.__baseUnsafe().pointee == rhs.__baseUnsafe().pointee
 #else
     // In libc++, `base()` returns UnsafePointer<CChar>.
-    return lhs.base() == rhs.base()
+    return lhs.__baseUnsafe() == rhs.__baseUnsafe()
 #endif
   }
 }

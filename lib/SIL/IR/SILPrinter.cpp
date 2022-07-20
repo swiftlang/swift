@@ -1936,12 +1936,23 @@ public:
     case CheckKind::NoImplicitCopy:
       *this << "[no_implicit_copy] ";
       break;
+    case CheckKind::NoCopy:
+      *this << "[no_copy] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }
 
   void visitCopyableToMoveOnlyWrapperValueInst(
       CopyableToMoveOnlyWrapperValueInst *I) {
+    switch (I->getInitialKind()) {
+    case CopyableToMoveOnlyWrapperValueInst::Owned:
+      *this << "[owned] ";
+      break;
+    case CopyableToMoveOnlyWrapperValueInst::Guaranteed:
+      *this << "[guaranteed] ";
+      break;
+    }
     *this << getIDAndType(I->getOperand());
   }
 

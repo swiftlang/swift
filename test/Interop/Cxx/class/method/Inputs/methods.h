@@ -1,7 +1,7 @@
 #ifndef TEST_INTEROP_CXX_CLASS_METHOD_METHODS_H
 #define TEST_INTEROP_CXX_CLASS_METHOD_METHODS_H
 
-struct NonTrivialInWrapper {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivialInWrapper {
   int value;
 
   ~NonTrivialInWrapper() { }

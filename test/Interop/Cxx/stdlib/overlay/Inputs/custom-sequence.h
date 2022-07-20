@@ -1,46 +1,17 @@
 #ifndef TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_SEQUENCE_H
 #define TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_SEQUENCE_H
 
-#include <cstddef>
+#include "custom-iterator.h"
 #include <iterator>
 
 struct SimpleSequence {
-  struct ConstIterator {
-  private:
-    int value;
-
-  public:
-    using iterator_category = std::input_iterator_tag;
-    using value_type = int;
-    using pointer = int *;
-    using reference = int &;
-    using difference_type = int;
-
-    ConstIterator(int value) : value(value) {}
-    ConstIterator(const ConstIterator &other) = default;
-
-    const int &operator*() const { return value; }
-
-    ConstIterator &operator++() {
-      value++;
-      return *this;
-    }
-    ConstIterator operator++(int) {
-      auto tmp = ConstIterator(value);
-      value++;
-      return tmp;
-    }
-
-    bool operator==(const ConstIterator &other) const {
-      return value == other.value;
-    }
-    bool operator!=(const ConstIterator &other) const {
-      return value != other.value;
-    }
-  };
-
   ConstIterator begin() const { return ConstIterator(1); }
   ConstIterator end() const { return ConstIterator(5); }
+};
+
+struct SimpleSequenceWithOutOfLineEqualEqual {
+  ConstIteratorOutOfLineEq begin() const { return ConstIteratorOutOfLineEq(1); }
+  ConstIteratorOutOfLineEq end() const { return ConstIteratorOutOfLineEq(5); }
 };
 
 struct SimpleArrayWrapper {

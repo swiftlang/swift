@@ -28,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -319,18 +320,29 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // let declarations.
       auto &tl = getTypeLowering(valueType);
       SILValue Val = Entry.value;
+      bool eliminateMoveOnlyWrapper =
+          Val->getType().isMoveOnlyWrapped() &&
+          !vd->getInterfaceType()->is<SILMoveOnlyWrappedType>();
 
       if (!Val->getType().isAddress()) {
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
         if (canGuarantee && !vd->getInterfaceType()->is<ReferenceStorageType>()) {
           auto guaranteed = ManagedValue::forUnmanaged(Val).borrow(*this, loc);
+          if (eliminateMoveOnlyWrapper)
+            guaranteed = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                loc, guaranteed);
           capturedArgs.push_back(guaranteed);
           break;
         }
-      
-        // Just retain a by-val let.
+
+        // Just copy a by-val let.
         Val = B.emitCopyValueOperation(loc, Val);
+        // If we need to unwrap a moveonlywrapped value, do so now but in an
+        // owned way to ensure that the partial apply is viewed as a semantic
+        // use of the value.
+        if (eliminateMoveOnlyWrapper)
+          Val = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, Val);
       } else {
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.

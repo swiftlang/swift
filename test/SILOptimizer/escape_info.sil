@@ -1240,3 +1240,24 @@ bb0:
   return %14 : $()
 }
 
+// CHECK-LABEL: Escape information for test_destroyArray:
+// CHECK: global:   %0 = alloc_ref $Y
+// CHECK:  -    :   %1 = alloc_ref $Z
+// CHECK: End function test_destroyArray
+sil @test_destroyArray : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Z
+  %2 = ref_element_addr %1 : $Z, #Z.y
+  store %0 to %2 : $*Y
+  %4 = alloc_stack $Z
+  store %1 to %4 : $*Z
+  %6 = metatype $@thick Z.Type
+  %7 = address_to_pointer %4 : $*Z to $Builtin.RawPointer
+  %8 = integer_literal $Builtin.Word, 1
+  %9 = builtin "destroyArray"<Z>(%6 : $@thick Z.Type, %7 : $Builtin.RawPointer, %8 : $Builtin.Word) : $()
+  dealloc_stack %4 : $*Z
+  %11 = tuple ()
+  return %11 : $()
+}
+

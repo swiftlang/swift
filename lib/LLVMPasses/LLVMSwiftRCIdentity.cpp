@@ -17,15 +17,6 @@
 using namespace llvm;
 using swift::SwiftRCIdentity;
 
-// Register this pass...
-char SwiftRCIdentity::ID = 0;
-INITIALIZE_PASS(SwiftRCIdentity, "swift-rc-identity",
-               "Swift RC Identity Analysis", false, true)
-
-bool SwiftRCIdentity::doInitialization(Module &M) {
-  return true;
-}
-
 llvm::Value *
 SwiftRCIdentity::stripPointerCasts(llvm::Value *Val) {
   return Val->stripPointerCasts();
@@ -86,9 +77,4 @@ SwiftRCIdentity::getSwiftRCIdentityRoot(llvm::Value *Val) {
       return OldVal;
   } while (true);
   return Val;
-}
-
-llvm::ImmutablePass *swift::createSwiftRCIdentityPass() {
-  initializeSwiftRCIdentityPass(*PassRegistry::getPassRegistry());
-  return new SwiftRCIdentity();
 }

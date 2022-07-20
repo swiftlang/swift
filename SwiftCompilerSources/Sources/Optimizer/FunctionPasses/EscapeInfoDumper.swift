@@ -25,19 +25,19 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
   struct Visitor : EscapeInfoVisitor {
     var results: Set<String> =  Set()
     
-    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+    mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       if operand.instruction is ReturnInst {
-        results.insert("return[\(path)]")
+        results.insert("return[\(path.projectionPath)]")
         return .ignore
       }
       return .continueWalk
     }
     
-    mutating func visitDef(def: Value, path: Path, state: State) -> DefResult {
+    mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
       guard let arg = def as? FunctionArgument else {
         return .continueWalkUp
       }
-      results.insert("arg\(arg.index)[\(path)]")
+      results.insert("arg\(arg.index)[\(path.projectionPath)]")
       return .walkDown
     }
   }
@@ -96,7 +96,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
   
   struct Visitor : EscapeInfoVisitor {
     let apply: Instruction
-    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+    mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       let user = operand.instruction
       if user == apply {
         return .abort

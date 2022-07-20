@@ -3,7 +3,7 @@
 {}
 @end
 
-struct S {
+struct __attribute__((swift_attr("import_unsafe"))) S {
   union {
     C *t;
     char c;

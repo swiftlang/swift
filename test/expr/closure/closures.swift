@@ -475,9 +475,9 @@ var f = { (s: Undeclared) -> Int in 0 } // expected-error {{cannot find type 'Un
 
 // <rdar://problem/21375863> Swift compiler crashes when using closure, declared to return illegal type.
 func r21375863() {
-  var width = 0 // expected-warning {{variable 'width' was never mutated}}
-  var height = 0 // expected-warning {{variable 'height' was never mutated}}
-  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{cannot find type 'asdf' in scope}} expected-warning {{variable 'bufs' was never used}}
+  var width = 0
+  var height = 0
+  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{cannot find type 'asdf' in scope}}
     [UInt8](repeating: 0, count: width*height)
   }
 }

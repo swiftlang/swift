@@ -2050,10 +2050,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst: {
     auto Ty = MF->getType(TyID);
-    auto *MVI = Builder.createCopyableToMoveOnlyWrapperValue(
-        Loc,
-        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
-    ResultInst = MVI;
+    bool isOwned = bool(Attr);
+    if (isOwned)
+      ResultInst = Builder.createOwnedCopyableToMoveOnlyWrapperValue(
+          Loc, getLocalValue(ValID,
+                             getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    else
+      ResultInst = Builder.createGuaranteedCopyableToMoveOnlyWrapperValue(
+          Loc, getLocalValue(ValID,
+                             getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
   }
 

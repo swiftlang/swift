@@ -5256,6 +5256,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
+    case ConstraintLocator::NamedPatternDecl: {
+      auto pattern = cast<NamedPattern>(anchor.get<Pattern *>());
+      anchor = pattern->getDecl();
+      path = path.slice(1);
+      break;
+    }
+
     case ConstraintLocator::ImplicitConversion:
       break;
 
@@ -5539,7 +5546,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // to figure out exactly where it was used.
   if (auto *argExpr = getAsExpr<InOutExpr>(locator->getAnchor())) {
     auto *argLoc = getConstraintSystem().getArgumentLocator(argExpr);
-    assert(argLoc && "Incorrect use of `inout` expression");
+    if (!argLoc)
+      return None;
+
     locator = argLoc;
   }
 

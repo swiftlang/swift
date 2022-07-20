@@ -8,7 +8,7 @@ inline void *operator new(size_t, void *p) { return p; }
 #include <new>
 #endif
 
-struct __attribute__((swift_attr("import_as_ref"))) Empty {
+struct __attribute__((swift_attr("import_reference"))) Empty {
   int test() const { return 42; }
 
   static Empty *create() { return new (malloc(sizeof(Empty))) Empty(); }
@@ -16,7 +16,7 @@ struct __attribute__((swift_attr("import_as_ref"))) Empty {
 
 void mutateIt(Empty &) {}
 
-struct __attribute__((swift_attr("import_as_ref"))) IntPair {
+struct __attribute__((swift_attr("import_reference"))) IntPair {
   int a = 1;
   int b = 2;
 

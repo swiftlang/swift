@@ -4504,8 +4504,18 @@ bool ConstraintSystem::repairFailures(
         if (lhs->isPlaceholder())
           return true;
 
-        conversionsOrFixes.push_back(
-            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+        auto *loc = getConstraintLocator(locator);
+        // If this `inout` is in incorrect position, it should be diagnosed
+        // by other fixes.
+        if (loc->directlyAt<InOutExpr>()) {
+          if (!getArgumentLocator(castToExpr(anchor))) {
+            conversionsOrFixes.push_back(
+                RemoveAddressOf::create(*this, lhs, rhs, loc));
+            return true;
+          }
+        }
+
+        conversionsOrFixes.push_back(TreatRValueAsLValue::create(*this, loc));
         return true;
       }
     }
@@ -4704,10 +4714,14 @@ bool ConstraintSystem::repairFailures(
       if (repairByInsertingExplicitCall(lhs, rhs))
         return true;
 
-      if (isa<InOutExpr>(AE->getSrc())) {
+      if (auto *inoutExpr = dyn_cast<InOutExpr>(AE->getSrc())) {
+        auto *loc = getConstraintLocator(inoutExpr);
+
+        if (hasFixFor(loc, FixKind::RemoveAddressOf))
+          return true;
+
         conversionsOrFixes.push_back(
-            RemoveAddressOf::create(*this, lhs, rhs,
-                                    getConstraintLocator(locator)));
+            RemoveAddressOf::create(*this, lhs, rhs, loc));
         return true;
       }
 
@@ -7343,6 +7357,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       }
     }
 
+    if (loc->isLastElement<LocatorPathElt::MemberRefBase>()) {
+      auto *fix = ContextualMismatch::create(*this, protocolTy, type, loc);
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
+    }
+
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
@@ -9737,7 +9757,7 @@ ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
       return SolutionKind::Solved;
 
     auto *memberRef = findResolvedMemberRef(memberLoc);
-    if (memberRef && memberRef->isStatic()) {
+    if (memberRef && (memberRef->isStatic() || isa<TypeAliasDecl>(memberRef))) {
       return simplifyConformsToConstraint(
           resultTy, baseTy, ConstraintKind::ConformsTo,
           getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase),
@@ -11211,18 +11231,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // following: $T1 -> $T2.
   auto func1 = type1->castTo<FunctionType>();
 
-  // If a type variable representing "function type" is a hole
-  // or it could be bound to some concrete type with a help of
-  // a fix, let's propagate holes to the "input" type. Doing so
-  // provides more information to upcoming argument and result matching.
-  if (shouldAttemptFixes()) {
-    if (auto *typeVar = type2->getAs<TypeVariableType>()) {
-      auto *locator = typeVar->getImpl().getLocator();
-      if (typeVar->isPlaceholder() || hasFixFor(locator))
-        recordAnyTypeVarAsPotentialHole(func1);
-    }
-  }
-
   // Before stripping lvalue-ness and optional types, save the original second
   // type for handling `func callAsFunction` and `@dynamicCallable`
   // applications. This supports the following cases:
@@ -11236,6 +11244,29 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Drill down to the concrete type on the right hand side.
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
+
+  // If a type variable representing "function type" is a hole
+  // or it could be bound to some concrete type with a help of
+  // a fix, let's propagate holes to the "input" type. Doing so
+  // provides more information to upcoming argument and result matching.
+  if (shouldAttemptFixes()) {
+    if (auto *typeVar = type2->getAs<TypeVariableType>()) {
+      auto *locator = typeVar->getImpl().getLocator();
+      if (hasFixFor(locator)) {
+        recordAnyTypeVarAsPotentialHole(func1);
+      }
+    }
+    Type underlyingType = desugar2;
+    while (auto *MT = underlyingType->getAs<AnyMetatypeType>()) {
+      underlyingType = MT->getInstanceType();
+    }
+    underlyingType =
+        getFixedTypeRecursive(underlyingType, flags, /*wantRValue=*/true);
+    if (underlyingType->isPlaceholder()) {
+      recordAnyTypeVarAsPotentialHole(func1);
+      return SolutionKind::Solved;
+    }
+  }
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
@@ -12926,6 +12957,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+  case FixKind::IgnoreInvalidASTNode: {
+    return recordFix(fix, 10) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+  case FixKind::IgnoreInvalidNamedPattern: {
+    return recordFix(fix, 100) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
   case FixKind::ExplicitlyConstructRawRepresentable: {

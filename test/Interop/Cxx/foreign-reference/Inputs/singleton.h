@@ -12,7 +12,7 @@ inline void *operator new(size_t, void *p) { return p; }
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-struct __attribute__((swift_attr("import_as_ref"))) DeletedDtor {
+struct __attribute__((swift_attr("import_reference"))) DeletedDtor {
   int value = 42;
 
   DeletedDtor() = default;
@@ -30,7 +30,7 @@ struct __attribute__((swift_attr("import_as_ref"))) DeletedDtor {
 
 void mutateIt(DeletedDtor &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_as_ref"))) PrivateDtor {
+struct __attribute__((swift_attr("import_reference"))) PrivateDtor {
   int value = 42;
 
   PrivateDtor() = default;
@@ -50,7 +50,7 @@ private:
 
 void mutateIt(PrivateDtor &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_as_ref"))) DeletedSpecialMembers {
+struct __attribute__((swift_attr("import_reference"))) DeletedSpecialMembers {
   int value = 42;
 
   DeletedSpecialMembers() = default;
@@ -68,7 +68,7 @@ struct __attribute__((swift_attr("import_as_ref"))) DeletedSpecialMembers {
 
 void mutateIt(DeletedSpecialMembers &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_as_ref"))) PrivateSpecialMembers {
+struct __attribute__((swift_attr("import_reference"))) PrivateSpecialMembers {
   int value = 42;
 
   PrivateSpecialMembers() = default;

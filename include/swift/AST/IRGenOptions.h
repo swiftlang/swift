@@ -237,6 +237,9 @@ public:
   /// well-formed?
   unsigned Verify : 1;
 
+  /// Should we use the legacy pass manager.
+  unsigned LegacyPassManager : 1;
+
   OptimizationMode OptMode;
 
   /// Which sanitizer is turned on.
@@ -443,7 +446,7 @@ public:
   IRGenOptions()
       : DWARFVersion(2),
         OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
-        Verify(true), OptMode(OptimizationMode::NotSet),
+        Verify(true), LegacyPassManager(1), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         SanitizeAddressUseODRIndicator(false),

@@ -640,6 +640,13 @@ T *getAsStmt(ASTNode node) {
   return nullptr;
 }
 
+template <typename T = Pattern>
+T *getAsPattern(ASTNode node) {
+  if (auto *P = node.dyn_cast<Pattern *>())
+    return dyn_cast_or_null<T>(P);
+  return nullptr;
+}
+
 SourceLoc getLoc(ASTNode node);
 SourceRange getSourceRange(ASTNode node);
 

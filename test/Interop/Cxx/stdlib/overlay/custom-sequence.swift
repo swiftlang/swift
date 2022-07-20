@@ -9,7 +9,6 @@ import Cxx
 
 var CxxSequenceTestSuite = TestSuite("CxxSequence")
 
-extension SimpleSequence.ConstIterator: UnsafeCxxInputIterator {}
 extension SimpleSequence: CxxSequence {}
 
 extension SimpleEmptySequence: CxxSequence {}
