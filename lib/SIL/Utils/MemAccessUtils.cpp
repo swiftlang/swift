@@ -897,6 +897,10 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
         if (addAllOperandsToWorklist(mvi)) {
           continue;
         }
+      } else if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(inst)) {
+        if (addAllOperandsToWorklist(c)) {
+          continue;
+        }
       }
     }
 

@@ -74,12 +74,11 @@ private func tryDevirtualizeReleaseOfObject(
   _ deallocStackRef: DeallocStackRefInst
 ) {
   let allocRefInstruction = deallocStackRef.allocRef
-  var root = release.operands[0].value
-  while let newRoot = stripRCIdentityPreservingInsts(root) {
-    root = newRoot
-  }
 
-  if root != allocRefInstruction {
+  // Check if the release instruction right before the `dealloc_stack_ref` really releases
+  // the allocated object (and not something else).
+  var finder = FindAllocationOfRelease(allocation: allocRefInstruction)
+  if !finder.allocationIsRoot(of: release.operand) {
     return
   }
 
@@ -109,119 +108,58 @@ private func tryDevirtualizeReleaseOfObject(
   context.erase(instruction: release)
 }
 
-private func stripRCIdentityPreservingInsts(_ value: Value) -> Value? {
-  guard let inst = value as? Instruction else { return nil }
+// Up-walker to find the root of a release instruction.
+private struct FindAllocationOfRelease : ValueUseDefWalker {
+  private let allocInst: AllocRefInstBase
+  private var allocFound = false
 
-  switch inst {
-  // First strip off RC identity preserving casts.
-  case is UpcastInst,
-       is UncheckedRefCastInst,
-       is InitExistentialRefInst,
-       is OpenExistentialRefInst,
-       is RefToBridgeObjectInst,
-       is BridgeObjectToRefInst,
-       is ConvertFunctionInst,
-       is UncheckedEnumDataInst:
-    return inst.operands[0].value
+  var walkUpCache = WalkerCache<SmallProjectionPath>()
 
-  // Then if we have a struct_extract that is extracting a non-trivial member
-  // from a struct with no other non-trivial members, a ref count operation on
-  // the struct is equivalent to a ref count operation on the extracted
-  // member. Strip off the extract.
-  case let sei as StructExtractInst where sei.isFieldOnlyNonTrivialField:
-    return sei.operand
+  init(allocation: AllocRefInstBase) { allocInst = allocation }
 
-  // If we have a struct or tuple instruction with only one non-trivial operand, the
-  // only reference count that can be modified is the non-trivial operand. Return
-  // the non-trivial operand.
-  case is StructInst, is TupleInst:
-    return inst.uniqueNonTrivialOperand
-
-  // If we have an enum instruction with a payload, strip off the enum to
-  // expose the enum's payload.
-  case let ei as EnumInst where !ei.operands.isEmpty:
-    return ei.operand
-
-  // If we have a tuple_extract that is extracting the only non trivial member
-  // of a tuple, a retain_value on the tuple is equivalent to a retain_value on
-  // the extracted value.
-  case let tei as TupleExtractInst where tei.isEltOnlyNonTrivialElt:
-    return tei.operand
-
-  default:
-    return nil
+  /// The top-level entry point: returns true if the root of `value` is the `allocInst`.
+  mutating func allocationIsRoot(of value: Value) -> Bool {
+    let path = SmallProjectionPath().push(.anyValueFields)
+    return walkUp(value: value, path: path) != .abortWalk &&
+           allocFound
   }
-}
 
-private extension Instruction {
-  /// Search the operands of this tuple for a unique non-trivial elt. If we find
-  /// it, return it. Otherwise return `nil`.
-  var uniqueNonTrivialOperand: Value? {
-    var candidateElt: Value?
-    let function = self.function
+  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
+    if value == allocInst {
+      allocFound = true
+      return .continueWalk
+    }
+    return .abortWalk
+  }
 
-    for op in operands {
-      if !op.value.type.isTrivial(in: function) {
-        if candidateElt == nil {
-          candidateElt = op.value
-          continue
+  // This function is called for `struct` and `tuple` instructions in case the `path` doesn't select
+  // a specific operand but all operands.
+  mutating func walkUpAllOperands(of def: Instruction, path: SmallProjectionPath) -> WalkResult {
+  
+    // Instead of walking up _all_ operands (which would be the default behavior), require that only a
+    // _single_ operand is not trivial and walk up that operand.
+    // We need to check this because the released value must not contain multiple copies of the
+    // allocated object. We can only replace a _single_ release with the destructor call and not
+    // multiple releases of the same object. E.g.
+    //
+    //    %x = alloc_ref [stack] $X
+    //    strong_retain %x
+    //    %t = tuple (%x, %x)
+    //    release_value %t       // -> releases %x two times!
+    //    dealloc_stack_ref %x
+    //
+    var nonTrivialOperandFound = false
+    for operand in def.operands {
+      if !operand.value.type.isTrivial(in: def.function) {
+        if nonTrivialOperandFound {
+          return .abortWalk
         }
-
-        // Otherwise, we have two values that are non-trivial. Bail.
-        return nil
+        nonTrivialOperandFound = true
+        if walkUp(value: operand.value, path: path) == .abortWalk {
+          return .abortWalk
+        }
       }
     }
-
-    return candidateElt
-  }
-}
-
-private extension TupleExtractInst {
-  var isEltOnlyNonTrivialElt: Bool {
-    let function = self.function
-
-    if type.isTrivial(in: function) {
-      return false
-    }
-
-    let opType = operand.type
-
-    var nonTrivialEltsCount = 0
-    for elt in opType.tupleElements {
-      if elt.isTrivial(in: function) {
-        nonTrivialEltsCount += 1
-      }
-
-      if nonTrivialEltsCount > 1 {
-        return false
-      }
-    }
-
-    return true
-  }
-}
-
-private extension StructExtractInst {
-  var isFieldOnlyNonTrivialField: Bool {
-    let function = self.function
-
-    if type.isTrivial(in: function) {
-      return false
-    }
-
-    let structType = operand.type
-
-    var nonTrivialFieldsCount = 0
-    for field in structType.getNominalFields(in: function) {
-      if field.isTrivial(in: function) {
-        nonTrivialFieldsCount += 1
-      }
-
-      if nonTrivialFieldsCount > 1 {
-        return false
-      }
-    }
-
-    return true
+    return .continueWalk
   }
 }

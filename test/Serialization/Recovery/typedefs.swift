@@ -56,6 +56,7 @@ let _ = wrapped // expected-error {{cannot find 'wrapped' in scope}}
 let _ = unwrapped // okay
 
 _ = usesWrapped(nil) // expected-error {{cannot find 'usesWrapped' in scope}}
+                     // expected-error@-1 {{'nil' requires a contextual type}}
 _ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'Int32'}}
 
 let _: WrappedAlias = nil // expected-error {{cannot find type 'WrappedAlias' in scope}}

@@ -923,15 +923,21 @@ ManagedValue SILGenBuilder::createGuaranteedMoveOnlyWrapperToCopyableValue(
 }
 
 ManagedValue
-SILGenBuilder::createCopyableToMoveOnlyWrapperValue(SILLocation loc,
-                                                    ManagedValue value) {
+SILGenBuilder::createOwnedCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                         ManagedValue value) {
   assert(value.isPlusOne(SGF) && "Argument must be at +1!");
   CleanupCloner cloner(*this, value);
-  SILValue v = value.forward(getSILGenFunction());
-  auto *mdi = SILBuilder::createCopyableToMoveOnlyWrapperValue(loc, v);
-  if (v->getType().isTrivial(getFunction()))
-    return SGF.emitManagedRValueWithCleanup(mdi);
+  auto *mdi = createOwnedCopyableToMoveOnlyWrapperValue(
+      loc, value.forward(getSILGenFunction()));
   return cloner.clone(mdi);
+}
+
+ManagedValue SILGenBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue(
+    SILLocation loc, ManagedValue value) {
+  auto *mdi =
+      createGuaranteedCopyableToMoveOnlyWrapperValue(loc, value.getValue());
+  assert(mdi->getOperand()->getType().isObject() && "Expected an object?!");
+  return ManagedValue::forUnmanaged(mdi);
 }
 
 ManagedValue

@@ -11,16 +11,35 @@
 // REQUIRES: executable_test
 
 #include <cassert>
+#include <cstdio>
 #include "functions.h"
 
 int main() {
   static_assert(!noexcept(Functions::emptyThrowFunction()), "noexcept function");
   static_assert(!noexcept(Functions::throwFunction()), "noexcept function");
+  static_assert(!noexcept(Functions::throwFunctionWithReturn()), "noexcept function");
 
-  Functions::emptyThrowFunction();
-  Functions::throwFunction();
+  try {
+    Functions::emptyThrowFunction();
+  } catch (swift::_impl::NaiveException& e) {
+    printf("%s\n", e.getMessage());
+  }
+  try {
+    Functions::throwFunction();
+  } catch (swift::_impl::NaiveException& e) {
+    printf("%s\n", e.getMessage());
+  }
+  try {
+    Functions::throwFunctionWithReturn();
+  } catch (swift::_impl::NaiveException& e) {
+    printf("%s\n", e.getMessage());
+  }
+
   return 0;
 }
 
 // CHECK: passEmptyThrowFunction
 // CHECK-NEXT: passThrowFunction
+// CHECK-NEXT: Exception
+// CHECK-NEXT: passThrowFunctionWithReturn
+// CHECK-NEXT: Exception

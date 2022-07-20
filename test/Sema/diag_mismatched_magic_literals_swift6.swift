@@ -1,5 +1,6 @@
-// The future "Swift 6 mode" behavior is staged in behind  `-enable-experimental-concise-pound-file`.
+// The upcoming "Swift 6 mode" behavior is staged in behind  `-enable-experimental-concise-pound-file`.
 // RUN: %target-typecheck-verify-swift -enable-experimental-concise-pound-file
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ConciseMagicFile
 
 // And is also available in Swift 6 mode on asserts compilers.
 // RUN: %target-typecheck-verify-swift -swift-version 6

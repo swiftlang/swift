@@ -11,6 +11,7 @@ let number⁚ Int // expected-note {{operator '⁚' (Two Dot Punctuation) looks 
 // expected-error @+1 {{consecutive statements on a line must be separated by ';'}}
 5 ‒ 5 // expected-note {{unicode character '‒' (Figure Dash) looks similar to '-' (Hyphen Minus); did you mean to use '-' (Hyphen Minus)?}} {{3-6=-}}
 
+// expected-error @+3 {{cannot convert value of type '(Bool, _)' to expected condition type 'Bool'}}
 // expected-error @+2 {{cannot find 'ꝸꝸꝸ' in scope}}
 // expected-error @+1 {{expected ',' separator}}
 if (true ꝸꝸꝸ false) {} // expected-note {{identifier 'ꝸꝸꝸ' contains possibly confused characters; did you mean to use '&&&'?}} {{10-19=&&&}}

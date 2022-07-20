@@ -433,9 +433,29 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   }
 
   // Primitive values are returned directly without any conversions.
-  os << "  return ";
+  // Assign the function return value to a variable if the function can throw.
+  if (!resultTy->isVoid() && hasThrows)
+    os << "  auto returnValue = ";
+  // If the function doesn't have a return value just call it.
+  else if (resultTy->isVoid() && hasThrows)
+    os << "  ";
+  // If the function can't throw just return its value result.
+  else if (!hasThrows)
+    os << "  return ";
   printCallToCFunc(/*additionalParam=*/None);
   os << ";\n";
+
+  // Create the condition and the statement to throw an exception.
+  if (hasThrows) {
+    os << "  if (opaqueError != nullptr)\n";
+    os << "    throw (swift::_impl::NaiveException(\"Exception\"));\n";
+  }
+
+  // Return the function result value if it doesn't throw.
+  if (!resultTy->isVoid() && hasThrows) {
+    os << "\n";
+    os << "return returnValue;\n";
+  }
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(

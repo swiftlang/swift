@@ -240,7 +240,7 @@ bool LangOptions::hasFeature(Feature feature) const {
 }
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
-  if (auto feature = getFutureFeature(featureName))
+  if (auto feature = getUpcomingFeature(featureName))
     return hasFeature(*feature);
 
   if (auto feature = getExperimentalFeature(featureName))
@@ -434,10 +434,10 @@ bool swift::isSuppressibleFeature(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
-llvm::Optional<Feature> swift::getFutureFeature(llvm::StringRef name) {
+llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
   return llvm::StringSwitch<Optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define FUTURE_FEATURE(FeatureName, SENumber, Version) \
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
                    .Default(None);
@@ -455,7 +455,7 @@ llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
 llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   switch (feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define FUTURE_FEATURE(FeatureName, SENumber, Version) \
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
   case Feature::FeatureName: return Version;
 #include "swift/Basic/Features.def"
   default: return None;

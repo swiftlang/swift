@@ -4,8 +4,7 @@ import CustomSequence
 import Cxx
 
 // === SimpleSequence ===
-
-extension SimpleSequence.ConstIterator: UnsafeCxxInputIterator {}
+// Conformance to UnsafeCxxInputIterator is synthesized.
 extension SimpleSequence: CxxSequence {}
 
 func checkSimpleSequence() {
@@ -17,6 +16,9 @@ func checkSimpleSequence() {
     print(item)
   }
 }
+
+// === SimpleSequenceWithOutOfLineEqualEqual ===
+extension SimpleSequenceWithOutOfLineEqualEqual : CxxSequence {}
 
 // === SimpleArrayWrapper ===
 // No UnsafeCxxInputIterator conformance required, since the iterators are actually UnsafePointers here.

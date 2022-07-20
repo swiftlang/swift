@@ -428,5 +428,5 @@ func testNonexistentPowerOperatorWithPowFunctionOutOfScope() {
   let x: Double = 3.0
   let y: Double = 3.0
   let z: Double = x**y // expected-error {{cannot find operator '**' in scope}}
-  let w: Double = a(x**2.0) // expected-error {{cannot find operator '**' in scope}}
+  let w: Double = a(x**2.0) // expected-error {{cannot find operator '**' in scope}} expected-error {{cannot convert value of type '()' to specified type 'Double'}}
 }
