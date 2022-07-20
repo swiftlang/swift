@@ -3208,12 +3208,8 @@ namespace {
       // @defs is an anachronism; ignore it.
       return nullptr;
     }
-    
-    Decl *VisitVarDecl(const clang::VarDecl *decl) {
 
-      // For now we don't import constexpr
-      if (decl->isConstexpr())
-        return nullptr;
+    Decl *VisitVarDecl(const clang::VarDecl *decl) {
 
       // Variables are imported as... variables.
       ImportedName importedName;
@@ -3260,6 +3256,10 @@ namespace {
       bool isStatic = false;
       if (dc->isTypeContext())
         isStatic = true;
+
+      // For now we don't import static constexpr
+      if (isStatic && decl->isConstexpr())
+        return nullptr;
 
       auto introducer = Impl.shouldImportGlobalAsLet(decl->getType())
                         ? VarDecl::Introducer::Let
