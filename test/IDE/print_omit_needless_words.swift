@@ -3,6 +3,7 @@
 // REQUIRES: objc_interop
 // FIXME: this is failing on simulators
 // REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module -enable-experimental-feature SendableCompletionHandlers
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift -enable-experimental-feature SendableCompletionHandlers
