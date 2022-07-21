@@ -11,9 +11,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// FIXME: rdar://96520224 Test fails on specific config: Tools Opt+Assert, Stdlib Opt+DebInfo+Assert, iOS_arm64e
-// UNSUPPORTED: CPU=arm64e
-
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: OS=windows-msvc
 
