@@ -52,6 +52,14 @@ public func test() -> some P {
   return Empty()
 }
 
+public func testUnavailable() -> some P {
+  if #unavailable(macOS 100.0.1) {
+    return Tuple<(Int, Int)>((0, 1))
+  }
+
+  return Empty()
+}
+
 public func test_return_from_conditional() -> some P {
   if #available(macOS 10.15, *) {
     return Named()

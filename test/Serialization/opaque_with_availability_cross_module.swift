@@ -45,3 +45,7 @@ Test().sayHello()
 let conditionalR = LimitedAvailOpaque.test_return_from_conditional()
 conditionalR.hello()
 // CHECK: Hello from Named
+
+let unavailableTest = LimitedAvailOpaque.testUnavailable()
+unavailableTest.hello()
+// CHECK: Hello from Tuple
