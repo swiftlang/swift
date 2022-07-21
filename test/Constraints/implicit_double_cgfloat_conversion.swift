@@ -280,3 +280,8 @@ func assignment_with_leading_dot_syntax() {
     }()
   }
 }
+
+func test_conversion_inside_tuple_elements() -> (a: CGFloat, b: (c: Int, d: CGFloat)) {
+  let x: Double = 0.0
+  return (a: x, b: (c: 42, d: x)) // Ok
+}
