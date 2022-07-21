@@ -35,7 +35,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     return fn;
   }
 
-  auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
+  auto fn = SILFunction::create(mod, linkage, name, type, nullptr,
                                 isBareSILFunction, isTransparent, isSerialized,
                                 entryCount, isDynamic, isDistributed,
                                 IsNotExactSelfClass, isThunk, subclassScope);
@@ -295,7 +295,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     IsDistributed = IsDistributed_t::IsDistributed;
   }
 
-  auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
+  auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
                                 IsDistributed, IsNotExactSelfClass,
                                 IsNotThunk, constant.getSubclassScope(),
@@ -362,7 +362,7 @@ SILFunction *SILFunctionBuilder::createFunction(
     IsThunk_t isThunk, SubclassScope subclassScope,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope) {
-  return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
+  return SILFunction::create(mod, linkage, name, loweredType, genericEnv,
                              isBareSILFunction, isTrans, isSerialized,
                              entryCount, isDynamic, isDistributed,
                              IsNotExactSelfClass, isThunk, subclassScope,
