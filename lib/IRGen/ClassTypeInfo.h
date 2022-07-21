@@ -20,6 +20,8 @@
 #include "ClassLayout.h"
 #include "HeapTypeInfo.h"
 
+#include "swift/ClangImporter/ClangImporterRequests.h"
+
 namespace swift {
 namespace irgen {
 
@@ -62,8 +64,9 @@ public:
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
                          Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
-      auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
-          ForeignReferenceTypeRefCountingOperation::release);
+      auto releaseFn = evaluateOrDefault(
+                           getClass()->getASTContext().evaluator,
+                           CustomRefCountingOperation({getClass(), CustomRefCountingOperationKind::release}), {}).operation;
       IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
       return;
     }
@@ -74,9 +77,10 @@ public:
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
-      auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
-          ForeignReferenceTypeRefCountingOperation::retain);
-      IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+      auto retainFn = evaluateOrDefault(
+                          getClass()->getASTContext().evaluator,
+                          CustomRefCountingOperation({getClass(), CustomRefCountingOperationKind::retain}), {}).operation;
+      IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value);
       return;
     }
 
@@ -89,9 +93,10 @@ public:
                     Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
       llvm::Value *value = e.claimNext();
-      auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
-          ForeignReferenceTypeRefCountingOperation::retain);
-      IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+      auto retainFn = evaluateOrDefault(
+                           getClass()->getASTContext().evaluator,
+                           CustomRefCountingOperation({getClass(), CustomRefCountingOperationKind::retain}), {}).operation;
+      IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value);
       return;
     }
 
@@ -102,8 +107,9 @@ public:
                      Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
       llvm::Value *value = e.claimNext();
-      auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
-          ForeignReferenceTypeRefCountingOperation::release);
+      auto releaseFn = evaluateOrDefault(
+                           getClass()->getASTContext().evaluator,
+                           CustomRefCountingOperation({getClass(), CustomRefCountingOperationKind::release}), {}).operation;
       IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
       return;
     }

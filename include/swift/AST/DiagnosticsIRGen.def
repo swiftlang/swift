@@ -59,19 +59,5 @@ ERROR(temporary_allocation_alignment_not_positive,none,
 ERROR(temporary_allocation_alignment_not_power_of_2,none,
       "alignment value must be a power of two", ())
 
-ERROR(foreign_reference_types_cannot_find_retain,none,
-      "cannot find retain function '%0'.", (StringRef))
-
-ERROR(foreign_reference_types_cannot_find_release,none,
-      "cannot find release function '%0'.", (StringRef))
-
-ERROR(foreign_reference_types_invalid_retain,none,
-      "specified retain function '%0' is invalid. Retain must have exactly one "
-      "argument of type '%1'", (StringRef, StringRef))
-
-ERROR(foreign_reference_types_invalid_release,none,
-      "specified release function '%0' is invalid. Release must have exactly "
-      "one argument of type '%1'", (StringRef, StringRef))
-
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

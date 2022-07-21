@@ -49,6 +49,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -5228,25 +5229,9 @@ bool ClassDecl::isForeignReferenceType() const {
 }
 
 bool ClassDecl::hasRefCountingAnnotations() const {
-  auto decl = dyn_cast_or_null<clang::RecordDecl>(getClangDecl());
-  if (!decl)
-    return false;
-
-  bool hasRetain = decl->hasAttrs() && llvm::any_of(decl->getAttrs(),
-         [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute().startswith("retain:");
-           return false;
-         });
-
-  bool hasRelease = decl->hasAttrs() && llvm::any_of(decl->getAttrs(),
-         [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute().startswith("release:");
-           return false;
-         });
-
-  return hasRetain && hasRelease;
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      CustomRefCountingOperation({this, CustomRefCountingOperationKind::release}), {}).kind != CustomRefCountingOperationResult::immortal;
 }
 
 ReferenceCounting ClassDecl::getObjectModel() const {

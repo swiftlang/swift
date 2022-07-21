@@ -12,7 +12,11 @@ inline void *operator new(size_t, void *p) { return p; }
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-struct __attribute__((swift_attr("import_reference"))) DeletedDtor {
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:immortal")))
+    __attribute__((swift_attr("release:immortal")))
+DeletedDtor {
   int value = 42;
 
   DeletedDtor() = default;
@@ -30,7 +34,11 @@ struct __attribute__((swift_attr("import_reference"))) DeletedDtor {
 
 void mutateIt(DeletedDtor &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_reference"))) PrivateDtor {
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:immortal")))
+    __attribute__((swift_attr("release:immortal")))
+PrivateDtor {
   int value = 42;
 
   PrivateDtor() = default;
@@ -50,7 +58,11 @@ private:
 
 void mutateIt(PrivateDtor &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_reference"))) DeletedSpecialMembers {
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:immortal")))
+    __attribute__((swift_attr("release:immortal")))
+DeletedSpecialMembers {
   int value = 42;
 
   DeletedSpecialMembers() = default;
@@ -68,7 +80,11 @@ struct __attribute__((swift_attr("import_reference"))) DeletedSpecialMembers {
 
 void mutateIt(DeletedSpecialMembers &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_reference"))) PrivateSpecialMembers {
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:immortal")))
+    __attribute__((swift_attr("release:immortal")))
+PrivateSpecialMembers {
   int value = 42;
 
   PrivateSpecialMembers() = default;

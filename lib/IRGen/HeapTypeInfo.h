@@ -31,33 +31,6 @@
 namespace swift {
 namespace irgen {
 
-enum class ForeignReferenceTypeRefCountingOperation { retain, release };
-
-static ValueDecl *findForeignReferenceTypeRefCountingOperation(ClassDecl *swiftDecl,
-                                                               ForeignReferenceTypeRefCountingOperation operation) {
-  std::string operationStr = operation == ForeignReferenceTypeRefCountingOperation::retain ? "retain:" : "release:";
-
-  auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
-  assert(decl->hasAttrs());
-
-  auto retainFnAttr = llvm::find_if(decl->getAttrs(),
-                                    [&operationStr](auto *attr) {
-                                      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-                                        return swiftAttr->getAttribute().startswith(operationStr);
-                                      return false;
-                                    });
-  assert(retainFnAttr != decl->getAttrs().end());
-
-  auto name = cast<clang::SwiftAttrAttr>(*retainFnAttr)->getAttribute().drop_front(StringRef(operationStr).size());
-  auto &ctx = swiftDecl->getASTContext();
-
-  llvm::SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInModule(swiftDecl->getParentModule(), name, results);
-
-  assert(results.size() == 1);
-  return results.front();
-}
-
 /// \group HeapTypeInfo
   
 /// The kind of 'isa' encoding a heap object uses to reference its heap
