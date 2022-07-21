@@ -25,8 +25,7 @@ DECL_NODES = [
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
-             Child('Initializer', kind='TypeInitializerClause',
-                   is_optional=True),
+             Child('Initializer', kind='TypeInitializerClause'),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
          ]),
@@ -162,6 +161,14 @@ DECL_NODES = [
              Child('LineNumber', kind='IntegerLiteralToken'),
          ]),
 
+    Node('DeclModifierDetail', kind='Syntax',
+         traits=['Parenthesized'],
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Detail', kind='IdentifierToken'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
     Node('DeclModifier', kind='Syntax',
          children=[
              Child('Name', kind='Token', classification='Attribute',
@@ -171,11 +178,10 @@ DECL_NODES = [
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating', 'indirect', '__consuming',
-                       'actor', 'async', 'distributed'
+                       'actor', 'async', 'distributed', 'isolated',
+                       'nonisolated', '_const', '_local'
                    ]),
-             Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
-             Child('Detail', kind='IdentifierToken', is_optional=True),
-             Child('DetailRightParen', kind='RightParenToken', is_optional=True),
+             Child('Detail', kind='DeclModifierDetail', is_optional=True),
          ]),
 
     Node('InheritedType', kind='Syntax',
@@ -197,7 +203,7 @@ DECL_NODES = [
          ]),
 
     # class-declaration -> attributes? access-level-modifier?
-    #                      ('class' | 'actor') class-name
+    #                      'class' class-name
     #                      generic-parameter-clause?
     #                      type-inheritance-clause?
     #                      generic-where-clause?
@@ -210,8 +216,7 @@ DECL_NODES = [
                    collection_element_name='Attribute', is_optional=True),
              Child('Modifiers', kind='ModifierList',
                    collection_element_name='Modifier', is_optional=True),
-             Child('ClassOrActorKeyword', kind='Token',
-                    token_choices=['ClassToken', 'ContextualKeywordToken']),
+             Child('ClassKeyword', kind='ClassToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
@@ -222,6 +227,31 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
+    # actor-declaration -> attributes? access-level-modifier?
+    #                      'actor' actor-name
+    #                      generic-parameter-clause?
+    #                      type-inheritance-clause?
+    #                      generic-where-clause?
+    #                     '{' actor-members '}'
+    # actor-name -> identifier
+    Node('ActorDecl', kind='Decl',
+         traits=['DeclGroup', 'IdentifiedDecl'],
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   collection_element_name='Attribute', is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   collection_element_name='Modifier', is_optional=True),
+             Child('ActorKeyword', kind='ContextualKeywordToken',
+                   text_choices=['actor']),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
     # struct-declaration -> attributes? access-level-modifier?
     #                         'struct' struct-name
     #                         generic-parameter-clause?
@@ -367,10 +397,13 @@ DECL_NODES = [
     #                       | mutation-modifier
     #                       | 'class'
     #                       | 'convenience'
+    #                       | 'distributed'
     #                       | 'dynamic'
     #                       | 'final'
     #                       | 'infix'
+    #                       | 'isolated'
     #                       | 'lazy'
+    #                       | 'nonisolated'
     #                       | 'optional'
     #                       | 'override'
     #                       | 'postfix'
@@ -427,13 +460,7 @@ DECL_NODES = [
                    is_optional=True),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
-             Child('Parameters', kind='ParameterClause'),
-             Child('ThrowsOrRethrowsKeyword', kind='Token',
-                   is_optional=True,
-                   token_choices=[
-                       'ThrowsToken',
-                       'RethrowsToken',
-                   ]),
+             Child('Signature', kind='FunctionSignature'),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
              # the body is not necessary inside a protocol definition
@@ -447,7 +474,7 @@ DECL_NODES = [
              Child('Modifiers', kind='ModifierList',
                    collection_element_name='Modifier', is_optional=True),
              Child('DeinitKeyword', kind='DeinitToken'),
-             Child('Body', kind='CodeBlock'),
+             Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
     Node('SubscriptDecl', kind='Decl',
@@ -478,11 +505,7 @@ DECL_NODES = [
     Node('AccessLevelModifier', kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
-             Child('LeftParen', kind='LeftParenToken',
-                   is_optional=True),
-             Child('Modifier', kind='IdentifierToken',
-                   is_optional=True),
-             Child('RightParen', kind='RightParenToken',
+             Child('Modifier', kind='DeclModifierDetail',
                    is_optional=True),
          ]),
 

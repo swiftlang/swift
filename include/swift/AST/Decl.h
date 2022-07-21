@@ -35,7 +35,6 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/Witness.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -105,6 +104,7 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class OpaqueReturnTypeRepr;
+  class Witness;
 
   namespace ast_scope {
   class AbstractPatternEntryScope;

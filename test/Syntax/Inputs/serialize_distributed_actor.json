@@ -8,7 +8,7 @@
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "kind": "ClassDecl",
+              "kind": "ActorDecl",
               "layout": [
                 null,
                 {
@@ -26,8 +26,6 @@
                           "trailingTrivia": " ",
                           "presence": "Present"
                         },
-                        null,
-                        null,
                         null
                       ],
                       "presence": "Present"
@@ -92,8 +90,6 @@
                                           "trailingTrivia": " ",
                                           "presence": "Present"
                                         },
-                                        null,
-                                        null,
                                         null
                                       ],
                                       "presence": "Present"

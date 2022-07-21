@@ -1460,7 +1460,7 @@ public:
                                       ParameterList *&BodyParams,
                                       ParameterContextKind paramContext,
                                       DefaultArgumentInfo &defaultArgs);
-  ParserStatus parseFunctionSignature(Identifier functionName,
+  ParserStatus parseFunctionSignature(DeclBaseName functionName,
                                       DeclName &fullName,
                                       ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
