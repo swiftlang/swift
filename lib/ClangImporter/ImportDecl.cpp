@@ -1988,7 +1988,8 @@ namespace {
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
-                                                    decl->getNameAsString())));
+                                                    decl->getNameAsString())),
+            decl->getLocation());
       }
 
       // FIXME: Figure out how to deal with incomplete types, since that
@@ -2004,7 +2005,8 @@ namespace {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_is_dependent,
-                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+            decl->getLocation());
         return nullptr;
       }
 
@@ -2013,7 +2015,8 @@ namespace {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_over_aligned,
-                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+            decl->getLocation());
         return nullptr;
       }
 
@@ -2034,7 +2037,8 @@ namespace {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_non_trivial_copy_destroy,
-                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+            decl->getLocation());
         return nullptr;
       }
 
@@ -2057,7 +2061,8 @@ namespace {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_parent_unimportable,
-                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())));
+                      Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+            decl->getLocation());
         return nullptr;
       }
 
@@ -2435,7 +2440,8 @@ namespace {
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
-                                                    decl->getNameAsString())));
+                                                    decl->getNameAsString())),
+            decl->getLocation());
       }
 
       decl = decl->getDefinition();
@@ -2496,7 +2502,8 @@ namespace {
             decl,
             Diagnostic(diag::record_not_automatically_importable,
                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString()),
-                       "does not have a copy constructor or destructor"));
+                       "does not have a copy constructor or destructor"),
+            decl->getLocation());
         return nullptr;
       }
 
@@ -2775,7 +2782,8 @@ namespace {
                     Diagnostic(diag::reference_passed_by_value,
                                Impl.SwiftContext.AllocateCopy(
                                    recordType->getDecl()->getNameAsString()),
-                               "a parameter"));
+                               "a parameter"),
+                    decl->getLocation());
                 return true;
               }
             }
@@ -2791,7 +2799,8 @@ namespace {
             decl, Diagnostic(diag::reference_passed_by_value,
                              Impl.SwiftContext.AllocateCopy(
                                  recordType->getDecl()->getNameAsString()),
-                             "the return"));
+                             "the return"),
+            decl->getLocation());
         return recordHasReferenceSemantics(recordType->getDecl());
       }
 

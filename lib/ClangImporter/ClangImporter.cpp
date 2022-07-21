@@ -2375,7 +2375,7 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
 
 void ClangImporter::Implementation::addImportDiagnostic(
     ImportDiagnosticTarget target, Diagnostic &&diag,
-    const clang::SourceLocation &loc) {
+    clang::SourceLocation loc) {
   ImportDiagnostic importDiag = ImportDiagnostic(target, diag, loc);
   if (SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics ||
       CollectedDiagnostics.count(importDiag))
