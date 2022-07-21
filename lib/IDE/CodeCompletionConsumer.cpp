@@ -19,7 +19,8 @@ using namespace swift::ide;
 static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
     CodeCompletionResultSink &targetSink, CodeCompletionCache::Value &source,
     bool onlyTypes, bool onlyPrecedenceGroups,
-    const ExpectedTypeContext *TypeContext, const DeclContext *DC) {
+    const ExpectedTypeContext *TypeContext, const DeclContext *DC,
+    bool CanCurrDeclContextHandleAsync) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
@@ -87,7 +88,7 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
         /*numBytesToErase=*/0, TypeContext, DC, &USRTypeContext,
-        ContextualNotRecommendedReason::None);
+        CanCurrDeclContextHandleAsync, ContextualNotRecommendedReason::None);
     targetSink.Results.push_back(contextualResult);
   }
 
@@ -98,7 +99,8 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
 void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     CodeCompletionContext &context,
     ArrayRef<RequestedCachedModule> requestedModules,
-    const ExpectedTypeContext *TypeContext, const DeclContext *DC) {
+    const ExpectedTypeContext *TypeContext, const DeclContext *DC,
+    bool CanCurrDeclContextHandleAsync) {
 
   // Use the current SourceFile as the DeclContext so that we can use it to
   // perform qualified lookup, and to get the correct visibility for
@@ -143,9 +145,9 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
-    auto newItems =
-        copyCodeCompletionResults(context.getResultSink(), **V, R.OnlyTypes,
-                                  R.OnlyPrecedenceGroups, TypeContext, DC);
+    auto newItems = copyCodeCompletionResults(
+        context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups,
+        TypeContext, DC, CanCurrDeclContextHandleAsync);
     postProcessCompletionResults(newItems, context.CodeCompletionKind, DC,
                                  &context.getResultSink());
   }

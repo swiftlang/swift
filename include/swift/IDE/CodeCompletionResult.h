@@ -326,6 +326,7 @@ class ContextFreeCodeCompletionResult {
   static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
 
   bool IsSystem : 1;
+  bool IsAsync : 1;
   CodeCompletionString *CompletionString;
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
@@ -356,7 +357,7 @@ public:
   /// \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, uint8_t AssociatedKind,
-      CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem,
+      CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem, bool IsAsync,
       CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
@@ -368,10 +369,10 @@ public:
       NullTerminatedStringRef FilterName,
       NullTerminatedStringRef NameForDiagnostics)
       : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
-        CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        ResultType(ResultType), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
+        IsAsync(IsAsync), CompletionString(CompletionString),
+        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
+        AssociatedUSRs(AssociatedUSRs), ResultType(ResultType),
+        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
         NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
@@ -399,7 +400,7 @@ public:
   static ContextFreeCodeCompletionResult *createPatternOrBuiltInOperatorResult(
       CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
       CodeCompletionString *CompletionString,
-      CodeCompletionOperatorKind KnownOperatorKind,
+      CodeCompletionOperatorKind KnownOperatorKind, bool IsAsync,
       NullTerminatedStringRef BriefDocComment,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
@@ -434,15 +435,17 @@ public:
   /// \note The caller must ensure that the \p CompletionString and all
   /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
-  static ContextFreeCodeCompletionResult *createDeclResult(
-      CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
-      const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
-      NullTerminatedStringRef BriefDocComment,
-      ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-      CodeCompletionResultType ResultType,
-      ContextFreeNotRecommendedReason NotRecommended,
-      CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-      NullTerminatedStringRef DiagnosticMessage);
+  static ContextFreeCodeCompletionResult *
+  createDeclResult(CodeCompletionResultSink &Sink,
+                   CodeCompletionString *CompletionString,
+                   const Decl *AssociatedDecl, bool IsAsync,
+                   NullTerminatedStringRef ModuleName,
+                   NullTerminatedStringRef BriefDocComment,
+                   ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+                   CodeCompletionResultType ResultType,
+                   ContextFreeNotRecommendedReason NotRecommended,
+                   CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+                   NullTerminatedStringRef DiagnosticMessage);
 
   CodeCompletionResultKind getKind() const { return Kind; }
 
@@ -471,6 +474,8 @@ public:
   }
 
   bool isSystem() const { return IsSystem; };
+
+  bool isAsync() const { return IsAsync; };
 
   CodeCompletionString *getCompletionString() const { return CompletionString; }
 
@@ -579,6 +584,7 @@ public:
                        const ExpectedTypeContext *TypeContext,
                        const DeclContext *DC,
                        const USRBasedTypeContext *USRTypeContext,
+                       bool CanCurrDeclContextHandleAsync,
                        ContextualNotRecommendedReason NotRecommended);
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {

@@ -134,15 +134,16 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     auto *contextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             sink.swiftSink, CodeCompletionResultKind::Pattern, completionString,
-            CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
-            CodeCompletionResultType::unknown(),
+            CodeCompletionOperatorKind::None, /*IsAsync=*/false,
+            /*BriefDocComment=*/"", CodeCompletionResultType::unknown(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
         *contextFreeResult, SemanticContextKind::Local,
         CodeCompletionFlairBit::ExpressionSpecific,
         /*NumBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-        /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None);
+        /*USRTypeContext=*/nullptr, /*CanCurrDeclContextHandleAsync=*/false,
+        ContextualNotRecommendedReason::None);
 
     CompletionBuilder builder(sink, *swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -1165,8 +1166,8 @@ Completion *CompletionBuilder::finish() {
         new (sink.allocator) ContextFreeCodeCompletionResult(
             contextFreeBase.getKind(),
             contextFreeBase.getOpaqueAssociatedKind(), opKind,
-            contextFreeBase.isSystem(), newCompletionString,
-            contextFreeBase.getModuleName(),
+            contextFreeBase.isSystem(), contextFreeBase.isAsync(),
+            newCompletionString, contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
             contextFreeBase.getAssociatedUSRs(),
             contextFreeBase.getResultType(),

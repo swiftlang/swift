@@ -910,6 +910,7 @@ static void transformAndForwardResults(
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             innerSink.swiftSink, CodeCompletionResultKind::BuiltinOperator,
             completionString, CodeCompletionOperatorKind::None,
+            /*IsAsync=*/false,
             /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,
@@ -919,6 +920,7 @@ static void transformAndForwardResults(
         CodeCompletionFlairBit::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0,
         /*TypeContext=*/nullptr, /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
+        /*CanCurrDeclContextHandleAsync=*/false,
         ContextualNotRecommendedReason::None);
 
     SwiftCompletionInfo info;

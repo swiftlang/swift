@@ -128,7 +128,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
-        Sink, CCS, AssociatedDecl, ModuleName,
+        Sink, CCS, AssociatedDecl, IsAsync, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
@@ -145,7 +145,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            Sink, Kind, CCS, CodeCompletionOperatorKind::None,
+            Sink, Kind, CCS, CodeCompletionOperatorKind::None, IsAsync,
             NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
@@ -164,6 +164,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         *ContextFreeResult, SemanticContextKind::None, CodeCompletionFlair(),
         /*NumBytesToErase=*/0, /*TypeContext=*/nullptr,
         /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
+        /*CanCurrDeclContextHandleAsync=*/false,
         ContextualNotRecommendedReason::None);
   } else {
     assert(
@@ -175,7 +176,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     // for USRTypeContext.
     return new (Allocator) CodeCompletionResult(
         *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
-        TypeContext, DC, /*USRTypeContext=*/nullptr, ContextualNotRecReason);
+        TypeContext, DC, /*USRTypeContext=*/nullptr,
+        CanCurrDeclContextHandleAsync, ContextualNotRecReason);
   }
 }
 

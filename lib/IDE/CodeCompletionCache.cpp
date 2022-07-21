@@ -104,7 +104,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
 static constexpr uint32_t onDiskCompletionCacheVersion =
-    8; // Store name for diagnostics
+    9; // Store whether a decl is async
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -235,6 +235,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto diagSeverity =
         static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
+    auto isAsync = static_cast<bool>(*cursor++);
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
@@ -264,7 +265,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
-            kind, associatedKind, opKind, isSystem, string, moduleName,
+            kind, associatedKind, opKind, isSystem, isAsync, string, moduleName,
             briefDocComment, makeArrayRef(assocUSRs).copy(*V.Allocator),
             CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
             diagMessage, filterName, nameForDiagnostics);
@@ -423,6 +424,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
       LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
+      LE.write(static_cast<uint8_t>(R->isAsync()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings

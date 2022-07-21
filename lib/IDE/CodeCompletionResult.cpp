@@ -26,7 +26,7 @@ ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
     CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
     CodeCompletionString *CompletionString,
-    CodeCompletionOperatorKind KnownOperatorKind,
+    CodeCompletionOperatorKind KnownOperatorKind, bool IsAsync,
     NullTerminatedStringRef BriefDocComment,
     CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
@@ -43,7 +43,8 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       Kind, /*AssociatedKind=*/0, KnownOperatorKind,
-      /*IsSystem=*/false, CompletionString, /*ModuleName=*/"", BriefDocComment,
+      /*IsSystem=*/false, IsAsync, CompletionString,
+      /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
       DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
@@ -61,7 +62,8 @@ ContextFreeCodeCompletionResult::createKeywordResult(
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
-      CodeCompletionOperatorKind::None, /*IsSystem=*/false, CompletionString,
+      CodeCompletionOperatorKind::None, /*IsSystem=*/false, /*IsAsync=*/false,
+      CompletionString,
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
@@ -80,7 +82,8 @@ ContextFreeCodeCompletionResult::createLiteralResult(
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
       CodeCompletionOperatorKind::None,
-      /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
+      /*IsSystem=*/false, /*IsAsync=*/false, CompletionString,
+      /*ModuleName=*/"",
       /*BriefDocComment=*/"",
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
@@ -95,7 +98,7 @@ getDeclNameForDiagnostics(const Decl *D, CodeCompletionResultSink &Sink) {
     llvm::raw_svector_ostream NameOS(Name);
     NameOS << "'";
     llvm::SmallString<64> Scratch;
-    NameOS << VD->getName().getString(Scratch);
+    VD->getName().printPretty(NameOS);
     NameOS << "'";
     return NullTerminatedStringRef(NameOS.str(), Sink.getAllocator());
   } else {
@@ -106,8 +109,8 @@ getDeclNameForDiagnostics(const Decl *D, CodeCompletionResultSink &Sink) {
 ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createDeclResult(
     CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
-    const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
-    NullTerminatedStringRef BriefDocComment,
+    const Decl *AssociatedDecl, bool IsAsync,
+    NullTerminatedStringRef ModuleName, NullTerminatedStringRef BriefDocComment,
     ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
     CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
@@ -121,8 +124,8 @@ ContextFreeCodeCompletionResult::createDeclResult(
       CodeCompletionResultKind::Declaration,
       static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
       CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
-      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
-      NotRecommended, DiagnosticSeverity, DiagnosticMessage,
+      IsAsync, CompletionString, ModuleName, BriefDocComment, AssociatedUSRs,
+      ResultType, NotRecommended, DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/getDeclNameForDiagnostics(AssociatedDecl, Sink));
 }
@@ -288,14 +291,30 @@ bool ContextFreeCodeCompletionResult::getDeclIsSystem(const Decl *D) {
 
 // MARK: - CodeCompletionResult
 
+static ContextualNotRecommendedReason
+getNotRecommenedReason(const ContextFreeCodeCompletionResult &ContextFree,
+                       bool CanCurrDeclContextHandleAsync,
+                       ContextualNotRecommendedReason ExplicitReason) {
+  if (ExplicitReason != ContextualNotRecommendedReason::None) {
+    return ExplicitReason;
+  }
+  if (ContextFree.isAsync() && !CanCurrDeclContextHandleAsync) {
+    return ContextualNotRecommendedReason::InvalidAsyncContext;
+  }
+  return ContextualNotRecommendedReason::None;
+}
+
 CodeCompletionResult::CodeCompletionResult(
     const ContextFreeCodeCompletionResult &ContextFree,
     SemanticContextKind SemanticContext, CodeCompletionFlair Flair,
     uint8_t NumBytesToErase, const ExpectedTypeContext *TypeContext,
     const DeclContext *DC, const USRBasedTypeContext *USRTypeContext,
+    bool CanCurrDeclContextHandleAsync,
     ContextualNotRecommendedReason NotRecommended)
     : ContextFree(ContextFree), SemanticContext(SemanticContext),
-      Flair(Flair.toRaw()), NotRecommended(NotRecommended),
+      Flair(Flair.toRaw()),
+      NotRecommended(getNotRecommenedReason(
+          ContextFree, CanCurrDeclContextHandleAsync, NotRecommended)),
       NumBytesToErase(NumBytesToErase),
       TypeDistance(ContextFree.getResultType().calculateTypeRelation(
           TypeContext, DC, USRTypeContext)) {}
