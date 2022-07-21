@@ -4,13 +4,8 @@ import StaticVar
 
 public func initStaticVars() -> CInt {
   return staticVar + staticVarInit + staticVarInlineInit + staticConst + staticConstInit
-    + staticConstInlineInit + staticConstexpr + staticNonTrivial.val + staticConstNonTrivial.val
-    + staticConstexprNonTrivial.val
+    + staticConstInlineInit + staticNonTrivial.val + staticConstNonTrivial.val
 }
-
-// Constexpr vars should be inlined and removed.
-// CHECK-NOT: ?staticConstexpr
-// CHECK-NOT: _ZL15staticConstexpr
 
 // CHECK: @{{_ZL9staticVar|staticVar}} = internal global i32 2, align 4
 // CHECK: @{{_ZL13staticVarInit|staticVarInit}} = internal global i32 0, align 4
@@ -20,7 +15,6 @@ public func initStaticVars() -> CInt {
 // CHECK: @{{_ZL21staticConstInlineInit|staticConstInlineInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL16staticNonTrivial|staticNonTrivial}} = internal global %class.NonTrivial zeroinitializer, align 4
 // CHECK: @{{_ZL21staticConstNonTrivial|staticConstNonTrivial}} = internal global %class.NonTrivial zeroinitializer, align 4
-// CHECK: @{{_ZL25staticConstexprNonTrivial|staticConstexprNonTrivial}} = internal constant %class.NonTrivial { i32 8192 }, align 4
 
 // CHECK: define internal void @{{__cxx_global_var_init|"\?\?__EstaticVarInit@@YAXXZ"}}()
 // CHECK: %call = call {{.*}}i32 @{{_Z13makeStaticVarv|"\?makeStaticVar@@YAHXZ"}}()
