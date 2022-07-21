@@ -693,6 +693,42 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   }
 }
 
+static bool emitConstValuesForWholeModuleIfNeeded(
+    CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasConstValuesOutputPath())
+    return false;
+  std::error_code EC;
+  assert(frontendOpts.InputsAndOutputs.isWholeModule() &&
+         "'emitConstValuesForWholeModule' only makes sense when the whole module can be seen");
+  auto ConstValuesFilePath = frontendOpts.InputsAndOutputs
+    .getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs
+    .ConstValuesOutputPath;
+  llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
+  OS << "{}\n";
+  return false;
+}
+
+static void emitConstValuesForAllPrimaryInputsIfNeeded(
+    CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &ConstValuesFilePath =
+        Invocation.getConstValuesFilePathForPrimary(
+            SF->getFilename());
+    if (ConstValuesFilePath.empty()) {
+      continue;
+    }
+
+    // TODO: Emit extracted values
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
+    OS << "{}\n";
+  }
+}
+
 static bool writeModuleSemanticInfoIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &frontendOpts = Invocation.getFrontendOptions();
@@ -900,6 +936,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   {
     hadAnyError |= writeModuleSemanticInfoIfNeeded(Instance);
   }
+
+  {
+    hadAnyError |= emitConstValuesForWholeModuleIfNeeded(Instance);
+  }
   return hadAnyError;
 }
 
@@ -1072,6 +1112,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
+
+  // Emit extracted constant values for every file in the batch
+  emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
 }
 
 static bool printSwiftVersion(const CompilerInvocation &Invocation) {

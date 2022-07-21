@@ -654,6 +654,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_abi_descriptor);
     return true;
   }
+  if (!FrontendOptions::canActionEmitConstValues(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasConstValuesOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_const_values);
+    return true;
+  }
   if (!FrontendOptions::canActionEmitModuleSemanticInfo(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasModuleSemanticInfoOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_semantic_info);
