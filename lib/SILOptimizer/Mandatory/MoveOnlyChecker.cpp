@@ -40,6 +40,10 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool> RunCopyOfSubValueCheck(
+    "sil-move-only-checker-perform-copy-of-subvalue-check",
+    llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
@@ -809,8 +813,9 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       // introducer. In such a case, a copy is needed but the user needs to use
       // _copy to explicit copy the value since they are extracting out a
       // subvalue.
-      if (!copyOfBorrowedProjectionChecker.check(markedValue) ||
-          !copyOfBorrowedProjectionChecker.shouldEmitDiagnostic()) {
+      if (RunCopyOfSubValueCheck &&
+          (!copyOfBorrowedProjectionChecker.check(markedValue) ||
+           !copyOfBorrowedProjectionChecker.shouldEmitDiagnostic())) {
         // If we failed to understand how to perform the check or did not find
         // any targets... continue. In the former case we want to fail with a
         // checker did not understand diagnostic later and in the former, we
