@@ -52,3 +52,9 @@ public extension Double {
   }
 }
 #endif
+
+import CoreFoundation
+
+extension CGFloat: CustomStringConvertible {
+  public var description: String { "" }
+}
