@@ -2809,6 +2809,8 @@ public:
   // There is no clear winner here since there are candidates within
   // limited availability contexts.
   void finalizeOpaque(const Candidate &universallyAvailable) {
+    using AvailabilityCondition = OpaqueTypeDecl::AvailabilityCondition;
+
     SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *, 4>
         conditionalSubstitutions;
 
@@ -2819,12 +2821,14 @@ public:
       if (!availabilityContext)
         continue;
 
-      SmallVector<VersionRange, 4> conditions;
+      SmallVector<AvailabilityCondition, 4> conditions;
 
       llvm::transform(availabilityContext->getCond(),
                       std::back_inserter(conditions),
                       [&](const StmtConditionElement &elt) {
-                        return elt.getAvailability()->getAvailableRange();
+                        auto condition = elt.getAvailability();
+                        return std::make_pair(condition->getAvailableRange(),
+                                              condition->isUnavailability());
                       });
 
       conditionalSubstitutions.push_back(
@@ -2836,7 +2840,7 @@ public:
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-            Ctx, {VersionRange::empty()},
+            Ctx, {{VersionRange::empty(), /*unavailable=*/false}},
             std::get<1>(universallyAvailable)
                 .mapReplacementTypesOutOfContext()));
 
@@ -2882,12 +2886,10 @@ public:
         return {true, S};
       }
 
-      // If this is `if #available` statement with no other dynamic
+      // If this is `if #(un)available` statement with no other dynamic
       // conditions, let's check if it returns opaque type directly.
       if (llvm::all_of(If->getCond(), [&](const auto &condition) {
-            return condition.getKind() ==
-                       StmtConditionElement::CK_Availability &&
-                   !condition.getAvailability()->isUnavailability();
+            return condition.getKind() == StmtConditionElement::CK_Availability;
           })) {
         // Check return statement directly with availability context set.
         if (auto *Then = dyn_cast<BraceStmt>(If->getThenStmt())) {

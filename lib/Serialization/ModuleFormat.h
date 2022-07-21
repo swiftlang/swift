@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 697; // change local type mangling
+const uint16_t SWIFTMODULE_VERSION_MINOR = 698; // opaque decl with unavailability conditions
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1462,10 +1462,17 @@ namespace decls_block {
     // - inlinable body text, if any
   >;
 
+  using ConditionalSubstitutionConditionLayout = BCRecordLayout<
+    CONDITIONAL_SUBSTITUTION_COND,
+    BCFixed<1>, // is unavailable?
+    BC_AVAIL_TUPLE // the OS version triple.
+  >;
+
   using ConditionalSubstitutionLayout = BCRecordLayout<
     CONDITIONAL_SUBSTITUTION,
-    SubstitutionMapIDField,
-    BCArray<IdentifierIDField> // N conditions where each is <major>.<minor>.<patch>
+    SubstitutionMapIDField
+    // Trailed by N conditions that include a version and
+    // unavailability indicator.
   >;
 
   using OpaqueTypeLayout = BCRecordLayout<

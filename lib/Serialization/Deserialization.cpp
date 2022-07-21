@@ -3548,6 +3548,40 @@ public:
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
   }
 
+  void deserializeConditionalSubstitutionConditions(
+      SmallVectorImpl<OpaqueTypeDecl::AvailabilityCondition> &conditions) {
+    using namespace decls_block;
+
+    SmallVector<uint64_t, 4> scratch;
+    StringRef blobData;
+
+    while (true) {
+      llvm::BitstreamEntry entry =
+          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+
+      scratch.clear();
+
+      unsigned recordID = MF.fatalIfUnexpected(
+          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+      if (recordID != decls_block::CONDITIONAL_SUBSTITUTION_COND)
+        break;
+
+      bool isUnavailability;
+      DEF_VER_TUPLE_PIECES(condition);
+
+      ConditionalSubstitutionConditionLayout::readRecord(
+          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(condition));
+
+      llvm::VersionTuple condition;
+      DECODE_VER_TUPLE(condition);
+
+      conditions.push_back(std::make_pair(VersionRange::allGTE(condition),
+                                          isUnavailability));
+    }
+  }
+
   void deserializeConditionalSubstitutions(
       SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
           &limitedAvailability) {
@@ -3566,20 +3600,16 @@ public:
       if (recordID != decls_block::CONDITIONAL_SUBSTITUTION)
         break;
 
-      ArrayRef<uint64_t> rawConditions;
       SubstitutionMapID substitutionMapRef;
 
       decls_block::ConditionalSubstitutionLayout::readRecord(
-          scratch, substitutionMapRef, rawConditions);
+          scratch, substitutionMapRef);
 
-      SmallVector<VersionRange, 4> conditions;
-      llvm::transform(rawConditions, std::back_inserter(conditions),
-                      [&](uint64_t id) {
-                        llvm::VersionTuple lowerEndpoint;
-                        if (lowerEndpoint.tryParse(MF.getIdentifier(id).str()))
-                          MF.fatal();
-                        return VersionRange::allGTE(lowerEndpoint);
-                      });
+      SmallVector<OpaqueTypeDecl::AvailabilityCondition, 2> conditions;
+      deserializeConditionalSubstitutionConditions(conditions);
+
+      if (conditions.empty())
+        MF.fatal();
 
       auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapRef);
       if (!subMapOrError)
@@ -3655,7 +3685,8 @@ public:
       } else {
         limitedAvailability.push_back(
             OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                ctx, VersionRange::empty(), subMapOrError.get()));
+                ctx, {{VersionRange::empty(), /*unavailability=*/false}},
+                subMapOrError.get()));
 
         opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
       }

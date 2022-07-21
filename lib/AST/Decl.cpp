@@ -8263,9 +8263,11 @@ void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
 
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions *
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-    ASTContext &ctx, ArrayRef<VersionRange> availabilityContext,
+    ASTContext &ctx,
+    ArrayRef<AvailabilityCondition> availabilityContext,
     SubstitutionMap substitutions) {
-  auto size = totalSizeToAlloc<VersionRange>(availabilityContext.size());
+  auto size =
+      totalSizeToAlloc<AvailabilityCondition>(availabilityContext.size());
   auto mem = ctx.Allocate(size, alignof(ConditionallyAvailableSubstitutions));
   return new (mem)
       ConditionallyAvailableSubstitutions(availabilityContext, substitutions);
