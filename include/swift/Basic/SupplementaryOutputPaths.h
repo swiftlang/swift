@@ -147,6 +147,9 @@ struct SupplementaryOutputPaths {
   /// The output path to generate ABI baseline.
   std::string ABIDescriptorOutputPath;
 
+  /// The output path for extracted compile-time-known value information
+  std::string ConstValuesOutputPath;
+
   /// The output path of Swift semantic info for this module.
   std::string ModuleSemanticInfoOutputPath;
 
@@ -188,6 +191,8 @@ struct SupplementaryOutputPaths {
       fn(ModuleSummaryOutputPath);
     if (!ABIDescriptorOutputPath.empty())
       fn(ABIDescriptorOutputPath);
+    if (!ConstValuesOutputPath.empty())
+      fn(ConstValuesOutputPath);
     if (!YAMLOptRecordPath.empty())
       fn(YAMLOptRecordPath);
     if (!BitstreamOptRecordPath.empty())
@@ -204,6 +209,7 @@ struct SupplementaryOutputPaths {
            TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
            ModuleSourceInfoOutputPath.empty() &&
            ABIDescriptorOutputPath.empty() &&
+           ConstValuesOutputPath.empty() &&
            ModuleSemanticInfoOutputPath.empty() && YAMLOptRecordPath.empty() &&
            BitstreamOptRecordPath.empty();
   }
