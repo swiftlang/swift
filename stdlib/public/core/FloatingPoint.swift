@@ -339,8 +339,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   ///     print(Double.pi)
   ///     // Prints "3.14159265358979"
-  ///
-  /// [wiki]: https://en.wikipedia.org/wiki/Pi
   static var pi: Self { get }
 
   // NOTE: Rationale for "ulp" instead of "epsilon":
