@@ -7,6 +7,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+// REQUIRES: asserts
 import _Concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {

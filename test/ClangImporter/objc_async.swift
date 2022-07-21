@@ -2,6 +2,8 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+// REQUIRES: asserts
+
 import Foundation
 import ObjCConcurrency
 // expected-remark@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
