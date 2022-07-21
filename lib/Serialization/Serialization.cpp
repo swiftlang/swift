@@ -3945,17 +3945,20 @@ public:
           S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code];
       for (const auto *subs :
            opaqueDecl->getConditionallyAvailableSubstitutions().drop_back()) {
-        SmallVector<IdentifierID, 4> conditions;
-
-        for (const auto &condition : subs->getAvailability()) {
-          auto lowerEndpoint = condition.getLowerEndpoint();
-          conditions.push_back(
-              S.addUniquedStringRef(lowerEndpoint.getAsString()));
-        }
-
         ConditionalSubstitutionLayout::emitRecord(
             S.Out, S.ScratchRecord, abbrCode,
-            S.addSubstitutionMapRef(subs->getSubstitutions()), conditions);
+            S.addSubstitutionMapRef(subs->getSubstitutions()));
+
+        unsigned condAbbrCode =
+            S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
+        for (const auto &condition : subs->getAvailability()) {
+          ENCODE_VER_TUPLE(osVersion, llvm::Optional<llvm::VersionTuple>(
+                                          condition.first.getLowerEndpoint()));
+          ConditionalSubstitutionConditionLayout::emitRecord(
+              S.Out, S.ScratchRecord, condAbbrCode,
+              /*isUnavailable=*/condition.second,
+              LIST_VER_TUPLE_PIECES(osVersion));
+        }
       }
     }
   }
@@ -5134,6 +5137,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefLayout>();
 
   registerDeclTypeAbbr<ConditionalSubstitutionLayout>();
+  registerDeclTypeAbbr<ConditionalSubstitutionConditionLayout>();
 
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
