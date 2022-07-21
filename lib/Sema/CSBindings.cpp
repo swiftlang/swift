@@ -731,7 +731,7 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
   return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
                          b.isDelayed(), b.isSubtypeOfExistentialType(),
                          b.involvesTypeVariables(),
-                         static_cast<unsigned char>(b.getLiteralKind()),
+                         static_cast<unsigned char>(b.getLiteralForScore()),
                          -numNonDefaultableBindings);
 }
 
@@ -1567,9 +1567,8 @@ void PotentialBindings::retract(Constraint *constraint) {
   EquivalentTo.remove_if(hasMatchingSource);
 }
 
-LiteralBindingKind BindingSet::getLiteralKind() const {
-  LiteralBindingKind kind = LiteralBindingKind::None;
-
+void BindingSet::forEachLiteralRequirement(
+    llvm::function_ref<void(KnownProtocolKind)> callback) const {
   for (const auto &literal : Literals) {
     auto *protocol = literal.first;
     const auto &info = literal.second;
@@ -1577,8 +1576,17 @@ LiteralBindingKind BindingSet::getLiteralKind() const {
     // Only uncovered defaultable literal protocols participate.
     if (!info.viableAsBinding())
       continue;
+    
+    if (auto protocolKind = protocol->getKnownProtocolKind())
+      callback(*protocolKind);
+  }
+}
 
-    switch (*protocol->getKnownProtocolKind()) {
+LiteralBindingKind BindingSet::getLiteralForScore() const {
+  LiteralBindingKind kind = LiteralBindingKind::None;
+
+  forEachLiteralRequirement([&](KnownProtocolKind protocolKind) {
+    switch (protocolKind) {
     case KnownProtocolKind::ExpressibleByDictionaryLiteral:
     case KnownProtocolKind::ExpressibleByArrayLiteral:
     case KnownProtocolKind::ExpressibleByStringInterpolation:
@@ -1594,8 +1602,7 @@ LiteralBindingKind BindingSet::getLiteralKind() const {
         kind = LiteralBindingKind::Atom;
       break;
     }
-  }
-
+  });
   return kind;
 }
 
@@ -1662,7 +1669,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     attributes.push_back("delayed");
   if (isSubtypeOfExistentialType())
     attributes.push_back("subtype_of_existential");
-  auto literalKind = getLiteralKind();
+  auto literalKind = getLiteralForScore();
   if (literalKind != LiteralBindingKind::None) {
     std::string literalAttrStr;
     literalAttrStr.append("[literal: ");
