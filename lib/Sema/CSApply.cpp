@@ -3466,7 +3466,10 @@ namespace {
       // type.
       auto *subExpr = expr->getSubExpr();
       auto type = simplifyType(cs.getType(expr));
-      subExpr = coerceToType(subExpr, type, cs.getConstraintLocator(subExpr));
+      subExpr = coerceToType(
+          subExpr, type,
+          cs.getConstraintLocator(
+              expr, ConstraintLocator::UnresolvedMemberChainResult));
       cs.setType(subExpr, type);
       return subExpr;
     }
