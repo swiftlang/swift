@@ -62,6 +62,15 @@ public enum A012_AttachToEntities {
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>c:@M@comment_to_xml@objc(cs)ATXHeaders(im)f0</USR><Declaration>@objc public func f0()</Declaration><CommentParts><Discussion><rawHTML><![CDATA[<h1>]]></rawHTML>LEVEL ONE<rawHTML><![CDATA[</h1>]]></rawHTML><rawHTML><![CDATA[<h2>]]></rawHTML>LEVEL TWO<rawHTML><![CDATA[</h2>]]></rawHTML></Discussion></CommentParts></Function>]
 }
 
+@objc public class Attributes {
+// CHECK: {{.*}}DocCommentAsXML=none
+    /// Here is an attribute:
+    ///
+    /// ^[Attribute text](string: "attributed")
+    @objc public func f0() {}
+    // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>c:@M@comment_to_xml@objc(cs)Attributes(im)f0</USR><Declaration>@objc public func f0()</Declaration><CommentParts><Abstract><Para>Here is an attribute:</Para></Abstract><Discussion><Para><Attribute attributes="string: &quot;attributed&quot;">Attribute text</Attribute></Para></Discussion></CommentParts></Function>]
+}
+
 @objc public class AutomaticLink {
 // CHECK: {{.*}}DocCommentAsXML=none
   /// And now for a URL.
@@ -196,6 +205,18 @@ public enum A012_AttachToEntities {
    */
   @objc public func f4() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f4()</Name><USR>c:@M@comment_to_xml@objc(cs)EmptyComments(im)f4</USR><Declaration>@objc public func f4()</Declaration><CommentParts><Abstract><Para>Aaa.</Para></Abstract></CommentParts></Function>]
+}
+
+@objc public class Footnotes {
+// CHECK: {{.*}}DocCommentAsXML=none
+    /// Has some footnotes.
+    ///
+    /// Footnotes aren't handled by swiftMarkup yet[^footnote], but they may in the future.
+    ///
+    /// [^footnote]: Footnotes aren't parsed by default in swift-cmark, and swiftMarkup doesn't
+    ///     enable the feature.
+    @objc public func f0() {}
+    // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>c:@M@comment_to_xml@objc(cs)Footnotes(im)f0</USR><Declaration>@objc public func f0()</Declaration><CommentParts><Abstract><Para>Has some footnotes.</Para></Abstract><Discussion><Para>Footnotes aren’t handled by swiftMarkup yet[^footnote], but they may in the future.</Para><Para>[^footnote]: Footnotes aren’t parsed by default in swift-cmark, and swiftMarkup doesn’t enable the feature.</Para></Discussion></CommentParts></Function>]
 }
 
 @objc public class HasThrowingFunction {

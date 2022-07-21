@@ -142,6 +142,15 @@ namespace {
         }
       }
 
+      void visitAttribute(const Attribute *A) {
+        print("^[");
+        for (const auto *Child : A->getChildren())
+          visit(Child);
+        print("](");
+        print(A->getAttributes());
+        print(")");
+      }
+
       void visitBlockQuote(const BlockQuote *BQ) {
         indent();
         printNewline();

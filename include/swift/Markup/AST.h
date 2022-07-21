@@ -589,6 +589,32 @@ public:
   }
 };
 
+class Attribute final : public InlineContent, private llvm::TrailingObjects<Image, MarkupASTNode *> {
+  friend TrailingObjects;
+
+  size_t NumChildren;
+  StringRef Attributes;
+
+  Attribute(StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
+
+public:
+  static Attribute *create(MarkupContext &MC, StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
+
+  StringRef getAttributes() const { return Attributes; }
+
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+  }
+
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+  }
+
+  static bool classof(const MarkupASTNode *N) {
+    return N->getKind() == ASTNodeKind::Attribute;
+  }
+};
+
 #pragma mark Private Extensions
 
 class PrivateExtension : public MarkupASTNode {

@@ -959,6 +959,13 @@
           <param name="pattern">.*\S.*</param>
         </data>
       </element>
+      <element name="Attribute">
+        <attribute name="attributes"/>
+        <!-- Non-empty text content. -->
+        <data type="string">
+          <param name="pattern">.*\S.*</param>
+        </data>
+      </element>
     </choice>
   </define>
 

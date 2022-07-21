@@ -216,6 +216,15 @@ ParseResult<Link> parseLink(MarkupContext &MC, ParseState State) {
   return { Link::create(MC, Destination, Children), ResultState.next() };
 }
 
+ParseResult<Attribute> parseAttribute(MarkupContext &MC, ParseState State) {
+  assert(cmark_node_get_type(State.Node) == CMARK_NODE_ATTRIBUTE && State.Event == CMARK_EVENT_ENTER);
+  std::string Attributes(cmark_node_get_attributes(State.Node));
+  SmallVector<MarkupASTNode *, 2> Children;
+  auto ResultState = parseChildren(MC, State, Children);
+  assert(State.Node == ResultState.Node && ResultState.Event == CMARK_EVENT_EXIT);
+  return { Attribute::create(MC, Attributes, Children), ResultState.next() };
+}
+
 ParseResult<List> parseList(MarkupContext &MC, ParseState State) {
   assert(cmark_node_get_type(State.Node) == CMARK_NODE_LIST
       && State.Event == CMARK_EVENT_ENTER);
@@ -244,6 +253,13 @@ ParseResult<MarkupASTNode> parseElement(MarkupContext &MC, ParseState State) {
   switch (NodeType) {
   case CMARK_NODE_DOCUMENT: {
     llvm_unreachable("Markup documents cannot be nested");
+  }
+  case CMARK_NODE_FOOTNOTE_REFERENCE:
+  case CMARK_NODE_FOOTNOTE_DEFINITION: {
+    llvm_unreachable("Footnotes are not currently parsed by swiftMarkup");
+  }
+  case CMARK_NODE_ATTRIBUTE: {
+    return parseAttribute(MC, State);
   }
   case CMARK_NODE_BLOCK_QUOTE: {
     return parseBlockQuote(MC, State);
