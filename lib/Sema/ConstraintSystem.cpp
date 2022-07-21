@@ -6018,7 +6018,8 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
 
   auto *decl = dyn_cast_or_null<ValueDecl>(dc->getAsDecl());
   if (!decl ||
-      !(decl->isDynamic() || decl->getDynamicallyReplacedDecl()))
+      (!Context.LangOpts.hasFeature(Feature::OpaqueTypeErasure) &&
+       !(decl->isDynamic() || decl->getDynamicallyReplacedDecl())))
     return expr;
 
   auto *opaque = contextualType->getAs<OpaqueTypeArchetypeType>();
