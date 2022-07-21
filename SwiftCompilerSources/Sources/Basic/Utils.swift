@@ -18,16 +18,18 @@ import std
 //===----------------------------------------------------------------------===//
 
 public struct StringRef : CustomStringConvertible, CustomReflectable {
-  let _bridged : BridgedStringRef
+  let _bridged: llvm.StringRef
 
-  public init(bridged: BridgedStringRef) { self._bridged = bridged }
+  public init(bridged: llvm.StringRef) { self._bridged = bridged }
 
   public var string: String { _bridged.string }
   public var description: String { string }
   public var customMirror: Mirror { Mirror(self, children: []) }
   
   public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
-    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: Int(lhs._bridged.length))
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(
+      start: lhs._bridged.__bytes_beginUnsafe(),
+      count: Int(lhs._bridged.__bytes_endUnsafe() - lhs._bridged.__bytes_beginUnsafe()))
     return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
       if lhsBuffer.count != rhsBuffer.count { return false }
       return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
@@ -41,24 +43,19 @@ public struct StringRef : CustomStringConvertible, CustomReflectable {
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 
-extension BridgedStringRef {
-  public var string: String {
-    let buffer = UnsafeBufferPointer<UInt8>(start: data, count: Int(length))
-    return String(decoding: buffer, as: UTF8.self)
-  }
-}
-
 extension llvm.StringRef {
-  public init(_ bridged: BridgedStringRef) {
-    self.init(bridged.data, bridged.length)
+  public var string: String {
+    String(_cxxString: self.str())
   }
 }
 
 extension String {
-  public func withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
+  /// Underscored to avoid name collision with Swift LLVM Bindings.
+  /// To be replaced with a bindings call once bindings are a dependency.
+  public func _withStringRef<T>(_ c: (llvm.StringRef) -> T) -> T {
     var str = self
     return str.withUTF8 { buffer in
-      return c(BridgedStringRef(data: buffer.baseAddress, length: buffer.count))
+      return c(llvm.StringRef(buffer.baseAddress, buffer.count))
     }
   }
 

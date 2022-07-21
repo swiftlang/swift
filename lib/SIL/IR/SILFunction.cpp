@@ -829,12 +829,9 @@ std::pair<const char *, int> SILFunction::
 parseEffects(StringRef attrs, bool fromSIL, bool isDerived,
              ArrayRef<StringRef> paramNames) {
   if (parseFunction) {
-    static_assert(sizeof(BridgedStringRef) == sizeof(StringRef),
-                  "relying on StringRef layout compatibility");
-    BridgedParsingError error =
-      parseFunction({this}, getBridgedStringRef(attrs), (SwiftInt)fromSIL,
-                (SwiftInt) isDerived,
-                {(const unsigned char *)paramNames.data(), paramNames.size()});
+    BridgedParsingError error = parseFunction(
+        {this}, attrs, (SwiftInt)fromSIL, (SwiftInt)isDerived,
+        {(const unsigned char *)paramNames.data(), paramNames.size()});
     return {(const char *)error.message, (int)error.position};
   }
   return {nullptr, 0};
