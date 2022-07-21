@@ -7,7 +7,7 @@
 // RUN: %target-swift-emit-module-interface(%t/Aliases.swiftinterface) %t/Aliases.swift -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Aliases.swiftinterface) -I %t
 
-// RUN: %target-swift-emit-module-interface(%t/UsesAliases.swiftinterface) %t/UsesAliases.swift -I %t
+// RUN: %target-swift-emit-module-interface(%t/UsesAliases.swiftinterface) %t/UsesAliases.swift -I %t -disable-availability-checking
 // TODO: enable verification of UsesAliases.swiftinterface (rdar://91447971)
 // RUN/: %target-swift-typecheck-module-from-interface(%t/UsesAliases.swiftinterface) -I %t
 
