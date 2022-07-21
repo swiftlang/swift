@@ -341,6 +341,10 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef DiagnosticMessage;
   NullTerminatedStringRef FilterName;
 
+  /// If the result represents a \c ValueDecl the name by which this decl should
+  /// be refered to in diagnostics.
+  NullTerminatedStringRef NameForDiagnostics;
+
 public:
   /// Memberwise initializer. \p AssociatedKInd is opaque and will be
   /// interpreted based on \p Kind. If \p KnownOperatorKind is \c None and the
@@ -361,13 +365,15 @@ public:
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       NullTerminatedStringRef DiagnosticMessage,
-      NullTerminatedStringRef FilterName)
+      NullTerminatedStringRef FilterName,
+      NullTerminatedStringRef NameForDiagnostics)
       : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         ResultType(ResultType), NotRecommended(NotRecommended),
         DiagnosticSeverity(DiagnosticSeverity),
-        DiagnosticMessage(DiagnosticMessage), FilterName(FilterName) {
+        DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
+        NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
     assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
                (DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) &&
@@ -491,6 +497,10 @@ public:
 
   NullTerminatedStringRef getFilterName() const { return FilterName; }
 
+  NullTerminatedStringRef getNameForDiagnostics() const {
+    return NameForDiagnostics;
+  }
+
   bool isOperator() const {
     if (getKind() == CodeCompletionResultKind::Declaration) {
       switch (getAssociatedDeclKind()) {
@@ -528,11 +538,6 @@ class CodeCompletionResult {
   ContextualNotRecommendedReason NotRecommended : 4;
   static_assert(int(ContextualNotRecommendedReason::MAX_VALUE) < 1 << 4, "");
 
-  CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
-  static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
-
-  NullTerminatedStringRef DiagnosticMessage;
-
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
   /// editor buffer.
@@ -553,14 +558,10 @@ private:
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        CodeCompletionResultTypeRelation TypeDistance,
-                       ContextualNotRecommendedReason NotRecommended,
-                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                       NullTerminatedStringRef DiagnosticMessage)
+                       ContextualNotRecommendedReason NotRecommended)
       : ContextFree(ContextFree), SemanticContext(SemanticContext),
         Flair(Flair.toRaw()), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
-        DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
-        TypeDistance(TypeDistance) {}
+        NumBytesToErase(NumBytesToErase), TypeDistance(TypeDistance) {}
 
 public:
   /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
@@ -578,9 +579,7 @@ public:
                        const ExpectedTypeContext *TypeContext,
                        const DeclContext *DC,
                        const USRBasedTypeContext *USRTypeContext,
-                       ContextualNotRecommendedReason NotRecommended,
-                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                       NullTerminatedStringRef DiagnosticMessage);
+                       ContextualNotRecommendedReason NotRecommended);
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;
@@ -699,37 +698,23 @@ public:
     return getContextFreeResult().getAssociatedUSRs();
   }
 
-  /// Get the contextual diagnostic severity. This disregards context-free
-  /// diagnostics.
-  CodeCompletionDiagnosticSeverity getContextualDiagnosticSeverity() const {
-    return DiagnosticSeverity;
-  }
+  /// Get the contextual diagnostic severity and message. This disregards
+  /// context-free diagnostics.
+  std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>
+  getContextualDiagnosticSeverityAndMessage(SmallVectorImpl<char> &Scratch,
+                                            const ASTContext &Ctx) const;
 
-  /// Get the contextual diagnostic message. This disregards context-free
-  /// diagnostics.
-  NullTerminatedStringRef getContextualDiagnosticMessage() const {
-    return DiagnosticMessage;
-  }
-
-  /// Return the contextual diagnostic severity if there was a contextual
-  /// diagnostic. If there is no contextual diagnostic, return the context-free
-  /// diagnostic severity.
-  CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
+  /// Return the contextual diagnostic severity and message if there was a
+  /// contextual diagnostic. If there is no contextual diagnostic, return the
+  /// context-free diagnostic severity and message.
+  std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>
+  getDiagnosticSeverityAndMessage(SmallVectorImpl<char> &Scratch,
+                                  const ASTContext &Ctx) const {
     if (NotRecommended != ContextualNotRecommendedReason::None) {
-      return DiagnosticSeverity;
+      return getContextualDiagnosticSeverityAndMessage(Scratch, Ctx);
     } else {
-      return getContextFreeResult().getDiagnosticSeverity();
-    }
-  }
-
-  /// Return the contextual diagnostic message if there was a contextual
-  /// diagnostic. If there is no contextual diagnostic, return the context-free
-  /// diagnostic message.
-  NullTerminatedStringRef getDiagnosticMessage() const {
-    if (NotRecommended != ContextualNotRecommendedReason::None) {
-      return DiagnosticMessage;
-    } else {
-      return getContextFreeResult().getDiagnosticMessage();
+      return std::make_pair(getContextFreeResult().getDiagnosticSeverity(),
+                            getContextFreeResult().getDiagnosticMessage());
     }
   }
 

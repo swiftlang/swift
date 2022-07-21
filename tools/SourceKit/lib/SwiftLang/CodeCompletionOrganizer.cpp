@@ -142,8 +142,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         *contextFreeResult, SemanticContextKind::Local,
         CodeCompletionFlairBit::ExpressionSpecific,
         /*NumBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-        /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None,
-        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+        /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None);
 
     CompletionBuilder builder(sink, *swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -1173,8 +1172,8 @@ Completion *CompletionBuilder::finish() {
             contextFreeBase.getResultType(),
             contextFreeBase.getNotRecommendedReason(),
             contextFreeBase.getDiagnosticSeverity(),
-            contextFreeBase.getDiagnosticMessage(),
-            newFilterName);
+            contextFreeBase.getDiagnosticMessage(), newFilterName,
+            contextFreeBase.getNameForDiagnostics());
     newBase = base.withContextFreeResultSemanticContextAndFlair(
         *contextFreeResult, semanticContext, flair, sink.swiftSink);
   }

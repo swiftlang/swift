@@ -33,8 +33,7 @@ func testActor(obj: MyActor) async {
 
 func testClosure(obj: (Int) async -> Void) {
   obj(#^CLOSURE_CALL^#)
-// FIXME: Emit diagnostics
 // CLOSURE_CALL: Begin completions
-// CLOSURE_CALL-DAG: Pattern/CurrModule/Flair[ArgLabels]/NotRecommended: ['(']{#Int#}[')'][' async'][#Void#]; name={{$}}
+// CLOSURE_CALL-DAG: Pattern/CurrModule/Flair[ArgLabels]/NotRecommended: ['(']{#Int#}[')'][' async'][#Void#]; name=; diagnostics=error:async function used in a context that does not support concurrency 
 // CLOSURE_CALL: End completions
 }

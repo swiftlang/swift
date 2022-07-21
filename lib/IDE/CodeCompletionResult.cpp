@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletionResult.h"
+#include "CodeCompletionDiagnostics.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
@@ -34,12 +35,19 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
   if (Sink.shouldProduceContextFreeResults()) {
     ResultType = ResultType.usrBasedType(Sink.getUSRTypeArena());
   }
+  NullTerminatedStringRef NameForDiagnostics;
+  if (KnownOperatorKind == CodeCompletionOperatorKind::None) {
+    NameForDiagnostics = "function";
+  } else {
+    NameForDiagnostics = "operator";
+  }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       Kind, /*AssociatedKind=*/0, KnownOperatorKind,
       /*IsSystem=*/false, CompletionString, /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
       DiagnosticMessage,
-      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()));
+      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
+      NameForDiagnostics);
 }
 
 ContextFreeCodeCompletionResult *
@@ -57,7 +65,8 @@ ContextFreeCodeCompletionResult::createKeywordResult(
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
-      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()));
+      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
+      /*NameForDiagnostics=*/"");
 }
 
 ContextFreeCodeCompletionResult *
@@ -75,7 +84,23 @@ ContextFreeCodeCompletionResult::createLiteralResult(
       /*BriefDocComment=*/"",
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
-      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()));
+      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
+      /*NameForDiagnostics=*/"");
+}
+
+static NullTerminatedStringRef
+getDeclNameForDiagnostics(const Decl *D, CodeCompletionResultSink &Sink) {
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    llvm::SmallString<64> Name;
+    llvm::raw_svector_ostream NameOS(Name);
+    NameOS << "'";
+    llvm::SmallString<64> Scratch;
+    NameOS << VD->getName().getString(Scratch);
+    NameOS << "'";
+    return NullTerminatedStringRef(NameOS.str(), Sink.getAllocator());
+  } else {
+    return "";
+  }
 }
 
 ContextFreeCodeCompletionResult *
@@ -98,7 +123,8 @@ ContextFreeCodeCompletionResult::createDeclResult(
       CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
       CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
       NotRecommended, DiagnosticSeverity, DiagnosticMessage,
-      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()));
+      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
+      /*NameForDiagnostics=*/getDeclNameForDiagnostics(AssociatedDecl, Sink));
 }
 
 CodeCompletionOperatorKind
@@ -267,22 +293,19 @@ CodeCompletionResult::CodeCompletionResult(
     SemanticContextKind SemanticContext, CodeCompletionFlair Flair,
     uint8_t NumBytesToErase, const ExpectedTypeContext *TypeContext,
     const DeclContext *DC, const USRBasedTypeContext *USRTypeContext,
-    ContextualNotRecommendedReason NotRecommended,
-    CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-    NullTerminatedStringRef DiagnosticMessage)
+    ContextualNotRecommendedReason NotRecommended)
     : ContextFree(ContextFree), SemanticContext(SemanticContext),
       Flair(Flair.toRaw()), NotRecommended(NotRecommended),
-      DiagnosticSeverity(DiagnosticSeverity),
-      DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
+      NumBytesToErase(NumBytesToErase),
       TypeDistance(ContextFree.getResultType().calculateTypeRelation(
           TypeContext, DC, USRTypeContext)) {}
 
 CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair NewFlair,
                                 CodeCompletionResultSink &Sink) const {
-  return new (*Sink.Allocator) CodeCompletionResult(
-      ContextFree, SemanticContext, NewFlair, NumBytesToErase, TypeDistance,
-      NotRecommended, DiagnosticSeverity, DiagnosticMessage);
+  return new (*Sink.Allocator)
+      CodeCompletionResult(ContextFree, SemanticContext, NewFlair,
+                           NumBytesToErase, TypeDistance, NotRecommended);
 }
 
 CodeCompletionResult *
@@ -290,9 +313,21 @@ CodeCompletionResult::withContextFreeResultSemanticContextAndFlair(
     const ContextFreeCodeCompletionResult &NewContextFree,
     SemanticContextKind NewSemanticContext, CodeCompletionFlair NewFlair,
     CodeCompletionResultSink &Sink) const {
-  return new (*Sink.Allocator) CodeCompletionResult(
-      NewContextFree, NewSemanticContext, NewFlair, NumBytesToErase,
-      TypeDistance, NotRecommended, DiagnosticSeverity, DiagnosticMessage);
+  return new (*Sink.Allocator)
+      CodeCompletionResult(NewContextFree, NewSemanticContext, NewFlair,
+                           NumBytesToErase, TypeDistance, NotRecommended);
+}
+
+std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>
+CodeCompletionResult::getContextualDiagnosticSeverityAndMessage(
+    SmallVectorImpl<char> &Scratch, const ASTContext &Ctx) const {
+  llvm::raw_svector_ostream Out(Scratch);
+  CodeCompletionDiagnosticSeverity Severity;
+  getContextualCompletionDiagnostics(
+      NotRecommended, ContextFree.getNameForDiagnostics(), Severity, Out, Ctx);
+  Out << '\0';
+  NullTerminatedStringRef Message(Out.str().data(), Out.str().size() - 1);
+  return std::make_pair(Severity, Message);
 }
 
 void CodeCompletionResult::printPrefix(raw_ostream &OS) const {

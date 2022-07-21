@@ -919,8 +919,7 @@ static void transformAndForwardResults(
         CodeCompletionFlairBit::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0,
         /*TypeContext=*/nullptr, /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
-        ContextualNotRecommendedReason::None,
-        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+        ContextualNotRecommendedReason::None);
 
     SwiftCompletionInfo info;
     std::vector<Completion *> extended = extendCompletions(

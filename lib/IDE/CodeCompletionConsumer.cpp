@@ -87,8 +87,7 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
         /*numBytesToErase=*/0, TypeContext, DC, &USRTypeContext,
-        ContextualNotRecommendedReason::None,
-        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+        ContextualNotRecommendedReason::None);
     targetSink.Results.push_back(contextualResult);
   }
 
