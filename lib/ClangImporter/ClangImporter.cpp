@@ -6081,23 +6081,28 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   auto operation = desc.kind;
   auto &ctx = swiftDecl->getASTContext();
 
-  std::string operationStr = operation == CustomRefCountingOperationKind::retain ? "retain:" : "release:";
+  std::string operationStr = operation == CustomRefCountingOperationKind::retain
+                                 ? "retain:"
+                                 : "release:";
 
   auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
   if (!decl->hasAttrs())
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
 
-  auto retainFnAttr = llvm::find_if(decl->getAttrs(),
-                                    [&operationStr](auto *attr) {
-                                      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-                                        return swiftAttr->getAttribute().startswith(operationStr);
-                                      return false;
-                                    });
+  auto retainFnAttr =
+      llvm::find_if(decl->getAttrs(), [&operationStr](auto *attr) {
+        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+          return swiftAttr->getAttribute().startswith(operationStr);
+        return false;
+      });
   if (retainFnAttr == decl->getAttrs().end()) {
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
   }
 
-  auto name = cast<clang::SwiftAttrAttr>(*retainFnAttr)->getAttribute().drop_front(StringRef(operationStr).size()).str();
+  auto name = cast<clang::SwiftAttrAttr>(*retainFnAttr)
+                  ->getAttribute()
+                  .drop_front(StringRef(operationStr).size())
+                  .str();
 
   if (name == "immortal")
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
@@ -6106,7 +6111,8 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   ctx.lookupInModule(swiftDecl->getParentModule(), name, results);
 
   if (results.size() == 1)
-    return {CustomRefCountingOperationResult::foundOperation, results.front(), name};
+    return {CustomRefCountingOperationResult::foundOperation, results.front(),
+            name};
 
   if (results.empty())
     return {CustomRefCountingOperationResult::notFound, nullptr, name};
@@ -6117,12 +6123,12 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 void swift::simple_display(llvm::raw_ostream &out,
                            CustomRefCountingOperationDescriptor desc) {
   out << "Finding custom (foreign reference) reference counting operation '"
-      << (desc.kind == CustomRefCountingOperationKind::retain ? "retain" : "release")
-      << "for '"
-      << desc.decl->getNameStr()
-      << "'.\n";
+      << (desc.kind == CustomRefCountingOperationKind::retain ? "retain"
+                                                              : "release")
+      << "for '" << desc.decl->getNameStr() << "'.\n";
 }
 
-SourceLoc swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
+SourceLoc
+swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
   return SourceLoc();
 }

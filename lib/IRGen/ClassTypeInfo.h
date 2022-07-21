@@ -64,9 +64,13 @@ public:
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
                          Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
-      auto releaseFn = evaluateOrDefault(
-                           getClass()->getASTContext().evaluator,
-                           CustomRefCountingOperation({getClass(), CustomRefCountingOperationKind::release}), {}).operation;
+      auto releaseFn =
+          evaluateOrDefault(
+              getClass()->getASTContext().evaluator,
+              CustomRefCountingOperation(
+                  {getClass(), CustomRefCountingOperationKind::release}),
+              {})
+              .operation;
       IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
       return;
     }
@@ -77,9 +81,13 @@ public:
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
-      auto retainFn = evaluateOrDefault(
-                          getClass()->getASTContext().evaluator,
-                          CustomRefCountingOperation({getClass(), CustomRefCountingOperationKind::retain}), {}).operation;
+      auto retainFn =
+          evaluateOrDefault(
+              getClass()->getASTContext().evaluator,
+              CustomRefCountingOperation(
+                  {getClass(), CustomRefCountingOperationKind::retain}),
+              {})
+              .operation;
       IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value);
       return;
     }
@@ -93,9 +101,13 @@ public:
                     Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
       llvm::Value *value = e.claimNext();
-      auto retainFn = evaluateOrDefault(
-                           getClass()->getASTContext().evaluator,
-                           CustomRefCountingOperation({getClass(), CustomRefCountingOperationKind::retain}), {}).operation;
+      auto retainFn =
+          evaluateOrDefault(
+              getClass()->getASTContext().evaluator,
+              CustomRefCountingOperation(
+                  {getClass(), CustomRefCountingOperationKind::retain}),
+              {})
+              .operation;
       IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value);
       return;
     }
@@ -107,9 +119,13 @@ public:
                      Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
       llvm::Value *value = e.claimNext();
-      auto releaseFn = evaluateOrDefault(
-                           getClass()->getASTContext().evaluator,
-                           CustomRefCountingOperation({getClass(), CustomRefCountingOperationKind::release}), {}).operation;
+      auto releaseFn =
+          evaluateOrDefault(
+              getClass()->getASTContext().evaluator,
+              CustomRefCountingOperation(
+                  {getClass(), CustomRefCountingOperationKind::release}),
+              {})
+              .operation;
       IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
       return;
     }

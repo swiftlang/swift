@@ -1522,13 +1522,16 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
   call->setDoesNotThrow();
 }
 
-void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn, llvm::Value *value) {
+void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
+    ValueDecl *fn, llvm::Value *value) {
   assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
 
   auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
   auto llvmFn = IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition);
 
-  auto argType = cast<llvm::FunctionType>(llvmFn->getType()->getPointerElementType())->getParamType(0);
+  auto argType =
+      cast<llvm::FunctionType>(llvmFn->getType()->getPointerElementType())
+          ->getParamType(0);
   value = Builder.CreateBitCast(value, argType);
 
   auto call = Builder.CreateCall(llvmFn, value);

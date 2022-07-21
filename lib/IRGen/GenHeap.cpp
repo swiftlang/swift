@@ -766,7 +766,7 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
           std::move(spareBits), isOptional);                                   \
     case ReferenceCounting::ObjC:                                              \
     case ReferenceCounting::None:                                              \
-    case ReferenceCounting::Custom:                                         \
+    case ReferenceCounting::Custom:                                            \
     case ReferenceCounting::Block:                                             \
     case ReferenceCounting::Unknown:                                           \
       return new Unknown##Name##ReferenceTypeInfo(                             \
@@ -1092,7 +1092,7 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
     case ReferenceCounting::Bridge:                                            \
     case ReferenceCounting::Block:                                             \
     case ReferenceCounting::Error:                                             \
-    case ReferenceCounting::Custom:                                         \
+    case ReferenceCounting::Custom:                                            \
     case ReferenceCounting::None:                                              \
       llvm_unreachable("unsupported reference kind with reference storage");   \
     }                                                                          \
@@ -1110,7 +1110,7 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
     case ReferenceCounting::Bridge:                                            \
     case ReferenceCounting::Block:                                             \
     case ReferenceCounting::Error:                                             \
-    case ReferenceCounting::Custom:                                         \
+    case ReferenceCounting::Custom:                                            \
     case ReferenceCounting::None:                                              \
       llvm_unreachable("unsupported reference kind with reference storage");   \
     }                                                                          \

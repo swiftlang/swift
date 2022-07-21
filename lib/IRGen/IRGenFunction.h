@@ -512,7 +512,7 @@ public:
   void emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn,
                                                  llvm::Value *value);
 
-      // Routines for an unknown reference-counting style (meaning,
+  // Routines for an unknown reference-counting style (meaning,
   // dynamically something compatible with either the ObjC or Swift styles).
   //   - strong references
   void emitUnknownStrongRetain(llvm::Value *value, Atomicity atomicity);

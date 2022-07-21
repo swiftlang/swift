@@ -2418,8 +2418,6 @@ namespace {
         }
       }
 
-      
-
       result->setMemberLoader(&Impl, 0);
       return result;
     }
@@ -2437,7 +2435,8 @@ namespace {
         if (operationFn->getParameters()->size() != 1)
           return false;
 
-        if (operationFn->getParameters()->get(0)->getInterfaceType()->isEqual(classDecl->getInterfaceType()))
+        if (operationFn->getParameters()->get(0)->getInterfaceType()->isEqual(
+                classDecl->getInterfaceType()))
           return false;
 
         return true;
@@ -2445,46 +2444,68 @@ namespace {
 
       auto retainOperation = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
-          CustomRefCountingOperation({classDecl, CustomRefCountingOperationKind::retain}), {});
-      if (retainOperation.kind == CustomRefCountingOperationResult::noAttribute) {
+          CustomRefCountingOperation(
+              {classDecl, CustomRefCountingOperationKind::retain}),
+          {});
+      if (retainOperation.kind ==
+          CustomRefCountingOperationResult::noAttribute) {
         HeaderLoc loc(decl->getLocation());
-        Impl.diagnose(loc, diag::reference_type_must_have_retain_attr, decl->getNameAsString());
-      } else if (retainOperation.kind == CustomRefCountingOperationResult::notFound) {
+        Impl.diagnose(loc, diag::reference_type_must_have_retain_attr,
+                      decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::notFound) {
         HeaderLoc loc(decl->getLocation());
-        Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_retain, retainOperation.name, decl->getNameAsString());
-      } else if (retainOperation.kind == CustomRefCountingOperationResult::tooManyFound) {
+        Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_retain,
+                      retainOperation.name, decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::tooManyFound) {
         HeaderLoc loc(decl->getLocation());
-        Impl.diagnose(loc, diag::too_many_reference_type_retain_operations, retainOperation.name, decl->getNameAsString());
-      } else if (retainOperation.kind == CustomRefCountingOperationResult::foundOperation) {
+        Impl.diagnose(loc, diag::too_many_reference_type_retain_operations,
+                      retainOperation.name, decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::foundOperation) {
         if (!isValidOperation(retainOperation.operation)) {
           HeaderLoc loc(decl->getLocation());
-          Impl.diagnose(loc, diag::foreign_reference_types_invalid_retain, retainOperation.name, decl->getNameAsString());
+          Impl.diagnose(loc, diag::foreign_reference_types_invalid_retain,
+                        retainOperation.name, decl->getNameAsString());
         }
       } else {
         // Nothing to do.
-        assert(retainOperation.kind == CustomRefCountingOperationResult::immortal);
+        assert(retainOperation.kind ==
+               CustomRefCountingOperationResult::immortal);
       }
 
       auto releaseOperation = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
-          CustomRefCountingOperation({classDecl, CustomRefCountingOperationKind::release}), {});
-      if (releaseOperation.kind == CustomRefCountingOperationResult::noAttribute) {
+          CustomRefCountingOperation(
+              {classDecl, CustomRefCountingOperationKind::release}),
+          {});
+      if (releaseOperation.kind ==
+          CustomRefCountingOperationResult::noAttribute) {
         HeaderLoc loc(decl->getLocation());
-        Impl.diagnose(loc, diag::reference_type_must_have_release_attr, decl->getNameAsString());
-      } else if (releaseOperation.kind == CustomRefCountingOperationResult::notFound) {
+        Impl.diagnose(loc, diag::reference_type_must_have_release_attr,
+                      decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::notFound) {
         HeaderLoc loc(decl->getLocation());
-        Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_release, releaseOperation.name, decl->getNameAsString());
-      } else if (releaseOperation.kind == CustomRefCountingOperationResult::tooManyFound) {
+        Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_release,
+                      releaseOperation.name, decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::tooManyFound) {
         HeaderLoc loc(decl->getLocation());
-        Impl.diagnose(loc, diag::too_many_reference_type_release_operations, releaseOperation.name, decl->getNameAsString());
-      } else if (releaseOperation.kind == CustomRefCountingOperationResult::foundOperation) {
+        Impl.diagnose(loc, diag::too_many_reference_type_release_operations,
+                      releaseOperation.name, decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::foundOperation) {
         if (!isValidOperation(releaseOperation.operation)) {
           HeaderLoc loc(decl->getLocation());
-          Impl.diagnose(loc, diag::foreign_reference_types_invalid_release, releaseOperation.name, decl->getNameAsString());
+          Impl.diagnose(loc, diag::foreign_reference_types_invalid_release,
+                        releaseOperation.name, decl->getNameAsString());
         }
       } else {
         // Nothing to do.
-        assert(releaseOperation.kind == CustomRefCountingOperationResult::immortal);
+        assert(releaseOperation.kind ==
+               CustomRefCountingOperationResult::immortal);
       }
     }
 

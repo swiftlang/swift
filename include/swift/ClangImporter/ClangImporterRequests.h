@@ -295,7 +295,8 @@ struct CustomRefCountingOperationDescriptor final {
                                        CustomRefCountingOperationKind kind)
       : decl(decl), kind(kind) {}
 
-  friend llvm::hash_code hash_value(const CustomRefCountingOperationDescriptor &desc) {
+  friend llvm::hash_code
+  hash_value(const CustomRefCountingOperationDescriptor &desc) {
     return llvm::hash_combine(desc.decl, desc.kind);
   }
 
@@ -310,12 +311,17 @@ struct CustomRefCountingOperationDescriptor final {
   }
 };
 
-void simple_display(llvm::raw_ostream &out, CustomRefCountingOperationDescriptor desc);
+void simple_display(llvm::raw_ostream &out,
+                    CustomRefCountingOperationDescriptor desc);
 SourceLoc extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc);
 
 struct CustomRefCountingOperationResult {
   enum CustomRefCountingOperationResultKind {
-    noAttribute, immortal, notFound, tooManyFound, foundOperation
+    noAttribute,
+    immortal,
+    notFound,
+    tooManyFound,
+    foundOperation
   };
 
   CustomRefCountingOperationResultKind kind;
@@ -341,10 +347,10 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  CustomRefCountingOperationResult evaluate(Evaluator &evaluator,
-                      CustomRefCountingOperationDescriptor desc) const;
+  CustomRefCountingOperationResult
+  evaluate(Evaluator &evaluator,
+           CustomRefCountingOperationDescriptor desc) const;
 };
-
 
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"

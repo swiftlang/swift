@@ -12,11 +12,9 @@ inline void *operator new(size_t, void *p) { return p; }
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-Empty {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) Empty {
   int test() const { return 42; }
   int testMutable() { return 42; }
 
@@ -26,12 +24,10 @@ Empty {
 void mutateIt(Empty &) {}
 Empty passThroughByValue(Empty x) { return x; }
 
-struct
-    __attribute__((swift_attr("@actor")))
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-MultipleAttrs {
+struct __attribute__((swift_attr("@actor")))
+__attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) MultipleAttrs {
   int test() const { return 42; }
   int testMutable() { return 42; }
 
@@ -40,11 +36,9 @@ MultipleAttrs {
   }
 };
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-IntPair {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) IntPair {
   int a = 1;
   int b = 2;
 
@@ -60,11 +54,9 @@ void mutateIt(IntPair &x) {
 }
 IntPair passThroughByValue(IntPair x) { return x; }
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-RefHoldingPair {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) RefHoldingPair {
   // REVIEW-NOTE: I added support for this but then removed it, as this sort of
   // indicates incorrect usage of a "reference type" and has weird semantics.
   IntPair pair;
@@ -78,11 +70,9 @@ RefHoldingPair {
   }
 };
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-RefHoldingPairRef {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) RefHoldingPairRef {
   IntPair &pair;
   int otherValue;
   RefHoldingPairRef(IntPair &pair) : pair(pair), otherValue(42) {}
@@ -96,11 +86,9 @@ RefHoldingPairRef {
   }
 };
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-RefHoldingPairPtr {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) RefHoldingPairPtr {
   IntPair *pair;
   int otherValue = 42;
 
@@ -128,11 +116,9 @@ struct ValueHoldingPair {
   }
 };
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-BigType {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) BigType {
   int a = 1;
   int b = 2;
   char buffer[32];
@@ -149,11 +135,9 @@ void mutateIt(BigType &x) {
 }
 BigType passThroughByValue(BigType x) { return x; }
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-BaseRef {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) BaseRef {
   int a = 1;
   int b = 2;
 
@@ -163,11 +147,9 @@ BaseRef {
   static BaseRef *create() { return new (malloc(sizeof(BaseRef))) BaseRef(); }
 };
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-DerivedRef : BaseRef {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) DerivedRef : BaseRef {
   int c = 1;
 
   int testDerived() const { return test() + c; }

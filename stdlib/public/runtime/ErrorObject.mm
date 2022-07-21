@@ -649,7 +649,8 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                               dest, destType, flags);
 
   // Not a class.
-  // Foreign reference types don't support casting to parent/child types yet (rdar://85881664&85881794).
+  // Foreign reference types don't support casting to parent/child types yet
+  // (rdar://85881664&85881794).
   case MetadataKind::ForeignReferenceType:
   default:
     return false;
