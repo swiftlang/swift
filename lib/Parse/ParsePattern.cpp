@@ -863,7 +863,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
-Parser::parseFunctionSignature(Identifier SimpleName,
+Parser::parseFunctionSignature(DeclBaseName SimpleName,
                                DeclName &FullName,
                                ParameterList *&bodyParams,
                                DefaultArgumentInfo &defaultArgs,
@@ -876,8 +876,11 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
 
-  ParameterContextKind paramContext = SimpleName.isOperator() ?
-    ParameterContextKind::Operator : ParameterContextKind::Function;
+  ParameterContextKind paramContext = SimpleName.isOperator()
+    ? ParameterContextKind::Operator
+    : (SimpleName == DeclBaseName::createConstructor()
+         ? ParameterContextKind::Initializer
+         : ParameterContextKind::Function);
   Status |= parseFunctionArguments(NamePieces, bodyParams, paramContext,
                                    defaultArgs);
   FullName = DeclName(Context, SimpleName, NamePieces);

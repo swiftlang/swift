@@ -53,7 +53,7 @@ inline bool featureImpliesFeature(Feature feature, Feature implied) {
 }
 
 /// Get the feature corresponding to this "future" feature, if there is one.
-llvm::Optional<Feature> getFutureFeature(llvm::StringRef name);
+llvm::Optional<Feature> getUpcomingFeature(llvm::StringRef name);
 
 /// Get the feature corresponding to this "experimental" feature, if there is
 /// one.

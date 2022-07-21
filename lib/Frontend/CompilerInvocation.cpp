@@ -15,6 +15,7 @@
 
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
@@ -635,6 +636,26 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
       Opts.Features.insert(*feature);
     }
+  }
+
+  // Map historical flags over to future features.
+  for (const Arg *A : Args.filtered(OPT_enable_upcoming_feature)) {
+    // Ignore unknown features.
+    auto feature = getUpcomingFeature(A->getValue());
+    if (!feature)
+      continue;
+
+    // Check if this feature was introduced already in this language version.
+    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
+      if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
+        Diags.diagnose(SourceLoc(), diag::error_upcoming_feature_on_by_default,
+                       A->getValue(), *firstVersion);
+        continue;
+      }
+    }
+
+    // Add the feature.
+    Opts.Features.insert(*feature);
   }
 
   // Map historical flags over to experimental features. We do this for all
