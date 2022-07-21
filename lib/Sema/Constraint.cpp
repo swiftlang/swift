@@ -322,7 +322,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
-void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, bool skipLocator) const {
+void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, unsigned indent, bool skipLocator) const {
   // Print all type variables as $T0 instead of _ here.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
@@ -383,11 +383,11 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, bool skipLocat
       Out << "pattern binding element @ ";
       Out << patternBindingElt->getIndex() << " : ";
       Out << '\n';
-      patternBinding->getPattern(patternBindingElt->getIndex())->dump(Out);
+      patternBinding->getPattern(patternBindingElt->getIndex())->dump(Out, indent);
     } else {
       Out << "syntactic element ";
       Out << '\n';
-      element.dump(Out);
+      element.dump(Out, indent);
     }
 
     return;
