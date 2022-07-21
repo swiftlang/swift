@@ -175,10 +175,32 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::EndBorrow:
-      case OperandOwnership::Reborrow:
         // Guaranteed values are considered uses of the value when the value is
-        // an owned phi and the guaranteed values are adjacent reborrow phis.
+        // an owned phi and the guaranteed values are adjacent reborrow phis or
+        // reborrow of such.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        break;
+      case OperandOwnership::Reborrow:
+        BranchInst *branch;
+        if (!(branch = dyn_cast<BranchInst>(user))) {
+          // Non-phi reborrows (tuples, etc) never end the lifetime of the owned
+          // value.
+          liveness.updateForUse(user, /*lifetimeEnding*/ false);
+          defUseWorklist.insert(cast<SingleValueInstruction>(user));
+          break;
+        }
+        if (is_contained(user->getOperandValues(), currentDef)) {
+          // An adjacent phi consumes the value being reborrowed.  Although this
+          // use doesn't end the lifetime, this user does.
+          liveness.updateForUse(user, /*lifetimeEnding*/ true);
+          break;
+        }
+        // No adjacent phi consumes the value.  This use is not lifetime ending.
+        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        // This branch reborrows a guaranteed phi whose lifetime is dependent on
+        // currentDef.  Uses of the reborrowing phi extend liveness.
+        auto *reborrow = branch->getArgForOperand(use);
+        defUseWorklist.insert(reborrow);
         break;
       }
     }
