@@ -314,6 +314,20 @@ struct ArgumentInitHelper {
                 loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
             SGF.emitManagedRValueWithCleanup(value);
           }
+        } else if (value->getType().isMoveOnly()) {
+          if (value->getOwnershipKind() == OwnershipKind::Owned) {
+            value = SGF.B.createMoveValue(loc, argrv.forward(SGF),
+                                          /*isLexical*/ true);
+            value = SGF.B.createMarkMustCheckInst(
+                loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+            SGF.emitManagedRValueWithCleanup(value);
+          } else {
+            assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
+            value = SGF.B.createCopyValue(loc, value);
+            value = SGF.B.createMarkMustCheckInst(
+                loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+            SGF.emitManagedRValueWithCleanup(value);
+          }
         } else {
           if (value->getOwnershipKind() == OwnershipKind::Owned) {
             value = SILValue(

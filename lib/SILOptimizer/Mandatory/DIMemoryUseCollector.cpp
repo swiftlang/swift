@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
+
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
@@ -1211,6 +1213,7 @@ void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
       Uses.append(beginAccess->getUses().begin(), beginAccess->getUses().end());
       continue;
     }
+
     if (isa<EndAccessInst>(User))
       continue;
 
@@ -1489,9 +1492,9 @@ void ElementUseCollector::collectClassSelfUses(
 
     // Look through begin_borrow, upcast, unchecked_ref_cast
     // and copy_value.
-    if (isa<BeginBorrowInst>(User) || isa<BeginAccessInst>(User)
-        || isa<UpcastInst>(User) || isa<UncheckedRefCastInst>(User)
-        || isa<CopyValueInst>(User)) {
+    if (isa<BeginBorrowInst>(User) || isa<BeginAccessInst>(User) ||
+        isa<UpcastInst>(User) || isa<UncheckedRefCastInst>(User) ||
+        isa<CopyValueInst>(User) || isa<MarkMustCheckInst>(User)) {
       auto value = cast<SingleValueInstruction>(User);
       std::copy(value->use_begin(), value->use_end(),
                 std::back_inserter(Worklist));
