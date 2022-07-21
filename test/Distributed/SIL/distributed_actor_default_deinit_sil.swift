@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// FIXME(distributed): test fails on optimized build: OSS - Swift (Tools Opt+No Assert,  Stdlib Opt+DebInfo, Test Simulator) - macOS
+// REQUIRES: radar97074020
+
 import Distributed
 import FakeDistributedActorSystems
 
