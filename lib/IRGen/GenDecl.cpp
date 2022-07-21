@@ -1914,6 +1914,7 @@ void IRGenerator::emitDynamicReplacements() {
       "\x01l_auto_dynamic_replacements_some", IGM.getPointerAlignment(),
       /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
   autoReplVar2->setSection(getDynamicReplacementSomeSection(IGM));
+  IGM.addUsedGlobal(autoReplVar2);
 }
 
 void IRGenerator::emitEagerClassInitialization() {
