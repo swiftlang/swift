@@ -1622,6 +1622,22 @@ static std::string getAtomLiteralAsString(ExprKind EK) {
 #undef ENTRY
 }
 
+/// Return string for collection literal kinds (interpolated string, array,
+/// dictionary) for printing in debug output.
+static std::string getCollectionLiteralAsString(KnownProtocolKind KPK) {
+#define ENTRY(Kind, String)                                                    \
+  case KnownProtocolKind::Kind:                                                \
+    return String
+  switch (KPK) {
+    ENTRY(ExpressibleByDictionaryLiteral, "dictionary");
+    ENTRY(ExpressibleByArrayLiteral, "array");
+    ENTRY(ExpressibleByStringInterpolation, "interpolated string");
+  default:
+    return "";
+  }
+#undef ENTRY
+}
+
 void BindingSet::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
                       unsigned indent) const {
   out.indent(indent);
