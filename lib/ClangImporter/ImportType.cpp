@@ -393,35 +393,40 @@ namespace {
 
     ImportResult VisitBitIntType(const clang::BitIntType *type) {
       Impl.addImportDiagnostic(type, Diagnostic(diag::unsupported_builtin_type,
-                                                type->getTypeClassName()));
+                                                type->getTypeClassName()),
+                               clang::SourceLocation());
       // BitInt is not supported in Swift.
       return Type();
     }
 
     ImportResult VisitPipeType(const clang::PipeType *type) {
       Impl.addImportDiagnostic(type, Diagnostic(diag::unsupported_builtin_type,
-                                                type->getTypeClassName()));
+                                                type->getTypeClassName()),
+                               clang::SourceLocation());
       // OpenCL types are not supported in Swift.
       return Type();
     }
 
     ImportResult VisitMatrixType(const clang::MatrixType *ty) {
       Impl.addImportDiagnostic(ty, Diagnostic(diag::unsupported_builtin_type,
-                                              ty->getTypeClassName()));
+                                              ty->getTypeClassName()),
+                               clang::SourceLocation());
       // Matrix types are not supported in Swift.
       return Type();
     }
 
     ImportResult VisitComplexType(const clang::ComplexType *type) {
       Impl.addImportDiagnostic(type, Diagnostic(diag::unsupported_builtin_type,
-                                                type->getTypeClassName()));
+                                                type->getTypeClassName()),
+                               clang::SourceLocation());
       // FIXME: Implement once Complex is in the library.
       return Type();
     }
 
     ImportResult VisitAtomicType(const clang::AtomicType *type) {
       Impl.addImportDiagnostic(type, Diagnostic(diag::unsupported_builtin_type,
-                                                type->getTypeClassName()));
+                                                type->getTypeClassName()),
+                               clang::SourceLocation());
       // FIXME: handle pointers and fields of atomic type
       return Type();
     }
@@ -1030,7 +1035,8 @@ namespace {
              ++cp) {
           if (!(*cp)->hasDefinition())
             Impl.addImportDiagnostic(
-                type, Diagnostic(diag::incomplete_protocol, *cp));
+                type, Diagnostic(diag::incomplete_protocol, *cp),
+                clang::SourceLocation());
         }
       }
 
@@ -1041,7 +1047,8 @@ namespace {
             Impl.importDecl(objcClass, Impl.CurrentVersion));
         if (!imported && !objcClass->hasDefinition())
           Impl.addImportDiagnostic(
-              type, Diagnostic(diag::incomplete_interface, objcClass));
+              type, Diagnostic(diag::incomplete_interface, objcClass),
+              clang::SourceLocation());
 
         if (!imported)
           return nullptr;
