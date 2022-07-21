@@ -479,6 +479,10 @@ void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
   for (auto conformance : IDC->getLocalConformances(
                             ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
+    if (Opts.PublicSymbolsOnly &&
+        getDeclLinkage(protocol) != FormalLinkage::PublicUnique)
+      continue;
+
     auto needsWTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
     if (!needsWTable)
