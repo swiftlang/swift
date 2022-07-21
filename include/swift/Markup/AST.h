@@ -589,16 +589,20 @@ public:
   }
 };
 
-class Attribute final : public InlineContent, private llvm::TrailingObjects<Image, MarkupASTNode *> {
+class InlineAttributes final : public InlineContent, private llvm::TrailingObjects<Image, MarkupASTNode *> {
   friend TrailingObjects;
+
+  // Note that inline attributes are like links, in that there are child inline nodes that are
+  // collectively styled by the attribute text. The child nodes are the text that should be
+  // displayed.
 
   size_t NumChildren;
   StringRef Attributes;
 
-  Attribute(StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
+  InlineAttributes(StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
 
 public:
-  static Attribute *create(MarkupContext &MC, StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
+  static InlineAttributes *create(MarkupContext &MC, StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
 
   StringRef getAttributes() const { return Attributes; }
 
@@ -611,7 +615,7 @@ public:
   }
 
   static bool classof(const MarkupASTNode *N) {
-    return N->getKind() == ASTNodeKind::Attribute;
+    return N->getKind() == ASTNodeKind::InlineAttributes;
   }
 };
 

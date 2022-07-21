@@ -142,7 +142,7 @@ namespace {
         }
       }
 
-      void visitAttribute(const Attribute *A) {
+      void visitInlineAttributes(const InlineAttributes *A) {
         print("^[");
         for (const auto *Child : A->getChildren())
           visit(Child);

@@ -216,13 +216,13 @@ ParseResult<Link> parseLink(MarkupContext &MC, ParseState State) {
   return { Link::create(MC, Destination, Children), ResultState.next() };
 }
 
-ParseResult<Attribute> parseAttribute(MarkupContext &MC, ParseState State) {
+ParseResult<InlineAttributes> parseAttribute(MarkupContext &MC, ParseState State) {
   assert(cmark_node_get_type(State.Node) == CMARK_NODE_ATTRIBUTE && State.Event == CMARK_EVENT_ENTER);
   std::string Attributes(cmark_node_get_attributes(State.Node));
   SmallVector<MarkupASTNode *, 2> Children;
   auto ResultState = parseChildren(MC, State, Children);
   assert(State.Node == ResultState.Node && ResultState.Event == CMARK_EVENT_EXIT);
-  return { Attribute::create(MC, Attributes, Children), ResultState.next() };
+  return { InlineAttributes::create(MC, Attributes, Children), ResultState.next() };
 }
 
 ParseResult<List> parseList(MarkupContext &MC, ParseState State) {

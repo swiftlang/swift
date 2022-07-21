@@ -72,7 +72,7 @@ struct CommentToXMLConverter {
     llvm_unreachable("Can't print a swift::markup::Document as XML directly");
   }
 
-  void printAttribute(const Attribute *A) {
+  void printInlineAttributes(const InlineAttributes *A) {
     OS << "<Attribute attributes=\"";
     appendWithXMLEscaping(OS, A->getAttributes());
     OS << "\">";
@@ -650,7 +650,7 @@ public:
       visit(Child);
   }
 
-  void visitAttribute(const Attribute *A) {
+  void visitInlineAttributes(const InlineAttributes *A) {
     // attributed strings don't have an analogue in Doxygen, so just print out the text
     for (const auto *Child : A->getChildren())
       visit(Child);
