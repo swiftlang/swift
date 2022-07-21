@@ -40,6 +40,10 @@ extern swift::once_t initializeToken;
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableJobDispatchIntegration();
 
+// Wrapper around SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS that the
+// Concurrency library can call.
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
+
 } // end namespace environment
 } // end namespace runtime
 } // end namespace Swift

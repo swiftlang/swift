@@ -41,7 +41,7 @@ namespace swift {
 #if 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
   fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
-          (unsigned long)Thread::current()::platformThreadId(), __FILE__,      \
+          (unsigned long)Thread::current().platformThreadId(), __FILE__,      \
           __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0

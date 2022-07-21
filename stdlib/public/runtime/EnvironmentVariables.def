@@ -50,6 +50,9 @@ VARIABLE(SWIFT_DEBUG_ENABLE_COW_CHECKS, bool, false,
 VARIABLE(SWIFT_ENABLE_ASYNC_JOB_DISPATCH_INTEGRATION, bool, true,
          "Enable use of dispatch_async_swift_job when available.")
 
+VARIABLE(SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS, bool, false,
+         "Check for and error on double-calls of unchecked continuations.")
+
 #if defined(__APPLE__) && defined(__MACH__)
 
 VARIABLE(SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, false,
