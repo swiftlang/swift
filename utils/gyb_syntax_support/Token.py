@@ -244,9 +244,8 @@ SYNTAX_TOKENS = [
     Punctuator('PrefixAmpersand', 'amp_prefix', text='&',
                requires_leading_space=True, requires_trailing_space=True, 
                serialization_code=96),
-    Punctuator('Arrow', 'arrow', text='->', requires_trailing_space=True,
-               serialization_code=78),
-
+    Punctuator('Arrow', 'arrow', text='->', requires_leading_space=True,
+               requires_trailing_space=True, serialization_code=78),
 
     Punctuator('Backtick', 'backtick', text='`', serialization_code=79),
 
