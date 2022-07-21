@@ -1168,7 +1168,7 @@ static int printCodeCompletionResults(
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, llvm::outs(), IncludeKeywords,
             IncludeComments, IncludeSourceText, PrintAnnotatedDescription,
-            *Result.Info.swiftASTContext);
+            Result.Info.compilerInstance->getASTContext());
         return 0;
       });
 }
@@ -1547,7 +1547,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
             printCodeCompletionResultsImpl(
                 Result->ResultSink.Results, OS, IncludeKeywords,
                 IncludeComments, IncludeSourceText,
-                CodeCompletionAnnotateResults, *Result->Info.swiftASTContext);
+                CodeCompletionAnnotateResults,
+                Result->Info.compilerInstance->getASTContext());
             break;
           }
           case CancellableResultKind::Failure:

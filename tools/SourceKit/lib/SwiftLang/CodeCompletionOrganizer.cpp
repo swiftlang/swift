@@ -76,10 +76,11 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     const Options &options, Completion *prefix, bool clearFlair) {
 
   ImportDepth depth;
-  if (info.swiftASTContext) {
+  if (info.compilerInstance) {
     // Build import depth map.
-    depth = ImportDepth(*info.swiftASTContext,
-                        info.invocation->getFrontendOptions());
+    depth = ImportDepth(
+        info.compilerInstance->getASTContext(),
+        info.compilerInstance->getInvocation().getFrontendOptions());
   }
 
   if (info.completionContext)
