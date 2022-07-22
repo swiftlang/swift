@@ -2626,6 +2626,10 @@ inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
   return attr->getLocation();
 }
 
+/// Determine whether the given attribute is available, looking up the
+/// attribute by name.
+bool hasAttribute(const LangOptions &langOpts, llvm::StringRef attributeName);
+
 } // end namespace swift
 
 #endif
