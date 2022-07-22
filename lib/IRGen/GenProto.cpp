@@ -1352,6 +1352,8 @@ public:
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
 
+      bool isAsyncRequirement = requirement.hasAsync();
+
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
              && "sil witness table does not match protocol");
@@ -1364,10 +1366,9 @@ public:
 #endif
 
       SILFunction *Func = entry.getMethodWitness().Witness;
-      auto *afd = cast<AbstractFunctionDecl>(
-          entry.getMethodWitness().Requirement.getDecl());
       llvm::Constant *witness = nullptr;
       if (Func) {
+        assert(Func->isAsync() == isAsyncRequirement);
         if (Func->isAsync()) {
           witness = IGM.getAddrOfAsyncFunctionPointer(Func);
         } else {
@@ -1376,7 +1377,7 @@ public:
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
-        if (afd->hasAsync()) {
+        if (isAsyncRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
               IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
               IGM.FunctionPtrTy);
@@ -1388,8 +1389,9 @@ public:
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
 
       PointerAuthSchema schema =
-          afd->hasAsync() ? IGM.getOptions().PointerAuth.AsyncProtocolWitnesses
-                          : IGM.getOptions().PointerAuth.ProtocolWitnesses;
+          isAsyncRequirement
+              ? IGM.getOptions().PointerAuth.AsyncProtocolWitnesses
+              : IGM.getOptions().PointerAuth.ProtocolWitnesses;
       Table.addSignedPointer(witness, schema, requirement);
       return;
     }
