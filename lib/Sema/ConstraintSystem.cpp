@@ -567,7 +567,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     }
 
     // Handle an apply of a nominal type which supports callAsFunction.
-    if (fnTy->isCallableNominalType(DC)) {
+    if (fnTy->isCallAsFunctionType(DC)) {
       return getConstraintLocator(anchor,
                                   {LocatorPathElt::ApplyFunction(),
                                    LocatorPathElt::ImplicitCallAsFunction()});
