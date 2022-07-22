@@ -7,9 +7,6 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-// FIXME: rdar://96520492 Test fails on specific config: Tools Opt+Assert, Stdlib Opt+DebInfo+Assert, iOS_arm64e
-// UNSUPPORTED: CPU=arm64e
-
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
