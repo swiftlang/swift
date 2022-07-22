@@ -519,7 +519,7 @@ public:
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "(attempting ";
-        choice->print(log, &CS.getASTContext().SourceMgr);
+        choice->print(log, &CS.getASTContext().SourceMgr, CS.solverState->depth * 2 + 2);
         log << '\n';
       }
 
@@ -974,6 +974,9 @@ public:
       auto remainingTime = OuterTimeRemaining->second;
       CS.Timer.emplace(anchor, CS, remainingTime);
     }
+    
+    if (CS.isDebugMode())
+      getDebugLogger() << ")\n";
   }
 
   StepResult resume(bool prevFailed) override;
