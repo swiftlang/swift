@@ -298,9 +298,9 @@ enum class FixKind : uint8_t {
   /// Ignore `ErrorExpr` or `ErrorType` during pre-check.
   IgnoreInvalidASTNode,
 
-  /// Ignore a named pattern whose type we couldn't infer. This issue should
-  /// already have been diagnosed elsewhere.
-  IgnoreInvalidNamedPattern,
+  /// Ignore a named or `_` pattern whose type we couldn't infer.
+  /// This issue should already have been diagnosed elsewhere.
+  IgnoreUnresolvedPatternVar,
 
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
@@ -2746,10 +2746,10 @@ public:
   }
 };
 
-class IgnoreInvalidNamedPattern final : public ConstraintFix {
-  IgnoreInvalidNamedPattern(ConstraintSystem &cs, NamedPattern *pattern,
-                            ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::IgnoreInvalidNamedPattern, locator) {}
+class IgnoreUnresolvedPatternVar final : public ConstraintFix {
+  IgnoreUnresolvedPatternVar(ConstraintSystem &cs, Pattern *pattern,
+                             ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreUnresolvedPatternVar, locator) {}
 
 public:
   std::string getName() const override {
@@ -2762,12 +2762,11 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
-  static IgnoreInvalidNamedPattern *create(ConstraintSystem &cs,
-                                           NamedPattern *pattern,
-                                           ConstraintLocator *locator);
+  static IgnoreUnresolvedPatternVar *
+  create(ConstraintSystem &cs, Pattern *pattern, ConstraintLocator *locator);
 
   static bool classof(ConstraintFix *fix) {
-    return fix->getKind() == FixKind::IgnoreInvalidNamedPattern;
+    return fix->getKind() == FixKind::IgnoreUnresolvedPatternVar;
   }
 };
 

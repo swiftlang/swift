@@ -12938,7 +12938,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidASTNode: {
     return recordFix(fix, 10) ? SolutionKind::Error : SolutionKind::Solved;
   }
-  case FixKind::IgnoreInvalidNamedPattern: {
+  case FixKind::IgnoreUnresolvedPatternVar: {
     return recordFix(fix, 100) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
