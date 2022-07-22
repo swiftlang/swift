@@ -843,9 +843,6 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // attempted to apply information gained from the
   // isolated constraint to the outer context.
   if (Snapshot && Snapshot->isScoped()) {
-    if (CS.isDebugMode())
-      getDebugLogger() << ")\n";
-
     return done(/*isSuccess=*/!prevFailed);
   }
 

@@ -6117,7 +6117,7 @@ public:
   bool isSymmetricOperator() const;
   bool isUnaryOperator() const;
 
-  void print(llvm::raw_ostream &Out, SourceManager *SM) const {
+  void print(llvm::raw_ostream &Out, SourceManager *SM, unsigned indent = 0) const {
     Out << "disjunction choice ";
     Choice->print(Out, SM);
   }
@@ -6149,9 +6149,9 @@ public:
 
   ConstraintLocator *getLocator() const { return Element->getLocator(); }
 
-  void print(llvm::raw_ostream &Out, SourceManager *SM) const {
+  void print(llvm::raw_ostream &Out, SourceManager *SM, unsigned indent) const {
     Out << "conjunction element ";
-    Element->print(Out, SM);
+    Element->print(Out, SM, indent);
   }
 
 private:
@@ -6186,7 +6186,7 @@ public:
   Optional<std::pair<ConstraintFix *, unsigned>>
   fixForHole(ConstraintSystem &cs) const;
 
-  void print(llvm::raw_ostream &Out, SourceManager *) const {
+  void print(llvm::raw_ostream &Out, SourceManager *, unsigned indent) const {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
     Out << "type variable " << TypeVar->getString(PO)
