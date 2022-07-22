@@ -256,6 +256,87 @@ struct ArgumentInitHelper {
     return argEmitter.visit(canTy, origTy);
   }
 
+  SILValue updateArgumentValueForBinding(ManagedValue argrv, SILLocation loc,
+                                         ParamDecl *pd, SILValue value,
+                                         const SILDebugVariable &varinfo) {
+    // If we do not need to support lexical lifetimes, just return value as the
+    // updated value.
+    if (!SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
+      return value;
+
+    bool isNoImplicitCopy = false;
+    if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+      isNoImplicitCopy = arg->isNoImplicitCopy();
+
+    // If we have a no implicit copy argument and the argument is trivial,
+    // we need to use copyable to move only to convert it to its move only
+    // form.
+    if (!isNoImplicitCopy) {
+      if (!value->getType().isMoveOnly()) {
+        if (value->getOwnershipKind() == OwnershipKind::Owned) {
+          value =
+              SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+          SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+        }
+        return value;
+      }
+
+      // At this point, we have a move only type.
+      if (value->getOwnershipKind() == OwnershipKind::Owned) {
+        value = SGF.B.createMoveValue(loc, argrv.forward(SGF),
+                                      /*isLexical*/ true);
+        value = SGF.B.createMarkMustCheckInst(
+            loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+        SGF.emitManagedRValueWithCleanup(value);
+        return value;
+      }
+
+      assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
+      value = SGF.B.createCopyValue(loc, value);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getType().isTrivial(SGF.F)) {
+      value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, value);
+      value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
+
+      // If our argument was owned, we use no implicit copy. Otherwise, we
+      // use no copy.
+      auto kind = MarkMustCheckInst::CheckKind::NoCopy;
+      if (pd->isOwned())
+        kind = MarkMustCheckInst::CheckKind::NoImplicitCopy;
+      value = SGF.B.createMarkMustCheckInst(loc, value, kind);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      value = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc, value);
+      value = SGF.B.createCopyValue(loc, value);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getOwnershipKind() == OwnershipKind::Owned) {
+      // If we have an owned value, forward it into the mark_must_check to
+      // avoid an extra destroy_value.
+      value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
+          loc, argrv.forward(SGF));
+      value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    return value;
+  }
+
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
   void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, ParamDecl *pd) {
@@ -276,66 +357,7 @@ struct ArgumentInitHelper {
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
-      if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
-              SGF.getModule())) {
-        bool isNoImplicitCopy = false;
-        if (auto *arg = dyn_cast<SILFunctionArgument>(value))
-          isNoImplicitCopy = arg->isNoImplicitCopy();
-
-        // If we have a no implicit copy argument and the argument is trivial,
-        // we need to use copyable to move only to convert it to its move only
-        // form.
-        if (isNoImplicitCopy) {
-          if (value->getType().isTrivial(SGF.F)) {
-            value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, value);
-            value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
-
-            // If our argument was owned, we use no implicit copy. Otherwise, we
-            // use no copy.
-            auto kind = MarkMustCheckInst::CheckKind::NoCopy;
-            if (pd->isOwned())
-              kind = MarkMustCheckInst::CheckKind::NoImplicitCopy;
-            value = SGF.B.createMarkMustCheckInst(loc, value, kind);
-            SGF.emitManagedRValueWithCleanup(value);
-          } else if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
-            value = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc,
-                                                                         value);
-            value = SGF.B.createCopyValue(loc, value);
-            value = SGF.B.createMarkMustCheckInst(
-                loc, value, MarkMustCheckInst::CheckKind::NoCopy);
-            SGF.emitManagedRValueWithCleanup(value);
-          } else if (value->getOwnershipKind() == OwnershipKind::Owned) {
-            // If we have an owned value, forward it into the mark_must_check to
-            // avoid an extra destroy_value.
-            value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
-                loc, argrv.forward(SGF));
-            value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
-            value = SGF.B.createMarkMustCheckInst(
-                loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
-            SGF.emitManagedRValueWithCleanup(value);
-          }
-        } else if (value->getType().isMoveOnly()) {
-          if (value->getOwnershipKind() == OwnershipKind::Owned) {
-            value = SGF.B.createMoveValue(loc, argrv.forward(SGF),
-                                          /*isLexical*/ true);
-            value = SGF.B.createMarkMustCheckInst(
-                loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
-            SGF.emitManagedRValueWithCleanup(value);
-          } else {
-            assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
-            value = SGF.B.createCopyValue(loc, value);
-            value = SGF.B.createMarkMustCheckInst(
-                loc, value, MarkMustCheckInst::CheckKind::NoCopy);
-            SGF.emitManagedRValueWithCleanup(value);
-          }
-        } else {
-          if (value->getOwnershipKind() == OwnershipKind::Owned) {
-            value = SILValue(
-                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
-          }
-        }
-      }
+      value = updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
       if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
