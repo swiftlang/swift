@@ -735,6 +735,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
   APIBreakingToAdd | APIBreakingToRemove,
   130)
 
+SIMPLE_DECL_ATTR(_moveOnly, MoveOnly,
+  OnNominalType |
+  UserInaccessible |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  131)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 

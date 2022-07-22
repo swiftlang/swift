@@ -924,3 +924,11 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
 
   return SILType();
 }
+
+// TODO: Create isPureMoveOnly.
+bool SILType::isMoveOnly() const {
+  if (auto *nom = getNominalOrBoundGenericNominal())
+    if (nom->isMoveOnly())
+      return true;
+  return isMoveOnlyWrapped();
+}

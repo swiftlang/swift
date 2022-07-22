@@ -2262,12 +2262,19 @@ class ValueDecl : public Decl {
     /// Whether this declaration produces an implicitly unwrapped
     /// optional result.
     unsigned isIUO : 1;
+
+    /// Whether the "isMoveOnly" bit has been computed yet.
+    unsigned isMoveOnlyComputed : 1;
+
+    /// Whether this declaration can not be copied and thus is move only.
+    unsigned isMoveOnly : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
+  friend class IsMoveOnlyRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
@@ -2541,6 +2548,9 @@ public:
 
   /// Is this declaration 'final'?
   bool isFinal() const;
+
+  /// Is this declaration 'moveOnly'?
+  bool isMoveOnly() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;

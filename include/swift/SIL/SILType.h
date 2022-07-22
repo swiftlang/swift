@@ -600,6 +600,10 @@ public:
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
 
+  /// Returns true if this type is a first class move only type or a move only
+  /// wrapped type.
+  bool isMoveOnly() const;
+
   /// Returns true if this SILType is a move only wrapper type.
   ///
   /// Canonical way to check if a SILType is move only. Using is/getAs/castTo
