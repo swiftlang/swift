@@ -572,15 +572,21 @@ public:
           // why we want this is even if we are only performing a borrow for our
           // lexical lifetime, we want to ensure that our defs see this
           // initialization as consuming this value.
-          if (value->getType().isMoveOnlyWrapped() &&
-              value->getOwnershipKind() == OwnershipKind::Owned) {
+          if (value->getOwnershipKind() == OwnershipKind::Owned) {
             assert(wasPlusOne);
             // NOTE: If our type is trivial when not wrapped in a
             // SILMoveOnlyWrappedType, this will return a trivial value. We rely
             // on the checker to determine if this is an acceptable use of the
             // value.
-            value = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(PrologueLoc,
-                                                                    value);
+            if (value->getType().isMoveOnly()) {
+              if (value->getType().isMoveOnlyWrapped()) {
+                value = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(
+                    PrologueLoc, value);
+              } else {
+                // Change this to be lexical and get rid of borrow scope?
+                value = SGF.B.createMoveValue(PrologueLoc, value);
+              }
+            }
           }
 
           // If we still have a non-trivial thing, emit code that will need to

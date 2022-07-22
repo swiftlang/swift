@@ -6396,5 +6396,8 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
       "annotating a type with a global actor %0 is not permitted within %1",
       (TypeRepr*, StringRef))
 
+ERROR(moveOnly_not_allowed_here,none,
+      "'moveOnly' may only be applied to classes, structs, and enums", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
