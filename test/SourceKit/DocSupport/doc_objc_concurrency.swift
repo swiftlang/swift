@@ -1,5 +1,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // RUN: %empty-directory(%t)
 
