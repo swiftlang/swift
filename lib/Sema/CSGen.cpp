@@ -2286,11 +2286,18 @@ namespace {
         return setType(type);
       }
       case PatternKind::Any: {
-        return setType(
-            externalPatternType
-                ? externalPatternType
-                : CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        TVO_CanBindToNoEscape));
+        Type type;
+
+        // Always prefer a contextual type when it's available.
+        if (externalPatternType) {
+          type = externalPatternType;
+        } else {
+          type = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      ConstraintLocator::AnyPatternDecl),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
+        }
+        return setType(type);
       }
 
       case PatternKind::Named: {
