@@ -11609,10 +11609,21 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
 /// implemented by a type.
 static llvm::DenseSet<FuncDecl *>
-lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
+lookupDynamicCallableMethods(NominalTypeDecl *decl, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator,
                              Identifier argumentName, bool hasKeywordArgs) {
   auto &ctx = CS.getASTContext();
+
+  // The generic arguments don't matter because we only want the member decls,
+  // not concrete overload choices (we form those later when adding the overload
+  // set). We map into context here to avoid an OverloadChoice assertion for an
+  // interface type base.
+  // TODO: We really ought to separate out the actual lookup part of
+  // `performMemberLookup` from the choice construction. That would allow us to
+  // requestify the lookup of dynamicCallable members on a per-decl basis, and
+  // map them onto viable and unviable choices onto a given base type.
+  auto type = decl->getDeclaredTypeInContext();
+
   DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
   auto matches = CS.performMemberLookup(
       ConstraintKind::ValueMember, methodName, type,
@@ -11636,112 +11647,44 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
 }
 
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
-/// implemented by a type. This function should not be called directly:
-/// instead, call `getDynamicCallableMethods` which performs caching.
+/// implemented by a given nominal type decl.
 static DynamicCallableMethods
-lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
+lookupDynamicCallableMethods(NominalTypeDecl *decl, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator) {
+  auto it = CS.DynamicCallableCache.find(decl);
+  if (it != CS.DynamicCallableCache.end())
+    return it->second;
+
+  // The decl must have @dynamicCallable.
   auto &ctx = CS.getASTContext();
+  HasDynamicCallableAttributeRequest req(decl);
+  if (!evaluateOrDefault(ctx.evaluator, req, false))
+    return DynamicCallableMethods();
+
   DynamicCallableMethods methods;
   methods.argumentsMethods =
-    lookupDynamicCallableMethods(type, CS, locator, ctx.Id_withArguments,
+    lookupDynamicCallableMethods(decl, CS, locator, ctx.Id_withArguments,
                                  /*hasKeywordArgs*/ false);
   methods.keywordArgumentsMethods =
-    lookupDynamicCallableMethods(type, CS, locator,
+    lookupDynamicCallableMethods(decl, CS, locator,
                                  ctx.Id_withKeywordArguments,
                                  /*hasKeywordArgs*/ true);
+  CS.DynamicCallableCache[decl] = methods;
   return methods;
 }
 
 /// Returns the @dynamicCallable required methods (if they exist) implemented
 /// by a type.
-/// This function may be slow for deep class hierarchies and multiple protocol
-/// conformances,  but it is invoked only after other constraint simplification
-/// rules fail.
 static DynamicCallableMethods
 getDynamicCallableMethods(Type type, ConstraintSystem &CS,
                           const ConstraintLocatorBuilder &locator) {
-  auto canType = type->getCanonicalType();
-  auto it = CS.DynamicCallableCache.find(canType);
-  if (it != CS.DynamicCallableCache.end()) return it->second;
+  SmallVector<NominalTypeDecl *, 4> decls;
+  namelookup::tryExtractDirectlyReferencedNominalTypes(type, decls);
 
-  // Calculate @dynamicCallable methods for composite types with multiple
-  // components (protocol composition types and archetypes).
-  auto calculateForComponentTypes =
-      [&](ArrayRef<Type> componentTypes) -> DynamicCallableMethods {
-    DynamicCallableMethods methods;
-    for (auto componentType : componentTypes) {
-      auto tmp = getDynamicCallableMethods(componentType, CS, locator);
-      methods.argumentsMethods.insert(tmp.argumentsMethods.begin(),
-                                      tmp.argumentsMethods.end());
-      methods.keywordArgumentsMethods.insert(
-          tmp.keywordArgumentsMethods.begin(),
-          tmp.keywordArgumentsMethods.end());
-    }
-    return methods;
-  };
+  DynamicCallableMethods result;
+  for (auto *decl : decls)
+    result.addMethods(lookupDynamicCallableMethods(decl, CS, locator));
 
-  // Calculate @dynamicCallable methods.
-  auto calculate = [&]() -> DynamicCallableMethods {
-    // If this is an archetype type, check if any types it conforms to
-    // (superclass or protocols) have the attribute.
-    if (auto archetype = dyn_cast<ArchetypeType>(canType)) {
-      SmallVector<Type, 2> componentTypes;
-      for (auto protocolDecl : archetype->getConformsTo())
-        componentTypes.push_back(protocolDecl->getDeclaredInterfaceType());
-      if (auto superclass = archetype->getSuperclass())
-        componentTypes.push_back(superclass);
-      return calculateForComponentTypes(componentTypes);
-    }
-
-    // If this is a protocol composition, check if any of its members have the
-    // attribute.
-    if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType))
-      return calculateForComponentTypes(protocolComp->getMembers());
-
-    if (auto existential = dyn_cast<ExistentialType>(canType)) {
-      auto constraint = existential->getConstraintType();
-      return getDynamicCallableMethods(constraint, CS, locator);
-    }
-
-    // Otherwise, this must be a nominal type.
-    // Dynamic calling doesn't work for tuples, etc.
-    auto nominal = canType->getAnyNominal();
-    if (!nominal) return DynamicCallableMethods();
-
-    // If this type conforms to a protocol which has the attribute, then
-    // look up the methods.
-    for (auto p : nominal->getAllProtocols())
-      if (p->getAttrs().hasAttribute<DynamicCallableAttr>())
-        return lookupDynamicCallableMethods(type, CS, locator);
-
-    // Walk superclasses, if present.
-    llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
-    while (1) {
-      // If we found a circular parent class chain, reject this.
-      if (!visitedDecls.insert(nominal).second)
-        return DynamicCallableMethods();
-
-      // If this type has the attribute on it, then look up the methods.
-      if (nominal->getAttrs().hasAttribute<DynamicCallableAttr>())
-        return lookupDynamicCallableMethods(type, CS, locator);
-
-      // If this type is a class with a superclass, check superclasses.
-      if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
-        if (auto superClass = cd->getSuperclassDecl()) {
-          nominal = superClass;
-          continue;
-        }
-      }
-
-      return DynamicCallableMethods();
-    }
-  };
-
-  auto result = calculate();
-  // Cache the result if the type does not contain type variables.
-  if (!type->hasTypeVariable())
-    CS.DynamicCallableCache[canType] = result;
   return result;
 }
 
