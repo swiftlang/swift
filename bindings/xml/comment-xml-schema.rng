@@ -959,7 +959,7 @@
           <param name="pattern">.*\S.*</param>
         </data>
       </element>
-      <element name="Attribute">
+      <element name="InlineAttributes">
         <attribute name="attributes"/>
         <!-- Non-empty text content. -->
         <data type="string">

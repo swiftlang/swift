@@ -68,7 +68,7 @@ public enum A012_AttachToEntities {
     ///
     /// ^[Attribute text](string: "attributed")
     @objc public func f0() {}
-    // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>c:@M@comment_to_xml@objc(cs)Attributes(im)f0</USR><Declaration>@objc public func f0()</Declaration><CommentParts><Abstract><Para>Here is an attribute:</Para></Abstract><Discussion><Para><Attribute attributes="string: &quot;attributed&quot;">Attribute text</Attribute></Para></Discussion></CommentParts></Function>]
+    // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>c:@M@comment_to_xml@objc(cs)Attributes(im)f0</USR><Declaration>@objc public func f0()</Declaration><CommentParts><Abstract><Para>Here is an attribute:</Para></Abstract><Discussion><Para><InlineAttributes attributes="string: &quot;attributed&quot;">Attribute text</InlineAttributes></Para></Discussion></CommentParts></Function>]
 }
 
 @objc public class AutomaticLink {

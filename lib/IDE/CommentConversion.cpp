@@ -73,7 +73,7 @@ struct CommentToXMLConverter {
   }
 
   void printInlineAttributes(const InlineAttributes *A) {
-    OS << "<Attribute attributes=\"";
+    OS << "<InlineAttributes attributes=\"";
     appendWithXMLEscaping(OS, A->getAttributes());
     OS << "\">";
 
@@ -81,7 +81,7 @@ struct CommentToXMLConverter {
       printASTNode(N);
     }
 
-    OS << "</Attribute>";
+    OS << "</InlineAttributes>";
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
