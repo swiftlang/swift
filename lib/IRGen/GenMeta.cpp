@@ -913,6 +913,10 @@ namespace {
         if (entry.getFunction().isAutoDiffDerivativeFunction())
           declRef = declRef.asAutoDiffDerivativeFunction(
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
+        if (entry.getFunction().isDistributedThunk()) {
+          flags = flags.withIsAsync(true);
+          declRef = declRef.asDistributed();
+        }
         addDiscriminator(flags, schema, declRef);
       }
 
