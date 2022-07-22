@@ -92,6 +92,7 @@ actor MyGlobalActor {
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
+// KEYWORD2-NEXT:             Keyword/None:                       ignoreDeprecationWarnings[#Func Attribute#]; name=ignoreDeprecationWarnings
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -117,6 +118,7 @@ actor MyGlobalActor {
 // KEYWORD3-NEXT:             Keyword/None:                       resultBuilder[#Class Attribute#]; name=resultBuilder
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
+// KEYWORD3-NEXT:             Keyword/None:                       ignoreDeprecationWarnings[#Class Attribute#]; name=ignoreDeprecationWarnings
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB class C2 {}
@@ -135,6 +137,7 @@ actor MyGlobalActor {
 // KEYWORD4-NEXT:             Keyword/None:                       resultBuilder[#Enum Attribute#]; name=resultBuilder
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
+// KEYWORD4-NEXT:             Keyword/None:                       ignoreDeprecationWarnings[#Enum Attribute#]; name=ignoreDeprecationWarnings
 // KEYWORD4-NEXT:             End completions
 
 
@@ -150,6 +153,7 @@ actor MyGlobalActor {
 // KEYWORD5-NEXT:             Keyword/None:                       resultBuilder[#Struct Attribute#]; name=resultBuilder
 // KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
 // KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
+// KEYWORD5-NEXT:             Keyword/None:                       ignoreDeprecationWarnings[#Struct Attribute#]; name=ignoreDeprecationWarnings
 // KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
@@ -169,6 +173,7 @@ actor MyGlobalActor {
 // ON_GLOBALVAR-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
 // ON_GLOBALVAR-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
 // ON_GLOBALVAR-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
+// ON_GLOBALVAR-DAG: Keyword/None:                       ignoreDeprecationWarnings[#Var Attribute#]; name=ignoreDeprecationWarnings
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -187,6 +192,7 @@ struct _S {
 // ON_INIT-DAG: Keyword/None:                       usableFromInline[#Constructor Attribute#]; name=usableFromInline
 // ON_INIT-DAG: Keyword/None:                       discardableResult[#Constructor Attribute#]; name=discardableResult
 // ON_INIT-DAG: Keyword/None:                       preconcurrency[#Constructor Attribute#]; name=preconcurrency
+// ON_INIT-DAG: Keyword/None:                       ignoreDeprecationWarnings[#Constructor Attribute#]; name=ignoreDeprecationWarnings
 // ON_INIT: End completions
 
   @#^ON_PROPERTY^# var foo
@@ -206,6 +212,7 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
 // ON_PROPERTY-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
 // ON_PROPERTY-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
+// ON_PROPERTY-DAG: Keyword/None:                       ignoreDeprecationWarnings[#Var Attribute#]; name=ignoreDeprecationWarnings
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -234,6 +241,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // ON_METHOD-DAG: Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
+// ON_METHOD-DAG: Keyword/None:                       ignoreDeprecationWarnings[#Func Attribute#]; name=ignoreDeprecationWarnings
 // ON_METHOD-NOT: Keyword
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -305,6 +313,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       exclusivity[#Declaration Attribute#]; name=exclusivity
 // ON_MEMBER_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
+// ON_MEMBER_LAST-DAG: Keyword/None:                       ignoreDeprecationWarnings[#Declaration Attribute#]; name=ignoreDeprecationWarnings
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -374,6 +383,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // KEYWORD_LAST-DAG: Keyword/None:                       exclusivity[#Declaration Attribute#]; name=exclusivity
 // KEYWORD_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
+// KEYWORD_LAST-DAG: Keyword/None:                       ignoreDeprecationWarnings[#Declaration Attribute#]; name=ignoreDeprecationWarnings
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper

@@ -109,6 +109,7 @@ class ExportContext {
   unsigned SPI : 1;
   unsigned Exported : 1;
   unsigned Deprecated : 1;
+  unsigned IgnoresDeprecation : 1;
   unsigned Implicit : 1;
   unsigned Unavailable : 1;
   unsigned Platform : 8;
@@ -117,7 +118,7 @@ class ExportContext {
   ExportContext(DeclContext *DC,
                 AvailabilityContext runningOSVersion,
                 FragileFunctionKind kind,
-                bool spi, bool exported, bool implicit, bool deprecated,
+                bool spi, bool exported, bool implicit, bool deprecated, bool IgnoresDeprecation,
                 Optional<PlatformKind> unavailablePlatformKind);
 
 public:
@@ -178,6 +179,10 @@ public:
   /// If true, the context is part of a deprecated declaration and can
   /// reference other deprecated declarations without warning.
   bool isDeprecated() const { return Deprecated; }
+
+  /// If true, the context is part of a declaration
+  // which explicitly asks to not report any deprecation warnings.
+  bool ignoresDeprecation() const { return IgnoresDeprecation; }
 
   Optional<PlatformKind> getUnavailablePlatformKind() const;
 

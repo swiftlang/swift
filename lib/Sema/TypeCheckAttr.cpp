@@ -126,6 +126,7 @@ public:
   IGNORED_ATTR(HasMissingDesignatedInitializers)
   IGNORED_ATTR(InheritsConvenienceInitializers)
   IGNORED_ATTR(Inline)
+  IGNORED_ATTR(IgnoreDeprecationWarnings)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)

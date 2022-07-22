@@ -21,6 +21,7 @@
 
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
@@ -288,6 +289,11 @@ public:
     return ParentAndKind.getInt() == ASTHierarchy::Decl ?
       reinterpret_cast<Decl*>(this + 1) : nullptr;
   }
+
+  /// Find the import that makes the given module available.
+  Optional<AttributedImport<ImportedModule>>
+  findImportFor(ModuleDecl *module) const;
+
   const Decl *getAsDecl() const {
     return const_cast<DeclContext*>(this)->getAsDecl();
   }

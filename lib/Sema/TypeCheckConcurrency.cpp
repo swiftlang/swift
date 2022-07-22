@@ -710,45 +710,13 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
           conformance.getConcrete())->isMissing());
 }
 
-/// Find the import that makes the given nominal declaration available.
-static Optional<AttributedImport<ImportedModule>> findImportFor(
-    NominalTypeDecl *nominal, const DeclContext *fromDC) {
-  // If the nominal type is from the current module, there's no import.
-  auto nominalModule = nominal->getParentModule();
-  if (nominalModule == fromDC->getParentModule())
-    return None;
-
-  auto fromSourceFile = fromDC->getParentSourceFile();
-  if (!fromSourceFile)
-    return None;
-
-  // Look to see if the owning module was directly imported.
-  for (const auto &import : fromSourceFile->getImports()) {
-    if (import.module.importedModule == nominalModule)
-      return import;
-  }
-
-  // Now look for transitive imports.
-  auto &importCache = nominal->getASTContext().getImportCache();
-  for (const auto &import : fromSourceFile->getImports()) {
-    auto &importSet = importCache.getImportSet(import.module.importedModule);
-    for (const auto &transitive : importSet.getTransitiveImports()) {
-      if (transitive.importedModule == nominalModule) {
-        return import;
-      }
-    }
-  }
-
-  return None;
-}
-
 /// Determine the diagnostic behavior for a Sendable reference to the given
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     NominalTypeDecl *nominal) const {
   // Determine whether this nominal type is visible via a @preconcurrency
   // import.
-  auto import = findImportFor(nominal, fromDC);
+  auto import = fromDC->findImportFor(nominal->getParentModule());
   auto sourceFile = fromDC->getParentSourceFile();
 
   // When the type is explicitly non-Sendable...
@@ -820,7 +788,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
     Optional<AttributedImport<swift::ImportedModule>> import;
     SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
     if (sourceFile) {
-      import = findImportFor(nominal, fromContext.fromDC);
+      import = fromContext.fromDC->findImportFor(nominal->getParentModule());
     }
 
     // If we found the import that makes this nominal type visible, remark

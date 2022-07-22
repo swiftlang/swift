@@ -11,26 +11,27 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/AST/ASTContext.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "clang/AST/ASTContext.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 #define DEBUG_TYPE "Name lookup"
@@ -269,6 +270,36 @@ ModuleDecl *DeclContext::getParentModule() const {
   while (!DC->isModuleContext())
     DC = DC->getParent();
   return const_cast<ModuleDecl *>(cast<ModuleDecl>(DC));
+}
+
+Optional<AttributedImport<ImportedModule>>
+DeclContext::findImportFor(ModuleDecl *module) const {
+  // If we're in the current module, there's no import.
+  if (module == getParentModule())
+    return None;
+
+  auto fromSourceFile = getParentSourceFile();
+  if (!fromSourceFile)
+    return None;
+
+  // Look to see if the owning module was directly imported.
+  for (const auto &import : fromSourceFile->getImports()) {
+    if (import.module.importedModule == module)
+      return import;
+  }
+
+  // Now look for transitive imports.
+  auto &importCache = module->getASTContext().getImportCache();
+  for (const auto &import : fromSourceFile->getImports()) {
+    auto &importSet = importCache.getImportSet(import.module.importedModule);
+    for (const auto &transitive : importSet.getTransitiveImports()) {
+      if (transitive.importedModule == module) {
+        return import;
+      }
+    }
+  }
+
+  return None;
 }
 
 SourceFile *DeclContext::getParentSourceFile() const {

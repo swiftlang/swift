@@ -536,6 +536,9 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     import.options |= ImportFlags::ImplementationOnly;
 
+  if (ID->getAttrs().hasAttribute<IgnoreDeprecationWarningsAttr>())
+    import.options |= ImportFlags::IgnoresDeprecationWarnings;
+
   if (auto *privateImportAttr =
           ID->getAttrs().getAttribute<PrivateImportAttr>()) {
     import.options |= ImportFlags::PrivateImport;

@@ -735,6 +735,16 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
   APIBreakingToAdd | APIBreakingToRemove,
   130)
 
+SIMPLE_DECL_ATTR(_distributed_thunk, DistributedThunk,
+  OnFunc | UserInaccessible |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  131)
+
+SIMPLE_DECL_ATTR(ignoreDeprecationWarnings, IgnoreDeprecationWarnings,
+  OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnImport | OnExtension |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  132)
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 
