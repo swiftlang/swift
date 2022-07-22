@@ -6119,16 +6119,3 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 
   return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
 }
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           CustomRefCountingOperationDescriptor desc) {
-  out << "Finding custom (foreign reference) reference counting operation '"
-      << (desc.kind == CustomRefCountingOperationKind::retain ? "retain"
-                                                              : "release")
-      << "for '" << desc.decl->getNameStr() << "'.\n";
-}
-
-SourceLoc
-swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
-  return SourceLoc();
-}
