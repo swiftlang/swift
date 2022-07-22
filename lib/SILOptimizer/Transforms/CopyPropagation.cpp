@@ -375,7 +375,7 @@ namespace {
 class CopyPropagation : public SILFunctionTransform {
   /// True if debug_value instructions should be pruned.
   bool pruneDebug;
-  /// True of all values should be canonicalized.
+  /// True if all values should be canonicalized.
   bool canonicalizeAll;
   /// If true, then borrow scopes will be canonicalized, allowing copies of
   /// guaranteed values to be optimized. Does *not* shrink the borrow scope.
@@ -588,7 +588,7 @@ SILTransform *swift::createMandatoryCopyPropagation() {
 }
 
 SILTransform *swift::createCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ false,
+  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ EnableRewriteBorrows,
                              /*poisonRefs*/ false);
 }
