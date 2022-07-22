@@ -10,7 +10,7 @@
 // RUN: %target-swift-frontend -typecheck %s -parse-as-library -emit-objc-header-path %t/swift.h
 // RUN: %FileCheck %s < %t/swift.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -DCGFLOAT_IN_COREFOUNDATION -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreFoundation.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -DCGFLOAT_IN_COREFOUNDATION -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -DCGFLOAT_IN_COREFOUNDATION -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
 
 // REQUIRES: objc_interop
