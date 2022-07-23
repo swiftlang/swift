@@ -218,6 +218,7 @@ public:
   }
 
   void visitFinalAttr(FinalAttr *attr);
+  void visitMoveOnlyAttr(MoveOnlyAttr *attr);
   void visitCompileTimeConstAttr(CompileTimeConstAttr *attr) {}
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
@@ -1907,6 +1908,14 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
       return;
     }
   }
+}
+
+void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
+  if (isa<NominalTypeDecl>(D))
+    return;
+
+  diagnose(attr->getLocation(), diag::moveOnly_not_allowed_here)
+    .fixItRemove(attr->getRange());
 }
 
 /// Return true if this is a builtin operator that cannot be defined in user

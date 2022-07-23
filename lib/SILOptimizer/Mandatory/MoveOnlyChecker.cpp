@@ -40,6 +40,10 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool> RunCopyOfSubValueCheck(
+    "sil-move-only-checker-perform-copy-of-subvalue-check",
+    llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
@@ -539,6 +543,46 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       if (!mmci || !mmci->hasMoveCheckerKind())
         continue;
 
+      // Handle guaranteed/owned move only typed arguments.
+      //
+      // We are pattern matching against these patterns:
+      //
+      // bb0(%0 : @guaranteed $T):
+      //   %1 = copy_value %0
+      //   %2 = mark_must_check [no_copy] %1
+      // bb0(%0 : @owned $T):
+      //   %1 = copy_value %0
+      //   %2 = mark_must_check [no_copy] %1
+      if (mmci->getOperand()->getType().isMoveOnly() &&
+          !mmci->getOperand()->getType().isMoveOnlyWrapped()) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(mmci->getOperand())) {
+          if (auto *arg = dyn_cast<SILFunctionArgument>(cvi->getOperand())) {
+            if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+              moveIntroducersToProcess.insert(mmci);
+              continue;
+            }
+          }
+        }
+
+        if (auto *mvi = dyn_cast<MoveValueInst>(mmci->getOperand())) {
+          if (mvi->isLexical()) {
+            if (auto *arg = dyn_cast<SILFunctionArgument>(mvi->getOperand())) {
+              if (arg->getOwnershipKind() == OwnershipKind::Owned) {
+                moveIntroducersToProcess.insert(mmci);
+                continue;
+              }
+            }
+          }
+        }
+
+        if (auto *arg = dyn_cast<SILFunctionArgument>(mmci->getOperand())) {
+          if (arg->getOwnershipKind() == OwnershipKind::Owned) {
+            moveIntroducersToProcess.insert(mmci);
+            continue;
+          }
+        }
+      }
+
       // Handle guaranteed arguments.
       //
       // We are pattern matching this pattern:
@@ -809,8 +853,9 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       // introducer. In such a case, a copy is needed but the user needs to use
       // _copy to explicit copy the value since they are extracting out a
       // subvalue.
-      if (!copyOfBorrowedProjectionChecker.check(markedValue) ||
-          !copyOfBorrowedProjectionChecker.shouldEmitDiagnostic()) {
+      if (RunCopyOfSubValueCheck &&
+          (!copyOfBorrowedProjectionChecker.check(markedValue) ||
+           !copyOfBorrowedProjectionChecker.shouldEmitDiagnostic())) {
         // If we failed to understand how to perform the check or did not find
         // any targets... continue. In the former case we want to fail with a
         // checker did not understand diagnostic later and in the former, we

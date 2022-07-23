@@ -939,7 +939,7 @@ public:
 
   void addImportDiagnostic(
       ImportDiagnosticTarget target, Diagnostic &&diag,
-      const clang::SourceLocation &loc = clang::SourceLocation());
+      clang::SourceLocation loc);
 
   /// Import the given Clang identifier into Swift.
   ///
@@ -1724,7 +1724,7 @@ class ImportDiagnosticAdder {
 public:
   ImportDiagnosticAdder(
       ClangImporter::Implementation &impl, ImportDiagnosticTarget target,
-      const clang::SourceLocation &loc = clang::SourceLocation())
+      clang::SourceLocation loc)
       : impl(impl), target(target), loc(loc) {}
 
   void operator () (Diagnostic &&diag) {

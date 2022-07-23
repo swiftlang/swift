@@ -306,6 +306,29 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// isMoveOnly computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsMoveOnlyRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isMoveOnlyComputed)
+    return decl->LazySemanticInfo.isMoveOnly;
+
+  return None;
+}
+
+void IsMoveOnlyRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.isMoveOnlyComputed = true;
+  decl->LazySemanticInfo.isMoveOnly = value;
+
+  // Add an attribute for printing
+  if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+    decl->getAttrs().add(new (decl->getASTContext())
+                             MoveOnlyAttr(/*Implicit=*/true));
+}
+
+//----------------------------------------------------------------------------//
 // isDynamic computation.
 //----------------------------------------------------------------------------//
 

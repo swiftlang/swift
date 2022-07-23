@@ -913,6 +913,10 @@ namespace {
         if (entry.getFunction().isAutoDiffDerivativeFunction())
           declRef = declRef.asAutoDiffDerivativeFunction(
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
+        if (entry.getFunction().isDistributedThunk()) {
+          flags = flags.withIsAsync(true);
+          declRef = declRef.asDistributed();
+        }
         addDiscriminator(flags, schema, declRef);
       }
 
@@ -2333,9 +2337,10 @@ namespace {
             for (unsigned condIndex : indices(conditions)) {
               const auto &condition = conditions[condIndex];
 
-              assert(condition.hasLowerEndpoint());
+              assert(condition.first.hasLowerEndpoint());
 
-              auto version = condition.getLowerEndpoint();
+              bool isUnavailability = condition.second;
+              auto version = condition.first.getLowerEndpoint();
               auto *major = getInt32Constant(version.getMajor());
               auto *minor = getInt32Constant(version.getMinor());
               auto *patch = getInt32Constant(version.getSubminor());
@@ -2347,6 +2352,13 @@ namespace {
 
               auto success = IGF.Builder.CreateICmpNE(
                   isAtLeast, llvm::Constant::getNullValue(IGM.Int32Ty));
+
+              if (isUnavailability) {
+                // Invert the result of "at least" check by xor'ing resulting
+                // boolean with `-1`.
+                success =
+                    IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
+              }
 
               auto nextCondOrRet = condIndex == conditions.size() - 1
                                        ? returnTypeBB
@@ -2367,7 +2379,7 @@ namespace {
           auto universal = substitutionSet.back();
 
           assert(universal->getAvailability().size() == 1 &&
-                 universal->getAvailability()[0].isEmpty());
+                 universal->getAvailability()[0].first.isEmpty());
 
           IGF.Builder.CreateRet(
               getResultValue(IGF, genericEnv, universal->getSubstitutions()));

@@ -15,10 +15,11 @@ public class MyGizmo {
   }
 
    // CHECK-LABEL: sil {{.*}}@$s8outliner7MyGizmoC11usePropertyyyF :
-   // CHECK: [[P_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
-   // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
+   // CHECK: [[A_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTeab_
+   // CHECK: apply [[A_FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
    // CHECK-NOT: return
-   // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
+   // CHECK: [[P_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTeob_
+   // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (@owned Gizmo) -> @owned Optional<String>
    // CHECK: return
    // CHECK: } // end sil function '$s8outliner7MyGizmoC11usePropertyyyF'
    public func useProperty() {
@@ -64,6 +65,35 @@ public func testOutlining() {
 // CHECK:  [[RES:%.*]] = apply [[METH]]([[OBJ]]) : $@convention(objc_method)
 // CHECK:  switch_enum [[RES]]
 // CHECK: } // end sil function '$s8outliner9dontCrash1ayyp_tF'
+
+// CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTeab_ : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*Gizmo):
+// CHECK:         [[INSTANCE:%[^,]+]] = load [[ADDR]]
+// CHECK:         [[CONSUMING_OUTLINED_BRIDGED_PROPERTY:%[^,]+]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTeob_
+// CHECK:         strong_retain [[INSTANCE]]
+// CHECK:         [[RETVAL:%[^,]+]] = apply [[CONSUMING_OUTLINED_BRIDGED_PROPERTY]]([[INSTANCE]])
+// CHECK:         return [[RETVAL]]
+// CHECK: } // end sil function '$sSo5GizmoC14stringPropertySSSgvgToTeab_'
+
+// CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTeob_ : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GIZME_STRINGPROPERTY_GETTER:%[^,]+]] = objc_method [[INSTANCE]] : $Gizmo, #Gizmo.stringProperty!getter.foreign 
+// CHECK:         [[MAYBE_NSSTRING:%[^,]+]] = apply [[GIZME_STRINGPROPERTY_GETTER]]([[INSTANCE]])
+// CHECK:         strong_release [[INSTANCE]]
+// CHECK:         switch_enum [[MAYBE_NSSTRING]] : $Optional<NSString>, case #Optional.some!enumelt: [[SOME_BLOCK:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BLOCK:bb[0-9]+]]
+// CHECK:       [[SOME_BLOCK]]([[REGISTER_5:%[^,]+]] : $NSString):                              
+// CHECK:         [[STRING_FROM_NSSTRING:%[^,]+]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
+// CHECK:         [[STRING_TYPE:%[^,]+]] = metatype $@thin String.Type
+// CHECK:         [[STRING:%[^,]+]] = apply [[STRING_FROM_NSSTRING]]([[MAYBE_NSSTRING]], [[STRING_TYPE]])
+// CHECK:         release_value [[MAYBE_NSSTRING]]
+// CHECK:         [[SOME_STRING:%[^,]+]] = enum $Optional<String>, #Optional.some!enumelt, [[STRING]]
+// CHECK:         br [[EXIT:bb[0-9]+]]([[SOME_STRING]] : $Optional<String>)
+// CHECK:       [[NONE_BLOCK]]:                                              
+// CHECK:         [[NONE_STRING:%[^,]+]] = enum $Optional<String>, #Optional.none!enumelt
+// CHECK:         br [[EXIT]]([[NONE_STRING]] : $Optional<String>)
+// CHECK:       [[EXIT]]([[MAYBE_STRING:%[^,]+]] :
+// CHECK:         return [[MAYBE_STRING]]
+// CHECK-LABEL: } // end sil function '$sSo5GizmoC14stringPropertySSSgvgToTeob_'
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTepb_ : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $Gizmo):

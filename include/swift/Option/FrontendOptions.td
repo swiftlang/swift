@@ -192,6 +192,10 @@ def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
 
+def const_gather_protocols_file
+  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
+    HelpText<"Specify a list of protocols for extraction of conformances' const values'">;
+
 def placeholder_dependency_module_map
   : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of external Swift module dependencies">;

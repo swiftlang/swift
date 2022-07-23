@@ -105,6 +105,11 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
 }
+std::string CompilerInvocation::getConstValuesFilePathForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.ConstValuesOutputPath;
+}
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()

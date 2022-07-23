@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -typecheck -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-
+// REQUIRES: asserts
 
 // overload resolution should pick sync version in a sync context
 func syncContext() {

@@ -2422,7 +2422,7 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
 
 void ClangImporter::Implementation::addImportDiagnostic(
     ImportDiagnosticTarget target, Diagnostic &&diag,
-    const clang::SourceLocation &loc) {
+    clang::SourceLocation loc) {
   ImportDiagnostic importDiag = ImportDiagnostic(target, diag, loc);
   if (SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics ||
       CollectedDiagnostics.count(importDiag))
@@ -5832,7 +5832,10 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
 static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_reference";
+             return swiftAttr->getAttribute() == "import_reference" ||
+                    // TODO: Remove this once libSwift hosttools no longer
+                    // requires it.
+                    swiftAttr->getAttribute() == "import_as_ref";
            return false;
          });
 }

@@ -367,7 +367,7 @@ static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
     return {};
 
   // Map from the base type into the this declaration's innermost type context,
-  // or if we're dealing with an extention rather than a member, into its
+  // or if we're dealing with an extension rather than a member, into its
   // extended nominal (the extension's own requirements shouldn't be considered
   // in the substitution).
   swift::DeclContext *DC;

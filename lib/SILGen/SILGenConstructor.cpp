@@ -26,6 +26,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -386,6 +387,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Allocate the local variable for 'self'.
   emitLocalVariableWithCleanup(selfDecl, MUIKind)->finishInitialization(*this);
+
   SILValue selfLV = VarLocs[selfDecl].value;
 
   // Emit the prolog.
@@ -831,6 +833,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                                 StoreOwnershipQualifier::Init);
     } else {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
+      if (selfArg.getType().isMoveOnly()) {
+        assert(selfArg.getOwnershipKind() == OwnershipKind::Owned);
+        selfArg = B.createMarkMustCheckInst(
+            selfDecl, selfArg, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+      }
       VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
     }
   }

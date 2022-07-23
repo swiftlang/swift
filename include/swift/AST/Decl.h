@@ -2262,12 +2262,19 @@ class ValueDecl : public Decl {
     /// Whether this declaration produces an implicitly unwrapped
     /// optional result.
     unsigned isIUO : 1;
+
+    /// Whether the "isMoveOnly" bit has been computed yet.
+    unsigned isMoveOnlyComputed : 1;
+
+    /// Whether this declaration can not be copied and thus is move only.
+    unsigned isMoveOnly : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
+  friend class IsMoveOnlyRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
@@ -2541,6 +2548,9 @@ public:
 
   /// Is this declaration 'final'?
   bool isFinal() const;
+
+  /// Is this declaration 'moveOnly'?
+  bool isMoveOnly() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
@@ -2952,9 +2962,12 @@ public:
     return false;
   }
 
+  using AvailabilityCondition = std::pair<VersionRange, bool>;
+
   class ConditionallyAvailableSubstitutions final
-      : private llvm::TrailingObjects<ConditionallyAvailableSubstitutions,
-                                      VersionRange> {
+      : private llvm::TrailingObjects<
+            ConditionallyAvailableSubstitutions,
+            AvailabilityCondition> {
     friend TrailingObjects;
 
     unsigned NumAvailabilityConditions;
@@ -2964,25 +2977,25 @@ public:
     /// A type with limited availability described by the provided set
     /// of availability conditions (with `and` relationship).
     ConditionallyAvailableSubstitutions(
-        ArrayRef<VersionRange> availabilityContext,
+        ArrayRef<AvailabilityCondition> availabilityContext,
         SubstitutionMap substitutions)
         : NumAvailabilityConditions(availabilityContext.size()),
           Substitutions(substitutions) {
       assert(!availabilityContext.empty());
       std::uninitialized_copy(availabilityContext.begin(),
                               availabilityContext.end(),
-                              getTrailingObjects<VersionRange>());
+                              getTrailingObjects<AvailabilityCondition>());
     }
 
   public:
-    ArrayRef<VersionRange> getAvailability() const {
-      return {getTrailingObjects<VersionRange>(), NumAvailabilityConditions};
+    ArrayRef<AvailabilityCondition> getAvailability() const {
+      return {getTrailingObjects<AvailabilityCondition>(), NumAvailabilityConditions};
     }
 
     SubstitutionMap getSubstitutions() const { return Substitutions; }
 
     static ConditionallyAvailableSubstitutions *
-    get(ASTContext &ctx, ArrayRef<VersionRange> availabilityContext,
+    get(ASTContext &ctx, ArrayRef<AvailabilityCondition> availabilityContext,
         SubstitutionMap substitutions);
   };
 };

@@ -5,6 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: asserts
 
 // CHECK-LABEL: class EffProps : NSObject {
 // CHECK:       @available(*, renamed: "getter:doggo()")

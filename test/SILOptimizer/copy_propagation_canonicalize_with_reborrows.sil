@@ -1,0 +1,306 @@
+// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+
+class X {}
+
+enum FakeOptional<T> {
+    case some(T)
+    case none
+}
+
+sil [ossa] @getX : $@convention(thin) () -> (@owned X)
+sil [ossa] @holdX : $@convention(thin) (@guaranteed X) -> ()
+
+// CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_endborrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:         end_borrow [[REBORROW]]
+// CHECK:         destroy_value [[VALUE]]
+// CHECK-LABEL: } // end sil function 'nohoist_destroy_over_reborrow_endborrow'
+sil [ossa] @nohoist_destroy_over_reborrow_endborrow : $@convention(thin) () -> () {
+entry:
+  %get = function_ref @getX : $@convention(thin) () -> @owned X
+  %value_1 = apply %get() : $@convention(thin) () -> @owned X
+  %lifetime = begin_borrow %value_1 : $X
+  br body(%lifetime : $X, %value_1 : $X)
+
+body(%reborrow : @guaranteed $X, %value_2 : @owned $X):
+  // TODO: The copy is currently needed to trigger canonicalization of the
+  // lifetime.  Remove once it is no longer needed.
+  %copy = copy_value %value_2 : $X
+  destroy_value %copy : $X
+
+  end_borrow %reborrow : $X
+  destroy_value %value_2 : $X
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_destroy_over_unrelated_endborrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[UNRELATED:%[^,]+]] : @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         end_borrow [[UNRELATED]]
+// CHECK-LABEL: } // end sil function 'hoist_destroy_over_unrelated_endborrow'
+sil [ossa] @hoist_destroy_over_unrelated_endborrow : $@convention(thin) (@guaranteed X) -> () {
+entry(%unrelated : @guaranteed $X):
+  %get = function_ref @getX : $@convention(thin) () -> @owned X
+  %value_1 = apply %get() : $@convention(thin) () -> @owned X
+  %borrow_1 = begin_borrow %unrelated : $X
+  br body(%borrow_1 : $X, %value_1 : $X)
+
+body(%borrow_2 : @guaranteed $X, %value_2 : @owned $X):
+  // TODO: The copy is currently needed to trigger canonicalization of the
+  // lifetime.  Remove once it is no longer needed.
+  %copy = copy_value %value_2 : $X
+  destroy_value %copy : $X
+
+  %hold = function_ref @holdX : $@convention(thin) (@guaranteed X) -> ()
+  apply %hold(%borrow_2) : $@convention(thin) (@guaranteed X) -> ()
+  end_borrow %borrow_2 : $X
+  destroy_value %value_2 : $X
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_reborrow_endborrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @guaranteed $X, {{%[^,]+}} : @owned $X):
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:         end_borrow [[REBORROW]]
+// CHECK:         destroy_value [[VALUE]]
+// CHECK-LABEL: } // end sil function 'nohoist_destroy_over_reborrow_reborrow_endborrow'
+sil [ossa] @nohoist_destroy_over_reborrow_reborrow_endborrow : $@convention(thin) () -> () {
+entry:
+  %get = function_ref @getX : $@convention(thin) () -> @owned X
+  %value_1 = apply %get() : $@convention(thin) () -> @owned X
+  %lifetime = begin_borrow %value_1 : $X
+  br body1(%lifetime : $X, %value_1 : $X)
+
+body1(%lifetime_2 : @guaranteed $X, %value_2 : @owned $X):
+  br body2(%lifetime_2 : $X, %value_2 : $X)
+
+body2(%lifetime_3 : @guaranteed $X, %value_3 : @owned $X):
+  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
+  %copy_3 = copy_value %value_3 : $X
+  destroy_value %copy_3 : $X
+
+  end_borrow %lifetime_3 : $X
+  destroy_value %value_3 : $X
+  br exit
+
+exit:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_destroy_over_unrelated_reborrow_reborrow_endborrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @guaranteed $X, {{%[^,]+}} : @owned $X):
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         end_borrow [[REBORROW]]
+// CHECK-LABEL: } // end sil function 'hoist_destroy_over_unrelated_reborrow_reborrow_endborrow'
+sil [ossa] @hoist_destroy_over_unrelated_reborrow_reborrow_endborrow : $@convention(thin) (@guaranteed X) -> () {
+entry(%unrelated : @guaranteed $X):
+  %get = function_ref @getX : $@convention(thin) () -> @owned X
+  %value_1 = apply %get() : $@convention(thin) () -> @owned X
+  %borrow_1 = begin_borrow %unrelated : $X
+  br body1(%borrow_1 : $X, %value_1 : $X)
+
+body1(%borrow_2 : @guaranteed $X, %value_2 : @owned $X):
+  br body2(%borrow_2 : $X, %value_2 : $X)
+
+body2(%borrow_3 : @guaranteed $X, %value_3 : @owned $X):
+  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
+  %copy_3 = copy_value %value_3 : $X
+  destroy_value %copy_3 : $X
+
+  %hold = function_ref @holdX : $@convention(thin) (@guaranteed X) -> ()
+  apply %hold(%borrow_3) : $@convention(thin) (@guaranteed X) -> ()
+  end_borrow %borrow_3 : $X
+  destroy_value %value_3 : $X
+  br exit
+
+exit:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_destroy_over_forward_reborrow_endborrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:         end_borrow [[REBORROW]]
+// CHECK:         destroy_value [[VALUE]]
+// CHECK-LABEL: } // end sil function 'nohoist_destroy_over_forward_reborrow_endborrow'
+sil [ossa] @nohoist_destroy_over_forward_reborrow_endborrow : $@convention(thin) () -> () {
+entry:
+  %get = function_ref @getX : $@convention(thin) () -> @owned X
+  %value_1 = apply %get() : $@convention(thin) () -> @owned X
+  br body1(%value_1 : $X)
+
+body1(%value_2 : @owned $X):
+  %lifetime_2 = begin_borrow %value_2 : $X
+  br body2(%lifetime_2 : $X, %value_2 : $X)
+
+body2(%lifetime_3 : @guaranteed $X, %value_3 : @owned $X):
+  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
+  %copy_3 = copy_value %value_3 : $X
+  destroy_value %copy_3 : $X
+
+  end_borrow %lifetime_3 : $X
+  destroy_value %value_3 : $X
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_loop : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @guaranteed $FakeOptional<X>, [[VALUE:%[^,]+]] : @owned $FakeOptional<X>):
+// CHECK:         cond_br undef, [[LOOP:bb[0-9]+]], [[BODY:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         end_borrow [[REBORROW]] : $FakeOptional<X>
+// CHECK:         destroy_value [[VALUE]] : $FakeOptional<X>
+// CHECK:       [[BODY]]:
+// CHECK:         end_borrow [[REBORROW]] : $FakeOptional<X>
+// CHECK:         destroy_value [[VALUE]] : $FakeOptional<X>
+// CHECK-LABEL: } // end sil function 'nohoist_destroy_over_reborrow_loop'
+sil [ossa] @nohoist_destroy_over_reborrow_loop : $@convention(thin) () -> () {
+entry:
+  %none1 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
+  %none2 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
+  br head(%none2 : $FakeOptional<X>, %none1 : $FakeOptional<X>)
+
+head(%reborrow : @guaranteed $FakeOptional<X>, %value : @owned $FakeOptional<X>):
+  cond_br undef, body, exit
+
+body:
+  %get = function_ref @getX : $@convention(thin) () -> (@owned X)
+  %value_0 = apply %get() : $@convention(thin) () -> (@owned X)
+  end_borrow %reborrow : $FakeOptional<X>
+
+  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
+  %bogus = copy_value %value : $FakeOptional<X>
+  destroy_value %bogus : $FakeOptional<X>
+
+  destroy_value %value : $FakeOptional<X>
+  %some_value_0 = enum $FakeOptional<X>, #FakeOptional.some!enumelt, %value_0 : $X
+  %some_borrow_0 = begin_borrow %some_value_0 : $FakeOptional<X>
+  br head(%some_borrow_0 : $FakeOptional<X>, %some_value_0 : $FakeOptional<X>)
+
+exit:
+  %retval = tuple ()
+  end_borrow %reborrow : $FakeOptional<X>
+  destroy_value %value : $FakeOptional<X>
+  return %retval : $()
+}
+
+// Ensure that an adjacent reborrow phi being reborrowed doesn't get counted as
+// a non-lifetime ending use and extend liveness beyond the instruction where
+// the reborrow occurs.
+// CHECK-LABEL: sil [ossa] @reborrow_adjacent_to_consume_doesnt_extend_lifetime : {{.*}} {
+// CHECK:       bb1([[REBORROW:%[^,]+]] : @guaranteed $X, [[VALUE:%[^,]+]] :
+// CHECK:       {{bb[0-9]+}}:
+// CHECK:         end_borrow [[REBORROW]]
+// CHECK:         destroy_value [[VALUE]]
+// CHECK-LABEL: } // end sil function 'reborrow_adjacent_to_consume_doesnt_extend_lifetime'
+sil [ossa] @reborrow_adjacent_to_consume_doesnt_extend_lifetime : $@convention(thin) (@owned X) -> () {
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  br bb1(%1 : $X, %0 : $X)
+
+bb1(%3 : @guaranteed $X, %4 : @owned $X):
+  cond_br undef, bb2, bb10
+
+bb2:
+  br bb3
+
+bb3:
+  br bb4(%3 : $X, %4 : $X)
+
+bb4(%8 : @guaranteed $X, %9 : @owned $X):
+  cond_br undef, bb5, bb8
+
+bb5:
+  br bb6
+
+bb6:
+  br bb7
+
+bb7:
+  %13 = function_ref @getX : $@convention(thin) () -> @owned X
+  %14 = apply %13() : $@convention(thin) () -> @owned X
+  end_borrow %8 : $X
+  destroy_value %9 : $X
+  %17 = begin_borrow %14 : $X
+  br bb4(%17 : $X, %14 : $X)
+
+bb8:
+  br bb9
+
+bb9:
+  br bb1(%8 : $X, %9 : $X)
+
+bb10:
+  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
+  %bogus = copy_value %4 : $X
+  destroy_value %bogus : $X
+  %23 = tuple ()
+  end_borrow %3 : $X
+  destroy_value %4 : $X
+  return %23 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_destroy_over_endborrow_nonadjacent_reborrow : {{.*}} {
+// CHECK:         end_borrow {{%[^,]+}}
+// CHECK:         destroy_value {{%[^,]+}}
+// CHECK-LABEL: } // end sil function 'nohoist_destroy_over_endborrow_nonadjacent_reborrow'
+sil [ossa] @nohoist_destroy_over_endborrow_nonadjacent_reborrow : $@convention(thin) (@owned X) -> () {
+entry(%value_1 : @owned $X):
+  %lifetime_1 = begin_borrow %value_1 : $X
+  br consume_and_reborrow(%lifetime_1 : $X, %value_1 : $X)
+
+consume_and_reborrow(%lifetime_2 : @guaranteed $X, %value_2 : @owned $X):
+  br reborrow_only(%lifetime_2 : $X)
+
+reborrow_only(%lifetime_3 : @guaranteed $X):
+  br exit
+
+exit:
+  %bogus = copy_value %value_2 : $X
+  destroy_value %bogus : $X
+  %retval = tuple ()
+  end_borrow %lifetime_3 : $X
+  destroy_value %value_2 : $X
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_destroy_over_endborrow_nonadjacent_reborrow_2 : {{.*}} {
+// CHECK:         end_borrow {{%[^,]+}}
+// CHECK:         destroy_value {{%[^,]+}}
+// CHECK-LABEL: } // end sil function 'nohoist_destroy_over_endborrow_nonadjacent_reborrow_2'
+sil [ossa] @nohoist_destroy_over_endborrow_nonadjacent_reborrow_2 : $@convention(thin) (@owned X) -> () {
+entry(%value_1 : @owned $X):
+  %lifetime_1 = begin_borrow %value_1 : $X
+  br consume_and_reborrow(%lifetime_1 : $X, %value_1 : $X)
+
+consume_and_reborrow(%lifetime_2 : @guaranteed $X, %value_2 : @owned $X):
+  br reborrow_only_1(%lifetime_2 : $X)
+
+reborrow_only_1(%lifetime_3 : @guaranteed $X):
+  br reborrow_only_2(%lifetime_3 : $X)
+
+reborrow_only_2(%lifetime_4 : @guaranteed $X):
+  br exit
+
+exit:
+  %bogus = copy_value %value_2 : $X
+  destroy_value %bogus : $X
+  %retval = tuple ()
+  end_borrow %lifetime_4 : $X
+  destroy_value %value_2 : $X
+  return %retval : $()
+}
+

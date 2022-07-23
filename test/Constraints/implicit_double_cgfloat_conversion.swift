@@ -262,3 +262,26 @@ func assignments_with_and_without_optionals() {
     copy.prop = (true ? cgf : (false ? v : cgf))
   }
 }
+
+extension CGFloat {
+  static let `default` = 42.0
+}
+
+// rdar://97261826 - crash during constraint application with leading-dot syntax
+func assignment_with_leading_dot_syntax() {
+  class Container {
+    var prop: CGFloat = 0
+  }
+
+  struct Test {
+    let test: Void = {
+      let c = Container()
+      c.prop = .default // Ok (Double -> CGFloat)
+    }()
+  }
+}
+
+func test_conversion_inside_tuple_elements() -> (a: CGFloat, b: (c: Int, d: CGFloat)) {
+  let x: Double = 0.0
+  return (a: x, b: (c: 42, d: x)) // Ok
+}
