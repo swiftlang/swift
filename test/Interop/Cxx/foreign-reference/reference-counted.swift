@@ -1,7 +1,8 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
 //
 // REQUIRES: executable_test
-// XFAIL: OS=windows-msvc
+// TODO: This should work without ObjC interop in the future rdar://97497120
+// REQUIRES: objc_interop
 
 import StdlibUnittest
 import ReferenceCounted
