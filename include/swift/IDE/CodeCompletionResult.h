@@ -214,6 +214,8 @@ enum class CompletionKind : uint8_t {
   ReturnStmtExpr,
   YieldStmtExpr,
   ForEachSequence,
+
+  /// The \c in keyword in a for-each loop.
   ForEachInKw,
   AfterPoundExpr,
   AfterPoundDirective,

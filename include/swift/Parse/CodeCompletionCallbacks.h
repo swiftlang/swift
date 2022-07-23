@@ -137,7 +137,7 @@ public:
   /// -- no tokens provided by user.
   virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) {};
 
-  /// Add comment
+  /// Complete the \c in keyword in a for-each loop.
   virtual void completeForEachInKeyword(){};
 
   /// Complete a given expr-postfix.
