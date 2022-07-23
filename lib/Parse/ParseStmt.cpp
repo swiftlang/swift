@@ -346,7 +346,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
-    if (Tok.is(tok::pound_if)) {
+    if (Tok.is(tok::pound_if) && !isStartOfSwiftDecl()) {
       auto IfConfigResult = parseIfConfig(
         [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
           parseBraceItems(Elements, Kind, IsActive
@@ -389,6 +389,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
                     IsAtStartOfLineOrPreviousHadSemi,
+                    /*IfConfigsAreDeclAttrs=*/true,
                     [&](Decl *D) {
                       TmpDecls.push_back(D);
 

@@ -3793,6 +3793,26 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
   return makeParserSuccess();
 }
 
+ParserStatus Parser::parseDeclAttributeList(
+    DeclAttributes &Attributes, bool ifConfigsAreDeclAttrs,
+    PatternBindingInitializer *initContext) {
+  ParserStatus Status;
+  while (Tok.isAny(tok::at_sign, tok::pound_if)) {
+    if (Tok.is(tok::at_sign)) {
+      SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
+      SourceLoc AtLoc = consumeToken();
+      Status |= parseDeclAttribute(Attributes, AtLoc, initContext);
+    } else {
+      if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes())
+        break;
+
+      Status |= parseIfConfigDeclAttributes(
+          Attributes, ifConfigsAreDeclAttrs, initContext);
+    }
+  }
+  return Status;
+}
+
 /// \verbatim
 ///   attribute-list:
 ///     /*empty*/
@@ -3800,19 +3820,14 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
 ///   attribute-list-clause:
 ///     '@' attribute
 /// \endverbatim
-ParserStatus Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
-  if (Tok.isNot(tok::at_sign))
+ParserStatus Parser::parseDeclAttributeList(
+    DeclAttributes &Attributes, bool IfConfigsAreDeclAttrs) {
+  if (Tok.isNot(tok::at_sign, tok::pound_if))
     return makeParserSuccess();
 
   PatternBindingInitializer *initContext = nullptr;
-  ParserStatus Status;
   SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
-  do {
-    SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
-    SourceLoc AtLoc = consumeToken();
-    Status |= parseDeclAttribute(Attributes, AtLoc, initContext);
-  } while (Tok.is(tok::at_sign));
-  return Status;
+  return parseDeclAttributeList(Attributes, IfConfigsAreDeclAttrs, initContext);
 }
 
 /// \verbatim
@@ -3902,7 +3917,8 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
           BacktrackingScope Scope(*this);
 
           consumeToken(); // consume actor
-          isActorModifier = isStartOfSwiftDecl();
+          isActorModifier = isStartOfSwiftDecl(
+              /*allowPoundIfAttributes=*/false);
         }
 
         if (!isActorModifier)
@@ -4273,7 +4289,7 @@ static void skipAttribute(Parser &P) {
   }
 }
 
-bool Parser::isStartOfSwiftDecl() {
+bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
   if (Tok.is(tok::at_sign) && peekToken().is(tok::kw_rethrows)) {
     // @rethrows does not follow the general rule of @<identifier> so
     // it is needed to short circuit this else there will be an infinite
@@ -4307,7 +4323,7 @@ bool Parser::isStartOfSwiftDecl() {
   // check 'let' and 'var' right now.
   if (Tok.is(tok::kw_try))
     return peekToken().isAny(tok::kw_let, tok::kw_var);
-  
+
   // Skip an attribute, since it might be a type attribute.  This can't
   // happen at the top level of a scope, but we do use isStartOfSwiftDecl()
   // in positions like generic argument lists.
@@ -4318,10 +4334,20 @@ bool Parser::isStartOfSwiftDecl() {
 
     // If this attribute is the last element in the block,
     // consider it is a start of incomplete decl.
-    if (Tok.isAny(tok::r_brace, tok::eof, tok::pound_endif))
+    if (Tok.isAny(tok::r_brace, tok::eof) ||
+        (Tok.is(tok::pound_endif) && !allowPoundIfAttributes))
       return true;
 
-    return isStartOfSwiftDecl();
+    return isStartOfSwiftDecl(allowPoundIfAttributes);
+  }
+
+  // Skip a #if that contains only attributes in all branches. These will be
+  // parsed as attributes of a declaration, not as separate declarations.
+  if (Tok.is(tok::pound_if) && allowPoundIfAttributes) {
+    BacktrackingScope backtrack(*this);
+    bool sawAnyAttributes = false;
+    return skipIfConfigOfAttributes(sawAnyAttributes) && sawAnyAttributes &&
+        isStartOfSwiftDecl();
   }
 
   // If we have a decl modifying keyword, check if the next token is a valid
@@ -4343,13 +4369,13 @@ bool Parser::isStartOfSwiftDecl() {
           // If we found the start of a decl while trying to skip over the
           // paren, then we have something incomplete like 'private('. Return
           // true for better recovery.
-          if (isStartOfSwiftDecl())
+          if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false))
             return true;
 
           skipSingle();
         }
       }
-      return isStartOfSwiftDecl();
+      return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false);
     }
   }
 
@@ -4376,7 +4402,7 @@ bool Parser::isStartOfSwiftDecl() {
     consumeToken(tok::l_paren);
     consumeToken(tok::identifier);
     consumeToken(tok::r_paren);
-    return isStartOfSwiftDecl();
+    return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false);
   }
 
   if (Tok.isContextualKeyword("actor")) {
@@ -4388,7 +4414,7 @@ bool Parser::isStartOfSwiftDecl() {
     // it's an actor declaration, otherwise, it isn't.
     do {
       consumeToken();
-    } while (isStartOfSwiftDecl());
+    } while (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false));
     return Tok.is(tok::identifier);
   }
 
@@ -4399,7 +4425,7 @@ bool Parser::isStartOfSwiftDecl() {
   // Otherwise, do a recursive parse.
   Parser::BacktrackingScope Backtrack(*this);
   consumeToken(tok::identifier);
-  return isStartOfSwiftDecl();
+  return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false);
 }
 
 bool Parser::isStartOfSILDecl() {
@@ -4510,12 +4536,13 @@ setOriginalDeclarationForDifferentiableAttributes(DeclAttributes attrs,
 ParserResult<Decl>
 Parser::parseDecl(ParseDeclOptions Flags,
                   bool IsAtStartOfLineOrPreviousHadSemi,
+                  bool IfConfigsAreDeclAttrs,
                   llvm::function_ref<void(Decl*)> Handler) {
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
 
-  if (Tok.is(tok::pound_if)) {
+  if (Tok.is(tok::pound_if) && !ifConfigContainsOnlyAttributes()) {
     auto IfConfigResult = parseIfConfig(
       [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
         ParserStatus Status;
@@ -4574,7 +4601,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
   DeclAttributes Attributes;
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-  ParserStatus AttrStatus = parseDeclAttributeList(Attributes);
+  ParserStatus AttrStatus = parseDeclAttributeList(
+      Attributes, IfConfigsAreDeclAttrs);
 
   // Parse modifiers.
   // Keep track of where and whether we see a contextual keyword on the decl.
@@ -5356,7 +5384,9 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   if (loadCurrentSyntaxNodeFromCache()) {
     return ParserStatus();
   }
-  Result = parseDecl(Options, IsAtStartOfLineOrPreviousHadSemi, handler);
+  Result = parseDecl(
+      Options, IsAtStartOfLineOrPreviousHadSemi,
+      /* IfConfigsAreDeclAttrs=*/false, handler);
   if (Result.isParseErrorOrHasCompletion())
     skipUntilDeclRBrace(tok::semi, tok::pound_endif);
   SourceLoc SemiLoc;
@@ -6200,7 +6230,8 @@ void Parser::skipSILUntilSwiftDecl() {
   // Tell the lexer we're about to start lexing SIL.
   Lexer::SILBodyRAII sbr(*L);
 
-  while (!Tok.is(tok::eof) && !isStartOfSwiftDecl()) {
+  while (!Tok.is(tok::eof) &&
+         !isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false)) {
     // SIL pound dotted paths need to be skipped specially as they can contain
     // decl keywords like 'subscript'.
     if (consumeIf(tok::pound)) {
