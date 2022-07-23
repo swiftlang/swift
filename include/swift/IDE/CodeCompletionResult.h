@@ -214,6 +214,7 @@ enum class CompletionKind : uint8_t {
   ReturnStmtExpr,
   YieldStmtExpr,
   ForEachSequence,
+  ForEachInKw,
   AfterPoundExpr,
   AfterPoundDirective,
   PlatformConditon,
