@@ -40,7 +40,8 @@ ABSTRACT_MARKUP_AST_NODE(InlineContent, MarkupASTNode)
   MARKUP_AST_NODE(Strong, InlineContent)
   MARKUP_AST_NODE(Link, InlineContent)
   MARKUP_AST_NODE(Image, InlineContent)
-MARKUP_AST_NODE_RANGE(Inline, Text, Image)
+  MARKUP_AST_NODE(InlineAttributes, InlineContent)
+MARKUP_AST_NODE_RANGE(Inline, Text, InlineAttributes)
 
 /// Private Markdown Extensions - these should not be implemented in the
 /// underlying cmark parser.

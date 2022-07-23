@@ -3102,6 +3102,12 @@ bool ValueDecl::isFinal() const {
                            getAttrs().hasAttribute<FinalAttr>());
 }
 
+bool ValueDecl::isMoveOnly() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsMoveOnlyRequest{const_cast<ValueDecl *>(this)},
+                           getAttrs().hasAttribute<MoveOnlyAttr>());
+}
+
 bool ValueDecl::isDynamic() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,

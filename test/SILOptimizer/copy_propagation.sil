@@ -36,15 +36,15 @@ sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
 
-// -O ignores this because there's no copy_value
+// -O hoists the destroy
 // -Onone hoists the destroy and adds a poison flag.
 //
 // CHECK-LABEL: sil [ossa] @testDestroyAfterCall : {{.*}} {
 // CHECK: bb0:
 // CHECK: [[ARG:%.*]] = apply
 // CHECK-ONONE:   destroy_value [poison] [[ARG]] : $B
-// CHECK:   apply
 // CHECK-OPT:   destroy_value [[ARG]] : $B
+// CHECK:   apply
 // CHECK-LABEL: } // end sil function 'testDestroyAfterCall'
 sil [ossa] @testDestroyAfterCall : $@convention(thin) () -> () {
 bb0:

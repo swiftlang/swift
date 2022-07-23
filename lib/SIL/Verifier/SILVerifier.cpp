@@ -2701,8 +2701,8 @@ public:
             "copy_value is only valid in functions with qualified "
             "ownership");
     require(I->getModule().getStage() == SILStage::Raw ||
-                !I->getOperand()->getType().isMoveOnlyWrapped(),
-            "@moveOnly types can only be copied in Raw SIL?!");
+                !I->getOperand()->getType().isMoveOnly(),
+            "'MoveOnly' types can only be copied in Raw SIL?!");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {

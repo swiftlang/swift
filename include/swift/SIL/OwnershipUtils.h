@@ -1217,6 +1217,14 @@ void findTransitiveReborrowBaseValuePairs(
     BorrowingOperand initialScopeOperand, SILValue origBaseValue,
     function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair);
 
+/// Visit the phis in the same block as \p phi which are reborrows of a borrow
+/// of one of the values reaching \p phi.
+///
+/// If the visitor returns false, stops visiting and returns false.  Otherwise,
+/// returns true.
+bool visitAdjacentReborrowsOfPhi(SILPhiArgument *phi,
+                                 function_ref<bool(SILPhiArgument *)> visitor);
+
 /// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
 /// its reborrows.
 void visitTransitiveEndBorrows(
