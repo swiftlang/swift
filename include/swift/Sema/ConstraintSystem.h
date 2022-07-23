@@ -5096,7 +5096,8 @@ public:
   ///
   /// An expression needs type erasure if:
   ///  1. The expression is a return value.
-  ///  2. The enclosing function is dynamic or a dynamic replacement.
+  ///  2. The enclosing function is dynamic, a dynamic replacement, or
+  ///     `-enable-experimental-opaque-type-erasure` is used.
   ///  3. The enclosing function returns an opaque type.
   ///  4. The opaque type conforms to (exactly) one protocol, and the protocol
   ///     has a declared type eraser.
