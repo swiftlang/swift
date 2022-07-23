@@ -618,6 +618,10 @@ def disable_swift3_objc_inference :
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
+  
+def enable_experimental_opaque_type_erasure : Flag<["-"], "enable-experimental-opaque-type-erasure">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
 
 def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
