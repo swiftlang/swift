@@ -32,6 +32,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
@@ -5033,31 +5034,212 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 }
 
 IterableDeclContext *IterableDeclContext::getImplementationContext() {
-  // Only ClangNodes have @_objcImplementation extensions.
-  if (!getDecl()->hasClangNode())
-    return this;
-
-  ClassDecl *classDecl = getAsGenericContext()->getSelfClassDecl();
-  if (!classDecl)
-    return this;
-
-  // Figure out the category name of the extension that will match this decl.
-  Identifier categoryName{};
-  if (getIterableContextKind() == IterableDeclContextKind::ExtensionDecl) {
-    auto category = cast<clang::ObjCCategoryDecl>(getDecl()->getClangDecl());
-    categoryName = getASTContext().getIdentifier(category->getName());
-  }
-
-  for (ExtensionDecl *ext : classDecl->getExtensions()) {
-    if (ext->isObjCImplementation()
-        && ext->getCategoryNameForObjCImplementation() == categoryName)
-      return ext;
-  }
+  if (auto implDecl = getDecl()->getObjCImplementationDecl())
+    if (auto implExt = dyn_cast<ExtensionDecl>(implDecl))
+      return implExt;
 
   return this;
 }
 
-Decl *ClangCategoryLookupRequest::
+namespace {
+struct OrderDecls {
+  bool operator () (Decl *lhs, Decl *rhs) const {
+    if (lhs->getDeclContext()->getModuleScopeContext()
+          == rhs->getDeclContext()->getModuleScopeContext()) {
+      auto &SM = lhs->getASTContext().SourceMgr;
+      return SM.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
+    }
+
+    auto lhsFile =
+        dyn_cast<SourceFile>(lhs->getDeclContext()->getModuleScopeContext());
+    auto rhsFile =
+        dyn_cast<SourceFile>(rhs->getDeclContext()->getModuleScopeContext());
+
+    if (!lhsFile)
+      return false;
+    if (!rhsFile)
+      return true;
+
+    return lhsFile->getFilename() < rhsFile->getFilename();
+  }
+};
+}
+
+static llvm::TinyPtrVector<Decl *>
+findImplsGivenInterface(ClassDecl *classDecl, Identifier categoryName) {
+  llvm::TinyPtrVector<Decl *> impls;
+  for (ExtensionDecl *ext : classDecl->getExtensions()) {
+    if (ext->isObjCImplementation()
+        && ext->getCategoryNameForObjCImplementation() == categoryName)
+      impls.push_back(ext);
+  }
+
+  if (impls.size() > 1) {
+    llvm::sort(impls, OrderDecls());
+
+    auto &diags = classDecl->getASTContext().Diags;
+    for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
+      auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
+      attr->setCategoryNameInvalid();
+
+      diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
+                     categoryName, classDecl)
+        .fixItRemove(attr->getRangeWithAt());
+      diags.diagnose(impls.front(), diag::previous_objc_implementation);
+    }
+  }
+
+  return impls;
+}
+
+static Identifier getCategoryName(ExtensionDecl *ext) {
+  // Could it be an imported category?
+  if (!ext || !ext->hasClangNode())
+    // Nope, not imported.
+    return Identifier();
+
+  auto category = dyn_cast<clang::ObjCCategoryDecl>(ext->getClangDecl());
+  if (!category)
+    // Nope, not a category.
+    return Identifier();
+
+  // We'll look for an implementation with this category name.
+  auto clangCategoryName = category->getName();
+  return ext->getASTContext().getIdentifier(clangCategoryName);
+}
+
+static IterableDeclContext *
+findInterfaceGivenImpl(ClassDecl *classDecl, ExtensionDecl *ext) {
+  assert(ext->isObjCImplementation());
+
+  if (auto name = ext->getCategoryNameForObjCImplementation())
+    return classDecl->getImportedObjCCategory(*name);
+
+  return nullptr;
+}
+
+static ObjCInterfaceAndImplementation
+constructResult(Decl *interface, llvm::TinyPtrVector<Decl *> impls) {
+  if (impls.empty())
+    return ObjCInterfaceAndImplementation();
+
+  return ObjCInterfaceAndImplementation(interface, impls.front());
+}
+
+static ObjCInterfaceAndImplementation
+findContextInterfaceAndImplementation(DeclContext *dc) {
+  if (!dc)
+    return {};
+
+  ClassDecl *classDecl = dc->getSelfClassDecl();
+  if (!classDecl || !classDecl->hasClangNode())
+    // Only extensions of ObjC classes can have @_objcImplementations.
+    return {};
+
+  // The name of the category to find implementations for, if `dc` turns out
+  // to be an interface.
+  Identifier categoryName;
+
+  // The interface, if we find one.
+  Decl *interfaceDecl;
+
+  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    // Is this an `@_objcImplementation extension`? If so, find the interface
+    // and process that instead.
+    if (ext->isObjCImplementation()) {
+      if (auto interfaceDC = findInterfaceGivenImpl(classDecl, ext))
+        return findContextInterfaceAndImplementation(
+                                         interfaceDC->getAsGenericContext());
+      return {};
+    }
+
+    // Is this an imported category? If so, extract its name so we can look for
+    // implementations of that category.
+    categoryName = getCategoryName(ext);
+    if (categoryName.empty())
+      return {};
+
+    interfaceDecl = ext;
+  } else {
+    // Must be an imported class. Look for its main implementation.
+    assert(isa_and_nonnull<ClassDecl>(dc));
+    categoryName = Identifier();    // technically a no-op
+    interfaceDecl = classDecl;
+  }
+
+  // If we reach here, we found an ObjC @interface of some kind and want to
+  // look for extensions implementing it.
+
+  auto implDecls = findImplsGivenInterface(classDecl, categoryName);
+  return constructResult(interfaceDecl, implDecls);
+}
+
+ObjCInterfaceAndImplementation ObjCInterfaceAndImplementationRequest::
+evaluate(Evaluator &evaluator, Decl *decl) const {
+  // These have direct links to their counterparts through the
+  // `@_objcImplementation` attribute. Let's resolve that.
+  // (Also directing nulls here, where they'll early-return.)
+  if (auto ty = dyn_cast_or_null<NominalTypeDecl>(decl))
+    return findContextInterfaceAndImplementation(ty);
+  else if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    return findContextInterfaceAndImplementation(ext);
+
+  // Anything else is resolved by first locating the context's interface and
+  // impl, then matching it to its counterpart. (Instead of calling
+  // `findContextInterfaceAndImplementation()` directly, we'll use the request
+  // recursively to take advantage of caching.)
+  auto contextDecl = decl->getDeclContext()->getAsDecl();
+  if (!contextDecl)
+    return {};
+
+  ObjCInterfaceAndImplementationRequest req(contextDecl);
+  /*auto contextPair =*/ evaluateOrDefault(evaluator, req, {});
+
+  // TODO: Implement member matching.
+  return {};
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ObjCInterfaceAndImplementation &pair) {
+  if (!pair) {
+    out << "no clang interface or @_objcImplementation";
+    return;
+  }
+
+  out << "clang interface ";
+  simple_display(out, pair.interfaceDecl);
+  out << " with @_objcImplementation ";
+  simple_display(out, pair.implementationDecl);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const ObjCInterfaceAndImplementation &pair) {
+  if (pair.implementationDecl)
+    return SourceLoc();
+  return extractNearestSourceLoc(pair.implementationDecl);
+}
+
+Decl *Decl::getImplementedObjCDecl() const {
+  if (hasClangNode())
+    // This *is* the interface, if there is one.
+    return nullptr;
+
+  ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
+  return evaluateOrDefault(getASTContext().evaluator, req, {})
+             .interfaceDecl;
+}
+
+Decl *Decl::getObjCImplementationDecl() const {
+  if (!hasClangNode())
+    // This *is* the implementation, if it has one.
+    return nullptr;
+
+  ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
+  return evaluateOrDefault(getASTContext().evaluator, req, {})
+             .implementationDecl;
+}
+
+IterableDeclContext *ClangCategoryLookupRequest::
 evaluate(Evaluator &evaluator, ClangCategoryLookupDescriptor desc) const {
   const ClassDecl *CD = desc.classDecl;
   Identifier categoryName = desc.categoryName;
@@ -5078,10 +5260,11 @@ evaluate(Evaluator &evaluator, ClangCategoryLookupDescriptor desc) const {
     return nullptr;
 
   ASTContext &ctx = CD->getASTContext();
-  return ctx.getClangModuleLoader()->importDeclDirectly(clangCategory);
+  auto imported = ctx.getClangModuleLoader()->importDeclDirectly(clangCategory);
+  return cast_or_null<ExtensionDecl>(imported);
 }
 
-Decl *ClassDecl::getImportedObjCCategory(Identifier name) const {
+IterableDeclContext *ClassDecl::getImportedObjCCategory(Identifier name) const {
   ClangCategoryLookupDescriptor desc{this, name};
   return evaluateOrDefault(getASTContext().evaluator,
                            ClangCategoryLookupRequest(desc),

@@ -1469,25 +1469,6 @@ bool ExtensionDecl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>();
 }
 
-const clang::ObjCContainerDecl *
-ExtensionDecl::getInterfaceForObjCImplementation() const {
-  auto categoryName = getCategoryNameForObjCImplementation();
-  if (!categoryName)
-    return nullptr;
-
-  auto CD = dyn_cast_or_null<ClassDecl>(getExtendedNominal());
-  if (!CD)
-    return nullptr;
-
-  auto importedDecl = CD->getImportedObjCCategory(*categoryName);
-  if (!importedDecl)
-    return nullptr;
-
-  assert(importedDecl->hasClangNode() &&
-         "@interface imported as clang-node-less decl?");
-  return cast<clang::ObjCContainerDecl>(importedDecl->getClangDecl());
-}
-
 Optional<Identifier>
 ExtensionDecl::getCategoryNameForObjCImplementation() const {
   assert(isObjCImplementation());

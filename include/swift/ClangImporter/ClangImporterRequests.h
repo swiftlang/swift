@@ -217,7 +217,7 @@ SourceLoc extractNearestSourceLoc(const ClangCategoryLookupDescriptor &desc);
 /// An empty/invalid \c categoryName requests the main interface for the class.
 class ClangCategoryLookupRequest
     : public SimpleRequest<ClangCategoryLookupRequest,
-                           Decl *(ClangCategoryLookupDescriptor),
+                           IterableDeclContext *(ClangCategoryLookupDescriptor),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -226,8 +226,78 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Decl *evaluate(Evaluator &evaluator,
-                 ClangCategoryLookupDescriptor desc) const;
+  IterableDeclContext *evaluate(Evaluator &evaluator,
+                                ClangCategoryLookupDescriptor desc) const;
+};
+
+/// Links an imported Clang decl to the native Swift decl(s) that implement it
+/// using \c \@_objcImplementation.
+struct ObjCInterfaceAndImplementation final {
+  Decl *interfaceDecl;
+  Decl *implementationDecl;
+
+  ObjCInterfaceAndImplementation(Decl *interfaceDecl,
+                                 Decl *implementationDecl)
+      : interfaceDecl(interfaceDecl), implementationDecl(implementationDecl)
+  {
+    assert(interfaceDecl && implementationDecl &&
+           "interface and implementation are both non-null");
+  }
+
+  ObjCInterfaceAndImplementation()
+      : interfaceDecl(nullptr), implementationDecl(nullptr) {}
+
+  operator bool() const {
+    return interfaceDecl;
+  }
+
+  friend llvm::hash_code
+  hash_value(const ObjCInterfaceAndImplementation &pair) {
+    return llvm::hash_combine(pair.interfaceDecl, pair.implementationDecl);
+  }
+
+  friend bool operator==(const ObjCInterfaceAndImplementation &lhs,
+                         const ObjCInterfaceAndImplementation &rhs) {
+    return lhs.interfaceDecl == rhs.interfaceDecl
+               && lhs.implementationDecl == rhs.implementationDecl;
+  }
+
+  friend bool operator!=(const ObjCInterfaceAndImplementation &lhs,
+                         const ObjCInterfaceAndImplementation &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const ObjCInterfaceAndImplementation &desc);
+SourceLoc extractNearestSourceLoc(const ObjCInterfaceAndImplementation &desc);
+
+/// Given a \c Decl whose declaration is imported from ObjC but whose
+/// implementation is provided by a Swift \c \@_objcImplementation
+/// \c extension , return both decls, with the imported interface first.
+/// Otherwise return \c {nullptr,nullptr} .
+///
+/// We retrieve both in a single request because we want to cache the
+/// relationship on both sides to avoid duplicating work.
+class ObjCInterfaceAndImplementationRequest
+    : public SimpleRequest<ObjCInterfaceAndImplementationRequest,
+                           ObjCInterfaceAndImplementation(Decl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ObjCInterfaceAndImplementation
+  evaluate(Evaluator &evaluator, Decl *decl) const;
+
+ public:
+   // Separate caching.
+   bool isCached() const { return true; }
+   Optional<ObjCInterfaceAndImplementation> getCachedResult() const;
+   void cacheResult(ObjCInterfaceAndImplementation value) const;
 };
 
 enum class CxxRecordSemanticsKind {

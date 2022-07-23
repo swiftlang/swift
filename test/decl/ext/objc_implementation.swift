@@ -3,6 +3,8 @@
 
 // FIXME: Should complain about method(fromHeader4:) and propertyFromHeader9
 @_objcImplementation extension ObjCClass {
+  // expected-note@-1 {{previously implemented by extension here}}
+
   func method(fromHeader1: CInt) {
     // FIXME: OK, provides an implementation for the header's method.
     // expected-error@-2 {{instance method 'method(fromHeader1:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
@@ -125,6 +127,8 @@
 
 // FIXME: Should complain about categoryMethodFromHeader4:
 @_objcImplementation(PresentAdditions) extension ObjCClass {
+  // expected-note@-1 {{previously implemented by extension here}}
+
   func method(fromHeader3: CInt) {
     // FIXME: Should complain about wrong category
     // expected-error@-2 {{instance method 'method(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
@@ -190,7 +194,11 @@
   }
 }
 
-@_objcImplementation(PresentAdditions) extension ObjCClass {} // FIXME: should complain about duplicate
+@_objcImplementation extension ObjCClass {}
+// expected-error@-1 {{duplicate implementation of Objective-C class 'ObjCClass'}}
+
+@_objcImplementation(PresentAdditions) extension ObjCClass {}
+// expected-error@-1 {{duplicate implementation of Objective-C category 'PresentAdditions' on class 'ObjCClass'}}
 
 @_objcImplementation(MissingAdditions) extension ObjCClass {}
 // expected-error@-1 {{could not find category 'MissingAdditions' on Objective-C class 'ObjCClass'; make sure your umbrella or bridging header imports the header that declares it}}

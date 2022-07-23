@@ -1417,8 +1417,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     return;
   }
 
-  if (!attr->isCategoryNameInvalid() &&
-      !CD->getImportedObjCCategory(attr->CategoryName)) {
+  if (!attr->isCategoryNameInvalid() && !ED->getImplementedObjCDecl()) {
     diagnose(attr->getLocation(),
              diag::attr_objc_implementation_category_not_found,
              attr->CategoryName, CD);
