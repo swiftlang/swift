@@ -1,11 +1,5 @@
-import sys  # noqa: I201
-
+from .Utils import error
 from .kinds import SYNTAX_BASE_KINDS, kind_to_type, lowercase_first_word
-
-
-def error(msg):
-    print('error: ' + msg, file=sys.stderr)
-    sys.exit(-1)
 
 
 class Node(object):
