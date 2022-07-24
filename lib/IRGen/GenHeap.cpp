@@ -589,6 +589,7 @@ unsigned IRGenModule::getReferenceStorageExtraInhabitantCount(
   case ReferenceCounting::ObjC:
   case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
+  case ReferenceCounting::Custom:
     break;
   case ReferenceCounting::Bridge:
   case ReferenceCounting::Error:
@@ -618,6 +619,7 @@ SpareBitVector IRGenModule::getReferenceStorageSpareBits(
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
   case ReferenceCounting::None:
+  case ReferenceCounting::Custom:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -648,6 +650,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantValue(unsigned bits,
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
   case ReferenceCounting::None:
+  case ReferenceCounting::Custom:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -669,6 +672,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantMask(
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
   case ReferenceCounting::None:
+  case ReferenceCounting::Custom:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -689,6 +693,7 @@ llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
   case ReferenceCounting::None:
+  case ReferenceCounting::Custom:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -726,6 +731,7 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
   case ReferenceCounting::None:
+  case ReferenceCounting::Custom:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -760,6 +766,7 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
           std::move(spareBits), isOptional);                                   \
     case ReferenceCounting::ObjC:                                              \
     case ReferenceCounting::None:                                              \
+    case ReferenceCounting::Custom:                                            \
     case ReferenceCounting::Block:                                             \
     case ReferenceCounting::Unknown:                                           \
       return new Unknown##Name##ReferenceTypeInfo(                             \
@@ -1015,6 +1022,8 @@ void IRGenFunction::emitStrongRelease(llvm::Value *value,
     return emitBridgeStrongRelease(value, atomicity);
   case ReferenceCounting::Error:
     return emitErrorStrongRelease(value);
+  case ReferenceCounting::Custom:
+    llvm_unreachable("Ref counting should be handled in TypeInfo.");
   case ReferenceCounting::None:
     return; // This is a no-op if we don't have any ref-counting.
   }
@@ -1042,6 +1051,8 @@ void IRGenFunction::emitStrongRetain(llvm::Value *value,
   case ReferenceCounting::Error:
     emitErrorStrongRetain(value);
     return;
+  case ReferenceCounting::Custom:
+    llvm_unreachable("Ref counting should be handled in TypeInfo.");
   case ReferenceCounting::None:
     return; // This is a no-op if we don't have any ref-counting.
   }
@@ -1061,6 +1072,7 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
     return UnknownRefCountedPtrTy;
   case ReferenceCounting::Error:
     return ErrorPtrTy;
+  case ReferenceCounting::Custom:
   case ReferenceCounting::None:
     return OpaquePtrTy;
   }
@@ -1080,6 +1092,7 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
     case ReferenceCounting::Bridge:                                            \
     case ReferenceCounting::Block:                                             \
     case ReferenceCounting::Error:                                             \
+    case ReferenceCounting::Custom:                                            \
     case ReferenceCounting::None:                                              \
       llvm_unreachable("unsupported reference kind with reference storage");   \
     }                                                                          \
@@ -1097,6 +1110,7 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
     case ReferenceCounting::Bridge:                                            \
     case ReferenceCounting::Block:                                             \
     case ReferenceCounting::Error:                                             \
+    case ReferenceCounting::Custom:                                            \
     case ReferenceCounting::None:                                              \
       llvm_unreachable("unsupported reference kind with reference storage");   \
     }                                                                          \

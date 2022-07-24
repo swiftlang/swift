@@ -509,6 +509,9 @@ public:
   llvm::Value *emitBlockCopyCall(llvm::Value *value);
   void emitBlockRelease(llvm::Value *value);
 
+  void emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn,
+                                                 llvm::Value *value);
+
   // Routines for an unknown reference-counting style (meaning,
   // dynamically something compatible with either the ObjC or Swift styles).
   //   - strong references

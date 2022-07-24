@@ -1882,7 +1882,8 @@ namespace {
     TypeLowering *handleReference(CanType type,
                                   RecursiveProperties properties) {
       auto silType = SILType::getPrimitiveObjectType(type);
-      if (type.isForeignReferenceType())
+      if (type.isForeignReferenceType() &&
+          type->getReferenceCounting() == ReferenceCounting::None)
         return new (TC) TrivialTypeLowering(
             silType, RecursiveProperties::forTrivial(), Expansion);
 

@@ -1600,6 +1600,7 @@ IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   case ReferenceCounting::Block:
   case ReferenceCounting::Error:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::Custom:
   case ReferenceCounting::None:
     llvm_unreachable("not implemented");
   }

@@ -4241,15 +4241,7 @@ public:
 
   /// Whether the class uses the ObjC object model (reference counting,
   /// allocation, etc.), the Swift model, or has no reference counting at all.
-  ReferenceCounting getObjectModel() const {
-    if (isForeignReferenceType())
-      return ReferenceCounting::None;
-
-    if (checkAncestry(AncestryFlags::ObjCObjectModel))
-      return ReferenceCounting::ObjC;
-
-    return ReferenceCounting::Native;
-  }
+  ReferenceCounting getObjectModel() const;
 
   LayoutConstraintKind getLayoutConstraintKind() const {
     if (getObjectModel() == ReferenceCounting::ObjC)
@@ -4363,6 +4355,8 @@ public:
   /// non-reference-counted swift reference type that was imported from a C++
   /// record.
   bool isForeignReferenceType() const;
+
+  bool hasRefCountingAnnotations() const;
 };
 
 /// The set of known protocols for which derived conformances are supported.
