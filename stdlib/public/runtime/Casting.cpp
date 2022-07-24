@@ -795,7 +795,8 @@ swift_dynamicCastUnknownClassImpl(const void *object,
 #endif
   }
 
-  // Foreign reference types don't suppport casting.
+  // Foreign reference types don't support casting to parent/child types yet
+  // (rdar://85881664&85881794).
   case MetadataKind::ForeignReferenceType: {
     return nullptr;
   }
@@ -841,7 +842,8 @@ swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
 #endif
   }
 
-  // Foreign reference types don't suppport casting.
+  // Foreign reference types don't support casting to parent/child types yet
+  // (rdar://85881664&85881794).
   case MetadataKind::ForeignReferenceType: {
     return nullptr;
   }
@@ -912,7 +914,8 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       return nullptr;
     }
 
-    // Foreign reference types don't suppport casting.
+    // Foreign reference types don't support casting to parent/child types yet
+    // (rdar://85881664&85881794).
     case MetadataKind::ForeignReferenceType: {
       return nullptr;
     }
@@ -937,7 +940,8 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
               (const ClassMetadata*)targetType))
         return origSourceType;
       return nullptr;
-    // Foreign reference types don't suppport casting.
+    // Foreign reference types don't support casting to parent/child types yet
+    // (rdar://85881664&85881794).
     case MetadataKind::ForeignReferenceType:
       return nullptr;
     default:
@@ -1025,15 +1029,16 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       // If we returned, then the cast succeeded.
       return origSourceType;
 
-    // Foreign reference types don't suppport casting.
+    // Foreign reference types don't support casting to parent/child types yet
+    // (rdar://85881664&85881794).
     case MetadataKind::ForeignReferenceType:
     default:
       swift_dynamicCastFailure(sourceType, targetType);
     }
     break;
 
-
-  // Foreign reference types don't suppport casting.
+  // Foreign reference types don't support casting to parent/child types yet
+  // (rdar://85881664&85881794).
   case MetadataKind::ForeignReferenceType: {
     swift_dynamicCastFailure(sourceType, targetType);
   }

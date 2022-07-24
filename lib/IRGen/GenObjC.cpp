@@ -21,6 +21,7 @@
 #include "llvm/IR/InlineAsm.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/GlobalDecl.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 
@@ -1518,5 +1519,21 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
     fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
   }
   auto call = Builder.CreateCall(fn, value);
+  call->setDoesNotThrow();
+}
+
+void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
+    ValueDecl *fn, llvm::Value *value) {
+  assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
+
+  auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
+  auto llvmFn = IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition);
+
+  auto argType =
+      cast<llvm::FunctionType>(llvmFn->getType()->getPointerElementType())
+          ->getParamType(0);
+  value = Builder.CreateBitCast(value, argType);
+
+  auto call = Builder.CreateCall(llvmFn, value);
   call->setDoesNotThrow();
 }

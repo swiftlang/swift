@@ -148,6 +148,7 @@ namespace {
         HeaderSize = CurSize;
         break;
       case ReferenceCounting::None:
+      case ReferenceCounting::Custom:
         break;
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:

@@ -2427,6 +2427,93 @@ namespace {
       return result;
     }
 
+    void validateForeignReferenceType(const clang::CXXRecordDecl *decl,
+                                      ClassDecl *classDecl) {
+      auto isValidOperation = [&](ValueDecl *operation) -> bool {
+        auto operationFn = dyn_cast<FuncDecl>(operation);
+        if (!operationFn)
+          return false;
+
+        if (!operationFn->getResultInterfaceType()->isVoid())
+          return false;
+
+        if (operationFn->getParameters()->size() != 1)
+          return false;
+
+        if (operationFn->getParameters()->get(0)->getInterfaceType()->isEqual(
+                classDecl->getInterfaceType()))
+          return false;
+
+        return true;
+      };
+
+      auto retainOperation = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CustomRefCountingOperation(
+              {classDecl, CustomRefCountingOperationKind::retain}),
+          {});
+      if (retainOperation.kind ==
+          CustomRefCountingOperationResult::noAttribute) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::reference_type_must_have_retain_attr,
+                      decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::notFound) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_retain,
+                      retainOperation.name, decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::tooManyFound) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::too_many_reference_type_retain_operations,
+                      retainOperation.name, decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::foundOperation) {
+        if (!isValidOperation(retainOperation.operation)) {
+          HeaderLoc loc(decl->getLocation());
+          Impl.diagnose(loc, diag::foreign_reference_types_invalid_retain,
+                        retainOperation.name, decl->getNameAsString());
+        }
+      } else {
+        // Nothing to do.
+        assert(retainOperation.kind ==
+               CustomRefCountingOperationResult::immortal);
+      }
+
+      auto releaseOperation = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CustomRefCountingOperation(
+              {classDecl, CustomRefCountingOperationKind::release}),
+          {});
+      if (releaseOperation.kind ==
+          CustomRefCountingOperationResult::noAttribute) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::reference_type_must_have_release_attr,
+                      decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::notFound) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_release,
+                      releaseOperation.name, decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::tooManyFound) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::too_many_reference_type_release_operations,
+                      releaseOperation.name, decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::foundOperation) {
+        if (!isValidOperation(releaseOperation.operation)) {
+          HeaderLoc loc(decl->getLocation());
+          Impl.diagnose(loc, diag::foreign_reference_types_invalid_release,
+                        releaseOperation.name, decl->getNameAsString());
+        }
+      } else {
+        // Nothing to do.
+        assert(releaseOperation.kind ==
+               CustomRefCountingOperationResult::immortal);
+      }
+    }
+
     Decl *VisitCXXRecordDecl(const clang::CXXRecordDecl *decl) {
       // This can be called from lldb without C++ interop being enabled: There
       // may be C++ declarations in imported modules, but the interface for
@@ -2508,6 +2595,9 @@ namespace {
       }
 
       auto result = VisitRecordDecl(decl);
+
+      if (auto classDecl = dyn_cast_or_null<ClassDecl>(result))
+        validateForeignReferenceType(decl, classDecl);
 
       // If this module is declared as a C++ module, try to synthesize
       // conformances to Swift protocols from the Cxx module.

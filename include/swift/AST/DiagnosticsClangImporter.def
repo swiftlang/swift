@@ -170,6 +170,27 @@ NOTE(dont_use_iterator_api, none, "C++ method '%0' that returns an unsafe "
                                   "APIs instead",
      (StringRef))
 
+ERROR(reference_type_must_have_retain_attr,none,
+      "reference type '%0' must have 'retain:' swift attribute.", (StringRef))
+ERROR(reference_type_must_have_release_attr,none,
+      "reference type '%0' must have 'release:' swift attribute.", (StringRef))
+ERROR(foreign_reference_types_cannot_find_retain,none,
+      "cannot find retain function '%0' for reference type '%1'.", (StringRef, StringRef))
+ERROR(foreign_reference_types_cannot_find_release,none,
+      "cannot find release function '%0' for reference type '%1'.", (StringRef, StringRef))
+ERROR(too_many_reference_type_retain_operations,none,
+      "too many functions with name '%0'. There must be exactly one retain "
+      "function for reference type '%1'.", (StringRef, StringRef))
+ERROR(too_many_reference_type_release_operations,none,
+      "too many functions with name '%0'. There must be exactly one release "
+      "function for reference type '%1'.", (StringRef, StringRef))
+ERROR(foreign_reference_types_invalid_retain,none,
+      "specified retain function '%0' is invalid. Retain must have exactly one "
+      "argument of type '%1'", (StringRef, StringRef))
+ERROR(foreign_reference_types_invalid_release,none,
+      "specified release function '%0' is invalid. Release must have exactly "
+      "one argument of type '%1'", (StringRef, StringRef))
+
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 not imported", (const clang::NamedDecl*))
 NOTE(invoked_func_not_imported, none, "function %0 not imported", (const clang::NamedDecl*))

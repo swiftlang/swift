@@ -22,3 +22,8 @@ module WitnessTable {
   header "witness-table.h"
   requires cplusplus
 }
+
+module ReferenceCounted {
+  header "reference-counted.h"
+  requires cplusplus
+}
