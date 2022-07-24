@@ -2980,6 +2980,8 @@ public:
       // not apply to functions returning ObjC types.
       } else if (clang::ento::coreFoundation::followsCreateRule(TheDecl)) {
         return ResultConvention::Owned;
+      } else if (tl.getLoweredType().isForeignReferenceType()) {
+        return ResultConvention::Unowned;
       } else {
         return ResultConvention::Autoreleased;
       }

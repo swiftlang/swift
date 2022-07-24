@@ -476,6 +476,23 @@ swift::extractNearestSourceLoc(const ClangRecordMemberLookupDescriptor &desc) {
   return extractNearestSourceLoc(desc.recordDecl);
 }
 
+//----------------------------------------------------------------------------//
+// CustomRefCountingOperation computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           CustomRefCountingOperationDescriptor desc) {
+  out << "Finding custom (foreign reference) reference counting operation '"
+      << (desc.kind == CustomRefCountingOperationKind::retain ? "retain"
+                                                              : "release")
+      << "for '" << desc.decl->getNameStr() << "'.\n";
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
+  return SourceLoc();
+}
+
 // Implement the clang importer type zone.
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"
