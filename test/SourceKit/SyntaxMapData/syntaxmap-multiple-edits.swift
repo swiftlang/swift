@@ -114,13 +114,28 @@
 // CHECK-NEXT:     key.length: 1
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 135,
+// CHECK-NEXT:     key.length: 1
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
 // CHECK-NEXT:     key.offset: 136,
 // CHECK-NEXT:     key.length: 1
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 138,
+// CHECK-NEXT:     key.length: 1
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
 // CHECK-NEXT:     key.offset: 140,
+// CHECK-NEXT:     key.length: 1
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 141,
 // CHECK-NEXT:     key.length: 1
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
@@ -209,9 +224,19 @@
 // CHECK-NEXT:     key.length: 2
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 56,
+// CHECK-NEXT:     key.length: 1
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.number,
 // CHECK-NEXT:     key.offset: 58,
 // CHECK-NEXT:     key.length: 2
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 61,
+// CHECK-NEXT:     key.length: 1
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.number,

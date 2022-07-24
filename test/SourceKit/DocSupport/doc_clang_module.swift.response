@@ -460,6 +460,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 194,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 198,
     key.length: 1
@@ -616,6 +621,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 427,
     key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 432,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
@@ -796,6 +806,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 697,
     key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 702,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
@@ -1019,6 +1034,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 1050,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 1054,
     key.length: 1
@@ -1163,6 +1183,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 1321,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 1325,
     key.length: 1
@@ -1301,6 +1326,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooRuncingOptions",
     key.offset: 1547,
     key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 1565,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
@@ -4314,6 +4344,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 7274,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 7278,
     key.length: 1
@@ -4482,6 +4517,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 7542,
     key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 7547,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,

@@ -29,6 +29,7 @@ namespace ide {
 enum class SyntaxNodeKind : uint8_t {
   Keyword,
   Identifier,
+  Operator,
   DollarIdent,
   Integer,
   Floating,
