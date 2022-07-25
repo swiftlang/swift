@@ -1436,9 +1436,10 @@ namespace {
                                  weakLinkage);
     }
 
-    void emitRODataFields(ConstantStructBuilder &b,
-                          ForMetaClass_t forMeta,
-                          HasUpdateCallback_t hasUpdater) {
+    void emitRODataFields(
+        ConstantStructBuilder &b, ForMetaClass_t forMeta,
+        HasUpdateCallback_t hasUpdater,
+        ForGenericPattern_t isForGeneric = IsNotForGenericPattern) {
       assert(FieldLayout && "can't emit rodata for a category");
 
       // struct _class_ro_t {
@@ -1497,7 +1498,7 @@ namespace {
       emitAndAddMethodList(b,
                            forMeta ? MethodListKind::ClassMethods
                                    : MethodListKind::InstanceMethods,
-                           llvm::GlobalVariable::InternalLinkage);
+                           llvm::GlobalVariable::InternalLinkage, isForGeneric);
 
       //   const protocol_list_t *baseProtocols;
       // Apparently, this list is the same in the class and the metaclass.
@@ -1530,7 +1531,7 @@ namespace {
 
       // };
     }
-    
+
     llvm::Constant *emitROData(ForMetaClass_t forMeta,
                                HasUpdateCallback_t hasUpdater) {
       ConstantInitBuilder builder(IGM);
@@ -1763,9 +1764,10 @@ namespace {
     };
 
     /// Emit the method list and add the pointer to the `builder`.
-    void emitAndAddMethodList(ConstantInitBuilder::StructBuilder &builder,
-                              MethodListKind kind,
-                              llvm::GlobalValue::LinkageTypes linkage) {
+    void emitAndAddMethodList(
+        ConstantInitBuilder::StructBuilder &builder, MethodListKind kind,
+        llvm::GlobalValue::LinkageTypes linkage,
+        ForGenericPattern_t isForGeneric = IsNotForGenericPattern) {
       ArrayRef<MethodDescriptor> methods;
       StringRef namePrefix;
       switch (kind) {
@@ -1793,6 +1795,12 @@ namespace {
       llvm::Constant *methodListPtr =
           buildMethodList(methods, namePrefix, linkage);
       builder.add(methodListPtr);
+
+      // Add the method list pointer to a section discoverable by the linker so
+      // that it can re-write it to a relative method list.
+      if (isForGeneric && methodListPtr != null()) {
+        IGM.addGenericObjCMethodList(methodListPtr);
+      }
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
@@ -2447,9 +2455,8 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
 
     // Note: an update callback is only ever used with the in-place
     // initialization pattern, which precludes generic classes.
-    builder.emitRODataFields(classRO,
-                             ForClass,
-                             DoesNotHaveUpdateCallback);
+    builder.emitRODataFields(classRO, ForClass, DoesNotHaveUpdateCallback,
+                             IsForGenericPattern);
     classRO.finishAndAddTo(init);
   }
 
@@ -2457,7 +2464,8 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
   assert(startOfMetaclassRO.isMultipleOf(IGM.getPointerSize()));
   {
     auto classRO = init.beginStruct();
-    builder.emitRODataFields(classRO, ForMetaClass, DoesNotHaveUpdateCallback);
+    builder.emitRODataFields(classRO, ForMetaClass, DoesNotHaveUpdateCallback,
+                             IsForGenericPattern);
     classRO.finishAndAddTo(init);
   }
 

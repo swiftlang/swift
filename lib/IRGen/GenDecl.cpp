@@ -974,6 +974,10 @@ void IRGenModule::addObjCClassStub(llvm::Constant *classPtr) {
   ObjCClassStubs.push_back(classPtr);
 }
 
+void IRGenModule::addGenericObjCMethodList(llvm::Constant *methodList) {
+  ObjCMethodLists.push_back(methodList);
+}
+
 void IRGenModule::addRuntimeResolvableType(GenericTypeDecl *type) {
   // Collect the nominal type records we emit into a special section.
   RuntimeResolvableTypes.push_back(type);
@@ -1067,6 +1071,12 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
 
 void IRGenModule::emitGlobalLists() {
   if (ObjCInterop) {
+    emitGlobalList(
+        *this, ObjCMethodLists, "objc_method_list",
+        GetObjCSectionName("__objc_methlist", "regular,no_dead_strip"),
+        llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
+        /*asContiguousArray*/ false);
+
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
     emitGlobalList(

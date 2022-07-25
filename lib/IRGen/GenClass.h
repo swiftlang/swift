@@ -78,6 +78,11 @@ namespace irgen {
     HasUpdateCallback = true
   };
 
+  enum ForGenericPattern_t : bool {
+    IsNotForGenericPattern = false,
+    IsForGenericPattern = true
+  };
+
   /// Creates a layout for the class \p classType with allocated tail elements
   /// \p tailTypes.
   ///

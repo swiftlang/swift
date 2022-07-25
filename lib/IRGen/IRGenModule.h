@@ -1080,6 +1080,7 @@ public:
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
+  void addGenericObjCMethodList(llvm::Constant *addr);
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
   void addAccessibleFunction(SILFunction *func);
@@ -1197,6 +1198,8 @@ private:
   /// Metadata nodes for autolinking info.
   SmallVector<LinkLibrary, 32> AutolinkEntries;
 
+  /// List of Objective-C method lists of generic classes.
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCMethodLists;
   /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCClasses;
   /// List of Objective-C classes that require nonlazy realization, bitcast to
