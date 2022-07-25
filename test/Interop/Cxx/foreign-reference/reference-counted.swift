@@ -4,6 +4,8 @@
 // TODO: This should work without ObjC interop in the future rdar://97497120
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar97532642
+
 import StdlibUnittest
 import ReferenceCounted
 
