@@ -111,24 +111,27 @@ public func makeUvw(_ x: Int) -> Uvw {
 // CHECK: class PrimitivePayload final {
 // CHECK:      inline int64_t getX() const {
 // CHECK-NEXT:   if (!isX()) abort();
-// CHECK-NEXT:   auto thisCopy = *this;
-// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy._destructiveProjectEnumData();
+// CHECK-NEXT:   alignas(PrimitivePayload) unsigned char buffer[sizeof(PrimitivePayload)];
+// CHECK-NEXT:   auto *thisCopy = new(buffer) PrimitivePayload(*this);
+// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
 // CHECK-NEXT:   int64_t result;
 // CHECK-NEXT:   memcpy(&result, payloadFromDestruction, sizeof(result));
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }
 // CHECK:      inline double getY() const {
 // CHECK-NEXT:   if (!isY()) abort();
-// CHECK-NEXT:   auto thisCopy = *this;
-// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy._destructiveProjectEnumData();
+// CHECK-NEXT:   alignas(PrimitivePayload) unsigned char buffer[sizeof(PrimitivePayload)];
+// CHECK-NEXT:   auto *thisCopy = new(buffer) PrimitivePayload(*this);
+// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
 // CHECK-NEXT:   double result;
 // CHECK-NEXT:   memcpy(&result, payloadFromDestruction, sizeof(result));
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }
 // CHECK:      inline bool getZ() const {
 // CHECK-NEXT:   if (!isZ()) abort();
-// CHECK-NEXT:   auto thisCopy = *this;
-// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy._destructiveProjectEnumData();
+// CHECK-NEXT:   alignas(PrimitivePayload) unsigned char buffer[sizeof(PrimitivePayload)];
+// CHECK-NEXT:   auto *thisCopy = new(buffer) PrimitivePayload(*this);
+// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
 // CHECK-NEXT:   bool result;
 // CHECK-NEXT:   memcpy(&result, payloadFromDestruction, sizeof(result));
 // CHECK-NEXT:   return result;
@@ -173,16 +176,18 @@ public func makeUvw(_ x: Int) -> Uvw {
 // CHECK: class Xyz final {
 // CHECK:      inline Foo getFirst() const {
 // CHECK-NEXT:   if (!isFirst()) abort();
-// CHECK-NEXT:   auto thisCopy = *this;
-// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy._destructiveProjectEnumData();
+// CHECK-NEXT:   alignas(Xyz) unsigned char buffer[sizeof(Xyz)];
+// CHECK-NEXT:   auto *thisCopy = new(buffer) Xyz(*this);
+// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
 // CHECK-NEXT:   return _impl::_impl_Foo::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::_impl_Foo::initializeWithTake(result, payloadFromDestruction);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 // CHECK:      inline Bar getThird() const {
 // CHECK-NEXT:   if (!isThird()) abort();
-// CHECK-NEXT:   auto thisCopy = *this;
-// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy._destructiveProjectEnumData();
+// CHECK-NEXT:   alignas(Xyz) unsigned char buffer[sizeof(Xyz)];
+// CHECK-NEXT:   auto *thisCopy = new(buffer) Xyz(*this);
+// CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
 // CHECK-NEXT:   return _impl::_impl_Bar::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::_impl_Bar::initializeWithTake(result, payloadFromDestruction);
 // CHECK-NEXT:   });

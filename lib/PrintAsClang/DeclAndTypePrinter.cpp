@@ -466,9 +466,16 @@ private:
             owningPrinter.outputLang);
         os << " get" << name << "() const {\n";
         os << "    if (!is" << name << "()) abort();\n";
-        os << "    auto thisCopy = *this;\n";
+        os << "    alignas(";
+        syntaxPrinter.printBaseName(ED);
+        os << ") unsigned char buffer[sizeof(";
+        syntaxPrinter.printBaseName(ED);
+        os << ")];\n";
+        os << "    auto *thisCopy = new(buffer) ";
+        syntaxPrinter.printBaseName(ED);
+        os << "(*this);\n";
         os << "    char * _Nonnull payloadFromDestruction = "
-              "thisCopy._destructiveProjectEnumData();\n";
+              "thisCopy->_destructiveProjectEnumData();\n";
         if (auto knownCxxType =
                 owningPrinter.typeMapping.getKnownCxxTypeInfo(firstTypeDecl)) {
           os << "    ";
@@ -480,7 +487,10 @@ private:
                 "memcpy(&result, payloadFromDestruction, sizeof(result));\n";
           os << "    return result;\n";
         } else {
-          os << "    return " << cxx_synthesis::getCxxImplNamespaceName();
+          os << "    return ";
+          syntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
+              firstTypeDecl->getModuleContext(), ED->getModuleContext());
+          os << cxx_synthesis::getCxxImplNamespaceName();
           os << "::";
           ClangValueTypePrinter::printCxxImplClassName(os, firstTypeDecl);
           os << "::returnNewValue([&](char * _Nonnull result) {\n";
