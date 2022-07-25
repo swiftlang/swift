@@ -60,18 +60,33 @@ def check_parallel_results(results, op):
     parallel implementation.
     """
 
-    fail_count = 0
     if results is None:
         return 0
+
+    # Remove non-errors
+    results = [r for r in results if r]
+
+    if results:
+        print(f"======{op} FAILURES======", file=sys.stderr)
+
+    messages = []
     for r in results:
-        if r is not None:
-            if fail_count == 0:
-                print("======%s FAILURES======" % op)
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
-            fail_count += 1
-            if r.stderr:
-                print(r.stderr)
-    return fail_count
+        try:
+            raise r
+        except KeyError as e:
+            messages.append(f"Failed to look up {e} in scheme\n")
+        except Exception:
+            path = getattr(r, 'repo_path', '')
+            reason = getattr(r, 'stderr', '')
+            if path:
+                message = f"{path} failed"
+            if reason:
+                message += f"\n```\n{reason}\n```"
+            message += f"\n{r}"
+            if message:
+                messages.append(message + '\n')
+    print('---\n\n'.join(messages), file=sys.stderr)
+    return len(results)
 
 
 def confirm_tag_in_repo(tag, repo_name):
@@ -100,20 +115,25 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
     cross_repo = False
     repo_branch = scheme_name
     if scheme_map:
-        scheme_branch = scheme_map[repo_name]
-        repo_branch = scheme_branch
-        remote_repo_id = config['repos'][repo_name]['remote']['id']
-        if remote_repo_id in cross_repos_pr:
-            cross_repo = True
-            pr_id = cross_repos_pr[remote_repo_id]
-            repo_branch = "ci_pr_{0}".format(pr_id)
-            shell.run(["git", "checkout", scheme_branch],
-                      echo=True)
-            shell.capture(["git", "branch", "-D", repo_branch],
-                          echo=True, allow_non_zero_exit=True)
-            shell.run(["git", "fetch", "origin",
-                       "pull/{0}/merge:{1}"
-                       .format(pr_id, repo_branch), "--tags"], echo=True)
+        try:
+            scheme_branch = scheme_map[repo_name]
+            repo_branch = scheme_branch
+            remote_repo_id = config['repos'][repo_name]['remote']['id']
+            if remote_repo_id in cross_repos_pr:
+                cross_repo = True
+                pr_id = cross_repos_pr[remote_repo_id]
+                repo_branch = "ci_pr_{0}".format(pr_id)
+                shell.run(["git", "checkout", scheme_branch],
+                          echo=True)
+                shell.capture(["git", "branch", "-D", repo_branch],
+                              echo=True, allow_non_zero_exit=True)
+                shell.run(["git", "fetch", "origin",
+                           "pull/{0}/merge:{1}"
+                           .format(pr_id, repo_branch), "--tags"], echo=True)
+        except KeyError as e:
+            print(f"Failed to look up {repo_name} in scheme", file=sys.stderr)
+            raise e
+            exit(1)
     return repo_branch, cross_repo
 
 
@@ -634,10 +654,9 @@ repositories.
 
     update_results = update_all_repositories(args, config, scheme,
                                              cross_repos_pr)
-    fail_count = 0
-    fail_count += check_parallel_results(clone_results, "CLONE")
+    fail_count = check_parallel_results(clone_results, "CLONE")
     fail_count += check_parallel_results(update_results, "UPDATE")
-    if fail_count > 0:
+    if fail_count:
         print("update-checkout failed, fix errors and try again")
     else:
         print("update-checkout succeeded")
