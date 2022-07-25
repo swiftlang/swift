@@ -117,7 +117,7 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       if (!mmci || !mmci->hasMoveCheckerKind())
         continue;
 
-      // Handle guaranteed/owned move only typed arguments.
+      // Handle guaranteed/owned move arguments and values.
       //
       // We are pattern matching against these patterns:
       //
@@ -125,8 +125,18 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       //   %1 = copy_value %0
       //   %2 = mark_must_check [no_copy] %1
       // bb0(%0 : @owned $T):
-      //   %1 = copy_value %0
-      //   %2 = mark_must_check [no_copy] %1
+      //   %1 = mark_must_check [no_copy] %2
+      //
+      // This is forming a let or an argument.
+      // bb0:
+      //   %1 = move_value [lexical] %0
+      //   %2 = mark_must_check [no_implicit_copy] %1
+      //
+      // This occurs when SILGen materializes a temporary move only value?
+      // bb0:
+      //   %1 = begin_borrow [lexical] %0
+      //   %2 = copy_value %1
+      //   %3 = mark_must_check [no_copy] %2
       if (mmci->getOperand()->getType().isMoveOnly() &&
           !mmci->getOperand()->getType().isMoveOnlyWrapped()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mmci->getOperand())) {
@@ -136,16 +146,20 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
               continue;
             }
           }
+
+          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+            if (bbi->isLexical()) {
+              moveIntroducersToProcess.insert(mmci);
+              continue;
+            }
+          }
         }
 
+        // Any time we have a lexical move_value, we can process it.
         if (auto *mvi = dyn_cast<MoveValueInst>(mmci->getOperand())) {
           if (mvi->isLexical()) {
-            if (auto *arg = dyn_cast<SILFunctionArgument>(mvi->getOperand())) {
-              if (arg->getOwnershipKind() == OwnershipKind::Owned) {
-                moveIntroducersToProcess.insert(mmci);
-                continue;
-              }
-            }
+            moveIntroducersToProcess.insert(mmci);
+            continue;
           }
         }
 
@@ -247,6 +261,8 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       //  %2 = copy_value %1
       //  %3 = copyable_to_moveonlywrapper [owned] %2
       //  %4 = mark_must_check [no_implicit_copy]
+      //
+      // Or for a move only type, we look for a move_value [lexical].
       if (auto *mvi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
               mmci->getOperand())) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
