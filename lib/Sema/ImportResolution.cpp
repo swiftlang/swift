@@ -28,6 +28,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -560,6 +561,8 @@ UnboundImport::UnboundImport(ImportDecl *ID)
 
   if (auto attr = ID->getAttrs().getAttribute<WeakLinkedAttr>())
     import.options |= ImportFlags::WeakLinked;
+
+  import.docVisibility = swift::symbolgraphgen::documentationVisibilityForDecl(ID);
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {
@@ -1032,6 +1035,14 @@ UnboundImport::UnboundImport(
   if (declaringOptions.contains(ImportFlags::ImplementationOnly) ||
       bystandingOptions.contains(ImportFlags::ImplementationOnly))
     import.options |= ImportFlags::ImplementationOnly;
+
+  // If either have a `@_documentation(visibility: <access>)` attribute, the
+  // cross-import has the more restrictive of the two.
+  if (declaringImport.docVisibility || bystandingImport.docVisibility) {
+    auto declaringAccess = declaringImport.docVisibility.getValueOr(AccessLevel::Public);
+    auto bystandingAccess = bystandingImport.docVisibility.getValueOr(AccessLevel::Public);
+    import.docVisibility = std::min(declaringAccess, bystandingAccess);
+  }
 }
 
 void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
