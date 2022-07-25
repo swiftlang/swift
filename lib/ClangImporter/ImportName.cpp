@@ -1768,6 +1768,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           const char *kind;
           if (fieldTagDecl->isStruct())
             kind = "struct";
+          else if (fieldTagDecl->isClass())
+            kind = "class";
           else if (fieldTagDecl->isUnion())
             kind = "union";
           else if  (fieldTagDecl->isEnum())
