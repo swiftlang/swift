@@ -23,14 +23,6 @@
 
 namespace swift {
 
-inline BridgedStringRef getBridgedStringRef(llvm::StringRef str) {
-  return {(const unsigned char *)str.data(), str.size()};
-}
-
-inline llvm::StringRef getStringRef(BridgedStringRef str) {
-  return llvm::StringRef((const char *)str.data, str.length);
-}
-
 template <typename T>
 inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
   return {static_cast<const T *>(bridged.data), bridged.numElements};
