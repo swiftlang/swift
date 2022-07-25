@@ -4261,7 +4261,10 @@ static bool diagnoseAmbiguityWithContextualType(
 
   assert(contextualTy);
 
-  DE.diagnose(getLoc(anchor), diag::no_candidates_match_result_type,
+  DE.diagnose(getLoc(anchor),
+              contextualTy->is<ProtocolType>()
+                  ? diag::no_overloads_have_result_type_conformance
+                  : diag::no_candidates_match_result_type,
               name.getBaseName().userFacingName(), contextualTy);
 
   for (const auto &solution : solutions) {
@@ -4275,9 +4278,12 @@ static bool diagnoseAmbiguityWithContextualType(
 
       if (isExpr<ApplyExpr>(anchor) || isExpr<SubscriptExpr>(anchor)) {
         auto fnType = type->castTo<FunctionType>();
-        DE.diagnose(loc,
-                    diag::cannot_convert_candidate_result_to_contextual_type,
-                    decl->getName(), fnType->getResult(), contextualTy);
+        DE.diagnose(
+            loc,
+            contextualTy->is<ProtocolType>()
+                ? diag::overload_result_type_does_not_conform
+                : diag::cannot_convert_candidate_result_to_contextual_type,
+            decl->getName(), fnType->getResult(), contextualTy);
       } else {
         DE.diagnose(loc, diag::found_candidate_type, type);
       }

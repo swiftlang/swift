@@ -267,6 +267,10 @@ ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
 
+ERROR(no_overloads_have_result_type_conformance,none,
+      "no '%0' overloads produce result type that conforms to %1",
+      (StringRef, Type))
+
 ERROR(no_candidates_match_argument_type,none,
       "no '%0' candidates produce the expected type %1 for parameter #%2",
       (StringRef, Type, unsigned))
@@ -557,6 +561,10 @@ ERROR(cannot_convert_subscript_assign_nil,none,
 
 NOTE(cannot_convert_candidate_result_to_contextual_type,none,
      "%0 produces %1, not the expected contextual result type %2",
+     (DeclName, Type, Type))
+
+NOTE(overload_result_type_does_not_conform,none,
+     "result type %1 of %0 does not conform to %2",
      (DeclName, Type, Type))
 
 // for ... in expression
