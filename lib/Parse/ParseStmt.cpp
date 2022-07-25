@@ -2292,14 +2292,23 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     diagnose(LBraceLoc, diag::expected_foreach_container);
     Container = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
   } else if (Tok.is(tok::code_complete)) {
-    Container =
-        makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
-    Container.setHasCodeCompletionAndIsError();
-    Status |= Container;
-    if (CodeCompletion)
-      CodeCompletion->completeForEachSequenceBeginning(
-          cast<CodeCompletionExpr>(Container.get()));
-    consumeToken(tok::code_complete);
+    // If there is no "in" keyword, suggest it. Otherwise, complete the
+    // sequence.
+    if (InLoc.isInvalid()) {
+      if (CodeCompletion)
+        CodeCompletion->completeForEachInKeyword();
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
+    } else {
+      Container =
+          makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
+      Container.setHasCodeCompletionAndIsError();
+      Status |= Container;
+      if (CodeCompletion)
+        CodeCompletion->completeForEachSequenceBeginning(
+            cast<CodeCompletionExpr>(Container.get()));
+      consumeToken(tok::code_complete);
+    }
   } else {
     Container = parseExprBasic(diag::expected_foreach_container);
     Status |= Container;

@@ -242,6 +242,7 @@ public:
   void completeStmtOrExpr(CodeCompletionExpr *E) override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
+  void completeForEachInKeyword() override;
   void completePostfixExpr(Expr *E, bool hasSpace) override;
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
@@ -363,6 +364,12 @@ void CodeCompletionCallbacksImpl::completeForEachSequenceBeginning(
   Kind = CompletionKind::ForEachSequence;
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
+}
+
+void CodeCompletionCallbacksImpl::completeForEachInKeyword() {
+  assert(P.Tok.is(tok::code_complete));
+  Kind = CompletionKind::ForEachInKw;
+  CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
@@ -1069,6 +1076,9 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
       addKeyword(Sink, "await", CodeCompletionKeywordKind::None);
     addKeyword(Sink, "var", CodeCompletionKeywordKind::kw_var);
     addKeyword(Sink, "case", CodeCompletionKeywordKind::kw_case);
+    break;
+  case CompletionKind::ForEachInKw:
+    addKeyword(Sink, "in", CodeCompletionKeywordKind::kw_in);
   }
 }
 
@@ -1960,6 +1970,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::CaseStmtKeyword:
   case CompletionKind::EffectsSpecifier:
   case CompletionKind::ForEachPatternBeginning:
+  case CompletionKind::ForEachInKw:
     // Handled earlier by keyword completions.
     break;
   }
