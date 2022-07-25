@@ -17,10 +17,6 @@
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef struct {
   BridgedFunction function;
   BridgedPassContext passContext;
@@ -84,10 +80,10 @@ typedef struct {
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
 typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
 
-void SILPassManager_registerFunctionPass(BridgedStringRef name,
+void SILPassManager_registerFunctionPass(llvm::StringRef name,
                                          BridgedFunctionPassRunFn runFn);
 
-void SILCombine_registerInstructionPass(BridgedStringRef name,
+void SILCombine_registerInstructionPass(llvm::StringRef name,
                                         BridgedInstructionPassRunFn runFn);
 
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context);
@@ -161,11 +157,7 @@ PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType);
 
 OptionalBridgedFunction
-PassContext_loadFunction(BridgedPassContext context, BridgedStringRef name);
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
+PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

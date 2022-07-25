@@ -13,6 +13,7 @@
 #include "ClangDerivedConformances.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 
 using namespace swift;
 
@@ -80,6 +81,8 @@ bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
 void swift::conformToCxxIteratorIfNeeded(
     ClangImporter::Implementation &impl, NominalTypeDecl *decl,
     const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to UnsafeCxxInputIterator", decl);
+
   assert(decl);
   assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();

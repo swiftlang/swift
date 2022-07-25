@@ -1486,9 +1486,8 @@ PassContext_getContextSubstitutionMap(BridgedPassContext context,
 }
 
 OptionalBridgedFunction
-PassContext_loadFunction(BridgedPassContext context, BridgedStringRef name) {
+PassContext_loadFunction(BridgedPassContext context, StringRef name) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  SILFunction *f = mod->loadFunction(getStringRef(name),
-                                     SILModule::LinkingMode::LinkNormal);
+  SILFunction *f = mod->loadFunction(name, SILModule::LinkingMode::LinkNormal);
   return {f};
 }

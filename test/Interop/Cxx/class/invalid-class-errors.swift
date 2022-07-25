@@ -17,6 +17,12 @@ struct __attribute__((swift_attr("import_unsafe"))) B {
     B(const B&) = delete;
 };
 
+namespace Namespace {
+struct Nested {
+  Nested(const Nested&) = delete;
+};
+}
+
 //--- test.swift
 
 import Test
@@ -25,3 +31,5 @@ import Test
 public func test(x: A) { }
 // CHECK: note: record 'B' is not automatically importable: does not have a copy constructor or destructor. Refer to the C++ Interop User Manual to classify this type.
 public func test(x: B) { }
+// CHECK: note: record 'Nested' is not automatically importable: does not have a copy constructor or destructor. Refer to the C++ Interop User Manual to classify this type.
+public func test(x: Namespace.Nested) { }
