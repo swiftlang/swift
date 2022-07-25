@@ -1253,6 +1253,12 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         .diagnose(comp->getNameLoc(), diag::invalid_member_type,
                   comp->getNameRef(), kind, parentType)
         .highlight(parentRange);
+
+    if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
+      ctx.getClangModuleLoader()->diagnoseMemberValue(
+          comp->getNameRef().getFullName(), parentType);
+    }
+
     return ErrorType::get(ctx);
   }
 
@@ -1308,6 +1314,12 @@ static Type diagnoseUnknownType(TypeResolution resolution,
           .diagnose(comp->getNameLoc(), diag::invalid_member_type,
                     comp->getNameRef(), kind, parentType)
           .highlight(parentRange);
+
+      if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
+        ctx.getClangModuleLoader()->diagnoseMemberValue(
+            comp->getNameRef().getFullName(), parentType);
+      }
+
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
       if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
