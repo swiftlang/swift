@@ -4270,22 +4270,18 @@ static bool diagnoseAmbiguityWithContextualType(
   for (const auto &solution : solutions) {
     auto overload = solution.getOverloadChoice(calleeLocator);
     if (auto *decl = overload.choice.getDeclOrNull()) {
-      auto loc = decl->getLoc();
-      if (loc.isInvalid())
-        continue;
-
       auto type = solution.simplifyType(overload.boundType);
 
       if (isExpr<ApplyExpr>(anchor) || isExpr<SubscriptExpr>(anchor)) {
         auto fnType = type->castTo<FunctionType>();
         DE.diagnose(
-            loc,
+            decl,
             contextualTy->is<ProtocolType>()
                 ? diag::overload_result_type_does_not_conform
                 : diag::cannot_convert_candidate_result_to_contextual_type,
             decl->getName(), fnType->getResult(), contextualTy);
       } else {
-        DE.diagnose(loc, diag::found_candidate_type, type);
+        DE.diagnose(decl, diag::found_candidate_type, type);
       }
     }
   }
