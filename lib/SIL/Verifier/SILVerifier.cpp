@@ -1094,7 +1094,7 @@ public:
     // If we do not have qualified ownership, then do not verify value base
     // ownership.
     if (!F->hasOwnership()) {
-      require(SILValue(V).getOwnershipKind() == OwnershipKind::None,
+      require(SILValue(V)->getOwnershipKind() == OwnershipKind::None,
               "Once ownership is gone, all values should have none ownership");
       return;
     }
@@ -2398,7 +2398,7 @@ public:
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(*SI->getFunction()) ||
-                  Src.getOwnershipKind() == OwnershipKind::None,
+                  Src->getOwnershipKind() == OwnershipKind::None,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;
@@ -4113,13 +4113,13 @@ public:
       auto succOwnershipKind =
           CBI->getSuccessBB()->args_begin()[0]->getOwnershipKind();
       require(succOwnershipKind.isCompatibleWith(
-                  CBI->getOperand().getOwnershipKind()),
+                  CBI->getOperand()->getOwnershipKind()),
               "succ dest block argument must have ownership compatible with "
               "the checked_cast_br operand");
       auto failOwnershipKind =
           CBI->getFailureBB()->args_begin()[0]->getOwnershipKind();
       require(failOwnershipKind.isCompatibleWith(
-                  CBI->getOperand().getOwnershipKind()),
+                  CBI->getOperand()->getOwnershipKind()),
               "failure dest block argument must have ownership compatible with "
               "the checked_cast_br operand");
 
@@ -4131,12 +4131,12 @@ public:
       // boxed AnyHashable (ClassType). This breaks with the guarantees of
       // checked_cast_br guaranteed, so we ban it.
       require(!CBI->getOperand()->getType().isAnyObject() ||
-                  CBI->getOperand().getOwnershipKind() !=
+                  CBI->getOperand()->getOwnershipKind() !=
                       OwnershipKind::Guaranteed,
               "checked_cast_br with an AnyObject typed source cannot forward "
               "guaranteed ownership");
       require(CBI->preservesOwnership() ||
-                  CBI->getOperand().getOwnershipKind() !=
+                  CBI->getOperand()->getOwnershipKind() !=
                       OwnershipKind::Guaranteed,
               "If checked_cast_br is not directly forwarding, it can not have "
               "guaranteed ownership");

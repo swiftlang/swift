@@ -161,7 +161,7 @@ bool CheckerLivenessInfo::compute() {
         // just mark it as extending liveness and look through it.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
         for (SILValue result : user->getResults()) {
-          if (result.getOwnershipKind() == OwnershipKind::Guaranteed)
+          if (result->getOwnershipKind() == OwnershipKind::Guaranteed)
             defUseWorklist.insert(result);
         }
         break;

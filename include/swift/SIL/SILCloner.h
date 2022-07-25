@@ -2456,8 +2456,8 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
     return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
   }
 
-  ValueOwnershipKind Kind = SILValue(Inst).getOwnershipKind();
-  if (getOpValue(Inst->getOperand()).getOwnershipKind() ==
+  ValueOwnershipKind Kind = SILValue(Inst)->getOwnershipKind();
+  if (getOpValue(Inst->getOperand())->getOwnershipKind() ==
       OwnershipKind::None) {
     Kind = OwnershipKind::None;
   }

@@ -123,7 +123,7 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
 static bool isOSSAEndScopeWithNoneOperand(SILInstruction *i) {
   if (!isa<EndBorrowInst>(i) && !isa<DestroyValueInst>(i))
     return false;
-  return i->getOperand(0).getOwnershipKind() == OwnershipKind::None;
+  return i->getOperand(0)->getOwnershipKind() == OwnershipKind::None;
 }
 
 /// Perform a fast local check to see if the instruction is dead.
@@ -571,8 +571,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
                                     SILValue value, SILType srcTy,
                                     SILType destTy,
                                     ArrayRef<SILInstruction *> usePoints) {
-  assert(value.getOwnershipKind() != OwnershipKind::Guaranteed
-         || !usePoints.empty() && "guaranteed value must have use points");
+  assert(value->getOwnershipKind() != OwnershipKind::Guaranteed ||
+         !usePoints.empty() && "guaranteed value must have use points");
 
   // No cast is required if types are the same.
   if (srcTy == destTy)
@@ -630,7 +630,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     auto *someBB = builder->getFunction().createBasicBlockAfter(curBB);
     auto *noneBB = builder->getFunction().createBasicBlockAfter(someBB);
 
-    auto *phi = contBB->createPhiArgument(destTy, value.getOwnershipKind());
+    auto *phi = contBB->createPhiArgument(destTy, value->getOwnershipKind());
     if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
       auto createEndBorrow = [&](SILBasicBlock::iterator insertPt) {
         builder->setInsertionPoint(insertPt);
@@ -1638,7 +1638,7 @@ static void cleanupUseOldValueBeforeRAUW(Operand *use, SILBuilder &builder,
     return;
   }
 
-  switch (use->get().getOwnershipKind()) {
+  switch (use->get()->getOwnershipKind()) {
   case OwnershipKind::Any:
     llvm_unreachable("Invalid ownership for value");
   case OwnershipKind::Owned: {
@@ -1689,7 +1689,7 @@ SILValue swift::makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock)
   if (!value->getFunction()->hasOwnership())
     return value;
 
-  if (value.getOwnershipKind() == OwnershipKind::None)
+  if (value->getOwnershipKind() == OwnershipKind::None)
     return value;
 
   auto insertPt = getInsertAfterPoint(value).getValue();
@@ -1707,10 +1707,10 @@ SILValue swift::makeValueAvailable(SILValue value, SILBasicBlock *inBlock) {
   if (!value->getFunction()->hasOwnership())
     return value;
 
-  if (value.getOwnershipKind() == OwnershipKind::None)
+  if (value->getOwnershipKind() == OwnershipKind::None)
     return value;
 
-  assert(value.getOwnershipKind() == OwnershipKind::Owned);
+  assert(value->getOwnershipKind() == OwnershipKind::Owned);
 
   SmallVector<SILBasicBlock *, 4> userBBs;
   for (auto use : value->getUses()) {
@@ -1786,7 +1786,7 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
   if (!value->getFunction()->hasOwnership())
     return;
 
-  if (value.getOwnershipKind() != OwnershipKind::Owned)
+  if (value->getOwnershipKind() != OwnershipKind::Owned)
     return;
 
   findJointPostDominatingSet(

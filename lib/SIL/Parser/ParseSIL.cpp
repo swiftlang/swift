@@ -3148,7 +3148,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (parseForwardingOwnershipKind(forwardingOwnership)
         || parseSILDebugLocation(InstLoc, B))
       return true;
@@ -3168,7 +3168,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (parseForwardingOwnershipKind(forwardingOwnership)
         || parseSILDebugLocation(InstLoc, B))
       return true;
@@ -3182,7 +3182,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (parseForwardingOwnershipKind(forwardingOwnership)
         || parseSILDebugLocation(InstLoc, B))
       return true;
@@ -3345,7 +3345,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
-    if (Val.getOwnershipKind() != LHSKind) {
+    if (Val->getOwnershipKind() != LHSKind) {
       return true;
     }
 
@@ -3555,7 +3555,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseTypedValueRef(Base, B))
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (parseForwardingOwnershipKind(forwardingOwnership)
         || parseSILDebugLocation(InstLoc, B))
       return true;
@@ -3748,7 +3748,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseSILType(Ty))
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (OwnershipForwardingMixin::isa(Opcode)) {
       if (parseForwardingOwnershipKind(forwardingOwnership))
         return true;
@@ -3879,7 +3879,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseTypedValueRef(BitsVal, B))
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (parseForwardingOwnershipKind(forwardingOwnership)
         || parseSILDebugLocation(InstLoc, B))
       return true;
@@ -3944,7 +3944,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseASTType(TargetType))
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (parseForwardingOwnershipKind(forwardingOwnership)
         || parseSILDebugLocation(InstLoc, B))
       return true;
@@ -3966,7 +3966,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseASTType(TargetType) || parseConditionalBranchDestinations())
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (parseForwardingOwnershipKind(forwardingOwnership)
         || parseSILDebugLocation(InstLoc, B)) {
       return true;
@@ -4019,7 +4019,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseTypedValueRef(Val, B))
       return true;
 
-    ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
     if (parseForwardingOwnershipKind(forwardingOwnership)
         || parseSILDebugLocation(InstLoc, B))
       return true;
@@ -4609,7 +4609,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
 
       ValueOwnershipKind forwardingOwnership =
-          Operand ? Operand.getOwnershipKind()
+          Operand ? Operand->getOwnershipKind()
                   : ValueOwnershipKind(OwnershipKind::None);
 
       if (parseForwardingOwnershipKind(forwardingOwnership)
@@ -4631,7 +4631,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           parseSILDeclRef(EltRef))
         return true;
 
-      ValueOwnershipKind forwardingOwnership = Operand.getOwnershipKind();
+      ValueOwnershipKind forwardingOwnership = Operand->getOwnershipKind();
       if (Opcode == SILInstructionKind::UncheckedEnumDataInst)
         parseForwardingOwnershipKind(forwardingOwnership);
 
@@ -4687,7 +4687,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
       }
       P.consumeToken(tok::integer_literal);
-      ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+      ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
 
       if (Opcode == SILInstructionKind::TupleExtractInst) {
         if (parseForwardingOwnershipKind(forwardingOwnership))
@@ -5023,7 +5023,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           parseSILDottedPath(FieldV))
         return true;
 
-      ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+      ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
       if (Opcode == SILInstructionKind::StructExtractInst) {
         if (parseForwardingOwnershipKind(forwardingOwnership))
           return true;
@@ -5241,7 +5241,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           parseSILType(ResultType))
         return true;
 
-      ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+      ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
       if (Opcode == SILInstructionKind::SelectEnumInst) {
         if (parseForwardingOwnershipKind(forwardingOwnership))
           return true;
@@ -5276,7 +5276,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> CaseBBs;
       SILBasicBlock *DefaultBB = nullptr;
-      ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+      ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
       while (!peekSILDebugLocation(P) && P.consumeIf(tok::comma)) {
         parsedComma = true;
 
@@ -5569,7 +5569,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           parseSILType(ExistentialTy))
         return true;
 
-      ValueOwnershipKind forwardingOwnership = Val.getOwnershipKind();
+      ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
       if (parseForwardingOwnershipKind(forwardingOwnership)
           || parseSILDebugLocation(InstLoc, B))
         return true;
@@ -5832,7 +5832,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
 
       ValueOwnershipKind forwardingOwnership =
-          functionOperand.getOwnershipKind();
+          functionOperand->getOwnershipKind();
       if (parseForwardingOwnershipKind(forwardingOwnership)
           || parseSILDebugLocation(InstLoc, B))
         return true;
@@ -5860,7 +5860,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
 
       ValueOwnershipKind forwardingOwnership =
-          functionOperand.getOwnershipKind();
+          functionOperand->getOwnershipKind();
       if (parseForwardingOwnershipKind(forwardingOwnership)
           || parseSILDebugLocation(InstLoc, B))
         return true;
