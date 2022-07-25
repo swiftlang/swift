@@ -66,7 +66,7 @@ struct PassContext {
 
   func loadFunction(name: StaticString) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      PassContext_loadFunction(_bridged, BridgedStringRef(data: nameBuffer.baseAddress, length: nameBuffer.count)).function
+      PassContext_loadFunction(_bridged, llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)).function
     }
   }
 

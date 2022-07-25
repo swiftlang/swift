@@ -24,7 +24,7 @@ public func initializeSwiftModules() {
 private func registerPass(
       _ pass: FunctionPass,
       _ runFn: @escaping (@convention(c) (BridgedFunctionPassCtxt) -> ())) {
-  pass.name.withBridgedStringRef { nameStr in
+  pass.name._withStringRef { nameStr in
     SILPassManager_registerFunctionPass(nameStr, runFn)
   }
 }
@@ -32,7 +32,7 @@ private func registerPass(
 private func registerPass<InstType: Instruction>(
       _ pass: InstructionPass<InstType>,
       _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())) {
-  pass.name.withBridgedStringRef { nameStr in
+  pass.name._withStringRef { nameStr in
     SILCombine_registerInstructionPass(nameStr, runFn)
   }
 }
