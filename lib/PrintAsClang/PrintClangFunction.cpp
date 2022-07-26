@@ -42,6 +42,12 @@ getKnownTypeInfo(const TypeDecl *typeDecl, PrimitiveTypeMapping &typeMapping,
 bool isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
                  OutputLanguageMode languageMode) {
   const TypeDecl *typeDecl;
+  if (auto *bgt = dyn_cast<BoundGenericStructType>(
+          t->isOptional() ? t->getOptionalObjectType()->getDesugaredType()
+                          : t->getDesugaredType())) {
+    return bgt->isUnsafePointer() || bgt->isUnsafeMutablePointer();
+  }
+
   if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer()))
     typeDecl = typeAliasType->getDecl();
   else if (auto *structDecl = t->getStructOrBoundGenericStruct())
@@ -93,6 +99,10 @@ public:
         languageMode(languageMode), modifiersDelegate(modifiersDelegate),
         moduleContext(moduleContext), typeUseKind(typeUseKind) {}
 
+  void printInoutTypeModifier() {
+    os << (languageMode == swift::OutputLanguageMode::Cxx ? " &" : " *");
+  }
+
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               Optional<OptionalTypeKind> optionalKind,
                               bool isInOutParam) {
@@ -103,9 +113,8 @@ public:
     if (knownTypeInfo->canBeNullable) {
       printNullability(optionalKind);
     }
-    if (isInOutParam) {
-      os << (languageMode == swift::OutputLanguageMode::Cxx ? " &" : " *");
-    }
+    if (isInOutParam)
+      printInoutTypeModifier();
     return true;
   }
 
@@ -177,6 +186,37 @@ public:
           .printValueTypeReturnType(decl, languageMode, moduleContext);
   }
 
+  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+                                 Optional<OptionalTypeKind> optionalKind,
+                                 bool isInOutParam) {
+    auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
+    bool isConst;
+    if (bgsTy->isUnsafePointer())
+      isConst = true;
+    else if (bgsTy->isUnsafeMutablePointer())
+      isConst = false;
+    else
+      return false;
+
+    auto args = BGT->getGenericArgs();
+    assert(args.size() == 1);
+    visitPart(args.front(), OTK_None, /*isInOutParam=*/false);
+    if (isConst)
+      os << " const";
+    os << " *";
+    printNullability(optionalKind);
+    if (isInOutParam)
+      printInoutTypeModifier();
+    return true;
+  }
+
+  void visitBoundGenericStructType(BoundGenericStructType *BGT,
+                                   Optional<OptionalTypeKind> optionalKind,
+                                   bool isInOutParam) {
+    if (printIfKnownGenericStruct(BGT, optionalKind, isInOutParam))
+      return;
+  }
+
   void visitPart(Type Ty, Optional<OptionalTypeKind> optionalKind,
                  bool isInOutParam) {
     TypeVisitor::visit(Ty, optionalKind, isInOutParam);
@@ -219,6 +259,14 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           ClangSyntaxPrinter(os).printIdentifier(name);
         }
       };
+
+  // Print any modifiers before the signature.
+  if (modifiers.isStatic) {
+    assert(!modifiers.isConst);
+    os << "static ";
+  }
+  if (modifiers.isInline)
+    os << "inline ";
 
   // Print out the return type.
   bool isIndirectReturnType =
@@ -314,6 +362,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     os << "void";
   }
   os << ')';
+  if (modifiers.isConst)
+    os << " const";
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
@@ -463,21 +513,18 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
   bool isConstructor = isa<ConstructorDecl>(FD);
   os << "  ";
-  if (isConstructor && !isDefinition)
-    os << "static ";
-  os << "inline ";
-  // FIXME: Full qualifier.
+
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
+  modifiers.isStatic = isConstructor && !isDefinition;
+  modifiers.isInline = true;
+  bool isMutating =
+      isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
+  modifiers.isConst = !isMutating && !isConstructor;
   printFunctionSignature(
       FD, isConstructor ? "init" : FD->getName().getBaseIdentifier().get(),
       resultTy, FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
-  bool isMutating = false;
-  if (auto *funcDecl = dyn_cast<FuncDecl>(FD))
-    isMutating = funcDecl->isMutating();
-  if (!isMutating && !isConstructor)
-    os << " const";
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -497,30 +544,48 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   os << "  }\n";
 }
 
+/// Returns true if the given property name like `isEmpty` can be remapped
+/// directly to a C++ method.
+static bool canRemapBoolPropertyNameDirectly(StringRef name) {
+  auto startsWithAndLonger = [&](StringRef prefix) -> bool {
+    return name.startswith(prefix) && name.size() > prefix.size();
+  };
+  return startsWithAndLonger("is") || startsWithAndLonger("has");
+}
+
+static std::string remapPropertyName(const AccessorDecl *accessor,
+                                     Type resultTy) {
+  // For a getter or setter, go through the variable or subscript decl.
+  StringRef propertyName = accessor->getStorage()->getBaseIdentifier().str();
+
+  // Boolean property getters can be remapped directly in certain cases.
+  if (accessor->isGetter() && resultTy->isBool() &&
+      canRemapBoolPropertyNameDirectly(propertyName)) {
+    return propertyName.str();
+  }
+
+  std::string name;
+  llvm::raw_string_ostream nameOS(name);
+  nameOS << (accessor->isSetter() ? "set" : "get")
+         << char(std::toupper(propertyName[0])) << propertyName.drop_front();
+  nameOS.flush();
+  return name;
+}
+
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
-  os << "  inline ";
-
-  StringRef propertyName;
-  // For a getter or setter, go through the variable or subscript decl.
-  propertyName = accessor->getStorage()->getBaseIdentifier().str();
-
-  std::string name;
-  llvm::raw_string_ostream nameOS(name);
-  // FIXME: some names are remapped differently. (e.g. isX).
-  nameOS << (accessor->isSetter() ? "set" : "get")
-         << char(std::toupper(propertyName[0])) << propertyName.drop_front();
+  os << "  ";
 
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
-  printFunctionSignature(accessor, nameOS.str(), resultTy,
-                         FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
-  if (accessor->isGetter()) {
-    os << " const";
-  }
+  modifiers.isInline = true;
+  modifiers.isConst = accessor->isGetter();
+  printFunctionSignature(accessor, remapPropertyName(accessor, resultTy),
+                         resultTy, FunctionSignatureKind::CxxInlineThunk, {},
+                         modifiers);
   if (!isDefinition) {
     os << ";\n";
     return;
