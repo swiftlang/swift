@@ -256,10 +256,6 @@ ERROR(cannot_pass_rvalue_inout,none,
 ERROR(cannot_provide_default_value_inout,none,
       "cannot provide default value to inout parameter %0", (Identifier))
 
-ERROR(cannot_call_with_params, none,
-      "cannot invoke %select{|initializer for type }2'%0' with an argument list"
-      " of type '%1'", (StringRef, StringRef, bool))
-
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
 
