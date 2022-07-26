@@ -64,9 +64,9 @@ public:
   /// Optional modifiers that can be applied to function signature.
   struct FunctionSignatureModifiers {
     /// Additional qualifier to add before the function's name.
-    const NominalTypeDecl *qualifierContext;
+    const NominalTypeDecl *qualifierContext = nullptr;
 
-    FunctionSignatureModifiers() : qualifierContext(nullptr) {}
+    FunctionSignatureModifiers() {}
   };
 
   /// Print the C function declaration or the C++ function thunk that
