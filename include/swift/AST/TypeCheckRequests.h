@@ -3554,6 +3554,23 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Inject or get `$_storage` property which is used to route accesses through
+/// to all stored properties of a type that has a type wrapper.
+class GetTypeWrapperProperty
+    : public SimpleRequest<GetTypeWrapperProperty, VarDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);

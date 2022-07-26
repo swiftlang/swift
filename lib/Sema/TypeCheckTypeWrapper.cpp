@@ -17,11 +17,40 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
 using namespace swift;
+
+/// Create a property declaration and inject it into the given type.
+static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
+                               Type type, VarDecl::Introducer introducer,
+                               Expr *initializer = nullptr) {
+  auto &ctx = parent->getASTContext();
+
+  auto *var = new (ctx) VarDecl(/*isStatic=*/false, introducer,
+                                /*nameLoc=*/SourceLoc(), name, parent);
+
+  var->setImplicit();
+  var->setSynthesized();
+  var->copyFormalAccessFrom(parent, /*sourceIsParentContext=*/true);
+  var->setInterfaceType(type);
+
+  Pattern *pattern = NamedPattern::createImplicit(ctx, var);
+  pattern->setType(type);
+
+  pattern = TypedPattern::createImplicit(ctx, pattern, type);
+
+  auto *PBD = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
+                                                 pattern, initializer, parent);
+
+  parent->addMember(PBD);
+  parent->addMember(var);
+
+  return var;
+}
 
 NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
@@ -112,4 +141,30 @@ GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
   parent->addMember(storage);
 
   return storage;
+}
+
+VarDecl *
+GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
+                                 NominalTypeDecl *parent) const {
+  auto &ctx = parent->getASTContext();
+
+  auto *typeWrapper = parent->getTypeWrapper();
+  if (!typeWrapper)
+    return nullptr;
+
+  auto *storage =
+      evaluateOrDefault(ctx.evaluator, GetTypeWrapperStorage{parent}, nullptr);
+
+  auto *typeWrapperType =
+      evaluateOrDefault(ctx.evaluator, GetTypeWrapperType{parent}, Type())
+          ->castTo<AnyGenericType>();
+  assert(typeWrapperType);
+
+  // $_storage: Wrapper<$Storage>
+  auto propertyTy = BoundGenericType::get(
+      typeWrapper, /*Parent=*/typeWrapperType->getParent(),
+      /*genericArgs=*/{storage->getInterfaceType()->getMetatypeInstanceType()});
+
+  return injectProperty(parent, ctx.Id_TypeWrapperProperty,
+                        propertyTy, VarDecl::Introducer::Var);
 }

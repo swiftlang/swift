@@ -309,6 +309,7 @@ IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 
 // Type wrappers
 IDENTIFIER_WITH_NAME(TypeWrapperStorage, "$Storage")
+IDENTIFIER_WITH_NAME(TypeWrapperProperty, "$_storage")
 
 #undef IDENTIFIER
 #undef IDENTIFIER_
