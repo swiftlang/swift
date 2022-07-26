@@ -504,13 +504,28 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   os << "  }\n";
 }
 
-static std::string remapPropertyName(const AccessorDecl *accessor) {
-  StringRef propertyName;
+/// Returns true if the given property name like `isEmpty` can be remapped
+/// directly to a C++ method.
+static bool canRemapBoolPropertyNameDirectly(StringRef name) {
+  auto startsWithAndLonger = [&](StringRef prefix) -> bool {
+    return name.startswith(prefix) && name.size() > prefix.size();
+  };
+  return startsWithAndLonger("is") || startsWithAndLonger("has");
+}
+
+static std::string remapPropertyName(const AccessorDecl *accessor,
+                                     Type resultTy) {
   // For a getter or setter, go through the variable or subscript decl.
-  propertyName = accessor->getStorage()->getBaseIdentifier().str();
+  StringRef propertyName = accessor->getStorage()->getBaseIdentifier().str();
+
+  // Boolean property getters can be remapped directly in certain cases.
+  if (accessor->isGetter() && resultTy->isBool() &&
+      canRemapBoolPropertyNameDirectly(propertyName)) {
+    return propertyName.str();
+  }
+
   std::string name;
   llvm::raw_string_ostream nameOS(name);
-  // FIXME: some names are remapped differently. (e.g. isX).
   nameOS << (accessor->isSetter() ? "set" : "get")
          << char(std::toupper(propertyName[0])) << propertyName.drop_front();
   nameOS.flush();
@@ -528,8 +543,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     modifiers.qualifierContext = typeDeclContext;
   modifiers.isInline = true;
   modifiers.isConst = accessor->isGetter();
-  printFunctionSignature(accessor, remapPropertyName(accessor), resultTy,
-                         FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
+  printFunctionSignature(accessor, remapPropertyName(accessor, resultTy),
+                         resultTy, FunctionSignatureKind::CxxInlineThunk, {},
+                         modifiers);
   if (!isDefinition) {
     os << ";\n";
     return;
