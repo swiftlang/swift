@@ -410,7 +410,7 @@ Type ASTBuilder::createFunctionType(
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
                                    resultDiffKind, clangFunctionType,
-                                   globalActor)
+                                   globalActor, clang::PointerAuthQualifier())
           .withAsync(flags.isAsync())
           .withConcurrent(flags.isSendable())
           .build();

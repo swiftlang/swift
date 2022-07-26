@@ -319,12 +319,15 @@ class ASTExtInfoBuilder {
 
   ClangTypeInfo clangTypeInfo;
   Type globalActor;
+  // Imported custom __ptrauth qualifier from C
+  clang::PointerAuthQualifier ptrAuthQual;
 
   using Representation = FunctionTypeRepresentation;
 
-  ASTExtInfoBuilder(
-      unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor
-  ) : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor) {}
+  ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo,
+                    Type globalActor, clang::PointerAuthQualifier ptrAuthQual)
+      : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor),
+        ptrAuthQual(ptrAuthQual) {}
 
 public:
   /// An ExtInfoBuilder for a typical Swift function: @convention(swift),
@@ -332,24 +335,24 @@ public:
   ASTExtInfoBuilder()
       : ASTExtInfoBuilder(Representation::Swift, false, false,
                           DifferentiabilityKind::NonDifferentiable, nullptr,
-                          Type()) {}
+                          Type(), clang::PointerAuthQualifier()) {}
 
   // Constructor for polymorphic type.
   ASTExtInfoBuilder(Representation rep, bool throws)
       : ASTExtInfoBuilder(rep, false, throws,
                           DifferentiabilityKind::NonDifferentiable, nullptr,
-                          Type()) {}
+                          Type(), clang::PointerAuthQualifier()) {}
 
   // Constructor with no defaults.
   ASTExtInfoBuilder(Representation rep, bool isNoEscape, bool throws,
                     DifferentiabilityKind diffKind, const clang::Type *type,
-                    Type globalActor)
+                    Type globalActor, clang::PointerAuthQualifier ptrAuthQual)
       : ASTExtInfoBuilder(
             ((unsigned)rep) | (isNoEscape ? NoEscapeMask : 0) |
                 (throws ? ThrowsMask : 0) |
                 (((unsigned)diffKind << DifferentiabilityMaskOffset) &
                  DifferentiabilityMask),
-            ClangTypeInfo(type), globalActor) {}
+            ClangTypeInfo(type), globalActor, ptrAuthQual) {}
 
   void checkInvariants() const;
 
@@ -380,6 +383,10 @@ public:
   }
 
   ClangTypeInfo getClangTypeInfo() const { return clangTypeInfo; }
+
+  clang::PointerAuthQualifier getPointerAuthQualifier() const {
+    return ptrAuthQual;
+  }
 
   constexpr SILFunctionTypeRepresentation getSILRepresentation() const {
     unsigned rawRep = bits & RepresentationMask;
@@ -417,31 +424,30 @@ public:
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo(),
-                             globalActor);
+                             globalActor, ptrAuthQual);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return ASTExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
-                             clangTypeInfo, globalActor);
+                             clangTypeInfo, globalActor, ptrAuthQual);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withConcurrent(bool concurrent = true) const {
     return ASTExtInfoBuilder(concurrent ? (bits | SendableMask)
                                         : (bits & ~SendableMask),
-                             clangTypeInfo, globalActor);
+                             clangTypeInfo, globalActor, ptrAuthQual);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withAsync(bool async = true) const {
-    return ASTExtInfoBuilder(async ? (bits | AsyncMask)
-                                   : (bits & ~AsyncMask),
-                             clangTypeInfo, globalActor);
+    return ASTExtInfoBuilder(async ? (bits | AsyncMask) : (bits & ~AsyncMask),
+                             clangTypeInfo, globalActor, ptrAuthQual);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withThrows(bool throws = true) const {
-    return ASTExtInfoBuilder(
-        throws ? (bits | ThrowsMask) : (bits & ~ThrowsMask), clangTypeInfo,
-        globalActor);
+    return ASTExtInfoBuilder(throws ? (bits | ThrowsMask)
+                                    : (bits & ~ThrowsMask),
+                             clangTypeInfo, globalActor, ptrAuthQual);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder
@@ -449,11 +455,12 @@ public:
     return ASTExtInfoBuilder(
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
-        clangTypeInfo, globalActor);
+        clangTypeInfo, globalActor, ptrAuthQual);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
-    return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor);
+    return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor,
+                             ptrAuthQual);
   }
 
   /// Put a SIL representation in the ExtInfo.
@@ -467,24 +474,32 @@ public:
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo(),
-                             globalActor);
+                             globalActor, ptrAuthQual);
   }
 
   LLVM_NODISCARD
   ASTExtInfoBuilder withGlobalActor(Type globalActor) const {
-    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor);
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, ptrAuthQual);
+  }
+
+  LLVM_NODISCARD
+  ASTExtInfoBuilder
+  withPointerAuthQualifier(clang::PointerAuthQualifier ptrAuthQual) const {
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, ptrAuthQual);
   }
 
   bool isEqualTo(ASTExtInfoBuilder other, bool useClangTypes) const {
     return bits == other.bits &&
-      (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
-      globalActor.getPointer() == other.globalActor.getPointer();
+           (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
+           globalActor.getPointer() == other.globalActor.getPointer() &&
+           ptrAuthQual == other.ptrAuthQual;
   }
 
-  constexpr std::tuple<unsigned, const void *, const void *>
+  constexpr std::tuple<unsigned, const void *, const void *, uint32_t>
   getFuncAttrKey() const {
-    return std::make_tuple(
-        bits, clangTypeInfo.getType(), globalActor.getPointer());
+    return std::make_tuple(bits, clangTypeInfo.getType(),
+                           globalActor.getPointer(),
+                           ptrAuthQual.getAsOpaqueValue());
   }
 }; // end ASTExtInfoBuilder
 
@@ -505,8 +520,9 @@ class ASTExtInfo {
   // Only for use by ASTExtInfoBuilder::build. Don't use it elsewhere!
   ASTExtInfo(ASTExtInfoBuilder builder) : builder(builder) {}
 
-  ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor)
-      : builder(bits, clangTypeInfo, globalActor) {
+  ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor,
+             clang::PointerAuthQualifier ptrAuthQual)
+      : builder(bits, clangTypeInfo, globalActor, ptrAuthQual) {
     builder.checkInvariants();
   };
 
@@ -545,6 +561,10 @@ public:
   constexpr bool isDifferentiable() const { return builder.isDifferentiable(); }
 
   ClangTypeInfo getClangTypeInfo() const { return builder.getClangTypeInfo(); }
+
+  clang::PointerAuthQualifier getPointerAuthQualifier() const {
+    return builder.getPointerAuthQualifier();
+  }
 
   constexpr bool hasSelfParam() const { return builder.hasSelfParam(); }
 
@@ -601,7 +621,7 @@ public:
     return builder.isEqualTo(other.builder, useClangTypes);
   }
 
-  constexpr std::tuple<unsigned, const void *, const void *>
+  constexpr std::tuple<unsigned, const void *, const void *, uint32_t>
   getFuncAttrKey() const {
     return builder.getFuncAttrKey();
   }
@@ -698,8 +718,8 @@ public:
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isSendable, bool isAsync,
                     DifferentiabilityKind diffKind, const clang::Type *type)
-      : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape,
-                                   isSendable, isAsync, diffKind),
+      : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isSendable,
+                                   isAsync, diffKind),
                           ClangTypeInfo(type)) {}
 
   // Constructor for polymorphic type.
@@ -806,7 +826,7 @@ public:
   LLVM_NODISCARD
   SILExtInfoBuilder withConcurrent(bool isSendable = true) const {
     return SILExtInfoBuilder(isSendable ? (bits | SendableMask)
-                                          : (bits & ~SendableMask),
+                                        : (bits & ~SendableMask),
                              clangTypeInfo);
   }
   LLVM_NODISCARD

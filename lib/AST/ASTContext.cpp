@@ -3978,15 +3978,18 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddInteger(std::get<0>(infoKey));
     ID.AddPointer(std::get<1>(infoKey));
     ID.AddPointer(std::get<2>(infoKey));
+    ID.AddInteger(std::get<3>(infoKey));
   }
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, Optional<ExtInfo> info) {
   Type globalActor;
-  if (info.has_value())
+  clang::PointerAuthQualifier pointerAuthQualifier;
+  if (info.has_value()) {
     globalActor = info->getGlobalActor();
-
+    pointerAuthQualifier = info->getPointerAuthQualifier();
+  }
   auto properties = getFunctionRecursiveProperties(params, result, globalActor);
   auto arena = getArena(properties);
 
@@ -4019,9 +4022,10 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   bool hasClangInfo =
       info.has_value() && !info.value().getClangTypeInfo().empty();
 
-  size_t allocSize = totalSizeToAlloc<
-      AnyFunctionType::Param, ClangTypeInfo, Type
-    >(params.size(), hasClangInfo ? 1 : 0, globalActor ? 1 : 0);
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo,
+                                      Type, clang::PointerAuthQualifier>(
+      params.size(), hasClangInfo ? 1 : 0, globalActor ? 1 : 0,
+      pointerAuthQualifier ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isAnyFunctionTypeCanonical(params, result);
@@ -4056,6 +4060,8 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
       *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
     if (Type globalActor = info->getGlobalActor())
       *getTrailingObjects<Type>() = globalActor;
+    if (auto ptrAuthQual = info->getPointerAuthQualifier())
+      *getTrailingObjects<clang::PointerAuthQualifier>() = ptrAuthQual;
   }
 }
 

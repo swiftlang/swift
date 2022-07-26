@@ -380,13 +380,14 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
     HasGlobalActor : 1,
+    HasPointerAuthQualifier : 1,
     : NumPadBits,
     NumParams : 16
   );
@@ -3142,6 +3143,8 @@ protected:
           !Info.value().getClangTypeInfo().empty();
       Bits.AnyFunctionType.HasGlobalActor =
           !Info.value().getGlobalActor().isNull();
+      Bits.AnyFunctionType.HasPointerAuthQualifier =
+          Info.value().getPointerAuthQualifier().isPresent();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3153,6 +3156,7 @@ protected:
       Bits.AnyFunctionType.HasClangTypeInfo = false;
       Bits.AnyFunctionType.ExtInfoBits = 0;
       Bits.AnyFunctionType.HasGlobalActor = false;
+      Bits.AnyFunctionType.HasPointerAuthQualifier = false;
     }
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
@@ -3195,10 +3199,16 @@ public:
     return Bits.AnyFunctionType.HasGlobalActor;
   }
 
+  bool hasPointerAuthQualifier() const {
+    return Bits.AnyFunctionType.HasPointerAuthQualifier;
+  }
+
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
 
   Type getGlobalActor() const;
+
+  clang::PointerAuthQualifier getPointerAuthQualifier() const;
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
@@ -3223,7 +3233,7 @@ public:
   ExtInfo getExtInfo() const {
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
-                   getGlobalActor());
+                   getGlobalActor(), getPointerAuthQualifier());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -3238,7 +3248,7 @@ public:
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits,
                    useClangFunctionType ? getCanonicalClangTypeInfo()
                                         : ClangTypeInfo(),
-                   globalActor);
+                   globalActor, getPointerAuthQualifier());
   }
 
   bool hasSameExtInfoAs(const AnyFunctionType *otherFn);
@@ -3457,7 +3467,8 @@ class FunctionType final
     : public AnyFunctionType,
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param,
-                                    ClangTypeInfo, Type> {
+                                    ClangTypeInfo, Type,
+                                    clang::PointerAuthQualifier> {
   friend TrailingObjects;
 
 
@@ -3496,6 +3507,12 @@ public:
     if (!hasGlobalActor())
       return Type();
     return *getTrailingObjects<Type>();
+  }
+
+  clang::PointerAuthQualifier getPointerAuthQualifier() const {
+    if (!hasPointerAuthQualifier())
+      return clang::PointerAuthQualifier();
+    return *getTrailingObjects<clang::PointerAuthQualifier>();
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -4691,6 +4708,8 @@ public:
   }
 
   ClangTypeInfo getClangTypeInfo() const;
+
+  clang::PointerAuthQualifier getPointerAuthQualifier() const;
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if

@@ -5874,12 +5874,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     globalActor = globalActorTy.get();
   }
 
-  auto info =
-      FunctionType::ExtInfoBuilder(*representation, noescape, throws, *diffKind,
-                                   clangFunctionType, globalActor)
-          .withConcurrent(concurrent)
-          .withAsync(async)
-          .build();
+  auto info = FunctionType::ExtInfoBuilder(
+                  *representation, noescape, throws, *diffKind,
+                  clangFunctionType, globalActor, clang::PointerAuthQualifier())
+                  .withConcurrent(concurrent)
+                  .withAsync(async)
+                  .build();
 
   auto resultTy = MF.getTypeChecked(resultID);
   if (!resultTy)

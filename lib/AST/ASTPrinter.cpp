@@ -5923,6 +5923,10 @@ public:
       Printer << " ";
     }
 
+    if (auto ptrAuthQual = info.getPointerAuthQualifier()) {
+      Printer << ptrAuthQual.getAsString() << " ";
+    }
+
     if (!Options.excludeAttrKind(TAK_Sendable) &&
         info.isSendable()) {
       Printer.printSimpleAttr("@Sendable") << " ";

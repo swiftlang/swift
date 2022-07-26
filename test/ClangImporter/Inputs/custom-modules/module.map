@@ -271,3 +271,7 @@ module CommonName {
   header "CommonName.h"
   export *
 }
+
+module PointerAuth {
+  header "import-ptrauth-field-fptr.h"
+}

@@ -3369,7 +3369,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), diffKind,
-      /*clangFunctionType*/ nullptr, Type());
+      /*clangFunctionType*/ nullptr, Type(), clang::PointerAuthQualifier());
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
