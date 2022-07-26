@@ -3536,6 +3536,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Inject or get `$Storage` type which has all of the stored properties
+/// of the given type with a type wrapper.
+class GetTypeWrapperStorage
+    : public SimpleRequest<GetTypeWrapperStorage,
+                           NominalTypeDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);

@@ -307,6 +307,9 @@ IDENTIFIER(decodeNextArgument)
 IDENTIFIER(SerializationRequirement)
 IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 
+// Type wrappers
+IDENTIFIER_WITH_NAME(TypeWrapperStorage, "$Storage")
+
 #undef IDENTIFIER
 #undef IDENTIFIER_
 #undef IDENTIFIER_WITH_NAME

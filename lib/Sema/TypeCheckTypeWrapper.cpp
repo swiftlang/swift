@@ -90,3 +90,26 @@ Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
   }
   return type;
 }
+
+NominalTypeDecl *
+GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *parent) const {
+  if (!parent->hasTypeWrapper())
+    return nullptr;
+
+  auto &ctx = parent->getASTContext();
+
+  auto *storage =
+      new (ctx) StructDecl(/*StructLoc=*/SourceLoc(), ctx.Id_TypeWrapperStorage,
+                           /*NameLoc=*/SourceLoc(),
+                           /*Inheritted=*/{},
+                           /*GenericParams=*/nullptr, parent);
+
+  storage->setImplicit();
+  storage->setSynthesized();
+  storage->copyFormalAccessFrom(parent, /*sourceIsParentContext=*/true);
+
+  parent->addMember(storage);
+
+  return storage;
+}

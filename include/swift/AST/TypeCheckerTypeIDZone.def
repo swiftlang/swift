@@ -405,3 +405,6 @@ SWIFT_REQUEST(TypeChecker, GetTypeWrapper,
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperType,
               Type(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperStorage,
+              NominalTypeDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
