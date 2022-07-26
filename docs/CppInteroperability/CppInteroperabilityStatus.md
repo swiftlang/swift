@@ -165,6 +165,6 @@ This status table describes which of the following Swift language features have 
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Getter accessors               | Yes, via `get<name>`. For structs only                   |
+| Getter accessors               | Yes, via `get<name>`. Boolean properties that start with `is` or `has` are remapped directly to a getter method using their original name. For structs only                   |
 | Setter accessors               | Yes, via `set<name>`. For structs only                   |
 | Mutation accessors             | No                                                       |
