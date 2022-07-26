@@ -221,6 +221,10 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       };
 
   // Print any modifiers before the signature.
+  if (modifiers.isStatic) {
+    assert(!modifiers.isConst);
+    os << "static ";
+  }
   if (modifiers.isInline)
     os << "inline ";
 
@@ -469,13 +473,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
   bool isConstructor = isa<ConstructorDecl>(FD);
   os << "  ";
-  if (isConstructor && !isDefinition)
-    os << "static ";
 
-  // FIXME: Full qualifier.
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
+  modifiers.isStatic = isConstructor && !isDefinition;
   modifiers.isInline = true;
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
