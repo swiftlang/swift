@@ -42,6 +42,12 @@ getKnownTypeInfo(const TypeDecl *typeDecl, PrimitiveTypeMapping &typeMapping,
 bool isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
                  OutputLanguageMode languageMode) {
   const TypeDecl *typeDecl;
+  if (auto *bgt = dyn_cast<BoundGenericStructType>(
+          t->isOptional() ? t->getOptionalObjectType()->getDesugaredType()
+                          : t->getDesugaredType())) {
+    return bgt->isUnsafePointer() || bgt->isUnsafeMutablePointer();
+  }
+
   if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer()))
     typeDecl = typeAliasType->getDecl();
   else if (auto *structDecl = t->getStructOrBoundGenericStruct())
@@ -175,6 +181,35 @@ public:
     } else
       ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
           .printValueTypeReturnType(decl, languageMode, moduleContext);
+  }
+
+  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+                                 Optional<OptionalTypeKind> optionalKind,
+                                 bool isInOutParam) {
+    auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
+    bool isConst;
+    if (bgsTy->isUnsafePointer())
+      isConst = true;
+    else if (bgsTy->isUnsafeMutablePointer())
+      isConst = false;
+    else
+      return false;
+
+    auto args = BGT->getGenericArgs();
+    assert(args.size() == 1);
+    visitPart(args.front(), OTK_None, /*isInOutParam=*/false);
+    if (isConst)
+      os << " const";
+    os << " *";
+    printNullability(optionalKind);
+    return true;
+  }
+
+  void visitBoundGenericStructType(BoundGenericStructType *BGT,
+                                   Optional<OptionalTypeKind> optionalKind,
+                                   bool isInOutParam) {
+    if (printIfKnownGenericStruct(BGT, optionalKind, isInOutParam))
+      return;
   }
 
   void visitPart(Type Ty, Optional<OptionalTypeKind> optionalKind,
