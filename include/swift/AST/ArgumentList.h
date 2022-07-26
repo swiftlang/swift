@@ -527,13 +527,6 @@ public:
       ASTContext &ctx,
       llvm::function_ref<Type(Expr *)> getType = __Expr_getType) const;
 
-  /// Avoid adding new usages of this. Creates a TupleType or ParenType
-  /// representing the types in the argument list. A ParenType will be returned
-  /// for a single argument, otherwise a TupleType.
-  Type composeTupleOrParenType(
-      ASTContext &ctx,
-      llvm::function_ref<Type(Expr *)> getType = __Expr_getType) const;
-
   /// Whether the argument list matches a given parameter list. This will return
   /// \c false if the arity doesn't match, or any of the canonical types or
   /// labels don't match. Note that this expects types to be present for the

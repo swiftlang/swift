@@ -965,3 +965,15 @@ do {
   let g2: Gift<Sweets> = Gift<Chocolate>(box)
   // expected-error@-1 {{cannot assign value of type 'Gift<Chocolate>' to type 'Gift<Sweets>'}}
 }
+
+func testOverloadGenericVarFn() {
+  struct S<T> {
+    var foo: T
+    func foo(_ y: Int) {}
+    init() { fatalError() }
+  }
+  // Make sure we can pick the variable overload over the function.
+  S<(String) -> Void>().foo("")
+  S<((String) -> Void)?>().foo?("")
+  S<((String) -> Void)?>().foo!("")
+}

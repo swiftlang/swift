@@ -6991,20 +6991,6 @@ bool ExtraneousCallFailure::diagnoseAsError() {
     }
   }
 
-  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
-    auto *baseExpr = UDE->getBase();
-    auto *call = castToExpr<CallExpr>(getRawAnchor());
-
-    if (getType(baseExpr)->isAnyObject()) {
-      auto argsTy = call->getArgs()->composeTupleOrParenType(
-          getASTContext(), [&](Expr *E) { return getType(E); });
-      emitDiagnostic(diag::cannot_call_with_params,
-                     UDE->getName().getBaseName().userFacingName(),
-                     argsTy.getString(), isa<TypeExpr>(baseExpr));
-      return true;
-    }
-  }
-
   auto diagnostic =
       emitDiagnostic(diag::cannot_call_non_function_value, getType(anchor));
   removeParensFixIt(diagnostic);

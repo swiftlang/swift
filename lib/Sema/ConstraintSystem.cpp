@@ -4403,19 +4403,17 @@ static bool diagnoseAmbiguity(
             type->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
         assert(fn);
 
-        if (fn->getNumParams() == 1) {
-          auto *argList =
-              solution.getArgumentList(solution.Fixes.front()->getLocator());
-          assert(argList);
+        auto *argList =
+            solution.getArgumentList(solution.Fixes.front()->getLocator());
+        assert(argList);
 
+        if (fn->getNumParams() == 1 && argList->isUnary()) {
           const auto &param = fn->getParams()[0];
-          auto argType = argList->composeTupleOrParenType(
-              cs.getASTContext(),
-              [&](Expr *E) { return solution.getResolvedType(E); });
+          auto argTy = solution.getResolvedType(argList->getUnaryExpr());
 
           DE.diagnose(noteLoc, diag::candidate_has_invalid_argument_at_position,
                       solution.simplifyType(param.getPlainType()),
-                      /*position=*/1, param.isInOut(), argType);
+                      /*position=*/1, param.isInOut(), argTy);
         } else {
           DE.diagnose(noteLoc, diag::candidate_partial_match,
                       fn->getParamListAsString(fn->getParams()));
