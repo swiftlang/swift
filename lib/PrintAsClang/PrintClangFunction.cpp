@@ -220,6 +220,10 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
         }
       };
 
+  // Print any modifiers before the signature.
+  if (modifiers.isInline)
+    os << "inline ";
+
   // Print out the return type.
   bool isIndirectReturnType =
       kind == FunctionSignatureKind::CFunctionProto &&
@@ -467,11 +471,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   os << "  ";
   if (isConstructor && !isDefinition)
     os << "static ";
-  os << "inline ";
+
   // FIXME: Full qualifier.
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
+  modifiers.isInline = true;
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
   modifiers.isConst = !isMutating && !isConstructor;
@@ -501,7 +506,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
-  os << "  inline ";
+  os << "  ";
 
   StringRef propertyName;
   // For a getter or setter, go through the variable or subscript decl.
@@ -516,6 +521,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
+  modifiers.isInline = true;
   modifiers.isConst = accessor->isGetter();
   printFunctionSignature(accessor, nameOS.str(), resultTy,
                          FunctionSignatureKind::CxxInlineThunk, {}, modifiers);

@@ -65,6 +65,7 @@ public:
   struct FunctionSignatureModifiers {
     /// Additional qualifier to add before the function's name.
     const NominalTypeDecl *qualifierContext = nullptr;
+    bool isInline = false;
     bool isConst = false;
 
     FunctionSignatureModifiers() {}
