@@ -763,6 +763,11 @@ DECL_ATTR(_expose, Expose,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   133)
 
+SIMPLE_DECL_ATTR(typeWrapper, TypeWrapper,
+  OnStruct | OnClass | OnEnum |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  134)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 
