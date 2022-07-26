@@ -288,10 +288,10 @@ public func trivialAssignToVar5OwnedArg(_ x: Trivial, @_noImplicitCopy _ x2: __o
 }
 
 public func trivialAccessField(_ x: Trivial) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
-    print(x2.value) // expected-note {{consuming use}}
+    @_noImplicitCopy let x2 = x
+    print(x2.value)
     for _ in 0..<1024 {
-        print(x2.value) // expected-note {{consuming use}}
+        print(x2.value)
     }
 }
 
@@ -302,10 +302,10 @@ public func trivialAccessFieldArg(@_noImplicitCopy _ x2: Trivial) {
     }
 }
 
-public func trivialAccessFieldOwnedArg(@_noImplicitCopy _ x2: __owned Trivial) { // expected-error {{'x2' consumed more than once}}
-    print(x2.value) // expected-note {{consuming use}}
+public func trivialAccessFieldOwnedArg(@_noImplicitCopy _ x2: __owned Trivial) {
+    print(x2.value)
     for _ in 0..<1024 {
-        print(x2.value) // expected-note {{consuming use}}
+        print(x2.value)
     }
 }
 
@@ -523,10 +523,10 @@ public func aggStructDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned AggStr
 }
 
 public func aggStructAccessField(_ x: AggStruct) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
-    print(x2.lhs) // expected-note {{consuming use}}
+    @_noImplicitCopy let x2 = x
+    print(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs) // expected-note {{consuming use}}
+        print(x2.lhs)
     }
 }
 
@@ -537,10 +537,10 @@ public func aggStructAccessFieldArg(@_noImplicitCopy _ x2: AggStruct) {
     }
 }
 
-public func aggStructAccessFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
-    print(x2.lhs) // expected-note {{consuming use}}
+public func aggStructAccessFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) {
+    print(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs) // expected-note {{consuming use}}
+        print(x2.lhs)
     }
 }
 
@@ -751,10 +751,10 @@ public func aggGenericStructDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned
 }
 
 public func aggGenericStructAccessField(_ x: AggGenericStruct<Trivial>) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
-    print(x2.lhs) // expected-note {{consuming use}}
+    @_noImplicitCopy let x2 = x
+    print(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs) // expected-note {{consuming use}}
+        print(x2.lhs)
     }
 }
 
@@ -765,10 +765,10 @@ public func aggGenericStructAccessFieldArg(@_noImplicitCopy _ x2: AggGenericStru
     }
 }
 
-public func aggGenericStructAccessFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Trivial>) { // expected-error {{'x2' consumed more than once}}
-    print(x2.lhs) // expected-note {{consuming use}}
+public func aggGenericStructAccessFieldOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Trivial>) {
+    print(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs) // expected-note {{consuming use}}
+        print(x2.lhs)
     }
 }
 
@@ -970,10 +970,10 @@ public func aggGenericStructDiamondInLoopOwnedArg<T>(@_noImplicitCopy _ x2: __ow
 }
 
 public func aggGenericStructAccessField<T>(_ x: AggGenericStruct<T>) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
-    print(x2.lhs) // expected-note {{consuming use}}
+    @_noImplicitCopy let x2 = x
+    print(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs) // expected-note {{consuming use}}
+        print(x2.lhs)
     }
 }
 
@@ -984,10 +984,10 @@ public func aggGenericStructAccessFieldArg<T>(@_noImplicitCopy _ x2: AggGenericS
     }
 }
 
-public func aggGenericStructAccessFieldOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
-    print(x2.lhs) // expected-note {{consuming use}}
+public func aggGenericStructAccessFieldOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) {
+    print(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs) // expected-note {{consuming use}}
+        print(x2.lhs)
     }
 }
 
