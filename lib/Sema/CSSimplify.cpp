@@ -135,7 +135,8 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
 }
 
 static bool areConservativelyCompatibleArgumentLabels(
-    OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
+    ConstraintSystem &cs, OverloadChoice choice,
+    SmallVectorImpl<FunctionType::Param> &args,
     MatchCallArgumentListener &listener,
     Optional<unsigned> unlabeledTrailingClosureArgIndex) {
   ValueDecl *decl = nullptr;
@@ -155,22 +156,34 @@ static bool areConservativelyCompatibleArgumentLabels(
     return true;
   }
 
-  if (!decl->hasParameterList())
-    return true;
-
-  // This is a member lookup, which generally means that the call arguments
-  // (if we have any) will apply to the second level of parameters, with
-  // the member lookup applying the curried self at the first level. But there
-  // are cases where we can get an unapplied declaration reference back.
+  // If this is a member lookup, the call arguments (if we have any) will
+  // generally be applied to the second level of parameters, with the member
+  // lookup applying the curried self at the first level. But there are cases
+  // where we can get an unapplied declaration reference back.
   auto hasAppliedSelf =
       decl->hasCurriedSelf() &&
       doesMemberRefApplyCurriedSelf(choice.getBaseType(), decl);
 
-  auto *fnType = decl->getInterfaceType()->castTo<AnyFunctionType>();
-  if (hasAppliedSelf) {
-    fnType = fnType->getResult()->getAs<AnyFunctionType>();
-    assert(fnType && "Parameter list curry level does not match type");
+  AnyFunctionType *fnType = nullptr;
+  if (decl->hasParameterList()) {
+    fnType = decl->getInterfaceType()->castTo<AnyFunctionType>();
+    if (hasAppliedSelf) {
+      fnType = fnType->getResult()->getAs<AnyFunctionType>();
+      assert(fnType && "Parameter list curry level does not match type");
+    }
+  } else if (auto *VD = dyn_cast<VarDecl>(decl)) {
+    // For variables, we can reject any type that we know cannot be callable.
+    auto varTy = VD->getValueInterfaceType()->lookThroughAllOptionalTypes();
+    if (!varTy->mayBeCallable(cs.DC))
+      return false;
+    fnType = varTy->getAs<AnyFunctionType>();
   }
+
+  // Given we want to be conservative with this checking, if there's any case
+  // we can't match arguments for (e.g callable nominals, type parameters),
+  // default to returning true.
+  if (!fnType)
+    return true;
 
   auto params = fnType->getParams();
   ParameterListInfo paramInfo(params, decl, hasAppliedSelf);
@@ -11014,7 +11027,7 @@ retry_after_fail:
 
           auto labelsMatch = [&](MatchCallArgumentListener &listener) {
             if (areConservativelyCompatibleArgumentLabels(
-                    choice, argsWithLabels, listener,
+                    *this, choice, argsWithLabels, listener,
                     argList->getFirstTrailingClosureIndex()))
               return true;
 
