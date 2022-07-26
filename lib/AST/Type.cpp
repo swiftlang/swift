@@ -2006,41 +2006,6 @@ bool TypeBase::satisfiesClassConstraint() {
   return mayHaveSuperclass() || isObjCExistentialType();
 }
 
-bool TypeBase::isCallableNominalType(DeclContext *dc) {
-  // Don't allow callAsFunction to be used with dynamic lookup.
-  if (isAnyObject())
-    return false;
-
-  // If the type cannot have members, we're done.
-  if (!mayHaveMembers())
-    return false;
-
-  auto canTy = getCanonicalType();
-  auto &ctx = canTy->getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           IsCallableNominalTypeRequest{canTy, dc}, false);
-}
-
-bool TypeBase::hasDynamicMemberLookupAttribute() {
-  if (!mayHaveMembers())
-    return false;
-
-  auto canTy = getCanonicalType();
-  auto &ctx = canTy->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, HasDynamicMemberLookupAttributeRequest{canTy}, false);
-}
-
-bool TypeBase::hasDynamicCallableAttribute() {
-  if (!mayHaveMembers())
-    return false;
-
-  auto canTy = getCanonicalType();
-  auto &ctx = canTy->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, HasDynamicCallableAttributeRequest{canTy}, false);
-}
-
 Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);

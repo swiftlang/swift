@@ -567,7 +567,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     }
 
     // Handle an apply of a nominal type which supports callAsFunction.
-    if (fnTy->isCallableNominalType(DC)) {
+    if (fnTy->isCallAsFunctionType(DC)) {
       return getConstraintLocator(anchor,
                                   {LocatorPathElt::ApplyFunction(),
                                    LocatorPathElt::ImplicitCallAsFunction()});
@@ -3433,18 +3433,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
           func->isAsyncContext() != isAsynchronousContext(useDC)) {
         increaseScore(
             func->isAsyncContext() ? SK_AsyncInSyncMismatch : SK_SyncInAsync);
-      }
-    }
-
-    // If we're binding to an init member, the 'throws' need to line up
-    // between the bound and reference types.
-    if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
-      auto boundFunctionType = boundType->getAs<AnyFunctionType>();
-
-      if (boundFunctionType &&
-          CD->hasThrows() != boundFunctionType->isThrowing()) {
-        boundType = boundFunctionType->withExtInfo(
-            boundFunctionType->getExtInfo().withThrows());
       }
     }
 
