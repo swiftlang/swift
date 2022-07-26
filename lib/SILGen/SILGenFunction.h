@@ -908,7 +908,9 @@ public:
   ///
   /// NOTE: this does not support actor initializers!
   void emitConstructorPrologActorHop(SILLocation loc,
-                                     Optional<ActorIsolation> actorIso);
+                                     ConstructorDecl *ctor,
+                                     ManagedValue self,
+                                     ActorIsolation actorIso);
 
   /// Set the given global actor as the isolation for this function
   /// (generally a thunk) and hop to it.
