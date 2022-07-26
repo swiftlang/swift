@@ -43,4 +43,11 @@ struct HasStaticMemberTemplates {
   template <class T> static T removeReference(T &a) { return a; }
 };
 
+template <typename T>
+struct MyTemplatedStruct {};
+
+struct HasTemplatedField {
+  MyTemplatedStruct<int> x;
+};
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_MEMBER_TEMPLATES_H
