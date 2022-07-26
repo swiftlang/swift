@@ -79,6 +79,8 @@ private:
 
   bool canSerializeType(SILType type);
 
+  bool canUseFromInline(DeclContext *declCtxt);
+
   bool canUseFromInline(SILFunction *func);
 
   bool shouldSerialize(SILFunction *F);
@@ -184,8 +186,7 @@ bool CrossModuleOptimization::canSerializeFunction(
     return iter->second;
 
   if (DeclContext *funcCtxt = function->getDeclContext()) {
-    ModuleDecl *module = function->getModule().getSwiftModule();
-    if (!module->canBeUsedForCrossModuleOptimization(funcCtxt))
+    if (!canUseFromInline(funcCtxt))
       return false;
   }
 
@@ -335,7 +336,7 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
       
         // Exclude types which are defined in an @_implementationOnly imported
         // module. Such modules are not transitively available.
-        if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(subNT)) {
+        if (!canUseFromInline(subNT)) {
           return true;
         }
       }
@@ -364,10 +365,9 @@ static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
   return true;
 }
 
-/// Returns true if the function \p func can be used from a serialized function.
-bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
-  DeclContext *funcCtxt = function->getDeclContext();
-  if (funcCtxt && !M.getSwiftModule()->canBeUsedForCrossModuleOptimization(funcCtxt))
+/// Returns true if the \p declCtxt can be used from a serialized function.
+bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
+  if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(declCtxt))
     return false;
 
   /// If we are emitting a TBD file, the TBD file only contains public symbols
@@ -377,8 +377,18 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
   /// (potentially) linked statically. Unfortunately there is no way to find out
   /// if another module is linked statically or dynamically, so we have to be
   /// conservative here.
-  if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(funcCtxt, M))
+  if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(declCtxt, M))
     return false;
+    
+  return true;
+}
+
+/// Returns true if the function \p func can be used from a serialized function.
+bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
+  if (DeclContext *funcCtxt = function->getDeclContext()) {
+    if (!canUseFromInline(funcCtxt))
+      return false;
+  }
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:
