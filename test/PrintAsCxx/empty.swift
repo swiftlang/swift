@@ -29,6 +29,7 @@
 // CHECK-NEXT:  #include <cstddef>
 // CHECK-NEXT:  #include <cstdbool>
 // CHECK-NEXT:  #include <cstring>
+// CHECK-NEXT:  #include <new>
 // CHECK-NEXT:  #include <stdlib.h>
 // CHECK-NEXT:  #if defined(_WIN32)
 // CHECK-NEXT:  #include <malloc.h>
