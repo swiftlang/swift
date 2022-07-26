@@ -962,6 +962,10 @@ bool Parser::skipIfConfigOfAttributes(bool &sawAnyAttributes) {
       break;
   }
 
+  // If we ran out of tokens, say we consumed the rest.
+  if (Tok.is(tok::eof))
+    return true;
+
   return Tok.isAtStartOfLine() && consumeIf(tok::pound_endif);
 }
 

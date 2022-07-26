@@ -4346,8 +4346,8 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
   if (Tok.is(tok::pound_if) && allowPoundIfAttributes) {
     BacktrackingScope backtrack(*this);
     bool sawAnyAttributes = false;
-    return skipIfConfigOfAttributes(sawAnyAttributes) && sawAnyAttributes &&
-        isStartOfSwiftDecl();
+    return skipIfConfigOfAttributes(sawAnyAttributes) &&
+        (Tok.is(tok::eof) || (sawAnyAttributes && isStartOfSwiftDecl()));
   }
 
   // If we have a decl modifying keyword, check if the next token is a valid
