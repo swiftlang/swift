@@ -3754,6 +3754,12 @@ public:
     return getGlobalActorInstance() != nullptr;
   }
 
+  /// Returns true if this type has a type wrapper custom attribute.
+  bool hasTypeWrapper() const { return bool(getTypeWrapper()); }
+
+  /// Return a type wrapper (if any) associated with this type.
+  NominalTypeDecl *getTypeWrapper() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&

@@ -3499,6 +3499,22 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Return a type wrapper (if any) associated with the given declaration.
+class GetTypeWrapper
+    : public SimpleRequest<GetTypeWrapper, NominalTypeDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
