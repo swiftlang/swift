@@ -504,28 +504,31 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   os << "  }\n";
 }
 
+static std::string remapPropertyName(const AccessorDecl *accessor) {
+  StringRef propertyName;
+  // For a getter or setter, go through the variable or subscript decl.
+  propertyName = accessor->getStorage()->getBaseIdentifier().str();
+  std::string name;
+  llvm::raw_string_ostream nameOS(name);
+  // FIXME: some names are remapped differently. (e.g. isX).
+  nameOS << (accessor->isSetter() ? "set" : "get")
+         << char(std::toupper(propertyName[0])) << propertyName.drop_front();
+  nameOS.flush();
+  return name;
+}
+
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
   os << "  ";
 
-  StringRef propertyName;
-  // For a getter or setter, go through the variable or subscript decl.
-  propertyName = accessor->getStorage()->getBaseIdentifier().str();
-
-  std::string name;
-  llvm::raw_string_ostream nameOS(name);
-  // FIXME: some names are remapped differently. (e.g. isX).
-  nameOS << (accessor->isSetter() ? "set" : "get")
-         << char(std::toupper(propertyName[0])) << propertyName.drop_front();
-
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
   modifiers.isInline = true;
   modifiers.isConst = accessor->isGetter();
-  printFunctionSignature(accessor, nameOS.str(), resultTy,
+  printFunctionSignature(accessor, remapPropertyName(accessor), resultTy,
                          FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
   if (!isDefinition) {
     os << ";\n";
