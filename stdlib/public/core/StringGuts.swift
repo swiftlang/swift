@@ -407,28 +407,28 @@ extension _StringGuts {
     return !isSmall && isFastUTF8 && isASCII
   }
 
-  @available(*, deprecated)
-  public // SPI(corelibs-foundation)
-  var _isContiguousUTF16: Bool {
+  // FIXME: Previously used by swift-corelibs-foundation. Aging for removal.
+  @available(*, unavailable)
+  public var _isContiguousUTF16: Bool {
     return false
   }
 
-  // FIXME: Remove. Still used by swift-corelibs-foundation
+  // FIXME: Mark as obsoleted. Still used by swift-corelibs-foundation.
   @available(*, deprecated)
   public var startASCII: UnsafeMutablePointer<UInt8> {
     return UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
   }
 
-  // FIXME: Remove. Still used by swift-corelibs-foundation
-  @available(*, deprecated)
+  // FIXME: Previously used by swift-corelibs-foundation. Aging for removal.
+  @available(*, unavailable)
   public var startUTF16: UnsafeMutablePointer<UTF16.CodeUnit> {
     fatalError("Not contiguous UTF-16")
   }
 }
 
-@available(*, deprecated)
-public // SPI(corelibs-foundation)
-func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
+// FIXME: Previously used by swift-corelibs-foundation. Aging for removal.
+@available(*, unavailable)
+public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
   let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
   let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
