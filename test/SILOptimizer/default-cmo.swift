@@ -41,3 +41,35 @@ public func doIncrementTBDWithCall(_ x: Int) -> Int {
   return ModuleTBD.incrementByThreeWithCall(x)
 }
 
+// CHECK-LABEL: sil @$s4Main23getSubmoduleKlassMemberSiyF
+// CHECK-NOT:     function_ref 
+// CHECK-NOT:     apply 
+// CHECK:       } // end sil function '$s4Main23getSubmoduleKlassMemberSiyF'
+public func getSubmoduleKlassMember() -> Int {
+  return Module.submoduleKlassMember()
+}
+
+// CHECK-LABEL: sil @$s4Main26getSubmoduleKlassMemberTBDSiyF
+// CHECK:         [[F:%[0-9]+]] = function_ref @$s9ModuleTBD20submoduleKlassMemberSiyF
+// CHECK:         [[I:%[0-9]+]] = apply [[F]]
+// CHECK:         return [[I]]
+// CHECK:       } // end sil function '$s4Main26getSubmoduleKlassMemberTBDSiyF'
+public func getSubmoduleKlassMemberTBD() -> Int {
+  return ModuleTBD.submoduleKlassMember()
+}
+
+// CHECK-LABEL: sil @$s4Main20getModuleKlassMemberSiyF
+// CHECK-NOT:     function_ref 
+// CHECK-NOT:     apply 
+// CHECK:       } // end sil function '$s4Main20getModuleKlassMemberSiyF'
+public func getModuleKlassMember() -> Int {
+  return Module.moduleKlassMember()
+}
+
+// CHECK-LABEL: sil @$s4Main23getModuleKlassMemberTBDSiyF
+// CHECK-NOT:     function_ref 
+// CHECK-NOT:     apply 
+// CHECK:       } // end sil function '$s4Main23getModuleKlassMemberTBDSiyF'
+public func getModuleKlassMemberTBD() -> Int {
+  return ModuleTBD.moduleKlassMember()
+}
