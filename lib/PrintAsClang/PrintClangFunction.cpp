@@ -99,6 +99,10 @@ public:
         languageMode(languageMode), modifiersDelegate(modifiersDelegate),
         moduleContext(moduleContext), typeUseKind(typeUseKind) {}
 
+  void printInoutTypeModifier() {
+    os << (languageMode == swift::OutputLanguageMode::Cxx ? " &" : " *");
+  }
+
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               Optional<OptionalTypeKind> optionalKind,
                               bool isInOutParam) {
@@ -109,9 +113,8 @@ public:
     if (knownTypeInfo->canBeNullable) {
       printNullability(optionalKind);
     }
-    if (isInOutParam) {
-      os << (languageMode == swift::OutputLanguageMode::Cxx ? " &" : " *");
-    }
+    if (isInOutParam)
+      printInoutTypeModifier();
     return true;
   }
 
@@ -202,6 +205,8 @@ public:
       os << " const";
     os << " *";
     printNullability(optionalKind);
+    if (isInOutParam)
+      printInoutTypeModifier();
     return true;
   }
 
