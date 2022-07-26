@@ -314,6 +314,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     os << "void";
   }
   os << ')';
+  if (modifiers.isConst)
+    os << " const";
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
@@ -470,14 +472,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
+  bool isMutating =
+      isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
+  modifiers.isConst = !isMutating && !isConstructor;
   printFunctionSignature(
       FD, isConstructor ? "init" : FD->getName().getBaseIdentifier().get(),
       resultTy, FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
-  bool isMutating = false;
-  if (auto *funcDecl = dyn_cast<FuncDecl>(FD))
-    isMutating = funcDecl->isMutating();
-  if (!isMutating && !isConstructor)
-    os << " const";
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -516,11 +516,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
+  modifiers.isConst = accessor->isGetter();
   printFunctionSignature(accessor, nameOS.str(), resultTy,
                          FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
-  if (accessor->isGetter()) {
-    os << " const";
-  }
   if (!isDefinition) {
     os << ";\n";
     return;
