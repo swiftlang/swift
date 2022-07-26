@@ -1900,6 +1900,12 @@ void namelookup::extractDirectlyReferencedNominalTypes(
   llvm_unreachable("Not a type containing nominal types?");
 }
 
+void namelookup::tryExtractDirectlyReferencedNominalTypes(
+    Type type, SmallVectorImpl<NominalTypeDecl *> &decls) {
+  if (!type->is<ModuleType>() && type->mayHaveMembers())
+    namelookup::extractDirectlyReferencedNominalTypes(type, decls);
+}
+
 bool DeclContext::lookupQualified(Type type,
                                   DeclNameRef member,
                                   NLOptions options,
@@ -3046,6 +3052,102 @@ swift::getDirectlyInheritedNominalTypeDecls(
     result.emplace_back(inheritedNominal, loc, SourceLoc());
 
   return result;
+}
+
+bool IsCallAsFunctionNominalRequest::evaluate(Evaluator &evaluator,
+                                              NominalTypeDecl *decl,
+                                              DeclContext *dc) const {
+  auto &ctx = dc->getASTContext();
+
+  // Do a qualified lookup for `callAsFunction`. We want to ignore access, as
+  // that will be checked when we actually try to solve with a `callAsFunction`
+  // member access.
+  SmallVector<ValueDecl *, 4> results;
+  auto opts = NL_QualifiedDefault | NL_ProtocolMembers | NL_IgnoreAccessControl;
+  dc->lookupQualified(decl, DeclNameRef(ctx.Id_callAsFunction), opts, results);
+
+  return llvm::any_of(results, [](ValueDecl *decl) -> bool {
+    if (auto *fd = dyn_cast<FuncDecl>(decl))
+      return fd->isCallAsFunctionMethod();
+    return false;
+  });
+}
+
+bool TypeBase::isCallAsFunctionType(DeclContext *dc) {
+  // We can perform the lookup at module scope to allow us to better cache the
+  // result across different contexts. Given we'll be doing a qualified lookup,
+  // this shouldn't make a difference.
+  dc = dc->getModuleScopeContext();
+
+  // Note this excludes AnyObject.
+  SmallVector<NominalTypeDecl *, 4> decls;
+  tryExtractDirectlyReferencedNominalTypes(this, decls);
+
+  auto &ctx = dc->getASTContext();
+  return llvm::any_of(decls, [&](auto *decl) {
+    IsCallAsFunctionNominalRequest req(decl, dc);
+    return evaluateOrDefault(ctx.evaluator, req, false);
+  });
+}
+
+template <class DynamicAttribute, class Req>
+static bool checkForDynamicAttribute(Evaluator &eval, NominalTypeDecl *decl) {
+  // If this type has the attribute on it, then yes!
+  if (decl->getAttrs().hasAttribute<DynamicAttribute>())
+    return true;
+
+  auto hasAttribute = [&](NominalTypeDecl *decl) -> bool {
+    return evaluateOrDefault(eval, Req{decl}, false);
+  };
+
+  // Check the protocols the type conforms to.
+  for (auto *proto : decl->getAllProtocols()) {
+    if (hasAttribute(proto))
+      return true;
+  }
+
+  // Check the superclass if present.
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    if (auto *superclass = classDecl->getSuperclassDecl()) {
+      if (hasAttribute(superclass))
+        return true;
+    }
+  }
+  return false;
+}
+
+bool HasDynamicMemberLookupAttributeRequest::evaluate(
+    Evaluator &eval, NominalTypeDecl *decl) const {
+  using Req = HasDynamicMemberLookupAttributeRequest;
+  return checkForDynamicAttribute<DynamicMemberLookupAttr, Req>(eval, decl);
+}
+
+bool TypeBase::hasDynamicMemberLookupAttribute() {
+  SmallVector<NominalTypeDecl *, 4> decls;
+  tryExtractDirectlyReferencedNominalTypes(this, decls);
+
+  auto &ctx = getASTContext();
+  return llvm::any_of(decls, [&](auto *decl) {
+    HasDynamicMemberLookupAttributeRequest req(decl);
+    return evaluateOrDefault(ctx.evaluator, req, false);
+  });
+}
+
+bool HasDynamicCallableAttributeRequest::evaluate(Evaluator &eval,
+                                                  NominalTypeDecl *decl) const {
+  using Req = HasDynamicCallableAttributeRequest;
+  return checkForDynamicAttribute<DynamicCallableAttr, Req>(eval, decl);
+}
+
+bool TypeBase::hasDynamicCallableAttribute() {
+  SmallVector<NominalTypeDecl *, 4> decls;
+  tryExtractDirectlyReferencedNominalTypes(this, decls);
+
+  auto &ctx = getASTContext();
+  return llvm::any_of(decls, [&](auto *decl) {
+    HasDynamicCallableAttributeRequest req(decl);
+    return evaluateOrDefault(ctx.evaluator, req, false);
+  });
 }
 
 void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {

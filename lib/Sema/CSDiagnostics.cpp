@@ -147,7 +147,7 @@ Expr *FailureDiagnostic::getBaseExprFor(const Expr *anchor) const {
     return MRE->getBase();
   else if (auto *call = dyn_cast<CallExpr>(anchor)) {
     auto fnType = getType(call->getFn());
-    if (fnType->isCallableNominalType(getDC())) {
+    if (fnType->isCallAsFunctionType(getDC())) {
       return call->getFn();
     }
   }

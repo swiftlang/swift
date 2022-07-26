@@ -7749,7 +7749,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // If this is an implicit call to a `callAsFunction` method, build the
   // appropriate member reference.
-  if (cs.getType(fn)->getRValueType()->isCallableNominalType(dc)) {
+  if (cs.getType(fn)->getRValueType()->isCallAsFunctionType(dc)) {
     fn = buildCallAsFunctionMethodRef(*this, apply, *overload, calleeLoc);
     if (!fn)
       return nullptr;
