@@ -36,7 +36,7 @@ Importing Swift APIs into C++ requires certain C++ features introduced in newer 
 
 A Swift module can be imported over into C++ by using an  `#include` that imports the generated C++ header for that module:
 
-```
+```swift
 // Swift module 'MyModule'
 func myFunction();
 
@@ -46,7 +46,7 @@ func myFunction();
 
 A C++ namespace is used to represent the Swift module. Namespacing provides a better user experience for accessing APIs from different modules as it encapsulates the different module interfaces in their own namespace. For example, in order to use a Swift module called `MyModule` from C++, you have to go through the `MyModule::` namespace in C++:
 
-```
+```c++
 // C++
 #include "MyModule-Swift.h"
 
@@ -87,10 +87,12 @@ Fundamental primitive types have a C++ fundamental type that represents them in 
 
 A function that takes or return primitive Swift types behaves like any other C++ function, and you can pass in the C++ types when calling them, just as you’d expect.
 
-```
+```swift
 // Swift module 'MyModule'
 func myFunction(x: float, _ c: Int) -> Bool
+```
 
+```c++
 // C++
 #include "MyModule-Swift.h"
 
@@ -103,10 +105,12 @@ int main() {
 
 A Swift `inout` parameter is mapped to a C++ reference type in the C++ function signature that’s generated in the C++ interface. You can then pass in a value directly to an `inout` parameter from C++ side, like the example below:
 
-```
+```swift
 // Swift module 'MyModule'
 func swapTwoInts(_ a: inout Int, _ b: inout Int)
+```
 
+```c++
 // C++ interface snippet
 void swapTwoInts(swift::Int &a, swift::Int &b) noexcept;
 
@@ -123,7 +127,7 @@ void testSwap() {
 
 Swift allows you to specify which overload of the function you would like to call using argument labels. For example, the following snippet is explicitly calling the second definition of `greet` because of the call using `greet(person:,from:)` argument labels:
 
-```
+```swift
 func greet(person: String, in city: String) {
   print("Hello \(person)! Welcome to \(city)!")
 }
@@ -137,7 +141,7 @@ greet(person: "Bill", from: "San Jose") // calls the second overload of greet.
 
 C++ only allows us to select which overload of the function we want to call by using type-based overloading. In cases where type-based overloading isn’t sufficient, like when the arguments have the same type but a different argument label, you can use the `exposed` attribute to provide a different C++ name for the C++ function, like in the following example:
 
-```
+```swift
 @expose(C++, greetPersonIn)
 func greet(person: String, in city: String) {
   print("Hello \(person)! Welcome to \(city)!")
@@ -153,11 +157,13 @@ func greet(person: String, from hometown: String) {
 
 Default parameter values allow you to provide a default value for Swift function parameter, allowing the program to not specify it when calling such function. The generated C++ interface for a Swift function contains default parameter values as well, just like in the following example:
 
-```
+```swift
 // Swift module 'MyModule'
 func someFunction(parameterWithoutDefault: Int, parameterWithDefault: Int = 12) {
 }
+```
 
+```c++
 // C++ interface snippet
 void someFunction(swift::Int parameterWithoutDefault, swift::Int parameterWithDefault = 12) noexcept;
 
@@ -182,7 +188,7 @@ Swift default parameter values that are set to a `#file` or `#line` call site sp
 
 A variadic parameter is a parameter that accepts zero or more values of the specified type. It gets exposed in C++ using a `swift::variadic_parameter_pack` class template. You can pass values to a variadic parameter using the C++ initializer list syntax. For example, the following Swift function with a `Double` variadic parameter:
 
-```
+```swift
 func arithmeticMean(_ numbers: Double...) -> Double {
    ...
 }
@@ -190,7 +196,7 @@ func arithmeticMean(_ numbers: Double...) -> Double {
 
 can be called from C++ using a C++ initializer list:
 
-```
+```c++
 arithmeticMean({ 1.0, 2.0 });
 ```
 
