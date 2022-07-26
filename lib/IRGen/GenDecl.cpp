@@ -928,6 +928,15 @@ static void markGlobalAsUsedBasedOnLinkage(IRGenModule &IGM, LinkInfo &link,
   // That mostly means we need to be good at not marking things external.
   if (link.isUsed())
     IGM.addUsedGlobal(global);
+  else if (!IGM.IRGen.Opts.shouldOptimize() &&
+           !IGM.IRGen.Opts.ConditionalRuntimeRecords &&
+           !IGM.IRGen.Opts.VirtualFunctionElimination &&
+           !IGM.IRGen.Opts.WitnessMethodElimination &&
+           !global->isDeclaration()) {
+    // llvm's pipeline has decide to run GlobalDCE as part of the O0 pipeline.
+    // Mark non public symbols as compiler used to counter act this.
+    IGM.addCompilerUsedGlobal(global);
+  }
 }
 
 bool LinkInfo::isUsed(IRLinkage IRL) {
