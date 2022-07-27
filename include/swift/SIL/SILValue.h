@@ -668,10 +668,10 @@ public:
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ///
   /// FIXME: remove this redundant API from SILValue.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      ValueOwnershipKind getOwnershipKind()
-          const { return Value->getOwnershipKind(); },
-      "Please use ValueBase::getOwnershipKind()");
+  [[deprecated("Please use ValueBase::getOwnershipKind()")]] ValueOwnershipKind
+  getOwnershipKind() const {
+    return Value->getOwnershipKind();
+  };
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
