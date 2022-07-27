@@ -455,6 +455,15 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING
     "Minimum deployment target version for watchOS")
 
 #
+#  Compatibility library deployment versions
+#
+
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX "10.9")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS "7.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_TVOS "9.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
+
+#
 # User-configurable debugging options.
 #
 
