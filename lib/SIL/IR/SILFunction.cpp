@@ -15,6 +15,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBridgingUtils.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -175,7 +176,7 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
                          IsDynamicallyReplaceable_t isDynamic,
                          IsExactSelfClass_t isExactSelfClass,
                          IsDistributed_t isDistributed) {
-  this->Name = Name;
+  setName(Name);
   this->LoweredType = LoweredType;
   this->GenericEnv = genericEnv;
   this->SpecializationInfo = nullptr;
@@ -215,6 +216,8 @@ SILFunction::~SILFunction() {
   // We also need to drop all references if instructions are allocated using
   // an allocator that may recycle freed memory.
   dropAllReferences();
+  if (snapshots)
+    snapshots->~SILFunction();
 
   if (ReplacedFunction) {
     ReplacedFunction->decrementRefCount();
@@ -235,6 +238,96 @@ SILFunction::~SILFunction() {
 
   if (destroyFunction)
     destroyFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
+}
+
+void SILFunction::createSnapshot(int id) {
+  assert(id != 0 && "invalid snapshot ID");
+  assert(!getSnapshot(id) && "duplicate snapshot");
+
+  SILFunction *newSnapshot = new (Module) SILFunction(Module,
+    getLinkage(), getName(), getLoweredFunctionType(), getGenericEnvironment(),
+    getLocation(), isBare(), isTransparent(), isSerialized(),
+    getEntryCount(), isThunk(), getClassSubclassScope(),
+    getInlineStrategy(), getEffectsKind(), getDebugScope(),
+    isDynamicallyReplaceable(), isExactSelfClass(), isDistributed());
+
+  // Copy all relevant properties.
+  // TODO: It's really unfortunate that this needs to be done manually. It would
+  //       be nice if all the properties are encapsulated into a single state,
+  //       which can be copied at once.
+  newSnapshot->SpecializationInfo = SpecializationInfo;
+  newSnapshot->ClangNodeOwner = ClangNodeOwner;
+  newSnapshot->DeclCtxt = DeclCtxt;
+  newSnapshot->Profiler = Profiler;
+  newSnapshot->ReplacedFunction = ReplacedFunction;
+  newSnapshot->RefAdHocRequirementFunction = RefAdHocRequirementFunction;
+  newSnapshot->ObjCReplacementFor = ObjCReplacementFor;
+  newSnapshot->SemanticsAttrSet = SemanticsAttrSet;
+  newSnapshot->SpecializeAttrSet = SpecializeAttrSet;
+  newSnapshot->Availability = Availability;
+  newSnapshot->specialPurpose = specialPurpose;
+  newSnapshot->perfConstraints = perfConstraints;
+  newSnapshot->GlobalInitFlag = GlobalInitFlag;
+  newSnapshot->HasCReferences = HasCReferences;
+  newSnapshot->IsWeakImported = IsWeakImported;
+  newSnapshot->HasOwnership = HasOwnership;
+  newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
+  newSnapshot->OptMode = OptMode;
+  newSnapshot->IsStaticallyLinked = IsStaticallyLinked;
+  newSnapshot->copyEffects(this);
+
+  SILFunctionCloner cloner(newSnapshot);
+  cloner.cloneFunction(this);
+
+  newSnapshot->snapshotID = id;
+  newSnapshot->snapshots = this->snapshots;
+  this->snapshots = newSnapshot;
+
+  // The cloner sometimes removes temporary instructions.
+  getModule().flushDeletedInsts();
+}
+
+SILFunction *SILFunction::getSnapshot(int ID) {
+  SILFunction *sn = this;
+  do {
+    if (sn->snapshotID == ID)
+      return sn;
+    sn = sn->snapshots;
+  } while (sn);
+  return nullptr;
+}
+
+void SILFunction::restoreFromSnapshot(int ID) {
+  SILFunction *sn = getSnapshot(ID);
+  assert(sn && "no snapshot found");
+
+  clear();
+  SILFunctionCloner cloner(this);
+  cloner.cloneFunction(sn);
+
+  // Beside the function body, only restore those properties, which are/can be
+  // modified by passes.
+  // TODO: There should be a clear sepratation from initialize-once properties
+  //       (`let`) and properties which can be modified by passes (`var`).
+  copyEffects(sn);
+
+  // The cloner sometimes removes temporary instructions.
+  getModule().flushDeletedInsts();
+}
+
+void SILFunction::deleteSnapshot(int ID) {
+  SILFunction *f = this;
+  do {
+    if (SILFunction *sn = f->snapshots) {
+      if (sn->snapshotID == ID) {
+        f->snapshots = sn->snapshots;
+        sn->snapshots = nullptr;
+        sn->~SILFunction();
+        getModule().flushDeletedInsts();
+        return;
+      }
+    }
+  } while ((f = f->snapshots) != nullptr);
 }
 
 void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
