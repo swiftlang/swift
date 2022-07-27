@@ -37,7 +37,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/Chrono.h"
 
 using namespace swift;
 
@@ -60,6 +59,10 @@ llvm::cl::opt<bool> SILPrintLast(
 llvm::cl::opt<std::string> SILNumOptPassesToRun(
     "sil-opt-pass-count", llvm::cl::init(""),
     llvm::cl::desc("Stop optimizing after <N> passes or <N>.<M> passes/sub-passes"));
+
+llvm::cl::opt<unsigned> SILOptProfileRepeat(
+    "sil-opt-profile-repeat", llvm::cl::init(1),
+    llvm::cl::desc("repeat passes N times and report the run time"));
 
 llvm::cl::opt<std::string> SILBreakOnFun(
     "sil-break-on-function", llvm::cl::init(""),
@@ -518,7 +521,6 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     F->dump(getOptions().EmitVerboseSIL);
   }
 
-  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   if (breakBeforeRunning(F->getName(), SFT))
     LLVM_BUILTIN_DEBUGTRAP;
   if (SILForceVerifyAll ||
@@ -531,30 +533,63 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
          && "change notifications not cleared");
 
-  swiftPassInvocation.startFunctionPassRun(SFT);
+  llvm::sys::TimePoint<> startTime = std::chrono::system_clock::now();
+  std::chrono::nanoseconds duration(0);
 
-  // Run it!
-  SFT->run();
+  enum {
+    // In future we might want to make snapshots with positive number (e.g.
+    // corresponding to pass indices). Therefore use -1 here to avoid collisions.
+    SnapshotID = -1
+  };
 
-  if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
-    invalidateAnalysis(F, changeNotifications);
-    changeNotifications = SILAnalysis::InvalidationKind::Nothing;
+  unsigned numRepeats = SILOptProfileRepeat;
+  if (numRepeats > 1) {
+    // Need to create a snapshot to restore the original state for consecutive runs.
+    F->createSnapshot(SnapshotID);
   }
-  swiftPassInvocation.finishedFunctionPassRun();
+  for (unsigned runIdx = 0; runIdx < numRepeats; runIdx++) {
+    swiftPassInvocation.startFunctionPassRun(SFT);
+
+    // Run it!
+    SFT->run();
+
+    if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
+      // Pause time measurement while invalidating analysis and restoring the snapshot.
+      duration += (std::chrono::system_clock::now() - startTime);
+
+      if (runIdx < numRepeats - 1) {
+        invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+        F->restoreFromSnapshot(SnapshotID);
+      } else {
+        invalidateAnalysis(F, changeNotifications);
+      }
+      changeNotifications = SILAnalysis::InvalidationKind::Nothing;
+      
+      // Continue time measurement (including flushing deleted instructions).
+      startTime = std::chrono::system_clock::now();
+    }
+    Mod->flushDeletedInsts();
+    swiftPassInvocation.finishedFunctionPassRun();
+  }
+
+  duration += (std::chrono::system_clock::now() - startTime);
+  totalPassRuntime += duration;
+  if (SILPrintPassTime) {
+    double milliSecs = (double)duration.count() / 1000000.;
+    llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SFT->getTag()
+                 << " @" << F->getName() << "\n";
+  }
+
+  if (numRepeats > 1)
+    F->deleteSnapshot(SnapshotID);
+
+  assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
   if (SILForceVerifyAll ||
       SILForceVerifyAroundPass.end() !=
           std::find_if(SILForceVerifyAroundPass.begin(),
                        SILForceVerifyAroundPass.end(), MatchFun)) {
     verifyAnalyses(F);
-  }
-  assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  Mod->flushDeletedInsts();
-
-  auto Delta = (std::chrono::system_clock::now() - StartTime).count();
-  if (SILPrintPassTime) {
-    llvm::dbgs() << Delta << " (" << SFT->getID() << "," << F->getName()
-                 << ")\n";
   }
 
   // If this pass invalidated anything, print and verify.
@@ -564,7 +599,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   }
 
   updateSILModuleStatsAfterTransform(F->getModule(), SFT, *this, NumPassesRun,
-                                     Delta);
+                                     duration.count());
 
   // Remember if this pass didn't change anything.
   if (!CurrentPassHasInvalidated)
@@ -697,9 +732,12 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->flushDeletedInsts();
 
-  auto Delta = (std::chrono::system_clock::now() - StartTime).count();
+  std::chrono::nanoseconds duration = std::chrono::system_clock::now() - StartTime;
+  totalPassRuntime += duration;
+
   if (SILPrintPassTime) {
-    llvm::dbgs() << Delta << " (" << SMT->getID() << ",Module)\n";
+    double milliSecs = (double)duration.count() / 1000000.;
+    llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SMT->getTag() << "\n";
   }
 
   // If this pass invalidated anything, print and verify.
@@ -708,7 +746,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
-  updateSILModuleStatsAfterTransform(*Mod, SMT, *this, NumPassesRun, Delta);
+  updateSILModuleStatsAfterTransform(*Mod, SMT, *this, NumPassesRun, duration.count());
 
   if (Options.VerifyAll &&
       (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
@@ -799,6 +837,12 @@ void SILPassManager::execute() {
 
 /// D'tor.
 SILPassManager::~SILPassManager() {
+
+  if (SILOptProfileRepeat > 1) {
+    double milliSecs = (double)totalPassRuntime.count() / 1000000.;
+    llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: total runtime of all passes\n";
+  }
+
   // Before we do anything further, verify the module and our analyses. These
   // are natural points with which to verify.
   //
