@@ -26,7 +26,7 @@ using namespace swift;
 
 bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
-         v.getOwnershipKind() == OwnershipKind::None;
+         v->getOwnershipKind() == OwnershipKind::None;
 }
 
 bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
@@ -168,7 +168,7 @@ bool swift::findInnerTransitiveGuaranteedUses(
       bool nonLeaf = false;
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
-        if (result.getOwnershipKind() == OwnershipKind::None)
+        if (result->getOwnershipKind() == OwnershipKind::None)
           return true;
         for (auto *resultUse : result->getUses()) {
           if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
@@ -288,7 +288,7 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
     case OperandOwnership::ForwardingBorrow: {
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
-        if (result.getOwnershipKind() == OwnershipKind::None)
+        if (result->getOwnershipKind() == OwnershipKind::None)
           return true;
         for (auto *resultUse : result->getUses()) {
           if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
@@ -1081,7 +1081,7 @@ void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
 
 bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
                                           SmallVectorImpl<BorrowedValue> &out) {
-  if (inputValue.getOwnershipKind() != OwnershipKind::Guaranteed)
+  if (inputValue->getOwnershipKind() != OwnershipKind::Guaranteed)
     return false;
 
   SmallVector<SILValue, 32> worklist;
@@ -1100,7 +1100,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // that we put this before checking for guaranteed forwarding instructions,
     // since we want to ignore guaranteed forwarding instructions that in this
     // specific case produce a .none value.
-    if (value.getOwnershipKind() == OwnershipKind::None)
+    if (value->getOwnershipKind() == OwnershipKind::None)
       continue;
 
     // Otherwise if v is an ownership forwarding value, add its defining
@@ -1134,7 +1134,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
 
 // FIXME: replace this logic with AccessBase::findOwnershipReferenceRoot.
 BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
-  if (inputValue.getOwnershipKind() != OwnershipKind::Guaranteed)
+  if (inputValue->getOwnershipKind() != OwnershipKind::Guaranteed)
     return {};
 
   SILValue currentValue = inputValue;
@@ -1145,7 +1145,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
       return scopeIntroducer;
     }
 
-    if (currentValue.getOwnershipKind() == OwnershipKind::None)
+    if (currentValue->getOwnershipKind() == OwnershipKind::None)
       return {};
 
     // Otherwise if v is an ownership forwarding value, add its defining
@@ -1186,7 +1186,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
 
 bool swift::getAllOwnedValueIntroducers(
     SILValue inputValue, SmallVectorImpl<OwnedValueIntroducer> &out) {
-  if (inputValue.getOwnershipKind() != OwnershipKind::Owned)
+  if (inputValue->getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
   SmallVector<SILValue, 32> worklist;
@@ -1205,7 +1205,7 @@ bool swift::getAllOwnedValueIntroducers(
     // that we put this before checking for guaranteed forwarding instructions,
     // since we want to ignore guaranteed forwarding instructions that in this
     // specific case produce a .none value.
-    if (value.getOwnershipKind() == OwnershipKind::None)
+    if (value->getOwnershipKind() == OwnershipKind::None)
       continue;
 
     // Otherwise if v is an ownership forwarding value, add its defining
@@ -1238,7 +1238,7 @@ bool swift::getAllOwnedValueIntroducers(
 }
 
 OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
-  if (inputValue.getOwnershipKind() != OwnershipKind::Owned)
+  if (inputValue->getOwnershipKind() != OwnershipKind::Owned)
     return {};
 
   SILValue currentValue = inputValue;
@@ -1513,7 +1513,7 @@ bool ForwardingOperand::visitForwardedValues(
 
   if (auto *mvri = dyn_cast<MultipleValueInstruction>(user)) {
     return llvm::all_of(mvri->getResults(), [&](SILValue value) {
-      if (value.getOwnershipKind() == OwnershipKind::None)
+      if (value->getOwnershipKind() == OwnershipKind::None)
         return true;
       return visitor(value);
     });

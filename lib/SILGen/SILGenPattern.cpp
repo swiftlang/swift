@@ -2523,8 +2523,8 @@ void PatternMatchEmission::emitSharedCaseBlocks(
         mv = SGF.emitManagedRValueWithCleanup(found->second);
       } else {
         SILValue arg = caseBB->getArgument(argIndex++);
-        assert(arg.getOwnershipKind() == OwnershipKind::Owned ||
-               arg.getOwnershipKind() == OwnershipKind::None);
+        assert(arg->getOwnershipKind() == OwnershipKind::Owned ||
+               arg->getOwnershipKind() == OwnershipKind::None);
         mv = SGF.emitManagedRValueWithCleanup(arg);
       }
 

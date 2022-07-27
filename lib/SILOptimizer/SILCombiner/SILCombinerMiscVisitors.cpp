@@ -1225,7 +1225,7 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *cvi) {
   // transformations around function types that result in given a copy_value a
   // thin_to_thick_function argument). In such a case, just RAUW with the
   // copy_value's operand since it is a no-op.
-  if (cvi->getOperand().getOwnershipKind() == OwnershipKind::None) {
+  if (cvi->getOperand()->getOwnershipKind() == OwnershipKind::None) {
     replaceInstUsesWith(*cvi, cvi->getOperand());
     return eraseInstFromFunction(*cvi);
   }
@@ -1241,7 +1241,7 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *dvi) {
   //
   // As an example, consider transformations around function types that result
   // in a thin_to_thick_function being passed to a destroy_value.
-  if (dvi->getOperand().getOwnershipKind() == OwnershipKind::None) {
+  if (dvi->getOperand()->getOwnershipKind() == OwnershipKind::None) {
     eraseInstFromFunction(*dvi);
     return nullptr;
   }
@@ -2035,7 +2035,7 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     //    lifetime of that argument.
     SILValue selectEnumOperand = SEI->getEnumOperand();
     SILValue switchEnumOperand = selectEnumOperand;
-    if (selectEnumOperand.getOwnershipKind() != OwnershipKind::None) {
+    if (selectEnumOperand->getOwnershipKind() != OwnershipKind::None) {
       switchEnumOperand =
           makeCopiedValueAvailable(selectEnumOperand, Builder.getInsertionBB());
     }
@@ -2348,7 +2348,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   {
     SILType baseType = base->getType();
     if (baseType.isObject()) {
-      if ((hasOwnership() && base.getOwnershipKind() == OwnershipKind::None) ||
+      if ((hasOwnership() && base->getOwnershipKind() == OwnershipKind::None) ||
           baseType.isTrivial(*mdi->getFunction())) {
         SILValue value = mdi->getValue();
         replaceInstUsesWith(*mdi, value);

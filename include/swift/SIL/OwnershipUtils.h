@@ -53,7 +53,7 @@ bool canOpcodeForwardGuaranteedValues(Operand *use);
 // This is the use-def equivalent of use->getOperandOwnership() ==
 // OperandOwnership::ForwardingBorrow.
 inline bool isForwardingBorrow(SILValue value) {
-  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
   return canOpcodeForwardGuaranteedValues(value);
 }
 
@@ -74,7 +74,7 @@ bool canOpcodeForwardOwnedValues(Operand *use);
 // This is the use-def equivalent of use->getOperandOwnership() ==
 // OperandOwnership::ForwardingConsume.
 inline bool isForwardingConsume(SILValue value) {
-  assert(value.getOwnershipKind() == OwnershipKind::Owned);
+  assert(value->getOwnershipKind() == OwnershipKind::Owned);
   return canOpcodeForwardOwnedValues(value);
 }
 
@@ -445,7 +445,7 @@ private:
 
 public:
   static BorrowedValueKind get(SILValue value) {
-    if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
+    if (value->getOwnershipKind() != OwnershipKind::Guaranteed)
       return Kind::Invalid;
     switch (value->getKind()) {
     default:
@@ -1025,7 +1025,7 @@ private:
 
 public:
   static OwnedValueIntroducerKind get(SILValue value) {
-    if (value.getOwnershipKind() != OwnershipKind::Owned)
+    if (value->getOwnershipKind() != OwnershipKind::Owned)
       return Kind::Invalid;
 
     switch (value->getKind()) {
