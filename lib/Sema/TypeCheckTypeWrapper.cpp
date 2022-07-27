@@ -168,3 +168,25 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
   return injectProperty(parent, ctx.Id_TypeWrapperProperty,
                         propertyTy, VarDecl::Introducer::Var);
 }
+
+VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
+                                                    VarDecl *property) const {
+  auto *wrappedType = property->getDeclContext()->getSelfNominalTypeDecl();
+  if (!(wrappedType && wrappedType->hasTypeWrapper()))
+    return nullptr;
+
+  // Type wrappers support only stored `var`s.
+  if (property->isStatic() || property->isLet() || !property->hasStorage())
+    return nullptr;
+
+  auto &ctx = wrappedType->getASTContext();
+
+  auto *storage = evaluateOrDefault(
+      ctx.evaluator, GetTypeWrapperStorage{wrappedType}, nullptr);
+  assert(storage);
+
+  return injectProperty(
+      storage, property->getName(),
+      storage->mapTypeIntoContext(property->getValueInterfaceType()),
+      property->getIntroducer());
+}

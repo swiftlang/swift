@@ -3571,6 +3571,23 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Given a stored property associated with a type wrapped type,
+/// produce a property that mirrors it in the type wrapper context.
+class GetTypeWrapperStorageForProperty
+    : public SimpleRequest<GetTypeWrapperStorageForProperty,
+                           VarDecl *(VarDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, VarDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
