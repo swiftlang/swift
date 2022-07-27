@@ -557,12 +557,6 @@ BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
 /// Triggers a runtime failure if the condition is true.
 BUILTIN_MISC_OPERATION(CondFailMessage, "condfail_message", "", Special)
 
-/// Sizeof has type T.Type -> Int
-BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
-
-/// Strideof has type T.Type -> Int
-BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
-
 /// IsPOD has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
 
@@ -579,9 +573,6 @@ BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 
 /// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
-
-/// Alignof has type T.Type -> Int
-BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
 ///
@@ -850,6 +841,15 @@ BUILTIN_MISC_OPERATION(AssumeAlignment, "assumeAlignment", "n", Special)
 #define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload) \
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
+
+/// Sizeof has type T.Type -> Int
+BUILTIN_MISC_OPERATION_WITH_SILGEN(Sizeof, "sizeof", "n", Special)
+
+/// Strideof has type T.Type -> Int
+BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
+
+/// Alignof has type T.Type -> Int
+BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
 
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
