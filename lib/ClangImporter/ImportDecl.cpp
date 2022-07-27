@@ -8193,9 +8193,13 @@ ClangImporter::Implementation::importDeclForDeclContext(
   if (!contextDeclsWarnedAbout.insert(contextDecl).second)
     return nullptr;
 
-  auto getDeclName = [](const clang::Decl *D) -> StringRef {
-    if (auto ND = dyn_cast<clang::NamedDecl>(D))
-      return ND->getName();
+  auto getDeclName = [](const clang::Decl *D) -> std::string {
+    if (auto ND = dyn_cast<clang::NamedDecl>(D)) {
+      std::string name;
+      llvm::raw_string_ostream os(name);
+      ND->printName(os);
+      return name;
+    }
     return "<anonymous>";
   };
 
