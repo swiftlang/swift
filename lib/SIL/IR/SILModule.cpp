@@ -161,14 +161,20 @@ void SILModule::checkForLeaks() const {
   int instsInModule = std::distance(scheduledForDeletion.begin(),
                                     scheduledForDeletion.end());
   for (const SILFunction &F : *this) {
-    for (const SILBasicBlock &block : F) {
-      instsInModule += std::distance(block.begin(), block.end());
-    }
+    const SILFunction *sn = &F;
+    do {
+      for (const SILBasicBlock &block : *sn) {
+        instsInModule += std::distance(block.begin(), block.end());
+      }
+    } while ((sn = sn->snapshots) != nullptr);
   }
   for (const SILFunction &F : zombieFunctions) {
-    for (const SILBasicBlock &block : F) {
-      instsInModule += std::distance(block.begin(), block.end());
-    }
+    const SILFunction *sn = &F;
+    do {
+      for (const SILBasicBlock &block : F) {
+        instsInModule += std::distance(block.begin(), block.end());
+      }
+    } while ((sn = sn->snapshots) != nullptr);
   }
   for (const SILGlobalVariable &global : getSILGlobals()) {
       instsInModule += std::distance(global.StaticInitializerBlock.begin(),
@@ -434,13 +440,14 @@ void SILModule::invalidateSILLoaderCaches() {
 
 SILFunction *SILModule::removeFromZombieList(StringRef Name) {
   if (auto *Zombie = ZombieFunctionTable.lookup(Name)) {
+    assert(Zombie->snapshotID == 0 && "zombie cannot be a snapthot function");
     ZombieFunctionTable.erase(Name);
     zombieFunctions.remove(Zombie);
 
     // The owner of the function's Name is the ZombieFunctionTable key, which is
     // freed by erase().
     // Make sure nobody accesses the name string after it is freed.
-    Zombie->Name = StringRef();
+    Zombie->setName(StringRef());
     return Zombie;
   }
   return nullptr;
@@ -449,6 +456,7 @@ SILFunction *SILModule::removeFromZombieList(StringRef Name) {
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
   assert(!F->isZombie() && "zombie function is in list of alive functions");
+  assert(F->snapshotID == 0 && "cannot erase a snapshot function");
 
   llvm::StringMapEntry<SILFunction*> *entry =
       &*ZombieFunctionTable.insert(std::make_pair(F->getName(), nullptr)).first;
@@ -459,7 +467,7 @@ void SILModule::eraseFunction(SILFunction *F) {
   // the function from the table we need to use the allocated name string from
   // the ZombieFunctionTable.
   FunctionTable.erase(F->getName());
-  F->Name = zombieName;
+  F->setName(zombieName);
 
   // The function is dead, but we need it later (at IRGen) for debug info
   // or vtable stub generation. So we move it into the zombie list.
