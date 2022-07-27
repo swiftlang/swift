@@ -26,3 +26,12 @@
 // CHECK:   static func addTwoTemplates<T, U>(_ a: T, _ b: U) -> T
 // CHECK:   static func removeReference<T>(_ a: inout T) -> T
 // CHECK: }
+
+// CHECK: struct __CxxTemplateInst17MyTemplatedStructIiE {
+// CHECK:   init()
+// CHECK: }
+
+// CHECK: struct HasTemplatedField {
+// CHECK:   init(x: __CxxTemplateInst17MyTemplatedStructIiE)
+// CHECK:   var x: __CxxTemplateInst17MyTemplatedStructIiE
+// CHECK: }

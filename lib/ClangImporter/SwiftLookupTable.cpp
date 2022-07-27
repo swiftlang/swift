@@ -1927,22 +1927,35 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // possible to find these decls during deserialization. For any C++ typedef
   // that defines a name for a class template instantiation (e.g. std::string),
   // import the mangled name of this instantiation, and add it to the table.
+  auto addTemplateSpecialization =
+      [&](clang::ClassTemplateSpecializationDecl *specializationDecl) {
+        auto name = nameImporter.importName(specializationDecl, currentVersion);
+
+        // Avoid adding duplicate entries into the table.
+        auto existingEntries =
+            table.lookup(DeclBaseName(name.getDeclName().getBaseName()),
+                         name.getEffectiveContext());
+        if (existingEntries.empty()) {
+          table.addEntry(name.getDeclName(), specializationDecl,
+                         name.getEffectiveContext());
+        }
+      };
   if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
     auto underlyingDecl = typedefNameDecl->getUnderlyingType()->getAsTagDecl();
 
     if (auto specializationDecl =
             dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
                 underlyingDecl)) {
-      auto name = nameImporter.importName(specializationDecl, currentVersion);
+      addTemplateSpecialization(specializationDecl);
+    }
+  }
+  if (auto valueDecl = dyn_cast<clang::ValueDecl>(named)) {
+    auto valueTypeDecl = valueDecl->getType()->getAsTagDecl();
 
-      // Avoid adding duplicate entries into the table.
-      auto existingEntries =
-          table.lookup(DeclBaseName(name.getDeclName().getBaseName()),
-                       name.getEffectiveContext());
-      if (existingEntries.empty()) {
-        table.addEntry(name.getDeclName(), specializationDecl,
-                       name.getEffectiveContext());
-      }
+    if (auto specializationDecl =
+            dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                valueTypeDecl)) {
+      addTemplateSpecialization(specializationDecl);
     }
   }
 
