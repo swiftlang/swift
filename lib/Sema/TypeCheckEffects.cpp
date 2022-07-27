@@ -752,7 +752,6 @@ public:
 
     if (auto *SAE = dyn_cast<SelfApplyExpr>(E)) {
       assert(!E->isImplicitlyAsync());
-      return Classification();
     }
 
     auto type = E->getFn()->getType();
@@ -760,17 +759,22 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
-    // If the function doesn't have any effects, we're done here.
+    auto fnRef = AbstractFunction::getAppliedFn(E);
+    auto conformances = fnRef.getSubstitutions().getConformances();
+    const auto hasAnyConformances = !conformances.empty();
+
+    // If the function doesn't have any effects or conformances, we're done
+    // here.
     if (!fnType->isThrowing() &&
         !E->implicitlyThrows() &&
         !fnType->isAsync() &&
-        !E->isImplicitlyAsync()) {
+        !E->isImplicitlyAsync() &&
+        !hasAnyConformances) {
       return Classification();
     }
 
     // Decompose the application.
     auto *args = E->getArgs();
-    auto fnRef = AbstractFunction::getAppliedFn(E);
 
     // If any of the arguments didn't type check, fail.
     for (auto arg : *args) {
@@ -2964,6 +2968,6 @@ void TypeChecker::checkPropertyWrapperEffects(
 
 bool TypeChecker::canThrow(Expr *expr) {
   ApplyClassifier classifier;
-  return (classifier.classifyExpr(expr, EffectKind::Throws) ==
-          ConditionalEffectKind::Always);
+  auto effect = classifier.classifyExpr(expr, EffectKind::Throws);
+  return (effect != ConditionalEffectKind::None);
 }
