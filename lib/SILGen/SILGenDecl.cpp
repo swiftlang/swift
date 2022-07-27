@@ -584,29 +584,36 @@ public:
     // that acts as a consuming use of the value. The reason why we want this is
     // even if we are only performing a borrow for our lexical lifetime, we want
     // to ensure that our defs see this initialization as consuming this value.
-    if (value->getOwnershipKind() == OwnershipKind::Owned) {
+    if (value->getOwnershipKind() == OwnershipKind::Owned &&
+        value->getType().isMoveOnlyWrapped()) {
       assert(wasPlusOne);
       // NOTE: If our type is trivial when not wrapped in a
       // SILMoveOnlyWrappedType, this will return a trivial value. We rely
       // on the checker to determine if this is an acceptable use of the
       // value.
-      if (value->getType().isMoveOnly()) {
-        if (value->getType().isMoveOnlyWrapped()) {
-          value = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(PrologueLoc,
-                                                                  value);
-        } else {
-          // Change this to be lexical and get rid of borrow scope?
-          value = SGF.B.createMoveValue(PrologueLoc, value);
-        }
-      }
+      value =
+          SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(PrologueLoc, value);
     }
 
     // If we still have a trivial thing, just return that.
     if (value->getType().isTrivial(SGF.F))
       return value;
 
+    // Check if we have a move only type. In that case, we perform a lexical
+    // move and insert a mark_must_check.
+    //
+    // We do this before the begin_borrow "normal" path below since move only
+    // types do not have no implicit copy attr on them.
+    if (value->getOwnershipKind() == OwnershipKind::Owned &&
+        value->getType().isMoveOnly() &&
+        !value->getType().isMoveOnlyWrapped()) {
+      value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
+      return SGF.B.createMarkMustCheckInst(
+          PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
+
     // Otherwise, if we do not have a no implicit copy variable, just do a
-    // borrow lexical.
+    // borrow lexical. This is the "normal path".
     if (!vd->getAttrs().hasAttribute<NoImplicitCopyAttr>())
       return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
 
