@@ -1960,21 +1960,21 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     llvm::SmallPtrSet<clang::Decl *, 8> alreadyAdded;
     alreadyAdded.insert(named->getCanonicalDecl());
 
-    for (auto redecl : named->redecls()) {
-      auto dc = cast<clang::DeclContext>(redecl);
-      for (auto member : dc->decls()) {
-        auto canonicalMember = member->getCanonicalDecl();
-        if (!alreadyAdded.insert(canonicalMember).second)
-          continue;
+    auto dc = cast<clang::DeclContext>(named);
+    for (auto member : dc->decls()) {
+      auto canonicalMember = isa<clang::NamespaceDecl>(member)
+                                 ? member
+                                 : member->getCanonicalDecl();
+      if (!alreadyAdded.insert(canonicalMember).second)
+        continue;
 
-        if (auto namedMember = dyn_cast<clang::NamedDecl>(canonicalMember)) {
-          // Make sure we're looking at the definition, otherwise, there won't
-          // be any members to add.
-          if (auto recordDecl = dyn_cast<clang::RecordDecl>(namedMember))
-            if (auto def = recordDecl->getDefinition())
-              namedMember = def;
-          addEntryToLookupTable(table, namedMember, nameImporter);
-        }
+      if (auto namedMember = dyn_cast<clang::NamedDecl>(canonicalMember)) {
+        // Make sure we're looking at the definition, otherwise, there won't
+        // be any members to add.
+        if (auto recordDecl = dyn_cast<clang::RecordDecl>(namedMember))
+          if (auto def = recordDecl->getDefinition())
+            namedMember = def;
+        addEntryToLookupTable(table, namedMember, nameImporter);
       }
     }
   }
