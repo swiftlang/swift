@@ -1736,10 +1736,10 @@ private:
   /// Determine if there exists a name mangling for the given type.
   static bool canMangle(TypeBase *Ty) {
     // TODO: C++ types are not yet supported (SR-13223).
-    if (Ty->getStructOrBoundGenericStruct() &&
-        isa_and_nonnull<clang::CXXRecordDecl>(
-            Ty->getStructOrBoundGenericStruct()->getClangDecl()))
-      return false;
+//    if (Ty->getStructOrBoundGenericStruct() &&
+//        isa_and_nonnull<clang::CXXRecordDecl>(
+//            Ty->getStructOrBoundGenericStruct()->getClangDecl()))
+//      return false;
 
     switch (Ty->getKind()) {
     case TypeKind::GenericFunction: // Not yet supported.
@@ -2513,6 +2513,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     const SILDebugScope *DS, Optional<SILLocation> DbgInstLoc,
     SILDebugVariable VarInfo, IndirectionKind Indirection,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstrKind) {
+  llvm::dbgs() << "";
   assert(DS && "variable has no scope");
 
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
@@ -2870,10 +2871,10 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (swift::TypeBase *ty = DbgTy.getType()) {
     if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
       ty = metaTy->getInstanceType().getPointer();
-    if (ty->getStructOrBoundGenericStruct() &&
-        isa_and_nonnull<clang::CXXRecordDecl>(
-            ty->getStructOrBoundGenericStruct()->getClangDecl()))
-      return;
+//    if (ty->getStructOrBoundGenericStruct() &&
+//        isa_and_nonnull<clang::CXXRecordDecl>(
+//            ty->getStructOrBoundGenericStruct()->getClangDecl()))
+//      return;
   }
 
   llvm::DIType *DITy = getOrCreateType(DbgTy);

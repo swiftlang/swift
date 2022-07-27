@@ -1091,10 +1091,10 @@ public:
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
         ty = metaTy->getRootClass().getPointer();
-      if (ty->getStructOrBoundGenericStruct() &&
-          isa_and_nonnull<clang::CXXRecordDecl>(
-              ty->getStructOrBoundGenericStruct()->getClangDecl()))
-        return;
+//      if (ty->getStructOrBoundGenericStruct() &&
+//          isa_and_nonnull<clang::CXXRecordDecl>(
+//              ty->getStructOrBoundGenericStruct()->getClangDecl()))
+//        return;
     }
 
     assert(IGM.DebugInfo && "debug info not enabled");
@@ -4968,6 +4968,8 @@ static bool InCoroContext(SILFunction &f, SILInstruction &i) {
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
+  llvm::dbgs() << "";
+
   auto SILVal = i->getOperand();
   bool IsAddrVal = SILVal->getType().isAddress();
   if (i->poisonRefs()) {
