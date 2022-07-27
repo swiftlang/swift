@@ -726,7 +726,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType,
         // Only attempt to parse a generic argument list in a cast destination
         // type if the token text is just "<", because it can be an operator,
         // for example: "1 as Int16 << 7".
-        if (Tok.getText().str() == "<" ||
+        if (Tok.getText().equals("<") ||
             reason != ParseTypeReason::CastDestination) {
           auto genericArgsStatus =
               parseGenericArguments(GenericArgs, LAngle, RAngle);
