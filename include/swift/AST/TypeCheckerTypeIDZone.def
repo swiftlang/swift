@@ -414,3 +414,6 @@ SWIFT_REQUEST(TypeChecker, GetTypeWrapperProperty,
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperStorageForProperty,
               VarDecl *(VarDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedPropertyGetterBody,
+              BraceStmt *(AccessorDecl *),
+              Cached, NoLocationInfo)

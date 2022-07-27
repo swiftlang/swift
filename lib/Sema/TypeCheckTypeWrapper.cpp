@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -50,6 +51,23 @@ static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
   parent->addMember(var);
 
   return var;
+}
+
+bool VarDecl::isAccessedViaTypeWrapper() const {
+  auto *parent = getDeclContext()->getSelfNominalTypeDecl();
+  if (!(parent && parent->hasTypeWrapper()))
+    return false;
+
+  if (isStatic() || isLet() || !hasStorage())
+    return false;
+
+  if (getAttrs().hasAttribute<LazyAttr>())
+    return false;
+
+  if (hasAttachedPropertyWrapper())
+    return false;
+
+  return true;
 }
 
 NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
@@ -176,7 +194,7 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
     return nullptr;
 
   // Type wrappers support only stored `var`s.
-  if (property->isStatic() || property->isLet() || !property->hasStorage())
+  if (!property->isAccessedViaTypeWrapper())
     return nullptr;
 
   auto &ctx = wrappedType->getASTContext();
@@ -185,8 +203,68 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
       ctx.evaluator, GetTypeWrapperStorage{wrappedType}, nullptr);
   assert(storage);
 
-  return injectProperty(
-      storage, property->getName(),
-      storage->mapTypeIntoContext(property->getValueInterfaceType()),
-      property->getIntroducer());
+  return injectProperty(storage, property->getName(),
+                        property->getValueInterfaceType(),
+                        property->getIntroducer());
+}
+
+/// Given the property create a subscript to reach its type wrapper storage:
+/// `$_storage[storageKeyPath: \$Storage.<property>]`.
+static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
+                                                   AccessorDecl *useDC) {
+  auto &ctx = useDC->getASTContext();
+  auto *parent = var->getDeclContext()->getSelfNominalTypeDecl();
+
+  if (!(parent && parent->hasTypeWrapper()))
+    return nullptr;
+
+  auto *typeWrapperVar =
+      evaluateOrDefault(ctx.evaluator, GetTypeWrapperProperty{parent}, nullptr);
+  auto *storageVar = evaluateOrDefault(
+      ctx.evaluator, GetTypeWrapperStorageForProperty{var}, nullptr);
+
+  assert(typeWrapperVar);
+  assert(storageVar);
+
+  // \$Storage.<property-name>
+  auto *argExpr = KeyPathExpr::createImplicit(
+      ctx, /*backslashLoc=*/SourceLoc(),
+      {KeyPathExpr::Component::forProperty(
+          {storageVar},
+          useDC->mapTypeIntoContext(storageVar->getInterfaceType()),
+          /*Loc=*/SourceLoc())},
+      /*endLoc=*/SourceLoc());
+
+  auto *subscriptBaseExpr = UnresolvedDotExpr::createImplicit(
+      ctx,
+      new (ctx) DeclRefExpr({useDC->getImplicitSelfDecl()},
+                            /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
+      typeWrapperVar->getName());
+
+  // $_storage[storageKeyPath: \$Storage.<property-name>]
+  return SubscriptExpr::create(
+      ctx, subscriptBaseExpr,
+      ArgumentList::forImplicitSingle(ctx, ctx.Id_storageKeyPath, argExpr),
+      ConcreteDeclRef(), /*implicit=*/true);
+}
+
+BraceStmt *
+SynthesizeTypeWrappedPropertyGetterBody::evaluate(Evaluator &evaluator,
+                                                  AccessorDecl *getter) const {
+  assert(getter->isGetter());
+
+  auto &ctx = getter->getASTContext();
+
+  auto *var = dyn_cast<VarDecl>(getter->getStorage());
+  if (!var)
+    return nullptr;
+
+  auto *subscript = subscriptTypeWrappedProperty(var, getter);
+  if (!subscript)
+    return nullptr;
+
+  ASTNode body = new (ctx) ReturnStmt(SourceLoc(), subscript,
+                                      /*isImplicit=*/true);
+  return BraceStmt::create(ctx, /*lbloc=*/var->getLoc(), body,
+                           /*rbloc=*/var->getLoc(), /*implicit=*/true);
 }
