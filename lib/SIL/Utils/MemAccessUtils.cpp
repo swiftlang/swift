@@ -904,7 +904,7 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
       }
     }
 
-    if (value.getOwnershipKind() == OwnershipKind::Guaranteed)
+    if (value->getOwnershipKind() == OwnershipKind::Guaranteed)
       roots.push_back(value);
   }
 }

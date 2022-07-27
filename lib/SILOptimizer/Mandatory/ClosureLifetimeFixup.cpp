@@ -226,7 +226,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   auto createLifetimeEnd = [](SILLocation loc, SILInstruction *insertPt,
                               SILValue value) {
     SILBuilderWithScope builder(insertPt);
-    if (value.getOwnershipKind() == OwnershipKind::Owned) {
+    if (value->getOwnershipKind() == OwnershipKind::Owned) {
       builder.emitDestroyOperation(loc, value);
       return;
     }
@@ -288,7 +288,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
 
   auto fixupSILForLifetimeExtension = [&](SILValue value) {
     // Use SSAUpdater to find insertion points for lifetime ends.
-    updater.initialize(optionalEscapingClosureTy, value.getOwnershipKind());
+    updater.initialize(optionalEscapingClosureTy, value->getOwnershipKind());
     SmallVector<SILPhiArgument *, 8> insertedPhis;
     updater.setInsertedPhis(&insertedPhis);
 

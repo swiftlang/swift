@@ -321,7 +321,7 @@ struct ValueOwnershipKind {
     return bool(merge(other));
   }
 
-  /// Returns isCompatibleWith(other.getOwnershipKind()).
+  /// Returns isCompatibleWith(other->getOwnershipKind()).
   ///
   /// Definition is inline after SILValue is defined to work around circular
   /// dependencies.
@@ -669,9 +669,10 @@ public:
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ///
   /// FIXME: remove this redundant API from SILValue.
-  ValueOwnershipKind getOwnershipKind() const {
-    return Value->getOwnershipKind();
-  }
+  LLVM_ATTRIBUTE_DEPRECATED(
+      ValueOwnershipKind getOwnershipKind()
+          const { return Value->getOwnershipKind(); },
+      "Please use ValueBase::getOwnershipKind()");
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
@@ -682,7 +683,7 @@ public:
 inline SILNodePointer::SILNodePointer(SILValue value) : node(value) { }
 
 inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
-  return isCompatibleWith(other.getOwnershipKind());
+  return isCompatibleWith(other->getOwnershipKind());
 }
 
 /// Constraints on the ownership of an operand value.

@@ -224,7 +224,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
       ops, [&i](const Operand &op) -> Optional<ValueOwnershipKind> {
         if (i->isTypeDependentOperand(op))
           return None;
-        return op.get().getOwnershipKind();
+        return op.get()->getOwnershipKind();
       }));
 
   if (!mergedValue) {

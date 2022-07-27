@@ -510,7 +510,7 @@ void ClosureCloner::populateCloned() {
     // If SIL ownership is enabled, we need to perform a borrow here if we have
     // a non-trivial value. We know that our value is not written to and it does
     // not escape. The use of a borrow enforces this.
-    if (mappedValue.getOwnershipKind() != OwnershipKind::None) {
+    if (mappedValue->getOwnershipKind() != OwnershipKind::None) {
       SILLocation loc(const_cast<ValueDecl *>((*ai)->getDecl()));
       mappedValue = getBuilder().emitBeginBorrowOperation(loc, mappedValue);
     }
@@ -603,7 +603,7 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *inst) {
 
       // We must have emitted a begin_borrow for any non-trivial value. Insert
       // an end_borrow if so.
-      if (value.getOwnershipKind() != OwnershipKind::None) {
+      if (value->getOwnershipKind() != OwnershipKind::None) {
         auto *bbi = cast<BeginBorrowInst>(value);
         value = bbi->getOperand();
         b.emitEndBorrowOperation(inst->getLoc(), bbi);
@@ -691,7 +691,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
     //
     // We assume that the value is already guaranteed.
     assert(
-        value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed) &&
+        value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed) &&
         "Expected argument value to be guaranteed");
     recordFoldedValue(lbi, value);
     return;
@@ -709,7 +709,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
     // already, so we can just extract the value.
     assert(
         !getBuilder().getFunction().hasOwnership() ||
-        value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
+        value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
     value = getBuilder().emitStructExtract(lbi->getLoc(), value,
                                            seai->getField(), lbi->getType());
     recordFoldedValue(lbi, value);
@@ -753,7 +753,7 @@ void ClosureCloner::visitLoadInst(LoadInst *li) {
     // already, so we can just extract the value.
     assert(
         !getBuilder().getFunction().hasOwnership() ||
-        value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
+        value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
     value = getBuilder().emitStructExtract(li->getLoc(), value,
                                            seai->getField(), li->getType());
 
