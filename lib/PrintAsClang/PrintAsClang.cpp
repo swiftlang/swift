@@ -322,6 +322,15 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
   emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
   emitMacro("SWIFT_CONTEXT", "__attribute__((swift_context))");
   emitMacro("SWIFT_ERROR_RESULT", "__attribute__((swift_error_result))");
+  if (ctx.getStdlibModule()->isStaticLibrary()) {
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
+  } else {
+    out << "#if defined(_WIN32)\n";
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL", "__declspec(dllimport)");
+    out << "#else\n";
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
+    out << "#endif\n";
+  }
   // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },

@@ -18,6 +18,7 @@
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
@@ -217,6 +218,22 @@ public:
       return;
   }
 
+  void visitGenericTypeParamType(GenericTypeParamType *genericTpt,
+                                 Optional<OptionalTypeKind> optionalKind,
+                                 bool isInOutParam) {
+    // FIXME: handle optionalKind.
+    // FIXME: handle isInOutParam.
+    os << "const ";
+    if (languageMode == OutputLanguageMode::Cxx) {
+      // Pass a reference to a template type.
+      os << genericTpt->getName();
+      os << " &";
+      return;
+    }
+    // Pass an opaque param in C mode.
+    os << "void * _Nonnull";
+  }
+
   void visitPart(Type Ty, Optional<OptionalTypeKind> optionalKind,
                  bool isInOutParam) {
     TypeVisitor::visit(Ty, optionalKind, isInOutParam);
@@ -249,6 +266,25 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, StringRef name, Type resultTy,
     FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams,
     FunctionSignatureModifiers modifiers) {
+  if (kind == FunctionSignatureKind::CxxInlineThunk && FD->isGeneric()) {
+    os << "template<";
+    llvm::interleaveComma(FD->getGenericParams()->getParams(), os,
+                          [&](const GenericTypeParamDecl *genericParam) {
+                            os << "class ";
+                            ClangSyntaxPrinter(os).printBaseName(genericParam);
+                          });
+    os << ">\n";
+    os << "requires ";
+    llvm::interleave(
+        FD->getGenericParams()->getParams(), os,
+        [&](const GenericTypeParamDecl *genericParam) {
+          os << "swift::isUsableInGenericContext<";
+          ClangSyntaxPrinter(os).printBaseName(genericParam);
+          os << ">";
+        },
+        " && ");
+    os << "\n";
+  }
   auto emittedModule = FD->getModuleContext();
   OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
                                       ? OutputLanguageMode::ObjC
@@ -360,6 +396,11 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       } else if (param.role ==  AdditionalParam::Role::Error) {
         os << "SWIFT_ERROR_RESULT ";
         os << "void ** _error";
+      } else if (param.role == AdditionalParam::Role::GenericRequirement) {
+        os << "void * _Nonnull ";
+        if (param.genericRequirement->Protocol)
+          ClangSyntaxPrinter(os).printBaseName(
+              param.genericRequirement->Protocol);
       }
     });
   }
@@ -378,6 +419,18 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
   auto namePrinter = [&]() { ClangSyntaxPrinter(os).printIdentifier(name); };
   if (!isKnownCxxType(type, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(type)) {
+    if (type->getAs<ArchetypeType>() && type->getAs<ArchetypeType>()
+                                            ->getInterfaceType()
+                                            ->is<GenericTypeParamType>()) {
+      // FIXME: NEED to handle boxed resilient type.
+      // os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() <<
+      // "::getOpaquePointer(";
+      os << "reinterpret_cast<const void *>(&";
+      namePrinter();
+      os << ')';
+      return;
+    }
+
     if (auto *decl = type->getNominalOrBoundGenericNominal()) {
       if ((isa<StructDecl>(decl) || isa<EnumDecl>(decl))) {
         ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
@@ -407,7 +460,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
 void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     StringRef swiftSymbolName, const ModuleDecl *moduleContext, Type resultTy,
     const ParameterList *params, ArrayRef<AdditionalParam> additionalParams,
-    bool hasThrows) {
+    bool hasThrows, const AnyFunctionType *funcType) {
   if (hasThrows) {
     os << "  void* opaqueError = nullptr;\n";
     os << "  void* self = nullptr;\n";
@@ -444,18 +497,36 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       if (hasParams)
         os << ", ";
       interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
-         if (param.role == AdditionalParam::Role::Self && !hasThrows)
-           printCxxToCFunctionParameterUse(
-               param.type, "*this", moduleContext, /*isInOut=*/false,
-               /*isIndirect=*/param.isIndirect, param.role);
-         else if(param.role == AdditionalParam::Role::Self && hasThrows)
-           printCxxToCFunctionParameterUse(
-               param.type, "self", moduleContext, /*isInOut=*/false,
-               /*isIndirect=*/param.isIndirect, param.role);
-         else if(param.role == AdditionalParam::Role::Error && hasThrows)
-           printCxxToCFunctionParameterUse(
-               param.type, "&opaqueError", moduleContext, /*isInOut=*/false,
-               /*isIndirect=*/param.isIndirect, param.role);
+        if (param.role == AdditionalParam::Role::GenericRequirement) {
+          auto genericRequirement = *param.genericRequirement;
+          // FIXME: Add protocol requirement support.
+          assert(!genericRequirement.Protocol);
+          if (auto *gtpt = genericRequirement.TypeParameter
+                               ->getAs<GenericTypeParamType>()) {
+            assert(funcType);
+            auto *gft = dyn_cast<GenericFunctionType>(funcType);
+            if (gtpt->getDepth() == 0) {
+              os << "swift::getTypeMetadata<"
+                 << gft->getGenericParams()[gtpt->getIndex()]->getName()
+                 << ">()";
+              return;
+            }
+          }
+          os << "ERROR";
+          return;
+        }
+        if (param.role == AdditionalParam::Role::Self && !hasThrows)
+          printCxxToCFunctionParameterUse(
+              param.type, "*this", moduleContext, /*isInOut=*/false,
+              /*isIndirect=*/param.isIndirect, param.role);
+        else if (param.role == AdditionalParam::Role::Self && hasThrows)
+          printCxxToCFunctionParameterUse(
+              param.type, "self", moduleContext, /*isInOut=*/false,
+              /*isIndirect=*/param.isIndirect, param.role);
+        else if (param.role == AdditionalParam::Role::Error && hasThrows)
+          printCxxToCFunctionParameterUse(
+              param.type, "&opaqueError", moduleContext, /*isInOut=*/false,
+              /*isIndirect=*/param.isIndirect, param.role);
       });
     }
 

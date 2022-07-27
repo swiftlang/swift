@@ -67,6 +67,31 @@
 // CHECK-NEXT: #undef SWIFT_NOEXCEPT_FUNCTION_PTR
 // CHECK-EMPTY:
 // CHECK-EMPTY:
+// CHECK-NEXT: // type metadata address for Bool.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSbN;
+// CHECK-NEXT: // type metadata address for Int8.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss4Int8VN;
+// CHECK-NEXT: // type metadata address for UInt8.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss5UInt8VN;
+// CHECK-NEXT: // type metadata address for Int16.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss5Int16VN;
+// CHECK-NEXT: // type metadata address for UInt16.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss6UInt16VN;
+// CHECK-NEXT: // type metadata address for Int32.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss5Int32VN;
+// CHECK-NEXT: // type metadata address for UInt32.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss6UInt32VN;
+// CHECK-NEXT: // type metadata address for Int64.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss5Int64VN;
+// CHECK-NEXT: // type metadata address for UInt64.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss6UInt64VN;
+// CHECK-NEXT: // type metadata address for Float.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSfN;
+// CHECK-NEXT: // type metadata address for Double.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSdN;
+// CHECK-NEXT: // type metadata address for OpaquePointer.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss13OpaquePointerVN;
+// CHECK-EMPTY:
 // CHECK-NEXT: #ifdef __cplusplus
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
@@ -121,6 +146,110 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
 // CHECK-EMPTY:
+// CHECK-EMPTY:
+// CHECK-NEXT: #if __cplusplus > 201402L
+// CHECK-NEXT: template<class T>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext = false;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<class T> inline void * _Nonnull getTypeMetadata();
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<bool> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<bool>() {
+// CHECK-NEXT:   return &_impl::$sSbN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<int8_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<int8_t>() {
+// CHECK-NEXT:   return &_impl::$ss4Int8VN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<uint8_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<uint8_t>() {
+// CHECK-NEXT:   return &_impl::$ss5UInt8VN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<int16_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<int16_t>() {
+// CHECK-NEXT:   return &_impl::$ss5Int16VN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<uint16_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<uint16_t>() {
+// CHECK-NEXT:   return &_impl::$ss6UInt16VN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<int32_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<int32_t>() {
+// CHECK-NEXT:   return &_impl::$ss5Int32VN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<uint32_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<uint32_t>() {
+// CHECK-NEXT:   return &_impl::$ss6UInt32VN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<int64_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<int64_t>() {
+// CHECK-NEXT:   return &_impl::$ss5Int64VN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<uint64_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<uint64_t>() {
+// CHECK-NEXT:   return &_impl::$ss6UInt64VN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<float> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<float>() {
+// CHECK-NEXT:   return &_impl::$sSfN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<double> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<double>() {
+// CHECK-NEXT:   return &_impl::$sSdN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<void *> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<void *>() {
+// CHECK-NEXT:   return &_impl::$ss13OpaquePointerVN;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: #endif
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:

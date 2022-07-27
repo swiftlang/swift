@@ -608,7 +608,7 @@ private:
   }
 
   Type getForeignResultType(AbstractFunctionDecl *AFD,
-                            FunctionType *methodTy,
+                            AnyFunctionType *methodTy,
                             Optional<ForeignAsyncConvention> asyncConvention,
                             Optional<ForeignErrorConvention> errorConvention) {
     // A foreign error convention can affect the result type as seen in
@@ -950,7 +950,7 @@ private:
   }
 
   /// Print C or C++ trailing attributes for a function declaration.
-  void printFunctionClangAttributes(FuncDecl *FD, FunctionType *funcTy) {
+  void printFunctionClangAttributes(FuncDecl *FD, AnyFunctionType *funcTy) {
     if (funcTy->getResult()->isUninhabited()) {
       os << " SWIFT_NORETURN";
     } else if (!funcTy->getResult()->isVoid() &&
@@ -1010,15 +1010,21 @@ private:
       llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
           &params) {
     for (auto param : ABIparams) {
-      if (param.role ==
-          IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self)
+      if (param.role == IRABIDetailsProvider::ABIAdditionalParam::
+                            ABIParameterRole::GenericRequirementRole)
+        params.push_back({DeclAndTypeClangFunctionPrinter::AdditionalParam::
+                              Role::GenericRequirement,
+                          resultTy->getASTContext().getOpaquePointerType(),
+                          /*isIndirect=*/false, param.genericRequirement});
+      else if (param.role ==
+               IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self)
         params.push_back(
             {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
              resultTy->getASTContext().getOpaquePointerType(),
              /*isIndirect=*/
              isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
-      if (param.role ==
-          IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Error)
+      else if (param.role == IRABIDetailsProvider::ABIAdditionalParam::
+                                 ABIParameterRole::Error)
         params.push_back(
             {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Error,
              resultTy->getASTContext().getOpaquePointerType()});
@@ -1034,12 +1040,15 @@ private:
         FD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention =
         FD->getForeignErrorConvention();
-    assert(!FD->getGenericSignature() &&
-           "top-level generic functions not supported here");
     // FIXME (Alex): Make type adjustments for C++.
-    auto funcTy = givenFuncType
-                      ? *givenFuncType
-                      : FD->getInterfaceType()->castTo<FunctionType>();
+    AnyFunctionType *funcTy;
+    if (givenFuncType || FD->getInterfaceType()->is<FunctionType>()) {
+      funcTy = givenFuncType ? *givenFuncType
+                             : FD->getInterfaceType()->castTo<FunctionType>();
+    } else {
+      funcTy = FD->getInterfaceType()->castTo<GenericFunctionType>();
+    }
+
     auto resultTy =
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
@@ -1061,7 +1070,8 @@ private:
            /*isIndirect=*/
            isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
     }
-    if (funcTy->isThrowing() && !ABIparams.empty())
+    // FIXME: Fix the method 'self' parameter.
+    if (!selfTypeDeclContext && !ABIparams.empty())
       convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
 
     funcPrinter.printFunctionSignature(
@@ -1098,13 +1108,10 @@ private:
         FD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention =
         FD->getForeignErrorConvention();
-    assert(!FD->getGenericSignature() &&
-           "top-level generic functions not supported here");
-    auto funcTy = FD->getInterfaceType()->castTo<FunctionType>();
+    auto funcTy = FD->getInterfaceType()->castTo<AnyFunctionType>();
     auto resultTy =
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
-    os << "inline ";
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
                                                 owningPrinter.typeMapping,
                                                 owningPrinter.interopContext);
@@ -1112,12 +1119,14 @@ private:
         additionalParams;
     auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
                          .getFunctionABIAdditionalParams(FD);
-    if (funcTy->isThrowing() && !ABIparams.empty())
+    if (!ABIparams.empty())
       convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
-
+    DeclAndTypeClangFunctionPrinter::FunctionSignatureModifiers modifiers;
+    modifiers.isInline = true;
     funcPrinter.printFunctionSignature(
         FD, FD->getName().getBaseIdentifier().get(), resultTy,
-        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk,
+        {}, modifiers);
     // FIXME: Support throwing exceptions for Swift errors.
     if (!funcTy->isThrowing())
       os << " noexcept";
@@ -1126,7 +1135,7 @@ private:
     os << " {\n";
     funcPrinter.printCxxThunkBody(
         funcABI.getSymbolName(), FD->getModuleContext(), resultTy,
-        FD->getParameters(), additionalParams, funcTy->isThrowing());
+        FD->getParameters(), additionalParams, funcTy->isThrowing(), funcTy);
     os << "}\n";
   }
 

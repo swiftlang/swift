@@ -14,6 +14,7 @@
 #define SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 
 #include "OutputLanguageMode.h"
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -26,6 +27,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class AccessorDecl;
+class AnyFunctionType;
 class FuncDecl;
 class ModuleDecl;
 class NominalTypeDecl;
@@ -55,12 +57,13 @@ public:
 
   /// Information about any additional parameters.
   struct AdditionalParam {
-    enum class Role { Self, Error };
+    enum class Role { GenericRequirement, Self, Error };
 
     Role role;
     Type type;
     // Should self be passed indirectly?
     bool isIndirect = false;
+    llvm::Optional<GenericRequirement> genericRequirement = None;
   };
 
   /// Optional modifiers that can be applied to function signature.
@@ -91,7 +94,8 @@ public:
                          const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params,
                          ArrayRef<AdditionalParam> additionalParams = {},
-                         bool hasThrows = false);
+                         bool hasThrows = false,
+                         const AnyFunctionType *funcType = nullptr);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
