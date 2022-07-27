@@ -288,11 +288,13 @@ SILCombiner::optimizeAlignment(PointerToAddressInst *ptrAdrInst) {
                                     m_SILValue(extendedAlignment))))) {
     alignOper = extendedAlignment;
   }
-  MetatypeInst *metatype;
   if (match(alignOper,
-            m_ApplyInst(BuiltinValueKind::Alignof, m_MetatypeInst(metatype)))) {
+            m_ApplyInst(BuiltinValueKind::Alignof))) {
+    CanType formalType = cast<BuiltinInst>(alignOper)->getSubstitutions()
+      .getReplacementTypes()[0]->getCanonicalType(ptrAdrInst->getFunction()->getGenericSignature());
+
     SILType instanceType = ptrAdrInst->getFunction()->getLoweredType(
-        metatype->getType().castTo<MetatypeType>().getInstanceType());
+      Lowering::AbstractionPattern::getOpaque(), formalType);
 
     if (instanceType.getAddressType() != ptrAdrInst->getType())
       return nullptr;
