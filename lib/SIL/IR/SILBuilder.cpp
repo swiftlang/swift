@@ -672,9 +672,9 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
 static ValueOwnershipKind deriveForwardingOwnership(SILValue operand,
                                                     SILType targetType,
                                                     SILFunction &func) {
-  if (operand.getOwnershipKind() != OwnershipKind::None
-      || targetType.isTrivial(func)) {
-    return operand.getOwnershipKind();
+  if (operand->getOwnershipKind() != OwnershipKind::None ||
+      targetType.isTrivial(func)) {
+    return operand->getOwnershipKind();
   }
   return OwnershipKind::Owned;
 }

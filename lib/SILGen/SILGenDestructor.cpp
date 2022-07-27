@@ -149,8 +149,8 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     resultSelfValue =
         B.createUncheckedRefCast(cleanupLoc, resultSelfValue, objectPtrTy);
   }
-  if (resultSelfValue.getOwnershipKind() != OwnershipKind::Owned) {
-    assert(resultSelfValue.getOwnershipKind() == OwnershipKind::Guaranteed);
+  if (resultSelfValue->getOwnershipKind() != OwnershipKind::Owned) {
+    assert(resultSelfValue->getOwnershipKind() == OwnershipKind::Guaranteed);
     resultSelfValue = B.createUncheckedOwnershipConversion(
         cleanupLoc, resultSelfValue, OwnershipKind::Owned);
   }
@@ -490,7 +490,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Call the superclass's -dealloc.
   SILType superclassSILTy = getLoweredLoadableType(superclassTy);
   SILValue superSelf = B.createUpcast(cleanupLoc, selfValue, superclassSILTy);
-  assert(superSelf.getOwnershipKind() == OwnershipKind::Owned);
+  assert(superSelf->getOwnershipKind() == OwnershipKind::Owned);
 
   auto subMap
     = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),

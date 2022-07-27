@@ -122,7 +122,7 @@ bool swift::removeUnreachableBlocks(SILFunction &f) {
 // Return true if a guaranteed terminator result can be borrowed such that the
 // nested borrow scope covers all its uses.
 static bool canBorrowGuaranteedResult(SILValue guaranteedResult) {
-  if (guaranteedResult.getOwnershipKind() != OwnershipKind::Guaranteed) {
+  if (guaranteedResult->getOwnershipKind() != OwnershipKind::Guaranteed) {
     // Either this terminator forwards an owned value, or it is some legal
     // conversion to a non-guaranteed value. Either way, not interesting.
     return true;
@@ -230,7 +230,7 @@ void BasicBlockCloner::updateSSAAfterCloning(
     for (auto *use : inst->getUses())
       useList.push_back(UseWrapper(use));
 
-    ssaUpdater.initialize(inst->getType(), inst.getOwnershipKind());
+    ssaUpdater.initialize(inst->getType(), inst->getOwnershipKind());
     ssaUpdater.addAvailableValue(origBB, inst);
     ssaUpdater.addAvailableValue(getNewBB(), newResult);
 
