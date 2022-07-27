@@ -35,3 +35,13 @@
 // CHECK:   init(x: __CxxTemplateInst17MyTemplatedStructIiE)
 // CHECK:   var x: __CxxTemplateInst17MyTemplatedStructIiE
 // CHECK: }
+
+// CHECK: struct __CxxTemplateInst33HasUninstantiatableTemplateMemberIN39HasTemplateInstantiationWithForwardDecl12NoDefinitionE32TemplateClassWithMemberTemplatesIS1_EE {
+// CHECK:   init(pointer: OpaquePointer!)
+// CHECK:   var pointer: OpaquePointer!
+// CHECK: }
+
+// CHECK: struct HasTemplateInstantiationWithForwardDecl {
+// CHECK:   init(noDefMember: __CxxTemplateInst33HasUninstantiatableTemplateMemberIN39HasTemplateInstantiationWithForwardDecl12NoDefinitionE32TemplateClassWithMemberTemplatesIS1_EE)
+// CHECK:   var noDefMember: __CxxTemplateInst33HasUninstantiatableTemplateMemberIN39HasTemplateInstantiationWithForwardDecl12NoDefinitionE32TemplateClassWithMemberTemplatesIS1_EE
+// CHECK: }
