@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_SILGENFUNCTION_H
 #define SWIFT_SILGEN_SILGENFUNCTION_H
 
+#include "ExecutorValue.h"
 #include "FormalEvaluation.h"
 #include "Initialization.h"
 #include "InitializeDistActorIdentity.h"
@@ -460,6 +461,7 @@ public:
   SILValue InitDelegationSelfBox;
   Optional<SILLocation> InitDelegationLoc;
   ManagedValue SuperInitDelegationSelf;
+  bool ComputingSelfForRebindInConstructor = false;
 
   RValue emitRValueForSelfInDelegationInit(SILLocation loc, CanType refType,
                                            SILValue result, SGFContext C);
@@ -477,7 +479,7 @@ public:
   /// isolated to the given executor, and hop_to_executor instructions must
   /// be inserted at the begin of the function and after all suspension
   /// points.
-  SILValue ExpectedExecutor;
+  ExecutorValue ExpectedExecutor;
 
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.

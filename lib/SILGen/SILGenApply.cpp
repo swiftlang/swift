@@ -4640,13 +4640,14 @@ RValue SILGenFunction::emitApply(
     }
 
     breadcrumb = emitHopToTargetExecutor(loc, executor);
-  } else if (ExpectedExecutor &&
-             (substFnType->isAsync() || calleeTypeInfo.foreign.async)) {
-    // Otherwise, if we're in an actor method ourselves, and we're calling into
-    // any sort of async function, we'll want to make sure to hop back to our
-    // own executor afterward, since the callee could have made arbitrary hops
-    // out of our isolation domain.
-    breadcrumb = ExecutorBreadcrumb(true);
+  } else if (ExpectedExecutor && !ComputingSelfForRebindInConstructor) {
+    if (substFnType->isAsync() || calleeTypeInfo.foreign.async) {
+      // Otherwise, if we're in an actor method ourselves, and we're calling into
+      // any sort of async function, we'll want to make sure to hop back to our
+      // own executor afterward, since the callee could have made arbitrary hops
+      // out of our isolation domain.
+      breadcrumb = ExecutorBreadcrumb(true);
+    }
   }
 
   SILValue rawDirectResult;

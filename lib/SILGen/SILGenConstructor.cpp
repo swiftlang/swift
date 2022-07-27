@@ -365,9 +365,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     auto isolation = getActorIsolation(ctor);
     SILLocation prologueLoc(selfDecl);
     prologueLoc.markAsPrologue();
-    // FIXME: is this the right ownership?
-    auto managedSelfBox = ManagedValue::forBorrowedAddressRValue(selfLV);
-    emitConstructorPrologActorHop(prologueLoc, ctor, managedSelfBox, isolation);
+    emitConstructorPrologActorHop(prologueLoc, ctor,
+                                  ManagedValue::forLValue(selfLV), isolation);
   }
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -728,7 +727,7 @@ void SILGenFunction::emitConstructorPrologActorHop(
 
   // if it's not injected by definite init, we do it in the prologue now.
   if (!ctorPrologueHopsAreInjectedByDefiniteInit(ctor, isolation))
-    B.createHopToExecutor(loc, ExpectedExecutor, /*mandatory*/ false);
+    ExpectedExecutor.emitHopToExecutor(loc, B, /*mandatory*/ false);
 
   assert(ExpectedExecutor && "method is expected to set the executor");
 }

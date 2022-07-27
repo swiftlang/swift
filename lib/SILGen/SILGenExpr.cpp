@@ -4148,6 +4148,7 @@ computeNewSelfForRebindSelfInConstructorExpr(SILGenFunction &SGF,
                                              RebindSelfInConstructorExpr *E) {
   // Get newSelf, forward the cleanup for newSelf and clean everything else
   // up.
+  llvm::SaveAndRestore<bool> X(SGF.ComputingSelfForRebindInConstructor, true);
   FormalEvaluationScope Scope(SGF);
   ManagedValue newSelfWithCleanup =
       SGF.emitRValueAsSingleValue(E->getSubExpr());
