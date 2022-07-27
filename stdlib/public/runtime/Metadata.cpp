@@ -471,7 +471,8 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
             reinterpret_cast<void *const *>(&src[i]),
             descriptors[i].Flags.getExtraDiscriminator(),
             !descriptors[i].Flags.isAsync(),
-            /*allowNull*/ false); // Don't allow NULL for Obj-C classes
+            /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
+                                 // might be proven unused and null'ed)
       }
     }
 
