@@ -741,7 +741,7 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
   return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
                          b.isDelayed(), b.isSubtypeOfExistentialType(),
                          b.involvesTypeVariables(),
-                         static_cast<unsigned char>(b.getLiteralKind()),
+                         static_cast<unsigned char>(b.getLiteralForScore()),
                          -numNonDefaultableBindings);
 }
 
@@ -1577,9 +1577,8 @@ void PotentialBindings::retract(Constraint *constraint) {
   EquivalentTo.remove_if(hasMatchingSource);
 }
 
-LiteralBindingKind BindingSet::getLiteralKind() const {
-  LiteralBindingKind kind = LiteralBindingKind::None;
-
+void BindingSet::forEachLiteralRequirement(
+    llvm::function_ref<void(KnownProtocolKind)> callback) const {
   for (const auto &literal : Literals) {
     auto *protocol = literal.first;
     const auto &info = literal.second;
@@ -1587,8 +1586,17 @@ LiteralBindingKind BindingSet::getLiteralKind() const {
     // Only uncovered defaultable literal protocols participate.
     if (!info.viableAsBinding())
       continue;
+    
+    if (auto protocolKind = protocol->getKnownProtocolKind())
+      callback(*protocolKind);
+  }
+}
 
-    switch (*protocol->getKnownProtocolKind()) {
+LiteralBindingKind BindingSet::getLiteralForScore() const {
+  LiteralBindingKind kind = LiteralBindingKind::None;
+
+  forEachLiteralRequirement([&](KnownProtocolKind protocolKind) {
+    switch (protocolKind) {
     case KnownProtocolKind::ExpressibleByDictionaryLiteral:
     case KnownProtocolKind::ExpressibleByArrayLiteral:
     case KnownProtocolKind::ExpressibleByStringInterpolation:
@@ -1604,8 +1612,7 @@ LiteralBindingKind BindingSet::getLiteralKind() const {
         kind = LiteralBindingKind::Atom;
       break;
     }
-  }
-
+  });
   return kind;
 }
 
@@ -1613,6 +1620,39 @@ unsigned BindingSet::getNumViableLiteralBindings() const {
   return llvm::count_if(Literals, [&](const auto &literal) {
     return literal.second.viableAsBinding();
   });
+}
+
+/// Return string for atomic literal kinds (integer, string, & boolean) for
+/// printing in debug output.
+static std::string getAtomLiteralAsString(ExprKind EK) {
+#define ENTRY(Kind, String)                                                    \
+  case ExprKind::Kind:                                                         \
+    return String
+  switch (EK) {
+    ENTRY(IntegerLiteral, "integer");
+    ENTRY(StringLiteral, "string");
+    ENTRY(BooleanLiteral, "boolean");
+    ENTRY(NilLiteral, "nil");
+  default:
+    return "";
+  }
+#undef ENTRY
+}
+
+/// Return string for collection literal kinds (interpolated string, array,
+/// dictionary) for printing in debug output.
+static std::string getCollectionLiteralAsString(KnownProtocolKind KPK) {
+#define ENTRY(Kind, String)                                                    \
+  case KnownProtocolKind::Kind:                                                \
+    return String
+  switch (KPK) {
+    ENTRY(ExpressibleByDictionaryLiteral, "dictionary");
+    ENTRY(ExpressibleByArrayLiteral, "array");
+    ENTRY(ExpressibleByStringInterpolation, "interpolated string");
+  default:
+    return "";
+  }
+#undef ENTRY
 }
 
 void BindingSet::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
@@ -1639,17 +1679,39 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     attributes.push_back("delayed");
   if (isSubtypeOfExistentialType())
     attributes.push_back("subtype_of_existential");
-  auto literalKind = getLiteralKind();
-  if (literalKind != LiteralBindingKind::None) {
-    auto literalAttrStr = ("[literal: " + getLiteralBindingKind(literalKind)
-                        + "]").str();
-    attributes.push_back(literalAttrStr);
-  }
   if (!attributes.empty()) {
     out << "[attributes: ";
     interleave(attributes, out, ", ");
-    out << "] ";
   }
+  
+  auto literalKind = getLiteralForScore();
+  if (literalKind != LiteralBindingKind::None) {
+    out << ", [literal: ";
+    switch (literalKind) {
+    case LiteralBindingKind::Atom: {
+      if (auto atomKind = TypeVar->getImpl().getAtomicLiteralKind()) {
+        out << getAtomLiteralAsString(*atomKind);
+      }
+      break;
+    }
+    case LiteralBindingKind::Collection: {
+      std::vector<std::string> collectionLiterals;
+      forEachLiteralRequirement([&](KnownProtocolKind protocolKind) {
+        collectionLiterals.push_back(
+            getCollectionLiteralAsString(protocolKind));
+      });
+      interleave(collectionLiterals, out, ", ");
+      break;
+    }
+    case LiteralBindingKind::Float:
+    case LiteralBindingKind::None:
+        out << getLiteralBindingKind(literalKind).str();
+      break;
+    }
+    out << "]";
+  }
+  out << "] ";
+
   if (involvesTypeVariables()) {
     out << "[involves_type_vars: ";
     interleave(AdjacentVars,
