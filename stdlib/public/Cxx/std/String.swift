@@ -19,6 +19,12 @@ extension std.string {
   }
 }
 
+extension std.string: ExpressibleByStringLiteral {
+  public init(stringLiteral value: String) {
+    self.init(value)
+  }
+}
+
 extension String {
   public init(cxxString: std.string) {
     self.init(cString: cxxString.__c_strUnsafe())

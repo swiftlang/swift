@@ -16,6 +16,9 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
   let cxx2 = std.string("something123")
   let swift2 = String(cxxString: cxx2)
   expectEqual(swift2, "something123")
+
+  let cxx3: std.string = "literal"
+  expectEqual(cxx3.size(), 7)
 }
 
 extension std.string.const_iterator: UnsafeCxxInputIterator {
