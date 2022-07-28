@@ -159,9 +159,10 @@ class SuperSub : SuperBase {
     return BigStruct()
   }
   func f() {
-    let _ = {
+    let x = {
       nil ?? super.boom()
     }
+    x()
   }
 }
 

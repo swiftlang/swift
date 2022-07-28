@@ -1619,6 +1619,7 @@ static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
     auto BB = llvm::BasicBlock::Create(IGM.getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);
     IRB.CreateRetVoid();
+    IGM.addUsedGlobal(ForceImportThunk);
     return ForceImportThunk;
   }
 }

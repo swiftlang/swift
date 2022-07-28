@@ -3,8 +3,8 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
-// RUN: %target-swift-frontend -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
+// RUN: %target-swift-frontend -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
+// RUN: %target-swift-frontend -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution -O %t/class_resilience.swift
 
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = hidden global [[INT]] 0
@@ -34,7 +34,10 @@
 
 // CHECK: @"$s16class_resilience14ResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS]] zeroinitializer
 
-// CHECK: @"$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external{{( dllimport)?}} global %swift.method_descriptor
+// CHECK-macosx: @"$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external{{( dllimport)?}} global %swift.method_descriptor
+// CHECK-iphoneos: @"$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external{{( dllimport)?}} global %swift.method_descriptor
+// CHECK-watchos: @"$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external{{( dllimport)?}} global %swift.method_descriptor
+// CHECK-tvos: @"$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external{{( dllimport)?}} global %swift.method_descriptor
 
 // CHECK: @"$s16class_resilience14ResilientChildCMn" = {{(protected )?}}{{(dllexport )?}}constant <{{.*}}> <{
 // --       flags: class, unique, has vtable, has override table, in-place initialization, has resilient superclass
