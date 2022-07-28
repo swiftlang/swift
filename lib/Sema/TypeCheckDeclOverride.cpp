@@ -620,8 +620,7 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   if (baseParams->size() != derivedParams->size())
     return false;
 
-  auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl,
-                                                        /*derivedSubs=*/None);
+  auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl);
 
   for (auto i : indices(baseParams->getArray())) {
     auto *baseParam = baseParams->get(i);

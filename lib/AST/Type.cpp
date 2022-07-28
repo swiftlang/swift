@@ -4989,7 +4989,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                               const ValueDecl *derivedDecl,
                                               Type memberType) {
   auto subs = SubstitutionMap::getOverrideSubstitutions(
-      baseDecl, derivedDecl, /*derivedSubs=*/None);
+      baseDecl, derivedDecl);
 
   if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
     memberType = FunctionType::get(genericMemberType->getParams(),

@@ -639,7 +639,8 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   SubstitutionMap subs;
   if (auto *genericEnv = fn->getGenericEnvironment())
     subs = genericEnv->getForwardingSubstitutionMap();
-  subs = SubstitutionMap::getOverrideSubstitutions(superclassCtor, fn, subs);
+  subs = SubstitutionMap::getOverrideSubstitutions(superclassCtor, fn)
+      .subst(subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
   auto type = superclassCtor->getInitializerInterfaceType().subst(subs);

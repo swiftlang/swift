@@ -497,8 +497,7 @@ SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
 SubstitutionMap
 SubstitutionMap::getOverrideSubstitutions(
                                       const ValueDecl *baseDecl,
-                                      const ValueDecl *derivedDecl,
-                                      Optional<SubstitutionMap> derivedSubs) {
+                                      const ValueDecl *derivedDecl) {
   // For overrides within a protocol hierarchy, substitute the Self type.
   if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
     auto baseSig = baseDecl->getInnermostDeclContext()
@@ -515,20 +514,16 @@ SubstitutionMap::getOverrideSubstitutions(
       ->getGenericSignatureOfContext();
 
   return getOverrideSubstitutions(baseClass, derivedClass,
-                                  baseSig, derivedSig,
-                                  derivedSubs);
+                                  baseSig, derivedSig);
 }
 
 SubstitutionMap
 SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
                                           const ClassDecl *derivedClass,
                                           GenericSignature baseSig,
-                                          GenericSignature derivedSig,
-                                          Optional<SubstitutionMap> derivedSubs) {
+                                          GenericSignature derivedSig) {
   if (baseSig.isNull())
     return SubstitutionMap();
-
-  auto *M = baseClass->getParentModule();
 
   unsigned baseDepth = 0;
   SubstitutionMap baseSubMap;
@@ -536,13 +531,8 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
     baseDepth = baseClassSig.getGenericParams().back()->getDepth() + 1;
 
     auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
-    if (derivedSubs)
-      derivedClassTy = derivedClassTy.subst(*derivedSubs);
-    auto baseClassTy = derivedClassTy->getSuperclassForDecl(baseClass);
-    if (baseClassTy->is<ErrorType>())
-      return SubstitutionMap();
-
-    baseSubMap = baseClassTy->getContextSubstitutionMap(M, baseClass);
+    baseSubMap = derivedClassTy->getContextSubstitutionMap(
+        baseClass->getParentModule(), baseClass);
   }
 
   unsigned origDepth = 0;
@@ -550,9 +540,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
     origDepth = derivedClassSig.getGenericParams().back()->getDepth() + 1;
 
   SubstitutionMap origSubMap;
-  if (derivedSubs)
-    origSubMap = *derivedSubs;
-  else if (derivedSig)
+  if (derivedSig)
     origSubMap = derivedSig->getIdentitySubstitutionMap();
 
   return combineSubstitutionMaps(baseSubMap, origSubMap,

@@ -199,8 +199,7 @@ public:
   /// written in terms of the generic signature of 'baseDecl'.
   static SubstitutionMap
   getOverrideSubstitutions(const ValueDecl *baseDecl,
-                           const ValueDecl *derivedDecl,
-                           Optional<SubstitutionMap> derivedSubs);
+                           const ValueDecl *derivedDecl);
 
   /// Variant of the above for when we have the generic signatures but not
   /// the decls for 'derived' and 'base'.
@@ -208,8 +207,7 @@ public:
   getOverrideSubstitutions(const ClassDecl *baseClass,
                            const ClassDecl *derivedClass,
                            GenericSignature baseSig,
-                           GenericSignature derivedSig,
-                           Optional<SubstitutionMap> derivedSubs);
+                           GenericSignature derivedSig);
 
   /// Combine two substitution maps as follows.
   ///
