@@ -1489,6 +1489,15 @@ public:
   /// types where possible.
   Type resolveInterfaceType(Type type) const;
 
+  Type getContextualType(ASTNode anchor) const {
+    for (const auto &entry : contextualTypes) {
+      if (entry.first == anchor) {
+        return simplifyType(entry.second.getType());
+      }
+    }
+    return Type();
+  }
+
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
   /// application of the argument to its parameter. If the locator is not
