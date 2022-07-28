@@ -180,7 +180,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   case tok::kw_Self:
   case tok::kw_Any:
   case tok::identifier: {
-    ty = parseTypeIdentifier(false, reason);
+    ty = parseTypeIdentifier(/*isParsingQualifiedDeclBaseType=*/false, reason);
     break;
   }
   case tok::l_paren:
