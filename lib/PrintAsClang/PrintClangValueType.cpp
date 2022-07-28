@@ -44,12 +44,29 @@ static void printCxxTypeName(raw_ostream &os, const NominalTypeDecl *type,
   printer.printBaseName(type);
 }
 
-/// Print out the C++ type name of the implementation class that provides hidden
-/// access to the private class APIs.
-static void printCxxImplClassName(raw_ostream &os,
-                                  const NominalTypeDecl *type) {
+void ClangValueTypePrinter::printCxxImplClassName(raw_ostream &os,
+                                                  const NominalTypeDecl *type) {
   os << "_impl_";
   ClangSyntaxPrinter(os).printBaseName(type);
+}
+
+void ClangValueTypePrinter::printMetadataAccessAsVariable(
+    raw_ostream &os, StringRef metadataFuncName, int indent,
+    StringRef varName) {
+  ClangSyntaxPrinter printer(os);
+  os << std::string(indent, ' ') << "auto " << varName << " = "
+     << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  printer.printSwiftTypeMetadataAccessFunctionCall(metadataFuncName);
+  os << ";\n";
+}
+
+void ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+    raw_ostream &os, StringRef metadataFuncName, int indent,
+    StringRef metadataVarName, StringRef vwTableVarName) {
+  ClangSyntaxPrinter printer(os);
+  printMetadataAccessAsVariable(os, metadataFuncName, indent, metadataVarName);
+  printer.printValueWitnessTableAccessSequenceFromTypeMetadata(
+      metadataVarName, vwTableVarName, indent);
 }
 
 static void
@@ -111,6 +128,18 @@ void ClangValueTypePrinter::printValueTypeDecl(
                                                           typeMetadataFuncName);
                          });
 
+  auto printEnumVWTableVariable = [&](StringRef metadataName = "metadata",
+                                      StringRef vwTableName = "vwTable",
+                                      StringRef enumVWTableName =
+                                          "enumVWTable") {
+    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+        os, typeMetadataFuncName);
+    os << "    const auto *" << enumVWTableName << " = reinterpret_cast<";
+    ClangSyntaxPrinter(os).printSwiftImplQualifier();
+    os << "EnumValueWitnessTable";
+    os << " *>(" << vwTableName << ");\n";
+  };
+
   // Print out the C++ class itself.
   os << "class ";
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
@@ -121,11 +150,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "  inline ~";
   printer.printBaseName(typeDecl);
   os << "() {\n";
-  os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
-     << "::";
-  printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
-  os << ";\n";
-  printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
+  ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+      os, typeMetadataFuncName);
   os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
   os << "  }\n";
 
@@ -134,11 +160,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "(const ";
   printer.printBaseName(typeDecl);
   os << " &other) {\n";
-  os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
-     << "::";
-  printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
-  os << ";\n";
-  printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
+  ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+      os, typeMetadataFuncName);
   if (isOpaqueLayout) {
     os << "    _storage = ";
     printer.printSwiftImplQualifier();
@@ -176,11 +199,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << " _make() {";
   if (isOpaqueLayout) {
     os << "\n";
-    os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
-       << "::";
-    printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
-    os << ";\n";
-    printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
+    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+        os, typeMetadataFuncName);
     os << "    return ";
     printer.printBaseName(typeDecl);
     os << "(vwTable);\n  }\n";
@@ -200,19 +220,17 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << ".getOpaquePointer()";
   os << "; }\n";
   os << "\n";
-  // Print out helper function for getting enum tag for enum type
+  // Print out helper function for enums
   if (isa<EnumDecl>(typeDecl)) {
+    os << "  inline char * _Nonnull _destructiveProjectEnumData() {\n";
+    printEnumVWTableVariable();
+    os << "    enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), "
+          "metadata._0);\n";
+    os << "    return _getOpaquePointer();\n";
+    os << "  }\n";
     // FIXME: (tongjie) return type should be unsigned
     os << "  inline int _getEnumTag() const {\n";
-    os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
-       << "::";
-    printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
-    os << ";\n";
-    printer.printValueWitnessTableAccessSequenceFromTypeMetadata("metadata");
-    os << "    const auto *enumVWTable = reinterpret_cast<";
-    ClangSyntaxPrinter(os).printSwiftImplQualifier();
-    os << "EnumValueWitnessTable";
-    os << " *>(vwTable);\n";
+    printEnumVWTableVariable();
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
     os << "  }\n";
@@ -259,6 +277,17 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "    callable(result._getOpaquePointer());\n";
         os << "    return result;\n";
         os << "  }\n";
+        // Print out helper function for initializeWithTake
+        // TODO: (tongjie) support opaque layout
+        if (!isOpaqueLayout) {
+          os << "  static inline void initializeWithTake(char * _Nonnull "
+                "destStorage, char * _Nonnull srcStorage) {\n";
+          ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+              os, typeMetadataFuncName);
+          os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
+                "metadata._0);\n";
+          os << "  }\n";
+        }
 
         os << "};\n";
       });
