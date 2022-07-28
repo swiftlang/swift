@@ -1942,25 +1942,10 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   }
 
   if (!op) {
-    SourceLoc insertionLoc;
-    if (isa<SourceFile>(FD->getParent())) {
-      // Parent context is SourceFile, insertion location is start of func
-      // declaration or unary operator
-      if (FD->isUnaryOperator()) {
-        insertionLoc = FD->getAttrs().getStartLoc();
-      } else {
-        insertionLoc = FD->getStartLoc();
-      }
-    } else {
-      // Find the topmost non-file decl context and insert there.
-      for (DeclContext *CurContext = FD->getLocalContext();
-           !isa<SourceFile>(CurContext);
-           CurContext = CurContext->getParent()) {
-        // Skip over non-decl contexts (e.g. closure expressions)
-        if (auto *D = CurContext->getAsDecl())
-            insertionLoc = D->getStartLoc();
-      }
-    }
+    // We want to insert at the start of the top-most declaration, taking
+    // attributes into consideration.
+    auto *insertionDecl = FD->getTopmostDeclarationDeclContext();
+    auto insertionLoc = insertionDecl->getSourceRangeIncludingAttrs().Start;
 
     SmallString<128> insertion;
     {
