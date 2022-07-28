@@ -293,15 +293,6 @@ for component in ${components[@]} ; do
   )
 done
 
-function log_event() {
-    build_script_log_path=${BUILD_DIR}/.build_script_log
-    event_type=$1
-    event_command=$2
-    evnet_duration=$3
-
-    build_event="{\"event\":\"${event_type}\", \"command\":\"${event_command}\", \"duration\":\"${evnet_duration}\"}"
-    echo "${build_event}" >> ${build_script_log_path}
-}
 
 # Centralized access point for traced command invocation.
 # Every operation that might mutates file system should be called via
@@ -314,11 +305,9 @@ function call() {
 
     SECONDS=0
     if [[ ! ${DRY_RUN} ]]; then
-        log_event "start" "$(quoted_print "$@")" "${SECONDS}"
         { set -x; } 2>/dev/null
         "$@"
         { set +x; } 2>/dev/null
-        log_event "finish" "$(quoted_print "$@")" "${SECONDS}"
     fi
 }
 
