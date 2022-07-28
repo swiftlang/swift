@@ -35,10 +35,17 @@ static CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
 static CFHashCode(*_CFStringHashNSString)(id str);
 static id(*_CFStringCreateTaggedPointerString)(const uint8_t *bytes, CFIndex numBytes);
 static __swift_uint8_t(*_NSIsNSString)(id arg);
+static CFTypeID(*_CFGetTypeID)(CFTypeRef obj);
+static CFTypeID _CFStringTypeID = 0;
 static once_t initializeBridgingFuncsOnce;
 
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
+
   void *cf = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_LAZY | RTLD_NOLOAD | RTLD_LOCAL | RTLD_FIRST);
+  auto getStringTypeID = (CFTypeID(*)(void))dlsym(cf ? cf : RTLD_DEFAULT, "CFStringGetTypeID");
+  assert(getStringTypeID);
+  _CFStringTypeID = getStringTypeID();
+  _CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(cf ? cf : RTLD_DEFAULT, "CFGetTypeID");
   _NSIsNSString = (__swift_uint8_t(*)(id))dlsym(cf ? cf : RTLD_DEFAULT, "_NSIsNSString");
   _CFStringHashNSString = (CFHashCode(*)(id))dlsym(cf ? cf : RTLD_DEFAULT, "CFStringHashNSString");
   _CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(cf ? cf : RTLD_DEFAULT, "CFStringHashCString");
@@ -67,10 +74,7 @@ _swift_stdlib_createTaggedPointerString(const _swift_shims_UInt8 * _Nonnull byte
 __swift_uint8_t
 _swift_stdlib_isNSString(id obj) {
   initializeBridgingFunctions();
-  if (_NSIsNSString != NULL) {
-    return _NSIsNSString(obj);
-  }
-  return [obj isKindOfClass: objc_lookUpClass("NSString")];
+  return _CFGetTypeID((CFTypeRef)obj) == _CFStringTypeID ? 1 : 0;
 }
 
 _swift_shims_CFHashCode
