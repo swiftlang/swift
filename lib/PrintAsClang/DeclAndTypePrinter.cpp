@@ -388,11 +388,13 @@ private:
   }
 
   void visitEnumDeclCxx(EnumDecl *ED) {
+    assert(owningPrinter.outputLang == OutputLanguageMode::Cxx);
+
     // FIXME: Print enum's availability
-    ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
-                                  owningPrinter.typeMapping,
-                                  owningPrinter.interopContext);
-    printer.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
+    ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
+                                           owningPrinter.typeMapping,
+                                           owningPrinter.interopContext);
+    valueTypePrinter.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
       ClangSyntaxPrinter syntaxPrinter(os);
       auto elementTagMapping =
           owningPrinter.interopContext.getIrABIDetails().getEnumTagMapping(ED);
@@ -418,6 +420,7 @@ private:
       os << "  inline operator cases() const {\n";
       os << "    switch (_getEnumTag()) {\n";
       for (const auto &pair : elementTagMapping) {
+        // TODO: have to use global variable for resilient enum
         os << "      case " << pair.second << ": return cases::";
         syntaxPrinter.printIdentifier(pair.first->getNameStr());
         os << ";\n";
@@ -427,7 +430,11 @@ private:
       os << "    }\n"; // switch's closing bracket
       os << "  }\n";   // operator cases()'s closing bracket
 
-      // Printing predicates
+      // Printing case-related functions
+      DeclAndTypeClangFunctionPrinter clangFuncPrinter(
+          os, owningPrinter.prologueOS, owningPrinter.typeMapping,
+          owningPrinter.interopContext);
+
       for (const auto &pair : elementTagMapping) {
         os << "  inline bool is";
         auto name = pair.first->getNameStr().str();
@@ -436,6 +443,64 @@ private:
         os << "    return *this == cases::";
         syntaxPrinter.printIdentifier(pair.first->getNameStr());
         os << ";\n  }\n";
+
+        if (!pair.first->hasAssociatedValues()) {
+          continue;
+        }
+
+        auto associatedValueList = pair.first->getParameterList();
+        // TODO: add tuple type support
+        if (associatedValueList->size() > 1) {
+          continue;
+        }
+        auto firstType = associatedValueList->front()->getType();
+        auto firstTypeDecl = firstType->getNominalOrBoundGenericNominal();
+        OptionalTypeKind optKind;
+        std::tie(firstType, optKind) =
+            getObjectTypeAndOptionality(firstTypeDecl, firstType);
+
+        // FIXME: (tongjie) may have to forward declare return type
+        os << "  inline ";
+        clangFuncPrinter.printClangFunctionReturnType(
+            firstType, optKind, firstTypeDecl->getModuleContext(),
+            owningPrinter.outputLang);
+        os << " get" << name << "() const {\n";
+        os << "    if (!is" << name << "()) abort();\n";
+        os << "    alignas(";
+        syntaxPrinter.printBaseName(ED);
+        os << ") unsigned char buffer[sizeof(";
+        syntaxPrinter.printBaseName(ED);
+        os << ")];\n";
+        os << "    auto *thisCopy = new(buffer) ";
+        syntaxPrinter.printBaseName(ED);
+        os << "(*this);\n";
+        os << "    char * _Nonnull payloadFromDestruction = "
+              "thisCopy->_destructiveProjectEnumData();\n";
+        if (auto knownCxxType =
+                owningPrinter.typeMapping.getKnownCxxTypeInfo(firstTypeDecl)) {
+          os << "    ";
+          clangFuncPrinter.printClangFunctionReturnType(
+              firstType, optKind, firstTypeDecl->getModuleContext(),
+              owningPrinter.outputLang);
+          os << " result;\n";
+          os << "    "
+                "memcpy(&result, payloadFromDestruction, sizeof(result));\n";
+          os << "    return result;\n";
+        } else {
+          os << "    return ";
+          syntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
+              firstTypeDecl->getModuleContext(), ED->getModuleContext());
+          os << cxx_synthesis::getCxxImplNamespaceName();
+          os << "::";
+          ClangValueTypePrinter::printCxxImplClassName(os, firstTypeDecl);
+          os << "::returnNewValue([&](char * _Nonnull result) {\n";
+          os << "      " << cxx_synthesis::getCxxImplNamespaceName();
+          os << "::";
+          ClangValueTypePrinter::printCxxImplClassName(os, firstTypeDecl);
+          os << "::initializeWithTake(result, payloadFromDestruction);\n";
+          os << "    });\n";
+        }
+        os << "  }\n";
       }
       os << "\n";
     });

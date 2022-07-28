@@ -234,6 +234,17 @@ private:
 
 } // end namespace
 
+void DeclAndTypeClangFunctionPrinter::printClangFunctionReturnType(
+    Type ty, OptionalTypeKind optKind, ModuleDecl *moduleContext,
+    OutputLanguageMode outputLang) {
+  CFunctionSignatureTypePrinter typePrinter(
+      os, cPrologueOS, typeMapping, outputLang, interopContext,
+      CFunctionSignatureTypePrinterModifierDelegate(), moduleContext,
+      FunctionSignatureTypeUse::ReturnType);
+  // Param for indirect return cannot be marked as inout
+  typePrinter.visit(ty, optKind, /*isInOutParam=*/false);
+}
+
 void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, StringRef name, Type resultTy,
     FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams,
@@ -279,12 +290,7 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     Type objTy;
     std::tie(objTy, retKind) =
         DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
-    CFunctionSignatureTypePrinter typePrinter(
-        os, cPrologueOS, typeMapping, outputLang, interopContext,
-        CFunctionSignatureTypePrinterModifierDelegate(), emittedModule,
-        FunctionSignatureTypeUse::ReturnType);
-    // Param for indirect return cannot be marked as inout
-    typePrinter.visit(objTy, retKind, /*isInOutParam=*/false);
+    printClangFunctionReturnType(objTy, retKind, emittedModule, outputLang);
   } else {
     os << "void";
   }

@@ -34,30 +34,30 @@ public func checkCLikeEnum(_ x: CLikeEnum, tag: Int) -> Bool {
     }
 }
 
-public enum CharOrSectionMarker {
-    case Paragraph
-    case Char(Unicode.Scalar)
-    case Chapter
+public enum BoolWithCase {
+    case first
+    case second(Bool)
+    case third
 }
 
-public func makeCharOrSectionMarker(_ tag: Int) -> CharOrSectionMarker {
+public func makeBoolWithCase(_ tag: Int) -> BoolWithCase {
     switch tag {
     case 1:
-        return .Paragraph
+        return .first
     case 2:
-        return .Char("🍎")
+        return .second(true)
     default:
-        return .Chapter
+        return .third
     }
 }
 
-public func checkCharOrSectionMarker(_ x: CharOrSectionMarker, tag: Int) -> Bool {
+public func checkBoolWithCase(_ x: BoolWithCase, tag: Int) -> Bool {
     switch x {
-    case .Paragraph:
+    case .first:
         return tag == 1
-    case .Char:
+    case .second:
         return tag == 2
-    case .Chapter:
+    case .third:
         return ![1, 2].contains(tag)
     }
 }
@@ -90,55 +90,43 @@ public func checkIntOrInfinity(_ x: IntOrInfinity, tag: Int) -> Bool {
     }
 }
 
-public enum TerminalChar {
-    case Cursor
-    case Plain(Unicode.Scalar)
-    case Bold(Unicode.Scalar)
-    case Underline(Unicode.Scalar)
-    case Blink(Unicode.Scalar)
-    case Empty
+public enum MultipleBoolWithCase {
+    case first
+    case second(Bool)
+    case third(Bool)
+    case fourth
 }
 
-public func makeTerminalChar(_ tag: Int) -> TerminalChar {
+public func makeMultipleBoolWithCase(_ tag: Int) -> MultipleBoolWithCase {
     switch tag {
     case 1:
-        return .Plain("P")
+        return .first
     case 2:
-        return .Bold("B")
+        return .second(true)
     case 3:
-        return .Underline("U")
-    case 4:
-        return .Blink("L")
-    case 5:
-        return .Empty
+        return .third(false)
     default:
-        return .Cursor
+        return .fourth
     }
 }
 
-public func checkTerminalChar(_ x: TerminalChar, tag: Int) -> Bool {
+public func checkMultipleBoolWithCase(_ x: MultipleBoolWithCase, tag: Int) -> Bool {
     switch x {
-    case .Plain:
+    case .first:
         return tag == 1
-    case .Bold:
+    case .second:
         return tag == 2
-    case .Underline:
+    case .third:
         return tag == 3
-    case .Blink:
-        return tag == 4
-    case .Empty:
-        return tag == 5
-    case .Cursor:
-        return ![1, 2, 3, 4, 5].contains(tag)
+    case .fourth:
+        return ![1, 2, 3].contains(tag)
     }
 }
-
-public class Bignum {}
 
 public enum IntDoubleOrBignum {
     case Int(Int)
     case Double(Double)
-    case Bignum(Bignum)
+    case Bignum
 }
 
 public func makeIntDoubleOrBignum(_ tag: Int) -> IntDoubleOrBignum {
@@ -148,7 +136,7 @@ public func makeIntDoubleOrBignum(_ tag: Int) -> IntDoubleOrBignum {
     case 2:
         return .Double(3.14)
     default:
-        return .Bignum(Bignum())
+        return .Bignum
     }
 }
 
@@ -163,6 +151,37 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
     }
 }
 
+// CHECK: class BoolWithCase final {
+
+// CHECK:      inline operator cases() const {
+// CHECK-NEXT:   switch (_getEnumTag()) {
+// CHECK-NEXT:     case 0: return cases::second;
+// CHECK-NEXT:     case 1: return cases::first;
+// CHECK-NEXT:     case 2: return cases::third;
+// CHECK-NEXT:     default: abort();
+// CHECK-NEXT:   }
+// CHECK-NEXT: }
+// CHECK-NEXT: inline bool isSecond() const {
+// CHECK-NEXT:   return *this == cases::second;
+// CHECK-NEXT: }
+// CHECK:      inline bool isFirst() const {
+// CHECK-NEXT:   return *this == cases::first;
+// CHECK-NEXT: }
+// CHECK-NEXT: inline bool isThird() const {
+// CHECK-NEXT:     return *this == cases::third;
+// CHECK-NEXT: }
+// CHECK:      inline int _getEnumTag() const {
+// CHECK-NEXT:   auto metadata = _impl::$s5Enums12BoolWithCaseOMa(0);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
+// CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
+// CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
+// CHECK-NEXT: }
+
 // CHECK: class CLikeEnum final {
 
 // CHECK:      inline operator cases() const {
@@ -176,45 +195,14 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: inline bool isOne() const {
 // CHECK-NEXT:   return *this == cases::one;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isTwo() const {
+// CHECK:      inline bool isTwo() const {
 // CHECK-NEXT:   return *this == cases::two;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isThree() const {
+// CHECK:      inline bool isThree() const {
 // CHECK-NEXT:   return *this == cases::three;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums9CLikeEnumOMa(0);
-// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
-// CHECK-NEXT: #ifdef __arm64e__
-// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
-// CHECK-NEXT: #else
-// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
-// CHECK-NEXT: #endif
-// CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
-// CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
-// CHECK-NEXT: }
-
-// CHECK: class CharOrSectionMarker final {
-
-// CHECK:      inline operator cases() const {
-// CHECK-NEXT:   switch (_getEnumTag()) {
-// CHECK-NEXT:     case 0: return cases::Char;
-// CHECK-NEXT:     case 1: return cases::Paragraph;
-// CHECK-NEXT:     case 2: return cases::Chapter;
-// CHECK-NEXT:     default: abort();
-// CHECK-NEXT:   }
-// CHECK-NEXT: }
-// CHECK-NEXT: inline bool isChar() const {
-// CHECK-NEXT:   return *this == cases::Char;
-// CHECK-NEXT: }
-// CHECK-NEXT: inline bool isParagraph() const {
-// CHECK-NEXT:   return *this == cases::Paragraph;
-// CHECK-NEXT: }
-// CHECK-NEXT: inline bool isChapter() const {
-// CHECK-NEXT:   return *this == cases::Chapter;
-// CHECK-NEXT: }
-// CHECK:      inline int _getEnumTag() const {
-// CHECK-NEXT:   auto metadata = _impl::$s5Enums19CharOrSectionMarkerOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
 // CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
@@ -261,10 +249,10 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: inline bool isInt() const {
 // CHECK-NEXT:   return *this == cases::Int;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isDouble() const {
+// CHECK:      inline bool isDouble() const {
 // CHECK-NEXT:   return *this == cases::Double;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isBignum() const {
+// CHECK:      inline bool isBignum() const {
 // CHECK-NEXT:   return *this == cases::Bignum;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
@@ -292,10 +280,10 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: inline bool isInt() const {
 // CHECK-NEXT:   return *this == cases::Int;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isNegInfinity() const {
+// CHECK:      inline bool isNegInfinity() const {
 // CHECK-NEXT:   return *this == cases::NegInfinity;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isPosInfinity() const {
+// CHECK:      inline bool isPosInfinity() const {
 // CHECK-NEXT:   return *this == cases::PosInfinity;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
@@ -310,39 +298,31 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
 
-// CHECK: class TerminalChar final {
+// CHECK: class MultipleBoolWithCase final {
 
 // CHECK:      inline operator cases() const {
-// CHECK-NEXT:   switch (_getEnumTag()) {
-// CHECK-NEXT:     case 0: return cases::Plain;
-// CHECK-NEXT:     case 1: return cases::Bold;
-// CHECK-NEXT:     case 2: return cases::Underline;
-// CHECK-NEXT:     case 3: return cases::Blink;
-// CHECK-NEXT:     case 4: return cases::Cursor;
-// CHECK-NEXT:     case 5: return cases::Empty;
+// CHECK-NEXT:     switch (_getEnumTag()) {
+// CHECK-NEXT:     case 0: return cases::second;
+// CHECK-NEXT:     case 1: return cases::third;
+// CHECK-NEXT:     case 2: return cases::first;
+// CHECK-NEXT:     case 3: return cases::fourth;
 // CHECK-NEXT:     default: abort();
-// CHECK-NEXT:   }
+// CHECK-NEXT:     }
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isPlain() const {
-// CHECK-NEXT:   return *this == cases::Plain;
+// CHECK-NEXT: inline bool isSecond() const {
+// CHECK-NEXT:     return *this == cases::second;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isBold() const {
-// CHECK-NEXT:   return *this == cases::Bold;
+// CHECK:      inline bool isThird() const {
+// CHECK-NEXT:     return *this == cases::third;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isUnderline() const {
-// CHECK-NEXT:   return *this == cases::Underline;
+// CHECK:      inline bool isFirst() const {
+// CHECK-NEXT:     return *this == cases::first;
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isBlink() const {
-// CHECK-NEXT:   return *this == cases::Blink;
-// CHECK-NEXT: }
-// CHECK-NEXT: inline bool isCursor() const {
-// CHECK-NEXT:   return *this == cases::Cursor;
-// CHECK-NEXT: }
-// CHECK-NEXT: inline bool isEmpty() const {
-// CHECK-NEXT:   return *this == cases::Empty;
+// CHECK-NEXT: inline bool isFourth() const {
+// CHECK-NEXT:     return *this == cases::fourth;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
-// CHECK-NEXT:   auto metadata = _impl::$s5Enums12TerminalCharOMa(0);
+// CHECK-NEXT:   auto metadata = _impl::$s5Enums20MultipleBoolWithCaseOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
 // CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
