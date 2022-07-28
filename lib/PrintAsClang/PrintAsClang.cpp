@@ -105,7 +105,9 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
-        out << "#if defined(_WIN32)\n#include <malloc.h>\n#endif\n";
+        out << "#if __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <shims/_SwiftCxxInteroperability.h>\n";
+        out << "#endif\n";
       },
       [&] {
         out << "#include <stdint.h>\n"
