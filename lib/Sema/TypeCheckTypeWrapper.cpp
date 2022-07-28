@@ -268,3 +268,31 @@ SynthesizeTypeWrappedPropertyGetterBody::evaluate(Evaluator &evaluator,
   return BraceStmt::create(ctx, /*lbloc=*/var->getLoc(), body,
                            /*rbloc=*/var->getLoc(), /*implicit=*/true);
 }
+
+BraceStmt *
+SynthesizeTypeWrappedPropertySetterBody::evaluate(Evaluator &evaluator,
+                                                  AccessorDecl *setter) const {
+  assert(setter->isSetter());
+
+  auto &ctx = setter->getASTContext();
+
+  auto *var = dyn_cast<VarDecl>(setter->getStorage());
+  if (!var)
+    return nullptr;
+
+  auto *subscript = subscriptTypeWrappedProperty(var, setter);
+  if (!subscript)
+    return nullptr;
+
+  VarDecl *newValueParam = setter->getParameters()->get(0);
+
+  auto *assignment = new (ctx) AssignExpr(
+      subscript, /*EqualLoc=*/SourceLoc(),
+      new (ctx) DeclRefExpr(newValueParam, DeclNameLoc(), /*IsImplicit=*/true),
+      /*Implicit=*/true);
+
+  ASTNode body = new (ctx) ReturnStmt(SourceLoc(), assignment,
+                                      /*isImplicit=*/true);
+  return BraceStmt::create(ctx, /*lbloc=*/var->getLoc(), body,
+                           /*rbloc=*/var->getLoc(), /*implicit=*/true);
+}

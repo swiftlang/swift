@@ -1509,6 +1509,14 @@ synthesizeTypeWrappedPropertyGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 }
 
 static std::pair<BraceStmt *, bool>
+synthesizeTypeWrappedPropertySetterBody(AccessorDecl *getter, ASTContext &ctx) {
+  auto *body = evaluateOrDefault(
+      ctx.evaluator, SynthesizeTypeWrappedPropertySetterBody{getter}, nullptr);
+  return body ? std::make_pair(body, /*isTypeChecked=*/false)
+              : synthesizeInvalidAccessor(getter, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
 synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   auto storage = getter->getStorage();
 
@@ -1755,6 +1763,11 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 
   // Synthesize the setter for a lazy property or property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
+    // If the type this stored property belongs to has a type wrapper
+    // we need to route getter/setter through the wrapper.
+    if (var->isAccessedViaTypeWrapper())
+      return synthesizeTypeWrappedPropertySetterBody(setter, ctx);
+
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       // Lazy property setters write to the underlying storage.
       if (var->hasObservers()) {
