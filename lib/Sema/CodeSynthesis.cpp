@@ -1113,6 +1113,10 @@ static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
   if (decl->isInvalid())
     return false;
 
+  // Don't attempt if the decl has a type wrapper.
+  if (decl->hasTypeWrapper())
+    return false;
+
   return true;
 }
 
