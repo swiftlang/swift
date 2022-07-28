@@ -35,10 +35,7 @@ static CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
 static CFHashCode(*_CFStringHashNSString)(id str);
 static id(*_CFStringCreateTaggedPointerString)(const uint8_t *bytes, CFIndex numBytes);
 static __swift_uint8_t(*_NSIsNSString)(id arg);
-static swift_once_t initializeBridgingFuncsOnce;
-
-extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
-                                       const void *addr) SWIFT_RUNTIME_WEAK_IMPORT;
+static once_t initializeBridgingFuncsOnce;
 
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
   void *cf = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_LAZY | RTLD_NOLOAD | RTLD_LOCAL | RTLD_FIRST);
@@ -52,9 +49,9 @@ static void _initializeBridgingFunctionsImpl(void *ctxt) {
 }
 
 static inline void initializeBridgingFunctions() {
-  swift_once(&initializeBridgingFuncsOnce,
-             _initializeBridgingFunctionsImpl,
-             nullptr);
+  once(initializeBridgingFuncsOnce,
+       _initializeBridgingFunctionsImpl,
+       nullptr);
 }
 
 void *
@@ -114,6 +111,9 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
   return imp(obj, sel, buffer, maxLength, encoding);
 
 }
+
+//extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
+//                                       const void *addr) SWIFT_RUNTIME_WEAK_IMPORT;
 
 __swift_uint8_t
 _swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
