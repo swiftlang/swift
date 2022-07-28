@@ -1470,8 +1470,9 @@ public:
   void finishEmitAfterTopLevel();
 
   Signature getSignature(CanSILFunctionType fnType);
-  Signature getSignature(CanSILFunctionType fnType,
-                         FunctionPointerKind kind);
+  Signature getSignature(CanSILFunctionType fnType, FunctionPointerKind kind,
+                         const clang::Decl *decl = nullptr);
+
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);

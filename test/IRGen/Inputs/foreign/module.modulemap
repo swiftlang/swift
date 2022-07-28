@@ -1,0 +1,5 @@
+
+module foreign {
+  header "foreign.h"
+  export *
+}

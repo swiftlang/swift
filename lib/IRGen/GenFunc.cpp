@@ -130,7 +130,7 @@ namespace {
     FuncSignatureInfo(CanSILFunctionType formalType)
       : FormalType(formalType) {}
     
-    Signature getSignature(IRGenModule &IGM) const;
+    Signature getSignature(IRGenModule &IGM, const clang::Decl *D) const;
   };
 
   /// The @thin function type-info class.
@@ -563,14 +563,15 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   llvm_unreachable("bad function type representation");
 }
 
-Signature FuncSignatureInfo::getSignature(IRGenModule &IGM) const {
+Signature
+FuncSignatureInfo::getSignature(IRGenModule &IGM, const clang::Decl *D) const {
   // If it's already been filled in, we're done.
   if (TheSignature.isValid())
     return TheSignature;
 
   // Update the cache and return.
   TheSignature = Signature::getUncached(IGM, FormalType,
-                                        FunctionPointerKind(FormalType));
+                                        FunctionPointerKind(FormalType), D);
   assert(TheSignature.isValid());
   return TheSignature;
 }
@@ -600,13 +601,14 @@ Signature IRGenModule::getSignature(CanSILFunctionType type) {
 }
 
 Signature IRGenModule::getSignature(CanSILFunctionType type,
-                                    FunctionPointerKind kind) {
+                                    FunctionPointerKind kind,
+                                    const clang::Decl *decl) {
   // Don't bother caching if we're working with a special kind.
   if (kind.isSpecial())
-    return Signature::getUncached(*this, type, kind);
+    return Signature::getUncached(*this, type, kind, nullptr);
 
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
-  return sigInfo.getSignature(*this);
+  return sigInfo.getSignature(*this,  decl);
 }
 
 llvm::FunctionType *
@@ -614,7 +616,7 @@ IRGenModule::getFunctionType(CanSILFunctionType type,
                              llvm::AttributeList &attrs,
                              ForeignFunctionInfo *foreignInfo) {
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
-  Signature sig = sigInfo.getSignature(*this);
+  Signature sig = sigInfo.getSignature(*this, nullptr);
   attrs = sig.getAttributes();
   if (foreignInfo) *foreignInfo = sig.getForeignInfo();
   return sig.getType();
@@ -626,7 +628,7 @@ IRGenModule::getForeignFunctionInfo(CanSILFunctionType type) {
     return ForeignFunctionInfo();
 
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
-  return sigInfo.getSignature(*this).getForeignInfo();
+  return sigInfo.getSignature(*this, nullptr).getForeignInfo();
 }
 
 static void emitApplyArgument(IRGenFunction &IGF,
