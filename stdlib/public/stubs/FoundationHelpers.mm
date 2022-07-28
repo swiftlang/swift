@@ -38,14 +38,14 @@ static __swift_uint8_t(*_NSIsNSString)(id arg);
 static once_t initializeBridgingFuncsOnce;
 
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
-  void *cf = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_LAZY | RTLD_NOLOAD | RTLD_LOCAL | RTLD_FIRST);
-  _NSIsNSString = (__swift_uint8_t(*)(id))dlsym(cf ? cf : RTLD_DEFAULT, "_NSIsNSString");
-  _CFStringHashNSString = (CFHashCode(*)(id))dlsym(cf ? cf : RTLD_DEFAULT, "CFStringHashNSString");
-  _CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(cf ? cf : RTLD_DEFAULT, "CFStringHashCString");
-  _CFStringCreateTaggedPointerString = (id(*)(const uint8_t *, CFIndex))dlsym(cf ? cf : RTLD_DEFAULT, "_CFStringCreateTaggedPointerString");
-  if (cf) {
-    dlclose(cf);
-  }
+  //void *cf = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_LAZY | RTLD_NOLOAD | RTLD_LOCAL | RTLD_FIRST);
+  _NSIsNSString = (__swift_uint8_t(*)(id))dlsym(RTLD_DEFAULT, "_NSIsNSString");
+  _CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT, "CFStringHashNSString");
+  _CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(RTLD_DEFAULT, "CFStringHashCString");
+  _CFStringCreateTaggedPointerString = (id(*)(const uint8_t *, CFIndex))dlsym(RTLD_DEFAULT, "_CFStringCreateTaggedPointerString");
+//  if (cf) {
+//    dlclose(cf);
+//  }
 }
 
 static inline void initializeBridgingFunctions() {
