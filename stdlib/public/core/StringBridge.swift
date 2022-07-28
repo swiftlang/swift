@@ -58,6 +58,10 @@ internal typealias _CocoaString = AnyObject
                options: UInt,
                range: _SwiftNSRange,
                locale: AnyObject?) -> Int
+  
+  @objc(newTaggedNSStringWithASCIIBytes_:length_:)
+     func createTaggedString(bytes: UnsafePointer<UInt8>,
+                             count: Int) -> AnyObject?
 }
 
 /*
@@ -559,14 +563,27 @@ extension String {
 }
 
 @_effects(releasenone)
-private func _createTaggedNSString(
+private func _createNSString(
+  _ receiver: _StringSelectorHolder,
   _ ptr: UnsafePointer<UInt8>,
-  _ count: Int
+  _ count: Int,
+  _ encoding: UInt32
 ) -> AnyObject? {
-  if let str = _swift_stdlib_createTaggedPointerString(ptr, count) {
-    return Unmanaged.fromOpaque(str).takeRetainedValue()
-  }
-  return nil
+  return receiver.createTaggedString(bytes: ptr, count: count)
+}
+
+@_effects(releasenone)
+private func _createCFString(
+  _ ptr: UnsafePointer<UInt8>,
+  _ count: Int,
+  _ encoding: UInt32
+) -> AnyObject? {
+  return _createNSString(
+    unsafeBitCast(__StringStorage.self as AnyClass, to: _StringSelectorHolder.self),
+    ptr,
+    count,
+    encoding
+  )
 }
 
 extension String {
@@ -579,9 +596,10 @@ extension String {
     // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
     if _guts.isSmallASCII {
       let maybeTagged = _guts.asSmall.withUTF8 { bufPtr in
-        return _createTaggedNSString(
+        return _createCFString(
           bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          bufPtr.count
+          bufPtr.count,
+          kCFStringEncodingUTF8
         )
       }
       if let tagged = maybeTagged { return tagged }
