@@ -659,6 +659,9 @@ bool SILFunction::hasDynamicSelfMetadata() const {
       selfTy = dynamicSelfTy.getSelfType();
   }
 
+  if (selfTy.isForeignReferenceType())
+    return false;
+
   return !!selfTy.getClassOrBoundGenericClass();
 }
 
