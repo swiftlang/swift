@@ -79,7 +79,8 @@ public func castObjCToSwift<T>(_ t: T) -> Int {
 
 // Check that compiler understands that this cast always fails
 // CHECK-LABEL: sil [noinline] {{.*}}@$s17cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftySiSo8NSStringCF
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 @inline(never)
@@ -89,7 +90,8 @@ public func testFailingBridgedCastFromObjCtoSwift(_ ns: NSString) -> Int {
 
 // Check that compiler understands that this cast always fails
 // CHECK-LABEL: sil [noinline] {{.*}}@$s17cast_folding_objc37testFailingBridgedCastFromSwiftToObjCySiSSF
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 @inline(never)
@@ -236,13 +238,15 @@ print("test0=\(test0())")
 // CHECK:         unconditional_checked_cast_addr
 
 // CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastNSObjectToNonClassType
-// CHECK:         builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 
 // CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyObjectToEveryType{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
 // CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyObjectToNonClassType
-// CHECK-NOT:         builtin "int_trap"
+// CHECK: [[MT:%[0-9]+]] = metatype $@thin Int.Type
+// CHECK: return [[MT]]
 
 // CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyToAny2Class{{.*}}
 // CHECK:         unconditional_checked_cast_addr

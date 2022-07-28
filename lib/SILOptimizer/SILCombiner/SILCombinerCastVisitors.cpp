@@ -772,7 +772,8 @@ SILInstruction *SILCombiner::visitUnconditionalCheckedCastAddrInst(
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI)) {
+  CastOpt.optimizeUnconditionalCheckedCastInst(UCCI);
+  if (UCCI->isDeleted()) {
     MadeChange = true;
     return nullptr;
   }
