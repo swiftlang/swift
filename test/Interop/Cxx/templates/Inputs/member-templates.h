@@ -50,4 +50,16 @@ struct HasTemplatedField {
   MyTemplatedStruct<int> x;
 };
 
+template <typename A, typename R = TemplateClassWithMemberTemplates<A>>
+struct HasUninstantiatableTemplateMember {
+  R *pointer; // R cannot be instantiated here, because R is an incomplete type,
+              // so this should be imported as OpaquePointer.
+};
+
+struct HasTemplateInstantiationWithForwardDecl {
+  class NoDefinition;
+
+  HasUninstantiatableTemplateMember<NoDefinition> noDefMember;
+};
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_MEMBER_TEMPLATES_H

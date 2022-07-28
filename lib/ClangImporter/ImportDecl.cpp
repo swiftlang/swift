@@ -2647,11 +2647,20 @@ namespace {
         return nullptr;
       }
 
-      // `Sema::isCompleteType` will try to instantiate the class template as a
-      // side-effect and we rely on this here. `decl->getDefinition()` can
-      // return nullptr before the call to sema and return its definition
-      // afterwards.
-      if (!Impl.getClangSema().isCompleteType(
+      // `decl->getDefinition()` can return nullptr before the call to sema and
+      // return its definition afterwards.
+      clang::Sema &clangSema = Impl.getClangSema();
+      if (!decl->getDefinition()) {
+        bool notInstantiated = clangSema.InstantiateClassTemplateSpecialization(
+            decl->getLocation(),
+            const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
+            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+            /*Complain*/ false);
+        // If the template can't be instantiated, bail.
+        if (notInstantiated)
+          return nullptr;
+      }
+      if (!clangSema.isCompleteType(
               decl->getLocation(),
               Impl.getClangASTContext().getRecordType(decl))) {
         // If we got nullptr definition now it means the type is not complete.
@@ -2675,8 +2684,8 @@ namespace {
       for (auto member : decl->decls()) {
         if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
           if (varDecl->getTemplateInstantiationPattern())
-            Impl.getClangSema()
-              .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
+            clangSema.InstantiateVariableDefinition(varDecl->getLocation(),
+                                                    varDecl);
         }
       }
 
