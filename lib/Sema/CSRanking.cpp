@@ -1420,7 +1420,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
     for (unsigned i = 0, n = viable.size(); i != n; ++i) {
       llvm::errs().indent(solverState->depth * 2)
-          << "--- Solution #" << i << " ---\n";
+          << "\n--- Solution #" << i << " ---\n";
       viable[i].dump(llvm::errs().indent(solverState->depth * 2));
     }
   }

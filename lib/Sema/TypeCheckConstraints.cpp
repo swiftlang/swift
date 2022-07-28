@@ -1238,9 +1238,9 @@ void Solution::dump(raw_ostream &out) const {
 
   SourceManager *sm = &getConstraintSystem().getASTContext().SourceMgr;
 
-  out << "Fixed score: " << FixedScore << "\n";
+  out << "Fixed score: " << FixedScore;
 
-  out << "Type variables:\n";
+  out << "\nType variables:\n";
   std::vector<std::pair<TypeVariableType *, Type>> bindings(
       typeBindings.begin(), typeBindings.end());
   llvm::sort(bindings, [](const std::pair<TypeVariableType *, Type> &lhs,
@@ -1260,77 +1260,85 @@ void Solution::dump(raw_ostream &out) const {
     out << "\n";
   }
 
-  out << "\n";
-  out << "Overload choices:\n";
-  for (auto ovl : overloadChoices) {
-    out.indent(2);
-    if (ovl.first)
-      ovl.first->dump(sm, out);
-    out << " with ";
+  if (!overloadChoices.empty()) {
+    out << "\nOverload choices:";
+    for (auto ovl : overloadChoices) {
+      out.indent(2);
+      if (ovl.first) {
+        out << "\n";
+        ovl.first->dump(sm, out);
+      }
+      out << " with ";
 
-    auto choice = ovl.second.choice;
-    switch (choice.getKind()) {
-    case OverloadChoiceKind::Decl:
-    case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::DeclViaBridge:
-    case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      choice.getDecl()->dumpRef(out);
-      out << " as ";
-      if (choice.getBaseType())
-        out << choice.getBaseType()->getString(PO) << ".";
+      auto choice = ovl.second.choice;
+      switch (choice.getKind()) {
+      case OverloadChoiceKind::Decl:
+      case OverloadChoiceKind::DeclViaDynamic:
+      case OverloadChoiceKind::DeclViaBridge:
+      case OverloadChoiceKind::DeclViaUnwrappedOptional:
+        choice.getDecl()->dumpRef(out);
+        out << " as ";
+        if (choice.getBaseType())
+          out << choice.getBaseType()->getString(PO) << ".";
 
-      out << choice.getDecl()->getBaseName() << ": "
-          << ovl.second.adjustedOpenedType->getString(PO) << "\n";
-      break;
+        out << choice.getDecl()->getBaseName() << ": "
+            << ovl.second.adjustedOpenedType->getString(PO);
+        break;
 
-    case OverloadChoiceKind::KeyPathApplication:
-      out << "key path application root "
-          << choice.getBaseType()->getString(PO) << "\n";
-      break;
+      case OverloadChoiceKind::KeyPathApplication:
+        out << "key path application root "
+            << choice.getBaseType()->getString(PO);
+        break;
 
-    case OverloadChoiceKind::DynamicMemberLookup:
-    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
-      out << "dynamic member lookup root "
-          << choice.getBaseType()->getString(PO)
-          << " name='" << choice.getName() << "'\n";
-      break;
-  
-    case OverloadChoiceKind::TupleIndex:
-      out << "tuple " << choice.getBaseType()->getString(PO) << " index "
-        << choice.getTupleIndex() << "\n";
-      break;
+      case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+        out << "dynamic member lookup root "
+            << choice.getBaseType()->getString(PO)
+            << " name='" << choice.getName();
+        break;
+    
+      case OverloadChoiceKind::TupleIndex:
+        out << "tuple " << choice.getBaseType()->getString(PO) << " index "
+          << choice.getTupleIndex();
+        break;
+      }
     }
     out << "\n";
   }
 
-  out << "\n";
-  out << "Constraint restrictions:\n";
-  for (auto &restriction : ConstraintRestrictions) {
-    out.indent(2) << restriction.first.first
-                  << " to " << restriction.first.second
-                  << " is " << getName(restriction.second) << "\n";
-  }
 
-  out << "\n";
-  out << "Trailing closure matching:\n";
-  for (auto &argumentMatching : argumentMatchingChoices) {
-    out.indent(2);
-    argumentMatching.first->dump(sm, out);
-    switch (argumentMatching.second.trailingClosureMatching) {
-    case TrailingClosureMatching::Forward:
-      out << ": forward\n";
-      break;
-    case TrailingClosureMatching::Backward:
-      out << ": backward\n";
-      break;
+  if (!ConstraintRestrictions.empty()) {
+    out << "\nConstraint restrictions:\n";
+    for (auto &restriction : ConstraintRestrictions) {
+      out.indent(2) << restriction.first.first
+                    << " to " << restriction.first.second
+                    << " is " << getName(restriction.second) << "\n";
     }
   }
 
-  out << "\nDisjunction choices:\n";
-  for (auto &choice : DisjunctionChoices) {
-    out.indent(2);
-    choice.first->dump(sm, out);
-    out << " is #" << choice.second << "\n";
+  if (!argumentMatchingChoices.empty()) {
+    out << "\nTrailing closure matching:\n";
+    for (auto &argumentMatching : argumentMatchingChoices) {
+      out.indent(2);
+      argumentMatching.first->dump(sm, out);
+      switch (argumentMatching.second.trailingClosureMatching) {
+      case TrailingClosureMatching::Forward:
+        out << ": forward\n";
+        break;
+      case TrailingClosureMatching::Backward:
+        out << ": backward\n";
+        break;
+      }
+    }
+  }
+
+  if (!DisjunctionChoices.empty()) {
+    out << "\nDisjunction choices:\n";
+    for (auto &choice : DisjunctionChoices) {
+      out.indent(2);
+      choice.first->dump(sm, out);
+      out << " is #" << choice.second << "\n";
+    }
   }
 
   if (!OpenedTypes.empty()) {
@@ -1413,20 +1421,21 @@ void ConstraintSystem::print(raw_ostream &out) const {
   // Print all type variables as $T0 instead of _ here.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
-  
-  out << "Score: " << CurrentScore << "\n";
+
+  out << "Score: " << CurrentScore;
 
   for (const auto &contextualTypeEntry : contextualTypes) {
     auto info = contextualTypeEntry.second.first;
-    out << "Contextual Type: " << info.getType().getString(PO);
-    if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
-      out << " at ";
-      TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
+    if (!info.getType().isNull()) {
+      out << "\nContextual Type: " << info.getType().getString(PO);
+      if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
+        out << " at ";
+        TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
+      }
     }
-    out << "\n";
   }
 
-  out << "Type Variables:\n";
+  out << "\nType Variables:\n";
   std::vector<TypeVariableType *> typeVariables(getTypeVariables().begin(),
                                                 getTypeVariables().end());
   llvm::sort(typeVariables,
@@ -1457,18 +1466,22 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\n";
   }
 
-  out << "\nActive Constraints:\n";
-  for (auto &constraint : ActiveConstraints) {
-    out.indent(2);
-    constraint.print(out, &getASTContext().SourceMgr);
-    out << "\n";
+  if (!ActiveConstraints.empty()) {
+    out << "\nActive Constraints:\n";
+    for (auto &constraint : ActiveConstraints) {
+      out.indent(2);
+      constraint.print(out, &getASTContext().SourceMgr);
+      out << "\n";
+    }
   }
 
-  out << "\nInactive Constraints:\n";
-  for (auto &constraint : InactiveConstraints) {
-    out.indent(2);
-    constraint.print(out, &getASTContext().SourceMgr);
-    out << "\n";
+  if (!InactiveConstraints.empty()) {
+    out << "\nInactive Constraints:\n";
+     for (auto &constraint : InactiveConstraints) {
+       out.indent(2);
+       constraint.print(out, &getASTContext().SourceMgr);
+       out << "\n";
+     }
   }
 
   if (solverState && solverState->hasRetiredConstraints()) {
@@ -1481,7 +1494,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!ResolvedOverloads.empty()) {
-    out << "Resolved overloads:\n";
+    out << "\nResolved overloads:\n";
 
     // Otherwise, report the resolved overloads.
     for (auto elt : ResolvedOverloads) {
@@ -1521,7 +1534,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
       elt.first->dump(&getASTContext().SourceMgr, out);
       out << "\n";
     }
-    out << "\n";
   }
 
   if (!DisjunctionChoices.empty()) {
@@ -1562,7 +1574,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!DefaultedConstraints.empty()) {
-    out << "\nDefaulted constraints: ";
+    out << "\nDefaulted constraints:\n";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
       locator->dump(&getASTContext().SourceMgr, out);
     }, [&] {

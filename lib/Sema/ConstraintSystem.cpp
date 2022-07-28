@@ -4612,7 +4612,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         << " solutions with fixes ---\n";
     int i = 0;
     for (auto &solution : solutions) {
-      log << "--- Solution #" << i++ << "---\n";
+      log << "\n--- Solution #" << i++ << "---\n";
       solution.dump(log);
       log << "\n";
     }
