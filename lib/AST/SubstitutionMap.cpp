@@ -539,14 +539,35 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   if (auto derivedClassSig = derivedClass->getGenericSignature())
     origDepth = derivedClassSig.getGenericParams().back()->getDepth() + 1;
 
-  SubstitutionMap origSubMap;
-  if (derivedSig)
-    origSubMap = derivedSig->getIdentitySubstitutionMap();
+  auto &ctx = baseSig->getASTContext();
 
-  return combineSubstitutionMaps(baseSubMap, origSubMap,
-                                 CombineSubstitutionMaps::AtDepth,
-                                 baseDepth, origDepth,
-                                 baseSig);
+  return get(
+    baseSig,
+    [&](SubstitutableType *type) -> Type {
+      if (auto gp = type->getAs<GenericTypeParamType>()) {
+        if (gp->getDepth() >= baseDepth) {
+          assert(gp->getDepth() == baseDepth);
+          auto substGP = GenericTypeParamType::get(gp->isTypeSequence(),
+                                                   gp->getDepth() + origDepth - baseDepth,
+                                                   gp->getIndex(), ctx);
+          return derivedSig->getSugaredType(substGP);
+        }
+      }
+
+      return Type(type).subst(baseSubMap);
+    },
+    [&](CanType type, Type substType, ProtocolDecl *proto) {
+      if (type->getRootGenericParam()->getDepth() >= baseDepth)
+        return ProtocolConformanceRef(proto);
+
+      if (auto conformance = baseSubMap.lookupConformance(type, proto))
+        return conformance;
+
+      if (substType->isTypeParameter())
+        return ProtocolConformanceRef(proto);
+
+      return proto->getParentModule()->lookupConformance(substType, proto);
+    });
 }
 
 SubstitutionMap
