@@ -421,60 +421,37 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
            /*isTypeChecked=*/true };
 }
 
-namespace {
-  struct DesignatedInitOverrideInfo {
-    GenericSignature GenericSig;
-    GenericParamList *GenericParams;
-    SubstitutionMap OverrideSubMap;
-  };
-}
-
-static DesignatedInitOverrideInfo
-computeDesignatedInitOverrideSignature(ASTContext &ctx,
-                                       ClassDecl *classDecl,
-                                       Type superclassTy,
-                                       ConstructorDecl *superclassCtor) {
+/// Clone the base class initializer's generic parameter list, but change the
+/// depth of the generic parameters to be one greater than the depth of the
+/// subclass.
+static GenericParamList *
+createDesignatedInitOverrideGenericParams(ASTContext &ctx,
+                                          ClassDecl *classDecl,
+                                          ConstructorDecl *superclassCtor) {
   auto *genericParams = superclassCtor->getGenericParams();
 
   // If genericParams is non-null, the base class initializer has its own
   // generic parameters. Otherwise, it is non-generic with a contextual
   // 'where' clause.
-  if (genericParams) {
-    // First, clone the base class initializer's generic parameter list,
-    // but change the depth of the generic parameters to be one greater
-    // than the depth of the subclass.
-    unsigned depth = 0;
-    if (auto classSig = classDecl->getGenericSignature())
-      depth = classSig.getGenericParams().back()->getDepth() + 1;
+  if (genericParams == nullptr)
+    return nullptr;
 
-    SmallVector<GenericTypeParamDecl *, 4> newParams;
-    for (auto *param : genericParams->getParams()) {
-      auto *newParam = GenericTypeParamDecl::create(
-          classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
-          depth, param->getIndex(), param->isOpaqueType(),
-          /*opaqueTypeRepr=*/nullptr);
-      newParams.push_back(newParam);
-    }
+  unsigned depth = 0;
+  if (auto classSig = classDecl->getGenericSignature())
+    depth = classSig.getGenericParams().back()->getDepth() + 1;
 
-    // We don't have to clone the RequirementReprs, because they're not
-    // used for anything other than SIL mode.
-    genericParams = GenericParamList::create(ctx,
-                                             SourceLoc(),
-                                             newParams,
-                                             SourceLoc(),
-                                             ArrayRef<RequirementRepr>(),
-                                             SourceLoc());
+  SmallVector<GenericTypeParamDecl *, 4> newParams;
+  for (auto *param : genericParams->getParams()) {
+    auto *newParam = GenericTypeParamDecl::create(
+        classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
+        depth, param->getIndex(), param->isOpaqueType(),
+        /*opaqueTypeRepr=*/nullptr);
+    newParams.push_back(newParam);
   }
 
-  auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
-  auto superclassCtorSig = superclassCtor->getGenericSignature();
-
-  auto subMap = SubstitutionMap::getOverrideSubstitutions(
-      superclassDecl, classDecl, superclassCtorSig, genericParams);
-  auto genericSig = ctx.getOverrideGenericSignature(
-      superclassDecl, classDecl, superclassCtorSig, genericParams);
-
-  return DesignatedInitOverrideInfo{genericSig, genericParams, subMap};
+  return GenericParamList::create(ctx, SourceLoc(),
+                                  newParams, SourceLoc(),
+                                  ArrayRef<RequirementRepr>(), SourceLoc());
 }
 
 static void
@@ -651,22 +628,25 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   //
   // FIXME: Remove this when lookup of initializers becomes restricted to our
   // immediate superclass.
-  auto *superclassCtorDecl =
-      superclassCtor->getDeclContext()->getSelfNominalTypeDecl();
-  Type superclassTy = classDecl->getSuperclass();
-  NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
-  if (superclassCtorDecl != superclassDecl) {
+  auto *superclassDecl = superclassCtor->getDeclContext()->getSelfClassDecl();
+  if (classDecl->getSuperclassDecl() != superclassDecl)
     return nullptr;
-  }
 
-  auto overrideInfo =
-      computeDesignatedInitOverrideSignature(ctx,
-                                             classDecl,
-                                             superclassTy,
-                                             superclassCtor);
+  auto *genericParams = createDesignatedInitOverrideGenericParams(
+      ctx, classDecl, superclassCtor);
 
-  if (auto superclassCtorSig = superclassCtor->getGenericSignature()) {
-    auto *genericEnv = overrideInfo.GenericSig.getGenericEnvironment();
+  auto superclassCtorSig = superclassCtor->getGenericSignature();
+
+  // Compute a generic signature for the initializer, and a substitution map
+  // from the superclass initializer signature to the initializer generic
+  // signature.
+  auto subMap = SubstitutionMap::getOverrideSubstitutions(
+      superclassDecl, classDecl, superclassCtorSig, genericParams);
+  auto genericSig = ctx.getOverrideGenericSignature(
+      superclassDecl, classDecl, superclassCtorSig, genericParams);
+
+  if (superclassCtorSig) {
+    auto *genericEnv = genericSig.getGenericEnvironment();
 
     // If the base class initializer has a 'where' clause, it might impose
     // requirements on the base class's own generic parameters that are not
@@ -676,15 +656,15 @@ createDesignatedInitOverride(ClassDecl *classDecl,
         classDecl->getParentModule(),
         superclassCtorSig.getRequirements(),
         [&](Type type) -> Type {
-          auto substType = type.subst(overrideInfo.OverrideSubMap);
-          return GenericEnvironment::mapTypeIntoContext(
-            genericEnv, substType);
+          auto substType = type.subst(subMap);
+          return GenericEnvironment::mapTypeIntoContext(genericEnv, substType);
         });
     if (checkResult != CheckGenericArgumentsResult::Success)
       return nullptr;
   }
 
-  // Create the initializer parameter patterns.
+  // Create the initializer parameter list by cloning the superclass initializer
+  // parameter list and applying the substitution map.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
        ParameterList::Inherited |
@@ -702,7 +682,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     auto *bodyParam = bodyParams->get(idx);
 
     auto paramTy = superclassParam->getInterfaceType();
-    auto substTy = paramTy.subst(overrideInfo.OverrideSubMap);
+    auto substTy = paramTy.subst(subMap);
 
     bodyParam->setInterfaceType(substTy);
   }
@@ -718,13 +698,13 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
-                              bodyParams, overrideInfo.GenericParams,
+                              bodyParams, genericParams,
                               classDecl);
 
   ctor->setImplicit();
 
   // Set the interface type of the initializer.
-  ctor->setGenericSignature(overrideInfo.GenericSig);
+  ctor->setGenericSignature(genericSig);
 
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
