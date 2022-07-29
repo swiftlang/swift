@@ -2475,6 +2475,12 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
+    // Synthesized getter for a type wrapped variable is never transparent.
+    if (auto var = dyn_cast<VarDecl>(storage)) {
+      if (var->isAccessedViaTypeWrapper())
+        return false;
+    }
+
     break;
 
   case AccessorKind::Set:
@@ -2493,6 +2499,10 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
                      PropertyWrapperSynthesizedPropertyKind::Projection)) {
           break;
         }
+
+        // Synthesized setter for a type wrapped variable is never transparent.
+        if (var->isAccessedViaTypeWrapper())
+          return false;
       }
 
       if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
