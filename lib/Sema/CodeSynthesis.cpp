@@ -645,6 +645,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   auto genericSig = ctx.getOverrideGenericSignature(
       superclassDecl, classDecl, superclassCtorSig, genericParams);
 
+  assert(!subMap.hasArchetypes());
+
   if (superclassCtorSig) {
     auto *genericEnv = genericSig.getGenericEnvironment();
 

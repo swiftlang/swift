@@ -4835,8 +4835,10 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 
   // Find the superclass type with the context matching that of the member.
   auto *ownerNominal = dc->getSelfNominalTypeDecl();
-  if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
-    baseTy = baseTy->getSuperclassForDecl(ownerClass);
+  if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal)) {
+    baseTy = baseTy->getSuperclassForDecl(ownerClass,
+                                      /*usesArchetypes=*/genericEnv != nullptr);
+  }
 
   // Gather all of the substitutions for all levels of generic arguments.
   auto params = genericSig.getGenericParams();

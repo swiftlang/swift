@@ -539,6 +539,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
     auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
     baseSubMap = derivedClassTy->getContextSubstitutionMap(
         baseClass->getParentModule(), baseClass);
+    assert(!baseSubMap.hasArchetypes());
   }
 
   unsigned origDepth = 0;
