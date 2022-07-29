@@ -103,6 +103,11 @@ static bool hasStoredProperties(NominalTypeDecl *decl) {
 }
 
 static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
+  // If declaration has a type wrapper, make sure that
+  // `$_storage` property is synthesized.
+  if (decl->hasTypeWrapper())
+    (void)decl->getTypeWrapperProperty();
+
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties, property and type wrappers to be synthesized.
   for (auto *member : decl->getMembers()) {

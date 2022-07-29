@@ -3760,6 +3760,11 @@ public:
   /// Return a type wrapper (if any) associated with this type.
   NominalTypeDecl *getTypeWrapper() const;
 
+  /// If this declaration has a type wrapper return a property that
+  /// is used for all type wrapper related operations (mainly for
+  /// applicable property access routing).
+  VarDecl *getTypeWrapperProperty() const;
+
   /// Get an initializer that could be used to instantiate a
   /// type wrapped type.
   ConstructorDecl *getTypeWrapperInitializer() const;

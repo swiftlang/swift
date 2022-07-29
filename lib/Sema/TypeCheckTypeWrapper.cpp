@@ -135,6 +135,12 @@ Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
   return type;
 }
 
+VarDecl *NominalTypeDecl::getTypeWrapperProperty() const {
+  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetTypeWrapperProperty{mutableSelf}, nullptr);
+}
+
 ConstructorDecl *NominalTypeDecl::getTypeWrapperInitializer() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
@@ -222,8 +228,7 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
   if (!(parent && parent->hasTypeWrapper()))
     return nullptr;
 
-  auto *typeWrapperVar =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperProperty{parent}, nullptr);
+  auto *typeWrapperVar = parent->getTypeWrapperProperty();
   auto *storageVar = var->getUnderlyingTypeWrapperStorage();
 
   assert(typeWrapperVar);
