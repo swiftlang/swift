@@ -111,7 +111,7 @@ func _getWitnessTablesFor(
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_makeDistributedTargetAccessorNotFoundError")
-public // SPI Distributed
+internal // SPI Distributed
 func _makeDistributedTargetAccessorNotFoundError(
   _ targetNameStart: UnsafePointer<UInt8>,
   _ targetNameLength: UInt
