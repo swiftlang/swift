@@ -677,7 +677,8 @@ void swift::printModuleContentsAsCxx(
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
   os << "#define SWIFT_PRINTED_CORE\n";
-  printSwiftToClangCoreScaffold(interopContext, writer.getTypeMapping(), os);
+  printSwiftToClangCoreScaffold(interopContext, M.getASTContext(),
+                                writer.getTypeMapping(), os);
   os << "#endif\n";
 
   // FIXME: refactor.
