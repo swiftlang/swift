@@ -396,11 +396,14 @@ namespace {
     unsigned AsyncContextIdx;
     unsigned AsyncResumeFunctionSwiftSelfIdx = 0;
     FunctionPointerKind FnKind;
+    bool ShouldComputeABIDetails;
+    SmallVector<GenericRequirement, 4> GenericRequirements;
 
     SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
-                       FunctionPointerKind fnKind)
-        : IGM(IGM), FnType(fnType), FnKind(fnKind) {
-    }
+                       FunctionPointerKind fnKind,
+                       bool ShouldComputeABIDetails = false)
+        : IGM(IGM), FnType(fnType), FnKind(fnKind),
+          ShouldComputeABIDetails(ShouldComputeABIDetails) {}
 
     /// Expand the components of the primary entrypoint of the function type.
     void expandFunctionType();
@@ -1628,7 +1631,9 @@ void SignatureExpansion::expandParameters() {
   // Next, the generic signature.
   if (hasPolymorphicParameters(FnType) &&
       !FnKind.shouldSuppressPolymorphicArguments())
-    expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
+    expandPolymorphicSignature(IGM, FnType, ParamIRTypes,
+                               ShouldComputeABIDetails ? &GenericRequirements
+                                                       : nullptr);
 
   // Certain special functions are passed the continuation directly.
   if (FnKind.shouldPassContinuationDirectly()) {
@@ -1925,14 +1930,19 @@ Signature SignatureExpansion::getSignature() {
   } else {
     result.ExtraDataKind = ExtraData::kindForMember<void>();
   }
+  if (ShouldComputeABIDetails)
+    result.ABIDetails =
+        SignatureExpansionABIDetails{std::move(GenericRequirements)};
   return result;
 }
 
 Signature Signature::getUncached(IRGenModule &IGM,
                                  CanSILFunctionType formalType,
-                                 FunctionPointerKind fpKind) {
+                                 FunctionPointerKind fpKind,
+                                 bool shouldComputeABIDetails) {
   GenericContextScope scope(IGM, formalType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, formalType, fpKind);
+  SignatureExpansion expansion(IGM, formalType, fpKind,
+                               shouldComputeABIDetails);
   expansion.expandFunctionType();
   return expansion.getSignature();
 }

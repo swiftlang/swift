@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "clang/AST/CharUnits.h"
 #include "llvm/ADT/MapVector.h"
@@ -49,13 +50,12 @@ public:
 
   /// Information about any ABI additional parameters.
   struct ABIAdditionalParam {
-    enum class ABIParameterRole { Self, Error };
+    enum class ABIParameterRole { GenericRequirementRole, Self, Error };
 
     ABIParameterRole role;
+    llvm::Optional<GenericRequirement> genericRequirement;
     TypeDecl *type;
   };
-
-  SmallVector<ABIAdditionalParam, 1> ABIAdditionalParams;
 
   /// Returns the size and alignment for the given type, or \c None if the type
   /// is not a fixed layout type.

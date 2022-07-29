@@ -3459,11 +3459,14 @@ namespace {
     ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
       : PolymorphicConvention(IGM, fn) {}
 
-    void expand(SmallVectorImpl<llvm::Type*> &out) {
+    void expand(SmallVectorImpl<llvm::Type *> &out,
+                SmallVectorImpl<GenericRequirement> *reqs) {
       for (auto &source : getSources())
         addEarlySource(source, out);
 
       enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
+        if (reqs)
+          reqs->push_back(reqt);
         out.push_back(reqt.Protocol ? IGM.WitnessTablePtrTy
                                     : IGM.TypeMetadataPtrTy);
       });
@@ -3490,10 +3493,11 @@ namespace {
 } // end anonymous namespace
 
 /// Given a generic signature, add the argument types required in order to call it.
-void irgen::expandPolymorphicSignature(IRGenModule &IGM,
-                                       CanSILFunctionType polyFn,
-                                       SmallVectorImpl<llvm::Type*> &out) {
-  ExpandPolymorphicSignature(IGM, polyFn).expand(out);
+void irgen::expandPolymorphicSignature(
+    IRGenModule &IGM, CanSILFunctionType polyFn,
+    SmallVectorImpl<llvm::Type *> &out,
+    SmallVectorImpl<GenericRequirement> *outReqs) {
+  ExpandPolymorphicSignature(IGM, polyFn).expand(out, outReqs);
 }
 
 void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,

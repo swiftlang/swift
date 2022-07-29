@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "swift/IRGen/Linking.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -231,7 +232,61 @@ void printCxxNaiveException(raw_ostream &os) {
   os << "};\n";
 }
 
+void printGenericTypeTraits(raw_ostream &os) {
+  os << "template<class T>\n";
+  os << "static inline const constexpr bool isUsableInGenericContext = "
+        "false;\n\n";
+  os << "template<class T> inline void * _Nonnull getTypeMetadata();\n\n";
+}
+
+void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
+                                     PrimitiveTypeMapping &typeMapping,
+                                     bool isCForwardDefinition) {
+  Type supportedPrimitiveTypes[] = {
+      astContext.getBoolType(),
+
+      // Primitive integer, C integer and Int/UInt mappings.
+      astContext.getInt8Type(), astContext.getUInt8Type(),
+      astContext.getInt16Type(), astContext.getUInt16Type(),
+      astContext.getInt32Type(), astContext.getUInt32Type(),
+      astContext.getInt64Type(), astContext.getUInt64Type(),
+
+      // Primitive floating point type mappings.
+      astContext.getFloatType(), astContext.getDoubleType(),
+
+      // Pointer types.
+      // FIXME: support raw pointers?
+      astContext.getOpaquePointerType()};
+
+  for (Type type : llvm::makeArrayRef(supportedPrimitiveTypes)) {
+    auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
+        type->getNominalOrBoundGenericNominal());
+
+    auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadata(
+        type->getCanonicalType(), irgen::TypeMetadataAddress::AddressPoint);
+    std::string typeMetadataVarName = typeMetadataFunc.mangleAsString();
+
+    if (isCForwardDefinition) {
+      os << "// type metadata address for " << type.getString() << ".\n";
+      os << "SWIFT_IMPORT_STDLIB_SYMBOL extern size_t " << typeMetadataVarName
+         << ";\n";
+      continue;
+    }
+
+    os << "template<>\n";
+    os << "static inline const constexpr bool isUsableInGenericContext<"
+       << typeInfo.name << "> = true;\n\n";
+
+    os << "template<>\ninline void * _Nonnull getTypeMetadata<";
+    os << typeInfo.name << ">() {\n";
+    os << "  return &" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::" << typeMetadataVarName << ";\n";
+    os << "}\n\n";
+  }
+}
+
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
+                                          ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
   ClangSyntaxPrinter printer(os);
@@ -242,6 +297,9 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
             printTypeMetadataResponseType(ctx, typeMapping, os);
             os << "\n";
             printValueWitnessTable(os);
+            os << "\n";
+            printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                            /*isCForwardDefinition=*/true);
           });
           os << "\n";
           printOpaqueAllocFee(os);
@@ -249,5 +307,13 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
           printSwiftResilientStorageClass(os);
           printCxxNaiveException(os);
         });
+    os << "\n";
+    // C++ only supports inline variables from C++17.
+    // FIXME: silence the warning instead?
+    os << "#if __cplusplus > 201402L\n";
+    printGenericTypeTraits(os);
+    printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                    /*isCForwardDefinition=*/false);
+    os << "#endif\n";
   });
 }
