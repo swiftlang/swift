@@ -112,10 +112,9 @@ func _getWitnessTablesFor(
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_makeDistributedTargetAccessorNotFoundError")
 internal // SPI Distributed
-func _makeDistributedTargetAccessorNotFoundError(
-  _ targetNameStart: UnsafePointer<UInt8>,
-  _ targetNameLength: UInt
-) -> Error {
-  let name = String(decodingCString: targetNameStart, as: Unicode.UTF8.self)
-  return ExecuteDistributedTargetError(message: "Could not find distributed accessor for target \(name)")
+func _makeDistributedTargetAccessorNotFoundError() -> Error {
+  /// We don't include the name of the target in case the input was compromised.
+  return ExecuteDistributedTargetError(
+    message: "Failed to locate distributed function accessor",
+    errorCode: .targetAccessorNotFound)
 }
