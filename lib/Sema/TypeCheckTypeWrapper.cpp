@@ -128,6 +128,13 @@ Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
   return type;
 }
 
+ConstructorDecl *NominalTypeDecl::getTypeWrapperInitializer() const {
+  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SynthesizeTypeWrapperInitializer{mutableSelf},
+                           nullptr);
+}
+
 NominalTypeDecl *
 GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *parent) const {

@@ -202,6 +202,9 @@ enum class ImplicitConstructorKind {
   /// the instance variables from a parameter of the same type and
   /// name.
   Memberwise,
+  /// The constructor of a type wrapped type which is going to
+  /// initialize underlying storage for all applicable properties.
+  TypeWrapper,
 };
 
 /// Create an implicit struct or class constructor.
@@ -316,6 +319,24 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                                       ctx.Id_system, decl);
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(systemTy);
+      arg->setImplicit();
+
+      params.push_back(arg);
+    }
+  } else if (ICK == ImplicitConstructorKind::TypeWrapper) {
+    // Access to the initializer should match that of its parent type.
+    accessLevel = decl->getEffectiveAccess();
+
+    for (auto *member : decl->getMembers()) {
+      auto *var = dyn_cast<VarDecl>(member);
+      if (!(var && var->isAccessedViaTypeWrapper()))
+        continue;
+
+      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, var->getName(), Loc,
+                                      var->getName(), decl);
+
+      arg->setSpecifier(ParamSpecifier::Default);
+      arg->setInterfaceType(var->getValueInterfaceType());
       arg->setImplicit();
 
       params.push_back(arg);
@@ -1126,6 +1147,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     return;
 
   if (!shouldAttemptInitializerSynthesis(decl)) {
+    // If declaration is type wrapped, synthesize a
+    // special initializer that would instantiate storage.
+    if (decl->hasTypeWrapper())
+      (void)decl->getTypeWrapperInitializer();
+
     decl->setAddedImplicitInitializers();
     return;
   }
@@ -1444,4 +1470,77 @@ void swift::addNonIsolatedToSynthesized(
 
   ASTContext &ctx = nominal->getASTContext();
   value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeTypeWrapperInitializerBody(AbstractFunctionDecl *fn, void *context) {
+  auto *ctor = cast<ConstructorDecl>(fn);
+  auto &ctx = ctor->getASTContext();
+  auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
+
+  // self.$_storage = .init(memberwise: $Storage(...))
+  auto *storageType =
+      evaluateOrDefault(ctx.evaluator, GetTypeWrapperStorage{parent}, nullptr);
+  assert(storageType);
+
+  auto *typeWrapperVar =
+      evaluateOrDefault(ctx.evaluator, GetTypeWrapperProperty{parent}, nullptr);
+  assert(typeWrapperVar);
+
+  auto *storageVarRef = UnresolvedDotExpr::createImplicit(
+      ctx,
+      new (ctx) DeclRefExpr({ctor->getImplicitSelfDecl()},
+                            /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
+      typeWrapperVar->getName());
+
+  SmallVector<Argument, 4> arguments;
+  {
+    for (auto *param : *ctor->getParameters()) {
+      arguments.push_back({/*labelLoc=*/SourceLoc(), param->getName(),
+                           new (ctx) DeclRefExpr(param, /*Loc=*/DeclNameLoc(),
+                                                 /*Implicit=*/true)});
+    }
+  }
+
+  auto *storageInit = CallExpr::createImplicit(
+      ctx,
+      TypeExpr::createImplicitForDecl(
+          /*Loc=*/DeclNameLoc(), storageType, ctor,
+          ctor->mapTypeIntoContext(storageType->getInterfaceType())),
+      ArgumentList::createImplicit(ctx, arguments));
+
+  auto *initRef = new (ctx) UnresolvedMemberExpr(
+      /*dotLoc=*/SourceLoc(), /*declNameLoc=*/DeclNameLoc(),
+      DeclNameRef::createConstructor(), /*implicit=*/true);
+  { initRef->setFunctionRefKind(FunctionRefKind::DoubleApply); }
+
+  // .init($Storage(...))
+  Expr *typeWrapperInit = CallExpr::createImplicit(
+      ctx, initRef,
+      ArgumentList::forImplicitSingle(ctx, ctx.Id_memberwise, storageInit));
+
+  auto *assignment = new (ctx)
+      AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(), typeWrapperInit,
+                 /*Implicit=*/true);
+
+  return {BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(),
+                            /*body=*/{assignment},
+                            /*rbloc=*/ctor->getLoc(), /*implicit=*/true),
+          /*isTypeChecked=*/false};
+}
+
+ConstructorDecl *
+SynthesizeTypeWrapperInitializer::evaluate(Evaluator &evaluator,
+                                           NominalTypeDecl *wrappedType) const {
+  if (!wrappedType->hasTypeWrapper())
+    return nullptr;
+
+  // Create the implicit memberwise constructor.
+  auto &ctx = wrappedType->getASTContext();
+  auto ctor = createImplicitConstructor(
+      wrappedType, ImplicitConstructorKind::TypeWrapper, ctx);
+  wrappedType->addMember(ctor);
+
+  ctor->setBodySynthesizer(synthesizeTypeWrapperInitializerBody);
+  return ctor;
 }

@@ -311,6 +311,7 @@ IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 IDENTIFIER_WITH_NAME(TypeWrapperStorage, "$Storage")
 IDENTIFIER_WITH_NAME(TypeWrapperProperty, "$_storage")
 IDENTIFIER(storageKeyPath)
+IDENTIFIER(memberwise)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

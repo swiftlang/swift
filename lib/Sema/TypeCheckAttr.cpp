@@ -3634,7 +3634,7 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
   // `init(memberwise:)`
   {
     DeclName initName(ctx, DeclBaseName::createConstructor(),
-                      ArrayRef<Identifier>(ctx.getIdentifier("memberwise")));
+                      ArrayRef<Identifier>(ctx.Id_memberwise));
 
     SmallVector<ValueDecl *, 2> inits;
     if (findMembersOrDiagnose(initName, inits,

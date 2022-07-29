@@ -3760,6 +3760,10 @@ public:
   /// Return a type wrapper (if any) associated with this type.
   NominalTypeDecl *getTypeWrapper() const;
 
+  /// Get an initializer that could be used to instantiate a
+  /// type wrapped type.
+  ConstructorDecl *getTypeWrapperInitializer() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
