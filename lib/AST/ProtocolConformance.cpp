@@ -957,14 +957,11 @@ void NormalProtocolConformance::overrideWitness(ValueDecl *requirement,
 
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
-    ProtocolConformance *genericConformance,
+    RootProtocolConformance *genericConformance,
     SubstitutionMap substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
     GenericConformance(genericConformance),
-    GenericSubstitutions(substitutions)
-{
-  assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
-}
+    GenericSubstitutions(substitutions) {}
 
 void SpecializedProtocolConformance::computeConditionalRequirements() const {
   // already computed?
@@ -1181,9 +1178,11 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto subMap = SubstitutionMap::get(getGenericSignature(),
                                        subs, conformances);
+
+    auto *mutableThis = const_cast<ProtocolConformance *>(this);
     return substType->getASTContext()
         .getSpecializedConformance(substType,
-                                   const_cast<ProtocolConformance *>(this),
+                                   cast<NormalProtocolConformance>(mutableThis),
                                    subMap);
   }
   case ProtocolConformanceKind::Builtin: {
@@ -1660,7 +1659,8 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     auto genericConformance = spec->getGenericConformance();
     return Ctx.getSpecializedConformance(
                                 getType()->getCanonicalType(),
-                                genericConformance->getCanonicalConformance(),
+                                cast<RootProtocolConformance>(
+                                    genericConformance->getCanonicalConformance()),
                                 spec->getSubstitutionMap().getCanonical());
   }
   }

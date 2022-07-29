@@ -2387,48 +2387,28 @@ ASTContext::getBuiltinConformance(
   return entry;
 }
 
-/// If one of the ancestor conformances already has a matching type, use
-/// that instead.
-static ProtocolConformance *collapseSpecializedConformance(
-                                             Type type,
-                                             ProtocolConformance *conformance,
-                                             SubstitutionMap substitutions) {
-  while (true) {
-    switch (conformance->getKind()) {
-    case ProtocolConformanceKind::Specialized:
-      conformance = cast<SpecializedProtocolConformance>(conformance)
-                      ->getGenericConformance();
-      break;
+static bool collapseSpecializedConformance(Type type,
+                                           RootProtocolConformance *conformance,
+                                           SubstitutionMap substitutions) {
+  if (!conformance->getType()->isEqual(type))
+    return false;
 
-    case ProtocolConformanceKind::Normal:
-    case ProtocolConformanceKind::Inherited:
-    case ProtocolConformanceKind::Self:
-    case ProtocolConformanceKind::Builtin:
-      // If the conformance matches, return it.
-      if (conformance->getType()->isEqual(type)) {
-        for (auto subConformance : substitutions.getConformances())
-          if (!subConformance.isAbstract())
-            return nullptr;
-
-        return conformance;
-      }
-
-      return nullptr;
-    }
+  for (auto subConformance : substitutions.getConformances()) {
+    if (!subConformance.isAbstract())
+      return false;
   }
+
+  return true;
 }
 
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
-                                      ProtocolConformance *generic,
+                                      RootProtocolConformance *generic,
                                       SubstitutionMap substitutions) {
-  // If we are performing a substitution that would get us back to the
-  // a prior conformance (e.g., mapping into and then out of a conformance),
-  // return the existing conformance.
-  if (auto existing = collapseSpecializedConformance(type, generic,
-                                                     substitutions)) {
+  // If the specialization is a no-op, use the root conformance instead.
+  if (collapseSpecializedConformance(type, generic, substitutions)) {
     ++NumCollapsedSpecializedProtocolConformances;
-    return existing;
+    return generic;
   }
 
   llvm::FoldingSetNodeID id;
