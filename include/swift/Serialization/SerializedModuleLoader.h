@@ -190,7 +190,7 @@ public:
                               unsigned previousGeneration) override;
 
   virtual void loadObjCMethods(
-                 NominalTypeDecl *typeDecl,
+                 ClassDecl *classDecl,
                  ObjCSelector selector,
                  bool isInstanceMethod,
                  unsigned previousGeneration,

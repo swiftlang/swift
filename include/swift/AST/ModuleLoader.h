@@ -226,11 +226,11 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) { }
 
-  /// Load the methods within the given type that produce
+  /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
-  /// \param typeDecl The type in which we are searching for @objc methods.
-  /// The search only considers this type and its extensions; not any
+  /// \param classDecl The class in which we are searching for @objc methods.
+  /// The search only considers this class and its extensions; not any
   /// superclasses.
   ///
   /// \param selector The selector to search for.
@@ -246,7 +246,7 @@ public:
   /// selector and are instance/class methods as requested. This list will be
   /// extended with any methods found in subsequent generations.
   virtual void loadObjCMethods(
-                 NominalTypeDecl *typeDecl,
+                 ClassDecl *classDecl,
                  ObjCSelector selector,
                  bool isInstanceMethod,
                  unsigned previousGeneration,
