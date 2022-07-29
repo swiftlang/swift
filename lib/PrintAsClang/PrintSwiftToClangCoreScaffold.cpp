@@ -210,13 +210,6 @@ void printCxxNaiveException(raw_ostream &os) {
   os << "};\n";
 }
 
-void printGenericTypeTraits(raw_ostream &os) {
-  os << "template<class T>\n";
-  os << "static inline const constexpr bool isUsableInGenericContext = "
-        "false;\n\n";
-  os << "template<class T> inline void * _Nonnull getTypeMetadata();\n\n";
-}
-
 void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
                                      PrimitiveTypeMapping &typeMapping,
                                      bool isCForwardDefinition) {
@@ -287,7 +280,6 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
     // C++ only supports inline variables from C++17.
     // FIXME: silence the warning instead?
     os << "#if __cplusplus > 201402L\n";
-    printGenericTypeTraits(os);
     printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
                                     /*isCForwardDefinition=*/false);
     os << "#endif\n";
