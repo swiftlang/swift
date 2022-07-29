@@ -5,7 +5,7 @@ extension Redecl1 {
   @objc(init)
   func initialize() { } // expected-error{{method 'initialize()' with Objective-C selector 'init' conflicts with initializer 'init()' with the same Objective-C selector}}
 
-  @objc func method2() { } // expected-note{{method 'method2()' declared here}}
+  @objc func method2() { } // expected-error{{method 'method2()' with Objective-C selector 'method2' conflicts with method 'method2_alias()' with the same Objective-C selector}}
 }
 
 @objc class Redecl2 {

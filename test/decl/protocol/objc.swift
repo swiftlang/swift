@@ -261,7 +261,7 @@ class C8SubRW2: C8Base {
 
 @available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
 @objc protocol P9 {
-  @objc(custom:) func f(_: Any) // expected-warning {{method 'f' with Objective-C selector 'custom:' conflicts with method 'h()' with the same Objective-C selector; this is an error in Swift 6}}
-  @objc(custom:) func g(_: Any) // expected-warning {{method 'g' with Objective-C selector 'custom:' conflicts with method 'h()' with the same Objective-C selector; this is an error in Swift 6}}
-  @objc(custom:) func h() async // expected-note 2 {{method 'h()' declared here}}
+  @objc(custom:) func f(_: Any) // expected-note 2 {{method 'f' declared here}}
+  @objc(custom:) func g(_: Any) // expected-warning {{method 'g' with Objective-C selector 'custom:' conflicts with method 'f' with the same Objective-C selector; this is an error in Swift 6}}
+  @objc(custom:) func h() async // expected-warning {{method 'h()' with Objective-C selector 'custom:' conflicts with method 'f' with the same Objective-C selector; this is an error in Swift 6}}
 }

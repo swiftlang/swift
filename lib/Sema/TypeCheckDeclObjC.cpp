@@ -2257,6 +2257,12 @@ namespace {
   /// Produce a deterministic ordering of the given declarations.
   struct OrderDeclarations {
     bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
+      // If one declaration is imported from ObjC and the other is native Swift,
+      // put the imported Clang one first.
+      if (lhs->hasClangNode() != rhs->hasClangNode()) {
+        return lhs->hasClangNode();
+      }
+
       // If the declarations come from different modules, order based on the
       // module.
       ModuleDecl *lhsModule = lhs->getDeclContext()->getParentModule();
@@ -2419,6 +2425,13 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
   return diagnosedAny;
 }
 
+/// Retrieve the source file for the given Objective-C member conflict.
+static TinyPtrVector<AbstractFunctionDecl *>
+getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
+  return conflict.typeDecl->lookupDirect(conflict.selector,
+                                         conflict.isInstanceMethod);
+}
+
 static ObjCAttr *getObjCAttrIfFromAccessNote(ValueDecl *VD) {
   if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>())
     if (objc->getAddedByAccessNote())
@@ -2430,94 +2443,6 @@ static ObjCAttr *getObjCAttrIfFromAccessNote(ValueDecl *VD) {
   return nullptr;
 }
 
-static bool hasCustomObjCName(AbstractFunctionDecl *afd) {
-  if (auto objc = afd->getAttrs().getAttribute<ObjCAttr>())
-    return objc->hasName();
-  return false;
-}
-
-/// Retrieve the methods involved in a specific Objective-C selector
-/// conflict. The list will be sorted so that the first method is the "best" one
-/// and the others can be diagnosed as conflicts with that one.
-static TinyPtrVector<AbstractFunctionDecl *>
-getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
-  // Look up all methods involved in the conflict.
-  auto methods = conflict.typeDecl->lookupDirect(conflict.selector,
-                                                 conflict.isInstanceMethod);
-
-  // Erase any invalid or stub declarations. We don't want to complain about
-  // them, because we might already have complained about redeclarations
-  // based on Swift matching.
-  llvm::erase_if(methods, [](AbstractFunctionDecl *afd) -> bool {
-    if (afd->isInvalid())
-      return true;
-
-    if (auto ad = dyn_cast<AccessorDecl>(afd))
-      return ad->getStorage()->isInvalid();
-
-    if (auto *ctor = dyn_cast<ConstructorDecl>(afd)) {
-      if (ctor->hasStubImplementation())
-        return true;
-    }
-    return false;
-  });
-
-  // Sort the conflicting methods from the "strongest" claim to the "weakest".
-  // This puts the "best" method at methods.front() so that others will be
-  // diagnosed as conflicts with that one, and it helps ensure that individual
-  // methods in a conflict set are diagnosed in a deterministic order.
-  llvm::stable_sort(methods,
-                    [](AbstractFunctionDecl *a, AbstractFunctionDecl *b) {
-    #define RULE(aCriterion, bCriterion) do { \
-      bool _aCriterion = (aCriterion), _bCriterion = (bCriterion); \
-      if (!_aCriterion && _bCriterion) \
-        return false; \
-      if (_aCriterion && !_bCriterion) \
-        return true; \
-    } while (0)
-
-    // Is one of these from Objective-C and the other from Swift?
-    // NOTE: Inserting another rule above this will break the hasClangNode()
-    // filtering below.
-    RULE(a->hasClangNode(),
-         b->hasClangNode());
-
-    // Is one of these async and the other not?
-    RULE(a->hasAsync(),
-         b->hasAsync());
-
-    // Is one of these explicit and the other from an access note?
-    RULE(!getObjCAttrIfFromAccessNote(a),
-         !getObjCAttrIfFromAccessNote(b));
-
-    // Is one of these from the main decl and the other an extension?
-    RULE(!isa<ExtensionDecl>(a->getDeclContext()),
-         !isa<ExtensionDecl>(b->getDeclContext()));
-
-    // Does one of these use plain @objc and the other @objc(selector)?
-    RULE(!hasCustomObjCName(a),
-         !hasCustomObjCName(b));
-
-    // Neither has a "stronger" claim, so just try to put them in some sort of
-    // consistent order.
-    OrderDeclarations ordering;
-    return ordering(a, b);
-
-    #undef RULE
-  });
-
-  // If the best method is imported from ObjC, eliminate any other imported ObjC
-  // methods. Selector conflicts between imported ObjC methods are spurious;
-  // they're just the same ObjC method being imported under different names with
-  // different ImportNameVersions.
-  if (!methods.empty() && methods.front()->hasClangNode())
-    llvm::erase_if(methods, [&](AbstractFunctionDecl *afd) {
-      return afd != methods.front() && afd->hasClangNode();
-    });
-
-  return methods;
-}
-
 bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // If there were no conflicts, we're done.
   if (sf.ObjCMethodConflicts.empty())
@@ -2525,43 +2450,92 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
   auto &Ctx = sf.getASTContext();
   DiagnosticStateRAII diagState(Ctx.Diags);
+  OrderDeclarations ordering;
 
-  // Build a list of all the conflicts and the methods involved in them.
-  using ConflictSet = std::pair<SourceFile::ObjCMethodConflict,
-                                TinyPtrVector<AbstractFunctionDecl *>>;
-  llvm::SmallVector<ConflictSet, 4> conflictSets;
-  for (auto conflict : sf.ObjCMethodConflicts) {
-    auto methods = getObjCMethodConflictDecls(conflict);
-    if (methods.size() < 2)
-      continue;
-    conflictSets.emplace_back(conflict, methods);
-  }
-
-  // Sort the set of conflicts so the different conflict sets are diagnosed in
-  // the same order. We use the first conflicting declaration in each set to
+  // Sort the set of conflicts so we get a deterministic order for
+  // diagnostics. We use the first conflicting declaration in each set to
   // perform the sort.
-  llvm::stable_sort(conflictSets,
-                    [](const ConflictSet &lhs, const ConflictSet &rhs) {
-                      OrderDeclarations ordering;
-                      return ordering(lhs.second[1], rhs.second[1]);
-                    });
+  llvm::SmallVector<SourceFile::ObjCMethodConflict, 4> localConflicts;
+  llvm::copy(sf.ObjCMethodConflicts, std::back_inserter(localConflicts));
+  std::sort(localConflicts.begin(), localConflicts.end(),
+            [&](const SourceFile::ObjCMethodConflict &lhs,
+                const SourceFile::ObjCMethodConflict &rhs) {
+              return ordering(getObjCMethodConflictDecls(lhs)[1],
+                              getObjCMethodConflictDecls(rhs)[1]);
+            });
 
   // Diagnose each conflict.
   bool anyConflicts = false;
-  for (const auto &conflictSet : conflictSets) {
+  for (const auto &conflict : localConflicts) {
+    auto methods = getObjCMethodConflictDecls(conflict);
+
+    // Erase any invalid or stub declarations. We don't want to complain about
+    // them, because we might already have complained about redeclarations
+    // based on Swift matching.
+    llvm::erase_if(methods, [](AbstractFunctionDecl *afd) -> bool {
+      if (afd->isInvalid())
+        return true;
+
+      if (auto ad = dyn_cast<AccessorDecl>(afd))
+        return ad->getStorage()->isInvalid();
+
+      if (auto *ctor = dyn_cast<ConstructorDecl>(afd)) {
+        if (ctor->hasStubImplementation())
+          return true;
+      }
+      return false;
+    });
+
+    if (methods.size() < 2)
+      continue;
+
     // Diagnose the conflict.
     anyConflicts = true;
-    
-    const auto &conflict = conflictSet.first;
-    const auto &methods = conflictSet.second;
 
-    ArrayRef<AbstractFunctionDecl *> methodsRef(methods);
+    /// If true, \p a has a "weaker" claim on the selector than \p b, and the
+    /// conflict diagnostic should appear on \p a instead of \p b.
+    auto areBackwards =
+        [&](AbstractFunctionDecl *a, AbstractFunctionDecl *b) -> bool {
+      #define RULE(aCriterion, bCriterion) do { \
+        bool _aCriterion = (aCriterion), _bCriterion = (bCriterion); \
+        if (!_aCriterion && _bCriterion) \
+          return true; \
+        if (_aCriterion && !_bCriterion) \
+          return false; \
+      } while (0)
+
+      // Is one of these from an access note?
+      RULE(getObjCAttrIfFromAccessNote(a),
+           getObjCAttrIfFromAccessNote(b));
+
+      // Is one of these from the main declaration?
+      RULE(!isa<ExtensionDecl>(a->getDeclContext()),
+           !isa<ExtensionDecl>(b->getDeclContext()));
+
+      // Is one of these imported from Objective-C?
+      RULE(a->hasClangNode(),
+           b->hasClangNode());
+
+      // Are these from different source files? If so, fall back to the order in
+      // which the declarations were type checked.
+      // FIXME: This is gross and nondeterministic.
+      if (a->getParentSourceFile() != b->getParentSourceFile())
+        return false;
+
+      // Handle them in source order.
+      return !ordering(a, b);
+
+      #undef RULE
+    };
+
+    MutableArrayRef<AbstractFunctionDecl *> methodsRef(methods);
+    if (areBackwards(methods[0], methods[1]))
+      std::swap(methodsRef[0], methodsRef[1]);
+
     auto originalMethod = methods.front();
-    auto origDiagInfo = getObjCMethodDiagInfo(originalMethod);
-    bool originalIsImportedAsync = originalMethod->hasClangNode() &&
-                                     originalMethod->hasAsync();
-
     auto conflictingMethods = methodsRef.slice(1);
+
+    auto origDiagInfo = getObjCMethodDiagInfo(originalMethod);
     for (auto conflictingDecl : conflictingMethods) {
       auto diagInfo = getObjCMethodDiagInfo(conflictingDecl);
 
@@ -2570,13 +2544,17 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
         if (auto accessor = dyn_cast<AccessorDecl>(originalMethod))
           originalDecl = accessor->getStorage();
 
-      // In Swift 5.7, we discovered cases which inadvertently bypassed selector
-      // conflict checking and have to be diagnosed as warnings in Swift 5:
+      // Conflicts between two imported ObjC methods are caused by the same
+      // clang decl having several Swift names.
+      if (originalDecl->hasClangNode() && conflictingDecl->hasClangNode())
+        continue;
 
-      // * Selectors for imported methods with async variants.
-      bool breakingInSwift5 = originalIsImportedAsync;
-      
-      // * Protocol requirements
+      bool breakingInSwift5 = false;
+      // Imported ObjC async methods weren't fully checked for selector
+      // conflicts until 5.7.
+      if (originalMethod->hasClangNode() && originalMethod->hasAsync())
+        breakingInSwift5 = true;
+      // Protocols weren't checked for selector conflicts in 5.0.
       if (!isa<ClassDecl>(conflict.typeDecl))
         breakingInSwift5 = true;
 
