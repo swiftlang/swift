@@ -915,6 +915,11 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     }
   }
 
+  if(Invocation.getLangOptions().EnableCXXInterop) {
+    llvm::dbgs() << "importing: " << CXX_SHIMS_NAME << "\n";
+    pushImport(CXX_SHIMS_NAME);
+  }
+
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
   imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
   return imports;
