@@ -434,7 +434,7 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
                                        ClassDecl *classDecl,
                                        Type superclassTy,
                                        ConstructorDecl *superclassCtor) {
-  auto *superclassDecl = superclassTy->getAnyNominal();
+  auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
 
   auto classSig = classDecl->getGenericSignature();
   auto superclassCtorSig = superclassCtor->getGenericSignature();
@@ -515,11 +515,6 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
     return ProtocolConformanceRef(proto);
   };
 
-  // Now form the substitution map that will be used to remap parameter
-  // types.
-  auto subMap = SubstitutionMap::get(superclassCtorSig,
-                                     substFn, lookupConformanceFn);
-
   SmallVector<Requirement, 2> requirements;
 
   // If the base initializer's generic signature is different
@@ -539,6 +534,11 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
                                        std::move(newParamTypes),
                                        std::move(requirements));
   }
+
+  // Now form the substitution map that will be used to remap parameter
+  // types.
+  auto subMap = SubstitutionMap::getOverrideSubstitutions(
+      superclassDecl, classDecl, superclassCtorSig, genericParams);
 
   return DesignatedInitOverrideInfo{genericSig, genericParams, subMap};
 }
