@@ -12932,6 +12932,33 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                : SolutionKind::Solved;
   }
 
+  case FixKind::ExplicitlyConstructRawRepresentable: {
+    auto rawValueLabel = getASTContext().Id_rawValue;
+    auto valueTy = type1->lookThroughSingleOptionalType();
+    auto unwrappedRawReprTy = type2->lookThroughSingleOptionalType();
+    auto memberLoc = getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::ApplyFunction));
+    auto memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+    addValueMemberConstraint(
+        MetatypeType::get(unwrappedRawReprTy, getASTContext()),
+        DeclNameRef(DeclName(getASTContext(), DeclBaseName::createConstructor(),
+                             {rawValueLabel})),
+        memberTy, DC, FunctionRefKind::SingleApply, {},
+        getConstraintLocator(
+            locator.withPathElement(ConstraintLocator::ConstructorMember)));
+    addConstraint(
+        ConstraintKind::ApplicableFunction,
+        FunctionType::get({AnyFunctionType::Param(valueTy, rawValueLabel)},
+                          unwrappedRawReprTy),
+        memberTy, memberLoc);
+    addConstraint(ConstraintKind::Bind, unwrappedRawReprTy, valueTy, memberLoc);
+
+    ArgumentInfos[getArgumentInfoLocator(memberLoc)] =
+        ArgumentInfo({rawValueLabel, None});
+
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
   case FixKind::TreatRValueAsLValue: {
     unsigned impact = 1;
     // If this is an attempt to use result of a function/subscript call as
