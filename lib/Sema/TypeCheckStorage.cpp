@@ -104,7 +104,7 @@ static bool hasStoredProperties(NominalTypeDecl *decl) {
 
 static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
   // Just walk over the members of the type, forcing backing storage
-  // for lazy properties and property wrappers to be synthesized.
+  // for lazy properties, property and type wrappers to be synthesized.
   for (auto *member : decl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
     if (!var || var->isStatic())
@@ -116,6 +116,10 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
     if (var->hasAttachedPropertyWrapper()) {
       (void) var->getPropertyWrapperAuxiliaryVariables();
       (void) var->getPropertyWrapperInitializerInfo();
+    }
+
+    if (var->isAccessedViaTypeWrapper()) {
+      (void)var->getUnderlyingTypeWrapperStorage();
     }
   }
 

@@ -5564,6 +5564,13 @@ public:
   /// all access to it routed through a type wrapper.
   bool isAccessedViaTypeWrapper() const;
 
+  /// For type wrapped properties (see \c isAccessedViaTypeWrapper)
+  /// all access is routed through a type wrapper.
+  ///
+  /// \returns an underlying type wrapper property which is a
+  /// storage endpoint for all access to this property.
+  VarDecl *getUnderlyingTypeWrapperStorage() const;
+
   /// Visit all auxiliary declarations to this VarDecl.
   ///
   /// An auxiliary declaration is a declaration synthesized by the compiler to support

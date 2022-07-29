@@ -60,6 +60,13 @@ bool VarDecl::isAccessedViaTypeWrapper() const {
                            false);
 }
 
+VarDecl *VarDecl::getUnderlyingTypeWrapperStorage() const {
+  auto *mutableSelf = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetTypeWrapperStorageForProperty{mutableSelf},
+                           nullptr);
+}
+
 NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
@@ -217,8 +224,7 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
 
   auto *typeWrapperVar =
       evaluateOrDefault(ctx.evaluator, GetTypeWrapperProperty{parent}, nullptr);
-  auto *storageVar = evaluateOrDefault(
-      ctx.evaluator, GetTypeWrapperStorageForProperty{var}, nullptr);
+  auto *storageVar = var->getUnderlyingTypeWrapperStorage();
 
   assert(typeWrapperVar);
   assert(storageVar);
