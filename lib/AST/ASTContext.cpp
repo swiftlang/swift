@@ -5328,11 +5328,6 @@ ASTContext::getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
       addedRequirements.push_back(reqt);
     }
   } else {
-    const auto derivedSuperclass = cast<ClassDecl>(derivedNominal)
-        ->getSuperclass();
-    if (derivedSuperclass.isNull())
-      return nullptr;
-
     unsigned derivedDepth = 0;
     unsigned baseDepth = 0;
     if (derivedNominalSig)
@@ -5340,8 +5335,9 @@ ASTContext::getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
     if (const auto baseNominalSig = baseNominal->getGenericSignature())
       baseDepth = baseNominalSig.getGenericParams().back()->getDepth() + 1;
 
-    const auto subMap = derivedSuperclass->getContextSubstitutionMap(
-        derivedNominal->getModuleContext(), baseNominal);
+    const auto subMap = derivedNominal->getDeclaredInterfaceType()
+        ->getContextSubstitutionMap(derivedNominal->getModuleContext(),
+                                    baseNominal);
 
     auto substFn = [&](SubstitutableType *type) -> Type {
       auto *gp = cast<GenericTypeParamType>(type);
