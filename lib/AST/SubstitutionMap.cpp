@@ -638,6 +638,9 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       // Some combination of storing substitution maps in BoundGenericTypes
       // as well as for method overrides would solve this, but for now, just
       // punt to module lookup.
+      if (substType->isTypeParameter())
+        return ProtocolConformanceRef(proto);
+
       return proto->getParentModule()->lookupConformance(substType, proto);
     });
 }

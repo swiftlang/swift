@@ -4428,10 +4428,12 @@ operator()(CanType dependentType, Type conformingReplacementType,
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  // Lookup conformances for opened existential.
-  if (conformingReplacementType->isOpenedExistential()) {
+  // Lookup conformances for archetypes that conform concretely
+  // via a superclass.
+  if (auto archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
     return conformedProtocol->getModuleContext()->lookupConformance(
-        conformingReplacementType, conformedProtocol);
+        conformingReplacementType, conformedProtocol,
+        /*allowMissing=*/true);
   }
   return Subs.lookupConformance(dependentType, conformedProtocol);
 }
