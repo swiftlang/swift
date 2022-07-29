@@ -1103,22 +1103,12 @@ ProtocolConformance::getRootNormalConformance() const {
 const RootProtocolConformance *
 ProtocolConformance::getRootConformance() const {
   const ProtocolConformance *C = this;
-  while (true) {
-    switch (C->getKind()) {
-    case ProtocolConformanceKind::Normal:
-    case ProtocolConformanceKind::Self:
-    case ProtocolConformanceKind::Builtin:
-      return cast<RootProtocolConformance>(C);
-    case ProtocolConformanceKind::Inherited:
-      C = cast<InheritedProtocolConformance>(C)
-          ->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized:
-      C = cast<SpecializedProtocolConformance>(C)
-        ->getGenericConformance();
-      break;
-    }
-  }
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(C))
+    C = inheritedC->getInheritedConformance();
+  if (auto *specializedC = dyn_cast<SpecializedProtocolConformance>(C))
+    return specializedC->getGenericConformance();
+
+  return cast<RootProtocolConformance>(C);
 }
 
 bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
