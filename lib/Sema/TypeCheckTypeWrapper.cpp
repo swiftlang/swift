@@ -54,20 +54,10 @@ static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
 }
 
 bool VarDecl::isAccessedViaTypeWrapper() const {
-  auto *parent = getDeclContext()->getSelfNominalTypeDecl();
-  if (!(parent && parent->hasTypeWrapper()))
-    return false;
-
-  if (isStatic() || isLet() || !hasStorage())
-    return false;
-
-  if (getAttrs().hasAttribute<LazyAttr>())
-    return false;
-
-  if (hasAttachedPropertyWrapper())
-    return false;
-
-  return true;
+  auto *mutableSelf = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsPropertyAccessedViaTypeWrapper{mutableSelf},
+                           false);
 }
 
 NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
@@ -295,4 +285,47 @@ SynthesizeTypeWrappedPropertySetterBody::evaluate(Evaluator &evaluator,
                                       /*isImplicit=*/true);
   return BraceStmt::create(ctx, /*lbloc=*/var->getLoc(), body,
                            /*rbloc=*/var->getLoc(), /*implicit=*/true);
+}
+
+bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
+                                                VarDecl *property) const {
+  auto *parent = property->getDeclContext()->getSelfNominalTypeDecl();
+  if (!(parent && parent->hasTypeWrapper()))
+    return false;
+
+  // Don't attempt to wrap the `$_storage` property.
+  if (property->getName() == property->getASTContext().Id_TypeWrapperProperty)
+    return false;
+
+  if (property->isStatic() || property->isLet())
+    return false;
+
+  // `lazy` properties are not wrapped.
+  if (property->getAttrs().hasAttribute<LazyAttr>())
+    return false;
+
+  // properties with attached property wrappers are not yet supported.
+  if (property->hasAttachedPropertyWrapper())
+    return false;
+
+  // Check whether this is a computed property.
+  {
+    auto declaresAccessor = [&](ArrayRef<AccessorKind> kinds) -> bool {
+      return llvm::any_of(kinds, [&](const AccessorKind &kind) {
+        return bool(property->getParsedAccessor(kind));
+      });
+    };
+
+    // property has a getter.
+    if (declaresAccessor(
+            {AccessorKind::Get, AccessorKind::Read, AccessorKind::Address}))
+      return false;
+
+    // property has a setter.
+    if (declaresAccessor({AccessorKind::Set, AccessorKind::Modify,
+                          AccessorKind::MutableAddress}))
+      return false;
+  }
+
+  return true;
 }
