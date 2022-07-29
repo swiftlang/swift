@@ -241,8 +241,12 @@ bool SplitterStep::mergePartialSolutions() const {
       // Finalize this solution.
       auto solution = CS.finalize();
       solutionMemory += solution.getTotalMemory();
-      if (CS.isDebugMode())
-        getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
+      if (CS.isDebugMode()) {
+        auto &log = getDebugLogger();
+        log << "(composed solution:";
+        CS.CurrentScore.print(log);
+        log << ")\n";
+      }
 
       // Save this solution.
       Solutions.push_back(std::move(solution));
@@ -429,8 +433,12 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto solution = CS.finalize();
-  if (CS.isDebugMode())
-    getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
+  if (CS.isDebugMode()) {
+    auto &log = getDebugLogger();
+    log << "(found solution:";
+    getCurrentScore().print(log);
+    log << ")\n";
+  }
 
   Solutions.push_back(std::move(solution));
   return finalize(/*isSuccess=*/true);

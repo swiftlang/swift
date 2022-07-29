@@ -1275,7 +1275,8 @@ void Solution::dump(raw_ostream &out) const {
 
   SourceManager *sm = &getConstraintSystem().getASTContext().SourceMgr;
 
-  out << "Fixed score: " << FixedScore;
+  out << "Fixed score:";
+  FixedScore.print(out);
 
   out << "\nType variables:\n";
   std::vector<std::pair<TypeVariableType *, Type>> bindings(
@@ -1428,7 +1429,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
 
-  out << "Score: " << CurrentScore;
+  out << "Score:";
+  CurrentScore.print(out);
 
   for (const auto &contextualTypeEntry : contextualTypes) {
     auto info = contextualTypeEntry.second.first;
