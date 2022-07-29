@@ -2,41 +2,54 @@
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
-// UNSUPPORTED: freestanding
 
 import Swift
 import StdlibUnittest
 
-var UnsafeRawPointerTestSuite =
-  TestSuite("UnsafeRawPointerTestSuite")
+var UnsafeRawPointerTestSuite = TestSuite("UnsafeRawPointerTestSuite")
 
-UnsafeRawPointerTestSuite.test("load.unaligned.SIMD")
+UnsafeRawPointerTestSuite.test("load.unaligned.largeAlignment")
 .skip(.custom({
-  if #available(SwiftStdlib 5.7, *) { return false }
-  return true
-}, reason: "Requires Swift 5.7's stdlib"))
+  if #available(SwiftStdlib 5.7, *) { return false } else { return true }
+}, reason: "Requires standard library from Swift 5.7"))
 .code {
   guard #available(SwiftStdlib 5.7, *) else { return }
-  var bytes: [UInt8] = Array(0..<64)
   var offset = 3
-  let vector16 = bytes.withUnsafeBytes { buffer -> SIMD16<UInt8> in
-    let aligned = buffer.baseAddress!.alignedUp(for: SIMD16<UInt8>.self)
+  let int128 = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 64) {
+    temporary -> Builtin.Int128 in
+    _ = temporary.initialize(from: 0..<64)
+    let buffer = UnsafeRawBufferPointer(temporary)
+    let aligned = buffer.baseAddress!.alignedUp(for: Builtin.Int128.self)
     offset += buffer.baseAddress!.distance(to: aligned)
-    return buffer.loadUnaligned(fromByteOffset: offset, as: SIMD16<UInt8>.self)
+    return buffer.loadUnaligned(fromByteOffset: offset, as: Builtin.Int128.self)
   }
-  expectEqual(Int(vector16[0]), offset)
-  var lastIndex = vector16.indices.last!
-  expectEqual(Int(vector16[lastIndex]), offset+lastIndex)
+  withUnsafeBytes(of: int128) {
+    expectEqual(Int($0[0]), offset)
+    let lastIndex = $0.indices.last!
+    expectEqual(Int($0[lastIndex]), offset+lastIndex)
+  }
+}
 
-  offset = 11
-  let vector32 = bytes.withUnsafeMutableBytes { buffer -> SIMD32<UInt8> in
-    let aligned = buffer.baseAddress!.alignedUp(for: SIMD32<UInt8>.self)
+UnsafeRawPointerTestSuite.test("load.unaligned.largeAlignment.mutablePointer")
+.skip(.custom({
+  if #available(SwiftStdlib 5.7, *) { return false } else { return true }
+}, reason: "Requires standard library from Swift 5.7"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+  var offset = 11
+  let int128 = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 64) {
+    temporary -> Builtin.Int128 in
+    let buffer = UnsafeMutableRawBufferPointer(temporary)
+    buffer.copyBytes(from: 0..<64)
+    let aligned = buffer.baseAddress!.alignedUp(for: Builtin.Int128.self)
     offset += buffer.baseAddress!.distance(to: aligned)
-    return buffer.loadUnaligned(fromByteOffset: offset, as: SIMD32<UInt8>.self)
+    return buffer.loadUnaligned(fromByteOffset: offset, as: Builtin.Int128.self)
   }
-  expectEqual(Int(vector32[0]), offset)
-  lastIndex = vector32.indices.last!
-  expectEqual(Int(vector32[lastIndex]), offset+lastIndex)
+  withUnsafeBytes(of: int128) {
+    expectEqual(Int($0[0]), offset)
+    let lastIndex = $0.indices.last!
+    expectEqual(Int($0[lastIndex]), offset+lastIndex)
+  }
 }
 
 runAllTests()
