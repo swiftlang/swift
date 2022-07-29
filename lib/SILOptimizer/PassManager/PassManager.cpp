@@ -553,14 +553,15 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     // Run it!
     SFT->run();
 
-    if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
+    if (CurrentPassHasInvalidated ||
+        changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
       // Pause time measurement while invalidating analysis and restoring the snapshot.
       duration += (std::chrono::system_clock::now() - startTime);
 
       if (runIdx < numRepeats - 1) {
         invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
         F->restoreFromSnapshot(SnapshotID);
-      } else {
+      } else if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
         invalidateAnalysis(F, changeNotifications);
       }
       changeNotifications = SILAnalysis::InvalidationKind::Nothing;
