@@ -108,5 +108,13 @@ int main() {
 // CHECK-NEXT: Bool value 1=false
 // CHECK-NEXT: other values=-78,45
   }
+
+  {
+    int x = 42;
+    int y = -13;
+    genericSwap(x, y);
+    assert(x == -13);
+    assert(y == 42);
+  }
   return 0;
 }

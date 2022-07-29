@@ -21,9 +21,16 @@ public func genericPrintFunctionMultiGeneric<T1, T2>(_ x: Int, _ t1: T1, _ t1p: 
     print("other values=\(x),\(y)")
 }
 
+public func genericSwap<T>(_ x: inout T, _ y: inout T) {
+  let t = x
+  x = y
+  y = t
+}
+
 // CHECK: SWIFT_EXTERN void $s9Functions20genericPrintFunctionyyxlF(const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunction(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF(ptrdiff_t x, const void * _Nonnull t1, const void * _Nonnull t1p, ptrdiff_t y, const void * _Nonnull t2, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionMultiGeneric(_:_:_:_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions26genericPrintFunctionTwoArgyyx_SitlF(const void * _Nonnull x, ptrdiff_t y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionTwoArg(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s9Functions11genericSwapyyxz_xztlF(void * _Nonnull x, void * _Nonnull y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericSwap(_:_:)
 
 // CHECK:      template<class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>
@@ -43,4 +50,10 @@ public func genericPrintFunctionMultiGeneric<T1, T2>(_ x: Int, _ t1: T1, _ t1p: 
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>
 // CHECK-NEXT: inline void genericPrintFunctionTwoArg(const T & x, swift::Int y) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions26genericPrintFunctionTwoArgyyx_SitlF(reinterpret_cast<const void *>(&x), y, swift::getTypeMetadata<T>());
+// CHECK-NEXT: }
+
+// CHECK:      template<class T>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T>
+// CHECK-NEXT: inline void genericSwap(T & x, T & y) noexcept {
+// CHECK-NEXT:   return _impl::$s9Functions11genericSwapyyxz_xztlF(reinterpret_cast<void *>(&x), reinterpret_cast<void *>(&y), swift::getTypeMetadata<T>());
 // CHECK-NEXT: }
