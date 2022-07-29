@@ -33,6 +33,7 @@ namespace llvm {
 namespace swift {
 
 class GenericEnvironment;
+class GenericParamList;
 class SubstitutableType;
 typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
 
@@ -207,7 +208,7 @@ public:
   getOverrideSubstitutions(const ClassDecl *baseClass,
                            const ClassDecl *derivedClass,
                            GenericSignature baseSig,
-                           GenericSignature derivedSig);
+                           GenericParamList *derivedParams);
 
   /// Combine two substitution maps as follows.
   ///

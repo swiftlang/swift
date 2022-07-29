@@ -27,6 +27,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -510,18 +511,23 @@ SubstitutionMap::getOverrideSubstitutions(
 
   auto baseSig = baseDecl->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
-  auto derivedSig = derivedDecl->getInnermostDeclContext()
-      ->getGenericSignatureOfContext();
 
-  return getOverrideSubstitutions(baseClass, derivedClass,
-                                  baseSig, derivedSig);
+  // If more kinds of overridable decls with generic parameter lists appear,
+  // add them here.
+  GenericParamList *derivedParams = nullptr;
+  if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(derivedDecl))
+    derivedParams = funcDecl->getGenericParams();
+  else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(derivedDecl))
+    derivedParams = subscriptDecl->getGenericParams();
+
+  return getOverrideSubstitutions(baseClass, derivedClass, baseSig, derivedParams);
 }
 
 SubstitutionMap
 SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
                                           const ClassDecl *derivedClass,
                                           GenericSignature baseSig,
-                                          GenericSignature derivedSig) {
+                                          GenericParamList *derivedParams) {
   if (baseSig.isNull())
     return SubstitutionMap();
 
@@ -547,10 +553,14 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
       if (auto gp = type->getAs<GenericTypeParamType>()) {
         if (gp->getDepth() >= baseDepth) {
           assert(gp->getDepth() == baseDepth);
-          auto substGP = GenericTypeParamType::get(gp->isTypeSequence(),
-                                                   gp->getDepth() + origDepth - baseDepth,
-                                                   gp->getIndex(), ctx);
-          return derivedSig->getSugaredType(substGP);
+          if (derivedParams != nullptr) {
+            return derivedParams->getParams()[gp->getIndex()]
+                ->getDeclaredInterfaceType();
+          }
+
+          return GenericTypeParamType::get(gp->isTypeSequence(),
+                                           gp->getDepth() + origDepth - baseDepth,
+                                           gp->getIndex(), ctx);
         }
       }
 
