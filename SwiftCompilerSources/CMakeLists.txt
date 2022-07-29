@@ -165,6 +165,7 @@ function(add_swift_compiler_modules_library name)
     add_custom_command_target(dep_target OUTPUT ${module_obj_file}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
+        importedHeaderDependencies
       COMMAND ${ALS_SWIFT_EXEC} "-c" "-o" ${module_obj_file}
               ${sdk_option}
               "-target" ${target}
@@ -228,6 +229,24 @@ else()
   project(SwiftInTheCompiler LANGUAGES C CXX)
 
   add_subdirectory(Sources)
+
+  # This is a hack to get correct dependencies from imported C++ headers:
+  # step 1: generate a dummy source file, which just includes all headers defined in include/swift/module.modulemap
+  add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+    COMMAND
+        "sed"
+        -n -e "/header/!d" -e "s/.*header/#include/" -e "w ${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+        "${CMAKE_SOURCE_DIR}/include/swift/module.modulemap"
+    DEPENDS "${CMAKE_SOURCE_DIR}/include/swift/module.modulemap"
+    COMMENT "Generate HeaderDependencies.cpp"
+)
+  
+  # step 2: build a library containing that source file. This library depends on all the included header files.
+  #         The swift modules can now depend on that target.
+  #         Note that this library is unused, i.e. not linked to anything.   
+  add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
+  target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_SOURCE_DIR}/include/swift")
 
   if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
