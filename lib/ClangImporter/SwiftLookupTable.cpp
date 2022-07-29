@@ -2143,19 +2143,6 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
 
   // Add this entry to the lookup table.
   addEntryToLookupTable(table, named, nameImporter);
-  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
-    if (auto typedefType = dyn_cast<clang::TemplateSpecializationType>(
-            typedefDecl->getUnderlyingType())) {
-      if (auto CTSD = dyn_cast<clang::ClassTemplateSpecializationDecl>(
-              typedefType->getAsTagDecl())) {
-        // Adding template instantiation behind typedef as a top-level entry
-        // so the instantiation appears in the API.
-        assert(!isa<clang::ClassTemplatePartialSpecializationDecl>(CTSD) &&
-            "Class template partial specialization cannot appear behind typedef");
-        addEntryToLookupTable(table, CTSD, nameImporter);
-      }
-    }
-  }
 }
 
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
