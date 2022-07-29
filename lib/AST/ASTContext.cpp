@@ -5321,49 +5321,41 @@ ASTContext::getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
 
   SmallVector<Requirement, 2> addedRequirements;
 
-  if (isa<ProtocolDecl>(baseNominal)) {
-    assert(isa<ProtocolDecl>(derivedNominal));
+  unsigned derivedDepth = 0;
+  unsigned baseDepth = 0;
+  if (derivedNominalSig)
+    derivedDepth = derivedNominalSig.getGenericParams().back()->getDepth() + 1;
+  if (const auto baseNominalSig = baseNominal->getGenericSignature())
+    baseDepth = baseNominalSig.getGenericParams().back()->getDepth() + 1;
 
-    for (auto reqt : baseGenericSig.getRequirements()) {
-      addedRequirements.push_back(reqt);
+  const auto subMap = derivedNominal->getDeclaredInterfaceType()
+      ->getContextSubstitutionMap(derivedNominal->getModuleContext(),
+                                  baseNominal);
+
+  auto substFn = [&](SubstitutableType *type) -> Type {
+    auto *gp = cast<GenericTypeParamType>(type);
+
+    if (gp->getDepth() < baseDepth) {
+      return Type(gp).subst(subMap);
     }
-  } else {
-    unsigned derivedDepth = 0;
-    unsigned baseDepth = 0;
-    if (derivedNominalSig)
-      derivedDepth = derivedNominalSig.getGenericParams().back()->getDepth() + 1;
-    if (const auto baseNominalSig = baseNominal->getGenericSignature())
-      baseDepth = baseNominalSig.getGenericParams().back()->getDepth() + 1;
 
-    const auto subMap = derivedNominal->getDeclaredInterfaceType()
-        ->getContextSubstitutionMap(derivedNominal->getModuleContext(),
-                                    baseNominal);
+    return CanGenericTypeParamType::get(
+        gp->isTypeSequence(), gp->getDepth() - baseDepth + derivedDepth,
+        gp->getIndex(), *this);
+  };
 
-    auto substFn = [&](SubstitutableType *type) -> Type {
-      auto *gp = cast<GenericTypeParamType>(type);
+  auto lookupConformanceFn =
+      [&](CanType depTy, Type substTy,
+          ProtocolDecl *proto) -> ProtocolConformanceRef {
+    if (auto conf = subMap.lookupConformance(depTy, proto))
+      return conf;
 
-      if (gp->getDepth() < baseDepth) {
-        return Type(gp).subst(subMap);
-      }
+    return ProtocolConformanceRef(proto);
+  };
 
-      return CanGenericTypeParamType::get(
-          gp->isTypeSequence(), gp->getDepth() - baseDepth + derivedDepth,
-          gp->getIndex(), *this);
-    };
-
-    auto lookupConformanceFn =
-        [&](CanType depTy, Type substTy,
-            ProtocolDecl *proto) -> ProtocolConformanceRef {
-      if (auto conf = subMap.lookupConformance(depTy, proto))
-        return conf;
-
-      return ProtocolConformanceRef(proto);
-    };
-
-    for (auto reqt : baseGenericSig.getRequirements()) {
-      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
-        addedRequirements.push_back(*substReqt);
-      }
+  for (auto reqt : baseGenericSig.getRequirements()) {
+    if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
+      addedRequirements.push_back(*substReqt);
     }
   }
 
