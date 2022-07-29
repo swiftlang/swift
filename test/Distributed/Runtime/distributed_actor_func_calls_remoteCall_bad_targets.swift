@@ -57,10 +57,12 @@ func test() async throws {
       returning: String.self
     )
   } catch {
-    // CHECK: << onThrow: ExecuteDistributedTargetError(message: "Could not find distributed accessor for target $s9BADMODULE7GreeterC5greet4nameS2S_tYaKFTE")
-    // CHECK: << remoteCall throw: ExecuteDistributedTargetError(message: "Could not find distributed accessor for target $s9BADMODULE7GreeterC5greet4nameS2S_tYaKFTE")
+    // CHECK: << onThrow: ExecuteDistributedTargetError(errorCode: Distributed.ExecuteDistributedTargetError.ErrorCode.targetAccessorNotFound, message: "Failed to locate distributed function accessor")
+    // CHECK: << remoteCall throw: ExecuteDistributedTargetError(errorCode: Distributed.ExecuteDistributedTargetError.ErrorCode.targetAccessorNotFound, message: "Failed to locate distributed function accessor")
     print("caught error: \(error)")
-    // CHECK: caught error: ExecuteDistributedTargetError(message: "Could not find distributed accessor for target $s9BADMODULE7GreeterC5greet4nameS2S_tYaKFTE")
+    print("call target was: \(badTarget.identifier)")
+    // CHECK: caught error: ExecuteDistributedTargetError(errorCode: Distributed.ExecuteDistributedTargetError.ErrorCode.targetAccessorNotFound, message: "Failed to locate distributed function accessor")
+    // CHECK: call target was: $s9BADMODULE7GreeterC5greet4nameS2S_tYaKFTE
   }
 }
 

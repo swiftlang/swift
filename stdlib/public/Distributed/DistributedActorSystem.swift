@@ -212,6 +212,10 @@ extension DistributedActorSystem {
   ///           some other mismatch between them happens. In general, this
   ///           method is allowed to throw in any situation that might otherwise
   ///           result in an illegal or unexpected invocation being performed.
+  ///
+  ///           Throws ``ExecuteDistributedTargetMissingAccessorError`` if the `target`
+  ///           does not resolve to a valid distributed function accessor, i.e. the
+  ///           call identifier is incorrect, corrupted, or simply not present in this process.
   public func executeDistributedTarget<Act>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -574,10 +578,28 @@ public protocol DistributedActorSystemError: Error {}
 
 @available(SwiftStdlib 5.7, *)
 public struct ExecuteDistributedTargetError: DistributedActorSystemError {
-  let message: String
+  public let errorCode: ErrorCode
+  public let message: String
+
+  public enum ErrorCode {
+    /// Thrown when unable to resolve the target identifier to a function accessor.
+    /// This can happen when the identifier is corrupt, illegal, or wrong in the
+    /// sense that the caller and callee do not have the called function recorded
+    /// using the same identifier.
+    case targetAccessorNotFound
+
+    /// A general issue during the execution of the distributed call target ocurred.
+    case other
+  }
 
   public init(message: String) {
     self.message = message
+    self.errorCode = .other
+  }
+
+  public init(message: String, errorCode: ErrorCode) {
+    self.message = message
+    self.errorCode = errorCode
   }
 }
 
