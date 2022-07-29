@@ -1699,16 +1699,6 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
-/// Is the new method an async alternative of any existing method, or vice
-/// versa?
-static bool isAnAsyncAlternative(AbstractFunctionDecl *newDecl,
-                                 llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
-  return llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    return newDecl->getAsyncAlternative(/*isKnownObjC=*/true) == oldDecl
-              || oldDecl->getAsyncAlternative(/*isKnownObjC=*/true) == newDecl;
-  });
-}
-
 void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
                                        ObjCSelector selector) {
   if (!ObjCMethodLookup && !createObjCMethodLookup())
@@ -1726,7 +1716,7 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   if (auto *sf = method->getParentSourceFile()) {
     if (vec.empty()) {
       sf->ObjCMethodList.push_back(method);
-    } else if (!isa<ProtocolDecl>(this) || !isAnAsyncAlternative(method, vec)) {
+    } else {
       // We have a conflict.
       sf->ObjCMethodConflicts.insert({ this, selector, isInstanceMethod });
     }
