@@ -2257,12 +2257,6 @@ namespace {
   /// Produce a deterministic ordering of the given declarations.
   struct OrderDeclarations {
     bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
-      // If one declaration is imported from ObjC and the other is native Swift,
-      // put the imported Clang one first.
-      if (lhs->hasClangNode() != rhs->hasClangNode()) {
-        return lhs->hasClangNode();
-      }
-
       // If the declarations come from different modules, order based on the
       // module.
       ModuleDecl *lhsModule = lhs->getDeclContext()->getParentModule();
@@ -2512,10 +2506,6 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
       RULE(!isa<ExtensionDecl>(a->getDeclContext()),
            !isa<ExtensionDecl>(b->getDeclContext()));
 
-      // Is one of these imported from Objective-C?
-      RULE(a->hasClangNode(),
-           b->hasClangNode());
-
       // Are these from different source files? If so, fall back to the order in
       // which the declarations were type checked.
       // FIXME: This is gross and nondeterministic.
@@ -2544,20 +2534,6 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
         if (auto accessor = dyn_cast<AccessorDecl>(originalMethod))
           originalDecl = accessor->getStorage();
 
-      // Conflicts between two imported ObjC methods are caused by the same
-      // clang decl having several Swift names.
-      if (originalDecl->hasClangNode() && conflictingDecl->hasClangNode())
-        continue;
-
-      bool breakingInSwift5 = false;
-      // Imported ObjC async methods weren't fully checked for selector
-      // conflicts until 5.7.
-      if (originalMethod->hasClangNode() && originalMethod->hasAsync())
-        breakingInSwift5 = true;
-      // Protocols weren't checked for selector conflicts in 5.0.
-      if (!isa<ClassDecl>(conflict.typeDecl))
-        breakingInSwift5 = true;
-
       bool redeclSame = (diagInfo == origDiagInfo);
       auto diag = Ctx.Diags.diagnose(conflictingDecl,
                                      redeclSame ? diag::objc_redecl_same
@@ -2565,7 +2541,9 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      diagInfo.first, diagInfo.second,
                                      origDiagInfo.first, origDiagInfo.second,
                                      conflict.selector);
-      diag.warnUntilSwiftVersionIf(breakingInSwift5, 6);
+
+      // Protocols weren't checked for selector conflicts in 5.0.
+      diag.warnUntilSwiftVersionIf(!isa<ClassDecl>(conflict.typeDecl), 6);
 
       auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
       swift::softenIfAccessNote(conflictingDecl, objcAttr, diag);
