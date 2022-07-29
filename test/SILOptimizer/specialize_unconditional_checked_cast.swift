@@ -49,13 +49,15 @@ ArchetypeToArchetype(t: b, t2: f)
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast011ArchetypeToE0{{[_0-9a-zA-Z]*}}FAA8NotUInt8V_AA1CCTg5 : $@convention(thin) (NotUInt8, @guaranteed C) -> @owned C {
 // CHECK-NOT: unconditional_checked_cast_addr
 // CHECK-NOT: unconditional_checked_cast_addr
-// CHECK:     builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NOT: unconditional_checked_cast_addr
 
 // y -> x where x is not a class but y is.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast011ArchetypeToE0{{[_0-9a-zA-Z]*}}FAA1CC_AA8NotUInt8VTg5 : $@convention(thin) (@guaranteed C, NotUInt8) -> NotUInt8 {
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 
 // x -> y where x is a super class of y.
@@ -73,14 +75,16 @@ ArchetypeToArchetype(t: b, t2: f)
 // x -> y where x and y are unrelated classes.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast011ArchetypeToE0{{[_0-9a-zA-Z]*}}FAA1CC_AA1ECTg5 : $@convention(thin) (@guaranteed C, @guaranteed E) -> @owned E {
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 
 // x -> y where x and y are unrelated non classes.
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast011ArchetypeToE0{{[_0-9a-zA-Z]*}}FAA8NotUInt8V_AA0H6UInt64VTg5 : $@convention(thin) (NotUInt8, NotUInt64) -> NotUInt64 {
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
-// CHECK:      builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 
 
@@ -105,14 +109,16 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // x -> y where y is a class but x is not.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{[_0-9a-zA-Z]*}}FAA1CC_Tg5
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
 // x -> y where x,y are not classes and x is a different type from y.
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{[_0-9a-zA-Z]*}}3Not{{.*}}Tg5
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
@@ -126,7 +132,8 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // x -> y where x is a class but y is not.
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{[_0-9a-zA-Z]*}}FAA8NotUInt8V_Tg5
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
@@ -141,7 +148,8 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // x -> y where x,y are classes, but x is unrelated to y.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{[_0-9a-zA-Z]*}}FAA1EC_Tg5
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
@@ -185,7 +193,8 @@ ArchetypeToConcreteConvertE(t: c)
 // result.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertE{{[_0-9a-zA-Z]*}}FAA1CC_Tg5
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
@@ -212,14 +221,16 @@ ConcreteToArchetypeConvertUInt8(t: b, t2: f)
 // x -> y where x is not a class but y is a class.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8{{[_0-9a-zA-Z]*}}FAA1CC_Tg5 : $@convention(thin) (NotUInt8, @guaranteed C) -> @owned C {
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
 // x -> y where x,y are different non class types.
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8{{[_0-9a-zA-Z]*}}Not{{.*}}Tg5 : $@convention(thin) (NotUInt8, NotUInt64) -> NotUInt64 {
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
@@ -242,7 +253,8 @@ ConcreteToArchetypeConvertC(t: c, t2: e)
 // x -> y where x is a class but y is not.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertC{{[_0-9a-zA-Z]*}}Not{{.*}}Tg5 : $@convention(thin) (@guaranteed C, NotUInt8) -> NotUInt8 {
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
@@ -260,7 +272,8 @@ ConcreteToArchetypeConvertC(t: c, t2: e)
 // x -> y where x and y are unrelated classes.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertC{{[_0-9a-zA-Z]*}}FAA1EC_Tg5 : $@convention(thin) (@guaranteed C, @guaranteed E) -> @owned E {
 // CHECK: bb0(%0 : $C, %1 : $E):
-// CHECK:      builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 
@@ -305,7 +318,8 @@ SuperToArchetypeC(c: c, t: b)
 // x -> y where x is a class and y is not.
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast17SuperToArchetypeC{{[_0-9a-zA-Z]*}}FAA8NotUInt8V_Tg5 : $@convention(thin) (@guaranteed C, NotUInt8) -> NotUInt8 {
 // CHECK: bb0
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: unreachable
 // CHECK-NEXT: }
 
@@ -343,7 +357,7 @@ public func ExistentialToArchetype<T>(o o : AnyObject, t : T) -> T {
 
 // AnyObject -> Non Class (should always fail)
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast22ExistentialToArchetype{{[_0-9a-zA-Z]*}}FAA8NotUInt8V_Tg5 : $@convention(thin) (@guaranteed AnyObject, NotUInt8) -> NotUInt8 {
-// CHECK-NOT: builtin "int_trap"()
+// CHECK-NOT: cond_fail
 // CHECK-NOT: unreachable
 // CHECK: return
 

@@ -2115,11 +2115,11 @@ public:
                                        Message, getModule()));
   }
 
-  BuiltinInst *createBuiltinTrap(SILLocation Loc) {
-    ASTContext &AST = getASTContext();
-    auto Id_trap = AST.getIdentifier("int_trap");
-    return createBuiltin(Loc, Id_trap, getModule().Types.getEmptyTupleType(),
-                         {}, {});
+  CondFailInst *createUnconditionalFail(SILLocation loc, StringRef message) {
+    Type int1Ty = BuiltinIntegerType::get(1, getASTContext());
+    auto int1SILTy = SILType::getPrimitiveObjectType(int1Ty->getCanonicalType());
+    auto *one = createIntegerLiteral(loc, int1SILTy, 1);
+    return createCondFail(loc, one, message);
   }
 
   //===--------------------------------------------------------------------===//
