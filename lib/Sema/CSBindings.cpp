@@ -1686,7 +1686,12 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   
   auto literalKind = getLiteralForScore();
   if (literalKind != LiteralBindingKind::None) {
-    out << ", [literal: ";
+    if (!attributes.empty()) {
+      out << ", ";
+    } else {
+      out << "[attributes: ";
+    }
+    out << "[literal: ";
     switch (literalKind) {
     case LiteralBindingKind::Atom: {
       if (auto atomKind = TypeVar->getImpl().getAtomicLiteralKind()) {
@@ -1708,9 +1713,14 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
         out << getLiteralBindingKind(literalKind).str();
       break;
     }
-    out << "]";
+    if (attributes.empty()) {
+      out << "]] ";
+    } else {
+      out << "]";
+    }
   }
-  out << "] ";
+  if (!attributes.empty())
+    out << "] ";
 
   if (involvesTypeVariables()) {
     out << "[involves_type_vars: ";
