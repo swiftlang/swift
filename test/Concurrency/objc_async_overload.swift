@@ -58,4 +58,5 @@ extension Delegate {
 
 extension Delegate {
   @objc public func makeRequest(fromSwift: Request, completionHandler: (() -> Void)?) {}
+  // expected-warning@-1 {{method 'makeRequest(fromSwift:completionHandler:)' with Objective-C selector 'makeRequestFromSwift:completionHandler:' conflicts with method 'makeRequest(fromSwift:)' with the same Objective-C selector; this is an error in Swift 6}}
 }

@@ -36,7 +36,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Strings.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1717,34 +1716,14 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
-/// If there is an apparent conflict between \p newDecl and one of the methods
-/// in \p vec, should we diagnose it?
-static bool
-shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
-                       llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
-  // Are all conflicting methods imported from ObjC and in our ObjC half or a
-  // bridging header? Some code bases implement ObjC methods in Swift even
-  // though it's not exactly supported.
-  auto newDeclModuleName = newDecl->getModuleContext()->getName();
-  if (llvm::all_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    if (!oldDecl->hasClangNode())
-      return false;
-    auto oldDeclModuleName = oldDecl->getModuleContext()->getName();
-    return oldDeclModuleName == newDeclModuleName
-               || oldDeclModuleName.str() == CLANG_HEADER_MODULE_NAME;
-  }))
-    return false;
-
-  // If we're looking at protocol requirements, is the new method an async
-  // alternative of any existing method, or vice versa?
-  if (isa<ProtocolDecl>(ty) &&
-      llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
+/// Is the new method an async alternative of any existing method, or vice
+/// versa?
+static bool isAnAsyncAlternative(AbstractFunctionDecl *newDecl,
+                                 llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
+  return llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
     return newDecl->getAsyncAlternative(/*isKnownObjC=*/true) == oldDecl
               || oldDecl->getAsyncAlternative(/*isKnownObjC=*/true) == newDecl;
-  }))
-    return false;
-
-  return true;
+  });
 }
 
 void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
@@ -1764,7 +1743,7 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   if (auto *sf = method->getParentSourceFile()) {
     if (vec.empty()) {
       sf->ObjCMethodList.push_back(method);
-    } else if (shouldDiagnoseConflict(this, method, vec)) {
+    } else if (!isa<ProtocolDecl>(this) || !isAnAsyncAlternative(method, vec)) {
       // We have a conflict.
       sf->ObjCMethodConflicts.insert({ this, selector, isInstanceMethod });
     }
