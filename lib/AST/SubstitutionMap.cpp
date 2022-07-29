@@ -523,62 +523,76 @@ SubstitutionMap::getOverrideSubstitutions(
   return getOverrideSubstitutions(baseClass, derivedClass, baseSig, derivedParams);
 }
 
+OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
+                                   const NominalTypeDecl *derivedNominal,
+                                   GenericSignature baseSig,
+                                   const GenericParamList *derivedParams)
+  : Ctx(baseSig->getASTContext()),
+    BaseDepth(0),
+    OrigDepth(0),
+    DerivedParams(derivedParams) {
+
+  if (auto baseNominalSig = baseNominal->getGenericSignature()) {
+    BaseDepth = baseNominalSig.getGenericParams().back()->getDepth() + 1;
+
+    auto derivedNominalTy = derivedNominal->getDeclaredInterfaceType();
+    BaseSubMap = derivedNominalTy->getContextSubstitutionMap(
+        baseNominal->getParentModule(), baseNominal);
+    assert(!BaseSubMap.hasArchetypes());
+  }
+
+  if (auto derivedNominalSig = derivedNominal->getGenericSignature())
+    OrigDepth = derivedNominalSig.getGenericParams().back()->getDepth() + 1;
+}
+
+Type QueryOverrideSubs::operator()(SubstitutableType *type) const {
+  if (auto gp = type->getAs<GenericTypeParamType>()) {
+    if (gp->getDepth() >= info.BaseDepth) {
+      assert(gp->getDepth() == info.BaseDepth);
+      if (info.DerivedParams != nullptr) {
+        return info.DerivedParams->getParams()[gp->getIndex()]
+            ->getDeclaredInterfaceType();
+      }
+
+      return GenericTypeParamType::get(
+          gp->isTypeSequence(),
+          gp->getDepth() + info.OrigDepth - info.BaseDepth,
+          gp->getIndex(), info.Ctx);
+    }
+  }
+
+  return Type(type).subst(info.BaseSubMap);
+}
+
+ProtocolConformanceRef
+LookUpConformanceInOverrideSubs::operator()(CanType type,
+                                            Type substType,
+                                            ProtocolDecl *proto) const {
+  if (type->getRootGenericParam()->getDepth() >= info.BaseDepth)
+    return ProtocolConformanceRef(proto);
+
+  if (auto conformance = info.BaseSubMap.lookupConformance(type, proto))
+    return conformance;
+
+  if (substType->isTypeParameter())
+    return ProtocolConformanceRef(proto);
+
+  return proto->getParentModule()->lookupConformance(substType, proto);
+}
+
 SubstitutionMap
-SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
-                                          const ClassDecl *derivedClass,
+SubstitutionMap::getOverrideSubstitutions(const NominalTypeDecl *baseNominal,
+                                          const NominalTypeDecl *derivedNominal,
                                           GenericSignature baseSig,
-                                          GenericParamList *derivedParams) {
+                                          const GenericParamList *derivedParams) {
   if (baseSig.isNull())
     return SubstitutionMap();
 
-  unsigned baseDepth = 0;
-  SubstitutionMap baseSubMap;
-  if (auto baseClassSig = baseClass->getGenericSignature()) {
-    baseDepth = baseClassSig.getGenericParams().back()->getDepth() + 1;
+  OverrideSubsInfo info(baseNominal, derivedNominal, baseSig, derivedParams);
 
-    auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
-    baseSubMap = derivedClassTy->getContextSubstitutionMap(
-        baseClass->getParentModule(), baseClass);
-    assert(!baseSubMap.hasArchetypes());
-  }
-
-  unsigned origDepth = 0;
-  if (auto derivedClassSig = derivedClass->getGenericSignature())
-    origDepth = derivedClassSig.getGenericParams().back()->getDepth() + 1;
-
-  auto &ctx = baseSig->getASTContext();
-
-  return get(
-    baseSig,
-    [&](SubstitutableType *type) -> Type {
-      if (auto gp = type->getAs<GenericTypeParamType>()) {
-        if (gp->getDepth() >= baseDepth) {
-          assert(gp->getDepth() == baseDepth);
-          if (derivedParams != nullptr) {
-            return derivedParams->getParams()[gp->getIndex()]
-                ->getDeclaredInterfaceType();
-          }
-
-          return GenericTypeParamType::get(gp->isTypeSequence(),
-                                           gp->getDepth() + origDepth - baseDepth,
-                                           gp->getIndex(), ctx);
-        }
-      }
-
-      return Type(type).subst(baseSubMap);
-    },
-    [&](CanType type, Type substType, ProtocolDecl *proto) {
-      if (type->getRootGenericParam()->getDepth() >= baseDepth)
-        return ProtocolConformanceRef(proto);
-
-      if (auto conformance = baseSubMap.lookupConformance(type, proto))
-        return conformance;
-
-      if (substType->isTypeParameter())
-        return ProtocolConformanceRef(proto);
-
-      return proto->getParentModule()->lookupConformance(substType, proto);
-    });
+  return get(baseSig,
+             QueryOverrideSubs(info),
+             LookUpConformanceInOverrideSubs(info));
 }
 
 SubstitutionMap

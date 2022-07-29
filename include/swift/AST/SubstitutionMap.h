@@ -205,10 +205,10 @@ public:
   /// Variant of the above for when we have the generic signatures but not
   /// the decls for 'derived' and 'base'.
   static SubstitutionMap
-  getOverrideSubstitutions(const ClassDecl *baseClass,
-                           const ClassDecl *derivedClass,
+  getOverrideSubstitutions(const NominalTypeDecl *baseNominal,
+                           const NominalTypeDecl *derivedNominal,
                            GenericSignature baseSig,
-                           GenericParamList *derivedParams);
+                           const GenericParamList *derivedParams);
 
   /// Combine two substitution maps as follows.
   ///
@@ -310,6 +310,39 @@ public:
   ProtocolConformanceRef operator()(CanType dependentType,
                                     Type conformingReplacementType,
                                     ProtocolDecl *conformedProtocol) const;
+};
+
+struct OverrideSubsInfo {
+  ASTContext &Ctx;
+  unsigned BaseDepth;
+  unsigned OrigDepth;
+  SubstitutionMap BaseSubMap;
+  const GenericParamList *DerivedParams;
+
+  OverrideSubsInfo(const NominalTypeDecl *baseNominal,
+                   const NominalTypeDecl *derivedNominal,
+                   GenericSignature baseSig,
+                   const GenericParamList *derivedParams);
+};
+
+struct QueryOverrideSubs {
+  OverrideSubsInfo info;
+
+  explicit QueryOverrideSubs(const OverrideSubsInfo &info)
+    : info(info) {}
+
+  Type operator()(SubstitutableType *type) const;
+};
+
+struct LookUpConformanceInOverrideSubs {
+  OverrideSubsInfo info;
+
+  explicit LookUpConformanceInOverrideSubs(const OverrideSubsInfo &info)
+    : info(info) {}
+
+  ProtocolConformanceRef operator()(CanType type,
+                                    Type substType,
+                                    ProtocolDecl *proto) const;
 };
 
 } // end namespace swift
