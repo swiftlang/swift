@@ -434,8 +434,6 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
                                        ClassDecl *classDecl,
                                        Type superclassTy,
                                        ConstructorDecl *superclassCtor) {
-  auto *moduleDecl = classDecl->getParentModule();
-
   auto *superclassDecl = superclassTy->getAnyNominal();
 
   auto classSig = classDecl->getGenericSignature();
@@ -445,103 +443,101 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
   // These are our outputs.
   GenericSignature genericSig = classSig;
   auto *genericParams = superclassCtor->getGenericParams();
-  auto subMap = superclassTy->getContextSubstitutionMap(
-      moduleDecl, superclassDecl);
 
-  if (superclassCtorSig.getPointer() != superclassSig.getPointer()) {
-    // If the base initializer's generic signature is different
-    // from that of the base class, the base class initializer either
-    // has generic parameters or a 'where' clause.
-    //
-    // We need to "rebase" the requirements on top of the derived class's
-    // generic signature.
+  SmallVector<GenericTypeParamType *, 1> newParamTypes;
+
+  // If genericParams is non-null, the base class initializer has its own
+  // generic parameters. Otherwise, it is non-generic with a contextual
+  // 'where' clause.
+  if (genericParams) {
+    // First, clone the base class initializer's generic parameter list,
+    // but change the depth of the generic parameters to be one greater
+    // than the depth of the subclass.
+    unsigned depth = 0;
+    if (auto genericSig = classDecl->getGenericSignature())
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
 
     SmallVector<GenericTypeParamDecl *, 4> newParams;
-    SmallVector<GenericTypeParamType *, 1> newParamTypes;
-
-    // If genericParams is non-null, the base class initializer has its own
-    // generic parameters. Otherwise, it is non-generic with a contextual
-    // 'where' clause.
-    if (genericParams) {
-      // First, clone the base class initializer's generic parameter list,
-      // but change the depth of the generic parameters to be one greater
-      // than the depth of the subclass.
-      unsigned depth = 0;
-      if (auto genericSig = classDecl->getGenericSignature())
-        depth = genericSig.getGenericParams().back()->getDepth() + 1;
-
-      for (auto *param : genericParams->getParams()) {
-        auto *newParam = GenericTypeParamDecl::create(
-            classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
-            depth, param->getIndex(), param->isOpaqueType(),
-            /*opaqueTypeRepr=*/nullptr);
-        newParams.push_back(newParam);
-      }
-
-      // We don't have to clone the RequirementReprs, because they're not
-      // used for anything other than SIL mode.
-      genericParams = GenericParamList::create(ctx,
-                                               SourceLoc(),
-                                               newParams,
-                                               SourceLoc(),
-                                               ArrayRef<RequirementRepr>(),
-                                               SourceLoc());
-
-      // Add the generic parameter types.
-      for (auto *newParam : newParams) {
-        newParamTypes.push_back(
-            newParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
-      }
+    for (auto *param : genericParams->getParams()) {
+      auto *newParam = GenericTypeParamDecl::create(
+          classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
+          depth, param->getIndex(), param->isOpaqueType(),
+          /*opaqueTypeRepr=*/nullptr);
+      newParams.push_back(newParam);
     }
 
-    // The depth at which the initializer's own generic parameters start, if any.
-    unsigned superclassDepth = 0;
-    if (superclassSig)
-      superclassDepth = superclassSig.getGenericParams().back()->getDepth() + 1;
+    // We don't have to clone the RequirementReprs, because they're not
+    // used for anything other than SIL mode.
+    genericParams = GenericParamList::create(ctx,
+                                             SourceLoc(),
+                                             newParams,
+                                             SourceLoc(),
+                                             ArrayRef<RequirementRepr>(),
+                                             SourceLoc());
 
-    // We're going to be substituting the requirements of the base class
-    // initializer to form the requirements of the derived class initializer.
-    auto substFn = [&](SubstitutableType *type) -> Type {
-      auto *gp = cast<GenericTypeParamType>(type);
-      // Generic parameters of the base class itself are mapped via the
-      // substitution map of the superclass type.
-      if (gp->getDepth() < superclassDepth)
-        return Type(gp).subst(subMap);
-
-      // Generic parameters added by the base class initializer map to the new
-      // generic parameters of the derived initializer.
-      return genericParams->getParams()[gp->getIndex()]
-                 ->getDeclaredInterfaceType();
-    };
-
-    // If we don't have any new generic parameters and the derived class is
-    // not generic, the base class initializer's 'where' clause should already
-    // be fully satisfied, and we can just drop it.
-    if (genericParams != nullptr || classSig) {
-      auto lookupConformanceFn =
-          [&](CanType depTy, Type substTy,
-              ProtocolDecl *proto) -> ProtocolConformanceRef {
-        if (depTy->getRootGenericParam()->getDepth() < superclassDepth)
-          if (auto conf = subMap.lookupConformance(depTy, proto))
-            return conf;
-
-        return ProtocolConformanceRef(proto);
-      };
-
-      SmallVector<Requirement, 2> requirements;
-      for (auto reqt : superclassCtorSig.getRequirements())
-        if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
-          requirements.push_back(*substReqt);
-
-      // Now form the substitution map that will be used to remap parameter
-      // types.
-      subMap = SubstitutionMap::get(superclassCtorSig,
-                                    substFn, lookupConformanceFn);
-
-      genericSig = buildGenericSignature(ctx, classSig,
-                                         std::move(newParamTypes),
-                                         std::move(requirements));
+    // Add the generic parameter types.
+    for (auto *newParam : newParams) {
+      newParamTypes.push_back(
+          newParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
     }
+  }
+
+  auto baseSubMap = superclassTy->getContextSubstitutionMap(
+      classDecl->getParentModule(), superclassDecl);
+
+  // The depth at which the initializer's own generic parameters start, if any.
+  unsigned superclassDepth = 0;
+  if (superclassSig)
+    superclassDepth = superclassSig.getGenericParams().back()->getDepth() + 1;
+
+  // We're going to be substituting the requirements of the base class
+  // initializer to form the requirements of the derived class initializer.
+  auto substFn = [&](SubstitutableType *type) -> Type {
+    auto *gp = cast<GenericTypeParamType>(type);
+    // Generic parameters of the base class itself are mapped via the
+    // substitution map of the superclass type.
+    if (gp->getDepth() < superclassDepth)
+      return Type(gp).subst(baseSubMap);
+
+    // Generic parameters added by the base class initializer map to the new
+    // generic parameters of the derived initializer.
+    return genericParams->getParams()[gp->getIndex()]
+               ->getDeclaredInterfaceType();
+  };
+
+  auto lookupConformanceFn =
+      [&](CanType depTy, Type substTy,
+          ProtocolDecl *proto) -> ProtocolConformanceRef {
+    if (depTy->getRootGenericParam()->getDepth() < superclassDepth)
+      if (auto conf = baseSubMap.lookupConformance(depTy, proto))
+        return conf;
+
+    return ProtocolConformanceRef(proto);
+  };
+
+  // Now form the substitution map that will be used to remap parameter
+  // types.
+  auto subMap = SubstitutionMap::get(superclassCtorSig,
+                                     substFn, lookupConformanceFn);
+
+  SmallVector<Requirement, 2> requirements;
+
+  // If the base initializer's generic signature is different
+  // from that of the base class, the base class initializer either
+  // has generic parameters or a 'where' clause.
+  //
+  // We need to "rebase" the requirements on top of the derived class's
+  // generic signature.
+  if (superclassSig.getPointer() != superclassCtorSig.getPointer() &&
+      (classSig || newParamTypes.size() != 0)) {
+    for (auto reqt : superclassCtorSig.getRequirements()) {
+      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
+        requirements.push_back(*substReqt);
+    }
+
+    genericSig = buildGenericSignature(ctx, classSig,
+                                       std::move(newParamTypes),
+                                       std::move(requirements));
   }
 
   return DesignatedInitOverrideInfo{genericSig, genericParams, subMap};
