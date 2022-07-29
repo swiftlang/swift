@@ -96,25 +96,6 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 // CHECK-EMPTY:
-// CHECK-NEXT: inline void * _Nonnull opaqueAlloc(size_t size, size_t align) noexcept {
-// CHECK-NEXT: #if defined(_WIN32)
-// CHECK-NEXT:   void *r = _aligned_malloc(size, align);
-// CHECK-NEXT: #else
-// CHECK-NEXT:   if (align < sizeof(void *)) align = sizeof(void *);
-// CHECK-NEXT:   void *r = nullptr;
-// CHECK-NEXT:   int res = posix_memalign(&r, align, size);
-// CHECK-NEXT:   (void)res;
-// CHECK-NEXT: #endif
-// CHECK-NEXT:   return r;
-// CHECK-NEXT: }
-// CHECK-NEXT: inline void opaqueFree(void * _Nonnull p) noexcept {
-// CHECK-NEXT: #if defined(_WIN32)
-// CHECK-NEXT:   _aligned_free(p);
-// CHECK-NEXT: #else
-// CHECK-NEXT:   free(p);
-// CHECK-NEXT: #endif
-// CHECK-NEXT: }
-// CHECK-EMPTY:
 // CHECK-NEXT: /// Container for an opaque Swift value, like resilient struct.
 // CHECK-NEXT: class OpaqueStorage {
 // CHECK-NEXT: public:
