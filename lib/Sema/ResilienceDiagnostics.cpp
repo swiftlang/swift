@@ -84,8 +84,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
-  // FIXME: Conditionalize this once we have a new language mode.
-  if (isa<TypeAliasDecl>(DC))
+  if (isa<TypeAliasDecl>(DC) && !Context.isSwiftVersionAtLeast(6))
     downgradeToWarning = DowngradeToWarning::Yes;
 
   auto diagID = diag::resilience_decl_unavailable;
