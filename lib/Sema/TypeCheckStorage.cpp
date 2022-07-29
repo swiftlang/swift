@@ -3277,6 +3277,8 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
       finishNSManagedImplInfo(var, info);
     } else if (var->hasAttachedPropertyWrapper()) {
       finishPropertyWrapperImplInfo(var, info);
+    } else if (var->isAccessedViaTypeWrapper()) {
+      info = StorageImplInfo::getMutableComputed();
     }
   }
 
