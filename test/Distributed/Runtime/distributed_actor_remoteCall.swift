@@ -492,7 +492,7 @@ func test() async throws {
     invocationDecoder: &decodeErrDecoder,
     handler: FakeResultHandler()
   )
-  // CHECK: ERROR: ExecuteDistributedTargetError(message: "Failed to decode of Int??? (for a test)")
+  // CHECK: ERROR: ExecuteDistributedTargetError(errorCode: Distributed.ExecuteDistributedTargetError.ErrorCode.other, message: "Failed to decode of Int??? (for a test)")
 
   print("done")
   // CHECK-NEXT: done
