@@ -99,9 +99,10 @@ namespace irgen {
 
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
-  void expandPolymorphicSignature(IRGenModule &IGM,
-                                  CanSILFunctionType type,
-                                  SmallVectorImpl<llvm::Type*> &types);
+  void expandPolymorphicSignature(
+      IRGenModule &IGM, CanSILFunctionType type,
+      SmallVectorImpl<llvm::Type *> &types,
+      SmallVectorImpl<GenericRequirement> *outReqs = nullptr);
 
   /// Return the number of trailing arguments necessary for calling a
   /// witness method.

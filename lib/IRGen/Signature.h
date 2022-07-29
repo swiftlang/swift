@@ -18,10 +18,12 @@
 #ifndef SWIFT_IRGEN_SIGNATURE_H
 #define SWIFT_IRGEN_SIGNATURE_H
 
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/CallingConv.h"
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Attributes.h"
+#include "llvm/IR/CallingConv.h"
 
 namespace llvm {
   class FunctionType;
@@ -94,6 +96,12 @@ public:
   uint32_t AsyncResumeFunctionSwiftSelfIdx = 0;
 };
 
+/// Recorded information about the specific ABI details.
+struct SignatureExpansionABIDetails {
+  /// Generic requirements added to the signature during expansion.
+  llvm::SmallVector<GenericRequirement, 2> GenericRequirements;
+};
+
 /// A signature represents something which can actually be called.
 class Signature {
   using ExtraData =
@@ -104,6 +112,7 @@ class Signature {
   llvm::CallingConv::ID CallingConv;
   ExtraData::Kind ExtraDataKind; // packed with above
   ExtraData ExtraDataStorage;
+  llvm::Optional<SignatureExpansionABIDetails> ABIDetails;
   static_assert(ExtraData::union_is_trivially_copyable,
                 "not trivially copyable");
 
@@ -126,7 +135,8 @@ public:
   /// IRGenModule::getSignature(CanSILFunctionType), which is what
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
-                               FunctionPointerKind kind);
+                               FunctionPointerKind kind,
+                               bool shouldComputeABIDetails = false);
 
   /// Compute the signature of a coroutine's continuation function.
   static Signature forCoroutineContinuation(IRGenModule &IGM,
@@ -193,6 +203,11 @@ public:
   llvm::AttributeList &getMutableAttributes() & {
     assert(isValid());
     return Attributes;
+  }
+
+  const SignatureExpansionABIDetails &getABIDetails() {
+    assert(ABIDetails.hasValue());
+    return *ABIDetails;
   }
 };
 
