@@ -15,21 +15,151 @@ import _Concurrency
 
 // ==== Distributed Actor -----------------------------------------------------
 
+
+
 /// Common protocol to which all distributed actors conform implicitly.
 ///
-/// It is not possible to conform to this protocol manually explicitly.
-/// Only a 'distributed actor' declaration or protocol with 'DistributedActor'
-/// requirement may conform to this protocol.
+/// The `DistributedActor` protocol generalizes over all distributed actor types.
+/// Distributed actor types implicitly conform to this protocol.
 ///
-/// The 'DistributedActor' protocol provides the core functionality of any
-/// distributed actor.
+/// It is not possible to conform to this protocol manually by any other type
+/// than a `distributed actor`.
 ///
-/// ## Implicit `Codable` conformance
+/// It is possible to require a type conform to the
+/// ``DistributedActor`` protocol by refining it with another protocol,
+/// or by using a generic constraint.
+///
+///
+/// ## The ActorSystem associated type
+/// Every distributed actor must declare what type of distributed actor system
+/// it is part of by implementing the ``ActorSystem`` associated type requirement.
+///
+/// This causes a number of other properties of the actor to be inferred:
+///   - the ``SerializationRequirement`` that will be used at compile time to
+///     verify `distributed` target declarations are well formed,
+///   - if the distributed actor is `Codable`, based on the ``ID`` being Codable or not,
+///   - the type of the `ActorSystem` accepted in the synthesized default initializer.
+///
+/// A distributed actor must declare what type of actor system it is ready to
+/// work with by fulfilling the ``ActorSystem`` type member requirement:
+///
+/// ```swift
+/// distributed actor Greeter {
+///   typealias ActorSystem = GreetingSystem // which conforms to DistributedActorSystem
+///
+///   func greet() -> String { "Hello!" }
+/// }
+/// ```
+///
+/// ### The DefaultDistributedActorSystem type alias
+/// Since it is fairly common to only be using one specific type of actor system
+/// within a module or entire codebase, it is possible to declare the default type
+/// or actor system all distributed actors will be using in a module by declaring
+/// a `DefaultDistributedActorSystem` module wide typealias:
+///
+/// ```swift
+/// import Distributed
+/// import AmazingActorSystemLibrary
+///
+/// typealias DefaultDistributedActorSystem = AmazingActorSystem
+///
+/// distributed actor Greeter {} // ActorSystem == AmazingActorSystem
+/// ```
+///
+/// This declaration makes all `distributed actor` declarations,
+/// which do not explicitly specify an ``ActorSystem`` typealias, to assume the
+/// `AmazingActorSystem` as their `ActorSystem`.
+///
+/// It is possible for a specific actor to override the system it is using,
+/// by declaring an ``ActorSystem`` type alias as usual:
+///
+/// ```swift
+/// typealias DefaultDistributedActorSystem = AmazingActorSystem
+///
+/// distributed actor Amazing {
+///   // ActorSystem == AmazingActorSystem
+/// }
+///
+/// distributed actor Superb {
+///   typealias ActorSystem = SuperbActorSystem
+/// }
+/// ```
+///
+/// In general the `DefaultDistributedActorSystem` should not be declared public,
+/// as picking the default should be left up to each specific module of a project.
+///
+/// ## Default initializer
+/// While classes and actors receive a synthesized *argument-free default
+/// initializer* (`init()`), distributed actors synthesize a default initializer
+/// that accepts a distributed actor system the actor is part of: `init(actorSystem:)`.
+///
+/// The accepted actor system must be of the `Self.ActorSystem` type, which
+/// must conform to the ``DistributedActorSystem`` protocol. This is required
+/// because of how distributed actors are always managed by, a concrete
+/// distributed actor system, and cannot exist on their own without one.
+///
+/// It is possible to explicitly declare an parameter-free initializer (`init()`),
+/// however the `actorSystem` property still must be assigned a concrete actor
+/// system instance the actor shall be part of.
+
+/// In general it is recommended to always have an `actorSystem` parameter as
+/// the last non-defaulted non-closure parameter in every distributed actors
+/// initializer parameter list. This way it is simple to swap in a "test actor
+// system" instance in unit tests, and avoid relying on global state which could
+/// make testing more difficult.
+///
+/// ## Implicit properties
+/// Every concrete `distributed actor` type receives two synthesized properties,
+/// which implement the protocol requirements of this protocol: `id` and `actorSystem`.
+///
+/// ### Property: Actor System
+/// The ``actorSystem`` property is an important part of every distributed actor's lifecycle management.
+/// Initialization as well as de-initialization both require interactions with the actor system,
+/// and it is the actor system that delivers
+///
+///
+/// The ``actorSystem`` property must be assigned in every designated initializer
+/// of a distributed actor explicitly. It is highly recommended to make it a
+/// parameter of every distributed actor initializer, and simply forward the
+/// value to the stored property, like this:
+///
+/// ```swift
+/// init(name: String, actorSystem: Self.ActorSystem) {
+///   self.name = name
+///   self.actorSystem = actorSystem
+/// }
+/// ```
+///
+/// ### Property: Distributed Actor Identity
+/// The ``id`` is assigned by the actor system during the distributed actor's
+/// initialization, and cannot be set or mutated by the actor itself.
+///
+/// The ``id`` is the effective identity of the actor, and is used in equality checks.
+///
+/// ## Automatic Conformances
+///
+/// ### Hashable and Identifiable conformance
+/// Every distributed actor conforms to the Hashable and Identifiable protocols.
+/// Its identity is strictly driven by its `id`, and therefore hash and equality
+/// implementations directly delegate to the `id` property.
+///
+/// Comparing a local distributed actor instance and a remote reference to it
+/// (both using the same ``id``) always returns true, as they both conceptually
+/// point at the same distributed actor.
+///
+/// It is not possible to implement those protocols relying on the actual actor's
+/// state, because it may be remote and the state may not be available. In other
+/// words, since these protocols must be implemented using `nonisolated` functions,
+/// only `nonisolated` `id` and `actorSystem` properties are accessible for their
+/// implementations.
+///
+/// ### Implicit `Codable` conformance
 /// If created with an actor system whose `ActorID` is `Codable`, the
 /// compiler will synthesize code for the concrete distributed actor to conform
-/// to `Codable` as well. This is necessary to support distributed calls where
-/// the `SerializationRequirement` is `Codable` and thus users may want to pass
-/// actors as arguments to remote calls.
+/// to `Codable` as well.
+///
+/// This is necessary to support distributed calls where the `SerializationRequirement`
+/// is `Codable` and thus users may want to pass actors as arguments to remote calls.
 ///
 /// The synthesized implementations use a single `SingleValueContainer` to
 /// encode/decode the `self.id` property of the actor. The `Decoder` required
@@ -40,6 +170,10 @@ import _Concurrency
 ///
 /// Use the `CodingUserInfoKey.actorSystemKey` to provide the necessary
 /// actor system for the decoding initializer when decoding a distributed actor.
+///
+/// - SeeAlso: ``DistributedActorSystem``
+/// - SeeAlso: ``Actor``
+/// - SeeAlso: ``AnyActor``
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActor: AnyActor, Identifiable, Hashable
   where ID == ActorSystem.ActorID,
@@ -102,6 +236,13 @@ extension DistributedActor {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
+
+  /// Key which is required to be set on a `Decoder`'s `userInfo` while attempting
+  /// to `init(from:)` a `DistributedActor`. The stored value under this key must
+  /// conform to ``DistributedActorSystem``.
+  ///
+  /// Missing to set this key will result in that initializer throwing, because
+  /// an actor system is required
   @available(SwiftStdlib 5.7, *)
   public static let actorSystemKey = CodingUserInfoKey(rawValue: "$distributed_actor_system")!
 }

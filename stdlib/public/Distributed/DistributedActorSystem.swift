@@ -581,6 +581,12 @@ public struct ExecuteDistributedTargetError: DistributedActorSystemError {
   }
 }
 
+/// Error thrown by distributed actor systems while encountering encoding/decoding
+/// issues.
+///
+/// Also thrown when attempt to decode ``DistributedActor`` is made,
+/// but no ``DistributedActorSystem`` is available in the `Decoder`'s
+/// `userInfo[.actorSystemKey]`, as it is required to perform the resolve call.
 @available(SwiftStdlib 5.7, *)
 public struct DistributedActorCodingError: DistributedActorSystemError {
   public let message: String
