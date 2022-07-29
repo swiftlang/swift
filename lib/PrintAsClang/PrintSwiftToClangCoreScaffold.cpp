@@ -154,28 +154,6 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
                  funcSig.parameterTypes[0]);
 }
 
-static void printOpaqueAllocFee(raw_ostream &os) {
-  os << R"text(inline void * _Nonnull opaqueAlloc(size_t size, size_t align) noexcept {
-#if defined(_WIN32)
-  void *r = _aligned_malloc(size, align);
-#else
-  if (align < sizeof(void *)) align = sizeof(void *);
-  void *r = nullptr;
-  int res = posix_memalign(&r, align, size);
-  (void)res;
-#endif
-  return r;
-}
-inline void opaqueFree(void * _Nonnull p) noexcept {
-#if defined(_WIN32)
-  _aligned_free(p);
-#else
-  free(p);
-#endif
-}
-)text";
-}
-
 static void printSwiftResilientStorageClass(raw_ostream &os) {
   auto name = cxx_synthesis::getCxxOpaqueStorageClassName();
   static_assert(TargetValueWitnessFlags<uint64_t>::AlignmentMask ==
@@ -301,8 +279,6 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
             printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
                                             /*isCForwardDefinition=*/true);
           });
-          os << "\n";
-          printOpaqueAllocFee(os);
           os << "\n";
           printSwiftResilientStorageClass(os);
           printCxxNaiveException(os);
