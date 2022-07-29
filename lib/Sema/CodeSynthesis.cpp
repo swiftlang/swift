@@ -1510,24 +1510,6 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   });
 }
 
-void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
-  auto &C = nominal->getASTContext();
-  // If nominal already has `@_fixed_layout`, return.
-  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
-    return;
-  auto access = nominal->getEffectiveAccess();
-  // If nominal does not have at least internal access, return.
-  if (access < AccessLevel::Internal)
-    return;
-  // If nominal is internal, it should have the `@usableFromInline` attribute.
-  if (access == AccessLevel::Internal &&
-      !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    nominal->getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
-  }
-  // Add `@_fixed_layout` to the nominal.
-  nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
-}
-
 void swift::addNonIsolatedToSynthesized(
     NominalTypeDecl *nominal, ValueDecl *value) {
   if (!getActorIsolation(nominal).isActorIsolated())
