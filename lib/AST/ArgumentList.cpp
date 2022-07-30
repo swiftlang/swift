@@ -262,32 +262,6 @@ Expr *ArgumentList::packIntoImplicitTupleOrParen(
   return tuple;
 }
 
-Type ArgumentList::composeTupleOrParenType(
-    ASTContext &ctx, llvm::function_ref<Type(Expr *)> getType) const {
-  if (auto *unary = getUnlabeledUnaryExpr()) {
-    auto ty = getType(unary);
-    assert(ty);
-    ParameterTypeFlags flags;
-    if (get(0).isInOut()) {
-      ty = ty->getInOutObjectType();
-      flags = flags.withInOut(true);
-    }
-    return ParenType::get(ctx, ty, flags);
-  }
-  SmallVector<TupleTypeElt, 4> elts;
-  for (auto arg : *this) {
-    auto ty = getType(arg.getExpr());
-    assert(ty);
-    ParameterTypeFlags flags;
-    if (arg.isInOut()) {
-      ty = ty->getInOutObjectType();
-      flags = flags.withInOut(true);
-    }
-    elts.emplace_back(ty, arg.getLabel(), flags);
-  }
-  return TupleType::get(elts, ctx);
-}
-
 bool ArgumentList::matches(ArrayRef<AnyFunctionType::Param> params,
                            llvm::function_ref<Type(Expr *)> getType) const {
   if (size() != params.size())

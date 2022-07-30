@@ -75,20 +75,19 @@ static void setUnimplementedRange(SwiftMetatype metatype,
 
 /// Registers the metatype of a swift SIL class.
 /// Called by initializeSwiftModules().
-void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
+void registerBridgedClass(StringRef className, SwiftMetatype metatype) {
   nodeMetatypesInitialized = true;
 
   // Handle the important non Node classes.
-  StringRef clName = getStringRef(className);
-  if (clName == "BasicBlock")
+  if (className == "BasicBlock")
     return SILBasicBlock::registerBridgedMetatype(metatype);
-  if (clName == "GlobalVariable")
+  if (className == "GlobalVariable")
     return SILGlobalVariable::registerBridgedMetatype(metatype);
-  if (clName == "BlockArgument") {
+  if (className == "BlockArgument") {
     nodeMetatypes[(unsigned)SILNodeKind::SILPhiArgument] = metatype;
     return;
   }
-  if (clName == "FunctionArgument") {
+  if (className == "FunctionArgument") {
     nodeMetatypes[(unsigned)SILNodeKind::SILFunctionArgument] = metatype;
     return;
   }
@@ -99,11 +98,11 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   // instructions gracefully, without the need to define the not-yet-used
   // classes in Swift.
 #define VALUE_RANGE(ID) SILNodeKind::First_##ID, SILNodeKind::Last_##ID
-  if (clName == "UnimplementedRefCountingInst")
+  if (className == "UnimplementedRefCountingInst")
     return setUnimplementedRange(metatype, VALUE_RANGE(RefCountingInst));
-  if (clName == "UnimplementedSingleValueInst")
+  if (className == "UnimplementedSingleValueInst")
     return setUnimplementedRange(metatype, VALUE_RANGE(SingleValueInstruction));
-  if (clName == "UnimplementedInstruction")
+  if (className == "UnimplementedInstruction")
     return setUnimplementedRange(metatype, VALUE_RANGE(SILInstruction));
 #undef VALUE_RANGE
 
@@ -122,21 +121,21 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   }
 
   std::string prefixedName;
-  auto iter = valueNamesToKind.find(clName);
+  auto iter = valueNamesToKind.find(className);
   if (iter == valueNamesToKind.end()) {
     // Try again with a "SIL" prefix. For example Argument -> SILArgument.
-    prefixedName = std::string("SIL") + std::string(clName);
+    prefixedName = std::string("SIL") + std::string(className);
     iter = valueNamesToKind.find(prefixedName);
     if (iter == valueNamesToKind.end()) {
-      llvm::errs() << "Unknown bridged node class " << clName << '\n';
+      llvm::errs() << "Unknown bridged node class " << className << '\n';
       abort();
     }
-    clName = prefixedName;
+    className = prefixedName;
   }
   SILNodeKind kind = iter->second;
   SwiftMetatype existingTy = nodeMetatypes[(unsigned)kind];
   if (existingTy && !unimplementedTypes.count(existingTy)) {
-    llvm::errs() << "Double registration of class " << clName << '\n';
+    llvm::errs() << "Double registration of class " << className << '\n';
     abort();
   }
   nodeMetatypes[(unsigned)kind] = metatype;
@@ -146,8 +145,8 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
 //                                SILFunction
 //===----------------------------------------------------------------------===//
 
-BridgedStringRef SILFunction_getName(BridgedFunction function) {
-  return getBridgedStringRef(castToFunction(function)->getName());
+llvm::StringRef SILFunction_getName(BridgedFunction function) {
+  return castToFunction(function)->getName();
 }
 
 std::string SILFunction_debugDescription(BridgedFunction function) {
@@ -219,9 +218,9 @@ SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
 }
 
 SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
-                                     BridgedStringRef attrName) {
+                                      StringRef attrName) {
   SILFunction *f = castToFunction(function);
-  return f->hasSemanticsAttr(getStringRef(attrName)) ? 1 : 0;
+  return f->hasSemanticsAttr(attrName) ? 1 : 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -463,7 +462,7 @@ BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
 }
 
 SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
-                                          BridgedStringRef fieldName) {
+                                          StringRef fieldName) {
   SILType ty = castToSILType(type);
   auto *nominal = ty.getNominalOrBoundGenericNominal();
   if (!nominal)
@@ -479,10 +478,9 @@ SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
   std::reverse(decls.begin(), decls.end());
 
   SwiftInt idx = 0;
-  StringRef fieldNm((const char *)fieldName.data, fieldName.length);
   for (auto *decl : decls) {
     for (VarDecl *field : decl->getStoredProperties()) {
-      if (field->getName().str() == fieldNm)
+      if (field->getName().str() == fieldName)
         return idx;
       idx++;
     }
@@ -491,7 +489,7 @@ SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
 }
 
 SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
-                                      BridgedStringRef caseName) {
+                                      StringRef caseName) {
   SILType ty = castToSILType(type);
   auto *enumDecl = ty.getEnumOrBoundGenericEnum();
   if (!enumDecl)
@@ -499,7 +497,7 @@ SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
 
   SwiftInt idx = 0;
   for (EnumElementDecl *elem : enumDecl->getAllElements()) {
-    if (elem->getNameStr() == getStringRef(caseName))
+    if (elem->getNameStr() == caseName)
       return idx;
     idx++;
   }
@@ -519,8 +517,8 @@ BridgedSubstitutionMap SubstitutionMap_getEmpty() {
 //                            SILGlobalVariable
 //===----------------------------------------------------------------------===//
 
-BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
-  return getBridgedStringRef(castToGlobal(global)->getName());
+llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
+  return castToGlobal(global)->getName();
 }
 
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
@@ -607,8 +605,8 @@ BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term) {
 //                            Instruction classes
 //===----------------------------------------------------------------------===//
 
-BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi) {
-  return getBridgedStringRef(castToInst<CondFailInst>(cfi)->getMessage());
+llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi) {
+  return castToInst<CondFailInst>(cfi)->getMessage();
 }
 
 BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi) {
@@ -623,8 +621,8 @@ BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri) {
   return {castToInst<FunctionRefInst>(fri)->getReferencedFunction()};
 }
 
-BridgedStringRef StringLiteralInst_getValue(BridgedInstruction sli) {
-  return getBridgedStringRef(castToInst<StringLiteralInst>(sli)->getValue());
+llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli) {
+  return castToInst<StringLiteralInst>(sli)->getValue();
 }
 
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei) {
@@ -789,23 +787,23 @@ SwiftInt ApplySite_getNumArguments(BridgedInstruction inst) {
 //===----------------------------------------------------------------------===//
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
-          BridgedBuilder b, BridgedStringRef name,
+          BridgedBuilder b, StringRef name,
           BridgedType operandType, BridgedType resultType,
           BridgedValueArray arguments) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      getSILDebugScope(b.loc));
   SmallVector<SILValue, 16> argValues;
   return {builder.createBuiltinBinaryFunction(getRegularLocation(b.loc),
-    getStringRef(name), getSILType(operandType), getSILType(resultType),
+    name, getSILType(operandType), getSILType(resultType),
     getSILValues(arguments, argValues))};
 }
 
 BridgedInstruction SILBuilder_createCondFail(BridgedBuilder b,
-          BridgedValue condition, BridgedStringRef message) {
+          BridgedValue condition, StringRef message) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      getSILDebugScope(b.loc));
   return {builder.createCondFail(getRegularLocation(b.loc),
-    castToSILValue(condition), getStringRef(message))};
+    castToSILValue(condition), message)};
 }
 
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder b,

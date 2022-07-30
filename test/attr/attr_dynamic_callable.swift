@@ -521,3 +521,30 @@ sr12019c(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)
 // Subclass
 let sr12019sub = SR12019SubClass()
 sr12019sub(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+
+protocol P {}
+extension P {
+  func dynamicallyCall(withArguments: [Int]) {}
+}
+
+@dynamicCallable
+protocol Q {}
+extension Q {
+  func dynamicallyCall(withArguments: [String]) {}
+}
+
+@dynamicCallable
+protocol R {}
+extension R {
+  func dynamicallyCall(withArguments: [Int]) {}
+}
+
+func testProtocolComposition(_ x: P & Q, _ y: Q & R) {
+  // Only Q is marked @dynamicCallable, so P's dynamicallyCall is not available.
+  x(0, 1) // expected-error 2{{cannot convert value of type 'Int' to expected argument type 'String'}}
+  x("a", "b")
+
+  // Fine, both Q and R are @dynamicCallable
+  y(0, 1)
+  y("a", "b")
+}

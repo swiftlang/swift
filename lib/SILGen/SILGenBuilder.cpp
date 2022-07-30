@@ -510,7 +510,7 @@ SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
 ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
                                        EnumElementDecl *decl, SILType type) {
   SILValue result = createEnum(loc, payload.forward(SGF), decl, type);
-  if (result.getOwnershipKind() != OwnershipKind::Owned)
+  if (result->getOwnershipKind() != OwnershipKind::Owned)
     return ManagedValue::forUnmanaged(result);
   return SGF.emitManagedRValueWithCleanup(result);
 }

@@ -34,7 +34,7 @@
 #define SWIFT_DEAD_VOUCHER ((voucher_t)-1)
 
 // The OS has voucher support if it has the header or if it has ObjC interop.
-#if SWIFT_HAS_VOUCHER_HEADER || SWIFT_OBJC_INTEROP
+#if (SWIFT_HAS_VOUCHER_HEADER || SWIFT_OBJC_INTEROP) && !SWIFT_THREADING_NONE
 #define SWIFT_HAS_VOUCHERS 1
 #endif
 

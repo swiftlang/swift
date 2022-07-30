@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
 
+// REQUIRES: rdar97532965
+
 import CustomSequence
 import Cxx
 

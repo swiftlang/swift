@@ -612,8 +612,14 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
+def enable_experimental_cxx_interop :
+  Flag<["-"], "enable-experimental-cxx-interop">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable experimental C++ interop code generation and config directives">;
+
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
+  Flags<[HelpHidden]>,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
 def experimental_emit_module_separately:

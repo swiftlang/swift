@@ -226,7 +226,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
           // This assumes that forwarding to a trivial value cannot extend the
           // lifetime. This way, simply projecting a trivial value out of an
           // aggregate isn't considered an escape.
-          if (result.getOwnershipKind() == OwnershipKind::None)
+          if (result->getOwnershipKind() == OwnershipKind::None)
             continue;
 
           pushDef(result);

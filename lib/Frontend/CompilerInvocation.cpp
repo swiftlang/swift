@@ -47,6 +47,17 @@ swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
 
+/// Converts a llvm::Triple to a llvm::VersionTuple.
+static llvm::VersionTuple
+getVersionTuple(const llvm::Triple &triple) {
+  unsigned major, minor, patch;
+  if (triple.isMacOSX())
+    triple.getMacOSXVersion(major, minor, patch);
+  else
+    triple.getOSVersion(major, minor, patch);
+  return llvm::VersionTuple(major, minor, patch);
+}
+
 void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
     StringRef mainExecutablePath, bool shared,
     llvm::SmallVectorImpl<char> &runtimeResourcePath) {
@@ -678,6 +689,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.Features.insert(Feature::AdditiveArithmeticDerivedConformances);
+  
+  if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
+    Opts.Features.insert(Feature::OpaqueTypeErasure);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
@@ -862,24 +876,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
-    // FIXME: Re-enable with rdar://91387029
-#if SWIFT_DEFAULT_API_TARGET_MIN_INLINING_VERSION_TO_MIN
+    const auto targetVersion = getVersionTuple(triple);
+    
     // In API modules, default to the version when Swift first became available.
-    if (Opts.LibraryLevel == LibraryLevel::API)
-      if (auto minTriple = minimumAvailableOSVersionForTriple(triple))
-        return *minTriple;
-#endif
+    if (Opts.LibraryLevel == LibraryLevel::API) {
+      if (auto minVersion = minimumAvailableOSVersionForTriple(triple))
+        return *minVersion;
+    }
 
     // In other modules, assume that availability is used less consistently
     // and that library clients will generally raise deployment targets as the
     // library evolves so the min inlining version should be the deployment
     // target by default.
-    unsigned major, minor, patch;
-    if (triple.isMacOSX())
-      triple.getMacOSXVersion(major, minor, patch);
-    else
-      triple.getOSVersion(major, minor, patch);
-    return llvm::VersionTuple(major, minor, patch);
+    return targetVersion;
   };
 
   Opts.MinimumInliningTargetVersion =
@@ -2389,8 +2398,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
   }
 
-  if (Args.hasArg(OPT_enable_new_llvm_pass_manager))
-    Opts.LegacyPassManager = false;
+  Opts.LegacyPassManager =
+      Args.hasFlag(OPT_disable_new_llvm_pass_manager,
+                   OPT_enable_new_llvm_pass_manager,
+                   Opts.LegacyPassManager);
 
   return false;
 }

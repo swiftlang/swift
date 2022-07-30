@@ -135,7 +135,8 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
 }
 
 static bool areConservativelyCompatibleArgumentLabels(
-    OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
+    ConstraintSystem &cs, OverloadChoice choice,
+    SmallVectorImpl<FunctionType::Param> &args,
     MatchCallArgumentListener &listener,
     Optional<unsigned> unlabeledTrailingClosureArgIndex) {
   ValueDecl *decl = nullptr;
@@ -155,22 +156,34 @@ static bool areConservativelyCompatibleArgumentLabels(
     return true;
   }
 
-  if (!decl->hasParameterList())
-    return true;
-
-  // This is a member lookup, which generally means that the call arguments
-  // (if we have any) will apply to the second level of parameters, with
-  // the member lookup applying the curried self at the first level. But there
-  // are cases where we can get an unapplied declaration reference back.
+  // If this is a member lookup, the call arguments (if we have any) will
+  // generally be applied to the second level of parameters, with the member
+  // lookup applying the curried self at the first level. But there are cases
+  // where we can get an unapplied declaration reference back.
   auto hasAppliedSelf =
       decl->hasCurriedSelf() &&
       doesMemberRefApplyCurriedSelf(choice.getBaseType(), decl);
 
-  auto *fnType = decl->getInterfaceType()->castTo<AnyFunctionType>();
-  if (hasAppliedSelf) {
-    fnType = fnType->getResult()->getAs<AnyFunctionType>();
-    assert(fnType && "Parameter list curry level does not match type");
+  AnyFunctionType *fnType = nullptr;
+  if (decl->hasParameterList()) {
+    fnType = decl->getInterfaceType()->castTo<AnyFunctionType>();
+    if (hasAppliedSelf) {
+      fnType = fnType->getResult()->getAs<AnyFunctionType>();
+      assert(fnType && "Parameter list curry level does not match type");
+    }
+  } else if (auto *VD = dyn_cast<VarDecl>(decl)) {
+    // For variables, we can reject any type that we know cannot be callable.
+    auto varTy = VD->getValueInterfaceType()->lookThroughAllOptionalTypes();
+    if (!varTy->mayBeCallable(cs.DC))
+      return false;
+    fnType = varTy->getAs<AnyFunctionType>();
   }
+
+  // Given we want to be conservative with this checking, if there's any case
+  // we can't match arguments for (e.g callable nominals, type parameters),
+  // default to returning true.
+  if (!fnType)
+    return true;
 
   auto params = fnType->getParams();
   ParameterListInfo paramInfo(params, decl, hasAppliedSelf);
@@ -1185,7 +1198,7 @@ public:
         argIdx == *UnlabeledTrailingClosureArgIndex && Callee) {
       if (auto *ctor = dyn_cast<ConstructorDecl>(Callee.get())) {
         auto resultTy = ctor->getResultInterfaceType();
-        if (resultTy->isCallableNominalType(CS.DC))
+        if (resultTy->isCallAsFunctionType(CS.DC))
           return true;
       }
     }
@@ -10985,7 +10998,7 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
         auto *dc = decl->getDeclContext();
         if (auto *parent = dc->getSelfNominalTypeDecl()) {
           auto type = parent->getDeclaredInterfaceType();
-          if (type->isCallableNominalType(DC))
+          if (type->isCallAsFunctionType(DC))
             return false;
         }
       }
@@ -11014,7 +11027,7 @@ retry_after_fail:
 
           auto labelsMatch = [&](MatchCallArgumentListener &listener) {
             if (areConservativelyCompatibleArgumentLabels(
-                    choice, argsWithLabels, listener,
+                    *this, choice, argsWithLabels, listener,
                     argList->getFirstTrailingClosureIndex()))
               return true;
 
@@ -11330,7 +11343,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Handle applications of types with `callAsFunction` methods.
   // Do this before stripping optional types below, when `shouldAttemptFixes()`
   // is true.
-  if (desugar2->isCallableNominalType(DC)) {
+  if (desugar2->isCallAsFunctionType(DC)) {
     auto memberLoc = getConstraintLocator(
         locator.withPathElement(ConstraintLocator::ImplicitCallAsFunction));
     // Add a `callAsFunction` member constraint, binding the member type to a
@@ -11391,7 +11404,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // trailing closure(s), closure(s) might not belong to
       // the constructor but rather to implicit `callAsFunction`,
       // there is no way to determine that without trying.
-      if (resultTy->isCallableNominalType(DC) &&
+      if (resultTy->isCallAsFunctionType(DC) &&
           argumentList->hasAnyTrailingClosures()) {
         auto *calleeLoc = getCalleeLocator(argumentsLoc);
 
@@ -11553,7 +11566,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // once constraint generation is done.
     if (getPhase() == ConstraintSystemPhase::ConstraintGeneration &&
         argumentList->hasAnyTrailingClosures() &&
-        instance2->isCallableNominalType(DC)) {
+        instance2->isCallAsFunctionType(DC)) {
       return formUnsolved(/*activate=*/true);
     }
 
@@ -11609,10 +11622,21 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
 /// implemented by a type.
 static llvm::DenseSet<FuncDecl *>
-lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
+lookupDynamicCallableMethods(NominalTypeDecl *decl, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator,
                              Identifier argumentName, bool hasKeywordArgs) {
   auto &ctx = CS.getASTContext();
+
+  // The generic arguments don't matter because we only want the member decls,
+  // not concrete overload choices (we form those later when adding the overload
+  // set). We map into context here to avoid an OverloadChoice assertion for an
+  // interface type base.
+  // TODO: We really ought to separate out the actual lookup part of
+  // `performMemberLookup` from the choice construction. That would allow us to
+  // requestify the lookup of dynamicCallable members on a per-decl basis, and
+  // map them onto viable and unviable choices onto a given base type.
+  auto type = decl->getDeclaredTypeInContext();
+
   DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
   auto matches = CS.performMemberLookup(
       ConstraintKind::ValueMember, methodName, type,
@@ -11636,112 +11660,44 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
 }
 
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
-/// implemented by a type. This function should not be called directly:
-/// instead, call `getDynamicCallableMethods` which performs caching.
+/// implemented by a given nominal type decl.
 static DynamicCallableMethods
-lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
+lookupDynamicCallableMethods(NominalTypeDecl *decl, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator) {
+  auto it = CS.DynamicCallableCache.find(decl);
+  if (it != CS.DynamicCallableCache.end())
+    return it->second;
+
+  // The decl must have @dynamicCallable.
   auto &ctx = CS.getASTContext();
+  HasDynamicCallableAttributeRequest req(decl);
+  if (!evaluateOrDefault(ctx.evaluator, req, false))
+    return DynamicCallableMethods();
+
   DynamicCallableMethods methods;
   methods.argumentsMethods =
-    lookupDynamicCallableMethods(type, CS, locator, ctx.Id_withArguments,
+    lookupDynamicCallableMethods(decl, CS, locator, ctx.Id_withArguments,
                                  /*hasKeywordArgs*/ false);
   methods.keywordArgumentsMethods =
-    lookupDynamicCallableMethods(type, CS, locator,
+    lookupDynamicCallableMethods(decl, CS, locator,
                                  ctx.Id_withKeywordArguments,
                                  /*hasKeywordArgs*/ true);
+  CS.DynamicCallableCache[decl] = methods;
   return methods;
 }
 
 /// Returns the @dynamicCallable required methods (if they exist) implemented
 /// by a type.
-/// This function may be slow for deep class hierarchies and multiple protocol
-/// conformances,  but it is invoked only after other constraint simplification
-/// rules fail.
 static DynamicCallableMethods
 getDynamicCallableMethods(Type type, ConstraintSystem &CS,
                           const ConstraintLocatorBuilder &locator) {
-  auto canType = type->getCanonicalType();
-  auto it = CS.DynamicCallableCache.find(canType);
-  if (it != CS.DynamicCallableCache.end()) return it->second;
+  SmallVector<NominalTypeDecl *, 4> decls;
+  namelookup::tryExtractDirectlyReferencedNominalTypes(type, decls);
 
-  // Calculate @dynamicCallable methods for composite types with multiple
-  // components (protocol composition types and archetypes).
-  auto calculateForComponentTypes =
-      [&](ArrayRef<Type> componentTypes) -> DynamicCallableMethods {
-    DynamicCallableMethods methods;
-    for (auto componentType : componentTypes) {
-      auto tmp = getDynamicCallableMethods(componentType, CS, locator);
-      methods.argumentsMethods.insert(tmp.argumentsMethods.begin(),
-                                      tmp.argumentsMethods.end());
-      methods.keywordArgumentsMethods.insert(
-          tmp.keywordArgumentsMethods.begin(),
-          tmp.keywordArgumentsMethods.end());
-    }
-    return methods;
-  };
+  DynamicCallableMethods result;
+  for (auto *decl : decls)
+    result.addMethods(lookupDynamicCallableMethods(decl, CS, locator));
 
-  // Calculate @dynamicCallable methods.
-  auto calculate = [&]() -> DynamicCallableMethods {
-    // If this is an archetype type, check if any types it conforms to
-    // (superclass or protocols) have the attribute.
-    if (auto archetype = dyn_cast<ArchetypeType>(canType)) {
-      SmallVector<Type, 2> componentTypes;
-      for (auto protocolDecl : archetype->getConformsTo())
-        componentTypes.push_back(protocolDecl->getDeclaredInterfaceType());
-      if (auto superclass = archetype->getSuperclass())
-        componentTypes.push_back(superclass);
-      return calculateForComponentTypes(componentTypes);
-    }
-
-    // If this is a protocol composition, check if any of its members have the
-    // attribute.
-    if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType))
-      return calculateForComponentTypes(protocolComp->getMembers());
-
-    if (auto existential = dyn_cast<ExistentialType>(canType)) {
-      auto constraint = existential->getConstraintType();
-      return getDynamicCallableMethods(constraint, CS, locator);
-    }
-
-    // Otherwise, this must be a nominal type.
-    // Dynamic calling doesn't work for tuples, etc.
-    auto nominal = canType->getAnyNominal();
-    if (!nominal) return DynamicCallableMethods();
-
-    // If this type conforms to a protocol which has the attribute, then
-    // look up the methods.
-    for (auto p : nominal->getAllProtocols())
-      if (p->getAttrs().hasAttribute<DynamicCallableAttr>())
-        return lookupDynamicCallableMethods(type, CS, locator);
-
-    // Walk superclasses, if present.
-    llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
-    while (1) {
-      // If we found a circular parent class chain, reject this.
-      if (!visitedDecls.insert(nominal).second)
-        return DynamicCallableMethods();
-
-      // If this type has the attribute on it, then look up the methods.
-      if (nominal->getAttrs().hasAttribute<DynamicCallableAttr>())
-        return lookupDynamicCallableMethods(type, CS, locator);
-
-      // If this type is a class with a superclass, check superclasses.
-      if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
-        if (auto superClass = cd->getSuperclassDecl()) {
-          nominal = superClass;
-          continue;
-        }
-      }
-
-      return DynamicCallableMethods();
-    }
-  };
-
-  auto result = calculate();
-  // Cache the result if the type does not contain type variables.
-  if (!type->hasTypeVariable())
-    CS.DynamicCallableCache[canType] = result;
   return result;
 }
 

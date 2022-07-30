@@ -40,10 +40,6 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> RunCopyOfSubValueCheck(
-    "sil-move-only-checker-perform-copy-of-subvalue-check",
-    llvm::cl::init(true));
-
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
@@ -71,423 +67,6 @@ static StringRef getVariableNameForValue(MarkMustCheckInst *mmci) {
 }
 
 //===----------------------------------------------------------------------===//
-//                    Copy of Borrowed Projection Checker
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct LivenessInfo {
-  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-  PrunedLiveness liveness;
-  PrunedLivenessBoundary livenessBoundary;
-
-  LivenessInfo() : discoveredBlocks(), liveness(&discoveredBlocks) {}
-
-  void clear() {
-    discoveredBlocks.clear();
-    liveness.clear();
-    livenessBoundary.clear();
-  }
-
-  void computeBoundary() {
-    assert(!liveness.empty());
-    livenessBoundary.compute(liveness);
-  }
-
-  ArrayRef<SILInstruction *> getLastUsers() const {
-    return livenessBoundary.lastUsers;
-  }
-};
-
-/// Once we have finished checking that a base owned value is not consumed
-/// unnecessarily, we need to look at all instances where the owned value was
-/// borrowed and prove that it was never copied in its borrowed form because the
-/// borrowed value must be consumed.
-///
-/// As part of this optimization, we flatten the borrowed lifetime and eliminate
-/// any copies that are only consumed by a destroy_value. If we find that the
-/// flattened borrowed value needs a copy to extend the lifetime of the value,
-/// we treat the lifetime extending use as requiring a consuming use.
-struct CopyOfBorrowedProjectionChecker {
-  SmallVector<SILInstruction *, 4> foundConsumesOfBorrowedSubValues;
-  SmallVector<SILInstruction *, 4> foundCopiesOfBorrowedSubValues;
-  SmallVector<SILInstruction *, 4> foundDestroysOfBorrowedSubValues;
-  SmallVector<SILInstruction *, 4> foundRecursiveBorrows;
-  SmallVector<SILInstruction *, 4> foundRecursiveEndBorrow;
-  SmallVector<ForwardingOperand, 4> foundOwnedForwardingUses;
-  LivenessInfo livenessInfo;
-  LivenessInfo markedValueExtendedLiveRangeInfo;
-  DeadEndBlocks *deBlocks;
-
-  CopyOfBorrowedProjectionChecker(DeadEndBlocks *deBlocks)
-      : deBlocks(deBlocks) {}
-
-  /// Performs checking for \p markedValue. Returns true if we were able to
-  /// successfully check/optimize. Returns false if we failed and did not
-  /// perform any work. In such a case, we should bail early even though we did
-  /// not emit a diagnostic so we emit a "checker did not understand" diagnostic
-  /// later.
-  bool check(SILValue markedValue);
-
-  bool shouldEmitDiagnostic() const {
-    return !foundConsumesOfBorrowedSubValues.empty();
-  }
-
-  void clear() {
-    foundConsumesOfBorrowedSubValues.clear();
-    foundCopiesOfBorrowedSubValues.clear();
-    foundDestroysOfBorrowedSubValues.clear();
-    foundRecursiveBorrows.clear();
-    foundRecursiveEndBorrow.clear();
-    foundOwnedForwardingUses.clear();
-    livenessInfo.clear();
-    markedValueExtendedLiveRangeInfo.clear();
-  }
-};
-
-} // namespace
-
-/// Walking from defs -> uses, see if \p markedValue has any uses by a borrow
-/// introducing instruction looking through owned consuming instructions. \p
-/// foundBorrows contains the resulting borrows that we found. \p
-/// extendedLiveRangeLiveness is returned having been initialized with the live
-/// range of markedValue ignoring Owned Forwarding.
-static void
-gatherBorrowsToCheckOfMovedValue(SILValue markedValue,
-                                 SmallVectorImpl<SILValue> &foundBorrows,
-                                 PrunedLiveness &extendedLiveRangeLiveness) {
-  SmallVector<SILValue, 8> worklist;
-  worklist.push_back(markedValue);
-
-  extendedLiveRangeLiveness.clear();
-  extendedLiveRangeLiveness.initializeDefBlock(markedValue->getParentBlock());
-
-  while (!worklist.empty()) {
-    auto value = worklist.pop_back_val();
-
-    for (auto *use : value->getUses()) {
-      auto *user = use->getUser();
-      switch (use->getOperandOwnership()) {
-      case OperandOwnership::NonUse:
-        break;
-      case OperandOwnership::TrivialUse:
-        llvm_unreachable("this operand cannot handle ownership");
-      case OperandOwnership::ForwardingUnowned:
-      case OperandOwnership::PointerEscape:
-      case OperandOwnership::InstantaneousUse:
-      case OperandOwnership::UnownedInstantaneousUse:
-      case OperandOwnership::BitwiseEscape:
-        // We don't care about these. We are looking for borrows and
-        // forwarding consumes!
-        break;
-      case OperandOwnership::ForwardingConsume:
-        if (auto op = ForwardingOperand(use)) {
-          bool addedToWorklist = false;
-          op.visitForwardedValues([&](SILValue v) {
-            // If the forwarded value is non-trivial, we want to visit it.
-            //
-            // QUESTION: Should we make this use then a non-lifetime ending use
-            // just in case?
-            if (!v->getType().isTrivial(*user->getFunction())) {
-              addedToWorklist = true;
-              worklist.push_back(v);
-            }
-            return true;
-          });
-          // If we have a forwarded value to look through, we want its uses to
-          // provide liveness. If we did not find any such values, we want to
-          // still track this value as the end of our parent value's lifetime.
-          if (addedToWorklist)
-            break;
-        }
-
-        extendedLiveRangeLiveness.updateForUse(user,
-                                               true /*is lifetime ending*/);
-        break;
-      case OperandOwnership::DestroyingConsume:
-        // We do not care about destroying consume uses.
-        extendedLiveRangeLiveness.updateForUse(user,
-                                               true /*is lifetime ending*/);
-        break;
-      case OperandOwnership::Borrow: {
-        foundBorrows.push_back(cast<BeginBorrowInst>(user));
-        break;
-      }
-      case OperandOwnership::EndBorrow:
-      case OperandOwnership::ForwardingBorrow:
-      case OperandOwnership::InteriorPointer:
-      case OperandOwnership::Reborrow:
-        llvm_unreachable("Should never see these on owned values");
-      }
-    }
-  }
-}
-
-bool CopyOfBorrowedProjectionChecker::check(SILValue markedValue) {
-  auto *parentBlock = markedValue->getParentBlock();
-  if (!parentBlock)
-    return false;
-
-  auto &liveness = livenessInfo.liveness;
-  liveness.initializeDefBlock(parentBlock);
-
-  LLVM_DEBUG(llvm::dbgs() << "CopyOfBorrowedProjection. MovedValue: "
-                          << markedValue);
-
-  // Call this utility routine to gather up our worklist of borrows and also the
-  // liveness of the moved value looking through forwarding uses. We use this
-  // liveness info later to determine if we require a copy_value of a subobject
-  // b/c the subobject use is outside the lifetime of the of the marked object.
-  SmallVector<SILValue, 8> worklist;
-  gatherBorrowsToCheckOfMovedValue(markedValue, worklist,
-                                   markedValueExtendedLiveRangeInfo.liveness);
-
-  if (worklist.empty()) {
-    LLVM_DEBUG(llvm::dbgs() << "CopyOfBorrowedProjection. No borrows to check! "
-                               "No Diagnostic Needed!\n");
-    return true;
-  }
-
-  // Ok, we now have our guaranteed values. Looking through guaranteed
-  // forwarding uses, search for a copy_value. If we found one, then we add
-  // it to the consumingUsesNeedingCopy array and use the same processing
-  // below. Otherwise, if we do not find any, then we are truly safe and
-  // continue.
-  while (!worklist.empty()) {
-    SILValue value = worklist.pop_back_val();
-    LLVM_DEBUG(llvm::dbgs()
-               << "CopyOfBorrowedProjection. Visiting Value: " << value);
-
-    for (auto *use : value->getUses()) {
-      auto *user = use->getUser();
-      LLVM_DEBUG(llvm::dbgs()
-                 << "CopyOfBorrowedProjection.     User: " << *user);
-      LLVM_DEBUG(llvm::dbgs()
-                 << "CopyOfBorrowedProjection.     Operand Ownership: "
-                 << use->getOperandOwnership() << '\n');
-
-      switch (use->getOperandOwnership()) {
-      case OperandOwnership::NonUse:
-        break;
-      case OperandOwnership::TrivialUse:
-        llvm_unreachable("this operand cannot handle ownership");
-
-      // Conservatively treat a conversion to an unowned value as a pointer
-      // escape. Is it legal to canonicalize ForwardingUnowned?
-      case OperandOwnership::ForwardingUnowned:
-      case OperandOwnership::PointerEscape:
-        // Just add liveness.
-        liveness.updateForUse(user, /*lifetimeEnding*/ false);
-        break;
-      case OperandOwnership::InstantaneousUse:
-      case OperandOwnership::UnownedInstantaneousUse:
-      case OperandOwnership::BitwiseEscape:
-        // Add liveness to be careful around dead end blocks until in OSSA we no
-        // longer use those.
-        liveness.updateForUse(user, /*lifetimeEnding*/ false);
-
-        // Look through copy_value.
-        if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
-          foundCopiesOfBorrowedSubValues.push_back(cvi);
-          worklist.push_back(cvi);
-        }
-
-        break;
-      case OperandOwnership::ForwardingConsume: {
-        if (auto op = ForwardingOperand(use)) {
-          // If our user is not directly forwarding, we cannot convert its
-          // ownership to be guaranteed, so we treat it as a true consuming use.
-          if (!op.preservesOwnership()) {
-            foundConsumesOfBorrowedSubValues.push_back(user);
-            liveness.updateForUse(user, /*lifetimeEnding*/ true);
-            break;
-          }
-
-          // Otherwise, add liveness and recurse into results.
-          foundOwnedForwardingUses.push_back(op);
-          liveness.updateForUse(user, /*lifetimeEnding*/ false);
-          llvm::copy(user->getResults(), std::back_inserter(worklist));
-          break;
-        }
-
-        // If we do not have a forwarding operand, treat this like a consume.
-        liveness.updateForUse(user, /*lifetimeEnding*/ true);
-        foundConsumesOfBorrowedSubValues.push_back(user);
-        break;
-      }
-      case OperandOwnership::DestroyingConsume:
-        liveness.updateForUse(user, /*lifetimeEnding*/ true);
-
-        if (!isa<DestroyValueInst>(user)) {
-          foundConsumesOfBorrowedSubValues.push_back(user);
-          break;
-        }
-
-        foundDestroysOfBorrowedSubValues.push_back(user);
-        break;
-      case OperandOwnership::Borrow: {
-        auto *bbi = cast<BeginBorrowInst>(user);
-        // Only add borrows to liveness if the borrow isn't lexical. If it is
-        // a lexical borrow, we have created an entirely new source level
-        // binding that should be tracked separately.
-        //
-        // TODO: Is this still true with the changes?
-        if (!bbi->isLexical()) {
-          bool failed = !liveness.updateForBorrowingOperand(use);
-          // If we fail, we will just bail and not eliminate these copies.
-          // Once we have @moveOnly in the SIL type system, this will result
-          // in a diagnostic that says we were not able to eliminate a
-          // copy. But that is in a later pass.
-          if (failed)
-            return false;
-          foundRecursiveBorrows.push_back(bbi);
-          worklist.push_back(bbi);
-        }
-        break;
-      }
-      case OperandOwnership::ForwardingBorrow:
-        // A forwarding borrow is validated as part of its parent borrow. So
-        // just mark it as extending liveness and look through it.
-        liveness.updateForUse(user, /*lifetimeEnding*/ false);
-        assert(OwnershipForwardingMixin::isa(use->getUser()));
-
-        if (auto *termInst =
-                dyn_cast<OwnershipForwardingTermInst>(use->getUser())) {
-          for (auto argList : termInst->getSuccessorBlockArgumentLists()) {
-            worklist.push_back(argList[use->getOperandNumber()]);
-          }
-          break;
-        }
-
-        for (auto result : use->getUser()->getResults()) {
-          if (result.getOwnershipKind() == OwnershipKind::Guaranteed)
-            worklist.push_back(result);
-        }
-        break;
-      case OperandOwnership::InteriorPointer: {
-        // We do not care about interior pointer uses. Just propagate
-        // liveness. Should add all address uses as liveness uses.
-        liveness.updateForUse(user, /*lifetimeEnding*/ false);
-        auto ptrOp = InteriorPointerOperand(use);
-        assert(ptrOp);
-        SmallVector<Operand *, 8> foundUses;
-        ptrOp.findTransitiveUses(&foundUses);
-        for (auto *op : foundUses) {
-          liveness.updateForUse(op->getUser(), /*lfietimeEnding*/ false);
-        }
-        break;
-      }
-      case OperandOwnership::EndBorrow:
-        foundRecursiveEndBorrow.push_back(user);
-        liveness.updateForUse(user, /*lifetimeEnding*/ false);
-        break;
-      case OperandOwnership::Reborrow:
-        // Reborrows do not occur this early in the pipeline.
-        llvm_unreachable(
-            "Reborrows do not occur until we optimize later in the pipeline");
-      }
-    }
-  }
-
-  // Ok, we have finished processing out worklist. If we found any /real/
-  // consumes, we are going to error in the caller. So just bail now.
-  if (foundConsumesOfBorrowedSubValues.size()) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "Found consume of borrowed subvalues! Will Emit Diagnostic!\n");
-    return true;
-  }
-
-  // Otherwise, the only reason why we could need a copy_value is if the copy is
-  // needed to lifetime extend the sub-object outside of the lifetime of the
-  // parent value. We use the liveness information that we gathered above to do
-  // this. We gathered two forms of liveness info:
-  //
-  // 1. liveness: the complete liveness info looking through copies/borrows.
-  //
-  // 2. markedValueExtendedLiveRangeInfo.liveness: this is the owned liveness
-  //    information defined for the marked value looking through owned
-  //    forwarding instructions.
-  //
-  // We need to show that the 2nd is within the boundary of the first.
-  //
-  // First though if we do not have any liveness at all, then we did not have
-  // any uses at all. So we can just return success.
-  if (liveness.empty()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "No liveness requiring uses! No diagnostic needed!\n");
-    return true;
-  }
-
-  // If we did not have an extended live range liveness for our value then that
-  // means that we must be post-dominated by dead end blocks since otherwise we
-  // would be leaking. That is illegal in OSSA, so we know that we do not need
-  // any copy_value for lifetime extension since our value must be live until
-  // the end of the function.
-  if (markedValueExtendedLiveRangeInfo.liveness.empty()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "No marked value extended live range info liveness!");
-    return true;
-  }
-
-  // Then see if our underlying markedValue's consuming uses are all not within
-  // the boundary of the uses. If they are within the boundary, then we know
-  // that there is some copy_value that is requiring to lifetime extend due to a
-  // non-consuming use that is after the lifetime of the value has ended. We
-  // need to emit a diagnostic on this. For now, lets just emit it as a
-  // consuming use.
-  //
-  // TODO: Emit a better diagnostic here that talks about the need for lifetime
-  // extension.
-  SWIFT_DEFER { livenessInfo.livenessBoundary.clear(); };
-  livenessInfo.computeBoundary();
-  markedValueExtendedLiveRangeInfo.computeBoundary();
-
-  LLVM_DEBUG(llvm::dbgs()
-             << "Checking if copy_value needed for lifetime extension!\n");
-
-  for (auto *user : markedValueExtendedLiveRangeInfo.getLastUsers()) {
-    if (!liveness.isWithinBoundary(user))
-      continue;
-
-    // Ok, we have some use that requires lifetime extension. It is going to be
-    // one of the boundary uses of our liveness query. In order to figure out
-    // which one it actually is, we see which is reachable from this use. In
-    // such a case, we are going to emit a diagnostic so we can use a bit more
-    // compile time since we are going to stop optimizing after codegening.
-    //
-    // TODO: Actually implement this... for now we just error on all boundary
-    // uses.
-    llvm::copy(livenessInfo.getLastUsers(),
-               std::back_inserter(foundConsumesOfBorrowedSubValues));
-  }
-
-  // If we are going to emit a diagnostic on a liveness boundary based
-  // copy_value, bail early.
-  if (foundConsumesOfBorrowedSubValues.size()) {
-    LLVM_DEBUG(llvm::dbgs() << "Found copy_value needed for lifetime "
-                               "extension! Emitting Diagnostic!\n");
-#ifndef NDEBUG
-    for (auto *user : livenessInfo.getLastUsers()) {
-      LLVM_DEBUG(llvm::dbgs() << "User: " << *user);
-    }
-#endif
-    return true;
-  }
-
-  // Otherwise, we have success. There aren't any consumes of the underlying
-  // value and all copy_value are balanced by destroy_values (modulo forwarding
-  // uses) or we would have emitted a diagnostic.
-  //
-  // TODO: We should be able to eliminate all copy/destroys that we found above
-  // since we proved that all uses are within the lifetime of the base owned
-  // value. But this at least gets the correct diagnostic in place for
-  // prototyping purposes.
-  LLVM_DEBUG(llvm::dbgs() << "No copy needed! No Diagnostic needed\n");
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
 //                                 Main Pass
 //===----------------------------------------------------------------------===//
 
@@ -500,19 +79,14 @@ struct MoveOnlyChecker {
   SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
 
   /// A per mark must check, vector of uses that copy propagation says need a
-  /// copy.
+  /// copy and thus are not final consuming uses.
   SmallVector<Operand *, 32> consumingUsesNeedingCopy;
 
-  /// A per mark must check, vector of uses that copy propagation says do not
-  /// need a copy. This could include lifetime extension.
-  ///
-  /// TODO: Rename this.
-  SmallVector<Operand *, 32> consumingUsesNotNeedingCopy;
+  /// A per mark must check, vector of consuming uses that copy propagation says
+  /// are actual last uses.
+  SmallVector<Operand *, 32> finalConsumingUses;
 
-  CopyOfBorrowedProjectionChecker copyOfBorrowedProjectionChecker;
-
-  MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks)
-      : fn(fn), copyOfBorrowedProjectionChecker(deBlocks) {}
+  MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
 
   /// Search through the current function for candidate mark_must_check
   /// [noimplicitcopy]. If we find one that does not fit a pattern that we
@@ -543,7 +117,7 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       if (!mmci || !mmci->hasMoveCheckerKind())
         continue;
 
-      // Handle guaranteed/owned move only typed arguments.
+      // Handle guaranteed/owned move arguments and values.
       //
       // We are pattern matching against these patterns:
       //
@@ -551,8 +125,18 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       //   %1 = copy_value %0
       //   %2 = mark_must_check [no_copy] %1
       // bb0(%0 : @owned $T):
-      //   %1 = copy_value %0
-      //   %2 = mark_must_check [no_copy] %1
+      //   %1 = mark_must_check [no_copy] %2
+      //
+      // This is forming a let or an argument.
+      // bb0:
+      //   %1 = move_value [lexical] %0
+      //   %2 = mark_must_check [no_implicit_copy] %1
+      //
+      // This occurs when SILGen materializes a temporary move only value?
+      // bb0:
+      //   %1 = begin_borrow [lexical] %0
+      //   %2 = copy_value %1
+      //   %3 = mark_must_check [no_copy] %2
       if (mmci->getOperand()->getType().isMoveOnly() &&
           !mmci->getOperand()->getType().isMoveOnlyWrapped()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mmci->getOperand())) {
@@ -562,16 +146,20 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
               continue;
             }
           }
+
+          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+            if (bbi->isLexical()) {
+              moveIntroducersToProcess.insert(mmci);
+              continue;
+            }
+          }
         }
 
+        // Any time we have a lexical move_value, we can process it.
         if (auto *mvi = dyn_cast<MoveValueInst>(mmci->getOperand())) {
           if (mvi->isLexical()) {
-            if (auto *arg = dyn_cast<SILFunctionArgument>(mvi->getOperand())) {
-              if (arg->getOwnershipKind() == OwnershipKind::Owned) {
-                moveIntroducersToProcess.insert(mmci);
-                continue;
-              }
-            }
+            moveIntroducersToProcess.insert(mmci);
+            continue;
           }
         }
 
@@ -673,6 +261,8 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       //  %2 = copy_value %1
       //  %3 = copyable_to_moveonlywrapper [owned] %2
       //  %4 = mark_must_check [no_implicit_copy]
+      //
+      // Or for a move only type, we look for a move_value [lexical].
       if (auto *mvi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
               mmci->getOperand())) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
@@ -754,8 +344,8 @@ void MoveOnlyChecker::emitDiagnostic(MarkMustCheckInst *markedValue,
              diag::sil_moveonlychecker_consuming_use_here);
   }
 
-  while (consumingUsesNotNeedingCopy.size()) {
-    auto *consumingUse = consumingUsesNotNeedingCopy.pop_back_val();
+  while (finalConsumingUses.size()) {
+    auto *consumingUse = finalConsumingUses.pop_back_val();
 
     // See if the consuming use is an owned moveonly_to_copyable whose only
     // user is a return. In that case, use the return loc instead. We do this
@@ -768,16 +358,6 @@ void MoveOnlyChecker::emitDiagnostic(MarkMustCheckInst *markedValue,
         loc = ri->getLoc();
       }
     }
-
-    diagnose(astContext, loc.getSourceLoc(),
-             diag::sil_moveonlychecker_consuming_use_here);
-  }
-
-  auto &foundConsumesOfBorrowedSubValues =
-      copyOfBorrowedProjectionChecker.foundConsumesOfBorrowedSubValues;
-  while (foundConsumesOfBorrowedSubValues.size()) {
-    auto *user = foundConsumesOfBorrowedSubValues.pop_back_val();
-    auto loc = user->getLoc();
 
     diagnose(astContext, loc.getSourceLoc(),
              diag::sil_moveonlychecker_consuming_use_here);
@@ -812,7 +392,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     consumingUsesNeedingCopy.push_back(use);
   };
   auto foundConsumingUseNotNeedingCopy = [&](Operand *use) {
-    consumingUsesNotNeedingCopy.push_back(use);
+    finalConsumingUses.push_back(use);
   };
 
   CanonicalizeOSSALifetime canonicalizer(
@@ -825,8 +405,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   while (!moveIntroducers.empty()) {
     SWIFT_DEFER {
       consumingUsesNeedingCopy.clear();
-      consumingUsesNotNeedingCopy.clear();
-      copyOfBorrowedProjectionChecker.clear();
+      finalConsumingUses.clear();
     };
 
     MarkMustCheckInst *markedValue = moveIntroducers.front();
@@ -839,8 +418,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     // If we are asked to perform guaranteed checking, emit an error if we have
     // /any/ consuming uses.
     if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
-      if (!consumingUsesNeedingCopy.empty() ||
-          !consumingUsesNotNeedingCopy.empty()) {
+      if (!consumingUsesNeedingCopy.empty() || !finalConsumingUses.empty()) {
         emitDiagnostic(markedValue, true /*original value guaranteed*/);
         valuesWithDiagnostics.insert(markedValue);
       }
@@ -848,22 +426,11 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     }
 
     if (consumingUsesNeedingCopy.empty()) {
-      // If we don't see any situations where we need a direct copy, check if we
-      // have any copy_value from any user of ours that is a borrow
-      // introducer. In such a case, a copy is needed but the user needs to use
-      // _copy to explicit copy the value since they are extracting out a
-      // subvalue.
-      if (RunCopyOfSubValueCheck &&
-          (!copyOfBorrowedProjectionChecker.check(markedValue) ||
-           !copyOfBorrowedProjectionChecker.shouldEmitDiagnostic())) {
-        // If we failed to understand how to perform the check or did not find
-        // any targets... continue. In the former case we want to fail with a
-        // checker did not understand diagnostic later and in the former, we
-        // succeeded.
-        continue;
-      }
-
-      // Otherwise, emit our diagnostic below.
+      // If we failed to understand how to perform the check or did not find
+      // any targets... continue. In the former case we want to fail with a
+      // checker did not understand diagnostic later and in the former, we
+      // succeeded.
+      continue;
     }
 
     emitDiagnostic(markedValue, false /*original value guaranteed*/);

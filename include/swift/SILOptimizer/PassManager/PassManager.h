@@ -20,6 +20,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <vector>
 
@@ -202,6 +203,8 @@ class SILPassManager {
   /// bare pointer to ensure that we can deregister the notification after this
   /// pass manager is destroyed.
   DeserializationNotificationHandler *deserializationNotificationHandler;
+
+  std::chrono::nanoseconds totalPassRuntime = std::chrono::nanoseconds(0);
 
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def. This is private as it should only be used by

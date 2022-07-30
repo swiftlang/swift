@@ -165,7 +165,7 @@ private:
            "The number of pullback struct fields must equal the number of "
            "pullback struct element values");
     for (auto pair : llvm::zip(pbStructDecl->getStoredProperties(), values)) {
-      assert(std::get<1>(pair).getOwnershipKind() !=
+      assert(std::get<1>(pair)->getOwnershipKind() !=
                  OwnershipKind::Guaranteed &&
              "Pullback struct elements must be @owned");
       auto insertion =

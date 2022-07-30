@@ -918,10 +918,15 @@ public:
             getAnyNominal());
   }
 
+  /// Checks whether this type may potentially be callable. This returns true
+  /// for function types, metatypes, nominal types that support being called,
+  /// and types that have not been inferred yet.
+  bool mayBeCallable(DeclContext *dc);
+
   /// Checks whether this is a type that supports being called through the
   /// implementation of a \c callAsFunction method. Note that this does not
   /// check access control.
-  bool isCallableNominalType(DeclContext *dc);
+  bool isCallAsFunctionType(DeclContext *dc);
 
   /// Return true if the specified type or a super-class/super-protocol has the
   /// @dynamicMemberLookup attribute on it.

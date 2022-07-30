@@ -8,3 +8,22 @@ public func incrementByThree(_ x: Int) -> Int {
 public func incrementByThreeWithCall(_ x: Int) -> Int {
   return incrementByOneNoCMO(x) + 2
 }
+
+public func submoduleKlassMember() -> Int {
+  let k = SubmoduleKlass()
+  return k.i
+}
+
+public final class ModuleKlass {
+  public var i: Int
+
+  public init() {
+    i = 27
+  }
+}
+
+public func moduleKlassMember() -> Int {
+  let k = ModuleKlass()
+  return k.i
+}
+

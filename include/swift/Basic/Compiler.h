@@ -180,7 +180,9 @@
 
 // Tells Swift's ClangImporter to import a C++ type as a foreign reference type.
 #if __has_attribute(swift_attr)
-#define SWIFT_IMPORT_REFERENCE __attribute__((swift_attr("import_reference")))
+#define SWIFT_IMPORT_REFERENCE __attribute__((swift_attr("import_reference"))) \
+  __attribute__((swift_attr("retain:immortal")))                               \
+  __attribute__((swift_attr("release:immortal")))
 #else
 #define SWIFT_IMPORT_REFERENCE
 #endif

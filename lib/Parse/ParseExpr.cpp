@@ -413,6 +413,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       diagnose(Tok.getLoc(), diag::expected_await_not_async)
         .fixItReplace(Tok.getLoc(), "await");
     }
+    Tok.setKind(tok::contextual_keyword);
     SourceLoc awaitLoc = consumeToken();
     ParserResult<Expr> sub =
       parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);

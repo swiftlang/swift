@@ -41,3 +41,14 @@
 // CHECK:   var m: M
 // CHECK:   var m2: M
 // CHECK: }
+
+// CHECK: struct G {
+// CHECK:   init()
+// CHECK:   init(cc: G.__Unnamed_class_cc)
+// CHECK:   struct __Unnamed_class_cc {
+// CHECK:     init()
+// CHECK:     init(m: M)
+// CHECK:     var m: M
+// CHECK:   }
+// CHECK:   var cc: G.__Unnamed_class_cc
+// CHECK: }

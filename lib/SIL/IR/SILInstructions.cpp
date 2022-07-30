@@ -686,7 +686,7 @@ SILType DifferentiableFunctionInst::getDifferentiableFunctionType(
 ValueOwnershipKind DifferentiableFunctionInst::getMergedOwnershipKind(
     SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions) {
   if (DerivativeFunctions.empty())
-    return OriginalFunction.getOwnershipKind();
+    return OriginalFunction->getOwnershipKind();
   return mergeSILValueOwnership(
       {OriginalFunction, DerivativeFunctions[0], DerivativeFunctions[1]});
 }
@@ -2740,7 +2740,7 @@ static void computeAggregateFirstLevelSubtypeInfo(
   Projection::getFirstLevelProjections(OpType, M, F.getTypeExpansionContext(),
                                        Projections);
 
-  auto OpOwnershipKind = Operand.getOwnershipKind();
+  auto OpOwnershipKind = Operand->getOwnershipKind();
   for (auto &P : Projections) {
     SILType ProjType = P.getType(OpType, M, F.getTypeExpansionContext());
     Types.emplace_back(ProjType);

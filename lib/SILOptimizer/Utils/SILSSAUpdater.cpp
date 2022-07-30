@@ -60,7 +60,7 @@ bool SILSSAUpdater::hasValueForBlock(SILBasicBlock *block) const {
 /// Indicate that a rewritten value is available in the specified block with the
 /// specified value.
 void SILSSAUpdater::addAvailableValue(SILBasicBlock *block, SILValue value) {
-  assert(value.getOwnershipKind().isCompatibleWith(ownershipKind));
+  assert(value->getOwnershipKind().isCompatibleWith(ownershipKind));
   (*blockToAvailableValueMap)[block] = value;
 }
 

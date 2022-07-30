@@ -169,10 +169,6 @@ SWIFT_REQUEST(TypeChecker, HasCircularInheritedProtocolsRequest,
               bool(ProtocolDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasCircularRawValueRequest,
               bool(EnumDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, HasDynamicMemberLookupAttributeRequest,
-              bool(CanType), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
-              bool(CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
               bool(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ModuleLibraryLevelRequest,
@@ -201,8 +197,6 @@ SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsCallableNominalTypeRequest,
-              bool(CanType, DeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,

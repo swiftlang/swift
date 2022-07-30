@@ -1129,11 +1129,13 @@ namespace {
       for (auto redecl : decl->redecls())
         Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
-      // Because a namespaces's decl context is the bridging header, make sure
-      // we add them to the bridging header lookup table.
-      addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
-                            const_cast<clang::NamespaceDecl *>(decl),
-                            Impl.getNameImporter());
+      for (auto redecl : decl->redecls()) {
+        // Because a namespaces's decl context is the bridging header, make sure
+        // we add them to the bridging header lookup table.
+        addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
+                              const_cast<clang::NamespaceDecl *>(redecl),
+                              Impl.getNameImporter());
+      }
 
       return enumDecl;
     }
@@ -2427,6 +2429,93 @@ namespace {
       return result;
     }
 
+    void validateForeignReferenceType(const clang::CXXRecordDecl *decl,
+                                      ClassDecl *classDecl) {
+      auto isValidOperation = [&](ValueDecl *operation) -> bool {
+        auto operationFn = dyn_cast<FuncDecl>(operation);
+        if (!operationFn)
+          return false;
+
+        if (!operationFn->getResultInterfaceType()->isVoid())
+          return false;
+
+        if (operationFn->getParameters()->size() != 1)
+          return false;
+
+        if (operationFn->getParameters()->get(0)->getInterfaceType()->isEqual(
+                classDecl->getInterfaceType()))
+          return false;
+
+        return true;
+      };
+
+      auto retainOperation = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CustomRefCountingOperation(
+              {classDecl, CustomRefCountingOperationKind::retain}),
+          {});
+      if (retainOperation.kind ==
+          CustomRefCountingOperationResult::noAttribute) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::reference_type_must_have_retain_attr,
+                      decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::notFound) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_retain,
+                      retainOperation.name, decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::tooManyFound) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::too_many_reference_type_retain_operations,
+                      retainOperation.name, decl->getNameAsString());
+      } else if (retainOperation.kind ==
+                 CustomRefCountingOperationResult::foundOperation) {
+        if (!isValidOperation(retainOperation.operation)) {
+          HeaderLoc loc(decl->getLocation());
+          Impl.diagnose(loc, diag::foreign_reference_types_invalid_retain,
+                        retainOperation.name, decl->getNameAsString());
+        }
+      } else {
+        // Nothing to do.
+        assert(retainOperation.kind ==
+               CustomRefCountingOperationResult::immortal);
+      }
+
+      auto releaseOperation = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CustomRefCountingOperation(
+              {classDecl, CustomRefCountingOperationKind::release}),
+          {});
+      if (releaseOperation.kind ==
+          CustomRefCountingOperationResult::noAttribute) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::reference_type_must_have_release_attr,
+                      decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::notFound) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_release,
+                      releaseOperation.name, decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::tooManyFound) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::too_many_reference_type_release_operations,
+                      releaseOperation.name, decl->getNameAsString());
+      } else if (releaseOperation.kind ==
+                 CustomRefCountingOperationResult::foundOperation) {
+        if (!isValidOperation(releaseOperation.operation)) {
+          HeaderLoc loc(decl->getLocation());
+          Impl.diagnose(loc, diag::foreign_reference_types_invalid_release,
+                        releaseOperation.name, decl->getNameAsString());
+        }
+      } else {
+        // Nothing to do.
+        assert(releaseOperation.kind ==
+               CustomRefCountingOperationResult::immortal);
+      }
+    }
+
     Decl *VisitCXXRecordDecl(const clang::CXXRecordDecl *decl) {
       // This can be called from lldb without C++ interop being enabled: There
       // may be C++ declarations in imported modules, but the interface for
@@ -2509,6 +2598,9 @@ namespace {
 
       auto result = VisitRecordDecl(decl);
 
+      if (auto classDecl = dyn_cast_or_null<ClassDecl>(result))
+        validateForeignReferenceType(decl, classDecl);
+
       // If this module is declared as a C++ module, try to synthesize
       // conformances to Swift protocols from the Cxx module.
       auto clangModule = decl->getOwningModule();
@@ -2555,11 +2647,20 @@ namespace {
         return nullptr;
       }
 
-      // `Sema::isCompleteType` will try to instantiate the class template as a
-      // side-effect and we rely on this here. `decl->getDefinition()` can
-      // return nullptr before the call to sema and return its definition
-      // afterwards.
-      if (!Impl.getClangSema().isCompleteType(
+      // `decl->getDefinition()` can return nullptr before the call to sema and
+      // return its definition afterwards.
+      clang::Sema &clangSema = Impl.getClangSema();
+      if (!decl->getDefinition()) {
+        bool notInstantiated = clangSema.InstantiateClassTemplateSpecialization(
+            decl->getLocation(),
+            const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
+            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+            /*Complain*/ false);
+        // If the template can't be instantiated, bail.
+        if (notInstantiated)
+          return nullptr;
+      }
+      if (!clangSema.isCompleteType(
               decl->getLocation(),
               Impl.getClangASTContext().getRecordType(decl))) {
         // If we got nullptr definition now it means the type is not complete.
@@ -2583,8 +2684,8 @@ namespace {
       for (auto member : decl->decls()) {
         if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
           if (varDecl->getTemplateInstantiationPattern())
-            Impl.getClangSema()
-              .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
+            clangSema.InstantiateVariableDefinition(varDecl->getLocation(),
+                                                    varDecl);
         }
       }
 
@@ -8103,9 +8204,13 @@ ClangImporter::Implementation::importDeclForDeclContext(
   if (!contextDeclsWarnedAbout.insert(contextDecl).second)
     return nullptr;
 
-  auto getDeclName = [](const clang::Decl *D) -> StringRef {
-    if (auto ND = dyn_cast<clang::NamedDecl>(D))
-      return ND->getName();
+  auto getDeclName = [](const clang::Decl *D) -> std::string {
+    if (auto ND = dyn_cast<clang::NamedDecl>(D)) {
+      std::string name;
+      llvm::raw_string_ostream os(name);
+      ND->printName(os);
+      return name;
+    }
     return "<anonymous>";
   };
 
