@@ -512,3 +512,30 @@ func rdar85166519() {
 
 // https://github.com/apple/swift/issues/58539
 if let x = nil {} // expected-error{{'nil' requires a contextual type}}
+
+// https://github.com/apple/swift/issues/56699
+let singleOptionalClosure: (() -> Void)? = nil
+let doubleOptionalClosure: (() -> Void)?? = nil
+singleOptionalClosure()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this closure}} {{22-22=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this closure}} {{22-22=??}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure?()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this closure}} {{23-23=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure!()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this closure}} {{23-23=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
