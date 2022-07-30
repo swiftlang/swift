@@ -1552,6 +1552,32 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   emitDiagnosticAt(unwrappedExpr->getLoc(), diag::optional_not_unwrapped,
                    baseType, unwrappedType);
 
+  // If this is a closure, suggest using optional chaining to
+  // call it.
+  if (unwrappedType->lookThroughAllOptionalTypes()->is<FunctionType>()) {
+    DeclRefExpr *declRefExpr = nullptr;
+    auto tryCastToDeclRef = [](Expr *expr) -> DeclRefExpr * {
+      if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
+        return dre;
+      }
+      return nullptr;
+    };
+    if (auto drf = dyn_cast<DeclRefExpr>(unwrappedExpr)) {
+      declRefExpr = drf;
+    } else if (auto fve = dyn_cast<ForceValueExpr>(unwrappedExpr)) {
+      declRefExpr = tryCastToDeclRef(fve->getSubExpr());
+    } else if (auto boe = dyn_cast<BindOptionalExpr>(unwrappedExpr)) {
+      declRefExpr = tryCastToDeclRef(boe->getSubExpr());
+    }
+    if (declRefExpr) {
+      auto depth = baseType->getOptionalityDepth();
+      auto diag = emitDiagnosticAt(unwrappedExpr->getLoc(),
+                                   diag::perform_optional_chain_on_closure);
+      auto fixItString = std::string(depth, '?');
+      diag.fixItInsertAfter(unwrappedExpr->getEndLoc(), fixItString);
+    }
+  }
+
   // If the expression we're unwrapping is the only reference to a
   // local variable whose type isn't explicit in the source, then
   // offer unwrapping fixits on the initializer as well.
