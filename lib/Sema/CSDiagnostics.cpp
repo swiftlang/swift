@@ -1555,21 +1555,15 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   // If this is a closure, suggest using optional chaining to
   // call it.
   if (unwrappedType->lookThroughAllOptionalTypes()->is<FunctionType>()) {
-    DeclRefExpr *declRefExpr = nullptr;
-    auto tryCastToDeclRef = [](Expr *expr) -> DeclRefExpr * {
-      if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-        return dre;
-      }
-      return nullptr;
-    };
-    if (auto drf = dyn_cast<DeclRefExpr>(unwrappedExpr)) {
-      declRefExpr = drf;
+    bool isDeclRefExpr = false;
+    if (isa<DeclRefExpr>(unwrappedExpr)) {
+      isDeclRefExpr = true;
     } else if (auto fve = dyn_cast<ForceValueExpr>(unwrappedExpr)) {
-      declRefExpr = tryCastToDeclRef(fve->getSubExpr());
+      isDeclRefExpr = isa<DeclRefExpr>(fve->getSubExpr());
     } else if (auto boe = dyn_cast<BindOptionalExpr>(unwrappedExpr)) {
-      declRefExpr = tryCastToDeclRef(boe->getSubExpr());
+      isDeclRefExpr = isa<DeclRefExpr>(boe->getSubExpr());
     }
-    if (declRefExpr) {
+    if (isDeclRefExpr) {
       auto depth = baseType->getOptionalityDepth();
       auto diag = emitDiagnosticAt(unwrappedExpr->getLoc(),
                                    diag::perform_optional_chain_on_closure);
