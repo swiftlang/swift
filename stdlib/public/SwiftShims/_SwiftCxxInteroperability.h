@@ -50,6 +50,20 @@ inline void opaqueFree(void *_Nonnull p) noexcept {
 }
 
 } // namespace _impl
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++17-extensions"
+
+/// True if the given type is a Swift type that can be used in a generic context
+/// in Swift.
+template <class T>
+static inline const constexpr bool isUsableInGenericContext = false;
+
+#pragma clang diagnostic pop
+
+/// Returns the type metadat for the given Swift type T.
+template <class T> inline void *_Nonnull getTypeMetadata();
+
 } // namespace swift
 #endif
 
