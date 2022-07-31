@@ -101,7 +101,8 @@ public:
         moduleContext(moduleContext), typeUseKind(typeUseKind) {}
 
   void printInoutTypeModifier() {
-    os << (languageMode == swift::OutputLanguageMode::Cxx ? " &" : " *");
+    os << (languageMode == swift::OutputLanguageMode::Cxx ? " &"
+                                                          : " * _Nonnull");
   }
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
