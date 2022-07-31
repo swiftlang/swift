@@ -21,6 +21,12 @@ using namespace swift;
 using namespace swift::Lowering;
 
 void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
+  // If the conformance is invalid, crash deterministically even in noassert
+  // builds.
+  if (conformanceRef.isInvalid()) {
+    llvm::report_fatal_error("Invalid conformance in type-checked AST");
+  }
+
   // We don't need to emit dependent conformances.
   if (conformanceRef.isAbstract())
     return;
