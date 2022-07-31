@@ -6121,3 +6121,48 @@ void swift::simple_display(llvm::raw_ostream &out,
 SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
   return SourceLoc();
 }
+
+CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
+    Evaluator &evaluator, CustomRefCountingOperationDescriptor desc) const {
+  auto swiftDecl = desc.decl;
+  auto operation = desc.kind;
+  auto &ctx = swiftDecl->getASTContext();
+
+  std::string operationStr = operation == CustomRefCountingOperationKind::retain
+                                 ? "retain:"
+                                 : "release:";
+
+  auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
+  if (!decl->hasAttrs())
+    return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
+
+  auto retainFnAttr =
+      llvm::find_if(decl->getAttrs(), [&operationStr](auto *attr) {
+        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+          return swiftAttr->getAttribute().startswith(operationStr);
+        return false;
+      });
+  if (retainFnAttr == decl->getAttrs().end()) {
+    return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
+  }
+
+  auto name = cast<clang::SwiftAttrAttr>(*retainFnAttr)
+                  ->getAttribute()
+                  .drop_front(StringRef(operationStr).size())
+                  .str();
+
+  if (name == "immortal")
+    return {CustomRefCountingOperationResult::immortal, nullptr, name};
+
+  llvm::SmallVector<ValueDecl *, 1> results;
+  ctx.lookupInModule(swiftDecl->getParentModule(), name, results);
+
+  if (results.size() == 1)
+    return {CustomRefCountingOperationResult::foundOperation, results.front(),
+            name};
+
+  if (results.empty())
+    return {CustomRefCountingOperationResult::notFound, nullptr, name};
+
+  return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
+}

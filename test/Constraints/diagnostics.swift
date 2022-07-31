@@ -1303,9 +1303,14 @@ func f11(_ n: Int) {}
 func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
 f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
 
-let f12: (Int) -> Void = { _ in } // expected-note {{candidate '(Int) -> Void' requires 1 argument, but 2 were provided}}
-func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' : 'P2')}}
-f12(3, f4)// expected-error {{no exact matches in call to global function 'f12'}}
+let f12: (Int) -> Void = { _ in }
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{where 'T' = 'Int'}}
+f12(3, f4)// expected-error {{global function 'f12' requires that 'Int' conform to 'P2'}}
+
+// SR-15293: Bad diagnostic for var + func overload with mismatched call
+func f13(x: Int, y: Int) {}
+var f13: Any = 0
+f13(0, x: 0) // expected-error {{incorrect argument labels in call (have '_:x:', expected 'x:y:')}}
 
 // SR-12242
 struct SR_12242_R<Value> {}

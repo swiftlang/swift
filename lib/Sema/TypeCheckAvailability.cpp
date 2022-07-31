@@ -180,7 +180,8 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
 static void computeExportContextBits(ASTContext &Ctx, Decl *D,
                                      bool *spi, bool *implicit, bool *deprecated,
                                      Optional<PlatformKind> *unavailablePlatformKind) {
-  if (D->isSPI())
+  if (D->isSPI() ||
+      D->isAvailableAsSPI())
     *spi = true;
 
   // Defer bodies are desugared to an implicit closure expression. We need to

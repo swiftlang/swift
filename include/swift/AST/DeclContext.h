@@ -459,6 +459,15 @@ public:
         const_cast<DeclContext *>(this)->getInnermostDeclarationDeclContext();
   }
 
+  /// Returns the topmost context that is a declaration, excluding ModuleDecl.
+  ///
+  /// This may return itself.
+  LLVM_READONLY
+  Decl *getTopmostDeclarationDeclContext();
+  const Decl *getTopmostDeclarationDeclContext() const {
+    return const_cast<DeclContext *>(this)->getTopmostDeclarationDeclContext();
+  }
+
   /// Returns the innermost context that is an AbstractFunctionDecl whose
   /// body has been skipped.
   LLVM_READONLY

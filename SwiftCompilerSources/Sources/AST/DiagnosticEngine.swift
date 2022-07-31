@@ -21,7 +21,7 @@ public protocol DiagnosticArgument {
 }
 extension String: DiagnosticArgument {
   public func _withBridgedDiagnosticArgument(_ fn: (swift.DiagnosticArgument) -> Void) {
-    withBridgedStringRef { fn(swift.DiagnosticArgument(llvm.StringRef($0))) }
+    _withStringRef { fn(swift.DiagnosticArgument($0)) }
   }
 }
 extension Int: DiagnosticArgument {
@@ -42,10 +42,10 @@ public struct DiagnosticFixIt {
   }
 
   func withBridgedDiagnosticFixIt(_ fn: (swift.DiagnosticInfo.FixIt) -> Void) {
-    text.withBridgedStringRef { bridgedTextRef in
+    text._withStringRef { bridgedTextRef in
       let bridgedDiagnosticFixIt = swift.DiagnosticInfo.FixIt(
         swift.CharSourceRange(start.bridged, UInt32(byteLength)),
-        llvm.StringRef(bridgedTextRef),
+        bridgedTextRef,
         llvm.ArrayRef<swift.DiagnosticArgument>())
       fn(bridgedDiagnosticFixIt)
     }

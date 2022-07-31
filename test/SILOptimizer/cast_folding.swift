@@ -741,7 +741,8 @@ public class DD : PP {
 // contains a trap followed by unreachable
 // and no code afterwards.
 // CHECK-LABEL: sil {{.*}}@$s12cast_folding7getAsDDyAA0E0CAA2CCCF
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 public func getAsDD(_ c: CC) -> DD {
@@ -752,7 +753,8 @@ public func getAsDD(_ c: CC) -> DD {
 // contains a trap followed by unreachable
 // and no code afterwards.
 // CHECK-LABEL: sil {{.*}}@$s12cast_folding7callFooySiAA2CCCF
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 public func callFoo(_ c: CC) -> Int {
@@ -768,7 +770,8 @@ func callFooGeneric<T : PP>(_ c: T) -> Int {
 // Check that the inlined version of callFooGeneric contains only a trap
 // followed by unreachable and no code afterwards
 // CHECK-LABEL: sil [noinline] {{.*}}@$s12cast_folding16callForGenericCCyyAA0F0CF
-// CHECK: builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 @inline(never)

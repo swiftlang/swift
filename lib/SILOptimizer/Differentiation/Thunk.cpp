@@ -296,7 +296,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   // Guaranteed values need an `end_borrow`.
   // Owned values need to be destroyed.
   for (auto arg : valuesToCleanup) {
-    switch (arg.getOwnershipKind()) {
+    switch (arg->getOwnershipKind()) {
     case OwnershipKind::Any:
       llvm_unreachable("value with any ownership kind?!");
     case OwnershipKind::Guaranteed:

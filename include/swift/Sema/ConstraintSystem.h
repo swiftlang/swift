@@ -1489,6 +1489,15 @@ public:
   /// types where possible.
   Type resolveInterfaceType(Type type) const;
 
+  Type getContextualType(ASTNode anchor) const {
+    for (const auto &entry : contextualTypes) {
+      if (entry.first == anchor) {
+        return simplifyType(entry.second.getType());
+      }
+    }
+    return Type();
+  }
+
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
   /// application of the argument to its parameter. If the locator is not
@@ -1715,6 +1724,13 @@ struct DynamicCallableMethods {
 
   void addKeywordArgumentsMethod(FuncDecl *method) {
     keywordArgumentsMethods.insert(method);
+  }
+
+  void addMethods(const DynamicCallableMethods &other) {
+    argumentsMethods.insert(other.argumentsMethods.begin(),
+                            other.argumentsMethods.end());
+    keywordArgumentsMethods.insert(other.keywordArgumentsMethods.begin(),
+                                   other.keywordArgumentsMethods.end());
   }
 
   /// Returns true if type defines either of the @dynamicCallable
@@ -2827,7 +2843,8 @@ public:
 
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
-  llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
+  llvm::DenseMap<NominalTypeDecl *, DynamicCallableMethods>
+      DynamicCallableCache;
 
   /// A cache of implicitly generated dot-member expressions used as roots
   /// for some `.callAsFunction` calls. The key here is "base" locator for
@@ -5096,7 +5113,8 @@ public:
   ///
   /// An expression needs type erasure if:
   ///  1. The expression is a return value.
-  ///  2. The enclosing function is dynamic or a dynamic replacement.
+  ///  2. The enclosing function is dynamic, a dynamic replacement, or
+  ///     `-enable-experimental-opaque-type-erasure` is used.
   ///  3. The enclosing function returns an opaque type.
   ///  4. The opaque type conforms to (exactly) one protocol, and the protocol
   ///     has a declared type eraser.

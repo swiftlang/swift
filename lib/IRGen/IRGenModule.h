@@ -93,6 +93,7 @@ namespace swift {
   class BraceStmt;
   class CanType;
   class GeneratedModule;
+  struct GenericRequirement;
   class LinkLibrary;
   class SILFunction;
   class IRGenOptions;
@@ -152,7 +153,6 @@ namespace irgen {
   class Signature;
   class StructMetadataLayout;
   struct SymbolicMangling;
-  struct GenericRequirement;
   class TypeConverter;
   class TypeInfo;
   enum class TypeMetadataAddress;
@@ -837,6 +837,7 @@ public:
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
     case ReferenceCounting::None:
+    case ReferenceCounting::Custom:
       return true;
 
     case ReferenceCounting::Bridge:

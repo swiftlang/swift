@@ -695,7 +695,7 @@ void OpaqueValueVisitor::canonicalizeReturnValues() {
       continue;
     }
     SILValue oldResult = returnInst->getOperand();
-    if (oldResult.getOwnershipKind() != OwnershipKind::Owned)
+    if (oldResult->getOwnershipKind() != OwnershipKind::Owned)
       continue;
 
     assert(oldResult->getType().is<TupleType>());
@@ -803,7 +803,7 @@ static Operand *getProjectedDefOperand(SILValue value) {
   case ValueKind::StructExtractInst:
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
-    assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+    assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
     return &cast<SingleValueInstruction>(value)->getAllOperands()[0];
   }
 }
@@ -1197,7 +1197,7 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
 // immediately before the return. This allows the return to be rewritten by
 // loading from storage.
 AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
-  assert(value.getOwnershipKind() != OwnershipKind::Guaranteed &&
+  assert(value->getOwnershipKind() != OwnershipKind::Guaranteed &&
          "creating storage for a guaranteed value implies a copy");
   // Instructions that produce an opened type never reach here because they
   // have guaranteed ownership--they project their storage. We reach this

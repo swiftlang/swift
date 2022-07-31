@@ -519,7 +519,7 @@ protected:
       return;
 
     // Update SSA form.
-    SSAUp.initialize(V->getType(), V.getOwnershipKind());
+    SSAUp.initialize(V->getType(), V->getOwnershipKind());
     SSAUp.addAvailableValue(OrigBB, V);
     SILValue NewVal = getMappedValue(V);
     SSAUp.addAvailableValue(getOpBasicBlock(OrigBB), NewVal);

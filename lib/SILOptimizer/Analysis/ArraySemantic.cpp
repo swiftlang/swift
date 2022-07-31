@@ -366,13 +366,13 @@ static SILValue copySelfValue(SILValue ArrayStructValue,
   if (DT->dominates(ArrayStructValue->getParentBlock(),
                     InsertBefore->getParent())) {
     assert(!func->hasOwnership() ||
-           ArrayStructValue.getOwnershipKind() == OwnershipKind::Owned ||
-           ArrayStructValue.getOwnershipKind() == OwnershipKind::Guaranteed);
+           ArrayStructValue->getOwnershipKind() == OwnershipKind::Owned ||
+           ArrayStructValue->getOwnershipKind() == OwnershipKind::Guaranteed);
     return ArrayStructValue;
   }
 
   assert(!func->hasOwnership() ||
-         ArrayStructValue.getOwnershipKind() == OwnershipKind::Owned);
+         ArrayStructValue->getOwnershipKind() == OwnershipKind::Owned);
 
   SILValue Val;
   if (auto *Load = dyn_cast<LoadInst>(ArrayStructValue)) {

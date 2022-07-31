@@ -225,7 +225,7 @@ static bool convertExtractsToDestructures(CanonicalDefWorklist &copiedDefs,
   SmallVector<StructExtractInst *, 4> extracts;
   auto pushExtract = [&extracts](CopyValueInst *copy) {
     if (auto *extract = dyn_cast<StructExtractInst>(copy->getOperand())) {
-      if (SILValue(extract).getOwnershipKind() == OwnershipKind::Guaranteed) {
+      if (SILValue(extract)->getOwnershipKind() == OwnershipKind::Guaranteed) {
         extracts.push_back(extract);
       }
     }
@@ -464,7 +464,7 @@ void CopyPropagation::run() {
       // If borrowed value is not owned, neither CanonicalizeOSSALifetime nor
       // LexicalDestroyFolding will do anything with it.  Just bail out now.
       auto borrowee = bbi->getOperand();
-      if (borrowee.getOwnershipKind() != OwnershipKind::Owned)
+      if (borrowee->getOwnershipKind() != OwnershipKind::Owned)
         break;
 
       auto canonicalized = canonicalizer.canonicalizeValueLifetime(borrowee);

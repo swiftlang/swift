@@ -1091,7 +1091,7 @@ ObjCMethodCall::outline(SILModule &M) {
       if (BridgedArgIdx < BridgedArguments.size() &&
           BridgedArguments[BridgedArgIdx].Idx == OrigSigIdx) {
         auto bridgedArgValue = BridgedArguments[BridgedArgIdx].bridgedValue();
-        if (bridgedArgValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+        if (bridgedArgValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
           bridgedArgValue = makeGuaranteedValueAvailable(
               bridgedArgValue, BridgedCall, *deBlocks);
         }

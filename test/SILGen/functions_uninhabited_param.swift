@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-emit-sil %s -o /dev/null -verify -enable-actor-data-race-checks
 
 //===--- Function declaration with uninhabited parameter type
                                    
@@ -19,9 +20,14 @@ map { arg in // expected-note {{'arg' is of type 'Never' which cannot be constru
   return 5 // expected-warning {{will never be executed}}
 }
 
-// We used to crash when emitting the closure below.
+// We used to crash when emitting the closures below.
 enum E {
   static func f(_: E) {}
+}
+
+@MainActor
+class Bar {
+  var foo: (E) -> Void = { _ in }
 }
 
 let _: (E.Type) -> (E) -> () = { s in { e in s.f(e) } }

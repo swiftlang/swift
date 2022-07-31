@@ -40,6 +40,7 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 from swift_build_support.swift_build_support.utils \
     import exit_rejecting_arguments
 from swift_build_support.swift_build_support.utils import fatal_error
+from swift_build_support.swift_build_support.utils import log_analyzer
 
 
 # -----------------------------------------------------------------------------
@@ -715,6 +716,9 @@ def main():
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        exit_code = main()
     except KeyboardInterrupt:
         sys.exit(1)
+    finally:
+        log_analyzer()
+    sys.exit(exit_code)

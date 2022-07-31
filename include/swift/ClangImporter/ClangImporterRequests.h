@@ -285,6 +285,73 @@ private:
   bool evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
 };
 
+enum class CustomRefCountingOperationKind { retain, release };
+
+struct CustomRefCountingOperationDescriptor final {
+  const ClassDecl *decl;
+  CustomRefCountingOperationKind kind;
+
+  CustomRefCountingOperationDescriptor(const ClassDecl *decl,
+                                       CustomRefCountingOperationKind kind)
+      : decl(decl), kind(kind) {}
+
+  friend llvm::hash_code
+  hash_value(const CustomRefCountingOperationDescriptor &desc) {
+    return llvm::hash_combine(desc.decl, desc.kind);
+  }
+
+  friend bool operator==(const CustomRefCountingOperationDescriptor &lhs,
+                         const CustomRefCountingOperationDescriptor &rhs) {
+    return lhs.decl == rhs.decl && lhs.kind == rhs.kind;
+  }
+
+  friend bool operator!=(const CustomRefCountingOperationDescriptor &lhs,
+                         const CustomRefCountingOperationDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    CustomRefCountingOperationDescriptor desc);
+SourceLoc extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc);
+
+struct CustomRefCountingOperationResult {
+  enum CustomRefCountingOperationResultKind {
+    noAttribute,
+    immortal,
+    notFound,
+    tooManyFound,
+    foundOperation
+  };
+
+  CustomRefCountingOperationResultKind kind;
+  ValueDecl *operation;
+  std::string name;
+};
+
+class CustomRefCountingOperation
+    : public SimpleRequest<CustomRefCountingOperation,
+                           CustomRefCountingOperationResult(
+                               CustomRefCountingOperationDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Caching
+  bool isCached() const { return true; }
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CustomRefCountingOperationResult
+  evaluate(Evaluator &evaluator,
+           CustomRefCountingOperationDescriptor desc) const;
+};
+
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

@@ -1419,6 +1419,43 @@ static ManagedValue emitBuiltinGetCurrentExecutor(
   return ManagedValue::forUnmanaged(SGF.emitGetCurrentExecutor(loc));
 }
 
+// Emit SIL for sizeof/strideof/alignof.
+// These formally take a metatype argument that's never actually used, so
+// we ignore it.
+static ManagedValue emitBuiltinSizeof(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forUnmanaged(
+    SGF.B.createBuiltin(loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Sizeof)),
+      SILType::getBuiltinWordType(ctx),
+      subs,
+      {}));
+}
+static ManagedValue emitBuiltinStrideof(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forUnmanaged(
+    SGF.B.createBuiltin(loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Strideof)),
+      SILType::getBuiltinWordType(ctx),
+      subs,
+      {}));
+}
+static ManagedValue emitBuiltinAlignof(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forUnmanaged(
+    SGF.B.createBuiltin(loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Alignof)),
+      SILType::getBuiltinWordType(ctx),
+      subs,
+      {}));
+}
+
 // Helper to lower a function argument to be usable as the entry point of a
 // new async task
 static ManagedValue

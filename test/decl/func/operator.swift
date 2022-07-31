@@ -33,6 +33,29 @@ extension X {
     }
 }
 
+// #60268: Make sure we insert at the start of the attributes.
+@discardableResult
+internal
+func ^^^ (lhs: Int, rhs: Int) -> Int {} // expected-error {{operator implementation without matching operator declaration}} {{37:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
+
+@discardableResult
+internal
+prefix func ^^^ (rhs: Int) -> Int {} // expected-error {{operator implementation without matching operator declaration}} {{41:1-1=prefix operator ^^^ : <# Precedence Group #>\n}}
+
+@frozen
+public
+struct Z {
+  struct Y {
+    static func ^^^ (lhs: Y, rhs: Y) {} // expected-error {{operator implementation without matching operator declaration}} {{45:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
+  }
+}
+
+_ = {
+  func ^^^ (lhs: Int, rhs: Int) {}
+  // expected-error@-1 {{operator functions can only be declared at global or in type scope}}
+  // expected-error@-2 {{operator implementation without matching operator declaration}} {{53:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
+}
+
 infix operator ++++ : ReallyHighPrecedence
 precedencegroup ReallyHighPrecedence {
   higherThan: BitwiseShiftPrecedence

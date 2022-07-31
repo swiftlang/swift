@@ -59,7 +59,7 @@ public:
   SILValue getValue() const { return op.get(); }
 
   ValueOwnershipKind getOwnershipKind() const {
-    return op.get().getOwnershipKind();
+    return op.get()->getOwnershipKind();
   }
 
   unsigned getOperandIndex() const { return op.getOperandNumber(); }

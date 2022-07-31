@@ -131,6 +131,22 @@
 // CHECK-NEXT:   return _impl::$s9Functions16passThroughUInt8ys0D0VADF(x);
 // CHECK-NEXT: }
 
+// CHECK:      inline int32_t * _Nullable passThroughUnsafeGenericMutableOptionalPointer(int32_t * _Nullable x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return _impl::$s9Functions46passThroughUnsafeGenericMutableOptionalPointerySpys5Int32VGSgAFF(x);
+// CHECK-NEXT: }
+
+// CHECK:      inline int32_t * _Nonnull passThroughUnsafeGenericMutablePointer(int32_t * _Nonnull x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return _impl::$s9Functions38passThroughUnsafeGenericMutablePointerySpys5Int32VGAEF(x);
+// CHECK-NEXT: }
+
+// CHECK:      inline int32_t const * _Nullable passThroughUnsafeGenericOptionalPointer(int32_t const * _Nullable x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return _impl::$s9Functions39passThroughUnsafeGenericOptionalPointerySPys5Int32VGSgAFF(x);
+// CHECK-NEXT: }
+
+// CHECK:      inline int32_t const * _Nonnull passThroughUnsafeGenericPointer(int32_t const * _Nonnull x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return _impl::$s9Functions31passThroughUnsafeGenericPointerySPys5Int32VGAEF(x);
+// CHECK-NEXT: }
+
 // CHECK:      inline void * _Nonnull passThroughUnsafeMutableRawPointer(void * _Nonnull x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::$s9Functions34passThroughUnsafeMutableRawPointeryS2vF(x);
 // CHECK-NEXT: }
@@ -189,3 +205,19 @@ public func passThroughUnsafeRawPointer(_ x: UnsafeRawPointer) -> UnsafeRawPoint
 public func passThroughUnsafeMutableRawPointer(_ x: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer { return x }
 
 public func roundTwoPassThroughUnsafeMutableRawPointer(_ x: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? { return x }
+
+public func passThroughUnsafeGenericPointer(_ x: UnsafePointer<Int32>) -> UnsafePointer<Int32> {
+    return x
+}
+
+public func passThroughUnsafeGenericOptionalPointer(_ x: UnsafePointer<Int32>?) -> UnsafePointer<Int32>? {
+    return x
+}
+
+public func passThroughUnsafeGenericMutablePointer(_ x: UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<Int32> {
+    return x
+}
+
+public func passThroughUnsafeGenericMutableOptionalPointer(_ x: UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<Int32>? {
+    return x
+}

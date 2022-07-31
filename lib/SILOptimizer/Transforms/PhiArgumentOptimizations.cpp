@@ -103,7 +103,7 @@ static bool hasOnlyNoneOwnershipIncomingValues(SILPhiArgument *phi) {
   for (unsigned idx = 0; idx < worklist.size(); idx++) {
     phi->getIncomingPhiValues(incomingValues);
     for (auto incomingValue : incomingValues) {
-      if (incomingValue.getOwnershipKind() == OwnershipKind::None)
+      if (incomingValue->getOwnershipKind() == OwnershipKind::None)
         continue;
       if (auto *incomingPhi = dyn_cast<SILPhiArgument>(incomingValue)) {
         if (incomingPhi->isPhi()) {

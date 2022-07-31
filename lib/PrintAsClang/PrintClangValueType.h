@@ -76,6 +76,24 @@ public:
                                      const ModuleDecl *moduleContext,
                                      llvm::function_ref<void()> bodyPrinter);
 
+  /// Print out the C++ type name of the implementation class that provides
+  /// hidden access to the private class APIs.
+  static void printCxxImplClassName(raw_ostream &os,
+                                    const NominalTypeDecl *type);
+
+  /// Print a variable that can be used to access type's metadata function
+  static void printMetadataAccessAsVariable(raw_ostream &os,
+                                            StringRef metadataFuncName,
+                                            int indent = 4,
+                                            StringRef varName = "metadata");
+
+  /// Print a variable that can be used to access type's metadata function and
+  /// value witness table
+  static void printValueWitnessTableAccessAsVariable(
+      raw_ostream &os, StringRef metadataFuncName, int indent = 4,
+      StringRef metadataVarName = "metadata",
+      StringRef vwTableVarName = "vwTable");
+
 private:
   /// Prints out the C stub name used to pass/return value directly for the
   /// given value type.

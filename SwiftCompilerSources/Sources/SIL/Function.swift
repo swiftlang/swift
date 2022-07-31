@@ -67,7 +67,7 @@ final public class Function : CustomStringConvertible, HasShortDescription {
 
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
-      SILFunction_hasSemanticsAttr(bridged, BridgedStringRef(data: buffer.baseAddress!, length: buffer.count)) != 0
+      SILFunction_hasSemanticsAttr(bridged, llvm.StringRef(buffer.baseAddress!, buffer.count)) != 0
     }
   }
 
@@ -105,18 +105,18 @@ final public class Function : CustomStringConvertible, HasShortDescription {
       // writeFn
       { (f: BridgedFunction, os: BridgedOStream, idx: Int) in
         let s = f.function.effects.argumentEffects[idx].description
-        s.withBridgedStringRef { OStream_write(os, $0) }
+        s._withStringRef { OStream_write(os, $0) }
       },
       // parseFn:
-      { (f: BridgedFunction, str: BridgedStringRef, fromSIL: Int, isDerived: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
+      { (f: BridgedFunction, str: llvm.StringRef, fromSIL: Int, isDerived: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
         do {
           var parser = StringParser(str.string)
           let effect: ArgumentEffect
           if fromSIL != 0 {
             effect = try parser.parseEffectFromSIL(for: f.function, isDerived: isDerived != 0)
           } else {
-            let paramToIdx = paramNames.withElements(ofType: BridgedStringRef.self) {
-                (buffer: UnsafeBufferPointer<BridgedStringRef>) -> Dictionary<String, Int> in
+            let paramToIdx = paramNames.withElements(ofType: llvm.StringRef.self) {
+                (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
               let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
               return Dictionary(uniqueKeysWithValues: keyValPairs)
             }

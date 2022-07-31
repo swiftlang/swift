@@ -34,12 +34,12 @@ module Cxx {
 Add the C++ module to the include path and enable C++ interop:
 - Navigate to your project directory 
 - In `Project` navigate to `Build Settings` -> `Swift Compiler`
-- Under `Custom Flags` -> `Other Swift Flags` add`-Xfrontend -enable-experimental-cxx-interop`
+- Under `Custom Flags` -> `Other Swift Flags` add`-enable-experimental-cxx-interop`
 - Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/Cxx`). Repeat this step in `Other Swift Flags` 
 
 ```
 //Add to Other Swift Flags and Import Paths respectively
--Xfrontend -enable-experimental-cxx-interop 
+-enable-experimental-cxx-interop
 -I./ProjectName/Cxx
 ```
 
@@ -118,7 +118,7 @@ let package = Package(
             sources: [ "main.swift" ],
             swiftSettings: [.unsafeFlags([
                 "-I", "Sources/Cxx",
-                "-Xfrontend", "-enable-experimental-cxx-interop",
+                "-enable-experimental-cxx-interop",
             ])]
         ),
     ]
@@ -151,7 +151,7 @@ After creating your project follow the steps [Creating a Module to contain your 
 - Create a `CMakeLists.txt` file and configure for your project
 - In`add_library` invoke `cxx-support` with the path to the C++ implementation file
 - Add the `target_include_directories` with `cxx-support` and path to the C++ Module `${CMAKE_SOURCE_DIR}/Sources/Cxx`
-- Add the `add_executable` to the specific files/directory you would like to generate source, with`SHELL:-Xfrontend -enable-experimental-cxx-interop`.
+- Add the `add_executable` to the specific files/directory you would like to generate source, with`SHELL:-enable-experimental-cxx-interop`.
 - In the example below we will be following the file structure used in [Creating a Swift Package](#Creating-a-Swift-Package) 
 
 ```
@@ -176,7 +176,7 @@ target_include_directories(cxx-support PUBLIC
 
 add_executable(CxxInterop ./Sources/CxxInterop/main.swift)
 target_compile_options(CxxInterop PRIVATE
-  "SHELL:-Xfrontend -enable-experimental-cxx-interop"
+  "SHELL:-enable-experimental-cxx-interop"
 target_link_libraries(CxxInterop PRIVATE cxx-support)
 
 ```

@@ -840,7 +840,7 @@ getEndPointsOfDataDependentChain(SingleValueInstruction *value, SILFunction *fun
 /// from a guaranteed basic block parameter representing a phi node.
 static Optional<BorrowedValue>
 getUniqueBorrowScopeIntroducingValue(SILValue value) {
-  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed &&
+  assert(value->getOwnershipKind() == OwnershipKind::Guaranteed &&
          "parameter must be a guarenteed value");
   return getSingleBorrowIntroducingValue(value);
 }
@@ -872,10 +872,10 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   }
   assert(!foldedVal->getType().isTrivial(*fun));
   assert(fun->hasOwnership());
-  assert(foldedVal.getOwnershipKind() == OwnershipKind::Owned &&
+  assert(foldedVal->getOwnershipKind() == OwnershipKind::Owned &&
          "constant value must have owned ownership kind");
 
-  if (originalVal.getOwnershipKind() == OwnershipKind::Owned) {
+  if (originalVal->getOwnershipKind() == OwnershipKind::Owned) {
     originalVal->replaceAllUsesWith(foldedVal);
     // Destroy originalVal, which is now unused, immediately after its
     // definition. Note that originalVal's destorys are now transferred to
@@ -893,7 +893,7 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   // Therefore, create a borrow of foldedVal at the beginning of the scope and
   // use the borrow in place of the originalVal. Also, end the borrow and
   // destroy foldedVal at the end of the borrow scope.
-  assert(originalVal.getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(originalVal->getOwnershipKind() == OwnershipKind::Guaranteed);
 
   // FIXME: getUniqueBorrowScopeIntroducingValue may look though various storage
   // casts. There's no reason to think that it's valid to replace uses of
@@ -957,7 +957,7 @@ static void substituteConstants(FoldState &foldState) {
     // other hand, if we are folding an owned value, we can insert the constant
     // value at the point where the owned value is defined.
     SILInstruction *insertionPoint = definingInst;
-    if (constantSILValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+    if (constantSILValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
       Optional<BorrowedValue> borrowIntroducer =
           getUniqueBorrowScopeIntroducingValue(constantSILValue);
       if (!borrowIntroducer) {
