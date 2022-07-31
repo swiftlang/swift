@@ -36,11 +36,9 @@ ConcreteDeclRef ConcreteDeclRef::getOverriddenDecl() const {
 
   SubstitutionMap subs;
   if (baseSig) {
-    Optional<SubstitutionMap> derivedSubMap;
+    subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl);
     if (derivedSig)
-      derivedSubMap = getSubstitutions();
-    subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl,
-                                                     derivedSubMap);
+      subs = subs.subst(getSubstitutions());
   }
   return ConcreteDeclRef(baseDecl, subs);
 }

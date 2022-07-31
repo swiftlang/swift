@@ -4224,7 +4224,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
                                   SILType::getPrimitiveObjectType(derivedFTy),
                                   subs, args, derivedYields);
     auto overrideSubs = SubstitutionMap::getOverrideSubstitutions(
-        base.getDecl(), derived.getDecl(), /*derivedSubs=*/subs);
+        base.getDecl(), derived.getDecl()).subst(subs);
 
     YieldInfo derivedYieldInfo(SGM, derived, derivedFTy, subs);
     YieldInfo baseYieldInfo(SGM, base, thunkTy, overrideSubs);

@@ -4413,10 +4413,12 @@ operator()(CanType dependentType, Type conformingReplacementType,
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  // Lookup conformances for opened existential.
-  if (conformingReplacementType->isOpenedExistential()) {
+  // Lookup conformances for archetypes that conform concretely
+  // via a superclass.
+  if (auto archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
     return conformedProtocol->getModuleContext()->lookupConformance(
-        conformingReplacementType, conformedProtocol);
+        conformingReplacementType, conformedProtocol,
+        /*allowMissing=*/true);
   }
   return Subs.lookupConformance(dependentType, conformedProtocol);
 }
@@ -4818,8 +4820,10 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 
   // Find the superclass type with the context matching that of the member.
   auto *ownerNominal = dc->getSelfNominalTypeDecl();
-  if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
-    baseTy = baseTy->getSuperclassForDecl(ownerClass);
+  if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal)) {
+    baseTy = baseTy->getSuperclassForDecl(ownerClass,
+                                      /*usesArchetypes=*/genericEnv != nullptr);
+  }
 
   // Gather all of the substitutions for all levels of generic arguments.
   auto params = genericSig.getGenericParams();
@@ -4972,7 +4976,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                               const ValueDecl *derivedDecl,
                                               Type memberType) {
   auto subs = SubstitutionMap::getOverrideSubstitutions(
-      baseDecl, derivedDecl, /*derivedSubs=*/None);
+      baseDecl, derivedDecl);
 
   if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
     memberType = FunctionType::get(genericMemberType->getParams(),
