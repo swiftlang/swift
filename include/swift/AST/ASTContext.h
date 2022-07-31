@@ -1344,6 +1344,12 @@ public:
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);
 
+  GenericSignature
+  getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
+                              const NominalTypeDecl *derivedNominal,
+                              GenericSignature baseGenericSig,
+                              const GenericParamList *derivedParams);
+
   enum class OverrideGenericSignatureReqCheck {
     /// Base method's generic requirements are satisfied by derived method
     BaseReqSatisfiedByDerived,

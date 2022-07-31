@@ -843,7 +843,7 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
   auto *decoder = ctx.getDistributedActorInvocationDecoder(actor);
   assert(decoder);
 
-  auto decoderTy = decoder->getInterfaceType()->getMetatypeInstanceType();
+  auto decoderTy = decoder->getDeclaredInterfaceType();
 
   auto members = TypeChecker::lookupMember(actor->getDeclContext(), decoderTy,
                                            DeclNameRef(ctx.Id_decodeNextArgument));
