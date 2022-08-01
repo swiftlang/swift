@@ -17,10 +17,16 @@ UnsafeRawPointerTestSuite.test("load.unaligned.largeAlignment")
   var offset = 3
   let int128 = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 64) {
     temporary -> Builtin.Int128 in
-    _ = temporary.initialize(from: 0..<64)
     let buffer = UnsafeRawBufferPointer(temporary)
+    _ = temporary.initialize(from: repeatElement(0, count: 64))
+    // Load a 128-bit floating point value
+    let fp = buffer.loadUnaligned(fromByteOffset: offset, as: Builtin.FPIEEE128.self)
+    noop(fp)
+    temporary.baseAddress!.deinitialize(count: 64)
+    _ = temporary.initialize(from: 0..<64)
     let aligned = buffer.baseAddress!.alignedUp(for: Builtin.Int128.self)
     offset += buffer.baseAddress!.distance(to: aligned)
+    // Load and return a 128-bit integer value
     return buffer.loadUnaligned(fromByteOffset: offset, as: Builtin.Int128.self)
   }
   withUnsafeBytes(of: int128) {
