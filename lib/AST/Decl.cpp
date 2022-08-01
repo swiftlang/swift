@@ -1009,7 +1009,7 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   auto &ctx = fromModule->getASTContext();
   auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
 
-  if (ctx.LangOpts.EnableAdHocAvailability)
+  if (ctx.LangOpts.WeakLinkAtTarget)
     return !availability.isSupersetOf(deploymentTarget);
 
   return !deploymentTarget.isContainedIn(availability);
