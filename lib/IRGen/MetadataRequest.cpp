@@ -2659,9 +2659,16 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   unsigned mangledStringSize;
   std::tie(mangledString, mangledStringSize) =
     IGM.getTypeRef(type, CanGenericSignature(), MangledTypeRefRole::Metadata);
-  
-  assert(mangledStringSize < 0x80000000u
-         && "2GB of mangled name ought to be enough for anyone");
+
+  // Android AArch64 reserves the top byte of the address for memory tagging
+  // since Android 11, so only use the bottom 23 bits to store this size
+  // and the 24th bit to signal that there is a size.
+  if (IGM.Triple.isAndroid() && IGM.Triple.getArch() == llvm::Triple::aarch64)
+    assert(mangledStringSize < 0x00800001u &&
+           "8MB of mangled name ought to be enough for Android AArch64");
+  else
+    assert(mangledStringSize < 0x80000000u &&
+           "2GB of mangled name ought to be enough for anyone");
   
   // Get or create the cache variable if necessary.
   auto cache = IGM.getAddrOfTypeMetadataDemanglingCacheVariable(type,
@@ -2731,6 +2738,21 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     auto contBB = subIGF.createBasicBlock("");
     llvm::Value *comparison = subIGF.Builder.CreateICmpSLT(load,
                                       llvm::ConstantInt::get(IGM.Int64Ty, 0));
+
+    // Check if the 24th bit is set on Android AArch64 and only instantiate the
+    // type metadata if it is, as otherwise it might be negative only because
+    // of the memory tag on Android.
+    if (IGM.Triple.isAndroid() &&
+        IGM.Triple.getArch() == llvm::Triple::aarch64) {
+
+      auto getBitAfterAndroidTag = subIGF.Builder.CreateAnd(
+        load, llvm::ConstantInt::get(IGM.Int64Ty, 0x0080000000000000));
+      auto checkNotAndroidTag = subIGF.Builder.CreateICmpNE(
+        getBitAfterAndroidTag, llvm::ConstantInt::get(IGM.Int64Ty, 0));
+
+      comparison = subIGF.Builder.CreateAnd(comparison, checkNotAndroidTag);
+    }
+
     comparison = subIGF.Builder.CreateExpect(comparison,
                                        llvm::ConstantInt::get(IGM.Int1Ty, 0));
     subIGF.Builder.CreateCondBr(comparison, isUnfilledBB, contBB);

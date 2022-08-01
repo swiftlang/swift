@@ -157,12 +157,22 @@ static_assert(alignof(HeapObject) == alignof(void*),
 #endif
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK
+#if defined(__ANDROID__)
+#define _swift_abi_ObjCReservedBitsMask                                        \
+  (__swift_uintptr_t) SWIFT_ABI_ANDROID_ARM64_OBJC_RESERVED_BITS_MASK
+#else
 #define _swift_abi_ObjCReservedBitsMask                                        \
   (__swift_uintptr_t) SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK
+#endif
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS
+#if defined(__ANDROID__)
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64 >> 8
+#else
 #define _swift_BridgeObject_TaggedPointerBits                                  \
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
+#endif
 
 #elif defined(__powerpc64__)
 
