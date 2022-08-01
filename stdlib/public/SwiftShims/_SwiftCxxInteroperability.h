@@ -51,6 +51,12 @@ inline void opaqueFree(void *_Nonnull p) noexcept {
 
 } // namespace _impl
 
+/// Swift's Int type.
+using Int = ptrdiff_t;
+
+/// Swift's UInt type.
+using UInt = size_t;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc++17-extensions"
 
