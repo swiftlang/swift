@@ -17,21 +17,21 @@
 
 ERROR(ide_async_in_nonasync_context, none,
       "async %0 used in a context that does not support concurrency",
-      (DeclName))
+      (StringRef))
 
 // NOTE: This is WARNING because this is emitted for cross actor references with
 // non-'Sendable' types. That is optionally ('-warn-concurrency') warning in
 // Swift 5.5.
 WARNING(ide_cross_actor_reference_swift5, none,
         "actor-isolated %0 should only be referenced from inside the actor",
-        (DeclName))
+        (StringRef))
 
 WARNING(ide_redundant_import, none,
-        "module %0 is already imported", (DeclName))
+        "module %0 is already imported", (StringRef))
 
 // FIXME: Inform which other 'import' this module came from.
 NOTE(ide_redundant_import_indirect, none,
-     "module %0 is already imported via another module import", (DeclName))
+     "module %0 is already imported via another module import", (StringRef))
 
 WARNING(ide_availability_softdeprecated, Deprecation,
         "%select{getter for |setter for |}0%1 will be deprecated"
@@ -45,6 +45,10 @@ WARNING(ide_availability_softdeprecated_rename, Deprecation,
         " in %select{a future version|%select{a future version of %3|%3 %5}4}2"
         ": renamed to '%6'",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple, StringRef))
+
+WARNING(ide_recursive_accessor_reference,none,
+        "attempting to %select{access|modify}1 %0 within its own "
+        "%select{getter|setter}1", (StringRef, bool))
 
 //===----------------------------------------------------------------------===//
 

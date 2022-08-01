@@ -254,6 +254,10 @@ public:
 
   void setIdealExpectedType(Type Ty) { expectedTypeContext.setIdealType(Ty); }
 
+  bool canCurrDeclContextHandleAsync() const {
+    return CanCurrDeclContextHandleAsync;
+  }
+
   void setCanCurrDeclContextHandleAsync(bool CanCurrDeclContextHandleAsync) {
     this->CanCurrDeclContextHandleAsync = CanCurrDeclContextHandleAsync;
   }

@@ -224,7 +224,8 @@ public:
                                  bool isInOutParam) {
     // FIXME: handle optionalKind.
     // FIXME: handle isInOutParam.
-    os << "const ";
+    if (!isInOutParam)
+      os << "const ";
     if (languageMode == OutputLanguageMode::Cxx) {
       // Pass a reference to a template type.
       os << genericTpt->getName();
@@ -426,7 +427,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       // FIXME: NEED to handle boxed resilient type.
       // os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() <<
       // "::getOpaquePointer(";
-      os << "reinterpret_cast<const void *>(&";
+      os << "reinterpret_cast<";
+      if (!isInOut)
+        os << "const ";
+      os << "void *>(&";
       namePrinter();
       os << ')';
       return;
