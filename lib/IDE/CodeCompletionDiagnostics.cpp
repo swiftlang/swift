@@ -42,11 +42,12 @@ CodeCompletionDiagnosticSeverity getSeverity(DiagnosticKind DiagKind) {
 }
 
 class CodeCompletionDiagnostics {
-  ASTContext &Ctx;
+  const ASTContext &Ctx;
   DiagnosticEngine &Engine;
 
 public:
-  CodeCompletionDiagnostics(ASTContext &Ctx) : Ctx(Ctx), Engine(Ctx.Diags) {}
+  CodeCompletionDiagnostics(const ASTContext &Ctx)
+      : Ctx(Ctx), Engine(Ctx.Diags) {}
 
   template <typename... ArgTypes>
   bool
@@ -159,27 +160,29 @@ bool swift::ide::getContextFreeCompletionDiagnostics(
 }
 
 bool swift::ide::getContextualCompletionDiagnostics(
-    ContextualNotRecommendedReason Reason, const ValueDecl *D,
-    CodeCompletionDiagnosticSeverity &Severity, llvm::raw_ostream &Out) {
-  CodeCompletionDiagnostics Diag(D->getASTContext());
+    ContextualNotRecommendedReason Reason, StringRef NameForDiagnostics,
+    CodeCompletionDiagnosticSeverity &Severity, llvm::raw_ostream &Out,
+    const ASTContext &Ctx) {
+  CodeCompletionDiagnostics Diag(Ctx);
   switch (Reason) {
   case ContextualNotRecommendedReason::InvalidAsyncContext:
     // FIXME: Could we use 'diag::async_in_nonasync_function'?
     return Diag.getDiagnostics(
-        Severity, Out, diag::ide_async_in_nonasync_context, D->getName());
+        Severity, Out, diag::ide_async_in_nonasync_context, NameForDiagnostics);
   case ContextualNotRecommendedReason::CrossActorReference:
-    return Diag.getDiagnostics(
-        Severity, Out, diag::ide_cross_actor_reference_swift5, D->getName());
+    return Diag.getDiagnostics(Severity, Out,
+                               diag::ide_cross_actor_reference_swift5,
+                               NameForDiagnostics);
   case ContextualNotRecommendedReason::RedundantImport:
     return Diag.getDiagnostics(Severity, Out, diag::ide_redundant_import,
-                               D->getName());
+                               NameForDiagnostics);
   case ContextualNotRecommendedReason::RedundantImportIndirect:
     return Diag.getDiagnostics(
-        Severity, Out, diag::ide_redundant_import_indirect, D->getName());
+        Severity, Out, diag::ide_redundant_import_indirect, NameForDiagnostics);
   case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
-    return Diag.getDiagnostics(
-        Severity, Out, diag::recursive_accessor_reference,
-        D->getName().getBaseIdentifier(), /*"getter"*/ 0);
+    return Diag.getDiagnostics(Severity, Out,
+                               diag::ide_recursive_accessor_reference,
+                               NameForDiagnostics, /*"getter"*/ 0);
   case ContextualNotRecommendedReason::None:
     llvm_unreachable("invalid not recommended reason");
   }

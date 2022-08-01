@@ -1369,7 +1369,8 @@ void swift::ide::deliverCompletionResults(
                                /*Sink=*/nullptr);
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
-                                   Lookup.getExpectedTypeContext(), DC);
+                                   Lookup.getExpectedTypeContext(), DC,
+                                   Lookup.canCurrDeclContextHandleAsync());
 }
 
 bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {

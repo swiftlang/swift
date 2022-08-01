@@ -43,6 +43,7 @@ class CodeCompletionResultBuilder {
   CodeCompletionFlair Flair;
   unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
+  bool IsAsync = false;
   Optional<CodeCompletionLiteralKind> LiteralKind;
   CodeCompletionKeywordKind KeywordKind = CodeCompletionKeywordKind::None;
   unsigned CurrentNestingLevel = 0;
@@ -63,6 +64,7 @@ class CodeCompletionResultBuilder {
   /// type relation to \c ResultType.
   const ExpectedTypeContext *TypeContext = nullptr;
   const DeclContext *DC = nullptr;
+  bool CanCurrDeclContextHandleAsync = false;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -113,6 +115,8 @@ public:
 
   void setAssociatedDecl(const Decl *D);
 
+  void setIsAsync(bool IsAsync) { this->IsAsync = IsAsync; }
+
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
   void setContextFreeNotRecommended(ContextFreeNotRecommendedReason Reason) {
@@ -147,6 +151,10 @@ public:
                       const DeclContext *DC) {
     this->TypeContext = &TypeContext;
     this->DC = DC;
+  }
+
+  void setCanCurrDeclContextHandleAsync(bool CanCurrDeclContextHandleAsync) {
+    this->CanCurrDeclContextHandleAsync = CanCurrDeclContextHandleAsync;
   }
 
   void withNestedGroup(CodeCompletionString::Chunk::ChunkKind Kind,
