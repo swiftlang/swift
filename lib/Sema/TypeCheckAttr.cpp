@@ -3587,6 +3587,12 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 }
 
 void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::TypeWrappers)) {
+    diagnose(attr->getLocation(), diag::type_wrappers_are_experimental);
+    attr->setInvalid();
+    return;
+  }
+
   auto nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
     return;

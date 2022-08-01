@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TypeWrappers
 
 @typeWrapper
 struct ConcreteTypeWrapper { // expected-error {{type wrapper has to declare a single generic parameter for underlying storage type}}

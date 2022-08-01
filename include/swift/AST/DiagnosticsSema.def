@@ -6480,6 +6480,9 @@ ERROR(move_expression_not_passed_lvalue,none,
 // MARK: Type Wrappers
 //------------------------------------------------------------------------------
 
+ERROR(type_wrappers_are_experimental,none,
+      "type wrappers are an experimental feature", ())
+
 ERROR(type_wrapper_attribute_not_allowed_here,none,
       "type wrapper attribute %0 can only be applied to a class, struct",
       (Identifier))
