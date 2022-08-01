@@ -29,13 +29,10 @@ NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
                            GetTypeWrapper{mutableSelf}, nullptr);
 }
 
-NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
-                                          NominalTypeDecl *decl) const {
+static void getTypeWrappers(
+    NominalTypeDecl *decl,
+    SmallVectorImpl<std::pair<CustomAttr *, NominalTypeDecl *>> &typeWrappers) {
   auto &ctx = decl->getASTContext();
-
-  // Note that we don't actually care whether there are duplicates,
-  // using the same type wrapper multiple times is still an error.
-  SmallVector<NominalTypeDecl *, 2> typeWrappers;
 
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
@@ -47,8 +44,19 @@ NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
 
     auto *typeWrapper = nominal->getAttrs().getAttribute<TypeWrapperAttr>();
     if (typeWrapper && typeWrapper->isValid())
-      typeWrappers.push_back(nominal);
+      typeWrappers.push_back({mutableAttr, nominal});
   }
+}
+
+NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
+                                          NominalTypeDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+
+  // Note that we don't actually care whether there are duplicates,
+  // using the same type wrapper multiple times is still an error.
+  SmallVector<std::pair<CustomAttr *, NominalTypeDecl *>, 2> typeWrappers;
+
+  getTypeWrappers(decl, typeWrappers);
 
   if (typeWrappers.empty())
     return nullptr;
@@ -58,5 +66,27 @@ NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
     return nullptr;
   }
 
-  return typeWrappers.front();
+  return typeWrappers.front().second;
+}
+
+Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
+                                  NominalTypeDecl *decl) const {
+  SmallVector<std::pair<CustomAttr *, NominalTypeDecl *>, 2> typeWrappers;
+
+  getTypeWrappers(decl, typeWrappers);
+
+  if (typeWrappers.size() != 1)
+    return Type();
+
+  auto *typeWrapperAttr = typeWrappers.front().first;
+  auto type = evaluateOrDefault(
+      evaluator,
+      CustomAttrTypeRequest{typeWrapperAttr, decl->getDeclContext(),
+                            CustomAttrTypeKind::TypeWrapper},
+      Type());
+
+  if (!type || type->hasError()) {
+    return ErrorType::get(decl->getASTContext());
+  }
+  return type;
 }

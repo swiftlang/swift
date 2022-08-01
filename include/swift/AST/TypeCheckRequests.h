@@ -3364,6 +3364,10 @@ enum class CustomAttrTypeKind {
   /// unbound generic types.
   PropertyWrapper,
 
+  /// Just like property wrappers, type wrappers are represented
+  /// as custom type attributes and allow unbound generic types.
+  TypeWrapper,
+
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
   GlobalActor,
@@ -3510,6 +3514,23 @@ private:
   friend SimpleRequest;
 
   NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Return a type of the type wrapper (if any) associated with the given
+/// declaration.
+class GetTypeWrapperType
+    : public SimpleRequest<GetTypeWrapperType, Type(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Type evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }
