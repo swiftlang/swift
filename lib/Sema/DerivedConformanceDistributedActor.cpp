@@ -236,7 +236,7 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
     auto requirement =
         Requirement(RequirementKind::Conformance,
                     resultGenericParamDecl->getDeclaredInterfaceType(),
-                    p->getInterfaceType()->getMetatypeInstanceType());
+                    p->getDeclaredInterfaceType());
     requirements.push_back(requirement);
   }
   GenericSignature doInvokeGenSig =

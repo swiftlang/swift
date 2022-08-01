@@ -3696,8 +3696,8 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     // to reference the overridden declaration instead.
     if (baseDecl != externalDecl) {
       externalSubs = SubstitutionMap::getOverrideSubstitutions(baseDecl,
-                                                               externalDecl,
-                                                               externalSubs);
+                                                               externalDecl)
+          .subst(externalSubs);
       externalDecl = baseDecl;
     }
   }

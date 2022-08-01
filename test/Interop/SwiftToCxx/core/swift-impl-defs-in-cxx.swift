@@ -129,11 +129,6 @@
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: #if __cplusplus > 201402L
-// CHECK-NEXT: template<class T>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext = false;
-// CHECK-EMPTY:
-// CHECK-NEXT: template<class T> inline void * _Nonnull getTypeMetadata();
-// CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<bool> = true;
 // CHECK-EMPTY:
