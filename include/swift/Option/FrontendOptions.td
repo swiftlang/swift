@@ -1065,9 +1065,11 @@ def clang_header_expose_public_decls:
   HelpText<"Expose all public declarations in the generated clang header">,
   Flags<[FrontendOption, HelpHidden]>;
   
-def enable_ad_hoc_availability :
-  Flag<["-"], "enable-ad-hoc-availability">,
-  HelpText<"Enable experimental support for ad hoc availability">;
+def weak_link_at_target :
+  Flag<["-"], "weak-link-at-target">,
+  HelpText<"Weakly link symbols for declarations that were introduced at the "
+           "deployment target. Symbols introduced before the deployment "
+           "target are still strongly linked.">;
 
 def concurrency_model :
     Separate<["-"], "concurrency-model">,

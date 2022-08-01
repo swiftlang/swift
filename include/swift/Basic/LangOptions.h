@@ -170,9 +170,9 @@ namespace swift {
     /// Only check the availability of the API, ignore function bodies.
     bool CheckAPIAvailabilityOnly = false;
 
-    /// Causes the compiler to treat declarations available at the current
-    /// runtime OS version as potentially unavailable.
-    bool EnableAdHocAvailability = false;
+    /// Causes the compiler to use weak linkage for symbols belonging to
+    /// declarations introduced at the deployment target.
+    bool WeakLinkAtTarget = false;
 
     /// Should conformance availability violations be diagnosed as errors?
     bool EnableConformanceAvailabilityErrors = false;
