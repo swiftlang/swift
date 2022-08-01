@@ -116,5 +116,15 @@ int main() {
     assert(x == -13);
     assert(y == 42);
   }
+
+  {
+    int x = 4;
+    assert(genericRet(x) == 4);
+  }
+
+  {
+    double x = -19.75;
+    assert(genericRet(x) == -19.75);
+  }
   return 0;
 }
