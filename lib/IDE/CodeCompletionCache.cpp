@@ -103,7 +103,8 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 7; // Store whether a type can be used as attribute
+static constexpr uint32_t onDiskCompletionCacheVersion =
+    9; // Store whether a decl is async
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -234,11 +235,13 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto diagSeverity =
         static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
+    auto isAsync = static_cast<bool>(*cursor++);
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
     auto filterNameIndex = read32le(cursor);
+    auto nameForDiagnosticsIndex = read32le(cursor);
 
     auto assocUSRCount = read32le(cursor);
     SmallVector<NullTerminatedStringRef, 4> assocUSRs;
@@ -258,13 +261,14 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
     auto filterName = getString(filterNameIndex);
+    auto nameForDiagnostics = getString(nameForDiagnosticsIndex);
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
-            kind, associatedKind, opKind, isSystem, string, moduleName,
+            kind, associatedKind, opKind, isSystem, isAsync, string, moduleName,
             briefDocComment, makeArrayRef(assocUSRs).copy(*V.Allocator),
             CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
-            diagMessage, filterName);
+            diagMessage, filterName, nameForDiagnostics);
 
     V.Results.push_back(result);
   }
@@ -420,12 +424,14 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
       LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
+      LE.write(static_cast<uint8_t>(R->isAsync()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
       LE.write(addString(R->getDiagnosticMessage())); // index into strings
       LE.write(addString(R->getFilterName())); // index into strings
+      LE.write(addString(R->getNameForDiagnostics())); // index into strings
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {
