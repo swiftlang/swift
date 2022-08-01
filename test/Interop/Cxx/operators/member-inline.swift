@@ -5,7 +5,6 @@
 // XFAIL: OS=windows-msvc
 
 import MemberInline
-import CxxShim
 import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")

@@ -861,6 +861,14 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   return getASTContext().canImportModule(modulePath);
 }
 
+bool CompilerInstance::canImportCxxShim() const {
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(CXX_SHIM_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
+}
+
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
@@ -915,9 +923,8 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     }
   }
 
-  if(Invocation.getLangOptions().EnableCXXInterop) {
-    llvm::dbgs() << "importing: " << CXX_SHIMS_NAME << "\n";
-    pushImport(CXX_SHIMS_NAME);
+  if(Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
+    pushImport(CXX_SHIM_NAME);
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
