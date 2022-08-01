@@ -188,6 +188,28 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
+static void maybeAddTypeWrapperDefaultArg(ParamDecl *arg, VarDecl *var,
+                                          ASTContext &ctx) {
+  assert(var->isAccessedViaTypeWrapper());
+
+  if (!var->getParentPattern()->getSingleVar())
+    return;
+
+  auto *PBD = var->getParentPatternBinding();
+
+  auto *initExpr = PBD->getInit(/*index=*/0);
+  if (!initExpr)
+    return;
+
+  // Type wrapper variables are never initialized directly,
+  // initialization expression (if any) becomes an default
+  // argument of the initializer synthesized by the type wrapper.
+  PBD->setInitializerSubsumed(/*index=*/0);
+
+  arg->setDefaultExpr(initExpr, /*isTypeChecked=*/false);
+  arg->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+}
+
 /// Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {
@@ -338,6 +360,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(var->getValueInterfaceType());
       arg->setImplicit();
+
+      maybeAddTypeWrapperDefaultArg(arg, var, ctx);
 
       params.push_back(arg);
     }

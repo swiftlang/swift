@@ -147,3 +147,18 @@ func testLocalWithNestedWrapper() {
   _ = t.test // Ok
   _ = t.computed // Ok
 }
+
+func testTypeWrapperWithDefaults() {
+  @NoopWrapper
+  struct A {
+    var question: String = "Ultimate Question"
+    var answer: Int = 42
+  }
+
+  let a = A()
+  _ = a.question
+  _ = a.answer
+
+  _ = A(question: "")
+  _ = A(answer: 0)
+}

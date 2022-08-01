@@ -24,3 +24,9 @@ public class Person<T> {
   public var name: String
   public var projects: [T]
 }
+
+@Wrapper
+public struct PersonWithDefaults {
+  public var name: String = "<no name>"
+  public var age: Int = 99
+}

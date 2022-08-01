@@ -37,3 +37,48 @@ print(p.name)
 print(p.projects)
 // CHECK: in getter
 // CHECK-NEXT: ["A", "B", "C", "D"]
+
+var pDefaults = PersonWithDefaults()
+// CHECK: Wrapper.init($Storage(name: "<no name>", age: 99))
+
+print(pDefaults.name)
+// CHECK: in getter
+// CHECK: <no name>
+
+print(pDefaults.age)
+// CHECK: in getter
+// CHECK: 99
+
+pDefaults.name = "Actual Name"
+// CHECK-NEXT: in setter => Actual Name
+
+pDefaults.age = 0
+// CHECK-NEXT: in setter => 0
+
+print(pDefaults.name)
+// CHECK: in getter
+// CHECK: Actual Name
+
+print(pDefaults.age)
+// CHECK: in getter
+// CHECK: 0
+
+let pDefaultsAge = PersonWithDefaults(name: "Actual Name")
+
+print(pDefaultsAge.name)
+// CHECK: in getter
+// CHECK: Actual Name
+
+print(pDefaultsAge.age)
+// CHECK: in getter
+// CHECK: 99
+
+let pDefaultsName = PersonWithDefaults(age: 31337)
+
+print(pDefaultsName.name)
+// CHECK: in getter
+// CHECK: <no name>
+
+print(pDefaultsName.age)
+// CHECK: in getter
+// CHECK: 31337
