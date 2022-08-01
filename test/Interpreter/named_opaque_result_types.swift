@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -g -swift-version 5 -Xfrontend -enable-experimental-named-opaque-types %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
