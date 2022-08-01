@@ -27,9 +27,14 @@ public func genericSwap<T>(_ x: inout T, _ y: inout T) {
   y = t
 }
 
+public func genericRet<T>(_ x: T) -> T {
+    return x
+}
+
 // CHECK: SWIFT_EXTERN void $s9Functions20genericPrintFunctionyyxlF(const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunction(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF(ptrdiff_t x, const void * _Nonnull t1, const void * _Nonnull t1p, ptrdiff_t y, const void * _Nonnull t2, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionMultiGeneric(_:_:_:_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions26genericPrintFunctionTwoArgyyx_SitlF(const void * _Nonnull x, ptrdiff_t y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionTwoArg(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s9Functions10genericRetyxxlF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericRet(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions11genericSwapyyxz_xztlF(void * _Nonnull x, void * _Nonnull y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericSwap(_:_:)
 
 // CHECK:      template<class T>
@@ -50,6 +55,14 @@ public func genericSwap<T>(_ x: inout T, _ y: inout T) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>
 // CHECK-NEXT: inline void genericPrintFunctionTwoArg(const T & x, swift::Int y) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions26genericPrintFunctionTwoArgyyx_SitlF(reinterpret_cast<const void *>(&x), y, swift::getTypeMetadata<T>());
+// CHECK-NEXT: }
+
+// CHECK:      template<class T>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T>
+// CHECK-NEXT: inline T genericRet(const T & x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   T returnValue;
+// CHECK-NEXT: _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
+// CHECK-NEXT:   return returnValue;
 // CHECK-NEXT: }
 
 // CHECK:      template<class T>
