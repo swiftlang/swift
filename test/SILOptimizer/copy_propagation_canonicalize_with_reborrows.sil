@@ -23,11 +23,6 @@ entry:
   br body(%lifetime : $X, %value_1 : $X)
 
 body(%reborrow : @guaranteed $X, %value_2 : @owned $X):
-  // TODO: The copy is currently needed to trigger canonicalization of the
-  // lifetime.  Remove once it is no longer needed.
-  %copy = copy_value %value_2 : $X
-  destroy_value %copy : $X
-
   end_borrow %reborrow : $X
   destroy_value %value_2 : $X
   br exit
@@ -50,11 +45,6 @@ entry(%unrelated : @guaranteed $X):
   br body(%borrow_1 : $X, %value_1 : $X)
 
 body(%borrow_2 : @guaranteed $X, %value_2 : @owned $X):
-  // TODO: The copy is currently needed to trigger canonicalization of the
-  // lifetime.  Remove once it is no longer needed.
-  %copy = copy_value %value_2 : $X
-  destroy_value %copy : $X
-
   %hold = function_ref @holdX : $@convention(thin) (@guaranteed X) -> ()
   apply %hold(%borrow_2) : $@convention(thin) (@guaranteed X) -> ()
   end_borrow %borrow_2 : $X
@@ -83,10 +73,6 @@ body1(%lifetime_2 : @guaranteed $X, %value_2 : @owned $X):
   br body2(%lifetime_2 : $X, %value_2 : $X)
 
 body2(%lifetime_3 : @guaranteed $X, %value_3 : @owned $X):
-  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
-  %copy_3 = copy_value %value_3 : $X
-  destroy_value %copy_3 : $X
-
   end_borrow %lifetime_3 : $X
   destroy_value %value_3 : $X
   br exit
@@ -113,10 +99,6 @@ body1(%borrow_2 : @guaranteed $X, %value_2 : @owned $X):
   br body2(%borrow_2 : $X, %value_2 : $X)
 
 body2(%borrow_3 : @guaranteed $X, %value_3 : @owned $X):
-  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
-  %copy_3 = copy_value %value_3 : $X
-  destroy_value %copy_3 : $X
-
   %hold = function_ref @holdX : $@convention(thin) (@guaranteed X) -> ()
   apply %hold(%borrow_3) : $@convention(thin) (@guaranteed X) -> ()
   end_borrow %borrow_3 : $X
@@ -144,10 +126,6 @@ body1(%value_2 : @owned $X):
   br body2(%lifetime_2 : $X, %value_2 : $X)
 
 body2(%lifetime_3 : @guaranteed $X, %value_3 : @owned $X):
-  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
-  %copy_3 = copy_value %value_3 : $X
-  destroy_value %copy_3 : $X
-
   end_borrow %lifetime_3 : $X
   destroy_value %value_3 : $X
   br exit
@@ -180,11 +158,6 @@ body:
   %get = function_ref @getX : $@convention(thin) () -> (@owned X)
   %value_0 = apply %get() : $@convention(thin) () -> (@owned X)
   end_borrow %reborrow : $FakeOptional<X>
-
-  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
-  %bogus = copy_value %value : $FakeOptional<X>
-  destroy_value %bogus : $FakeOptional<X>
-
   destroy_value %value : $FakeOptional<X>
   %some_value_0 = enum $FakeOptional<X>, #FakeOptional.some!enumelt, %value_0 : $X
   %some_borrow_0 = begin_borrow %some_value_0 : $FakeOptional<X>
@@ -244,9 +217,6 @@ bb9:
   br bb1(%8 : $X, %9 : $X)
 
 bb10:
-  // TODO: Remove the copy once it isn't necessary to trigger canonicalization.
-  %bogus = copy_value %4 : $X
-  destroy_value %bogus : $X
   %23 = tuple ()
   end_borrow %3 : $X
   destroy_value %4 : $X
@@ -269,8 +239,6 @@ reborrow_only(%lifetime_3 : @guaranteed $X):
   br exit
 
 exit:
-  %bogus = copy_value %value_2 : $X
-  destroy_value %bogus : $X
   %retval = tuple ()
   end_borrow %lifetime_3 : $X
   destroy_value %value_2 : $X
@@ -296,8 +264,6 @@ reborrow_only_2(%lifetime_4 : @guaranteed $X):
   br exit
 
 exit:
-  %bogus = copy_value %value_2 : $X
-  destroy_value %bogus : $X
   %retval = tuple ()
   end_borrow %lifetime_4 : $X
   destroy_value %value_2 : $X
