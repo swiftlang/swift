@@ -480,7 +480,7 @@ bool SILFunction::isWeakImported() const {
   auto deploymentTarget =
       AvailabilityContext::forDeploymentTarget(getASTContext());
 
-  if (getASTContext().LangOpts.EnableAdHocAvailability)
+  if (getASTContext().LangOpts.WeakLinkAtTarget)
     return !Availability.isSupersetOf(deploymentTarget);
 
   return !deploymentTarget.isContainedIn(Availability);
