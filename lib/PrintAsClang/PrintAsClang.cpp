@@ -337,15 +337,6 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
       [&] { emitMacro("SWIFT_NOEXCEPT"); });
-  emitCxxConditional(out, [&] {
-    out << "#if !defined(SWIFT_CXX_INT_DEFINED)\n";
-    out << "#define SWIFT_CXX_INT_DEFINED\n";
-    out << "namespace swift {\n";
-    out << "using Int = ptrdiff_t;\n";
-    out << "using UInt = size_t;\n";
-    out << "}\n";
-    out << "#endif\n";
-  });
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 }
