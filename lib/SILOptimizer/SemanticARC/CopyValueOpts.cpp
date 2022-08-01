@@ -187,7 +187,6 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // scope, regardless of whether the end of the scope is inside a dead-end
   // block.
   {
-    SmallVector<Operand *, 8> scratchSpace;
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
           return !borrowScope.areUsesWithinTransitiveScope(
               lr.getAllConsumingUses(), nullptr);
