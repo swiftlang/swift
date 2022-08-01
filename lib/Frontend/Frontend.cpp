@@ -923,7 +923,7 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     }
   }
 
-  if(Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
+  if (Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
     pushImport(CXX_SHIM_NAME);
   }
 
