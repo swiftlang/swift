@@ -128,7 +128,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
-        Sink, CCS, AssociatedDecl, IsAsync, ModuleName,
+        Sink, CCS, AssociatedDecl, IsAsync, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,

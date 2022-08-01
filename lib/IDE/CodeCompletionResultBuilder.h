@@ -44,6 +44,7 @@ class CodeCompletionResultBuilder {
   unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
   bool IsAsync = false;
+  bool HasAsyncAlternative = false;
   Optional<CodeCompletionLiteralKind> LiteralKind;
   CodeCompletionKeywordKind KeywordKind = CodeCompletionKeywordKind::None;
   unsigned CurrentNestingLevel = 0;
@@ -116,6 +117,9 @@ public:
   void setAssociatedDecl(const Decl *D);
 
   void setIsAsync(bool IsAsync) { this->IsAsync = IsAsync; }
+  void setHasAsyncAlternative(bool HasAsyncAlternative) {
+    this->HasAsyncAlternative = HasAsyncAlternative;
+  }
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
