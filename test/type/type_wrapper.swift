@@ -82,3 +82,68 @@ struct InaccessibleOrInvalidSubscripts<S> {
     get { true }
   }
 }
+
+@typeWrapper
+struct NoopWrapper<S> {
+  init(memberwise: S) {}
+
+  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    get { fatalError() }
+    set { }
+  }
+}
+
+@NoopWrapper
+struct A {
+  var a: String
+  var b: Int
+}
+
+@NoopWrapper
+class GenericA<K: Hashable, V> {
+  var data: [K: V]
+}
+
+@NoopWrapper // expected-error {{type wrapper attribute 'NoopWrapper' can only be applied to a class, struct}}
+protocol P {
+}
+
+@NoopWrapper // expected-error {{type wrapper attribute 'NoopWrapper' can only be applied to a class, struct}}
+enum E {
+  var x: Int { get { 42 } }
+}
+
+func testWrappedTypeAccessChecking() {
+  let a = A(a: "", b: 42) // synthesized init
+  let b = GenericA(data: ["ultimate question": 42]) // generic synthesized init
+
+  _ = a.a // Ok
+  _ = b.data // Ok
+}
+
+struct Parent {
+  @typeWrapper
+  struct Wrapper<S> {
+    init(memberwise: S) {}
+
+    subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+      get { fatalError() }
+      set { }
+    }
+  }
+}
+
+func testLocalWithNestedWrapper() {
+  @Parent.Wrapper
+  class WithNestedWrapper<T> {
+    var test: [T]
+
+    var computed: String {
+      get { "" }
+    }
+  }
+
+  let t = WithNestedWrapper(test: [1, 2]) // synthesized init
+  _ = t.test // Ok
+  _ = t.computed // Ok
+}
