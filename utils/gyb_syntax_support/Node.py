@@ -69,12 +69,19 @@ class Node(object):
         """
         return "Unknown" in self.syntax_kind
 
+    def is_missing(self):
+        """
+        Returns `True` if this node is a `Missing` syntax subclass.
+        """
+        return "Missing" in self.syntax_kind
+
     def is_buildable(self):
         """
         Returns `True` if this node should have a builder associated.
         """
         return not self.is_base() and \
             not self.is_unknown() and \
+            not self.is_missing() and \
             not self.is_syntax_collection()
 
     def shall_be_omitted_when_empty(self):
