@@ -2288,9 +2288,25 @@ namespace {
       case PatternKind::Any: {
         Type type;
 
+        // If this is a situation like `[let] _ = <expr>`, return
+        // initializer expression.
+        auto getInitializerExpr = [&locator]() -> Expr * {
+          auto last = locator.last();
+          if (!last)
+            return nullptr;
+
+          auto contextualTy = last->getAs<LocatorPathElt::ContextualType>();
+          return (contextualTy && contextualTy->isFor(CTP_Initialization))
+                     ? locator.trySimplifyToExpr()
+                     : nullptr;
+        };
+
         // Always prefer a contextual type when it's available.
         if (externalPatternType) {
           type = externalPatternType;
+        } else if (auto *initializer = getInitializerExpr()) {
+          // For initialization always assume a type of initializer.
+          type = CS.getType(initializer)->getRValueType();
         } else {
           type = CS.createTypeVariable(
               CS.getConstraintLocator(pattern,
