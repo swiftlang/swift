@@ -59,10 +59,7 @@ def get_verify_resource_dir_modules_commands(
     known_platforms = [
         ('appletvos', 'arm64', 'arm64-apple-tvos9.0'),
         ('appletvsimulator', 'x86_64', 'x86_64-apple-tvos9.0'),
-        ('iphoneos', 'armv7', 'armv7-apple-ios7.0'),
-        ('iphoneos', 'armv7s', 'armv7s-apple-ios7.0'),
         ('iphoneos', 'arm64', 'arm64-apple-ios7.0'),
-        ('iphonesimulator', 'i386', 'i386-apple-ios7.0'),
         ('iphonesimulator', 'x86_64', 'x86_64-apple-ios7.0'),
         ('macosx', 'x86_64', 'x86_64-apple-macosx10.9'),
         ('watchos', 'armv7k', 'armv7k-apple-watchos2.0'),
