@@ -111,8 +111,9 @@ def run_build_script_helper(action, host_target, product, args,
     if not clean:
         helper_cmd.append('--no-clean')
 
-    # Pass Cross compile host info
-    if product.has_cross_compile_hosts():
+    # Pass Cross compile host info unless we're testing.
+    # It doesn't make sense to run tests of the cross compile host.
+    if product.has_cross_compile_hosts() and action != 'test':
         if product.is_darwin_host(host_target):
             if len(args.cross_compile_hosts) != 1:
                 raise RuntimeError("Cross-Compiling indexstoredb to multiple " +
