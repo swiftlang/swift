@@ -305,8 +305,16 @@ ERROR(batch_scan_input_file_missing,none,
       "cannot open batch dependencies scan input file from %0",
       (StringRef))
 
+ERROR(const_extract_protocol_list_input_file_missing,none,
+      "cannot open constant extraction protocol list input file from %0",
+      (StringRef))
+
 ERROR(batch_scan_input_file_corrupted,none,
       "batch dependencies scan input file from %0 is malformed",
+      (StringRef))
+
+ERROR(const_extract_protocol_list_input_file_corrupted,none,
+      "constant extraction protocol list input file from %0 is malformed",
       (StringRef))
 
 ERROR(unknown_platform_name, none,
