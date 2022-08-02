@@ -459,6 +459,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       return;
     }
 
+    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+      ClangClassTypePrinter::printParameterCxxtoCUseScaffold(
+          os, classDecl, moduleContext, namePrinter, isInOut);
+      return;
+    }
+
     if (auto *decl = type->getNominalOrBoundGenericNominal()) {
       if ((isa<StructDecl>(decl) || isa<EnumDecl>(decl))) {
         ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
