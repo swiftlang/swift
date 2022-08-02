@@ -84,3 +84,7 @@ public func takeClassWithIntFieldInout(_ x: inout ClassWithIntField) {
 // CHECK: inline void takeClassWithIntField(const ClassWithIntField& x) noexcept {
 // CHECK-NEXT:  return _impl::$s5Class04takeA12WithIntFieldyyAA0acdE0CF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x));
 // CHECK-NEXT: }
+
+// CHECK: inline void takeClassWithIntFieldInout(ClassWithIntField& x) noexcept {
+// CHECK-NEXT:    return _impl::$s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(&::swift::_impl::_impl_RefCountedClass::getOpaquePointerRef(x));
+// CHECK-NEXT:  }
