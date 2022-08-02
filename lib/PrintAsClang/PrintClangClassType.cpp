@@ -70,7 +70,7 @@ void ClangClassTypePrinter::printClassTypeDecl(
         os << "public:\n";
         os << "static inline ";
         printer.printBaseName(typeDecl);
-        os << " fromUnretained(void * _Nonnull ptr) noexcept { return ";
+        os << " makeRetained(void * _Nonnull ptr) noexcept { return ";
         printer.printBaseName(typeDecl);
         os << "(ptr); }\n";
         os << "};\n";
@@ -85,7 +85,7 @@ void ClangClassTypePrinter::printClassTypeReturnScaffold(
       type->getModuleContext(), moduleContext);
   os << cxx_synthesis::getCxxImplNamespaceName() << "::";
   ClangValueTypePrinter::printCxxImplClassName(os, type);
-  os << "::fromUnretained(";
+  os << "::makeRetained(";
   bodyPrinter();
   os << ");\n";
 }

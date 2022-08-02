@@ -43,7 +43,7 @@ public final class ClassWithIntField {
 // CHECK-EMPTY:
 // CHECK-NEXT:class _impl_ClassWithIntField {
 // CHECK-NEXT:public:
-// CHECK-NEXT:static inline ClassWithIntField fromUnretained(void * _Nonnull ptr) noexcept { return ClassWithIntField(ptr); }
+// CHECK-NEXT:static inline ClassWithIntField makeRetained(void * _Nonnull ptr) noexcept { return ClassWithIntField(ptr); }
 // CHECK-NEXT:};
 // CHECK-EMPTY:
 // CHECK-NEXT:} // namespace _impl
@@ -57,5 +57,5 @@ public func returnClassWithIntField() -> ClassWithIntField {
 }
 
 // CHECK: inline ClassWithIntField returnClassWithIntField() noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_ClassWithIntField::fromUnretained(_impl::$s5Class06returnA12WithIntFieldAA0acdE0CyF());
+// CHECK-NEXT:   return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class06returnA12WithIntFieldAA0acdE0CyF());
 // CHECK-NEXT: }
