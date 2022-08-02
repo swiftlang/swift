@@ -83,6 +83,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
   Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
+  Opts.IgnoreInterfaceProvidedOptions |= Args.hasArg(OPT_ignore_interface_provided_options);
 
   // FIXME: Remove this flag
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
@@ -231,6 +232,9 @@ bool ArgsToFrontendOptionsConverter::convert(
     return true;
 
   if (checkUnusedSupplementaryOutputPaths())
+    return true;
+
+  if (checkBuildFromInterfaceOnlyOptions())
     return true;
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
@@ -612,6 +616,17 @@ bool ArgsToFrontendOptionsConverter::
   Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(mainOutputs,
                                                        supplementaryOutputs,
                                                        mainOutputForIndexUnits);
+  return false;
+}
+
+bool ArgsToFrontendOptionsConverter::checkBuildFromInterfaceOnlyOptions()
+    const {
+  if (Opts.RequestedAction != FrontendOptions::ActionType::CompileModuleFromInterface &&
+      Opts.IgnoreInterfaceProvidedOptions) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_cannot_ignore_interface_options_in_mode);
+    return true;
+  }
   return false;
 }
 
