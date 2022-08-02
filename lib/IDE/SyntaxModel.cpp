@@ -231,9 +231,20 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         break;
 
       case tok::oper_prefix:
-        if (Tok.getText() == "-")
+        if (Tok.getText() == "-" && I != E &&
+            (Tokens[I+1].getKind() == tok::integer_literal ||
+             Tokens[I+1].getKind() == tok::floating_literal)) {
           UnaryMinusLoc = Loc;
-        continue;
+          continue;
+        } else {
+          Kind = SyntaxNodeKind::Operator;
+          break;
+        }
+      case tok::oper_postfix:
+      case tok::oper_binary_spaced:
+      case tok::oper_binary_unspaced:
+        Kind = SyntaxNodeKind::Operator;
+        break;
 
       case tok::comment:
         if (Tok.getText().startswith("///") ||
