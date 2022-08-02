@@ -1073,10 +1073,6 @@ def create_argument_parser():
     option('--skip-test-ios-simulator',
            toggle_false('test_ios_simulator'),
            help='skip testing iOS simulator targets')
-    option('--skip-test-ios-32bit-simulator',
-           toggle_false('test_ios_32bit_simulator'),
-           default=False,
-           help='skip testing iOS 32 bit simulator targets')
     option('--skip-test-watchos-32bit-simulator',
            toggle_false('test_watchos_32bit_simulator'),
            default=False,

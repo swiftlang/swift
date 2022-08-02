@@ -629,8 +629,6 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-cygwin', dest='test_cygwin'),
     DisableOption('--skip-test-freebsd', dest='test_freebsd'),
     DisableOption('--skip-test-ios', dest='test_ios'),
-    DisableOption('--skip-test-ios-32bit-simulator',
-                  dest='test_ios_32bit_simulator'),
     DisableOption('--skip-test-watchos-32bit-simulator',
                   dest='test_watchos_32bit_simulator'),
     DisableOption('--skip-test-ios-host', dest='test_ios_host'),
