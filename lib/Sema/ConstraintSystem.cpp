@@ -5608,6 +5608,13 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     if (simplifyType(rawFnType)->is<UnresolvedType>())
       return None;
 
+    // A tuple construction is spelled in the AST as a function call, but
+    // is really more like a tuple conversion.
+    if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
+      if (metaTy->getInstanceType()->is<TupleType>())
+        return None;
+    }
+
     assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
   }

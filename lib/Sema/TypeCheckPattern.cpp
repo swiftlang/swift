@@ -1036,8 +1036,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     if ((options.getContext() == TypeResolverContext::EnumPatternPayload)
         && !isa<TuplePattern>(semantic)) {
       if (auto tupleType = type->getAs<TupleType>()) {
-        if (tupleType->getNumElements() == 1 &&
-            !tupleType->getElement(0).isVararg()) {
+        if (tupleType->getNumElements() == 1) {
           auto elementTy = tupleType->getElementType(0);
           sub = coercePatternToType(
               pattern.forSubPattern(sub, /*retainTopLevel=*/true), elementTy,

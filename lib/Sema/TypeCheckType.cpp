@@ -3935,7 +3935,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
     auto eltName = repr->getElementName(i);
 
-    elements.emplace_back(ty, eltName, ParameterTypeFlags());
+    elements.emplace_back(ty, eltName);
 
     if (eltName.empty())
       continue;

@@ -999,30 +999,6 @@ namespace {
       return false;
     }
 
-    /// If the given parameter \p param has non-trivial ownership semantics,
-    /// adjust the type of the given expression \p expr to reflect it. The
-    /// expression is expected to serve as either an argument or reference
-    /// to the parameter.
-    void adjustExprOwnershipForParam(Expr *expr,
-                                     const AnyFunctionType::Param &param) {
-      // If the 'self' parameter has non-trivial ownership, adjust the
-      // argument accordingly.
-      switch (param.getValueOwnership()) {
-      case ValueOwnership::Default:
-      case ValueOwnership::InOut:
-        break;
-
-      case ValueOwnership::Owned:
-      case ValueOwnership::Shared:
-        assert(param.getPlainType()->isEqual(cs.getType(expr)));
-
-        expr->setType(ParenType::get(cs.getASTContext(), param.getPlainType(),
-                                     param.getParameterFlags()));
-        cs.cacheType(expr);
-        break;
-      }
-    }
-
     /// Build the call inside the body of a single curry thunk
     /// "{ args in base.fn(args) }".
     ///
@@ -1048,10 +1024,6 @@ namespace {
         const auto calleeSelfParam = calleeFnTy->getParams().front();
         baseExpr =
             coerceToType(baseExpr, calleeSelfParam.getOldType(), locator);
-
-        // If the 'self' parameter has non-trivial ownership, adjust the
-        // argument type accordingly.
-        adjustExprOwnershipForParam(baseExpr, calleeSelfParam);
 
         // Uncurry the callee type in the presence of a base expression; we
         // want '(args) -> result' vs. '(self) -> (args) -> result'.
@@ -1357,11 +1329,6 @@ namespace {
 
         selfOpenedRef = new (ctx) OpaqueValueExpr(SourceLoc(), opaqueValueTy);
         cs.cacheType(selfOpenedRef);
-
-        // If we're opening an existential and the thunk's 'self' parameter has
-        // non-trivial ownership, we must adjust the parameter reference type
-        // here, because the body will use the opaque value instead.
-        adjustExprOwnershipForParam(selfParamRef, selfThunkParam);
       }
 
       Expr *outerThunkBody = nullptr;
@@ -1385,11 +1352,6 @@ namespace {
 
         // Close the existential if warranted.
         if (hasOpenedExistential) {
-          // If the callee's 'self' parameter has non-trivial ownership, adjust
-          // the argument type accordingly.
-          adjustExprOwnershipForParam(selfOpenedRef,
-                                      selfCalleeTy->getParams().front());
-
           outerThunkBody = new (ctx) OpenExistentialExpr(
               selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef),
               outerThunkBody, outerThunkBody->getType());
@@ -5401,7 +5363,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
 
     converted.push_back(toElt);
     labels.push_back(toLabel);
-    convertedElts.emplace_back(toEltType, toLabel, ParameterTypeFlags());
+    convertedElts.emplace_back(toEltType, toLabel);
   }
 
   // Shuffling tuple elements is an anti-pattern worthy of a diagnostic.  We
