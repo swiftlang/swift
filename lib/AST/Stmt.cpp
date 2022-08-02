@@ -501,6 +501,13 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
                body, caseVarDecls, implicit, fallthroughStmt);
 }
 
+DoStmt *DoStmt::createImplicit(ASTContext &C, LabeledStmtInfo labelInfo,
+                               ArrayRef<ASTNode> body) {
+  return new (C) DoStmt(labelInfo, /*doLoc=*/SourceLoc(),
+                        BraceStmt::createImplicit(C, body),
+                        /*implicit=*/true);
+}
+
 namespace {
 
 template<typename CaseIterator>
