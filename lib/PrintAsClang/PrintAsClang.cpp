@@ -80,6 +80,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "# include <swift/objc-prologue.h>\n"
          "#endif\n"
          "\n"
+         "#pragma clang diagnostic ignored \"-Wduplicate-method-match\"\n"
          "#pragma clang diagnostic ignored \"-Wauto-import\"\n";
   emitObjCConditional(out,
                       [&] { out << "#include <Foundation/Foundation.h>\n"; });

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s -verify
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s > %t.log 2>&1
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -emit-sil %s -verify
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -emit-sil %s > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
 
 // REQUIRES: objc_interop
@@ -19,12 +19,3 @@ extension NSObject {
 // CHECK: ObjectiveC.NSObjectProtocol:{{.*}}note: method 'class()' declared here
 }
 
-// rdar://96470068 - Don't want conflict diagnostics in the same module
-extension MyObject {
-  @objc func implementedInSwift() {}
-}
-
-// ...or the bridging header
-extension MyBridgedObject {
-  @objc func implementedInSwift() {}
-}

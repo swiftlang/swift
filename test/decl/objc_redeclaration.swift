@@ -26,7 +26,7 @@ extension Redecl1 {
   @objc var method1_var_alias: Int {
     @objc(method1) get { return 5 } // expected-error{{getter for 'method1_var_alias' with Objective-C selector 'method1' conflicts with method 'method1()' with the same Objective-C selector}}
 
-    @objc(method2:) set { } // expected-error{{setter for 'method1_var_alias' with Objective-C selector 'method2:' conflicts with method 'method2' with the same Objective-C selector}}
+    @objc(method2:) set { } // expected-note{{setter for 'method1_var_alias' declared here}}
   }
 
   @objc subscript (i: Int) -> Redecl1 {
@@ -37,7 +37,7 @@ extension Redecl1 {
 
 extension Redecl1 {
   @objc
-  func method2(_ x: Int) { } // expected-note{{method 'method2' declared here}}
+  func method2(_ x: Int) { } // expected-error{{method 'method2' with Objective-C selector 'method2:' conflicts with setter for 'method1_var_alias' with the same Objective-C selector}}
 
   @objc(objectAtIndexedSubscript:)
   func indexed(_ x: Int) { } // expected-error{{method 'indexed' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with subscript getter with the same Objective-C selector}}

@@ -53,9 +53,3 @@ extension Delegate {
     }
   }
 }
-
-// rdar://95887113 - Implementing an ObjC category method in Swift is not strictly valid, but should be tolerated
-
-extension Delegate {
-  @objc public func makeRequest(fromSwift: Request, completionHandler: (() -> Void)?) {}
-}

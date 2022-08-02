@@ -631,7 +631,7 @@ public:
   ///
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested.
-  void loadObjCMethods(NominalTypeDecl *typeDecl,
+  void loadObjCMethods(ClassDecl *classDecl,
                        ObjCSelector selector,
                        bool isInstanceMethod,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);

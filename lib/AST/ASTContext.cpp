@@ -1925,12 +1925,24 @@ void ASTContext::loadObjCMethods(
   PrettyStackTraceSelector stackTraceSelector("looking for", selector);
   PrettyStackTraceDecl stackTraceDecl("...in", tyDecl);
 
+  // @objc protocols cannot have @objc extension members, so if we've recorded
+  // everything in the protocol definition, we've recorded everything. And we
+  // only ever use the ObjCSelector version of `NominalTypeDecl::lookupDirect()`
+  // on protocols in primary file typechecking, so we don't care about protocols
+  // that need to be loaded from files.
+  // TODO: Rework `ModuleLoader::loadObjCMethods()` to support protocols too if
+  //       selector-based `NominalTypeDecl::lookupDirect()` ever needs to work
+  //       in more situations.
+  ClassDecl *classDecl = dyn_cast<ClassDecl>(tyDecl);
+  if (!classDecl)
+    return;
+
   for (auto &loader : getImpl().ModuleLoaders) {
     // Ignore the Clang importer if we've been asked for Swift-only results.
     if (swiftOnly && loader.get() == getClangModuleLoader())
       continue;
 
-    loader->loadObjCMethods(tyDecl, selector, isInstanceMethod,
+    loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
                             previousGeneration, methods);
   }
 }

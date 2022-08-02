@@ -613,7 +613,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
 }
 
 void ModuleFile::loadObjCMethods(
-       NominalTypeDecl *typeDecl,
+       ClassDecl *classDecl,
        ObjCSelector selector,
        bool isInstanceMethod,
        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
@@ -627,7 +627,7 @@ void ModuleFile::loadObjCMethods(
     return;
   }
 
-  std::string ownerName = Mangle::ASTMangler().mangleNominalType(typeDecl);
+  std::string ownerName = Mangle::ASTMangler().mangleNominalType(classDecl);
   auto results = *known;
   for (const auto &result : results) {
     // If the method is the wrong kind (instance vs. class), skip it.

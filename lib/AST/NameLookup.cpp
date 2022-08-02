@@ -36,7 +36,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Strings.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1311,24 +1310,7 @@ class swift::ObjCMethodLookupTable
         : public llvm::DenseMap<std::pair<ObjCSelector, char>,
                                 StoredObjCMethods>,
           public ASTAllocated<ObjCMethodLookupTable>
-{
-  SWIFT_DEBUG_DUMP {
-    llvm::errs() << "ObjCMethodLookupTable:\n";
-    for (auto pair : *this) {
-      auto selector = pair.getFirst().first;
-      auto isInstanceMethod = pair.getFirst().second;
-      auto &methods = pair.getSecond();
-
-      llvm::errs() << "  \"" << (isInstanceMethod ? "-" : "+") << selector
-                   << "\":\n";
-      for (auto method : methods.Methods) {
-        llvm::errs() << "  - \"";
-        method->dumpRef(llvm::errs());
-        llvm::errs() << "\"\n";
-      }
-    }
-  }
-};
+{};
 
 MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
   // Register a cleanup with the ASTContext to call the lookup table
@@ -1686,7 +1668,7 @@ bool NominalTypeDecl::createObjCMethodLookup() {
   assert(!ObjCMethodLookup && "Already have an Objective-C member table");
 
   // Most types cannot have ObjC methods.
-  if (!(isa<ClassDecl>(this) || isa<ProtocolDecl>(this)))
+  if (!(isa<ClassDecl>(this)))
     return false;
 
   auto &ctx = getASTContext();
@@ -1717,36 +1699,6 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
-/// If there is an apparent conflict between \p newDecl and one of the methods
-/// in \p vec, should we diagnose it?
-static bool
-shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
-                       llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
-  // Are all conflicting methods imported from ObjC and in our ObjC half or a
-  // bridging header? Some code bases implement ObjC methods in Swift even
-  // though it's not exactly supported.
-  auto newDeclModuleName = newDecl->getModuleContext()->getName();
-  if (llvm::all_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    if (!oldDecl->hasClangNode())
-      return false;
-    auto oldDeclModuleName = oldDecl->getModuleContext()->getName();
-    return oldDeclModuleName == newDeclModuleName
-               || oldDeclModuleName.str() == CLANG_HEADER_MODULE_NAME;
-  }))
-    return false;
-
-  // If we're looking at protocol requirements, is the new method an async
-  // alternative of any existing method, or vice versa?
-  if (isa<ProtocolDecl>(ty) &&
-      llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    return newDecl->getAsyncAlternative(/*isKnownObjC=*/true) == oldDecl
-              || oldDecl->getAsyncAlternative(/*isKnownObjC=*/true) == newDecl;
-  }))
-    return false;
-
-  return true;
-}
-
 void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
                                        ObjCSelector selector) {
   if (!ObjCMethodLookup && !createObjCMethodLookup())
@@ -1762,11 +1714,12 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
     return;
 
   if (auto *sf = method->getParentSourceFile()) {
-    if (vec.empty()) {
-      sf->ObjCMethodList.push_back(method);
-    } else if (shouldDiagnoseConflict(this, method, vec)) {
+    if (vec.size() == 1) {
       // We have a conflict.
-      sf->ObjCMethodConflicts.insert({ this, selector, isInstanceMethod });
+      sf->ObjCMethodConflicts.push_back(std::make_tuple(this, selector,
+                                                        isInstanceMethod));
+    } if (vec.empty()) {
+      sf->ObjCMethodList.push_back(method);
     }
   }
 
