@@ -2456,6 +2456,14 @@ ASTContext::getSpecializedConformance(Type type,
 
 InheritedProtocolConformance *
 ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
+  // Collapse multiple levels of inherited conformance.
+  while (auto *otherInherited = dyn_cast<InheritedProtocolConformance>(inherited))
+    inherited = otherInherited->getInheritedConformance();
+
+  assert(isa<SpecializedProtocolConformance>(inherited) ||
+         isa<NormalProtocolConformance>(inherited) ||
+         isa<BuiltinProtocolConformance>(inherited));
+
   llvm::FoldingSetNodeID id;
   InheritedProtocolConformance::Profile(id, type, inherited);
 
