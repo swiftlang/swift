@@ -183,6 +183,9 @@ bool swift::ide::getContextualCompletionDiagnostics(
     return Diag.getDiagnostics(Severity, Out,
                                diag::ide_recursive_accessor_reference,
                                NameForDiagnostics, /*"getter"*/ 0);
+  case ContextualNotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext:
+    return Diag.getDiagnostics(
+        Severity, Out, diag::ide_has_async_alternative, NameForDiagnostics);
   case ContextualNotRecommendedReason::None:
     llvm_unreachable("invalid not recommended reason");
   }

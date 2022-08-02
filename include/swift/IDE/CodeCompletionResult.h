@@ -251,16 +251,17 @@ enum class CodeCompletionDiagnosticSeverity : uint8_t {
 /// E.g. \c InvalidAsyncContext depends on whether the usage context is async or
 /// not.
 enum class NotRecommendedReason : uint8_t {
-  None = 0,                    // both contextual and context-free
-  RedundantImport,             // contextual
-  RedundantImportIndirect,     // contextual
-  Deprecated,                  // context-free
-  SoftDeprecated,              // context-free
-  InvalidAsyncContext,         // contextual
-  CrossActorReference,         // contextual
-  VariableUsedInOwnDefinition, // contextual
+  None = 0,                              // both contextual and context-free
+  RedundantImport,                       // contextual
+  RedundantImportIndirect,               // contextual
+  Deprecated,                            // context-free
+  SoftDeprecated,                        // context-free
+  InvalidAsyncContext,                   // contextual
+  CrossActorReference,                   // contextual
+  VariableUsedInOwnDefinition,           // contextual
+  NonAsyncAlternativeUsedInAsyncContext, // contextual
 
-  MAX_VALUE = VariableUsedInOwnDefinition
+  MAX_VALUE = NonAsyncAlternativeUsedInAsyncContext
 };
 
 /// TODO: We consider deprecation warnings as context free although they don't
@@ -294,10 +295,14 @@ enum class ContextualNotRecommendedReason : uint8_t {
   None = 0,
   RedundantImport,
   RedundantImportIndirect,
+  /// A method that is async is being used in a non-async context.
   InvalidAsyncContext,
   CrossActorReference,
   VariableUsedInOwnDefinition,
-  MAX_VALUE = VariableUsedInOwnDefinition
+  /// A method that is sync and has an async alternative is used in an async
+  /// context.
+  NonAsyncAlternativeUsedInAsyncContext,
+  MAX_VALUE = NonAsyncAlternativeUsedInAsyncContext
 };
 
 enum class CodeCompletionResultKind : uint8_t {
@@ -330,6 +335,9 @@ class ContextFreeCodeCompletionResult {
 
   bool IsSystem : 1;
   bool IsAsync : 1;
+  /// Whether the result has been annotated as having an async alternative that
+  /// should be prefered in async contexts.
+  bool HasAsyncAlternative : 1;
   CodeCompletionString *CompletionString;
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
@@ -361,7 +369,7 @@ public:
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, uint8_t AssociatedKind,
       CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem, bool IsAsync,
-      CodeCompletionString *CompletionString,
+      bool HasAsyncAlternative, CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
@@ -372,10 +380,11 @@ public:
       NullTerminatedStringRef FilterName,
       NullTerminatedStringRef NameForDiagnostics)
       : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
-        IsAsync(IsAsync), CompletionString(CompletionString),
-        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), ResultType(ResultType),
-        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
+        IsAsync(IsAsync), HasAsyncAlternative(HasAsyncAlternative),
+        CompletionString(CompletionString), ModuleName(ModuleName),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        ResultType(ResultType), NotRecommended(NotRecommended),
+        DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
         NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
@@ -387,6 +396,8 @@ public:
            "Completion item should have diagnostic message iff the diagnostics "
            "severity is not none");
     assert(CompletionString && "Result should have a completion string");
+    assert(!(HasAsyncAlternative && IsAsync) &&
+           "A function shouldn't be both async and have an async alternative");
     if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None) {
       this->KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
     }
@@ -442,7 +453,7 @@ public:
   createDeclResult(CodeCompletionResultSink &Sink,
                    CodeCompletionString *CompletionString,
                    const Decl *AssociatedDecl, bool IsAsync,
-                   NullTerminatedStringRef ModuleName,
+                   bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
                    NullTerminatedStringRef BriefDocComment,
                    ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
                    CodeCompletionResultType ResultType,
@@ -479,6 +490,8 @@ public:
   bool isSystem() const { return IsSystem; };
 
   bool isAsync() const { return IsAsync; };
+
+  bool hasAsyncAlternative() const { return HasAsyncAlternative; };
 
   CodeCompletionString *getCompletionString() const { return CompletionString; }
 
@@ -671,6 +684,8 @@ public:
       return NotRecommendedReason::RedundantImportIndirect;
     case ContextualNotRecommendedReason::InvalidAsyncContext:
       return NotRecommendedReason::InvalidAsyncContext;
+    case ContextualNotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext:
+      return NotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext;
     case ContextualNotRecommendedReason::CrossActorReference:
       return NotRecommendedReason::CrossActorReference;
     case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
