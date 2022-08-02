@@ -261,6 +261,12 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'BackDeployAttributeSpecList' : 257,
     'BackDeployVersionList' : 258,
     'BackDeployVersionArgument' : 259,
+    'Missing': 260,
+    'MissingDecl': 261,
+    'MissingExpr': 262,
+    'MissingStmt': 263,
+    'MissingType': 264,
+    'MissingPattern': 265,
 }
 
 
