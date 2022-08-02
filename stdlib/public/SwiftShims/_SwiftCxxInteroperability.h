@@ -28,6 +28,10 @@
 namespace swift {
 namespace _impl {
 
+extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
+
+extern "C" void swift_release(void *_Nonnull) noexcept;
+
 inline void *_Nonnull opaqueAlloc(size_t size, size_t align) noexcept {
 #if defined(_WIN32)
   void *r = _aligned_malloc(size, align);
