@@ -7,7 +7,7 @@ A Swift library author might want to expose their interface to C++, to allow a C
 **NOTE:** This document does not go over the following Swift language features yet:
 
 * Closures
-* Class types & inheritance
+* inheritance
 * Existential types (any P)
 * Nested types
 * Operators
@@ -569,6 +569,62 @@ Barcode normalizeBarcode(Barcode barcode) {
   return barcode;
 }
 ```
+
+## Using Swift Class Types
+
+Swift class types that are usable from C++ are available in their corresponding module namespace. They’re bridged over as a C++ class that stores a referenced counted pointer inside of it. Its initializers, methods and properties are exposed as members of the C++ class.
+
+### Reference counting in C++
+
+C++ class types that represent Swift classes perform automatic
+reference counting (ARC) operations when the C++ value that represents
+the reference to the Swift class is copied and destroyed.
+
+For example, the following Swift class:
+
+```swift
+// Swift module 'People'.
+class Person {
+  let name: String
+  init(name: String) {
+    self.name = name
+    print("\(name) is being initialized")
+  }
+  deinit {
+    print("\(name) is being deinitialized")
+  }
+}
+
+func createRandomPerson() -> Person {
+  return Person(name: getRandomName())
+}
+```
+
+Can be used from C++ with reference counting performed
+automatically:
+
+```c++
+#include "People-Swift.h"
+
+using namespace People;
+
+void doSomething(Person p) {
+  ...
+}
+
+void createAndUsePerson() {
+  Person p = createRandomPerson();
+
+  doSomething(p); // 'p' is copied. Person referenced by p is referenced twice.
+  // Destructor for copy of 'p' is called. Person referenced by p is referenced once.
+
+  // Destructor for 'p' gets called here. Person referenced by p is deallocated.
+}
+```
+
+The Swift `Person` class instance that C++ variable `p` referenced gets deallocated
+at the end of `createAndUsePerson` as the two C++ values that referenced it
+inside of `createAndUsePerson` were destroyed.
 
 ## Accessing Properties In C++
 
