@@ -37,6 +37,10 @@ public:
                                const ModuleDecl *moduleContext,
                                llvm::function_ref<void(void)> bodyPrinter);
 
+  static void printParameterCxxtoCUseScaffold(
+      raw_ostream &os, const ClassDecl *type, const ModuleDecl *moduleContext,
+      llvm::function_ref<void(void)> bodyPrinter, bool isInOut);
+
 private:
   raw_ostream &os;
 };
