@@ -862,6 +862,12 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
           worklist.insert(terminator->getOperand(0));
           continue;
         }
+      } else if (arg->isPhi()) {
+        SmallVector<SILValue, 4> incomingValues;
+        arg->getIncomingPhiValues(incomingValues);
+        for (auto incomingValue : incomingValues) {
+          worklist.insert(incomingValue);
+        }
       }
     } else if (auto *inst = value->getDefiningInstruction()) {
       if (auto *result =
