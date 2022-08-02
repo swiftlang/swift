@@ -31,53 +31,24 @@ void ClangClassTypePrinter::printClassTypeDecl(
                            os << ";\n";
                          });
 
+  StringRef baseClassName = "RefCountedClass";
+  StringRef baseClassQualifiedName = "swift::_impl::RefCountedClass";
+
   os << "class ";
   printer.printBaseName(typeDecl);
   // FIXME: Add support for inherintance.
-  os << " final";
+  os << " final : " << baseClassQualifiedName;
   os << " {\n";
   os << "public:\n";
 
-  // Destructor releases the object.
-  os << "  inline ~";
-  printer.printBaseName(typeDecl);
-  os << "() { swift::" << cxx_synthesis::getCxxImplNamespaceName()
-     << "::swift_release(_opaquePointer); }\n";
-
-  os << "  inline ";
-  printer.printBaseName(typeDecl);
-  os << "(const ";
-  printer.printBaseName(typeDecl);
-  os << "& other) noexcept : _opaquePointer(other._opaquePointer) { swift::"
-     << cxx_synthesis::getCxxImplNamespaceName()
-     << "::swift_retain(_opaquePointer); }\n";
-
-  os << "  inline ";
-  printer.printBaseName(typeDecl);
-  os << " & operator=(const ";
-  printer.printBaseName(typeDecl);
-  os << "& other) noexcept {\n    swift::"
-     << cxx_synthesis::getCxxImplNamespaceName()
-     << "::swift_retain(other._opaquePointer);\n";
-  os << "    swift::" << cxx_synthesis::getCxxImplNamespaceName()
-     << "::swift_release(_opaquePointer);\n";
-  os << "    _opaquePointer = other._opaquePointer;\n";
-  os << "    return *this;\n";
-  os << "  }\n";
-
-  // FIXME: move semantics should be restricted?
-  os << "  inline ";
-  printer.printBaseName(typeDecl);
-  os << "(";
-  printer.printBaseName(typeDecl);
-  os << "&&) noexcept = default;\n";
+  os << "  using " << baseClassName << "::" << baseClassName << ";\n";
+  os << "  using " << baseClassName << "::operator=;\n";
 
   os << "private:\n";
   os << "  inline ";
   printer.printBaseName(typeDecl);
-  os << "(void * _Nonnull ptr) noexcept : _opaquePointer(ptr) {}\n";
-  os << "\n  void * _Nonnull _opaquePointer;\n";
-  os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  os << "(void * _Nonnull ptr) noexcept : " << baseClassName << "(ptr) {}\n";
+  os << "\n  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
   os << "};\n\n";

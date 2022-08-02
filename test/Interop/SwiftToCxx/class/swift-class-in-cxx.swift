@@ -31,21 +31,13 @@ public final class ClassWithIntField {
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
 // CHECK-EMPTY:
-// CHECK-NEXT: class ClassWithIntField final {
+// CHECK-NEXT: class ClassWithIntField final : swift::_impl::RefCountedClass {
 // CHECK-NEXT: public:
-// CHECK-NEXT:   inline ~ClassWithIntField() { swift::_impl::swift_release(_opaquePointer); }
-// CHECK-NEXT:   inline ClassWithIntField(const ClassWithIntField& other) noexcept : _opaquePointer(other._opaquePointer) { swift::_impl::swift_retain(_opaquePointer); }
-// CHECK-NEXT:   inline ClassWithIntField & operator=(const ClassWithIntField& other) noexcept {
-// CHECK-NEXT:     swift::_impl::swift_retain(other._opaquePointer);
-// CHECK-NEXT:     swift::_impl::swift_release(_opaquePointer);
-// CHECK-NEXT:     _opaquePointer = other._opaquePointer;
-// CHECK-NEXT:     return *this;
-// CHECK-NEXT:   }
-// CHECK-NEXT:   inline ClassWithIntField(ClassWithIntField&&) noexcept = default;
+// CHECK-NEXT:   using RefCountedClass::RefCountedClass;
+// CHECK-NEXT:   using RefCountedClass::operator=;
 // CHECK-NEXT: private:
-// CHECK-NEXT:   inline ClassWithIntField(void * _Nonnull ptr) noexcept : _opaquePointer(ptr) {}
+// CHECK-NEXT:   inline ClassWithIntField(void * _Nonnull ptr) noexcept : RefCountedClass(ptr) {}
 // CHECK-EMPTY:
-// CHECK-NEXT:   void * _Nonnull _opaquePointer;
 // CHECK-NEXT:   friend class _impl::_impl_ClassWithIntField;
 // CHECK-NEXT: };
 // CHECK-EMPTY:
@@ -66,7 +58,7 @@ public final class ClassWithIntField {
 
 public final class register { }
 
-// CHECK: class register_ final {
+// CHECK: class register_ final : swift::_impl::RefCountedClass {
 
 public func returnClassWithIntField() -> ClassWithIntField {
   return ClassWithIntField()
