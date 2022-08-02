@@ -26,6 +26,10 @@ WARNING(ide_cross_actor_reference_swift5, none,
         "actor-isolated %0 should only be referenced from inside the actor",
         (StringRef))
 
+WARNING(ide_has_async_alternative, none,
+        "%0 has an async alternative that should be preferred in an async "
+        "context", (StringRef))
+
 WARNING(ide_redundant_import, none,
         "module %0 is already imported", (StringRef))
 
