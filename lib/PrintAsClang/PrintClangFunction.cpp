@@ -15,6 +15,7 @@
 #include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
+#include "PrintClangClassType.h"
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/AST/Decl.h"
@@ -145,6 +146,21 @@ public:
       return;
 
     visitPart(aliasTy->getSinglyDesugaredType(), optionalKind, isInOutParam);
+  }
+
+  void visitClassType(ClassType *CT, Optional<OptionalTypeKind> optionalKind,
+                      bool isInOutParam) {
+    // FIXME: handle optionalKind.
+    // FIXME: handle isInOutParam.
+    if (languageMode != OutputLanguageMode::Cxx) {
+      os << "void * _Nonnull";
+      return;
+    }
+    if (typeUseKind == FunctionSignatureTypeUse::ParamType)
+      os << "const ";
+    ClangSyntaxPrinter(os).printBaseName(CT->getDecl());
+    if (typeUseKind == FunctionSignatureTypeUse::ParamType)
+      os << "&";
   }
 
   void visitEnumType(EnumType *ET, Optional<OptionalTypeKind> optionalKind,
@@ -557,6 +573,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       ros << "reinterpret_cast<void *>(&returnValue)";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));
       os << ";\n  return returnValue;\n";
+      return;
+    }
+    if (auto *classDecl = resultTy->getClassOrBoundGenericClass()) {
+      ClangClassTypePrinter::printClassTypeReturnScaffold(
+          os, classDecl, moduleContext,
+          [&]() { printCallToCFunc(/*additionalParam=*/None); });
       return;
     }
     if (auto *decl = resultTy->getNominalOrBoundGenericNominal()) {
