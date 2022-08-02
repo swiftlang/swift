@@ -3623,12 +3623,17 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
 }
 
 Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
-                                   bool wantParamFlags) {
+                                   ParameterFlagHandling paramFlagHandling) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
-    auto flags = wantParamFlags ? param.getParameterFlags()
-                                : ParameterTypeFlags();
-    elements.emplace_back(param.getParameterType(), param.getLabel(), flags);
+    switch (paramFlagHandling) {
+    case ParameterFlagHandling::IgnoreNonEmpty:
+      break;
+    case ParameterFlagHandling::AssertEmpty:
+      assert(param.getParameterFlags().isNone());
+      break;
+    }
+    elements.emplace_back(param.getParameterType(), param.getLabel());
   }
   return TupleType::get(elements, ctx);
 }

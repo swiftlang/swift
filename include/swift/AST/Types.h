@@ -2123,6 +2123,28 @@ public:
   uint16_t toRaw() const { return value.toRaw(); }
 };
 
+/// A type that indicates how parameter flags should be handled in an operation
+/// that requires the conversion into a type that doesn't support them, such as
+/// tuples.
+enum class ParameterFlagHandling {
+  /// Ignores any parameter flags that may be present, dropping them from the
+  /// result. This should only be used in specific cases, including e.g:
+  ///
+  /// - The flags have already been handled, and unsuitable flags have been
+  ///   rejected or asserted to not be present.
+  /// - The flags aren't relevant for the particular conversion (e.g for type
+  ///   printing or compatibility logic).
+  /// - The conversion is only interested in the 'internal argument' of a
+  ///   parameter, in which case only the type and label are relevant.
+  ///
+  /// In all other cases, you ought to verify that unsuitable flags are not
+  /// present, or add assertions to that effect.
+  IgnoreNonEmpty,
+
+  /// Asserts that no parameter flags are present.
+  AssertEmpty
+};
+
 class YieldTypeFlags {
   enum YieldFlags : uint8_t {
     None        = 0,
@@ -3127,10 +3149,9 @@ protected:
 public:
   /// Take an array of parameters and turn it into a tuple or paren type.
   ///
-  /// \param wantParamFlags Whether to preserve the parameter flags from the
-  /// given set of parameters.
+  /// \param paramFlagHandling How to handle the parameter flags.
   static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params,
-                           bool wantParamFlags = true);
+                           ParameterFlagHandling paramFlagHandling);
 
   /// Given two arrays of parameters determine if they are equal in their
   /// canonicalized form. Internal labels and type sugar is *not* taken into

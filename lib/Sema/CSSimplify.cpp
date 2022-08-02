@@ -2650,8 +2650,12 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
   // If the argument was a single "tuple", let's bind newly
   // synthesized arguments to it.
   if (argumentTuple) {
+    // We can ignore parameter flags here as we're imploding a tuple for a
+    // simulated ((X, Y, Z)) -> R to (X, Y, Z) -> R conversion. As such, this is
+    // similar to e.g { x, y, z in fn((x, y, z)) }.
     cs.addConstraint(ConstraintKind::Bind, *argumentTuple,
-                     FunctionType::composeTuple(ctx, args),
+                     FunctionType::composeTuple(
+                         ctx, args, ParameterFlagHandling::IgnoreNonEmpty),
                      cs.getConstraintLocator(anchor));
   }
 
@@ -2884,8 +2888,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // Form an imploded tuple type, dropping the parameter flags as although
     // canImplodeParams makes sure we're not dealing with vargs, inout, etc,
     // we may still have e.g ownership flags left over, which we can drop.
-    auto input = AnyFunctionType::composeTuple(getASTContext(), params,
-                                               /*wantParamFlags*/ false);
+    auto input = AnyFunctionType::composeTuple(
+        getASTContext(), params, ParameterFlagHandling::IgnoreNonEmpty);
     params.clear();
     // If fixes are disabled let's do an easy thing and implode
     // tuple directly into parameters list.
@@ -7008,8 +7012,11 @@ ConstraintSystem::simplifyConstructionConstraint(
       args.push_back(arg.withFlags(flags));
     }
 
-    // Tuple construction is simply tuple conversion.
-    Type argType = AnyFunctionType::composeTuple(getASTContext(), args);
+    // Tuple construction is simply tuple conversion. We should have already
+    // handled the parameter flags. If any future parameter flags are added,
+    // they should also be verified above.
+    Type argType = AnyFunctionType::composeTuple(
+        getASTContext(), args, ParameterFlagHandling::AssertEmpty);
     Type resultType = fnType->getResult();
 
     ConstraintLocatorBuilder builder(locator);
@@ -7995,7 +8002,7 @@ ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
 
   auto tupleTy =
       AnyFunctionType::composeTuple(getASTContext(), funcTy->getParams(),
-                                    /*wantParamFlags*/ false);
+                                    ParameterFlagHandling::IgnoreNonEmpty);
 
   addConstraint(ConstraintKind::Bind, tupleTy, second,
                 locator.withPathElement(ConstraintLocator::FunctionArgument));
