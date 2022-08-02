@@ -41,4 +41,10 @@ private:
   int mutableMethodsCalledCount = 0;
 };
 
+struct HasAmbiguousMethods2 {
+  int increment(int a) const {
+    return a + 1;
+  }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_AMBIGUOUS_METHOD_METHODS_H

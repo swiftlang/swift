@@ -452,6 +452,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
   case SyntaxNodeKind::Identifier:
   case SyntaxNodeKind::DollarIdent:
     return KindIdentifier;
+  case SyntaxNodeKind::Operator:
+    return KindOperator;
   case SyntaxNodeKind::Integer:
   case SyntaxNodeKind::Floating:
     return KindNumber;

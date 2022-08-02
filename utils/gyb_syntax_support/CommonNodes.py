@@ -12,6 +12,12 @@ COMMON_NODES = [
     Node('UnknownStmt', kind='Stmt'),
     Node('UnknownType', kind='Type'),
     Node('UnknownPattern', kind='Pattern'),
+    Node('Missing', kind='Syntax'),
+    Node('MissingDecl', kind='Decl'),
+    Node('MissingExpr', kind='Expr'),
+    Node('MissingStmt', kind='Stmt'),
+    Node('MissingType', kind='Type'),
+    Node('MissingPattern', kind='Pattern'),
 
     # code-block-item = (decl | stmt | expr) ';'?
     Node('CodeBlockItem', kind='Syntax', omit_when_empty=True,

@@ -256,6 +256,9 @@ SWIFT_REQUEST(TypeChecker, PropertyWrapperMutabilityRequest,
 SWIFT_REQUEST(TypeChecker, PropertyWrapperTypeInfoRequest,
               PropertyWrapperTypeInfo(NominalTypeDecl *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ConstantValueInfoRequest,
+              ConstValueTypeInfo(NominalTypeDecl *), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ProtocolRequiresClassRequest, bool(ProtocolDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrimaryAssociatedTypesRequest,

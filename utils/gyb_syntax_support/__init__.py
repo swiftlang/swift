@@ -15,12 +15,14 @@ from .PatternNodes import PATTERN_NODES  # noqa: I201
 from .StmtNodes import STMT_NODES  # noqa: I201
 from .Trivia import TRIVIAS  # noqa: I201
 from .TypeNodes import TYPE_NODES  # noqa: I201
+from .kinds import SYNTAX_BASE_KINDS  # noqa: I201
 
 
 # Re-export global constants
 SYNTAX_NODES = COMMON_NODES + EXPR_NODES + DECL_NODES + ATTRIBUTE_NODES + \
     STMT_NODES + GENERIC_NODES + TYPE_NODES + PATTERN_NODES + \
     AVAILABILITY_NODES
+NON_BASE_SYNTAX_NODES = [node for node in SYNTAX_NODES if not node.is_base()]
 SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
 SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
@@ -121,8 +123,12 @@ def make_missing_swift_child(child):
             tok_kind += '("")'
         return 'RawSyntax.missingToken(TokenKind.%s)' % tok_kind
     else:
-        missing_kind = "unknown" if child.syntax_kind == "Syntax" \
-                       else child.swift_syntax_kind
+        if child.syntax_kind == "Syntax":
+            missing_kind = "unknown"
+        elif child.syntax_kind in SYNTAX_BASE_KINDS:
+            missing_kind = f"missing{child.syntax_kind}"
+        else:
+            missing_kind = child.swift_syntax_kind 
         return 'RawSyntax.missing(SyntaxKind.%s)' % missing_kind
 
 

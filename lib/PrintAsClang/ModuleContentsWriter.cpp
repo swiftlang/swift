@@ -605,6 +605,8 @@ public:
 
       if (auto ED = dyn_cast<EnumDecl>(D)) {
         success = writeEnum(ED);
+      } else if (auto CD = dyn_cast<ClassDecl>(D)) {
+        success = writeClass(CD);
       } else if (outputLangMode == OutputLanguageMode::Cxx) {
         if (auto FD = dyn_cast<FuncDecl>(D))
           success = writeFunc(FD);
@@ -612,9 +614,7 @@ public:
           success = writeStruct(SD);
         // FIXME: Warn on unsupported exported decl.
       } else if (isa<ValueDecl>(D)) {
-        if (auto CD = dyn_cast<ClassDecl>(D))
-          success = writeClass(CD);
-        else if (auto PD = dyn_cast<ProtocolDecl>(D))
+        if (auto PD = dyn_cast<ProtocolDecl>(D))
           success = writeProtocol(PD);
         else if (auto ED = dyn_cast<FuncDecl>(D))
           success = writeFunc(ED);
