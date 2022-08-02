@@ -34,6 +34,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: class ClassWithIntField final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   inline ~ClassWithIntField() { swift::_impl::swift_release(_opaquePointer); }
+// CHECK-NEXT:   inline ClassWithIntField(const ClassWithIntField& other) noexcept : _opaquePointer(other._opaquePointer) { swift::_impl::swift_retain(_opaquePointer); } 
 // CHECK-NEXT:   inline ClassWithIntField(ClassWithIntField&&) noexcept = default;
 // CHECK-NEXT: private:
 // CHECK-NEXT:   inline ClassWithIntField(void * _Nonnull ptr) noexcept : _opaquePointer(ptr) {}

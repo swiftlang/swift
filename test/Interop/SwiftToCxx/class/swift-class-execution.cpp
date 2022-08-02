@@ -64,5 +64,16 @@ int main() {
 // CHECK-NEXT: destroy ClassWithIntField
 // CHECK-NEXT: ClassWithIntField: -11;
 // CHECK-NEXT: destroy ClassWithIntField
+
+  {
+    auto x = returnClassWithIntField();
+    {
+      auto x2 = x;
+      assert(getRetainCount(x) == 2);
+    }
+    assert(getRetainCount(x) == 1);
+  }
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: destroy ClassWithIntField
   return 0;
 }
