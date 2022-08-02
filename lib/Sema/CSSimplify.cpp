@@ -2134,9 +2134,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  // FIXME: Remove varargs logic below once we're no longer comparing
-  // argument lists in CSRanking.
-
   // Equality and subtyping have fairly strict requirements on tuple matching,
   // requiring element names to either match up or be disjoint.
   if (kind < ConstraintKind::Conversion) {
@@ -2198,10 +2195,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
             hasLabelMismatch = true;
         }
       }
-
-      // Variadic bit must match.
-      if (elt1.isVararg() != elt2.isVararg())
-        return getTypeMatchFailure(locator);
 
       // Compare the element types.
       auto result = matchTypes(elt1.getType(), elt2.getType(), kind, subflags,
@@ -2581,10 +2574,8 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
     // has a single parameter of type `(Int, Int) -> Void`.
     if (auto *tuple = argType->getAs<TupleType>()) {
       args.pop_back();
-      for (const auto &elt : tuple->getElements()) {
-        args.push_back(AnyFunctionType::Param(elt.getType(), elt.getName(),
-                                              elt.getParameterFlags()));
-      }
+      for (const auto &elt : tuple->getElements())
+        args.emplace_back(elt.getType(), elt.getName());
     } else if (auto *typeVar = argType->getAs<TypeVariableType>()) {
       auto isParam = [](const Expr *expr) {
         if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {

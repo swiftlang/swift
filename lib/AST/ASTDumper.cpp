@@ -3649,7 +3649,6 @@ namespace {
 
     void visitParenType(ParenType *T, StringRef label) {
       printCommon(label, "paren_type");
-      dumpParameterFlags(T->getParameterFlags());
       printRec(T->getUnderlyingType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3664,7 +3663,6 @@ namespace {
         PrintWithColorRAII(OS, TypeFieldColor) << "tuple_type_elt";
         if (elt.hasName())
           printField("name", elt.getName().str());
-        dumpParameterFlags(elt.getParameterFlags());
         printRec(elt.getType());
         OS << ")";
       }

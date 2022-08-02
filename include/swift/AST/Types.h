@@ -363,11 +363,7 @@ protected:
     HasCachedType : 1
   );
 
-  enum { NumFlagBits = 8 };
-  SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
-    /// Whether there is an original type.
-    Flags : NumFlagBits
-  );
+  SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
 
   SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+16,
     /// Extra information which affects how the function is called, like
@@ -429,11 +425,7 @@ protected:
     ArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
-    /// Whether an element of the tuple is inout, __shared or __owned.
-    /// Values cannot have such tuple types in the language.
-    HasElementWithOwnership : 1,
-
+  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 32,
     : NumPadBits,
 
     /// The number of elements of the tuple.
@@ -724,8 +716,8 @@ public:
     return getRecursiveProperties().isLValue();
   }
   
-  /// Is this a first-class value type, meaning it is not an InOutType or a
-  /// tuple type containing an InOutType?
+  /// Is this a first-class value type, meaning it is not an LValueType or an
+  /// InOutType.
   bool isMaterializable();
 
   /// Is this a non-escaping type, that is, a non-escaping function type or a
@@ -1995,11 +1987,6 @@ public:
   }
 };
 
-// TODO: As part of AST modernization, replace with a proper
-// 'ParameterTypeElt' or similar, and have FunctionTypes only have a list
-// of 'ParameterTypeElt's. Then, this information can be removed from
-// TupleTypeElt.
-//
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
@@ -2218,21 +2205,12 @@ public:
 
 /// ParenType - A paren type is a type that's been written in parentheses.
 class ParenType : public SugarType {
-  friend class ASTContext;
-  
-  ParenType(Type UnderlyingType, RecursiveTypeProperties properties,
-            ParameterTypeFlags flags);
+  ParenType(Type UnderlyingType, RecursiveTypeProperties properties);
 
 public:
+  static ParenType *get(const ASTContext &C, Type underlying);
+
   Type getUnderlyingType() const { return getSinglyDesugaredType(); }
-
-  static ParenType *get(const ASTContext &C, Type underlying,
-                        ParameterTypeFlags flags = {});
-
-  /// Get the parameter flags
-  ParameterTypeFlags getParameterFlags() const {
-    return ParameterTypeFlags::fromRaw(Bits.ParenType.Flags);
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2248,37 +2226,17 @@ class TupleTypeElt {
   /// This is the type of the field.
   Type ElementType;
 
-  /// Flags that are specific to and relevant for parameter types
-  ParameterTypeFlags Flags;
-
   friend class TupleType;
   
 public:
   TupleTypeElt() = default;
-  TupleTypeElt(Type ty, Identifier name = Identifier(),
-               ParameterTypeFlags fl = {});
-  
+  TupleTypeElt(Type ty, Identifier name = Identifier());
+
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
-  
-  Type getRawType() const { return ElementType; }
-  Type getType() const;
 
-  ParameterTypeFlags getParameterFlags() const { return Flags; }
+  Type getType() const { return ElementType; }
 
-  /// Determine whether this field is variadic.
-  bool isVararg() const { return Flags.isVariadic(); }
-
-  /// Determine whether this field is an autoclosure parameter closure.
-  bool isAutoClosure() const { return Flags.isAutoClosure(); }
-
-  /// Determine whether this field is marked 'inout'.
-  bool isInOut() const { return Flags.isInOut(); }
-  
-  /// Remove the type of this varargs element designator, without the array
-  /// type wrapping it.
-  Type getVarargBaseTy() const;
-  
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const;
 
@@ -2340,11 +2298,6 @@ public:
   /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
-  
-  /// Returns true if this tuple has inout, __shared or __owned elements.
-  bool hasElementWithOwnership() const {
-    return static_cast<bool>(Bits.TupleType.HasElementWithOwnership);
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2359,13 +2312,11 @@ public:
   
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
-            RecursiveTypeProperties properties,
-            bool hasElementWithOwnership)
-     : TypeBase(TypeKind::Tuple, CanCtx, properties) {
-     Bits.TupleType.HasElementWithOwnership = hasElementWithOwnership;
-     Bits.TupleType.Count = elements.size();
-     std::uninitialized_copy(elements.begin(), elements.end(),
-                             getTrailingObjects<TupleTypeElt>());
+            RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Tuple, CanCtx, properties) {
+    Bits.TupleType.Count = elements.size();
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            getTrailingObjects<TupleTypeElt>());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
@@ -6554,17 +6505,9 @@ inline bool TypeBase::isTypeSequenceParameter() {
          t->castTo<GenericTypeParamType>()->isTypeSequence();
 }
 
+// TODO: This will become redundant once InOutType is removed.
 inline bool TypeBase::isMaterializable() {
-  if (hasLValueType())
-    return false;
-
-  if (is<InOutType>())
-    return false;
-
-  if (auto *TTy = getAs<TupleType>())
-    return !TTy->hasElementWithOwnership();
-
-  return true;
+  return !(hasLValueType() || is<InOutType>());
 }
 
 inline GenericTypeParamType *TypeBase::getRootGenericParam() {
@@ -6776,26 +6719,12 @@ inline bool CanType::isActuallyCanonicalOrNull() const {
          getPointer()->isCanonical();
 }
 
-inline Type TupleTypeElt::getVarargBaseTy() const {
-  TypeBase *T = getType().getPointer();
-  if (auto *AT = dyn_cast<VariadicSequenceType>(T))
-    return AT->getBaseType();
-  if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
-    // It's the stdlib Array<T>.
-    return BGT->getGenericArgs()[0];
-  }
-  assert(T->hasError());
-  return T;
-}
-
 inline TupleTypeElt TupleTypeElt::getWithName(Identifier name) const {
-  assert(getParameterFlags().isInOut() == getType()->is<InOutType>());
-  return TupleTypeElt(getRawType(), name, getParameterFlags());
+  return TupleTypeElt(getType(), name);
 }
 
 inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
-  auto flags = getParameterFlags().withInOut(T->is<InOutType>());
-  return TupleTypeElt(T->getInOutObjectType(), getName(), flags);
+  return TupleTypeElt(T, getName());
 }
 
 /// Create one from what's present in the parameter decl and type

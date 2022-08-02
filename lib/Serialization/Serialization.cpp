@@ -4535,7 +4535,6 @@ public:
 
   void visitParenType(const ParenType *parenTy) {
     using namespace decls_block;
-    assert(parenTy->getParameterFlags().isNone());
     serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
   }
 
@@ -4546,7 +4545,6 @@ public:
 
     abbrCode = S.DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
-      assert(elt.getParameterFlags().isNone());
       TupleTypeEltLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(elt.getName()),
