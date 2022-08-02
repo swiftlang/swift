@@ -94,6 +94,8 @@ enum class ReflectionMetadataMode : unsigned {
   Runtime,      ///< Make reflection metadata fully available.
 };
 
+enum class StackProtectorMode : bool { NoStackProtector, StackProtector };
+
 using clang::PointerAuthSchema;
 
 struct PointerAuthOptions : clang::PointerAuthOptions {
@@ -280,6 +282,8 @@ public:
   /// Whether we should run swift specific LLVM optimizations after IRGen.
   unsigned DisableSwiftSpecificLLVMOptzns : 1;
 
+  unsigned EnableStackProtector : 1;
+
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
 
@@ -457,10 +461,10 @@ public:
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        Playground(false), EmitStackPromotionChecks(false),
-        UseSingleModuleLLVMEmission(false), FunctionSections(false),
-        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
-        LLVMLTOKind(IRGenLLVMLTOKind::None),
+        EnableStackProtector(false), Playground(false),
+        EmitStackPromotionChecks(false), UseSingleModuleLLVMEmission(false),
+        FunctionSections(false), PrintInlineTree(false),
+        EmbedMode(IRGenEmbedMode::None), LLVMLTOKind(IRGenLLVMLTOKind::None),
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),
         ReflectionMetadata(ReflectionMetadataMode::Runtime),
@@ -543,6 +547,9 @@ public:
   bool hasMultipleIRGenThreads() const { return !UseSingleModuleLLVMEmission && NumThreads > 1; }
   bool shouldPerformIRGenerationInParallel() const { return !UseSingleModuleLLVMEmission && NumThreads != 0; }
   bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
+  StackProtectorMode getStackProtectorMode() const {
+    return StackProtectorMode(EnableStackProtector);
+  }
 };
 
 } // end namespace swift
