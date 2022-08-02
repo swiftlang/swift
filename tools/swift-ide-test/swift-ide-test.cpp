@@ -1826,6 +1826,7 @@ public:
     case SyntaxNodeKind::Keyword: Id = "kw"; break;
     // Skip identifier.
     case SyntaxNodeKind::Identifier: return;
+    case SyntaxNodeKind::Operator: return;
     case SyntaxNodeKind::DollarIdent: Id = "dollar"; break;
     case SyntaxNodeKind::Integer: Id = "int"; break;
     case SyntaxNodeKind::Floating: Id = "float"; break;
@@ -1857,6 +1858,7 @@ public:
     case SyntaxNodeKind::Keyword: Col = llvm::raw_ostream::MAGENTA; break;
     // Skip identifier.
     case SyntaxNodeKind::Identifier: return;
+    case SyntaxNodeKind::Operator: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::DollarIdent: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::Integer: Col = llvm::raw_ostream::BLUE; break;
     case SyntaxNodeKind::Floating: Col = llvm::raw_ostream::BLUE; break;
