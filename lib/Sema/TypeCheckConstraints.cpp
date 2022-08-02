@@ -216,7 +216,6 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
     // Otherwise, assign this input to the next output element.
     const auto &elt2 = toTuple[i];
-    assert(!elt2.isVararg());
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.

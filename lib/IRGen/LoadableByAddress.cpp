@@ -204,7 +204,7 @@ bool LargeSILTypeMapper::containsDifferentFunctionSignature(
   if (nonOptionalType.getAs<TupleType>()) {
     auto origType = nonOptionalType.getAs<TupleType>();
     for (TupleTypeElt canElem : origType->getElements()) {
-      auto origCanType = CanType(canElem.getRawType());
+      auto origCanType = CanType(canElem.getType());
       auto elem = SILType::getPrimitiveObjectType(origCanType);
       auto newElem = getNewSILType(genEnv, elem, Mod);
       if (containsDifferentFunctionSignature(genEnv, Mod, elem, newElem)) {
@@ -450,13 +450,10 @@ SILType LargeSILTypeMapper::getNewTupleType(GenericEnvironment *GenericEnv,
   assert(origType && "Expected a tuple type");
   SmallVector<TupleTypeElt, 2> newElems;
   for (TupleTypeElt canElem : origType->getElements()) {
-    auto origCanType = CanType(canElem.getRawType());
+    auto origCanType = CanType(canElem.getType());
     auto elem = SILType::getPrimitiveObjectType(origCanType);
     auto newElem = getNewSILType(GenericEnv, elem, Mod);
-    auto newTupleType =
-        TupleTypeElt(newElem.getASTType(), canElem.getName(),
-                     canElem.getParameterFlags());
-    newElems.push_back(newTupleType);
+    newElems.emplace_back(newElem.getASTType(), canElem.getName());
   }
   auto type = TupleType::get(newElems, nonOptionalType.getASTContext());
   auto canType = CanType(type);
