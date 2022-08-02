@@ -267,6 +267,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'MissingStmt': 263,
     'MissingType': 264,
     'MissingPattern': 265,
+    'GarbageNodes' : 266,
 }
 
 

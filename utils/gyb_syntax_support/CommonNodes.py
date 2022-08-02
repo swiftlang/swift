@@ -57,4 +57,10 @@ COMMON_NODES = [
              Child('RightBrace', kind='RightBraceToken', 
                    requires_leading_newline=True),
          ]),
+
+    Node('GarbageNodes', kind='SyntaxCollection', element='Syntax',
+         description='''
+         A collection of syntax nodes that occurred in the source code but
+         could not be used to form a valid syntax tree.
+         '''),
 ]

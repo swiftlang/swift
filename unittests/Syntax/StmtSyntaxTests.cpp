@@ -47,7 +47,7 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
 
-    Factory.makeFallthroughStmt(FallthroughKW).print(OS);
+    Factory.makeFallthroughStmt(/*GarbageNodes=*/None, FallthroughKW).print(OS);
     ASSERT_EQ(OS.str().str(), "fallthrough");
   }
 
@@ -57,7 +57,8 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
 
     auto NewFallthroughKW = FallthroughKW.withLeadingTrivia("  ");
 
-    Factory.makeFallthroughStmt(NewFallthroughKW).print(OS);
+    Factory.makeFallthroughStmt(/*GarbageNodes=*/None, NewFallthroughKW)
+        .print(OS);
     ASSERT_EQ(OS.str().str(), "  fallthrough");
   }
 
@@ -68,7 +69,8 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     auto NewFallthroughKW =
         FallthroughKW.withLeadingTrivia("  ").withTrailingTrivia("  ");
 
-    Factory.makeFallthroughStmt(NewFallthroughKW).print(OS);
+    Factory.makeFallthroughStmt(/*GarbageNodes=*/None, NewFallthroughKW)
+        .print(OS);
     ASSERT_EQ(OS.str().str(), "  fallthrough  ");
   }
 
@@ -88,7 +90,8 @@ TEST(StmtSyntaxTests, BreakStmtGetAPIs) {
   SyntaxFactory Factory(Arena);
   auto BreakKW = Factory.makeBreakKeyword("", " ");
   auto Label = Factory.makeIdentifier("sometimesYouNeedTo", "", "");
-  auto Break = Factory.makeBreakStmt(BreakKW, Label);
+  auto Break = Factory.makeBreakStmt(/*GarbageNodes=*/None, BreakKW,
+                                     /*GarbageNodes=*/None, Label);
 
   /// These should be directly shared through reference-counting.
   ASSERT_EQ(BreakKW.getRaw(), Break.getBreakKeyword().getRaw());
@@ -140,7 +143,8 @@ TEST(StmtSyntaxTests, BreakStmtMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     auto BreakKW = Factory.makeBreakKeyword("", " ");
     auto Label = Factory.makeIdentifier("theBuild", "", "");
-    auto Break = Factory.makeBreakStmt(BreakKW, Label);
+    auto Break = Factory.makeBreakStmt(/*GarbageNodes=*/None, BreakKW,
+                                       /*GarbageNodes=*/None, Label);
     Break.print(OS);
     ASSERT_EQ(OS.str().str(), "break theBuild"); // don't you dare
   }
@@ -159,7 +163,8 @@ TEST(StmtSyntaxTests, ContinueStmtGetAPIs) {
   SyntaxFactory Factory(Arena);
   auto ContinueKW = Factory.makeContinueKeyword("", " ");
   auto Label = Factory.makeIdentifier("always", "", "");
-  auto Continue = Factory.makeContinueStmt(ContinueKW, Label);
+  auto Continue = Factory.makeContinueStmt(/*GarbageNodes=*/None, ContinueKW,
+                                           /*GarbageNodes=*/None, Label);
 
   /// These should be directly shared through reference-counting.
   ASSERT_EQ(ContinueKW.getRaw(), Continue.getContinueKeyword().getRaw());
@@ -210,7 +215,8 @@ TEST(StmtSyntaxTests, ContinueStmtMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     auto ContinueKW = Factory.makeContinueKeyword("", " ");
     auto Label = Factory.makeIdentifier("toLead", "", "");
-    auto Continue = Factory.makeContinueStmt(ContinueKW, Label);
+    auto Continue = Factory.makeContinueStmt(/*GarbageNodes=*/None, ContinueKW,
+                                             /*GarbageNodes=*/None, Label);
     Continue.print(OS);
     ASSERT_EQ(OS.str().str(), "continue toLead"); // by example
   }
@@ -230,8 +236,10 @@ TEST(StmtSyntaxTests, ReturnStmtMakeAPIs) {
   auto ReturnKW = Factory.makeReturnKeyword("", " ");
   auto Minus = Factory.makePrefixOperator("-", "", "");
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
+  auto OneLiteral =
+      Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
   auto MinusOne = Factory.makePrefixOperatorExpr(
-      Minus, Factory.makeIntegerLiteralExpr(OneDigits));
+      /*GarbageNodes=*/None, Minus, /*GarbageNodes=*/None, OneLiteral);
 
   {
     llvm::SmallString<48> Scratch;
@@ -243,7 +251,10 @@ TEST(StmtSyntaxTests, ReturnStmtMakeAPIs) {
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    Factory.makeReturnStmt(ReturnKW, MinusOne).print(OS);
+    Factory
+        .makeReturnStmt(/*GarbageNodes=*/None, ReturnKW, /*GarbageNodes=*/None,
+                        MinusOne)
+        .print(OS);
     ASSERT_EQ(OS.str().str(), "return -1");
   }
 }
@@ -254,9 +265,12 @@ TEST(StmtSyntaxTests, ReturnStmtGetAPIs) {
   auto ReturnKW = Factory.makeReturnKeyword("", " ");
   auto Minus = Factory.makePrefixOperator("-", "", "");
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
+  auto OneLiteral =
+      Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
   auto MinusOne = Factory.makePrefixOperatorExpr(
-      Minus, Factory.makeIntegerLiteralExpr(OneDigits));
-  auto Return = Factory.makeReturnStmt(ReturnKW, MinusOne);
+      /*GarbageNodes=*/None, Minus, /*GarbageNodes=*/None, OneLiteral);
+  auto Return = Factory.makeReturnStmt(/*GarbageNodes=*/None, ReturnKW,
+                                       /*GarbageNodes=*/None, MinusOne);
 
   ASSERT_EQ(ReturnKW.getRaw(), Return.getReturnKeyword().getRaw());
   auto GottenExpression = Return.getExpression().getValue();
@@ -270,8 +284,10 @@ TEST(StmtSyntaxTests, ReturnStmtWithAPIs) {
   auto ReturnKW = Factory.makeReturnKeyword("", " ");
   auto Minus = Factory.makePrefixOperator("-", "", "");
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
+  auto OneLiteral =
+      Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
   auto MinusOne = Factory.makePrefixOperatorExpr(
-      Minus, Factory.makeIntegerLiteralExpr(OneDigits));
+      /*GarbageNodes=*/None, Minus, /*GarbageNodes=*/None, OneLiteral);
 
   {
     llvm::SmallString<48> Scratch;
