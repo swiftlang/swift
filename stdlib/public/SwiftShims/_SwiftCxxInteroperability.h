@@ -73,7 +73,19 @@ public:
 protected:
   inline RefCountedClass(void *_Nonnull ptr) noexcept : _opaquePointer(ptr) {}
 
+private:
   void *_Nonnull _opaquePointer;
+  friend class _impl_RefCountedClass;
+};
+
+class _impl_RefCountedClass {
+public:
+  static inline void *_Nonnull getOpaquePointer(const RefCountedClass &object) {
+    return object._opaquePointer;
+  }
+  static inline void *_Nonnull &getOpaquePointerRef(RefCountedClass &object) {
+    return object._opaquePointer;
+  }
 };
 
 } // namespace _impl

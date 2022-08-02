@@ -17,8 +17,8 @@
 extern "C" size_t swift_retainCount(void * _Nonnull obj);
 
 size_t getRetainCount(const Class::ClassWithIntField & swiftClass) {
-    void *p = Class::_impl::_impl_ClassWithIntField::getOpaquePointer(swiftClass);
-    return swift_retainCount(p);
+  void *p = swift::_impl::_impl_RefCountedClass::getOpaquePointer(swiftClass);
+  return swift_retainCount(p);
 }
 
 int main() {

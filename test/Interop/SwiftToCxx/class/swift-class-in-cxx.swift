@@ -31,7 +31,7 @@ public final class ClassWithIntField {
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
 // CHECK-EMPTY:
-// CHECK-NEXT: class ClassWithIntField final : swift::_impl::RefCountedClass {
+// CHECK-NEXT: class ClassWithIntField final : public swift::_impl::RefCountedClass {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   using RefCountedClass::RefCountedClass;
 // CHECK-NEXT:   using RefCountedClass::operator=;
@@ -46,19 +46,17 @@ public final class ClassWithIntField {
 // CHECK-NEXT:class _impl_ClassWithIntField {
 // CHECK-NEXT:public:
 // CHECK-NEXT:static inline ClassWithIntField makeRetained(void * _Nonnull ptr) noexcept { return ClassWithIntField(ptr); }
-// CHECK-NEXT:static inline void * _Nonnull getOpaquePointer(const ClassWithIntField &object) noexcept { return object._opaquePointer; }
-// CHECK-NEXT:static inline void * _Nonnull &getOpaquePointerRef(ClassWithIntField &object) noexcept { return object._opaquePointer; }
 // CHECK-NEXT:};
 // CHECK-EMPTY:
 // CHECK-NEXT:} // namespace _impl
 
 // CHECK: inline ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(_impl::_impl_ClassWithIntField::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 public final class register { }
 
-// CHECK: class register_ final : swift::_impl::RefCountedClass {
+// CHECK: class register_ final : public swift::_impl::RefCountedClass {
 
 public func returnClassWithIntField() -> ClassWithIntField {
   return ClassWithIntField()
@@ -84,5 +82,5 @@ public func takeClassWithIntFieldInout(_ x: inout ClassWithIntField) {
 // CHECK-NEXT: }
 
 // CHECK: inline void takeClassWithIntField(const ClassWithIntField& x) noexcept {
-// CHECK-NEXT:  return _impl::$s5Class04takeA12WithIntFieldyyAA0acdE0CF(_impl::_impl_ClassWithIntField::getOpaquePointer(x));
+// CHECK-NEXT:  return _impl::$s5Class04takeA12WithIntFieldyyAA0acdE0CF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x));
 // CHECK-NEXT: }
