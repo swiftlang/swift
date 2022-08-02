@@ -13,6 +13,7 @@ target_link_libraries(swiftFrontendTool INTERFACE
   clangBasic)
 target_link_libraries(swiftFrontendTool PRIVATE
     swiftClangImporter
+    swiftConstExtract
     swiftDemangling
     swiftDependencyScan
     swiftFrontend

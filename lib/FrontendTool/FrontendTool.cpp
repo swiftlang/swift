@@ -50,6 +50,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/TargetInfo.h"
+#include "swift/ConstExtract/ConstExtract.h"
 #include "swift/Option/Options.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
@@ -697,35 +698,59 @@ static bool emitConstValuesForWholeModuleIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &frontendOpts = Invocation.getFrontendOptions();
+  auto constExtractProtocolListPath =
+      Instance.getASTContext().SearchPathOpts.ConstGatherProtocolListFilePath;
+  if (constExtractProtocolListPath.empty())
+    return false;
   if (!frontendOpts.InputsAndOutputs.hasConstValuesOutputPath())
     return false;
-  std::error_code EC;
   assert(frontendOpts.InputsAndOutputs.isWholeModule() &&
          "'emitConstValuesForWholeModule' only makes sense when the whole module can be seen");
   auto ConstValuesFilePath = frontendOpts.InputsAndOutputs
     .getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs
     .ConstValuesOutputPath;
+
+  // List of protocols whose conforming nominal types
+  // we should extract compile-time-known values from
+  std::unordered_set<std::string> Protocols;
+  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
+                                                     Instance.getDiags(), Protocols);
+  if (!inputParseSuccess)
+    return true;
+  auto ConstValues = gatherConstValuesForModule(Protocols,
+                                                Instance.getMainModule());
+  std::error_code EC;
   llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
-  OS << "{}\n";
+  writeAsJSONToFile(ConstValues, OS);
   return false;
 }
 
 static void emitConstValuesForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
+  auto constExtractProtocolListPath =
+      Instance.getASTContext().SearchPathOpts.ConstGatherProtocolListFilePath;
+  if (constExtractProtocolListPath.empty())
+    return;
 
+  // List of protocols whose conforming nominal types
+  // we should extract compile-time-known values from
+  std::unordered_set<std::string> Protocols;
+  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
+                                                     Instance.getDiags(), Protocols);
+  if (!inputParseSuccess)
+    return;
   for (auto *SF : Instance.getPrimarySourceFiles()) {
     const std::string &ConstValuesFilePath =
         Invocation.getConstValuesFilePathForPrimary(
             SF->getFilename());
-    if (ConstValuesFilePath.empty()) {
+    if (ConstValuesFilePath.empty())
       continue;
-    }
 
-    // TODO: Emit extracted values
+    auto ConstValues = gatherConstValuesForPrimary(Protocols, SF);
     std::error_code EC;
     llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
-    OS << "{}\n";
+    writeAsJSONToFile(ConstValues, OS);
   }
 }
 
