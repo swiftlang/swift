@@ -758,7 +758,7 @@ protected:
     // If needed, generate constraints for everything in the case statement.
     if (cs) {
       auto locator = cs->getConstraintLocator(
-          subjectExpr, LocatorPathElt::ContextualType(CTP_Initialization));
+          subjectExpr, LocatorPathElt::ContextualType(CTP_CaseStmt));
       Type subjectType = cs->getType(subjectExpr);
 
       if (cs->generateConstraints(caseStmt, dc, subjectType, locator)) {
