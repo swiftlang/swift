@@ -31,6 +31,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'PoundColumnExpr': 26,
     'TryExpr': 27,
     'AwaitExpr': 249,
+    'MoveExpr': 267,
     'IdentifierExpr': 28,
     'SuperRefExpr': 29,
     'NilLiteralExpr': 30,
