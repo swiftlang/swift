@@ -2246,11 +2246,11 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 }
 
 /// Get or create an LLVM function with these linkage rules.
-llvm::Function *irgen::createFunction(IRGenModule &IGM,
-                                      LinkInfo &linkInfo,
+llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
                                       const Signature &signature,
                                       llvm::Function *insertBefore,
-                                      OptimizationMode FuncOptMode) {
+                                      OptimizationMode FuncOptMode,
+                                      StackProtectorMode stackProtect) {
   auto name = linkInfo.getName();
 
   llvm::Function *existing = IGM.Module.getFunction(name);
@@ -2282,7 +2282,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
       .to(fn, linkInfo.isForDefinition());
 
   llvm::AttrBuilder initialAttrs;
-  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
+  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode, stackProtect);
   // Merge initialAttrs with attrs.
   auto updatedAttrs = signature.getAttributes().addFnAttributes(
       IGM.getLLVMContext(), initialAttrs);
@@ -3059,7 +3059,7 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   LinkInfo implLink = LinkInfo::get(*this, entity, ForDefinition);
   auto implFn =
       createFunction(*this, implLink, signature, nullptr /*insertBefore*/,
-                     f->getOptimizationMode());
+                     f->getOptimizationMode(), shouldEmitStackProtector(f));
   implFn->addFnAttr(llvm::Attribute::NoInline);
 
   IRGenFunction IGF(*this, implFn);
@@ -3168,6 +3168,10 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   return thunk;
 }
 
+StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
+  return IRGen.Opts.getStackProtectorMode();
+}
+
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(
     SILFunction *f, ForDefinition_t forDefinition,
@@ -3263,7 +3267,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   fn = createFunction(*this, link, signature, insertBefore,
-                      f->getOptimizationMode());
+                      f->getOptimizationMode(), shouldEmitStackProtector(f));
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition
