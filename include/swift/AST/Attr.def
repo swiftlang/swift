@@ -740,6 +740,10 @@ SIMPLE_DECL_ATTR(_moveOnly, MoveOnly,
   UserInaccessible |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   131)
+  
+SIMPLE_DECL_ATTR(_alwaysEmitConformanceMetadata, AlwaysEmitConformanceMetadata,
+  OnProtocol | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  132)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
