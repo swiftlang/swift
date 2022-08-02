@@ -52,6 +52,19 @@ void ClangClassTypePrinter::printClassTypeDecl(
      << cxx_synthesis::getCxxImplNamespaceName()
      << "::swift_retain(_opaquePointer); }\n";
 
+  os << "  inline ";
+  printer.printBaseName(typeDecl);
+  os << " & operator=(const ";
+  printer.printBaseName(typeDecl);
+  os << "& other) noexcept {\n    swift::"
+     << cxx_synthesis::getCxxImplNamespaceName()
+     << "::swift_retain(other._opaquePointer);\n";
+  os << "    swift::" << cxx_synthesis::getCxxImplNamespaceName()
+     << "::swift_release(_opaquePointer);\n";
+  os << "    _opaquePointer = other._opaquePointer;\n";
+  os << "    return *this;\n";
+  os << "  }\n";
+
   // FIXME: move semantics should be restricted?
   os << "  inline ";
   printer.printBaseName(typeDecl);
