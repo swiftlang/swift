@@ -1351,6 +1351,9 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
         Sink, CodeCompletionResultKind::Declaration,
         getSemanticContext(FD, Reason, dynamicLookupInfo));
     Builder.setIsAsync(implictlyAsync || (AFT->hasExtInfo() && AFT->isAsync()));
+    Builder.setHasAsyncAlternative(
+        FD->getAsyncAlternative() &&
+        !FD->getAsyncAlternative()->shouldHideFromEditor());
     Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
     Builder.setAssociatedDecl(FD);
 
