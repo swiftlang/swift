@@ -86,7 +86,9 @@ private:
       SmallVectorImpl<SerializationOptions::FileDependency> &Deps,
       bool IsHashBased);
 
-  bool buildSwiftModuleInternal(StringRef OutPath, bool ShouldSerializeDeps,
+  bool buildSwiftModuleInternal(StringRef OutPath,
+                                bool ShouldSerializeDeps,
+                                bool IgnoreInterfaceProvidedOptions,
                                 std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                                 ArrayRef<std::string> CandidateModules);
 public:
@@ -116,7 +118,9 @@ public:
     extraDependencies.push_back(path);
   }
 
-  bool buildSwiftModule(StringRef OutPath, bool ShouldSerializeDeps,
+  bool buildSwiftModule(StringRef OutPath,
+                        bool ShouldSerializeDeps,
+                        bool ignoreInterfaceProvidedOptions,
                         std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                         llvm::function_ref<void()> RemarkRebuild = nullptr,
                         ArrayRef<std::string> CandidateModules = {});
