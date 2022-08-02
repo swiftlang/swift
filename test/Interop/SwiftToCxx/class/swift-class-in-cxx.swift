@@ -21,6 +21,7 @@ public final class ClassWithIntField {
 // CHECK: SWIFT_EXTERN void * _Nonnull $s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughClassWithIntField(_:)
 // CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s5Class06returnA12WithIntFieldAA0acdE0CyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // returnClassWithIntField()
 // CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA12WithIntFieldyyAA0acdE0CF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntField(_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(void * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntFieldInout(_:)
 
 // CHECK: namespace Class {
 
@@ -47,6 +48,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT:public:
 // CHECK-NEXT:static inline ClassWithIntField makeRetained(void * _Nonnull ptr) noexcept { return ClassWithIntField(ptr); }
 // CHECK-NEXT:static inline void * _Nonnull getOpaquePointer(const ClassWithIntField &object) noexcept { return object._opaquePointer; }
+// CHECK-NEXT:static inline void * _Nonnull &getOpaquePointerRef(ClassWithIntField &object) noexcept { return object._opaquePointer; }
 // CHECK-NEXT:};
 // CHECK-EMPTY:
 // CHECK-NEXT:} // namespace _impl
@@ -71,6 +73,11 @@ public func passThroughClassWithIntField(_ x: ClassWithIntField) -> ClassWithInt
 
 public func takeClassWithIntField(_ x: ClassWithIntField) {
   print("ClassWithIntField: \(x.field);")
+}
+
+public func takeClassWithIntFieldInout(_ x: inout ClassWithIntField) {
+  x = ClassWithIntField()
+  x.field = -11
 }
 
 // CHECK: inline ClassWithIntField returnClassWithIntField() noexcept SWIFT_WARN_UNUSED_RESULT {

@@ -51,5 +51,18 @@ int main() {
 // CHECK-NEXT: ClassWithIntField: 42;
 // CHECK-NEXT: ClassWithIntField: 42;
 // CHECK-NEXT: destroy ClassWithIntField
+
+  {
+    auto x = returnClassWithIntField();
+    assert(getRetainCount(x) == 1);
+    takeClassWithIntFieldInout(x);
+    assert(getRetainCount(x) == 1);
+    takeClassWithIntField(x);
+  }
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: destroy ClassWithIntField
+// CHECK-NEXT: ClassWithIntField: -11;
+// CHECK-NEXT: destroy ClassWithIntField
   return 0;
 }
