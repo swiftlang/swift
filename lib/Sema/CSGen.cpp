@@ -868,7 +868,7 @@ namespace {
       case TypeKind::Tuple: {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
-          result.emplace_back(elt.getRawType(), elt.getName());
+          result.emplace_back(elt.getType(), elt.getName());
         return;
       }
       case TypeKind::Paren: {
@@ -1762,11 +1762,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-
-      auto &ctx = CS.getASTContext();
-      auto parenType = CS.getType(expr->getSubExpr())->getInOutObjectType();
-      auto parenFlags = ParameterTypeFlags().withInOut(expr->isSemanticallyInOutExpr());
-      return ParenType::get(ctx, parenType, parenFlags);
+      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -3522,6 +3518,26 @@ namespace {
       }
 
       return tv;
+    }
+
+    Type visitTypeJoinExpr(TypeJoinExpr *expr) {
+      auto *locator = CS.getConstraintLocator(expr);
+      SmallVector<std::pair<Type, ConstraintLocator *>, 4> elements;
+      elements.reserve(expr->getNumElements());
+
+      for (auto *element : expr->getElements()) {
+        elements.emplace_back(CS.getType(element),
+                              CS.getConstraintLocator(element));
+      }
+
+      auto resultTy = CS.getType(expr->getVar());
+      // The type of a join expression is obtained by performing
+      // a "join-meet" operation on deduced types of its elements
+      // and the underlying variable.
+      auto joinedTy = CS.addJoinConstraint(locator, elements);
+
+      CS.addConstraint(ConstraintKind::Equal, resultTy, joinedTy, locator);
+      return resultTy;
     }
 
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,

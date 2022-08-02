@@ -397,8 +397,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, VariadicSequenceType*> VariadicSequenceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
-    llvm::DenseMap<Type, ParenType*> SimpleParenTypes; // Most are simple
-    llvm::DenseMap<std::pair<Type, unsigned>, ParenType*> ParenTypes;
+    llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
     llvm::DenseMap<Type, InOutType*> InOutTypes;
@@ -2626,7 +2625,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
     llvm::capacity_in_bytes(VariadicSequenceTypes) +
-    llvm::capacity_in_bytes(SimpleParenTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
@@ -2836,22 +2834,14 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
   return vecTy;
 }
 
-ParenType *ParenType::get(const ASTContext &C, Type underlying,
-                          ParameterTypeFlags fl) {
-  if (fl.isInOut())
-    assert(!underlying->is<InOutType>() && "caller did not pass a base type");
-  if (underlying->is<InOutType>())
-    assert(fl.isInOut() && "caller did not set flags correctly");
-  
+ParenType *ParenType::get(const ASTContext &C, Type underlying) {
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
-  auto flags = fl.toRaw();
-  ParenType *&Result = flags == 0
-      ? C.getImpl().getArena(arena).SimpleParenTypes[underlying]
-      : C.getImpl().getArena(arena).ParenTypes[{underlying, flags}];
+  ParenType *&Result = C.getImpl().getArena(arena).ParenTypes[underlying];
   if (Result == nullptr) {
-    Result = new (C, arena) ParenType(underlying,
-                                      properties, fl);
+    Result = new (C, arena) ParenType(underlying, properties);
+    assert((C.hadError() || !underlying->is<InOutType>()) &&
+           "Cannot wrap InOutType");
   }
   return Result;
 }
@@ -2866,35 +2856,19 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
   for (const TupleTypeElt &Elt : Fields) {
     ID.AddPointer(Elt.Name.get());
     ID.AddPointer(Elt.getType().getPointer());
-    ID.AddInteger(Elt.Flags.toRaw());
   }
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
-  if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
-    return ParenType::get(C, Fields[0].getRawType(),
-                          Fields[0].getParameterFlags());
+  if (Fields.size() == 1 && !Fields[0].hasName())
+    return ParenType::get(C, Fields[0].getType());
 
   RecursiveTypeProperties properties;
-  bool hasElementWithOwnership = false;
   for (const TupleTypeElt &Elt : Fields) {
     auto eltTy = Elt.getType();
     if (!eltTy) continue;
-    
     properties |= eltTy->getRecursiveProperties();
-    // Recur into paren types and canonicalized paren types.  'inout' in nested
-    // non-paren tuples are malformed and will be diagnosed later.
-    if (auto *TTy = Elt.getType()->getAs<TupleType>()) {
-      if (TTy->getNumElements() == 1)
-        hasElementWithOwnership |= TTy->hasElementWithOwnership();
-    } else if (auto *Pty = dyn_cast<ParenType>(Elt.getType().getPointer())) {
-      hasElementWithOwnership |= (Pty->getParameterFlags().getValueOwnership() !=
-                                  ValueOwnership::Default);
-    } else {
-      hasElementWithOwnership |= (Elt.getParameterFlags().getValueOwnership() !=
-                                  ValueOwnership::Default);
-    }
   }
 
   auto arena = getArena(properties);
@@ -2919,24 +2893,15 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   size_t bytes = totalSizeToAlloc<TupleTypeElt>(Fields.size());
   // TupleType will copy the fields list into ASTContext owned memory.
   void *mem = C.Allocate(bytes, alignof(TupleType), arena);
-  auto New = new (mem) TupleType(Fields, IsCanonical ? &C : nullptr, properties,
-                                 hasElementWithOwnership);
+  auto New = new (mem) TupleType(Fields, IsCanonical ? &C : nullptr,
+                                 properties);
   C.getImpl().getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
 }
 
-TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
-                           ParameterTypeFlags fl)
-  : Name(name), ElementType(ty), Flags(fl) {
-  if (fl.isInOut())
-    assert(!ty->is<InOutType>() && "caller did not pass a base type");
-  if (ty->is<InOutType>())
-    assert(fl.isInOut() && "caller did not set flags correctly");
-}
-
-Type TupleTypeElt::getType() const {
-  if (Flags.isInOut()) return InOutType::get(ElementType);
-  return ElementType;
+TupleTypeElt::TupleTypeElt(Type ty, Identifier name)
+    : Name(name), ElementType(ty) {
+  assert(!ty->is<InOutType>() && "Cannot have InOutType in a tuple");
 }
 
 PackExpansionType *PackExpansionType::get(Type patternTy) {
@@ -3623,12 +3588,17 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
 }
 
 Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
-                                   bool wantParamFlags) {
+                                   ParameterFlagHandling paramFlagHandling) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
-    auto flags = wantParamFlags ? param.getParameterFlags()
-                                : ParameterTypeFlags();
-    elements.emplace_back(param.getParameterType(), param.getLabel(), flags);
+    switch (paramFlagHandling) {
+    case ParameterFlagHandling::IgnoreNonEmpty:
+      break;
+    case ParameterFlagHandling::AssertEmpty:
+      assert(param.getParameterFlags().isNone());
+      break;
+    }
+    elements.emplace_back(param.getParameterType(), param.getLabel());
   }
   return TupleType::get(elements, ctx);
 }

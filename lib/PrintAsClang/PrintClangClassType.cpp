@@ -70,9 +70,12 @@ void ClangClassTypePrinter::printClassTypeDecl(
         os << "public:\n";
         os << "static inline ";
         printer.printBaseName(typeDecl);
-        os << " fromUnretained(void * _Nonnull ptr) noexcept { return ";
+        os << " makeRetained(void * _Nonnull ptr) noexcept { return ";
         printer.printBaseName(typeDecl);
         os << "(ptr); }\n";
+        os << "static inline void * _Nonnull getOpaquePointer(const ";
+        printer.printBaseName(typeDecl);
+        os << " &object) noexcept { return object._opaquePointer; }\n";
         os << "};\n";
       });
 }
@@ -85,7 +88,20 @@ void ClangClassTypePrinter::printClassTypeReturnScaffold(
       type->getModuleContext(), moduleContext);
   os << cxx_synthesis::getCxxImplNamespaceName() << "::";
   ClangValueTypePrinter::printCxxImplClassName(os, type);
-  os << "::fromUnretained(";
+  os << "::makeRetained(";
   bodyPrinter();
   os << ");\n";
+}
+
+void ClangClassTypePrinter::printParameterCxxtoCUseScaffold(
+    raw_ostream &os, const ClassDecl *type, const ModuleDecl *moduleContext,
+    llvm::function_ref<void(void)> bodyPrinter, bool isInOut) {
+  // FIXME: Handle isInOut
+  ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
+      type->getModuleContext(), moduleContext);
+  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  ClangValueTypePrinter::printCxxImplClassName(os, type);
+  os << "::getOpaquePointer(";
+  bodyPrinter();
+  os << ')';
 }

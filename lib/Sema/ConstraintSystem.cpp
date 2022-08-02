@@ -894,6 +894,18 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
               TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
                   TVO_CanBindToHole);
         }
+
+        if (auto *var = placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
+          if (var->getName().hasDollarPrefix()) {
+            auto *repr =
+                new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
+            return createTypeVariable(
+                getConstraintLocator(locator,
+                                     LocatorPathElt::PlaceholderType(repr)),
+                TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+                    TVO_CanBindToHole);
+          }
+        }
       }
 
       return type;
@@ -5608,6 +5620,13 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     if (simplifyType(rawFnType)->is<UnresolvedType>())
       return None;
 
+    // A tuple construction is spelled in the AST as a function call, but
+    // is really more like a tuple conversion.
+    if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
+      if (metaTy->getInstanceType()->is<TupleType>())
+        return None;
+    }
+
     assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
   }
@@ -6110,6 +6129,10 @@ void SolutionApplicationTargetsKey::dump(raw_ostream &OS) const {
     storage.varDecl->dump(OS);
     return;
 
+  case Kind::functionRef:
+    OS << "<function>\n";
+    storage.functionRef->dumpContext();
+    return;
   }
   llvm_unreachable("invalid statement kind");
 }
