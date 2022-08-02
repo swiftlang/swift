@@ -1261,6 +1261,8 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
     Attrs.removeAttribute(llvm::Attribute::MinSize);
     Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
   }
+  Attrs.addAttribute(llvm::Attribute::StackProtect);
+  Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
