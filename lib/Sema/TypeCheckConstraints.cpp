@@ -1357,9 +1357,16 @@ void Solution::dump(raw_ostream &out) const {
       llvm::interleave(
           opened.second.begin(), opened.second.end(),
           [&](OpenedType opened) {
+            out << "'";
+            opened.second->getImpl().getGenericParameter()->print(out);
+            out << "' (";
             Type(opened.first).print(out, PO);
+            out << ")";
             out << " -> ";
+            out << getFixedType(opened.second);
+            out << " [from ";
             Type(opened.second).print(out, PO);
+            out << "]";
           },
           [&]() { out << ", "; });
       out << "\n";
@@ -1562,7 +1569,11 @@ void ConstraintSystem::print(raw_ostream &out) const {
       llvm::interleave(
           opened.second.begin(), opened.second.end(),
           [&](OpenedType opened) {
+            out << "'";
+            opened.second->getImpl().getGenericParameter()->print(out);
+            out << "' (";
             Type(opened.first).print(out, PO);
+            out << ")";
             out << " -> ";
             Type(opened.second).print(out, PO);
           },
