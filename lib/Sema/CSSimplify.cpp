@@ -6983,10 +6983,33 @@ ConstraintSystem::simplifyConstructionConstraint(
         fnType = contextualType;
       }
     }
+    SmallVector<AnyFunctionType::Param, 4> args;
+    for (auto idx : indices(fnType->getParams())) {
+      auto &arg = fnType->getParams()[idx];
+
+      // We can disregard '_const', it's not applicable for tuple construction.
+      auto flags = arg.getParameterFlags().withCompileTimeConst(false);
+
+      // We cannot handle inout for tuple construction.
+      if (flags.isInOut()) {
+        if (!shouldAttemptFixes())
+          return SolutionKind::Error;
+
+        auto *argLoc = getConstraintLocator(locator, {
+          LocatorPathElt::ApplyArgument(),
+          LocatorPathElt::ApplyArgToParam(idx, idx, ParameterTypeFlags())
+        });
+        auto argTy = arg.getParameterType();
+        if (recordFix(RemoveAddressOf::create(*this, argTy, argTy, argLoc)))
+          return SolutionKind::Error;
+
+        flags = flags.withInOut(false);
+      }
+      args.push_back(arg.withFlags(flags));
+    }
 
     // Tuple construction is simply tuple conversion.
-    Type argType = AnyFunctionType::composeTuple(getASTContext(),
-                                                 fnType->getParams());
+    Type argType = AnyFunctionType::composeTuple(getASTContext(), args);
     Type resultType = fnType->getResult();
 
     ConstraintLocatorBuilder builder(locator);
