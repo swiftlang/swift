@@ -2110,16 +2110,18 @@ namespace {
       for (auto m : decl->decls()) {
         if (auto method = dyn_cast<clang::CXXMethodDecl>(m)) {
           if (method->getDeclName().isIdentifier()) {
-            if (Impl.cxxMethods.find(method->getName()) ==
-                Impl.cxxMethods.end()) {
-              Impl.cxxMethods[method->getName()] = {};
+            auto contextMap = Impl.cxxMethods.find(method->getDeclContext());
+            if (contextMap == Impl.cxxMethods.end() ||
+                contextMap->second.find(method->getName()) ==
+                    contextMap->second.end()) {
+              Impl.cxxMethods[method->getDeclContext()][method->getName()] = {};
             }
             if (method->isConst()) {
               // Add to const set
-              Impl.cxxMethods[method->getName()].first.insert(method);
+              Impl.cxxMethods[method->getDeclContext()][method->getName()].first.insert(method);
             } else {
               // Add to mutable set
-              Impl.cxxMethods[method->getName()].second.insert(method);
+              Impl.cxxMethods[method->getDeclContext()][method->getName()].second.insert(method);
             }
           }
         }
@@ -2258,8 +2260,11 @@ namespace {
             }
 
             if (cxxMethod->getDeclName().isIdentifier()) {
-              auto &mutableFuncPtrs = Impl.cxxMethods[cxxMethod->getName()].second;
-              if(mutableFuncPtrs.contains(cxxMethod)) {
+              auto &mutableFuncPtrs =
+                  Impl.cxxMethods[cxxMethod->getDeclContext()]
+                                 [cxxMethod->getName()]
+                                     .second;
+              if (mutableFuncPtrs.contains(cxxMethod)) {
                 result->addMemberToLookupTable(member);
               }
             }
@@ -2977,7 +2982,7 @@ namespace {
       // In such a case append a suffix ("Mutating") to the mutable version
       // of the method when importing to swift
       if(decl->getDeclName().isIdentifier()) {
-        const auto &cxxMethodPair = Impl.cxxMethods[decl->getName()];
+        const auto &cxxMethodPair = Impl.cxxMethods[decl->getDeclContext()][decl->getName()];
         const auto &constFuncPtrs = cxxMethodPair.first;
         const auto &mutFuncPtrs = cxxMethodPair.second;
 
