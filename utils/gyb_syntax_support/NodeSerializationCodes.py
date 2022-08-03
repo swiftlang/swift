@@ -166,7 +166,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AvailabilityVersionRestriction': 161,
     'VersionTuple': 162,
     'CodeBlockItemList': 163,
-    # removed: 'FunctionCallArgumentList': 164,
+    'LayoutRequirement': 164,
     'TupleExprElementList': 165,
     'ArrayElementList': 166,
     'DictionaryElementList': 167,
