@@ -520,6 +520,20 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged).kind }
 }
 
+public protocol ScopedInstruction {
+  associatedtype EndInstructions
+
+  var endInstructions: EndInstructions { get }
+}
+
+extension BeginAccessInst : ScopedInstruction {
+  public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndAccessInst?>>, EndAccessInst>
+
+  public var endInstructions: EndInstructions {
+    uses.lazy.compactMap({ $0.value.definingInstruction as? EndAccessInst })
+  }
+}
+
 final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
