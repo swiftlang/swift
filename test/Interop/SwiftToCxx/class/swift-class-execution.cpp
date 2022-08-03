@@ -17,8 +17,8 @@
 extern "C" size_t swift_retainCount(void * _Nonnull obj);
 
 size_t getRetainCount(const Class::ClassWithIntField & swiftClass) {
-    void *p = Class::_impl::_impl_ClassWithIntField::getOpaquePointer(swiftClass);
-    return swift_retainCount(p);
+  void *p = swift::_impl::_impl_RefCountedClass::getOpaquePointer(swiftClass);
+  return swift_retainCount(p);
 }
 
 int main() {
@@ -50,6 +50,48 @@ int main() {
 // CHECK-NEXT: ClassWithIntField: 0;
 // CHECK-NEXT: ClassWithIntField: 42;
 // CHECK-NEXT: ClassWithIntField: 42;
+// CHECK-NEXT: destroy ClassWithIntField
+
+  {
+    auto x = returnClassWithIntField();
+    assert(getRetainCount(x) == 1);
+    takeClassWithIntFieldInout(x);
+    assert(getRetainCount(x) == 1);
+    takeClassWithIntField(x);
+  }
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: destroy ClassWithIntField
+// CHECK-NEXT: ClassWithIntField: -11;
+// CHECK-NEXT: destroy ClassWithIntField
+
+  {
+    auto x = returnClassWithIntField();
+    {
+      auto x2 = x;
+      assert(getRetainCount(x) == 2);
+    }
+    assert(getRetainCount(x) == 1);
+  }
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: destroy ClassWithIntField
+
+  {
+    auto x = returnClassWithIntField();
+    {
+      auto x2 = returnClassWithIntField();
+      assert(getRetainCount(x2) == 1);
+      assert(getRetainCount(x) == 1);
+      x = x2;
+      assert(getRetainCount(x) == 2);
+    }
+    takeClassWithIntField(x);
+    assert(getRetainCount(x) == 1);
+  }
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: destroy ClassWithIntField
+// CHECK-NEXT: ClassWithIntField: 0;
 // CHECK-NEXT: destroy ClassWithIntField
   return 0;
 }

@@ -31,32 +31,24 @@ void ClangClassTypePrinter::printClassTypeDecl(
                            os << ";\n";
                          });
 
+  StringRef baseClassName = "RefCountedClass";
+  StringRef baseClassQualifiedName = "swift::_impl::RefCountedClass";
+
   os << "class ";
   printer.printBaseName(typeDecl);
   // FIXME: Add support for inherintance.
-  os << " final";
+  os << " final : public " << baseClassQualifiedName;
   os << " {\n";
   os << "public:\n";
 
-  // Destructor releases the object.
-  os << "  inline ~";
-  printer.printBaseName(typeDecl);
-  os << "() { swift::" << cxx_synthesis::getCxxImplNamespaceName()
-     << "::swift_release(_opaquePointer); }\n";
-
-  // FIXME: move semantics should be restricted?
-  os << "  inline ";
-  printer.printBaseName(typeDecl);
-  os << "(";
-  printer.printBaseName(typeDecl);
-  os << "&&) noexcept = default;\n";
+  os << "  using " << baseClassName << "::" << baseClassName << ";\n";
+  os << "  using " << baseClassName << "::operator=;\n";
 
   os << "private:\n";
   os << "  inline ";
   printer.printBaseName(typeDecl);
-  os << "(void * _Nonnull ptr) noexcept : _opaquePointer(ptr) {}\n";
-  os << "\n  void * _Nonnull _opaquePointer;\n";
-  os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  os << "(void * _Nonnull ptr) noexcept : " << baseClassName << "(ptr) {}\n";
+  os << "\n  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
   os << "};\n\n";
@@ -73,9 +65,6 @@ void ClangClassTypePrinter::printClassTypeDecl(
         os << " makeRetained(void * _Nonnull ptr) noexcept { return ";
         printer.printBaseName(typeDecl);
         os << "(ptr); }\n";
-        os << "static inline void * _Nonnull getOpaquePointer(const ";
-        printer.printBaseName(typeDecl);
-        os << " &object) noexcept { return object._opaquePointer; }\n";
         os << "};\n";
       });
 }
@@ -96,12 +85,14 @@ void ClangClassTypePrinter::printClassTypeReturnScaffold(
 void ClangClassTypePrinter::printParameterCxxtoCUseScaffold(
     raw_ostream &os, const ClassDecl *type, const ModuleDecl *moduleContext,
     llvm::function_ref<void(void)> bodyPrinter, bool isInOut) {
-  // FIXME: Handle isInOut
-  ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
-      type->getModuleContext(), moduleContext);
-  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  ClangValueTypePrinter::printCxxImplClassName(os, type);
-  os << "::getOpaquePointer(";
+  if (isInOut)
+    os << '&';
+  os << "::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+     << "::_impl_RefCountedClass"
+     << "::getOpaquePointer";
+  if (isInOut)
+    os << "Ref";
+  os << '(';
   bodyPrinter();
   os << ')';
 }
