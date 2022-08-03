@@ -237,8 +237,8 @@ else()
     COMMAND
         "sed"
         -n -e "/header/!d" -e "s/.*header/#include/" -e "w ${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
-        "${CMAKE_SOURCE_DIR}/include/swift/module.modulemap"
-    DEPENDS "${CMAKE_SOURCE_DIR}/include/swift/module.modulemap"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift/module.modulemap"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift/module.modulemap"
     COMMENT "Generate HeaderDependencies.cpp"
 )
   
@@ -246,7 +246,7 @@ else()
   #         The swift modules can now depend on that target.
   #         Note that this library is unused, i.e. not linked to anything.   
   add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
-  target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_SOURCE_DIR}/include/swift")
+  target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
 
   if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
