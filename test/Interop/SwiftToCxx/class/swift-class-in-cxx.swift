@@ -35,9 +35,9 @@ public final class ClassWithIntField {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   using RefCountedClass::RefCountedClass;
 // CHECK-NEXT:   using RefCountedClass::operator=;
-// CHECK-NEXT: private:
+// CHECK-NEXT: protected:
 // CHECK-NEXT:   inline ClassWithIntField(void * _Nonnull ptr) noexcept : RefCountedClass(ptr) {}
-// CHECK-EMPTY:
+// CHECK-NEXT: private:
 // CHECK-NEXT:   friend class _impl::_impl_ClassWithIntField;
 // CHECK-NEXT: };
 // CHECK-EMPTY:
