@@ -59,7 +59,7 @@ void ClangClassTypePrinter::printClassTypeDecl(
 
   os << "  using " << baseClassName << "::" << baseClassName << ";\n";
   os << "  using " << baseClassName << "::operator=;\n";
-
+  bodyPrinter();
   os << "protected:\n";
   os << "  inline ";
   printer.printBaseName(typeDecl);

@@ -300,9 +300,10 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       // FIXME: Print availability.
-      ClangClassTypePrinter(os).printClassTypeDecl(CD, []() {
-        // FIXME: print class body.
-      });
+      ClangClassTypePrinter(os).printClassTypeDecl(
+          CD, [&]() { printMembers(CD->getMembers()); });
+      os << outOfLineDefinitions;
+      outOfLineDefinitions.clear();
       return;
     }
 
