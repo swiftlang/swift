@@ -1592,6 +1592,39 @@ public:
     return std::move(*applyCallee);
   }
 
+  /// \returns true if the conversion is from an async function to
+  /// the same type but with a global actor added. For example this:
+  ///     () async -> ()  ==>  @MainActor () async -> ()
+  /// will return true. In all other cases, returns false.
+  static bool addsGlobalActorToAsyncFn(FunctionConversionExpr *fce) {
+    CanType oldTy = fce->getSubExpr()->getType()->getCanonicalType();
+    CanType newTy = fce->getType()->getCanonicalType();
+
+    if (auto oldFnTy = dyn_cast<AnyFunctionType>(oldTy)) {
+      if (auto newFnTy = dyn_cast<AnyFunctionType>(newTy)) {
+        // old type MUST be async
+        if (!oldFnTy->hasEffect(EffectKind::Async))
+          return false;
+
+        // old type MUST NOT have a global actor
+        if (oldFnTy->hasGlobalActor())
+          return false;
+
+        // new type MUST have a global actor
+        if (!newFnTy->hasGlobalActor())
+          return false;
+
+        // see if adding the global actor to the old type yields the new type.
+        auto globalActor = newFnTy->getGlobalActor();
+        auto addedActor = oldFnTy->getExtInfo().withGlobalActor(globalActor);
+
+        return oldFnTy->withExtInfo(addedActor) == newFnTy;
+      }
+    }
+
+    return false;
+  }
+
   /// Ignore parentheses and implicit conversions.
   static Expr *ignoreParensAndImpConversions(Expr *expr) {
     while (true) {
@@ -1605,7 +1638,16 @@ public:
       // works given that we check the result for certain forms.
       if (auto eval = dyn_cast<OptionalEvaluationExpr>(expr)) {
         if (auto inject = dyn_cast<InjectIntoOptionalExpr>(eval->getSubExpr())) {
-          if (auto bind = dyn_cast<BindOptionalExpr>(inject->getSubExpr())) {
+
+          auto nextSubExpr = inject->getSubExpr();
+
+          // skip over a specific, known no-op function conversion, if it exists
+          if (auto funcConv = dyn_cast<FunctionConversionExpr>(nextSubExpr)) {
+            if (addsGlobalActorToAsyncFn(funcConv))
+              nextSubExpr = funcConv->getSubExpr();
+          }
+
+          if (auto bind = dyn_cast<BindOptionalExpr>(nextSubExpr)) {
             if (bind->getDepth() == 0)
               return bind->getSubExpr();
           }
