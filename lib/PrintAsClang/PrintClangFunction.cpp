@@ -713,7 +713,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
   modifiers.isInline = true;
-  modifiers.isConst = accessor->isGetter();
+  modifiers.isConst = accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
   printFunctionSignature(accessor, remapPropertyName(accessor, resultTy),
                          resultTy, FunctionSignatureKind::CxxInlineThunk, {},
                          modifiers);
