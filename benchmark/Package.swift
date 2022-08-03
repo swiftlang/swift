@@ -97,7 +97,7 @@ products += multiSourceLibraries.map {
 
 var targets: [Target] = []
 targets.append(.target(name: "TestsUtils", path: "utils", sources: ["TestsUtils.swift"]))
-targets.append(.target(name: "SimpleArray", path: "single-source", sources: ["SimpleArray.swift"]))
+targets.append(.target(name: "SimpleArray", path: "utils", sources: ["SimpleArray.swift"]))
 targets.append(.systemLibrary(name: "LibProc", path: "utils/LibProc"))
 targets.append(
   .target(name: "DriverUtils",

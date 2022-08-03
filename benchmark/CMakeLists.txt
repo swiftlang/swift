@@ -216,7 +216,7 @@ endif()
 
 set(BENCH_LIBRARY_MODULES
     utils/TestsUtils
-    single-source/SimpleArray
+    utils/SimpleArray
 )
 
 set(BENCH_DRIVER_LIBRARY_MODULES
