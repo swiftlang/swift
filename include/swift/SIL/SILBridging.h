@@ -141,6 +141,13 @@ typedef enum {
 } BridgedMemoryBehavior;
 
 typedef enum {
+  AccessKind_Init,
+  AccessKind_Read,
+  AccessKind_Modify,
+  AccessKind_Deinit
+} BridgedAccessKind;
+
+typedef enum {
   Ownership_Unowned,
   Ownership_Owned,
   Ownership_Guaranteed,
@@ -321,6 +328,7 @@ BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
 SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
+BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess);
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr);
 SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr);
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);
