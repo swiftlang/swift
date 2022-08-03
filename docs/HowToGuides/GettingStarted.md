@@ -222,7 +222,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    - If you use an editor other than Xcode and/or you want somewhat faster builds,
      go with Ninja.
    - If you are comfortable with using Xcode and would prefer to use it,
-     go with Xcode. But, since Xcode build is not as stable as Ninja's, you can also try to use [a ninja build integrated into Xcode](#integrate-a-ninja-build-with-xcode).
+     go with Xcode. If you run into issues building with Xcode, you can alternatively [integrate a Ninja build into Xcode](#integrate-a-ninja-build-with-xcode).
    There is also a third option, which is somewhat more involved:
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
