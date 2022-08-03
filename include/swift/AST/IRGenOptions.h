@@ -461,7 +461,7 @@ public:
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        EnableStackProtector(false), Playground(false),
+        EnableStackProtector(true), Playground(false),
         EmitStackPromotionChecks(false), UseSingleModuleLLVMEmission(false),
         FunctionSections(false), PrintInlineTree(false),
         EmbedMode(IRGenEmbedMode::None), LLVMLTOKind(IRGenLLVMLTOKind::None),
