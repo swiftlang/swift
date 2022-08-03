@@ -25,6 +25,8 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
 
   public var shortDescription: String { name.string }
 
+  public var isLet: Bool { SILGlobalVariable_isLet(bridged) != 0 }
+
   // TODO: initializer instructions
 
   var bridged: BridgedGlobalVar { BridgedGlobalVar(obj: SwiftObject(self)) }

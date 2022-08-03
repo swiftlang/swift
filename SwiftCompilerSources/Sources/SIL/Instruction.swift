@@ -448,6 +448,8 @@ final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, Unary
 
 final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { RefElementAddrInst_fieldIndex(bridged) }
+
+  public var fieldIsLet: Bool { RefElementAddrInst_fieldIsLet(bridged) != 0 }
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {}
