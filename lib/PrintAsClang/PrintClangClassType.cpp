@@ -31,24 +31,41 @@ void ClangClassTypePrinter::printClassTypeDecl(
                            os << ";\n";
                          });
 
-  StringRef baseClassName = "RefCountedClass";
-  StringRef baseClassQualifiedName = "swift::_impl::RefCountedClass";
+  std::string baseClassName;
+  std::string baseClassQualifiedName;
+
+  if (auto *parentClass = typeDecl->getSuperclassDecl()) {
+    llvm::raw_string_ostream baseNameOS(baseClassName);
+    ClangSyntaxPrinter(baseNameOS).printBaseName(parentClass);
+    llvm::raw_string_ostream baseQualNameOS(baseClassQualifiedName);
+    ClangSyntaxPrinter(baseQualNameOS)
+        .printModuleNamespaceQualifiersIfNeeded(parentClass->getModuleContext(),
+                                                typeDecl->getModuleContext());
+    if (!baseQualNameOS.str().empty())
+      baseQualNameOS << "::";
+    baseQualNameOS << baseNameOS.str();
+  } else {
+    baseClassName = "RefCountedClass";
+    baseClassQualifiedName = "swift::_impl::RefCountedClass";
+  }
 
   os << "class ";
   printer.printBaseName(typeDecl);
-  // FIXME: Add support for inherintance.
-  os << " final : public " << baseClassQualifiedName;
+  if (typeDecl->isFinal())
+    os << " final";
+  os << " : public " << baseClassQualifiedName;
   os << " {\n";
   os << "public:\n";
 
   os << "  using " << baseClassName << "::" << baseClassName << ";\n";
   os << "  using " << baseClassName << "::operator=;\n";
 
-  os << "private:\n";
+  os << "protected:\n";
   os << "  inline ";
   printer.printBaseName(typeDecl);
   os << "(void * _Nonnull ptr) noexcept : " << baseClassName << "(ptr) {}\n";
-  os << "\n  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  os << "private:\n";
+  os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
   os << "};\n\n";

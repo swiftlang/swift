@@ -35,9 +35,9 @@ public final class ClassWithIntField {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   using RefCountedClass::RefCountedClass;
 // CHECK-NEXT:   using RefCountedClass::operator=;
-// CHECK-NEXT: private:
+// CHECK-NEXT: protected:
 // CHECK-NEXT:   inline ClassWithIntField(void * _Nonnull ptr) noexcept : RefCountedClass(ptr) {}
-// CHECK-EMPTY:
+// CHECK-NEXT: private:
 // CHECK-NEXT:   friend class _impl::_impl_ClassWithIntField;
 // CHECK-NEXT: };
 // CHECK-EMPTY:
@@ -84,3 +84,7 @@ public func takeClassWithIntFieldInout(_ x: inout ClassWithIntField) {
 // CHECK: inline void takeClassWithIntField(const ClassWithIntField& x) noexcept {
 // CHECK-NEXT:  return _impl::$s5Class04takeA12WithIntFieldyyAA0acdE0CF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x));
 // CHECK-NEXT: }
+
+// CHECK: inline void takeClassWithIntFieldInout(ClassWithIntField& x) noexcept {
+// CHECK-NEXT:    return _impl::$s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(&::swift::_impl::_impl_RefCountedClass::getOpaquePointerRef(x));
+// CHECK-NEXT:  }
