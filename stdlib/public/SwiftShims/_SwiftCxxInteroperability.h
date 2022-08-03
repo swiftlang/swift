@@ -53,6 +53,41 @@ inline void opaqueFree(void *_Nonnull p) noexcept {
 #endif
 }
 
+/// Base class for a Swift reference counted class value.
+class RefCountedClass {
+public:
+  inline ~RefCountedClass() { swift_release(_opaquePointer); }
+  inline RefCountedClass(const RefCountedClass &other) noexcept
+      : _opaquePointer(other._opaquePointer) {
+    swift_retain(_opaquePointer);
+  }
+  inline RefCountedClass &operator=(const RefCountedClass &other) noexcept {
+    swift_retain(other._opaquePointer);
+    swift_release(_opaquePointer);
+    _opaquePointer = other._opaquePointer;
+    return *this;
+  }
+  // FIXME: What to do in 'move'?
+  inline RefCountedClass(RefCountedClass &&) noexcept = default;
+
+protected:
+  inline RefCountedClass(void *_Nonnull ptr) noexcept : _opaquePointer(ptr) {}
+
+private:
+  void *_Nonnull _opaquePointer;
+  friend class _impl_RefCountedClass;
+};
+
+class _impl_RefCountedClass {
+public:
+  static inline void *_Nonnull getOpaquePointer(const RefCountedClass &object) {
+    return object._opaquePointer;
+  }
+  static inline void *_Nonnull &getOpaquePointerRef(RefCountedClass &object) {
+    return object._opaquePointer;
+  }
+};
+
 } // namespace _impl
 
 /// Swift's Int type.
