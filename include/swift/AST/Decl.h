@@ -1416,10 +1416,6 @@ public:
 
   bool hasValidParent() const;
 
-  /// Determine whether this extension has already been bound to a nominal
-  /// type declaration.
-  bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
-
   /// Retrieve the extended type definition as written in the source, if it exists.
   ///
   /// Repr would not be available if the extension was been loaded
