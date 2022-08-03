@@ -1413,7 +1413,7 @@ DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                                   Ty);
 }
 
-static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
+static ValueDecl *getCalledValue(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
@@ -1422,16 +1422,11 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
 
   // Look through SelfApplyExpr.
   if (auto *SAE = dyn_cast<SelfApplyExpr>(E))
-    return SAE->getCalledValue(skipFunctionConversions);
-
-  if (skipFunctionConversions) {
-    if (auto fnConv = dyn_cast<FunctionConversionExpr>(E))
-      return getCalledValue(fnConv->getSubExpr(), skipFunctionConversions);
-  }
+    return SAE->getCalledValue();
 
   Expr *E2 = E->getValueProvidingExpr();
   if (E != E2)
-    return getCalledValue(E2, skipFunctionConversions);
+    return getCalledValue(E2);
 
   return nullptr;
 }
@@ -1473,8 +1468,8 @@ Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
                            new (ctx) ErrorExpr(getSourceRange(), getType()));
 }
 
-ValueDecl *ApplyExpr::getCalledValue(bool skipFunctionConversions) const {
-  return ::getCalledValue(Fn, skipFunctionConversions);
+ValueDecl *ApplyExpr::getCalledValue() const {
+  return ::getCalledValue(Fn);
 }
 
 SubscriptExpr::SubscriptExpr(Expr *base, ArgumentList *argList,
@@ -1911,14 +1906,6 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     return expr;
   };
 
-  auto maybeUnwrapConversions = [](Expr *expr) {
-    if (auto *covariantReturn = dyn_cast<CovariantReturnConversionExpr>(expr))
-      expr = covariantReturn->getSubExpr();
-    if (auto *functionConversion = dyn_cast<FunctionConversionExpr>(expr))
-      expr = functionConversion->getSubExpr();
-    return expr;
-  };
-
   switch (getThunkKind()) {
   case AutoClosureExpr::Kind::None:
   case AutoClosureExpr::Kind::AsyncLet:
@@ -1929,7 +1916,6 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     body = body->getSemanticsProvidingExpr();
     body = maybeUnwrapOpenExistential(body);
     body = maybeUnwrapOptionalEval(body);
-    body = maybeUnwrapConversions(body);
 
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
       return outerCall->getFn();
@@ -1948,10 +1934,9 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
       innerBody = innerBody->getSemanticsProvidingExpr();
       innerBody = maybeUnwrapOpenExistential(innerBody);
       innerBody = maybeUnwrapOptionalEval(innerBody);
-      innerBody = maybeUnwrapConversions(innerBody);
+
       if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
-        auto outerFn = maybeUnwrapConversions(outerCall->getFn());
-        if (auto *innerCall = dyn_cast<ApplyExpr>(outerFn)) {
+        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
           return innerCall->getFn();
         }
       }

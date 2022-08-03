@@ -489,21 +489,13 @@ static Optional<PartialApplyThunkInfo> decomposePartialApplyThunk(
 
 /// Find the immediate member reference in the given expression.
 static Optional<std::pair<ConcreteDeclRef, SourceLoc>>
-findReference(Expr *expr) {
-  // Look through a function conversion.
-  if (auto fnConv = dyn_cast<FunctionConversionExpr>(expr))
-    expr = fnConv->getSubExpr();
-
+findMemberReference(Expr *expr) {
   if (auto declRef = dyn_cast<DeclRefExpr>(expr))
     return std::make_pair(declRef->getDeclRef(), declRef->getLoc());
 
   if (auto otherCtor = dyn_cast<OtherConstructorDeclRefExpr>(expr)) {
     return std::make_pair(otherCtor->getDeclRef(), otherCtor->getLoc());
   }
-
-  Expr *inner = expr->getValueProvidingExpr();
-  if (inner != expr)
-    return findReference(inner);
 
   return None;
 }
@@ -1843,7 +1835,7 @@ namespace {
         // like based on the original written syntax, e.g., "self.method".
         if (auto partialApply = decomposePartialApplyThunk(
                 apply, Parent.getAsExpr())) {
-          if (auto memberRef = findReference(partialApply->fn)) {
+          if (auto memberRef = findMemberReference(partialApply->fn)) {
             // NOTE: partially-applied thunks are never annotated as
             // implicitly async, regardless of whether they are escaping.
             checkReference(
@@ -1864,7 +1856,7 @@ namespace {
       // NOTE: SelfApplyExpr is a subtype of ApplyExpr
       if (auto call = dyn_cast<SelfApplyExpr>(expr)) {
         Expr *fn = call->getFn()->getValueProvidingExpr();
-        if (auto memberRef = findReference(fn)) {
+        if (auto memberRef = findMemberReference(fn)) {
           checkReference(
               call->getBase(), memberRef->first, memberRef->second,
               /*partialApply=*/None, call);
@@ -2099,8 +2091,6 @@ namespace {
 
         if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
           expr = conversion->getSubExpr();
-        if (auto fnConv = dyn_cast<FunctionConversionExpr>(expr))
-          expr = fnConv->getSubExpr();
       } while (prior != expr);
 
       if (auto call = dyn_cast<DotSyntaxCallExpr>(expr)) {
@@ -2377,9 +2367,7 @@ namespace {
         // and the fact that the reference may be just an argument to an apply
         ApplyExpr *apply = applyStack.back();
         Expr *fn = apply->getFn()->getValueProvidingExpr();
-        if (auto fnConv = dyn_cast<FunctionConversionExpr>(fn))
-          fn = fnConv->getSubExpr()->getValueProvidingExpr();
-        if (auto memberRef = findReference(fn)) {
+        if (auto memberRef = findMemberReference(fn)) {
           auto concDecl = memberRef->first;
           if (decl == concDecl.getDecl() && !apply->isImplicitlyAsync()) {
 
@@ -2497,8 +2485,7 @@ namespace {
 
       // If we are not in an asynchronous context, complain.
       if (!getDeclContext()->isAsyncContext()) {
-        if (auto calleeDecl = apply->getCalledValue(
-                /*skipFunctionConversions=*/true)) {
+        if (auto calleeDecl = apply->getCalledValue()) {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
