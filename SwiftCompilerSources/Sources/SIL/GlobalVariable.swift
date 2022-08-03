@@ -32,6 +32,14 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
   var bridged: BridgedGlobalVar { BridgedGlobalVar(obj: SwiftObject(self)) }
 }
 
+public func ==(_ lhs: GlobalVariable, _ rhs: GlobalVariable) -> Bool {
+  return lhs === rhs
+}
+
+public func !=(_ lhs: GlobalVariable, _ rhs: GlobalVariable) -> Bool {
+  return (lhs !== rhs)
+}
+
 // Bridging utilities
 
 extension BridgedGlobalVar {
