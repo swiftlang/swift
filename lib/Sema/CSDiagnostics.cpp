@@ -2217,7 +2217,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
     if (isValidKeyPathDynamicMemberLookup(subscript)) {
       // Type has a following format:
       // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
-      auto *fullType = member->adjustedOpenedFullType->castTo<FunctionType>();
+      auto *fullType = member->openedFullType->castTo<FunctionType>();
       auto *fnType = fullType->getResult()->castTo<FunctionType>();
 
       auto paramTy = fnType->getParams()[0].getPlainType();

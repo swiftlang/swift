@@ -1086,12 +1086,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     reqLocator = cs->getConstraintLocator(
         static_cast<Expr *>(nullptr), LocatorPathElt::ProtocolRequirement(req));
     OpenedTypeMap reqReplacements;
-    reqType = cs->getTypeOfMemberReference(selfTy, req, dc,
-                                           /*isDynamicResult=*/false,
-                                           FunctionRefKind::DoubleApply,
-                                           reqLocator,
-                                           &reqReplacements)
-        .referenceType;
+    std::tie(std::ignore, reqType)
+      = cs->getTypeOfMemberReference(selfTy, req, dc,
+                                     /*isDynamicResult=*/false,
+                                     FunctionRefKind::DoubleApply,
+                                     reqLocator,
+                                     &reqReplacements);
     reqType = reqType->getRValueType();
 
     // For any type parameters we replaced in the witness, map them
@@ -1119,15 +1119,16 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     witnessLocator = cs->getConstraintLocator({},
                                               LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
-      openWitnessType = cs->getTypeOfMemberReference(
-          selfTy, witness, dc, /*isDynamicResult=*/false,
-          FunctionRefKind::DoubleApply, witnessLocator)
-        .referenceType;
+      std::tie(std::ignore, openWitnessType)
+        = cs->getTypeOfMemberReference(selfTy, witness, dc,
+                                       /*isDynamicResult=*/false,
+                                       FunctionRefKind::DoubleApply,
+                                       witnessLocator);
     } else {
-      openWitnessType = cs->getTypeOfReference(
-          witness, FunctionRefKind::DoubleApply, witnessLocator,
-          /*useDC=*/nullptr)
-        .referenceType;
+      std::tie(std::ignore, openWitnessType)
+        = cs->getTypeOfReference(witness,
+                                 FunctionRefKind::DoubleApply,
+                                 witnessLocator, /*useDC=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
 

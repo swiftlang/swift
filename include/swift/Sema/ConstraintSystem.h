@@ -614,10 +614,6 @@ struct SelectedOverload {
   /// we're referencing a member.
   const Type openedFullType;
 
-  /// The opened type of the base of the reference to this overload, adjusted
-  /// for `@preconcurrency` or other contextual type-altering attributes.
-  const Type adjustedOpenedFullType;
-
   /// The opened type produced by referring to this overload.
   const Type openedType;
 
@@ -4474,8 +4470,9 @@ public:
   ///
   /// \param decl The declarations whose type is being computed.
   ///
-  /// \returns a description of the type of this declaration reference.
-  DeclReferenceType getTypeOfReference(
+  /// \returns a pair containing the full opened type (if applicable) and
+  /// opened type of a reference to declaration.
+  std::pair<Type, Type> getTypeOfReference(
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
@@ -4537,8 +4534,9 @@ public:
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
   ///
-  /// \returns a description of the type of this declaration reference.
-  DeclReferenceType getTypeOfMemberReference(
+  /// \returns a pair containing the full opened type (which includes the opened
+  /// base) and opened type of a reference to this member.
+  std::pair<Type, Type> getTypeOfMemberReference(
                           Type baseTy, ValueDecl *decl, DeclContext *useDC,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,

@@ -527,7 +527,7 @@ namespace {
       auto choice = overload.choice;
       assert(choice.getKind() != OverloadChoiceKind::DeclViaDynamic);
       auto *decl = choice.getDecl();
-      auto fullType = simplifyType(overload.adjustedOpenedFullType);
+      auto fullType = simplifyType(overload.openedFullType);
 
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
@@ -1388,7 +1388,7 @@ namespace {
                          ConstraintLocatorBuilder memberLocator, bool Implicit,
                          AccessSemantics semantics) {
       const auto &choice = overload.choice;
-      const auto adjustedOpenedType = overload.openedType;
+      const auto openedType = overload.openedType;
 
       ValueDecl *member = choice.getDecl();
 
@@ -1433,7 +1433,7 @@ namespace {
         if (!isExistentialMetatype && baseTy->is<ProtocolType>() &&
             member->isStatic()) {
           auto selfParam =
-              overload.adjustedOpenedFullType->castTo<FunctionType>()->getParams()[0];
+              overload.openedFullType->castTo<FunctionType>()->getParams()[0];
 
           Type baseTy =
               simplifyType(selfParam.getPlainType())->getMetatypeInstanceType();
@@ -1449,7 +1449,7 @@ namespace {
       // If we're referring to a member type, it's just a type
       // reference.
       if (auto *TD = dyn_cast<TypeDecl>(member)) {
-        Type refType = simplifyType(adjustedOpenedType);
+        Type refType = simplifyType(openedType);
         auto ref = TypeExpr::createForDecl(memberLoc, TD, dc);
         cs.setType(ref, refType);
         auto *result = new (context) DotSyntaxBaseIgnoredExpr(
@@ -1458,7 +1458,7 @@ namespace {
         return result;
       }
 
-      auto refTy = simplifyType(overload.adjustedOpenedFullType);
+      auto refTy = simplifyType(overload.openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
       // reference.
@@ -1596,7 +1596,7 @@ namespace {
         // FIXME: FunctionRefKind
 
         // Compute the type of the reference.
-        Type refType = simplifyType(adjustedOpenedType);
+        Type refType = simplifyType(openedType);
 
         // If the base was an opened existential, erase the opened
         // existential.
@@ -1649,7 +1649,7 @@ namespace {
         // type having 'Self' swapped for the appropriate replacement
         // type -- usually the base object type.
         if (hasDynamicSelf) {
-          const auto conversionTy = simplifyType(adjustedOpenedType);
+          const auto conversionTy = simplifyType(openedType);
           if (!containerTy->isEqual(conversionTy)) {
             result = cs.cacheType(new (context) CovariantReturnConversionExpr(
                 result, conversionTy));
@@ -1724,7 +1724,7 @@ namespace {
           // must be downcast to the opened archetype before being erased to the
           // subclass existential to cope with the expectations placed
           // on 'CovariantReturnConversionExpr'.
-          curryThunkTy = simplifyType(adjustedOpenedType)->castTo<FunctionType>();
+          curryThunkTy = simplifyType(openedType)->castTo<FunctionType>();
         } else {
           curryThunkTy = refTy->castTo<FunctionType>();
 
@@ -1789,7 +1789,7 @@ namespace {
         ref = forceUnwrapIfExpected(ref, memberLocator);
         apply = ConstructorRefCallExpr::create(context, ref, base);
       } else if (isUnboundInstanceMember) {
-        auto refType = cs.simplifyType(adjustedOpenedType);
+        auto refType = cs.simplifyType(openedType);
         if (!cs.getType(ref)->isEqual(refType)) {
           ref = new (context) FunctionConversionExpr(ref, refType);
           cs.cacheType(ref);
@@ -1812,7 +1812,7 @@ namespace {
         }
       }
 
-      return finishApply(apply, adjustedOpenedType, locator, memberLocator);
+      return finishApply(apply, openedType, locator, memberLocator);
     }
 
     /// Convert the given literal expression via a protocol pair.
@@ -2072,7 +2072,7 @@ namespace {
       auto subscriptRef = resolveConcreteDeclRef(subscript, memberLoc);
 
       // Coerce the index argument.
-      auto openedFullFnType = simplifyType(selected.adjustedOpenedFullType)
+      auto openedFullFnType = simplifyType(selected.openedFullType)
                                   ->castTo<FunctionType>();
       auto fullSubscriptTy = openedFullFnType->getResult()
                                   ->castTo<FunctionType>();
@@ -2098,7 +2098,7 @@ namespace {
         auto resultTy = simplifyType(selected.openedType)
                             ->castTo<FunctionType>()
                             ->getResult();
-        assert(!selected.adjustedOpenedFullType->hasOpenedExistential()
+        assert(!selected.openedFullType->hasOpenedExistential()
                && "open existential archetype in AnyObject subscript type?");
         cs.setType(subscriptExpr, resultTy);
         Expr *result = subscriptExpr;
@@ -3085,7 +3085,7 @@ namespace {
 
       // Build a partial application of the delegated initializer.
       auto callee = resolveConcreteDeclRef(ctor, ctorLocator);
-      Expr *ctorRef = buildOtherConstructorRef(overload.adjustedOpenedFullType, callee,
+      Expr *ctorRef = buildOtherConstructorRef(overload.openedFullType, callee,
                                                base, nameLoc, ctorLocator,
                                                implicit);
       auto *call =
@@ -3308,7 +3308,7 @@ namespace {
     Type getTypeOfDynamicMemberIndex(const SelectedOverload &overload) {
       assert(overload.choice.isAnyDynamicMemberLookup());
 
-      auto declTy = solution.simplifyType(overload.adjustedOpenedFullType);
+      auto declTy = solution.simplifyType(overload.openedFullType);
       auto subscriptTy = declTy->castTo<FunctionType>()->getResult();
       auto refFnType = subscriptTy->castTo<FunctionType>();
       assert(refFnType->getParams().size() == 1 &&
