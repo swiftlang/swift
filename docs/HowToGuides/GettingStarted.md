@@ -318,7 +318,7 @@ It is even possible to integrate the Ninja build into Xcode. For details on how 
     * [Building Swift compiler from source fails when not using Ninja](https://forums.swift.org/t/building-swift-compiler-from-source-fails-when-not-using-ninja/54656)
     * [ALL_BUILD Target failing at validation](https://forums.swift.org/t/help-building-swift-in-xcode-error/49728)
     * [“gtest/gtest.h” not found while compiling the compiler](https://forums.swift.org/t/gtest-gtest-h-not-found-in-typeref-cpp-while-compiling-the-compiler/44399)
-- If you still could not find a solution to your issue, feel free to create a new [Swift Forums] thread in the [Development/Compiler](https://forums.swift.org/c/development/compiler) category: 
+- If you still could not find a solution to your issue, feel free to create a new Swift Forums thread in the [Development/Compiler](https://forums.swift.org/c/development/compiler) category: 
   - Include information about your configuration and the errors you are seeing.
   - You can [create a gist](https://gist.github.com) with the entire build
     output and link it, while highlighting the most important part of the
