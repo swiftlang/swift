@@ -308,7 +308,7 @@ It is even possible to integrate the Ninja build into Xcode. For details on how 
   In many situations, there are several errors, so scrolling further back
   and looking at the first error may be more helpful than simply looking
   at the last error.
-- Check if others have encountered the same issue on the [Swift Forums](https://forums.swift.org/c/development/compiler) or an issue on
+- Check if others have encountered the same issue on the [Swift Forums](https://forums.swift.org/c/development/compiler) or on
    [Swift repository 'Issues' tab][Swift Issues].
   - Here is a list of threads that describe common issues:
     * [Problems with `build-script` building compiler with `–xcode`](https://forums.swift.org/t/problems-with-build-script-building-compiler-with-xcode/53477)
