@@ -601,7 +601,7 @@ bool AllowFunctionTypeMismatch::diagnoseForAmbiguity(
       auto *decl = overload->choice.getDecl();
       if (decl->getLoc().isValid()) {
         DE.diagnose(decl, diag::found_candidate_type,
-                    solution.simplifyType(overload->adjustedOpenedType));
+                    solution.simplifyType(overload->openedType));
       }
     }
 

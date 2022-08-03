@@ -1388,7 +1388,7 @@ namespace {
                          ConstraintLocatorBuilder memberLocator, bool Implicit,
                          AccessSemantics semantics) {
       const auto &choice = overload.choice;
-      const auto adjustedOpenedType = overload.adjustedOpenedType;
+      const auto adjustedOpenedType = overload.openedType;
 
       ValueDecl *member = choice.getDecl();
 
@@ -1595,21 +1595,16 @@ namespace {
         ref->setImplicit(Implicit);
         // FIXME: FunctionRefKind
 
-        auto computeRefType = [&](Type openedType) {
-          // Compute the type of the reference.
-          Type refType = simplifyType(adjustedOpenedType);
+        // Compute the type of the reference.
+        Type refType = simplifyType(adjustedOpenedType);
 
-          // If the base was an opened existential, erase the opened
-          // existential.
-          if (openedExistential) {
-            refType = refType->typeEraseOpenedArchetypesWithRoot(
-                baseTy->castTo<OpenedArchetypeType>(), dc);
-          }
+        // If the base was an opened existential, erase the opened
+        // existential.
+        if (openedExistential) {
+          refType = refType->typeEraseOpenedArchetypesWithRoot(
+              baseTy->castTo<OpenedArchetypeType>(), dc);
+        }
 
-          return refType;
-        };
-
-        Type refType = computeRefType(adjustedOpenedType);
         cs.setType(ref, refType);
 
         closeExistentials(ref, locator, /*force=*/openedExistential);
@@ -1972,7 +1967,7 @@ namespace {
       // Apply a key path if we have one.
       if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
         auto applicationTy =
-            simplifyType(selected.adjustedOpenedType)->castTo<FunctionType>();
+            simplifyType(selected.openedType)->castTo<FunctionType>();
 
         // The index argument should be (keyPath: KeyPath<Root, Value>).
         // Dig the key path expression out of the arguments.
@@ -2100,7 +2095,7 @@ namespace {
         // TODO: diagnose if semantics != AccessSemantics::Ordinary?
         auto subscriptExpr = DynamicSubscriptExpr::create(
             ctx, base, args, subscriptRef, isImplicit);
-        auto resultTy = simplifyType(selected.adjustedOpenedType)
+        auto resultTy = simplifyType(selected.openedType)
                             ->castTo<FunctionType>()
                             ->getResult();
         assert(!selected.adjustedOpenedFullType->hasOpenedExistential()
@@ -2157,7 +2152,7 @@ namespace {
       // base object type.
       if (hasDynamicSelf) {
         const auto conversionTy = simplifyType(
-            selected.adjustedOpenedType->castTo<FunctionType>()->getResult());
+            selected.openedType->castTo<FunctionType>()->getResult());
 
         if (!containerTy->isEqual(conversionTy)) {
           result = cs.cacheType(
@@ -2857,7 +2852,7 @@ namespace {
         return nullptr;
 
       auto fnType =
-          simplifyType(selectedOverload->adjustedOpenedType)->castTo<FunctionType>();
+          simplifyType(selectedOverload->openedType)->castTo<FunctionType>();
 
       auto newArgs = coerceCallArguments(
           expr->getArgs(), fnType, witness, /*applyExpr=*/nullptr,
@@ -5032,7 +5027,7 @@ namespace {
         const SelectedOverload &overload, SourceLoc componentLoc,
         ConstraintLocator *locator,
         SmallVectorImpl<KeyPathExpr::Component> &components) {
-      auto resolvedTy = simplifyType(overload.adjustedOpenedType);
+      auto resolvedTy = simplifyType(overload.openedType);
       if (auto *property = overload.choice.getDeclOrNull()) {
         // Key paths can only refer to properties currently.
         auto varDecl = cast<VarDecl>(property);
@@ -5093,7 +5088,7 @@ namespace {
       }
 
       auto subscriptType =
-          simplifyType(overload.adjustedOpenedType)->castTo<AnyFunctionType>();
+          simplifyType(overload.openedType)->castTo<AnyFunctionType>();
       auto resolvedTy = subscriptType->getResult();
 
       // Coerce the indices to the type the subscript expects.
@@ -5109,7 +5104,7 @@ namespace {
 
       auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
 
-      auto fnType = overload.adjustedOpenedType->castTo<FunctionType>();
+      auto fnType = overload.openedType->castTo<FunctionType>();
       SmallVector<Identifier, 4> newLabels;
       for (auto &param : fnType->getParams()) {
         newLabels.push_back(param.getLabel());
@@ -7665,7 +7660,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           cs.getConstraintLocator(applyFunctionLoc))) {
     auto *method = dyn_cast<FuncDecl>(selected->choice.getDecl());
     auto methodType =
-        simplifyType(selected->adjustedOpenedType)->getAs<AnyFunctionType>();
+        simplifyType(selected->openedType)->getAs<AnyFunctionType>();
     if (method && methodType) {
       // Handle a call to a @dynamicCallable method.
       if (isValidDynamicCallableMethod(method, methodType))

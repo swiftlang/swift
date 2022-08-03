@@ -1091,7 +1091,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
                                            FunctionRefKind::DoubleApply,
                                            reqLocator,
                                            &reqReplacements)
-        .adjustedReferenceType;
+        .referenceType;
     reqType = reqType->getRValueType();
 
     // For any type parameters we replaced in the witness, map them
@@ -1122,12 +1122,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       openWitnessType = cs->getTypeOfMemberReference(
           selfTy, witness, dc, /*isDynamicResult=*/false,
           FunctionRefKind::DoubleApply, witnessLocator)
-        .adjustedReferenceType;
+        .referenceType;
     } else {
       openWitnessType = cs->getTypeOfReference(
           witness, FunctionRefKind::DoubleApply, witnessLocator,
           /*useDC=*/nullptr)
-        .adjustedReferenceType;
+        .referenceType;
     }
     openWitnessType = openWitnessType->getRValueType();
 
