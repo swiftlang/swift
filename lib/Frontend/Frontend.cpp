@@ -866,8 +866,7 @@ bool CompilerInstance::canImportCxxShim() const {
       getASTContext().getIdentifier(CXX_SHIM_NAME));
   auto modulePath = builder.get();
   return getASTContext().canImportModule(modulePath) &&
-         Invocation.getFrontendOptions().InputMode !=
-             FrontendOptions::ParseInputMode::SwiftModuleInterface;
+         !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
