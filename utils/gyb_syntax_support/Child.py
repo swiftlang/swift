@@ -83,3 +83,6 @@ class Child(object):
         if self.token_choices:
             return self.token_choices[0]
         return None
+
+    def is_garbage_nodes(self):
+        return self.syntax_kind == 'GarbageNodes'

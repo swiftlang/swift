@@ -15,14 +15,17 @@ SymbolicReferenceExprSyntax getCannedSymbolicRef(const RC<SyntaxArena> &Arena) {
   // First, make a symbolic reference to an 'Array<Int>'
   auto Array = Factory.makeIdentifier("Array", {}, {});
   auto Int = Factory.makeIdentifier("Int", {}, {});
-  auto IntType = Factory.makeSimpleTypeIdentifier(Int, None);
-  auto IntArg = Factory.makeGenericArgument(IntType, None);
+  auto IntType = Factory.makeSimpleTypeIdentifier(/*GarbageNodes=*/None, Int,
+                                                  /*GarbageNodes=*/None, None);
+  auto IntArg = Factory.makeGenericArgument(/*GarbageNodes=*/None, IntType,
+                                            /*GarbageNodes=*/None, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder(Arena);
   ArgBuilder.useLeftAngleBracket(Factory.makeLeftAngleToken({}, {}))
       .useRightAngleBracket(Factory.makeRightAngleToken({}, {}))
       .addArgument(IntArg);
 
-  return Factory.makeSymbolicReferenceExpr(Array, ArgBuilder.build());
+  return Factory.makeSymbolicReferenceExpr(
+      /*GarbageNodes=*/None, Array, /*GarbageNodes=*/None, ArgBuilder.build());
 }
 
 FunctionCallExprSyntax getCannedFunctionCall(const RC<SyntaxArena> &Arena) {
@@ -34,15 +37,22 @@ FunctionCallExprSyntax getCannedFunctionCall(const RC<SyntaxArena> &Arena) {
   auto Colon = Factory.makeColonToken({}, " ");
   auto OneDigits = Factory.makeIntegerLiteral("1", {}, {});
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "", Arena);
-  auto One = Factory.makePrefixOperatorExpr(
-      NoSign, Factory.makeIntegerLiteralExpr(OneDigits));
+  auto OneLiteral =
+      Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
+  auto One = Factory.makePrefixOperatorExpr(/*GarbageNodes=*/None, NoSign,
+                                            /*GarbageNodes=*/None, OneLiteral);
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
 
-  auto Arg = Factory.makeTupleExprElement(Label, Colon, One, NoComma);
+  auto Arg = Factory.makeTupleExprElement(
+      /*GarbageNodes=*/None, Label, /*GarbageNodes=*/None, Colon,
+      /*GarbageNodes=*/None, One, /*GarbageNodes=*/None, NoComma);
   auto Args = Factory.makeTupleExprElementList({Arg});
 
-  return Factory.makeFunctionCallExpr(getCannedSymbolicRef(Arena), LParen, Args,
-                                      RParen, None, None);
+  return Factory.makeFunctionCallExpr(
+      /*GarbageNodes=*/None, getCannedSymbolicRef(Arena), /*GarbageNodes=*/None,
+      LParen, /*GarbageNodes=*/None, Args,
+      /*GarbageNodes=*/None, RParen, /*GarbageNodes=*/None, None,
+      /*GarbageNodes=*/None, None);
 }
 
 TEST(UnknownSyntaxTests, UnknownSyntaxMakeAPIs) {
@@ -88,19 +98,19 @@ TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
     // RawSyntax layout but with the UnknownExpr Kind.;
     auto Unknown = makeRoot<UnknownExprSyntax>(Call.getRaw());
 
-    ASSERT_EQ(Unknown.getNumChildren(), size_t(6));
+    ASSERT_EQ(Unknown.getNumChildren(), size_t(12));
 
     // Get the second child from the unknown call, which is the argument list.
     // This should print the same as the known one: "elements: 1"
     SmallString<48> UnknownScratch;
     llvm::raw_svector_ostream UnknownOS(UnknownScratch);
-    auto ExprGottenFromUnknown = Unknown.getChild(0)
+    auto ExprGottenFromUnknown = Unknown.getChild(1)
       ->castTo<SymbolicReferenceExprSyntax>();
     ExprGottenFromUnknown.print(UnknownOS);
 
     ASSERT_EQ(KnownOS.str().str(), UnknownOS.str().str());
 
-    auto ExprGottenFromUnknown2 = Unknown.getChild(0);
+    auto ExprGottenFromUnknown2 = Unknown.getChild(1);
     ASSERT_TRUE(ExprGottenFromUnknown
                 .hasSameIdentityAs(*ExprGottenFromUnknown2));
   }
@@ -118,19 +128,19 @@ TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
     // RawSyntax layout but with the Unknown Kind.
     auto Unknown = makeRoot<UnknownSyntax>(Call.getRaw());
 
-    ASSERT_EQ(Unknown.getNumChildren(), size_t(6));
+    ASSERT_EQ(Unknown.getNumChildren(), size_t(12));
 
     // Get the third child from the unknown call, which is the argument list.
     // This should print the same as the known one: "elements: 1"
     SmallString<48> UnknownScratch;
     llvm::raw_svector_ostream UnknownOS(UnknownScratch);
-    auto ArgsGottenFromUnknown = Unknown.getChild(2)
+    auto ArgsGottenFromUnknown = Unknown.getChild(5)
       ->castTo<TupleExprElementListSyntax>();
     ArgsGottenFromUnknown.print(UnknownOS);
 
     ASSERT_EQ(KnownOS.str().str(), UnknownOS.str().str());
 
-    auto ArgsGottenFromUnknown2 = Unknown.getChild(2);
+    auto ArgsGottenFromUnknown2 = Unknown.getChild(5);
     ASSERT_TRUE(ArgsGottenFromUnknown
                   .hasSameIdentityAs(*ArgsGottenFromUnknown2));
   }
@@ -147,7 +157,9 @@ TEST(UnknownSyntaxTests, EmbedUnknownExpr) {
   SmallString<48> KnownScratch;
   llvm::raw_svector_ostream KnownOS(KnownScratch);
   auto CallWithKnownExpr = Factory.makeFunctionCallExpr(
-      SymbolicRef, LParen, EmptyArgs, RParen, None, None);
+      /*GarbageNodes=*/None, SymbolicRef, /*GarbageNodes=*/None, LParen,
+      /*GarbageNodes=*/None, EmptyArgs, /*GarbageNodes=*/None, RParen,
+      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None);
   CallWithKnownExpr.print(KnownOS);
 
   // Let's make a function call expression where the called expression is
