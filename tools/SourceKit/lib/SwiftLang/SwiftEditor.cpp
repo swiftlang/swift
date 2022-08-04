@@ -963,6 +963,15 @@ public:
     if (AvailableAttr::isUnavailable(D))
       return true;
 
+    auto &SM = D->getASTContext().SourceMgr;
+    if (D == D->getASTContext().getOptionalNoneDecl() &&
+        SM.extractText(Range, BufferID) == "nil") {
+      // If a 'nil' literal occurs in a swift-case statement, it gets replaced
+      // by a reference to 'Optional.none' in the AST. We want to continue
+      // highlighting 'nil' as a keyword and not as an enum element.
+      return true;
+    }
+
     if (CtorTyRef)
       D = CtorTyRef;
     annotate(D, /*IsRef=*/true, Range);
