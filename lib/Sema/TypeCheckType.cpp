@@ -4237,7 +4237,8 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
     // Diagnose redundant `any` on an already existential type e.g. any (any P)
     // with a fix-it to remove first any.
     if (constraintType->is<ExistentialType>()) {
-      diagnose(repr->getLoc(), diag::redundant_any_in_existential, constraintType)
+      diagnose(repr->getLoc(), diag::redundant_any_in_existential,
+               ExistentialType::get(constraintType))
           .fixItRemove(repr->getAnyLoc());
       return constraintType;
     }
