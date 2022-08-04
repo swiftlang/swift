@@ -524,21 +524,23 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
 ParserResult<Stmt> Parser::parseStmt() {
   AssertParserMadeProgressBeforeLeavingScopeRAII apmp(*this);
 
+  // If this is a label on a loop/switch statement, consume it and pass it into
+  // parsing logic below.
+  SyntaxParsingContext LabelContext(SyntaxContext, SyntaxKind::LabeledStmt);
+  LabeledStmtInfo LabelInfo;
+  if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
+    LabelInfo.Loc = consumeIdentifier(LabelInfo.Name,
+                                      /*diagnoseDollarPrefix=*/true);
+    consumeToken(tok::colon);
+  } else {
+    LabelContext.setTransparent();
+  }
+
   SyntaxParsingContext LocalContext(SyntaxContext, SyntaxContextKind::Stmt);
 
   // Note that we're parsing a statement.
   StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
                                   StructureMarkerKind::Statement);
-  
-  LabeledStmtInfo LabelInfo;
-  
-  // If this is a label on a loop/switch statement, consume it and pass it into
-  // parsing logic below.
-  if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-    LabelInfo.Loc = consumeIdentifier(LabelInfo.Name,
-                                      /*diagnoseDollarPrefix=*/true);
-    consumeToken(tok::colon);
-  }
 
   SourceLoc tryLoc;
   (void)consumeIf(tok::kw_try, tryLoc);
