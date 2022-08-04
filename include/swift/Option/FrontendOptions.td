@@ -877,6 +877,10 @@ def compile_module_from_interface :
   HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
   ModeOpt;
 
+def ignore_interface_provided_options :
+  Flag<["-"], "ignore-interface-provided-options">,
+  HelpText<"Ignore all module flags specified in the swiftinterface being built">;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
@@ -1078,6 +1082,13 @@ def concurrency_model :
 def concurrency_model_EQ :
     Joined<["-"], "concurrency-model=">,
     Alias<concurrency_model>;
+
+def enable_stack_protector :
+  Flag<["-"], "enable-stack-protector">,
+  HelpText<"Enable the stack protector">;
+def disable_stack_protector :
+  Flag<["-"], "disable-stack-protector">,
+  HelpText<"Disable the stack-protector">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,

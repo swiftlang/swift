@@ -105,7 +105,13 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
-        out << "#if __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
+        // FIXME: Look for the header in the SDK.
+        out << "// Look for the C++ interop support header relative to clang's resource dir:\n";
+        out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.\n";
+        out << "#if __has_include(<../../../swift/shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <../../../swift/shims/_SwiftCxxInteroperability.h>\n";
+        out << "// Alternatively, allow user to find the header using additional include path into 'swift'.\n";
+        out << "#elif __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
         out << "#include <shims/_SwiftCxxInteroperability.h>\n";
         out << "#endif\n";
       },

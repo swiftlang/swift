@@ -180,7 +180,9 @@ struct ErrorDowngradeConsumerRAII: DiagnosticConsumer {
 };
 
 bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
-    StringRef OutPath, bool ShouldSerializeDeps,
+    StringRef OutPath,
+    bool ShouldSerializeDeps,
+    bool IgnoreInterfaceProvidedOptions,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     ArrayRef<std::string> CompiledCandidates) {
 
@@ -200,6 +202,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
                                                              interfacePath,
                                                              OutPath,
                                                              diagnosticLoc,
+                                                             IgnoreInterfaceProvidedOptions,
                                            [&](SubCompilerInstanceInfo &info) {
     auto &SubInstance = *info.Instance;
     auto subInvocation = SubInstance.getInvocation();
@@ -320,6 +323,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
 
 bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
                                               bool ShouldSerializeDeps,
+                                              bool IgnoreInterfaceProvidedOptions,
                           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                           llvm::function_ref<void()> RemarkRebuild,
                           ArrayRef<std::string> CompiledCandidates) {
@@ -327,8 +331,8 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
     if (RemarkRebuild) {
       RemarkRebuild();
     }
-    return buildSwiftModuleInternal(OutPath, ShouldSerializeDeps, ModuleBuffer,
-                                    CompiledCandidates);
+    return buildSwiftModuleInternal(OutPath, ShouldSerializeDeps, IgnoreInterfaceProvidedOptions,
+                                    ModuleBuffer, CompiledCandidates);
   };
   if (disableInterfaceFileLock) {
     return build();
