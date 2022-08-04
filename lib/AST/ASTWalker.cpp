@@ -1188,6 +1188,25 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitTypeJoinExpr(TypeJoinExpr *E) {
+    if (auto *newVar = dyn_cast<DeclRefExpr>(doIt(E->getVar()))) {
+      E->setVar(newVar);
+    } else {
+      return nullptr;
+    }
+
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
+      if (auto *origElt = E->getElement(i)) {
+        if (Expr *Elt = doIt(origElt))
+          E->setElement(i, Elt);
+        else
+          return nullptr;
+      }
+    }
+
+    return E;
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Everything Else
   //===--------------------------------------------------------------------===//

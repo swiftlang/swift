@@ -151,12 +151,13 @@ public:
   void visitClassType(ClassType *CT, Optional<OptionalTypeKind> optionalKind,
                       bool isInOutParam) {
     // FIXME: handle optionalKind.
-    // FIXME: handle isInOutParam.
     if (languageMode != OutputLanguageMode::Cxx) {
       os << "void * _Nonnull";
+      if (isInOutParam)
+        os << " * _Nonnull";
       return;
     }
-    if (typeUseKind == FunctionSignatureTypeUse::ParamType)
+    if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
       os << "const ";
     ClangSyntaxPrinter(os).printBaseName(CT->getDecl());
     if (typeUseKind == FunctionSignatureTypeUse::ParamType)

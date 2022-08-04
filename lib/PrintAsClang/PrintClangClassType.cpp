@@ -31,31 +31,40 @@ void ClangClassTypePrinter::printClassTypeDecl(
                            os << ";\n";
                          });
 
+  std::string baseClassName;
+  std::string baseClassQualifiedName;
+
+  if (auto *parentClass = typeDecl->getSuperclassDecl()) {
+    llvm::raw_string_ostream baseNameOS(baseClassName);
+    ClangSyntaxPrinter(baseNameOS).printBaseName(parentClass);
+    llvm::raw_string_ostream baseQualNameOS(baseClassQualifiedName);
+    ClangSyntaxPrinter(baseQualNameOS)
+        .printModuleNamespaceQualifiersIfNeeded(parentClass->getModuleContext(),
+                                                typeDecl->getModuleContext());
+    if (!baseQualNameOS.str().empty())
+      baseQualNameOS << "::";
+    baseQualNameOS << baseNameOS.str();
+  } else {
+    baseClassName = "RefCountedClass";
+    baseClassQualifiedName = "swift::_impl::RefCountedClass";
+  }
+
   os << "class ";
   printer.printBaseName(typeDecl);
-  // FIXME: Add support for inherintance.
-  os << " final";
+  if (typeDecl->isFinal())
+    os << " final";
+  os << " : public " << baseClassQualifiedName;
   os << " {\n";
   os << "public:\n";
 
-  // Destructor releases the object.
-  os << "  inline ~";
-  printer.printBaseName(typeDecl);
-  os << "() { swift::" << cxx_synthesis::getCxxImplNamespaceName()
-     << "::swift_release(_opaquePointer); }\n";
+  os << "  using " << baseClassName << "::" << baseClassName << ";\n";
+  os << "  using " << baseClassName << "::operator=;\n";
 
-  // FIXME: move semantics should be restricted?
+  os << "protected:\n";
   os << "  inline ";
   printer.printBaseName(typeDecl);
-  os << "(";
-  printer.printBaseName(typeDecl);
-  os << "&&) noexcept = default;\n";
-
+  os << "(void * _Nonnull ptr) noexcept : " << baseClassName << "(ptr) {}\n";
   os << "private:\n";
-  os << "  inline ";
-  printer.printBaseName(typeDecl);
-  os << "(void * _Nonnull ptr) noexcept : _opaquePointer(ptr) {}\n";
-  os << "\n  void * _Nonnull _opaquePointer;\n";
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
@@ -73,9 +82,6 @@ void ClangClassTypePrinter::printClassTypeDecl(
         os << " makeRetained(void * _Nonnull ptr) noexcept { return ";
         printer.printBaseName(typeDecl);
         os << "(ptr); }\n";
-        os << "static inline void * _Nonnull getOpaquePointer(const ";
-        printer.printBaseName(typeDecl);
-        os << " &object) noexcept { return object._opaquePointer; }\n";
         os << "};\n";
       });
 }
@@ -96,12 +102,14 @@ void ClangClassTypePrinter::printClassTypeReturnScaffold(
 void ClangClassTypePrinter::printParameterCxxtoCUseScaffold(
     raw_ostream &os, const ClassDecl *type, const ModuleDecl *moduleContext,
     llvm::function_ref<void(void)> bodyPrinter, bool isInOut) {
-  // FIXME: Handle isInOut
-  ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
-      type->getModuleContext(), moduleContext);
-  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  ClangValueTypePrinter::printCxxImplClassName(os, type);
-  os << "::getOpaquePointer(";
+  if (isInOut)
+    os << '&';
+  os << "::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+     << "::_impl_RefCountedClass"
+     << "::getOpaquePointer";
+  if (isInOut)
+    os << "Ref";
+  os << '(';
   bodyPrinter();
   os << ')';
 }

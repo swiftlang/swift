@@ -1246,8 +1246,9 @@ void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
 }
 
 /// Construct initial function attributes from options.
-void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
-                                               OptimizationMode FuncOptMode) {
+void IRGenModule::constructInitialFnAttributes(
+    llvm::AttrBuilder &Attrs, OptimizationMode FuncOptMode,
+    StackProtectorMode stackProtector) {
   // Add the default attributes for the Clang configuration.
   clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
 
@@ -1260,6 +1261,10 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
   } else {
     Attrs.removeAttribute(llvm::Attribute::MinSize);
     Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
+  }
+  if (stackProtector == StackProtectorMode::StackProtector) {
+    Attrs.addAttribute(llvm::Attribute::StackProtectStrong);
+    Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
 }
 

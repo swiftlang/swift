@@ -2406,6 +2406,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                    OPT_enable_new_llvm_pass_manager,
                    Opts.LegacyPassManager);
 
+  Opts.EnableStackProtector =
+      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
+                   Opts.EnableStackProtector);
+
   return false;
 }
 
