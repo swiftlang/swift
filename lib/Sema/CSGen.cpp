@@ -2265,9 +2265,11 @@ namespace {
               ->getUnderlyingType();
         }
 
-        auto underlyingType =
-            getTypeForPattern(paren->getSubPattern(), locator,
-                              externalPatternType, bindPatternVarsOneWay);
+        auto *subPattern = paren->getSubPattern();
+        auto underlyingType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            externalPatternType, bindPatternVarsOneWay);
 
         if (!underlyingType)
           return Type();
@@ -2694,7 +2696,9 @@ namespace {
           // and we're matching the type of that subpattern to the parameter
           // types.
           Type subPatternType = getTypeForPattern(
-              subPattern, locator, Type(), bindPatternVarsOneWay);
+              subPattern,
+              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+              Type(), bindPatternVarsOneWay);
 
           if (!subPatternType)
             return Type();
