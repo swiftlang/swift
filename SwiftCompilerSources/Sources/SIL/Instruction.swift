@@ -316,10 +316,14 @@ final public class BuiltinInst : SingleValueInstruction {
   public enum ID  {
     case None
     case DestroyArray
+    case IsUnique
+    case CondUnreachable
   }
-  public var id: ID? {
+  public var id: ID {
     switch BuiltinInst_getID(bridged) {
       case DestroyArrayBuiltin: return .DestroyArray
+      case IsUniqueBuiltin: return .IsUnique
+      case CondUnreachableBuiltin: return .CondUnreachable
       default: return .None
     }
   }
