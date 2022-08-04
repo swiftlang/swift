@@ -1166,6 +1166,9 @@ NOTE(unwrap_iuo_initializer,none,
 NOTE(unwrap_with_guard,none,
      "short-circuit using 'guard' to exit this function early "
      "if the optional value contains 'nil'", ())
+NOTE(perform_optional_chain_on_function_type, none,
+     "use optional chaining to call this value of function type when optional "
+     "is non-'nil'", ())
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))

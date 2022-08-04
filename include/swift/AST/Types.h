@@ -1254,6 +1254,9 @@ public:
   /// types.
   Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
 
+  /// Return the number of optionals this type is wrapped with.
+  unsigned int getOptionalityDepth();
+
   /// Remove concurrency-related types and constraints from the given
   /// type
   ///
