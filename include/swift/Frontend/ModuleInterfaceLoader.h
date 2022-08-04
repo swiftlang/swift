@@ -453,7 +453,7 @@ public:
       const StringRef backupInterfaceDir, const StringRef prebuiltCachePath,
       const StringRef ABIDescriptorPath, StringRef interfacePath,
       StringRef outputPath, bool ShouldSerializeDeps,
-      ArrayRef<std::string> CompiledCandidates, StringRef CompilerVersion,
+      ArrayRef<std::string> CompiledCandidates,
       DependencyTracker *tracker = nullptr);
 };
 
@@ -473,13 +473,8 @@ private:
   InFlightDiagnostic diagnose(StringRef interfacePath,
                               SourceLoc diagnosticLoc,
                               Diag<ArgTypes...> ID,
-                        typename detail::PassArgument<ArgTypes>::type... Args) {
-    SourceLoc loc = diagnosticLoc;
-    if (diagnosticLoc.isInvalid()) {
-      // Diagnose this inside the interface file, if possible.
-      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
-    }
-    return Diags->diagnose(loc, ID, std::move(Args)...);
+                              typename detail::PassArgument<ArgTypes>::type... Args) {
+    return InterfaceSubContextDelegateImpl::diagnose(interfacePath, diagnosticLoc, SM, Diags, ID, std::move(Args)...);
   }
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
@@ -500,6 +495,22 @@ public:
       StringRef backupModuleInterfaceDir,
       bool serializeDependencyHashes, bool trackSystemDependencies,
       RequireOSSAModules_t requireOSSAModules);
+
+  template<typename ...ArgTypes>
+  static InFlightDiagnostic diagnose(StringRef interfacePath,
+                                     SourceLoc diagnosticLoc,
+                                     SourceManager &SM,
+                                     DiagnosticEngine *Diags,
+                                     Diag<ArgTypes...> ID,
+                                     typename detail::PassArgument<ArgTypes>::type... Args) {
+    SourceLoc loc = diagnosticLoc;
+    if (diagnosticLoc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
+    }
+    return Diags->diagnose(loc, ID, std::move(Args)...);
+  }
+
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
                                   StringRef outputPath,

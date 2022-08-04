@@ -1259,13 +1259,83 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
                                         SearchPathOpts.CandidateCompiledModules);
 }
 
+static bool readSwiftInterfaceVersionAndArgs(
+    SourceManager &SM, DiagnosticEngine &Diags, llvm::StringSaver &ArgSaver,
+    SmallVectorImpl<const char *> &SubArgs, std::string &CompilerVersion,
+    StringRef interfacePath, SourceLoc diagnosticLoc) {
+  llvm::vfs::FileSystem &fs = *SM.getFileSystem();
+  auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
+  if (!FileOrError) {
+    // Don't use this->diagnose() because it'll just try to re-open
+    // interfacePath.
+    Diags.diagnose(diagnosticLoc, diag::error_open_input_file, interfacePath,
+                   FileOrError.getError().message());
+    return true;
+  }
+  auto SB = FileOrError.get()->getBuffer();
+  auto VersRe = getSwiftInterfaceFormatVersionRegex();
+  auto CompRe = getSwiftInterfaceCompilerVersionRegex();
+  SmallVector<StringRef, 1> VersMatches, CompMatches;
+
+  if (!VersRe.match(SB, &VersMatches)) {
+    InterfaceSubContextDelegateImpl::diagnose(
+        interfacePath, diagnosticLoc, SM, &Diags,
+        diag::error_extracting_version_from_module_interface);
+    return true;
+  }
+
+  if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
+    InterfaceSubContextDelegateImpl::diagnose(
+        interfacePath, diagnosticLoc, SM, &Diags,
+        diag::error_extracting_version_from_module_interface);
+    return true;
+  }
+
+  assert(VersMatches.size() == 2);
+  // FIXME We should diagnose this at a location that makes sense:
+  auto Vers = swift::version::Version(VersMatches[1], SourceLoc(), &Diags);
+
+  if (CompRe.match(SB, &CompMatches)) {
+    assert(CompMatches.size() == 2);
+    CompilerVersion = ArgSaver.save(CompMatches[1]).str();
+  } else {
+    // Don't diagnose; handwritten module interfaces don't include this field.
+    CompilerVersion = "(unspecified, file possibly handwritten)";
+  }
+
+  // For now: we support anything with the same "major version" and assume
+  // minor versions might be interesting for debugging, or special-casing a
+  // compatible field variant.
+  if (Vers.asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
+    InterfaceSubContextDelegateImpl::diagnose(
+        interfacePath, diagnosticLoc, SM, &Diags,
+        diag::unsupported_version_of_module_interface, interfacePath, Vers);
+    return true;
+  }
+  return false;
+}
+
 bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
     CompilerInstance &Instance, const StringRef moduleCachePath,
     const StringRef backupInterfaceDir, const StringRef prebuiltCachePath,
     const StringRef ABIDescriptorPath, StringRef interfacePath,
     StringRef outputPath, bool ShouldSerializeDeps,
-    ArrayRef<std::string> CompiledCandidates, StringRef CompilerVersion,
+    ArrayRef<std::string> CompiledCandidates,
     DependencyTracker *tracker) {
+  
+  // Read out the compiler version.
+  llvm::BumpPtrAllocator alloc;
+  llvm::StringSaver ArgSaver(alloc);
+  std::string CompilerVersion;
+  SmallVector<const char *, 64> InterfaceArgs;
+  readSwiftInterfaceVersionAndArgs(Instance.getSourceMgr(),
+                                   Instance.getDiags(),
+                                   ArgSaver,
+                                   InterfaceArgs,
+                                   CompilerVersion,
+                                   interfacePath,
+                                   SourceLoc());
+  
   auto Builder = ExplicitModuleInterfaceBuilder(
       Instance, &Instance.getDiags(), Instance.getSourceMgr(),
       moduleCachePath, backupInterfaceDir, prebuiltCachePath,
@@ -1382,53 +1452,10 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
     std::string &CompilerVersion,
     StringRef interfacePath,
     SourceLoc diagnosticLoc) {
-  llvm::vfs::FileSystem &fs = *SM.getFileSystem();
-  auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
-  if (!FileOrError) {
-    // Don't use this->diagnose() because it'll just try to re-open
-    // interfacePath.
-    Diags->diagnose(diagnosticLoc, diag::error_open_input_file,
-                    interfacePath, FileOrError.getError().message());
+  if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, SubArgs,
+                                       CompilerVersion, interfacePath,
+                                       diagnosticLoc))
     return true;
-  }
-  auto SB = FileOrError.get()->getBuffer();
-  auto VersRe = getSwiftInterfaceFormatVersionRegex();
-  auto CompRe = getSwiftInterfaceCompilerVersionRegex();
-  SmallVector<StringRef, 1> VersMatches, CompMatches;
-
-  if (!VersRe.match(SB, &VersMatches)) {
-    diagnose(interfacePath, diagnosticLoc,
-             diag::error_extracting_version_from_module_interface);
-    return true;
-  }
-  
-  if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
-    diagnose(interfacePath, diagnosticLoc,
-             diag::error_extracting_version_from_module_interface);
-    return true;
-  }
-  
-  assert(VersMatches.size() == 2);
-  // FIXME We should diagnose this at a location that makes sense:
-  auto Vers = swift::version::Version(VersMatches[1], SourceLoc(), Diags);
-
-  if (CompRe.match(SB, &CompMatches)) {
-    assert(CompMatches.size() == 2);
-    CompilerVersion = ArgSaver.save(CompMatches[1]).str();
-  }
-  else {
-    // Don't diagnose; handwritten module interfaces don't include this field.
-    CompilerVersion = "(unspecified, file possibly handwritten)";
-  }
-
-  // For now: we support anything with the same "major version" and assume
-  // minor versions might be interesting for debugging, or special-casing a
-  // compatible field variant.
-  if (Vers.asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
-    diagnose(interfacePath, diagnosticLoc,
-             diag::unsupported_version_of_module_interface, interfacePath, Vers);
-    return true;
-  }
 
   SmallString<32> ExpectedModuleName = subInvocation.getModuleName();
   if (subInvocation.parseArgs(SubArgs, *Diags)) {

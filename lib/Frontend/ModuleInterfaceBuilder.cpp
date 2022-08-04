@@ -181,16 +181,16 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
 }
 
 std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
-    StringRef interfacePath, StringRef outputPath, bool ShouldSerializeDeps,
+    StringRef InterfacePath, StringRef OutputPath, bool ShouldSerializeDeps,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    ArrayRef<std::string> compiledCandidates,
+    ArrayRef<std::string> CompiledCandidates,
     StringRef CompilerVersion) {
   auto Invocation = Instance.getInvocation();
   // Try building forwarding module first. If succeed, return.
   if (Instance.getASTContext()
           .getModuleInterfaceChecker()
-          ->tryEmitForwardingModule(Invocation.getModuleName(), interfacePath,
-                                    compiledCandidates, outputPath)) {
+          ->tryEmitForwardingModule(Invocation.getModuleName(), InterfacePath,
+                                    CompiledCandidates, OutputPath)) {
     return std::error_code();
   }
   FrontendOptions &FEOpts = Invocation.getFrontendOptions();
@@ -198,15 +198,12 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
       (FEOpts.RequestedAction == FrontendOptions::ActionType::Typecheck);
   const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
   StringRef InPath = InputInfo.getFileName();
-  const auto &OutputInfo =
-      InputInfo.getPrimarySpecificPaths().SupplementaryOutputs;
-  StringRef OutPath = OutputInfo.ModuleOutputPath;
 
   // Build the .swiftmodule; this is a _very_ abridged version of the logic
   // in performCompile in libFrontendTool, specialized, to just the one
   // module-serialization task we're trying to do here.
   LLVM_DEBUG(llvm::dbgs() << "Setting up instance to compile " << InPath
-                          << " to " << OutPath << "\n");
+                          << " to " << OutputPath << "\n");
 
   LLVM_DEBUG(llvm::dbgs() << "Performing sema\n");
   if (isTypeChecking && FEOpts.DowngradeInterfaceVerificationError) {
@@ -262,7 +259,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   // Setup the callbacks for serialization, which can occur during the
   // optimization pipeline.
   SerializationOptions SerializationOpts;
-  std::string OutPathStr = OutPath.str();
+  std::string OutPathStr = OutputPath.str();
   SerializationOpts.OutputPath = OutPathStr.c_str();
   SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
   SerializationOpts.AutolinkForceLoad =
@@ -277,8 +274,8 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   SerializationOpts.SDKName = Instance.getASTContext().LangOpts.SDKName;
   SerializationOpts.ABIDescriptorPath = ABIDescriptorPath.str();
   SmallVector<FileDependency, 16> Deps;
-  bool serializeHashes = FEOpts.SerializeModuleInterfaceDependencyHashes;
-  if (collectDepsForSerialization(Deps, interfacePath, serializeHashes)) {
+  bool SerializeHashes = FEOpts.SerializeModuleInterfaceDependencyHashes;
+  if (collectDepsForSerialization(Deps, InterfacePath, SerializeHashes)) {
     return std::make_error_code(std::errc::not_supported);
   }
   if (ShouldSerializeDeps)

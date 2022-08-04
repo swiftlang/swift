@@ -93,6 +93,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (Args.hasArg(OPT_track_system_dependencies)) {
     Opts.IntermoduleDependencyTracking =
         IntermoduleDepTrackingMode::IncludeSystem;
+  } else if (Args.hasArg(OPT_explicit_interface_module_build)) {
+    // Always track at least the non-system dependencies for interface building.
+    Opts.IntermoduleDependencyTracking =
+        IntermoduleDepTrackingMode::ExcludeSystem;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_bad_file_descriptor_retry_count)) {
@@ -624,7 +628,7 @@ bool ArgsToFrontendOptionsConverter::checkBuildFromInterfaceOnlyOptions()
   if (Opts.RequestedAction != FrontendOptions::ActionType::CompileModuleFromInterface &&
       Opts.ExplicitInterfaceBuild) {
     Diags.diagnose(SourceLoc(),
-                   diag::error_cannot_ignore_interface_options_in_mode);
+                   diag::error_cannot_explicit_interface_build_in_mode);
     return true;
   }
   return false;
