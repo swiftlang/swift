@@ -462,7 +462,7 @@ bool SILFunction::isWeakImported() const {
   if (!isAvailableExternally())
     return false;
 
-  if (isAlwaysWeakImported())
+  if (isAlwaysWeakImported() || isWeakImportedByModule())
     return true;
 
   if (Availability.isAlwaysAvailable())

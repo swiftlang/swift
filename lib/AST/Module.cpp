@@ -2574,6 +2574,15 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
+bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
+  for (auto &import : *Imports) {
+    if (import.options.contains(ImportFlags::WeakLinked) &&
+        module == import.module.importedModule)
+      return true;
+  }
+  return false;
+}
+
 bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
@@ -2597,6 +2606,15 @@ bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
   if (importedSPIGroups.empty())
     return false;
   return importedSPIGroups.count(spiGroup);
+}
+
+bool ModuleDecl::importsModuleAsWeakLinked(
+    const ModuleDecl *importedModule) const {
+  for (auto file : getFiles()) {
+    if (file->importsModuleAsWeakLinked(importedModule))
+      return true;
+  }
+  return false;
 }
 
 bool Decl::isSPI() const {

@@ -312,7 +312,14 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       F->setClangNodeOwner(decl);
 
     F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
-    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
+
+    if (decl->isAlwaysWeakImported()) {
+      F->setIsWeakImported(IsWeakImported_t::IsAlwaysWeakImported);
+    } else if (decl->isWeakImported(mod.getSwiftModule())) {
+      F->setIsWeakImported(IsWeakImported_t::IsWeakImportedByModule);
+    } else {
+      F->setIsWeakImported(IsWeakImported_t::IsNotWeakImported);
+    }
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();

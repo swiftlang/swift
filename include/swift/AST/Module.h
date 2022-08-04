@@ -686,6 +686,9 @@ public:
   // Is \p spiGroup accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(Identifier spiGroup, const ModuleDecl *fromModule) const;
 
+  /// Is \p importedModule imported as \c @_weakLinked from this module?
+  bool importsModuleAsWeakLinked(const ModuleDecl *importedModule) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
