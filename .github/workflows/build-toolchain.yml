@@ -245,9 +245,9 @@ jobs:
         timeout-minutes: 30
         with:
           path: build-cache
-          key: ${{ matrix.target }}-sccache-v12-${{ steps.cache_timestamp.outputs.timestamp }}
+          key: ${{ matrix.target }}-sccache-v13-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            ${{ matrix.target }}-sccache-v12-
+            ${{ matrix.target }}-sccache-v13-
 
       - name: Clean build directory
         if: ${{ matrix.clean_build_dir }}
