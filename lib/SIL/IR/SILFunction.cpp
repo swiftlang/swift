@@ -913,11 +913,11 @@ void Function_register(SwiftMetatype metatype,
 }
 
 std::pair<const char *, int> SILFunction::
-parseEffects(StringRef attrs, bool fromSIL, bool isDerived,
+parseEffects(StringRef attrs, bool fromSIL, int effectFlags,
              ArrayRef<StringRef> paramNames) {
   if (parseFunction) {
     BridgedParsingError error = parseFunction(
-        {this}, attrs, (SwiftInt)fromSIL, (SwiftInt)isDerived,
+        {this}, attrs, (SwiftInt)fromSIL, (SwiftInt)effectFlags,
         {(const unsigned char *)paramNames.data(), paramNames.size()});
     return {(const char *)error.message, (int)error.position};
   }
@@ -947,15 +947,17 @@ void SILFunction::
 visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const {
   if (!getEffectFlagsFunction)
     return;
-    
-  int idx = 0;
+  // effects with index -1 are effects that are not tied to a specific argument
+  int idx = -1;
   BridgedFunction bridgedFn = {const_cast<SILFunction *>(this)};
   while (int flags = getEffectFlagsFunction(bridgedFn, idx)) {
     ArgEffectKind kind = ArgEffectKind::Unknown;
-    if (flags & EffectsFlagEscape)
+    if (flags & EffectsFlag_Escape)
       kind = ArgEffectKind::Escape;
+    else if (flags & EffectsFlag_SideEffect)
+      kind = ArgEffectKind::SideEffect;
 
-    c(idx, (flags & EffectsFlagDerived) != 0, kind);
+    c(idx, (flags & EffectsFlag_Derived) != 0, kind);
     idx++;
   }
 }

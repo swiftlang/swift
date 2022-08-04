@@ -152,7 +152,7 @@ class SILFunction
     public SwiftObjectHeader {
     
 private:
-  void *libswiftSpecificData[1];
+  void *libswiftSpecificData[2];
 
 public:
   using BlockListType = llvm::iplist<SILBasicBlock>;
@@ -1013,11 +1013,12 @@ public:
   
   enum class ArgEffectKind {
     Unknown,
-    Escape
+    Escape,
+    SideEffect
   };
   
   std::pair<const char *, int>  parseEffects(StringRef attrs, bool fromSIL,
-                                             bool isDerived,
+                                             int effectFlags,
                                              ArrayRef<StringRef> paramNames);
   void writeEffect(llvm::raw_ostream &OS, int effectIdx) const;
   void copyEffects(SILFunction *from);

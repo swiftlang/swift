@@ -777,6 +777,8 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
               return .abortWalk
             }
           }
+        case .sideEffect:
+          break
         }
       }
       if !matched {

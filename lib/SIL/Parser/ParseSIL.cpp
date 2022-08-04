@@ -30,6 +30,7 @@
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
@@ -963,7 +964,7 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
 struct ArgEffectLoc {
   SourceLoc start;
   SourceLoc end;
-  bool isDerived;
+  int effectFlags;
 };
 
 static bool parseDeclSILOptional(bool *isTransparent,
@@ -1214,8 +1215,17 @@ static bool parseDeclSILOptional(bool *isTransparent,
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     } else if (argEffectLocs && (SP.P.Tok.getText() == "escapes" ||
-                                 SP.P.Tok.getText() == "defined_escapes")) {
-      bool isDerived = SP.P.Tok.getText() == "escapes";
+                                 SP.P.Tok.getText() == "defined_escapes" ||
+                                 SP.P.Tok.getText() == "sideeffect")) {
+      int effectFlags = 0;
+      if (SP.P.Tok.getText() == "escapes") {
+        effectFlags = EffectsFlag_Escape | EffectsFlag_Derived;
+      } else if (SP.P.Tok.getText() == "defined_escapes") {
+        effectFlags = EffectsFlag_Escape;
+      } else if (SP.P.Tok.getText() == "sideeffect") {
+        effectFlags = EffectsFlag_SideEffect | EffectsFlag_Derived;
+      }
+      
       SP.P.consumeToken();
       do {
         SourceLoc effectsStart = SP.P.Tok.getLoc();
@@ -1223,7 +1233,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
           SP.P.consumeToken();
         }
         SourceLoc effectsEnd = SP.P.Tok.getLoc();
-        argEffectLocs->push_back({effectsStart, effectsEnd, isDerived});
+        argEffectLocs->push_back({effectsStart, effectsEnd, effectFlags});
       } while (SP.P.consumeIf(tok::comma));
       SP.P.consumeToken();
       continue;
@@ -6496,7 +6506,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
       StringRef effectsStr = P.SourceMgr.extractText(
                         CharSourceRange(P.SourceMgr, aeLoc.start, aeLoc.end));
       auto error = FunctionState.F->parseEffects(effectsStr, /*fromSIL*/true,
-                                                 /*isDerived*/ aeLoc.isDerived,
+                                                 /*isDerived*/ aeLoc.effectFlags,
                                                  {});
       if (error.first) {
         SourceLoc loc = aeLoc.start;

@@ -522,6 +522,8 @@ extension BridgedAccessKind {
 // TODO: add support for begin_unpaired_access
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged).kind }
+
+  public var isStatic: Bool { BeginAccessInst_isStatic(bridged) != 0 }
 }
 
 public protocol ScopedInstruction {

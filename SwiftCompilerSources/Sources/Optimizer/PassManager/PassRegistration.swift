@@ -43,6 +43,7 @@ private func registerSwiftPasses() {
   registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
   registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
   registerPass(accessDumper, { accessDumper.run($0) })
+  registerPass(effectInference, { effectInference.run($0) })
   registerPass(computeEffects, { computeEffects.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(stackPromotion, { stackPromotion.run($0) })

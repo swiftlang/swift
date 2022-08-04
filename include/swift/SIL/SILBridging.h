@@ -179,8 +179,13 @@ typedef enum {
 } BridgedBuiltinID;
 
 enum {
-  EffectsFlagEscape = 0x1,
-  EffectsFlagDerived = 0x2
+  // Least significant bit is set to `1` if the effect is derived
+  // 0b010 -> "define_escapes"
+  // 0b011 -> "escapes"
+  // 0b101 -> "sideeffects", currently always derived
+  EffectsFlag_Derived = 0x1,
+  EffectsFlag_Escape = 0x2,
+  EffectsFlag_SideEffect = 0x5,
 };
 
 void registerBridgedClass(llvm::StringRef className, SwiftMetatype metatype);
@@ -331,6 +336,7 @@ SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
 BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess);
+SwiftInt BeginAccessInst_isStatic(BridgedInstruction beginAccess);
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr);
 SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr);
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);

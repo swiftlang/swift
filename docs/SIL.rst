@@ -1092,10 +1092,16 @@ The specified memory effects of the function.
 
   sil-function-attribute ::= '[' 'escapes' escape-list ']'
   sil-function-attribute ::= '[' 'defined_escapes' escape-list ']'
+  sil-function-attribute ::= '[' 'sideeffect' global-effect ',' sideeffect-list ']'
+  global-effect ::= 'g:' sideeffect-flags ';trap'? ';allocate'? ';readrc'
   escape-list ::= (escape-list ',')? escape
   escape ::= '!' arg-selection                 // not-escaping
   escape ::= arg-selection '=>' arg-selection  // exclusive escaping
   escape ::= arg-selection '->' arg-selection  // not-exclusive escaping
+  sideeffect-flags ::= '_'
+  sideeffect-flags ::= 'r'? 'w'? '+'? '-'?
+  sideeffect-list ::= (sideeffect-list ',')? sideeffect
+  sideeffect ::= sideeffect-flags '(' arg-selection ')'
   arg-selection ::= arg-or-return ('.' projection-path)?
   arg-or-return ::= '%' [0-9]+
   arg-or-return ::= '%r'

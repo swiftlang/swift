@@ -66,12 +66,15 @@ public protocol ApplySite : Instruction {
 
 extension ApplySite {
   public var callee: Value { operands[ApplyOperands.calleeOperandIndex].value }
-
-  public var arguments: LazyMapSequence<OperandArray, Value> {
+  
+  public var argumentOperands: OperandArray {
     let numArgs = ApplySite_getNumArguments(bridged)
     let offset = ApplyOperands.firstArgumentIndex
-    let argOps = operands[offset..<(numArgs + offset)]
-    return argOps.lazy.map { $0.value }
+    return operands[offset..<(numArgs + offset)]
+  }
+
+  public var arguments: LazyMapSequence<OperandArray, Value> {
+    argumentOperands.lazy.map { $0.value }
   }
 
   public var substitutionMap: SubstitutionMap {

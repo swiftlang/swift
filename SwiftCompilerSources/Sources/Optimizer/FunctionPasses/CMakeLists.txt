@@ -11,6 +11,7 @@ swift_compiler_sources(Optimizer
   AccessDumper.swift
   ComputeEffects.swift
   EscapeInfoDumper.swift
+  EffectInference.swift
   ObjCBridgingOptimization.swift
   SILPrinter.swift
   MergeCondFails.swift

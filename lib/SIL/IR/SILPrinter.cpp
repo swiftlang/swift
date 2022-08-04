@@ -3019,6 +3019,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   llvm::SmallVector<int, 8> definedEscapesIndices;
   llvm::SmallVector<int, 8> escapesIndices;
+  llvm::SmallVector<int, 8> sideeffectIndices;
   visitArgEffects([&](int effectIdx, bool isDerived, ArgEffectKind kind) {
     if (kind == ArgEffectKind::Escape) {
       if (isDerived) {
@@ -3026,23 +3027,38 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
       } else {
         definedEscapesIndices.push_back(effectIdx);
       }
+    } else if (kind == ArgEffectKind::SideEffect) {
+      sideeffectIndices.push_back(effectIdx);
     }
   });
   if (!definedEscapesIndices.empty()) {
     OS << "[defined_escapes ";
-    for (int effectIdx : definedEscapesIndices) {
-      if (effectIdx > 0)
-        OS << ", ";
-      writeEffect(OS, effectIdx);
+    writeEffect(OS, definedEscapesIndices[0]);
+    for (int* effectIdx = definedEscapesIndices.begin() + 1;
+            effectIdx < definedEscapesIndices.end(); ++effectIdx) {
+      OS << ", ";
+      writeEffect(OS, *effectIdx);
     }
     OS << "] ";
   }
   if (!escapesIndices.empty()) {
     OS << "[escapes ";
-    for (int effectIdx : escapesIndices) {
-      if (effectIdx > 0)
-        OS << ", ";
-      writeEffect(OS, effectIdx);
+    writeEffect(OS, escapesIndices[0]);
+    for (int* effectIdx = escapesIndices.begin() + 1;
+            effectIdx < escapesIndices.end(); ++effectIdx) {
+      OS << ", ";
+      writeEffect(OS, *effectIdx);
+    }
+    OS << "] ";
+  }
+
+  if (!sideeffectIndices.empty()) {
+    OS << "[sideeffects ";
+    writeEffect(OS, sideeffectIndices[0]);
+    for (int* effectIdx = sideeffectIndices.begin() + 1;
+            effectIdx < sideeffectIndices.end(); ++effectIdx) {
+      OS << ", ";
+      writeEffect(OS, *effectIdx);
     }
     OS << "] ";
   }

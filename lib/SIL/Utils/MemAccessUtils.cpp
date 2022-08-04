@@ -382,6 +382,8 @@ static bool isLetForBase(SILValue base) {
 
   // Is this an address of a global "let"?
   if (auto *gai = dyn_cast<GlobalAddrInst>(base)) {
+    // TODO: why not
+    // return gai->getReferencedGlobal()->isLet();
     auto *globalDecl = gai->getReferencedGlobal()->getDecl();
     return globalDecl && globalDecl->isLet();
   }

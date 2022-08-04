@@ -745,6 +745,10 @@ BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess) 
   }
 }
 
+SwiftInt BeginAccessInst_isStatic(BridgedInstruction beginAccess) {
+  return castToInst<BeginAccessInst>(beginAccess)->getEnforcement() == SILAccessEnforcement::Static ? 1 : 0;
+}
+
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr) {
   return castToInst<CopyAddrInst>(copyAddr)->isTakeOfSrc() ? 1 : 0;
 }

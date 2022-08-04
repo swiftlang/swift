@@ -104,16 +104,22 @@ final public class Function : CustomStringConvertible, HasShortDescription {
       },
       // writeFn
       { (f: BridgedFunction, os: BridgedOStream, idx: Int) in
-        let s = f.function.effects.argumentEffects[idx].description
+        let s = (idx == -1 ?
+          "\(f.function.effects.globalEffects)" :
+          f.function.effects.argumentEffects[idx].description)
         s._withStringRef { OStream_write(os, $0) }
       },
       // parseFn:
-      { (f: BridgedFunction, str: llvm.StringRef, fromSIL: Int, isDerived: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
+      { (f: BridgedFunction, str: llvm.StringRef, fromSIL: Int, effectFlags: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
         do {
           var parser = StringParser(str.string)
+          if isSideEffect(effectFlags: effectFlags) && parser.consume("g:") {
+            f.function.effects.globalEffects = try parser.parseGlobalEffect()
+            return BridgedParsingError(message: nil, position: 0)
+          }
           let effect: ArgumentEffect
           if fromSIL != 0 {
-            effect = try parser.parseEffectFromSIL(for: f.function, isDerived: isDerived != 0)
+            effect = try parser.parseEffectFromSIL(for: f.function, effectFlags: effectFlags)
           } else {
             let paramToIdx = paramNames.withElements(ofType: llvm.StringRef.self) {
                 (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
@@ -152,16 +158,19 @@ final public class Function : CustomStringConvertible, HasShortDescription {
       },
       // getEffectFlags
       {  (f: BridgedFunction, idx: Int) -> Int in
+      if idx == -1 { return f.function.effects.globalEffects.isValid ? (Int(EffectsFlag_SideEffect) | Int(EffectsFlag_Derived)) : 0 }
         let argEffects = f.function.effects.argumentEffects
         if idx >= argEffects.count { return 0 }
         let effect = argEffects[idx]
         var flags = 0
         switch effect.kind {
           case .notEscaping, .escaping:
-            flags |= Int(EffectsFlagEscape)
+            flags |= Int(EffectsFlag_Escape)
+          case .sideEffect:
+            flags |= Int(EffectsFlag_SideEffect)
         }
         if effect.isDerived {
-          flags |= Int(EffectsFlagDerived)
+          flags |= Int(EffectsFlag_Derived)
         }
         return flags
       }
@@ -233,6 +242,17 @@ public enum ArgumentConvention {
   /// This argument is passed directly.  Its type is non-trivial, and the caller
   /// guarantees its validity for the entirety of the call.
   case directGuaranteed
+
+
+  public var isIndirect: Bool {
+    switch self {
+    case .indirectIn, .indirectInConstant, .indirectInGuaranteed,
+         .indirectInout, .indirectInoutAliasable, .indirectOut:
+      return true
+    case .directOwned, .directUnowned, .directGuaranteed:
+      return false
+    }
+  }
 }
 
 // Bridging utilities
