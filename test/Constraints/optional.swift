@@ -512,3 +512,46 @@ func rdar85166519() {
 
 // https://github.com/apple/swift/issues/58539
 if let x = nil {} // expected-error{{'nil' requires a contextual type}}
+
+// https://github.com/apple/swift/issues/56699
+let singleOptionalClosure: (() -> Void)? = nil
+let doubleOptionalClosure: (() -> Void)?? = nil
+singleOptionalClosure()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{22-22=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{22-22=??}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure?()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{23-23=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure!()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{23-23=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+struct FunctionContainer {
+  func test() {}
+}
+
+func testFunctionContainerMethodCall(container: FunctionContainer?) {
+  let fn = container?.test
+   // expected-note@-1 {{short-circuit}}
+   // expected-note@-2 {{coalesce}}
+   // expected-note@-3 {{force-unwrap}}
+  fn()
+  // expected-error@-1 {{value of optional type}}
+  // expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{5-5=?}}
+  // expected-note@-3 {{coalesce}}
+  // expected-note@-4 {{force-unwrap}}
+}
