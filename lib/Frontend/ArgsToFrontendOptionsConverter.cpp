@@ -83,7 +83,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
   Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
-  Opts.IgnoreInterfaceProvidedOptions |= Args.hasArg(OPT_ignore_interface_provided_options);
+  Opts.ExplicitInterfaceBuild |= Args.hasArg(OPT_explicit_interface_module_build);
 
   // FIXME: Remove this flag
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
@@ -622,7 +622,7 @@ bool ArgsToFrontendOptionsConverter::
 bool ArgsToFrontendOptionsConverter::checkBuildFromInterfaceOnlyOptions()
     const {
   if (Opts.RequestedAction != FrontendOptions::ActionType::CompileModuleFromInterface &&
-      Opts.IgnoreInterfaceProvidedOptions) {
+      Opts.ExplicitInterfaceBuild) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_ignore_interface_options_in_mode);
     return true;

@@ -877,9 +877,9 @@ def compile_module_from_interface :
   HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
   ModeOpt;
 
-def ignore_interface_provided_options :
-  Flag<["-"], "ignore-interface-provided-options">,
-  HelpText<"Ignore all module flags specified in the swiftinterface being built">;
+def explicit_interface_module_build :
+  Flag<["-"], "explicit-interface-module-build">,
+  HelpText<"Use the specified command-line to build the module from interface, instead of flags specified in the interface">;
 
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,

@@ -110,7 +110,7 @@ public:
 
   /// If building a module from interface, ignore compiler flags
   /// specified in the swiftinterface.
-  bool IgnoreInterfaceProvidedOptions = false;
+  bool ExplicitInterfaceBuild = false;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;

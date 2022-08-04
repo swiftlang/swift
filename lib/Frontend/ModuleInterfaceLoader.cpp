@@ -1003,7 +1003,7 @@ class ModuleInterfaceLoaderImpl {
       }
       // Set up a builder if we need to build the module. It'll also set up
       // the genericSubInvocation we'll need to use to compute the cache paths.
-      ModuleInterfaceBuilder builder(
+      ImplicitModuleInterfaceBuilder builder(
         ctx.SourceMgr, diagsToUse,
         astDelegate, interfacePath, moduleName, cacheDir,
         prebuiltCacheDir, backupInterfaceDir, StringRef(),
@@ -1018,7 +1018,6 @@ class ModuleInterfaceLoaderImpl {
         builder.addExtraDependency(modulePath);
       failed = builder.buildSwiftModule(cachedOutputPath,
                                         /*shouldSerializeDeps*/true,
-                                        Opts.ignoreInterfaceProvidedOptions,
                                         &moduleBuffer, remarkRebuild);
     }
     if (!failed) {
@@ -1037,7 +1036,7 @@ class ModuleInterfaceLoaderImpl {
                      interfacePath, backupPath);
       // Set up a builder if we need to build the module. It'll also set up
       // the genericSubInvocation we'll need to use to compute the cache paths.
-      ModuleInterfaceBuilder fallbackBuilder(
+      ImplicitModuleInterfaceBuilder fallbackBuilder(
         ctx.SourceMgr, &ctx.Diags, astDelegate, backupPath, moduleName, cacheDir,
         prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock, diagnosticLoc,
@@ -1053,7 +1052,6 @@ class ModuleInterfaceLoaderImpl {
       // can find it from the canonical interface file.
       auto failedAgain = fallbackBuilder.buildSwiftModule(cachedOutputPath,
                                                           /*shouldSerializeDeps*/true,
-                                                          Opts.ignoreInterfaceProvidedOptions,
                                                           &moduleBuffer,
                                                           remarkRebuild);
       if (failedAgain)
@@ -1230,14 +1228,13 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
       BackupInterfaceDir,
       SerializeDependencyHashes, TrackSystemDependencies, RequireOSSAModules);
-  ModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
-                                 ModuleName, CacheDir, PrebuiltCacheDir,
-                                 BackupInterfaceDir, ABIOutputPath,
-                                 LoaderOpts.disableInterfaceLock);
+  ImplicitModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
+                                         ModuleName, CacheDir, PrebuiltCacheDir,
+                                         BackupInterfaceDir, ABIOutputPath,
+                                         LoaderOpts.disableInterfaceLock);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   auto failed = builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
-                                         LoaderOpts.ignoreInterfaceProvidedOptions,
                                          /*ModuleBuffer*/nullptr, nullptr,
                                          SearchPathOpts.CandidateCompiledModules);
   if (!failed)
@@ -1249,18 +1246,37 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     return true;
   assert(failed);
   assert(!backInPath.empty());
-  ModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
-                                       ModuleName, CacheDir, PrebuiltCacheDir,
-                                       BackupInterfaceDir, ABIOutputPath,
-                                       LoaderOpts.disableInterfaceLock);
+  ImplicitModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
+                                               ModuleName, CacheDir, PrebuiltCacheDir,
+                                               BackupInterfaceDir, ABIOutputPath,
+                                               LoaderOpts.disableInterfaceLock);
   // Ensure we can rebuild module after user changed the original interface file.
   backupBuilder.addExtraDependency(InPath);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   return backupBuilder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
-                                        LoaderOpts.ignoreInterfaceProvidedOptions,
                                         /*ModuleBuffer*/nullptr, nullptr,
                                         SearchPathOpts.CandidateCompiledModules);
+}
+
+bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
+    CompilerInstance &Instance, const StringRef moduleCachePath,
+    const StringRef backupInterfaceDir, const StringRef prebuiltCachePath,
+    const StringRef ABIDescriptorPath, StringRef interfacePath,
+    StringRef outputPath, bool ShouldSerializeDeps,
+    ArrayRef<std::string> CompiledCandidates, StringRef CompilerVersion,
+    DependencyTracker *tracker) {
+  auto Builder = ExplicitModuleInterfaceBuilder(
+      Instance, &Instance.getDiags(), Instance.getSourceMgr(),
+      moduleCachePath, backupInterfaceDir, prebuiltCachePath,
+      ABIDescriptorPath, {});
+  auto error = Builder.buildSwiftModuleFromInterface(
+      interfacePath, outputPath, ShouldSerializeDeps, /*ModuleBuffer*/nullptr,
+      CompiledCandidates, CompilerVersion);
+  if (!error)
+    return false;
+  else
+    return true;
 }
 
 void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
@@ -1365,8 +1381,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
     SmallVectorImpl<const char *> &SubArgs,
     std::string &CompilerVersion,
     StringRef interfacePath,
-    SourceLoc diagnosticLoc,
-    bool ignoreInterfaceProvidedOptions) {
+    SourceLoc diagnosticLoc) {
   llvm::vfs::FileSystem &fs = *SM.getFileSystem();
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
   if (!FileOrError) {
@@ -1386,14 +1401,13 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
              diag::error_extracting_version_from_module_interface);
     return true;
   }
-
-  if (!ignoreInterfaceProvidedOptions) {
-    if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
-      diagnose(interfacePath, diagnosticLoc,
-               diag::error_extracting_version_from_module_interface);
-      return true;
-    }
+  
+  if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
+    diagnose(interfacePath, diagnosticLoc,
+             diag::error_extracting_version_from_module_interface);
+    return true;
   }
+  
   assert(VersMatches.size() == 2);
   // FIXME We should diagnose this at a location that makes sense:
   auto Vers = swift::version::Version(VersMatches[1], SourceLoc(), Diags);
@@ -1613,11 +1627,9 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                  StringRef interfacePath,
                                                  StringRef outputPath,
                                                  SourceLoc diagLoc,
-                                                 bool ignoreInterfaceProvidedOptions,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                             ArrayRef<StringRef>, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, outputPath, diagLoc,
-                                  ignoreInterfaceProvidedOptions,
                                   [&](SubCompilerInstanceInfo &info){
     return action(info.Instance->getASTContext(),
                   info.Instance->getMainModule(),
@@ -1632,7 +1644,6 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
                                                           StringRef interfacePath,
                                                           StringRef outputPath,
                                                           SourceLoc diagLoc,
-                                                          bool ignoreInterfaceProvidedOptions,
                   llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) {
   // We are about to mess up the compiler invocation by using the compiler
   // arguments in the textual interface file. So copy to use a new compiler
@@ -1690,8 +1701,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
                                           SubArgs,
                                           CompilerVersion,
                                           interfacePath,
-                                          diagLoc,
-                                          ignoreInterfaceProvidedOptions)) {
+                                          diagLoc)) {
     return std::make_error_code(std::errc::not_supported);
   }
 
