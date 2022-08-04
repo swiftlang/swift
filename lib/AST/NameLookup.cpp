@@ -1726,12 +1726,17 @@ shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
   // bridging header? Some code bases implement ObjC methods in Swift even
   // though it's not exactly supported.
   auto newDeclModuleName = newDecl->getModuleContext()->getName();
+  auto newDeclPrivateModuleName = newDecl->getASTContext().getIdentifier(
+                     (llvm::Twine(newDeclModuleName.str()) + "_Private").str());
+  auto bridgingHeaderModuleName = newDecl->getASTContext().getIdentifier(
+                                                     CLANG_HEADER_MODULE_NAME);
   if (llvm::all_of(vec, [&](AbstractFunctionDecl *oldDecl) {
     if (!oldDecl->hasClangNode())
       return false;
     auto oldDeclModuleName = oldDecl->getModuleContext()->getName();
     return oldDeclModuleName == newDeclModuleName
-               || oldDeclModuleName.str() == CLANG_HEADER_MODULE_NAME;
+               || oldDeclModuleName == newDeclPrivateModuleName
+               || oldDeclModuleName == bridgingHeaderModuleName;
   }))
     return false;
 
