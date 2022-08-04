@@ -1412,6 +1412,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         fn = FVE->getSubExpr();
       } else if (auto dotSyntaxRef = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
         fn = dotSyntaxRef->getRHS();
+      } else if (auto fnConvExpr = dyn_cast<FunctionConversionExpr>(fn)) {
+        fn = fnConvExpr->getSubExpr();
       } else {
         break;
       }
