@@ -67,6 +67,7 @@ class Builder(object):
         self.host = host
         self.arch = arch
         self.native_build_dir = native_build_dir
+        self.swiftc_path = args.swiftc_path
 
     def call(self, command, env=None, without_sleeping=False):
         if without_sleeping:
@@ -172,7 +173,7 @@ class Builder(object):
             "-DSWIFT_HOST_VARIANT_SDK=" + host_sdk,
             "-DSWIFT_HOST_VARIANT_ARCH=" + self.arch,
             "-DCMAKE_Swift_COMPILER_TARGET=" + host_triple,
-            "-DCMAKE_Swift_COMPILER=" + self.toolchain.swiftc,
+            "-DCMAKE_Swift_COMPILER=" + self.swiftc_path,
             "-DCMAKE_C_FLAGS=" + llvm_c_flags,
             "-DCMAKE_CXX_FLAGS=" + llvm_c_flags,
         ]
@@ -400,6 +401,7 @@ Example invocations:
         defaults.DARWIN_INSTALL_PREFIX if isDarwin else defaults.UNIX_INSTALL_PREFIX
     )
     default_ninja = toolchain.ninja
+    default_swiftc = toolchain.swiftc
 
     option("--release", store_true, help="build in release mode")
     option(
@@ -498,6 +500,16 @@ Example invocations:
         store_path,
         default=default_ninja,
         help="the path to ninja (default = %s)" % default_ninja,
+    )
+    option(
+        "--swiftc-path",
+        store_path,
+        default=default_swiftc,
+        help="""
+        Override the swiftc compiler used to build SwiftCompilerSources.
+        This is needed to build the most recent state of main if it uses C++ interop 
+        features that aren't in the host's toolchain yet. (default = %s)
+        """ % default_swiftc
     )
 
     parser = optbuilder.build()
