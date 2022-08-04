@@ -1552,7 +1552,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   emitDiagnosticAt(unwrappedExpr->getLoc(), diag::optional_not_unwrapped,
                    baseType, unwrappedType);
 
-  // If this is a closure, suggest using optional chaining to
+  // If this is a function type, suggest using optional chaining to
   // call it.
   if (unwrappedType->lookThroughAllOptionalTypes()->is<FunctionType>()) {
     bool isDeclRefExpr = false;
@@ -1566,7 +1566,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     if (isDeclRefExpr) {
       auto depth = baseType->getOptionalityDepth();
       auto diag = emitDiagnosticAt(unwrappedExpr->getLoc(),
-                                   diag::perform_optional_chain_on_closure);
+                                   diag::perform_optional_chain_on_function_type);
       auto fixItString = std::string(depth, '?');
       diag.fixItInsertAfter(unwrappedExpr->getEndLoc(), fixItString);
     }
