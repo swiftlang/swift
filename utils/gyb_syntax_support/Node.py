@@ -1,3 +1,4 @@
+from .Child import Child  # noqa: I201
 from .Utils import error
 from .kinds import SYNTAX_BASE_KINDS, kind_to_type, lowercase_first_word
 
@@ -11,7 +12,7 @@ class Node(object):
     """
 
     def __init__(self, name, description=None, kind=None, traits=None,
-                 children=None, element=None, element_name=None,
+                 children=[], element=None, element_name=None,
                  element_choices=None, omit_when_empty=False, 
                  elements_separated_by_newline=False):
         self.syntax_kind = name
@@ -22,7 +23,29 @@ class Node(object):
         self.description = description
 
         self.traits = traits or []
-        self.children = children or []
+        self.children = []
+        # Add implicitly generated GarbageNodes children in between any two 
+        # defined children
+        if kind != 'SyntaxCollection':
+            for i in range(2 * len(children)):
+                if i % 2 == 0:
+                    if i == 0:
+                        name = 'GarbageBefore' + children[0].name
+                    else:
+                        name = 'GarbageBetween%sAnd%s' % \
+                            (children[int(i / 2) - 1].name, children[int(i / 2)].name)
+                    self.children.append(Child(
+                        name, 
+                        kind='GarbageNodes', 
+                        collection_element_name=name,
+                        is_optional=True
+                    ))
+                else:
+                    self.children.append(children[int((i - 1) / 2)])
+
+        self.non_garbage_children = \
+            [child for child in children if not child.is_garbage_nodes()]
+
         self.base_kind = kind
         if self.base_kind == 'SyntaxCollection':
             self.base_type = 'Syntax'
@@ -36,8 +59,7 @@ class Node(object):
         self.omit_when_empty = omit_when_empty
         self.collection_element = element or ""
         # For SyntaxCollections make sure that the element_name is set.
-        assert(not self.is_syntax_collection() or element_name or
-               (element and element != 'Syntax'))
+        assert(not self.is_syntax_collection() or element_name or element)
         # If there's a preferred name for the collection element that differs
         # from its supertype, use that.
         self.collection_element_name = element_name or self.collection_element

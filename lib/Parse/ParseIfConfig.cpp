@@ -817,8 +817,20 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     // clause unless we're doing a parse-only pass.
     if (isElse) {
       isActive = !foundActive && shouldEvaluate;
-      if (SyntaxContext->isEnabled())
+      if (SyntaxContext->isEnabled()) {
+        // Because we use the same libSyntax node for #elseif and #else, we need
+        // to disambiguate whether a postfix expression is the condition of
+        // #elseif or a postfix expression of the #else body.
+        // To do this, push three empty syntax nodes onto the stack.
+        //  - First one for garbage nodes between the #else keyword and the
+        //    condition
+        //  - One for the condition itself (whcih doesn't exist)
+        //  - And finally one for the garbage nodes between the condition and
+        //    the elements
         SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+      }
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
