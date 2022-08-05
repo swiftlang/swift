@@ -394,11 +394,11 @@ private:
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-              Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-              IsTransparent_t isTrans, IsSerialized_t isSerialized,
-              ProfileCounter entryCount, IsThunk_t isThunk,
-              SubclassScope classSubclassScope, Inline_t inlineStrategy,
-              EffectsKind E, const SILDebugScope *debugScope,
+              IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+              IsSerialized_t isSerialized, ProfileCounter entryCount,
+              IsThunk_t isThunk, SubclassScope classSubclassScope,
+              Inline_t inlineStrategy, EffectsKind E,
+              const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass,
               IsDistributed_t isDistributed);
@@ -418,18 +418,14 @@ private:
          SILFunction *InsertBefore = nullptr,
          const SILDebugScope *DebugScope = nullptr);
 
-  void init(SILLinkage Linkage, StringRef Name,
-                         CanSILFunctionType LoweredType,
-                         GenericEnvironment *genericEnv,
-                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                         ProfileCounter entryCount, IsThunk_t isThunk,
-                         SubclassScope classSubclassScope,
-                         Inline_t inlineStrategy, EffectsKind E,
-                         const SILDebugScope *DebugScope,
-                         IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass,
-                         IsDistributed_t isDistributed);
+  void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
+            GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
+            IsTransparent_t isTrans, IsSerialized_t isSerialized,
+            ProfileCounter entryCount, IsThunk_t isThunk,
+            SubclassScope classSubclassScope, Inline_t inlineStrategy,
+            EffectsKind E, const SILDebugScope *DebugScope,
+            IsDynamicallyReplaceable_t isDynamic,
+            IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed);
 
   /// Set has ownership to the given value. True means that the function has
   /// ownership, false means it does not.
