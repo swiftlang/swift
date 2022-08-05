@@ -311,6 +311,8 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *attr);
 
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
+  
+  void visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr);
 
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
@@ -379,6 +381,10 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
     diagnoseAndRemoveAttr(attr, error);
     return;
   }
+}
+
+void AttributeChecker::visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr) {
+  return;
 }
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
