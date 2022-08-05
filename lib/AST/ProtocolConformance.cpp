@@ -347,46 +347,19 @@ GenericSignature ProtocolConformance::getGenericSignature() const {
 }
 
 SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
-  // Walk down to the base NormalProtocolConformance.
-  SubstitutionMap subMap;
-  const ProtocolConformance *parent = this;
-  while (!isa<RootProtocolConformance>(parent)) {
-    switch (parent->getKind()) {
-    case ProtocolConformanceKind::Normal:
-    case ProtocolConformanceKind::Self:
-    case ProtocolConformanceKind::Builtin:
-      llvm_unreachable("should have exited the loop?!");
-    case ProtocolConformanceKind::Inherited:
-      parent =
-          cast<InheritedProtocolConformance>(parent)->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized: {
-      auto SC = cast<SpecializedProtocolConformance>(parent);
-      parent = SC->getGenericConformance();
-      assert(subMap.empty() && "multiple conformance specializations?!");
-      subMap = SC->getSubstitutionMap();
-      break;
-    }
-    }
-  }
+  const ProtocolConformance *conformance = this;
 
-  // Found something; we're done!
-  if (!subMap.empty())
-    return subMap;
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance))
+    conformance = inheritedC->getInheritedConformance();
 
-  // If the normal conformance is for a generic type, and we didn't hit a
-  // specialized conformance, collect the substitutions from the generic type.
-  // FIXME: The AST should do this for us.
-  const NormalProtocolConformance *normalC =
-      dyn_cast<NormalProtocolConformance>(parent);
-  if (!normalC)
-    return SubstitutionMap();
+  if (auto *specializedC = dyn_cast<SpecializedProtocolConformance>(conformance))
+    return specializedC->getSubstitutionMap();
 
-  if (!normalC->getType()->isSpecialized())
-    return SubstitutionMap();
+  auto *rootC = cast<RootProtocolConformance>(conformance);
+  if (auto genericSig = rootC->getGenericSignature())
+    return genericSig->getIdentitySubstitutionMap();
 
-  auto *DC = normalC->getDeclContext();
-  return normalC->getType()->getContextSubstitutionMap(M, DC);
+  return SubstitutionMap();
 }
 
 bool RootProtocolConformance::isInvalid() const {
@@ -957,14 +930,11 @@ void NormalProtocolConformance::overrideWitness(ValueDecl *requirement,
 
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
-    ProtocolConformance *genericConformance,
+    RootProtocolConformance *genericConformance,
     SubstitutionMap substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
     GenericConformance(genericConformance),
-    GenericSubstitutions(substitutions)
-{
-  assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
-}
+    GenericSubstitutions(substitutions) {}
 
 void SpecializedProtocolConformance::computeConditionalRequirements() const {
   // already computed?
@@ -1133,22 +1103,12 @@ ProtocolConformance::getRootNormalConformance() const {
 const RootProtocolConformance *
 ProtocolConformance::getRootConformance() const {
   const ProtocolConformance *C = this;
-  while (true) {
-    switch (C->getKind()) {
-    case ProtocolConformanceKind::Normal:
-    case ProtocolConformanceKind::Self:
-    case ProtocolConformanceKind::Builtin:
-      return cast<RootProtocolConformance>(C);
-    case ProtocolConformanceKind::Inherited:
-      C = cast<InheritedProtocolConformance>(C)
-          ->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized:
-      C = cast<SpecializedProtocolConformance>(C)
-        ->getGenericConformance();
-      break;
-    }
-  }
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(C))
+    C = inheritedC->getInheritedConformance();
+  if (auto *specializedC = dyn_cast<SpecializedProtocolConformance>(C))
+    return specializedC->getGenericConformance();
+
+  return cast<RootProtocolConformance>(C);
 }
 
 bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
@@ -1181,9 +1141,11 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto subMap = SubstitutionMap::get(getGenericSignature(),
                                        subs, conformances);
+
+    auto *mutableThis = const_cast<ProtocolConformance *>(this);
     return substType->getASTContext()
         .getSpecializedConformance(substType,
-                                   const_cast<ProtocolConformance *>(this),
+                                   cast<NormalProtocolConformance>(mutableThis),
                                    subMap);
   }
   case ProtocolConformanceKind::Builtin: {
@@ -1660,7 +1622,8 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     auto genericConformance = spec->getGenericConformance();
     return Ctx.getSpecializedConformance(
                                 getType()->getCanonicalType(),
-                                genericConformance->getCanonicalConformance(),
+                                cast<RootProtocolConformance>(
+                                    genericConformance->getCanonicalConformance()),
                                 spec->getSubstitutionMap().getCanonical());
   }
   }

@@ -1922,7 +1922,7 @@ NOTE(extension_stored_property_fixit,none,
      "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
-      (Identifier))
+      (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause",
       (Identifier))
@@ -1938,6 +1938,8 @@ ERROR(invalid_nominal_extension,none,
       (Type, Type))
 NOTE(invalid_nominal_extension_rewrite,none,
      "did you mean to extend %0 instead?", (Type))
+ERROR(synthesized_nominal_extension,none,
+      "cannot extend synthesized type %0", (Type))
 
 // Protocols
 ERROR(type_does_not_conform,none,

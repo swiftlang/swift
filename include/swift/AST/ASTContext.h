@@ -105,6 +105,7 @@ namespace swift {
   class NormalProtocolConformance;
   class OpaqueTypeDecl;
   class InheritedProtocolConformance;
+  class RootProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
   enum class BuiltinConformanceKind;
@@ -1245,7 +1246,7 @@ public:
   /// specialized conformance from the generic conformance.
   ProtocolConformance *
   getSpecializedConformance(Type type,
-                            ProtocolConformance *generic,
+                            RootProtocolConformance *generic,
                             SubstitutionMap substitutions);
 
   /// Produce an inherited conformance, for subclasses of a type
