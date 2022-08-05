@@ -256,7 +256,7 @@ public:
 class TypeReplacements {
 private:
   Optional<SILType> resultType;
-  Optional<SILType> indirectResultType;
+  llvm::MapVector<unsigned, CanType> indirectResultTypes;
   llvm::MapVector<unsigned, CanType> paramTypeReplacements;
   llvm::MapVector<unsigned, CanType> yieldTypeReplacements;
 
@@ -267,11 +267,15 @@ public:
 
   bool hasResultType() const { return resultType.hasValue(); }
 
-  Optional<SILType> getIndirectResultType() const { return indirectResultType; }
+  const llvm::MapVector<unsigned, CanType> &getIndirectResultTypes() const {
+    return indirectResultTypes;
+  }
 
-  void setIndirectResultType(SILType type) { indirectResultType = type; }
+  void addIndirectResultType(unsigned index, CanType type) {
+    indirectResultTypes.insert(std::make_pair(index, type));
+  }
 
-  bool hasIndirectResultType() const { return indirectResultType.hasValue(); }
+  bool hasIndirectResultTypes() const { return !indirectResultTypes.empty(); }
 
   const llvm::MapVector<unsigned, CanType> &getParamTypeReplacements() const {
     return paramTypeReplacements;
@@ -299,7 +303,7 @@ public:
 
   bool hasTypeReplacements() const {
     return hasResultType() || hasParamTypeReplacements() ||
-           hasIndirectResultType() || hasYieldTypeReplacements();
+           hasIndirectResultTypes() || hasYieldTypeReplacements();
   }
 };
 
@@ -332,12 +336,12 @@ public:
 
   void setResultType(SILType type) { typeReplacements.setResultType(type); }
 
-  bool hasIndirectResultType() const {
-    return typeReplacements.hasIndirectResultType();
+  bool hasIndirectResultTypes() const {
+    return typeReplacements.hasIndirectResultTypes();
   }
 
-  void setIndirectResultType(SILType type) {
-    typeReplacements.setIndirectResultType(type);
+  void addIndirectResultType(unsigned index, CanType type) {
+    typeReplacements.addIndirectResultType(index, type);
   }
 
   bool hasTypeReplacements() const {
@@ -2097,7 +2101,7 @@ static SILValue fixSpecializedReturnType(SILValue returnVal, SILType returnType,
 static void
 prepareCallArguments(ApplySite AI, SILBuilder &Builder,
                      const ReabstractionInfo &ReInfo,
-                     const llvm::MapVector<unsigned, CanType> &typeReplacements,
+                     const TypeReplacements &typeReplacements,
                      SmallVectorImpl<SILValue> &Arguments,
                      SmallVectorImpl<unsigned> &ArgAtIndexNeedsEndBorrow,
                      SILValue &StoreResultTo) {
@@ -2115,8 +2119,33 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
       // Handle result arguments.
       unsigned formalIdx =
           substConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
+
+      bool converted = false;
+      if (typeReplacements.hasIndirectResultTypes()) {
+        auto typeReplacementIt = typeReplacements.getIndirectResultTypes().find(formalIdx);
+        if (typeReplacementIt != typeReplacements.getIndirectResultTypes().end()) {
+          auto specializedTy = typeReplacementIt->second;
+          if (InputValue->getType().isAddress()) {
+            auto argTy = SILType::getPrimitiveAddressType(specializedTy);
+            InputValue = Builder.createUncheckedAddrCast(Loc, InputValue, argTy);
+          } else {
+            auto argTy = SILType::getPrimitiveObjectType(specializedTy);
+            if (SILType::canRefCast(InputValue->getType(), argTy,
+                                    Builder.getModule())) {
+              InputValue = Builder.createUncheckedRefCast(Loc, InputValue, argTy);
+            } else {
+              InputValue =
+                  Builder.createUncheckedBitwiseCast(Loc, InputValue, argTy);
+            }
+          }
+          converted = true;
+        }
+      }
+
       if (!ReInfo.isFormalResultConverted(formalIdx)) {
-        return false;
+        if (converted)
+          Arguments.push_back(InputValue);
+        return converted;
       }
 
       // The result is converted from indirect to direct. We need to insert
@@ -2135,9 +2164,9 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
     // Handle type conversions for shape based specializations, e.g.
     // some reference type -> AnyObject
     bool converted = false;
-    if (!typeReplacements.empty()) {
-      auto typeReplacementIt = typeReplacements.find(paramIdx);
-      if (typeReplacementIt != typeReplacements.end()) {
+    if (typeReplacements.hasParamTypeReplacements()) {
+      auto typeReplacementIt = typeReplacements.getParamTypeReplacements().find(paramIdx);
+      if (typeReplacementIt != typeReplacements.getParamTypeReplacements().end()) {
         auto specializedTy = typeReplacementIt->second;
         if (InputValue->getType().isAddress()) {
           auto argTy = SILType::getPrimitiveAddressType(specializedTy);
@@ -2210,7 +2239,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   SILValue resultOut;
 
   prepareCallArguments(applySite, builder, reInfo,
-                       typeReplacements.getParamTypeReplacements(), arguments,
+                       typeReplacements, arguments,
                        argsNeedingEndBorrow, resultOut);
 
   // Create a substituted callee type.
@@ -2252,12 +2281,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
       fixUsedVoidType(resultBlock->getArgument(0), loc, builder);
 
       SILValue returnValue;
-      if (typeReplacements.hasIndirectResultType()) {
-        SILArgument *arg = resultBlock->replacePhiArgument(
-            0, *typeReplacements.getIndirectResultType(), OwnershipKind::Owned);
-        returnValue = fixSpecializedReturnType(
-            arg, resultOut->getType().getObjectType(), loc, builder);
-      } else {
+      if (!typeReplacements.hasIndirectResultTypes()) {
         returnValue = resultBlock->replacePhiArgument(
             0, resultOut->getType().getObjectType(), OwnershipKind::Owned);
       }
@@ -2278,6 +2302,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     auto *newAI =
         builder.createApply(loc, callee, subs, arguments,
                             ai->getApplyOptions());
+
     SILValue returnValue = newAI;
     if (resultOut) {
       if (!calleeSILSubstFnTy.isNoReturnFunction(
@@ -2285,10 +2310,6 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
         // Store the direct result to the original result address.
         fixUsedVoidType(ai, loc, builder);
 
-        if (typeReplacements.hasIndirectResultType()) {
-          returnValue = fixSpecializedReturnType(
-              newAI, *typeReplacements.getIndirectResultType(), loc, builder);
-        }
         builder.emitStoreValueOperation(loc, returnValue, resultOut,
                                         StoreOwnershipQualifier::Init);
       } else {
@@ -2868,17 +2889,18 @@ bool usePrespecialized(
       auto substConv = apply.getSubstCalleeConv();
       auto resultType =
           fn->getConventions().getSILResultType(fn->getTypeExpansionContext());
+      SmallVector<SILResultInfo, 4> indirectResults(substConv.getIndirectSILResults());
 
       for (auto pair : llvm::enumerate(apply.getArgumentOperands())) {
-        auto param = pair.value().get();
-        if (pair.index() < substConv.getSILArgIndexOfFirstParam() &&
-            resultType != param->getType()) {
-          assert(!result.hasIndirectResultType());
-          if (apply.getKind() == ApplySiteKind::TryApplyInst) {
-            result.setIndirectResultType(resultType.getObjectType());
-          } else {
-            result.setIndirectResultType(param->getType().getObjectType());
+        if (pair.index() < substConv.getSILArgIndexOfFirstParam()) {
+          auto formalIndex = substConv.getIndirectFormalResultIndexForSILArg(pair.index());
+          auto fnResult = indirectResults[formalIndex];
+          if (fnResult.isFormalIndirect()) {
+            // FIXME: properly get the type
+            auto indirectResultTy = refF->getASTContext().getAnyObjectType();  //fnResult.getReturnValueType(M, fnType, expansion);
+            result.addIndirectResultType(formalIndex, indirectResultTy);
           }
+
           continue;
         }
 
@@ -2907,8 +2929,7 @@ bool usePrespecialized(
         }
       }
 
-      if (!result.hasIndirectResultType() &&
-          resultType != apply.getType().getObjectType()) {
+      if (resultType != apply.getType().getObjectType()) {
         result.setResultType(apply.getType().getObjectType());
       }
     }

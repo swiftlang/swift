@@ -101,14 +101,18 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT: } // end sil function '$s22pre_specialized_module16useInternalThingyyxlFSi_Tg5'
 
 // OPT: sil shared @$s22pre_specialized_module16useInternalThingyyxlFAA9SomeClassC_Tg5 : $@convention(thin) (@guaranteed SomeClass) -> () {
+// OPT:   [[R1:%.*]] = init_existential_addr {{%.*}} : $*Any, $SomeClass
 // OPT:   [[F1:%.*]] = function_ref @$s22pre_specialized_module14InternalThing2V7computexyFyXl_Ts5 : $@convention(method) (@guaranteed InternalThing2<AnyObject>) -> @owned AnyObject
+// OPT:   [[R2:%.*]] = unchecked_addr_cast [[R1]] : $*SomeClass to $*AnyObject
 // OPT:   [[A1:%.*]] = unchecked_bitwise_cast {{%.*}} : $InternalThing2<SomeClass> to $InternalThing2<AnyObject>
-// OPT:   [[R1:%.*]] = apply [[F1]]([[A1]]) : $@convention(method) (@guaranteed InternalThing2<AnyObject>) -> @owned AnyObject
-// OPT:   [[R2:%.*]] = unchecked_ref_cast [[R1]] : $AnyObject to $SomeClass
+// OPT:   [[R3:%.*]] = apply [[F1]]([[A1]]) : $@convention(method) (@guaranteed InternalThing2<AnyObject>) -> @owned AnyObject
+// OPT:   store [[R3]] to [[R2]] : $*AnyObject
+// OPT:   [[R4:%.*]] = init_existential_addr {{%.*}} : $*Any, $SomeClass
 // OPT:   [[F2:%.*]] = function_ref @$s22pre_specialized_module14InternalThing2V9computedXxvgyXl_Ts5 : $@convention(method) (@guaranteed InternalThing2<AnyObject>) -> @owned AnyObject
+// OPT:   [[R5:%.*]] = unchecked_addr_cast [[R4]] : $*SomeClass to $*AnyObject
 // OPT:   [[A2:%.*]] = unchecked_bitwise_cast {{%.*}} : $InternalThing2<SomeClass> to $InternalThing2<AnyObject>
-// OPT:   [[R3:%.*]] = apply [[F2]]([[A2]]) : $@convention(method) (@guaranteed InternalThing2<AnyObject>) -> @owned AnyObject
-// OPT:   [[R4:%.*]] = unchecked_ref_cast [[R3]] : $AnyObject to $SomeClass
+// OPT:   [[R6:%.*]] = apply [[F2]]([[A2]]) : $@convention(method) (@guaranteed InternalThing2<AnyObject>) -> @owned AnyObject
+// OPT:   store [[R6]] to [[R5]] : $*AnyObject
 // OPT:   [[F3:%.*]] = function_ref @$s22pre_specialized_module14InternalThing2V9computedYxvsyXl_Ts5 : $@convention(method) (@owned AnyObject, @inout InternalThing2<AnyObject>) -> ()
 // OPT:   [[A3:%.*]] = unchecked_ref_cast {{%.*}} : $SomeClass to $AnyObject
 // OPT:   [[A4:%.*]] = unchecked_addr_cast {{%.*}} : $*InternalThing2<SomeClass> to $*InternalThing2<AnyObject>
@@ -116,7 +120,6 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT:   [[F4:%.*]] = function_ref @$s22pre_specialized_module14InternalThing2V9computedYxvgyXl_Ts5 : $@convention(method) (@guaranteed InternalThing2<AnyObject>) -> @owned AnyObject
 // OPT:   [[A5:%.*]] = unchecked_bitwise_cast {{%.*}} : $InternalThing2<SomeClass> to $InternalThing2<AnyObject>
 // OPT:   [[R5:%.*]] = apply [[F4]]([[A5]]) : $@convention(method) (@guaranteed InternalThing2<AnyObject>) -> @owned AnyObject
-// OPT:   [[R6:%.*]] = unchecked_ref_cast [[R5]] : $AnyObject to $SomeClass
 // OPT:   [[F5:%.*]] = function_ref @$s22pre_specialized_module14InternalThing2V9computedZxvMyXl_Ts5 : $@yield_once @convention(method) (@inout InternalThing2<AnyObject>) -> @yields @inout AnyObject
 // OPT:   ([[R7:%.*]], {{%.*}}) = begin_apply [[F5]]([[A4]]) : $@yield_once @convention(method) (@inout InternalThing2<AnyObject>) -> @yields @inout AnyObject
 // OPT:   [[R8:%.*]] = unchecked_addr_cast [[R7]] : $*AnyObject to $*SomeClass
@@ -134,7 +137,6 @@ public func usePrespecializedEntryPoints() {
   useInternalEmitIntoClientPrespecialized(2)
   useInternalEmitIntoClientPrespecialized(2.0)
   useInternalThing(2)
-  // FIXME: begin_apply is broken with AnyObject specialization
   useInternalThing(SomeClass())
 }
 
@@ -147,7 +149,8 @@ public func usePrespecializedEntryPoints() {
 // OPT:   [[A1:%.*]] = unchecked_ref_cast {{%.*}} : $SomeClass to $AnyObject
 // OPT:   try_apply [[F3]]([[A1]]) : $@convention(thin) (@guaranteed AnyObject) -> (@owned AnyObject, @error Error), normal [[BB1:bb.*]], error
 // OPT: [[BB1]]([[A2:%.*]] : $AnyObject):
-// OPT:   unchecked_ref_cast [[A2]] : $AnyObject to $SomeClass
+// OPT:   [[R1:%.*]] = unchecked_addr_cast {{%.*}} : $*SomeClass to $*AnyObject
+// OPT:   store [[A2]] to [[R1]] : $*AnyObject
 // OPT: } // end sil function '$s14pre_specialize34usePrespecializedThrowsEntryPointsyyKF'
 public func usePrespecializedThrowsEntryPoints() throws {
   consume(try publicPrespecializedThrows(1))
@@ -155,11 +158,20 @@ public func usePrespecializedThrowsEntryPoints() throws {
   consume(try publicPrespecializedThrows(SomeClass()))
 }
 
-// FIXME: Currently this causes a compiler crash
-//
-// public func useT(_ c: SomeClass, _ d: SomeOtherClass, _ x: Int64) {
-//   consume(publicPresepcializedMultipleIndirectResults(c, d, x))
-// }
+// OPT: {{bb.*}}([[A1:%.*]] : $SomeClass, [[A2:%.*]] : $SomeOtherClass, [[A3:%.*]] : $Int64):
+// OPT:   [[R1:%.*]] = alloc_stack $SomeOtherClass
+// OPT:   [[R2:%.*]] = alloc_stack $SomeClass
+// OPT:   [[F1:%.*]] = function_ref @$s22pre_specialized_module43publicPresepcializedMultipleIndirectResultsyq__s5Int64Vxtx_q_ADtr0_lFyXl_yXlTs5 : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Int64) -> (@out AnyObject, Int64, @out AnyObject)
+// OPT:   [[R3:%.*]] = unchecked_addr_cast [[R1]] : $*SomeOtherClass to $*AnyObject
+// OPT:   [[R4:%.*]] = unchecked_addr_cast [[R2]] : $*SomeClass to $*AnyObject
+// OPT:   [[A4:%.*]] = unchecked_ref_cast [[A1]] : $SomeClass to $AnyObject
+// OPT:   [[A5:%.*]] = unchecked_ref_cast [[A2]] : $SomeOtherClass to $AnyObject
+// OPT:   [[R5:%.*]] = apply [[F1]]([[R3]], [[R4]], [[A4]], [[A5]], [[A3]]) : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Int64) -> (@out AnyObject, Int64, @out AnyObject)
+// OPT: } // end sil function '$s14pre_specialize40usePresepcializedMultipleIndirectResultsyy0A19_specialized_module9SomeClassC_AA0j5OtherK0Cs5Int64VtF'
+public final class SomeOtherClass {}
+public func usePresepcializedMultipleIndirectResults(_ c: SomeClass, _ d: SomeOtherClass, _ x: Int64) {
+  consume(publicPresepcializedMultipleIndirectResults(c, d, x))
+}
 
 // OPT: sil [noinline] @$s14pre_specialize15usePartialApply1y0A19_specialized_module9SomeClassCAFcAF_tF : $@convention(thin) (@guaranteed SomeClass) -> @owned @callee_guaranteed (@guaranteed SomeClass) -> @owned SomeClass {
 // OPT:   [[F1:%.*]] = function_ref @$s14pre_specialize15usePartialApply1y0A19_specialized_module9SomeClassCAFcAF_tF0cdE5InnerL_1xxx_tlFyXl_Ts5 : $@convention(thin) (@guaranteed AnyObject, @guaranteed SomeClass) -> @owned AnyObject
