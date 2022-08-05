@@ -130,10 +130,9 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
                 shell.run(["git", "fetch", "origin",
                            "pull/{0}/merge:{1}"
                            .format(pr_id, repo_branch), "--tags"], echo=True)
-        except KeyError as e:
+        except KeyError:
             print(f"Failed to look up {repo_name} in scheme", file=sys.stderr)
-            raise e
-            exit(1)
+            raise
     return repo_branch, cross_repo
 
 
