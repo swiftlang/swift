@@ -86,7 +86,7 @@ class TestResultBuilder {
     // CHECK:              closure_expr type='() -> ConcreteP'
     takesBuilder {
       // CHECK: return_stmt
-      // CHECK-NEXT: load_expr implicit type='ConcreteP'
+      // CHECK-NEXT: call_expr implicit type='ConcreteP'
       ConcreteP()
     }
   }
