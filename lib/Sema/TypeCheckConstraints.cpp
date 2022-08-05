@@ -1228,6 +1228,43 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
 //===----------------------------------------------------------------------===//
 #pragma mark Debugging
 
+void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
+                          raw_ostream &out) const {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  out << " with ";
+
+  switch (getKind()) {
+  case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclViaDynamic:
+  case OverloadChoiceKind::DeclViaBridge:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    getDecl()->dumpRef(out);
+    out << " as ";
+    if (getBaseType())
+      out << getBaseType()->getString(PO) << ".";
+
+    out << getDecl()->getBaseName() << ": "
+        << adjustedOpenedType->getString(PO);
+    break;
+
+  case OverloadChoiceKind::KeyPathApplication:
+    out << "key path application root " << getBaseType()->getString(PO);
+    break;
+
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+    out << "dynamic member lookup root " << getBaseType()->getString(PO)
+        << " name='" << getName();
+    break;
+
+  case OverloadChoiceKind::TupleIndex:
+    out << "tuple " << getBaseType()->getString(PO) << " index "
+        << getTupleIndex();
+    break;
+  }
+}
+
 void Solution::dump() const {
   dump(llvm::errs());
 }
@@ -1268,40 +1305,9 @@ void Solution::dump(raw_ostream &out) const {
         out << "\n";
         ovl.first->dump(sm, out);
       }
-      out << " with ";
 
       auto choice = ovl.second.choice;
-      switch (choice.getKind()) {
-      case OverloadChoiceKind::Decl:
-      case OverloadChoiceKind::DeclViaDynamic:
-      case OverloadChoiceKind::DeclViaBridge:
-      case OverloadChoiceKind::DeclViaUnwrappedOptional:
-        choice.getDecl()->dumpRef(out);
-        out << " as ";
-        if (choice.getBaseType())
-          out << choice.getBaseType()->getString(PO) << ".";
-
-        out << choice.getDecl()->getBaseName() << ": "
-            << ovl.second.adjustedOpenedType->getString(PO);
-        break;
-
-      case OverloadChoiceKind::KeyPathApplication:
-        out << "key path application root "
-            << choice.getBaseType()->getString(PO);
-        break;
-
-      case OverloadChoiceKind::DynamicMemberLookup:
-      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
-        out << "dynamic member lookup root "
-            << choice.getBaseType()->getString(PO)
-            << " name='" << choice.getName();
-        break;
-    
-      case OverloadChoiceKind::TupleIndex:
-        out << "tuple " << choice.getBaseType()->getString(PO) << " index "
-          << choice.getTupleIndex();
-        break;
-      }
+      choice.dump(ovl.second.adjustedOpenedType, sm, out);
     }
     out << "\n";
   }
