@@ -3134,7 +3134,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     if (result.getKind() == ForeignRepresentableKind::Bridged
         && !result.getConformance()->getType()->isEqual(type)) {
       auto specialized = type->getASTContext()
-        .getSpecializedConformance(type, result.getConformance(),
+        .getSpecializedConformance(type,
+             cast<RootProtocolConformance>(result.getConformance()),
              boundGenericType->getContextSubstitutionMap(dc->getParentModule(),
                                                  boundGenericType->getDecl()));
       result = ForeignRepresentationInfo::forBridged(specialized);
