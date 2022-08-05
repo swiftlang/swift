@@ -2842,6 +2842,11 @@ public:
         verifyConformance(ext, conformance);
       }
 
+      // Make sure extension binding succeeded.
+      if (!ext->hasBeenBound()) {
+        Out << "ExtensionDecl was not bound\n";
+        abort();
+      }
       verifyCheckedBase(ext);
     }
 
