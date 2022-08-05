@@ -298,10 +298,11 @@ ParserStatus Parser::parseGenericWhereClause(
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
       SourceLoc ColonLoc = consumeToken();
-      BodyContext->setCreateSyntax(SyntaxKind::ConformanceRequirement);
       if (Tok.is(tok::identifier) &&
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
+        BodyContext->setCreateSyntax(SyntaxKind::LayoutRequirement);
+
         // Parse a layout constraint.
         Identifier LayoutName;
         auto LayoutLoc = consumeIdentifier(LayoutName,
@@ -323,6 +324,7 @@ ParserStatus Parser::parseGenericWhereClause(
               LayoutConstraintLoc(Layout, LayoutLoc)));
         }
       } else {
+        BodyContext->setCreateSyntax(SyntaxKind::ConformanceRequirement);
         // Parse the protocol or composition.
         ParserResult<TypeRepr> Protocol = parseType();
         Status |= Protocol;

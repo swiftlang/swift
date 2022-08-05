@@ -3388,20 +3388,27 @@ public:
 
     SmallVector<DeclID, 8> relations;
     for (auto &rel : group->getHigherThan()) {
-      assert(rel.Group && "Undiagnosed invalid precedence group!");
-      relations.push_back(S.addDeclRef(rel.Group));
+      if (rel.Group) {
+        relations.push_back(S.addDeclRef(rel.Group));
+      } else if (!S.allowCompilerErrors()) {
+        assert(rel.Group && "Undiagnosed invalid precedence group!");
+      }
     }
+
+    size_t numHigher = relations.size();
     for (auto &rel : group->getLowerThan()) {
-      assert(rel.Group && "Undiagnosed invalid precedence group!");
-      relations.push_back(S.addDeclRef(rel.Group));
+      if (rel.Group) {
+        relations.push_back(S.addDeclRef(rel.Group));
+      } else if (!S.allowCompilerErrors()) {
+        assert(rel.Group && "Undiagnosed invalid precedence group!");
+      }
     }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[PrecedenceGroupLayout::Code];
     PrecedenceGroupLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                       nameID, contextID.getOpaqueValue(),
                                       associativity, group->isAssignment(),
-                                      group->getHigherThan().size(),
-                                      relations);
+                                      numHigher, relations);
   }
 
   void visitInfixOperatorDecl(const InfixOperatorDecl *op) {
@@ -4528,7 +4535,6 @@ public:
 
   void visitParenType(const ParenType *parenTy) {
     using namespace decls_block;
-    assert(parenTy->getParameterFlags().isNone());
     serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
   }
 
@@ -4539,7 +4545,6 @@ public:
 
     abbrCode = S.DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
-      assert(elt.getParameterFlags().isNone());
       TupleTypeEltLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(elt.getName()),

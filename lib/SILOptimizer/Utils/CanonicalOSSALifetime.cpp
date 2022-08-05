@@ -622,7 +622,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroys() {
 /// copies and destroys for deletion. Insert new copies for interior uses that
 /// require ownership of the used operand.
 void CanonicalizeOSSALifetime::rewriteCopies() {
-  assert(currentDef.getOwnershipKind() == OwnershipKind::Owned);
+  assert(currentDef->getOwnershipKind() == OwnershipKind::Owned);
 
   SmallSetVector<SILInstruction *, 8> instsToDelete;
   defUseWorklist.clear();
@@ -802,7 +802,7 @@ static bool shouldCanonicalizeWithPoison(SILValue def) {
 
 /// Canonicalize a single extended owned lifetime.
 bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
-  if (def.getOwnershipKind() != OwnershipKind::Owned)
+  if (def->getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
   if (def->isLexical())

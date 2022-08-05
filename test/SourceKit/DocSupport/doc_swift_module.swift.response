@@ -706,6 +706,11 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 755,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 759,
     key.length: 1
@@ -902,6 +907,11 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1003,
     key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 1008,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
@@ -1313,6 +1323,11 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 7
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 1608,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
@@ -1444,6 +1459,11 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1813,
     key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 1818,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
@@ -1804,6 +1824,11 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.usr: "s:4cake4ProtP7ElementQa",
     key.offset: 2183,
     key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 2191,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.ref.struct,

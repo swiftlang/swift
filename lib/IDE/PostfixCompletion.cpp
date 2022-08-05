@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/DotExprCompletion.h"
+#include "swift/IDE/PostfixCompletion.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/Sema/CompletionContextFinder.h"
@@ -21,7 +21,7 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
-void DotExprTypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
+void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   assert(!gotCallback());
 
   // Default to checking the completion expression in isolation.
@@ -44,7 +44,7 @@ void DotExprTypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
                              [&](const Solution &S) { sawSolution(S); });
 }
 
-void DotExprTypeCheckCompletionCallback::sawSolutionImpl(
+void PostfixCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
   auto &CS = S.getConstraintSystem();
   auto *ParsedExpr = CompletionExpr->getBase();
@@ -96,7 +96,7 @@ void DotExprTypeCheckCompletionCallback::sawSolutionImpl(
   }
 }
 
-void DotExprTypeCheckCompletionCallback::deliverResults(
+void PostfixCompletionCallback::deliverResults(
     Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
     CodeCompletionContext &CompletionCtx, CodeCompletionConsumer &Consumer) {
   ASTContext &Ctx = DC->getASTContext();

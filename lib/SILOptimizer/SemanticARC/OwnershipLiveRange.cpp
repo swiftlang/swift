@@ -23,7 +23,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     : introducer(OwnedValueIntroducer::get(value)), destroyingUses(),
       ownershipForwardingUses(), unknownConsumingUses() {
   assert(introducer);
-  assert(introducer.value.getOwnershipKind() == OwnershipKind::Owned);
+  assert(introducer.value->getOwnershipKind() == OwnershipKind::Owned);
 
   SmallVector<Operand *, 32> tmpDestroyingUses;
   SmallVector<Operand *, 32> tmpForwardingConsumingUses;
@@ -41,7 +41,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
 
     // Do a quick check that we did not add ValueOwnershipKind that are not
     // owned to the worklist.
-    assert(op->get().getOwnershipKind() == OwnershipKind::Owned &&
+    assert(op->get()->getOwnershipKind() == OwnershipKind::Owned &&
            "Added non-owned value to worklist?!");
 
     auto *user = op->getUser();
@@ -75,10 +75,10 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     auto *ti = dyn_cast<TermInst>(user);
     if ((ti && !ti->isTransformationTerminator()) ||
         !canOpcodeForwardGuaranteedValues(op) ||
-        1 != count_if(user->getNonTypeDependentOperandValues(),
-                      [&](SILValue v) {
-                        return v.getOwnershipKind() == OwnershipKind::Owned;
-                      })) {
+        1 !=
+            count_if(user->getNonTypeDependentOperandValues(), [&](SILValue v) {
+              return v->getOwnershipKind() == OwnershipKind::Owned;
+            })) {
       tmpUnknownConsumingUses.push_back(op);
       continue;
     }
@@ -105,7 +105,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // the the users force the live range to be alive.
     if (!ti) {
       for (SILValue v : user->getResults()) {
-        if (v.getOwnershipKind() != OwnershipKind::Owned)
+        if (v->getOwnershipKind() != OwnershipKind::Owned)
           continue;
         llvm::copy(v->getUses(), std::back_inserter(worklist));
       }

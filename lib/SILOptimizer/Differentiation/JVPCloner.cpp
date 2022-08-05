@@ -1439,7 +1439,7 @@ void JVPCloner::Implementation::initializeDifferentialStructElements(
          "The number of differential struct fields must equal the number of "
          "differential struct element values");
   for (auto pair : llvm::zip(diffStructDecl->getStoredProperties(), values)) {
-    assert(std::get<1>(pair).getOwnershipKind() != OwnershipKind::Guaranteed &&
+    assert(std::get<1>(pair)->getOwnershipKind() != OwnershipKind::Guaranteed &&
            "Differential struct elements must be @owned");
     auto insertion = differentialStructElements.insert(
         {std::get<0>(pair), std::get<1>(pair)});

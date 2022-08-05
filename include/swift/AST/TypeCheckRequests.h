@@ -18,6 +18,7 @@
 
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ConstTypeInfo.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Effects.h"
@@ -706,6 +707,26 @@ private:
 
   // Evaluation.
   PropertyWrapperTypeInfo
+  evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Retrieve information about compile-time-known
+class ConstantValueInfoRequest
+  : public SimpleRequest<ConstantValueInfoRequest,
+                         ConstValueTypeInfo(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ConstValueTypeInfo
   evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
 
 public:
@@ -2792,25 +2813,6 @@ public:
   void cacheResult(Expr *expr) const;
 };
 
-/// Computes whether this is a type that supports being called through the
-/// implementation of a \c callAsFunction method.
-class IsCallableNominalTypeRequest
-    : public SimpleRequest<IsCallableNominalTypeRequest,
-                           bool(CanType, DeclContext *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, CanType ty, DeclContext *dc) const;
-
-public:
-  // Cached.
-  bool isCached() const { return true; }
-};
-
 class DynamicallyReplacedDeclRequest
     : public SimpleRequest<DynamicallyReplacedDeclRequest,
                            ValueDecl *(ValueDecl *), RequestFlags::Cached> {
@@ -2890,52 +2892,6 @@ public:
   // Incremental dependencies.
   evaluator::DependencySource
   readDependencySource(const evaluator::DependencyRecorder &) const;
-};
-
-/// Computes whether the specified type or a super-class/super-protocol has the
-/// @dynamicMemberLookup attribute on it.
-class HasDynamicMemberLookupAttributeRequest
-    : public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
-                           bool(CanType), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, CanType ty) const;
-
-public:
-  bool isCached() const {
-    // Don't cache types containing type variables, as they must not outlive
-    // the constraint system that created them.
-    auto ty = std::get<0>(getStorage());
-    return !ty->hasTypeVariable();
-  }
-};
-
-/// Computes whether the specified type or a super-class/super-protocol has the
-/// @dynamicCallable attribute on it.
-class HasDynamicCallableAttributeRequest
-    : public SimpleRequest<HasDynamicCallableAttributeRequest,
-                           bool(CanType), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, CanType ty) const;
-
-public:
-  bool isCached() const {
-    // Don't cache types containing type variables, as they must not outlive
-    // the constraint system that created them.
-    auto ty = std::get<0>(getStorage());
-    return !ty->hasTypeVariable();
-  }
 };
 
 /// Determines the type of a given pattern.

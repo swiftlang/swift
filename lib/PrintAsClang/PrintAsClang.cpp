@@ -104,7 +104,16 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <cstdbool>\n"
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
-        out << "#if defined(_WIN32)\n#include <malloc.h>\n#endif\n";
+        out << "#include <new>\n";
+        // FIXME: Look for the header in the SDK.
+        out << "// Look for the C++ interop support header relative to clang's resource dir:\n";
+        out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.\n";
+        out << "#if __has_include(<../../../swift/shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <../../../swift/shims/_SwiftCxxInteroperability.h>\n";
+        out << "// Alternatively, allow user to find the header using additional include path into 'swift'.\n";
+        out << "#elif __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <shims/_SwiftCxxInteroperability.h>\n";
+        out << "#endif\n";
       },
       [&] {
         out << "#include <stdint.h>\n"
@@ -321,19 +330,19 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
   emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
   emitMacro("SWIFT_CONTEXT", "__attribute__((swift_context))");
   emitMacro("SWIFT_ERROR_RESULT", "__attribute__((swift_error_result))");
+  if (ctx.getStdlibModule()->isStaticLibrary()) {
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
+  } else {
+    out << "#if defined(_WIN32)\n";
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL", "__declspec(dllimport)");
+    out << "#else\n";
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
+    out << "#endif\n";
+  }
   // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
       [&] { emitMacro("SWIFT_NOEXCEPT"); });
-  emitCxxConditional(out, [&] {
-    out << "#if !defined(SWIFT_CXX_INT_DEFINED)\n";
-    out << "#define SWIFT_CXX_INT_DEFINED\n";
-    out << "namespace swift {\n";
-    out << "using Int = ptrdiff_t;\n";
-    out << "using UInt = size_t;\n";
-    out << "}\n";
-    out << "#endif\n";
-  });
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 }

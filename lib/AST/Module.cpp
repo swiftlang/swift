@@ -1150,7 +1150,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
       auto genericParam = GenericTypeParamType::get(/*type sequence*/ false, 0,
                                                     genericParams.size(), ctx);
       genericParams.push_back(genericParam);
-      typeSubstitutions.push_back(elt.getRawType());
+      typeSubstitutions.push_back(elt.getType());
       genericElements.push_back(elt.getWithType(genericParam));
       conditionalRequirements.push_back(
           Requirement(RequirementKind::Conformance, genericParam,

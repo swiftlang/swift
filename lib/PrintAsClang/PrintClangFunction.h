@@ -13,8 +13,11 @@
 #ifndef SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 #define SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 
+#include "OutputLanguageMode.h"
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
@@ -24,6 +27,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class AccessorDecl;
+class AnyFunctionType;
 class FuncDecl;
 class ModuleDecl;
 class NominalTypeDecl;
@@ -53,20 +57,24 @@ public:
 
   /// Information about any additional parameters.
   struct AdditionalParam {
-    enum class Role { Self, Error };
+    enum class Role { GenericRequirement, Self, Error };
 
     Role role;
     Type type;
     // Should self be passed indirectly?
     bool isIndirect = false;
+    llvm::Optional<GenericRequirement> genericRequirement = None;
   };
 
   /// Optional modifiers that can be applied to function signature.
   struct FunctionSignatureModifiers {
     /// Additional qualifier to add before the function's name.
-    const NominalTypeDecl *qualifierContext;
+    const NominalTypeDecl *qualifierContext = nullptr;
+    bool isStatic = false;
+    bool isInline = false;
+    bool isConst = false;
 
-    FunctionSignatureModifiers() : qualifierContext(nullptr) {}
+    FunctionSignatureModifiers() {}
   };
 
   /// Print the C function declaration or the C++ function thunk that
@@ -86,7 +94,8 @@ public:
                          const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params,
                          ArrayRef<AdditionalParam> additionalParams = {},
-                         bool hasThrows = false);
+                         bool hasThrows = false,
+                         const AnyFunctionType *funcType = nullptr);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
@@ -99,6 +108,11 @@ public:
                                       const AccessorDecl *accessor,
                                       StringRef swiftSymbolName, Type resultTy,
                                       bool isDefinition);
+
+  /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
+  void printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
+                                    ModuleDecl *moduleContext,
+                                    OutputLanguageMode outputLang);
 
 private:
   void printCxxToCFunctionParameterUse(

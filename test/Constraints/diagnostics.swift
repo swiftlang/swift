@@ -573,7 +573,16 @@ func r22263468(_ a : String?) {
   // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
   // re-think the way errors in tuple elements are detected because it's currently impossible to detect
   // exactly what went wrong here and aggregate fixes for different elements at the same time.
-  _ = MyTuple(42, a) // expected-error {{tuple type '(_const Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
+  _ = MyTuple(42, a) // expected-error {{tuple type '(Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
+}
+
+func testTupleConstructionInOutArg() {
+  typealias II = (Int, Int)
+
+  var i = 0
+  _ = (Int, Int)(&i, 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  _ = II(&i, 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  _ = II(&i, &i) // expected-error 2{{'&' may only be used to pass an argument to inout parameter}}
 }
 
 // rdar://71829040 - "ambiguous without more context" error for tuple type mismatch.
@@ -1303,9 +1312,14 @@ func f11(_ n: Int) {}
 func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
 f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
 
-let f12: (Int) -> Void = { _ in } // expected-note {{candidate '(Int) -> Void' requires 1 argument, but 2 were provided}}
-func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' : 'P2')}}
-f12(3, f4)// expected-error {{no exact matches in call to global function 'f12'}}
+let f12: (Int) -> Void = { _ in }
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{where 'T' = 'Int'}}
+f12(3, f4)// expected-error {{global function 'f12' requires that 'Int' conform to 'P2'}}
+
+// SR-15293: Bad diagnostic for var + func overload with mismatched call
+func f13(x: Int, y: Int) {}
+var f13: Any = 0
+f13(0, x: 0) // expected-error {{incorrect argument labels in call (have '_:x:', expected 'x:y:')}}
 
 // SR-12242
 struct SR_12242_R<Value> {}

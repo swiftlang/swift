@@ -139,7 +139,7 @@ static void updateSSAForUseOfValue(
   assert(Res->getType() == MappedValue->getType() && "The types must match");
 
   insertedPhis.clear();
-  updater.initialize(Res->getType(), Res.getOwnershipKind());
+  updater.initialize(Res->getType(), Res->getOwnershipKind());
   updater.addAvailableValue(Header, Res);
   updater.addAvailableValue(EntryCheckBlock, MappedValue);
 

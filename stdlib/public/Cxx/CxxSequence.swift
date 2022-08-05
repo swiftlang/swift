@@ -66,6 +66,7 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
 public protocol CxxSequence: Sequence {
   associatedtype RawIterator: UnsafeCxxInputIterator
   associatedtype Element = RawIterator.Pointee
+  associatedtype Iterator = CxxIterator<Self>
 
   // `begin()` and `end()` have to be mutating, otherwise calling 
   // `self.sequence.begin()` will copy `self.sequence` into a temporary value,

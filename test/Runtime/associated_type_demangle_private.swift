@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
+// REQUIRES: rdar97996884
 
 import Swift
 import StdlibUnittest
@@ -104,8 +105,7 @@ AssociatedTypeDemangleTests.test("nested private generic types in associated typ
   if #available(SwiftStdlib 5.1, *) {}
   // Bug is still present in Swift 5.0 runtime.
   else {
-    // FIXME: rdar://problem/51959305
-    // expectCrashLater(withMessage: "failed to demangle witness for associated type 'Second' in conformance")
+    expectCrashLater(withMessage: "failed to demangle witness for associated type 'Second' in conformance")
     return
   }
 

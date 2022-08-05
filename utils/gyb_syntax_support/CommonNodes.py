@@ -12,6 +12,12 @@ COMMON_NODES = [
     Node('UnknownStmt', kind='Stmt'),
     Node('UnknownType', kind='Type'),
     Node('UnknownPattern', kind='Pattern'),
+    Node('Missing', kind='Syntax'),
+    Node('MissingDecl', kind='Decl'),
+    Node('MissingExpr', kind='Expr'),
+    Node('MissingStmt', kind='Stmt'),
+    Node('MissingType', kind='Type'),
+    Node('MissingPattern', kind='Pattern'),
 
     # code-block-item = (decl | stmt | expr) ';'?
     Node('CodeBlockItem', kind='Syntax', omit_when_empty=True,
@@ -51,4 +57,10 @@ COMMON_NODES = [
              Child('RightBrace', kind='RightBraceToken', 
                    requires_leading_newline=True),
          ]),
+
+    Node('GarbageNodes', kind='SyntaxCollection', element='Syntax',
+         description='''
+         A collection of syntax nodes that occurred in the source code but
+         could not be used to form a valid syntax tree.
+         '''),
 ]

@@ -251,16 +251,17 @@ enum class CodeCompletionDiagnosticSeverity : uint8_t {
 /// E.g. \c InvalidAsyncContext depends on whether the usage context is async or
 /// not.
 enum class NotRecommendedReason : uint8_t {
-  None = 0,                    // both contextual and context-free
-  RedundantImport,             // contextual
-  RedundantImportIndirect,     // contextual
-  Deprecated,                  // context-free
-  SoftDeprecated,              // context-free
-  InvalidAsyncContext,         // contextual
-  CrossActorReference,         // contextual
-  VariableUsedInOwnDefinition, // contextual
+  None = 0,                              // both contextual and context-free
+  RedundantImport,                       // contextual
+  RedundantImportIndirect,               // contextual
+  Deprecated,                            // context-free
+  SoftDeprecated,                        // context-free
+  InvalidAsyncContext,                   // contextual
+  CrossActorReference,                   // contextual
+  VariableUsedInOwnDefinition,           // contextual
+  NonAsyncAlternativeUsedInAsyncContext, // contextual
 
-  MAX_VALUE = VariableUsedInOwnDefinition
+  MAX_VALUE = NonAsyncAlternativeUsedInAsyncContext
 };
 
 /// TODO: We consider deprecation warnings as context free although they don't
@@ -294,10 +295,14 @@ enum class ContextualNotRecommendedReason : uint8_t {
   None = 0,
   RedundantImport,
   RedundantImportIndirect,
+  /// A method that is async is being used in a non-async context.
   InvalidAsyncContext,
   CrossActorReference,
   VariableUsedInOwnDefinition,
-  MAX_VALUE = VariableUsedInOwnDefinition
+  /// A method that is sync and has an async alternative is used in an async
+  /// context.
+  NonAsyncAlternativeUsedInAsyncContext,
+  MAX_VALUE = NonAsyncAlternativeUsedInAsyncContext
 };
 
 enum class CodeCompletionResultKind : uint8_t {
@@ -329,6 +334,10 @@ class ContextFreeCodeCompletionResult {
   static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
 
   bool IsSystem : 1;
+  bool IsAsync : 1;
+  /// Whether the result has been annotated as having an async alternative that
+  /// should be prefered in async contexts.
+  bool HasAsyncAlternative : 1;
   CodeCompletionString *CompletionString;
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
@@ -344,6 +353,10 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef DiagnosticMessage;
   NullTerminatedStringRef FilterName;
 
+  /// If the result represents a \c ValueDecl the name by which this decl should
+  /// be refered to in diagnostics.
+  NullTerminatedStringRef NameForDiagnostics;
+
 public:
   /// Memberwise initializer. \p AssociatedKInd is opaque and will be
   /// interpreted based on \p Kind. If \p KnownOperatorKind is \c None and the
@@ -355,8 +368,8 @@ public:
   /// \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, uint8_t AssociatedKind,
-      CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem,
-      CodeCompletionString *CompletionString,
+      CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem, bool IsAsync,
+      bool HasAsyncAlternative, CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
@@ -364,13 +377,16 @@ public:
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       NullTerminatedStringRef DiagnosticMessage,
-      NullTerminatedStringRef FilterName)
+      NullTerminatedStringRef FilterName,
+      NullTerminatedStringRef NameForDiagnostics)
       : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
+        IsAsync(IsAsync), HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         ResultType(ResultType), NotRecommended(NotRecommended),
         DiagnosticSeverity(DiagnosticSeverity),
-        DiagnosticMessage(DiagnosticMessage), FilterName(FilterName) {
+        DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
+        NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
     assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
                (DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) &&
@@ -380,6 +396,8 @@ public:
            "Completion item should have diagnostic message iff the diagnostics "
            "severity is not none");
     assert(CompletionString && "Result should have a completion string");
+    assert(!(HasAsyncAlternative && IsAsync) &&
+           "A function shouldn't be both async and have an async alternative");
     if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None) {
       this->KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
     }
@@ -396,7 +414,7 @@ public:
   static ContextFreeCodeCompletionResult *createPatternOrBuiltInOperatorResult(
       CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
       CodeCompletionString *CompletionString,
-      CodeCompletionOperatorKind KnownOperatorKind,
+      CodeCompletionOperatorKind KnownOperatorKind, bool IsAsync,
       NullTerminatedStringRef BriefDocComment,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
@@ -431,15 +449,17 @@ public:
   /// \note The caller must ensure that the \p CompletionString and all
   /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
-  static ContextFreeCodeCompletionResult *createDeclResult(
-      CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
-      const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
-      NullTerminatedStringRef BriefDocComment,
-      ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-      CodeCompletionResultType ResultType,
-      ContextFreeNotRecommendedReason NotRecommended,
-      CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-      NullTerminatedStringRef DiagnosticMessage);
+  static ContextFreeCodeCompletionResult *
+  createDeclResult(CodeCompletionResultSink &Sink,
+                   CodeCompletionString *CompletionString,
+                   const Decl *AssociatedDecl, bool IsAsync,
+                   bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
+                   NullTerminatedStringRef BriefDocComment,
+                   ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+                   CodeCompletionResultType ResultType,
+                   ContextFreeNotRecommendedReason NotRecommended,
+                   CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+                   NullTerminatedStringRef DiagnosticMessage);
 
   CodeCompletionResultKind getKind() const { return Kind; }
 
@@ -469,6 +489,10 @@ public:
 
   bool isSystem() const { return IsSystem; };
 
+  bool isAsync() const { return IsAsync; };
+
+  bool hasAsyncAlternative() const { return HasAsyncAlternative; };
+
   CodeCompletionString *getCompletionString() const { return CompletionString; }
 
   NullTerminatedStringRef getModuleName() const { return ModuleName; }
@@ -493,6 +517,10 @@ public:
   }
 
   NullTerminatedStringRef getFilterName() const { return FilterName; }
+
+  NullTerminatedStringRef getNameForDiagnostics() const {
+    return NameForDiagnostics;
+  }
 
   bool isOperator() const {
     if (getKind() == CodeCompletionResultKind::Declaration) {
@@ -531,11 +559,6 @@ class CodeCompletionResult {
   ContextualNotRecommendedReason NotRecommended : 4;
   static_assert(int(ContextualNotRecommendedReason::MAX_VALUE) < 1 << 4, "");
 
-  CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
-  static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
-
-  NullTerminatedStringRef DiagnosticMessage;
-
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
   /// editor buffer.
@@ -556,14 +579,10 @@ private:
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        CodeCompletionResultTypeRelation TypeDistance,
-                       ContextualNotRecommendedReason NotRecommended,
-                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                       NullTerminatedStringRef DiagnosticMessage)
+                       ContextualNotRecommendedReason NotRecommended)
       : ContextFree(ContextFree), SemanticContext(SemanticContext),
         Flair(Flair.toRaw()), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
-        DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
-        TypeDistance(TypeDistance) {}
+        NumBytesToErase(NumBytesToErase), TypeDistance(TypeDistance) {}
 
 public:
   /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
@@ -581,9 +600,8 @@ public:
                        const ExpectedTypeContext *TypeContext,
                        const DeclContext *DC,
                        const USRBasedTypeContext *USRTypeContext,
-                       ContextualNotRecommendedReason NotRecommended,
-                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                       NullTerminatedStringRef DiagnosticMessage);
+                       bool CanCurrDeclContextHandleAsync,
+                       ContextualNotRecommendedReason NotRecommended);
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;
@@ -666,6 +684,8 @@ public:
       return NotRecommendedReason::RedundantImportIndirect;
     case ContextualNotRecommendedReason::InvalidAsyncContext:
       return NotRecommendedReason::InvalidAsyncContext;
+    case ContextualNotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext:
+      return NotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext;
     case ContextualNotRecommendedReason::CrossActorReference:
       return NotRecommendedReason::CrossActorReference;
     case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
@@ -702,37 +722,23 @@ public:
     return getContextFreeResult().getAssociatedUSRs();
   }
 
-  /// Get the contextual diagnostic severity. This disregards context-free
-  /// diagnostics.
-  CodeCompletionDiagnosticSeverity getContextualDiagnosticSeverity() const {
-    return DiagnosticSeverity;
-  }
+  /// Get the contextual diagnostic severity and message. This disregards
+  /// context-free diagnostics.
+  std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>
+  getContextualDiagnosticSeverityAndMessage(SmallVectorImpl<char> &Scratch,
+                                            const ASTContext &Ctx) const;
 
-  /// Get the contextual diagnostic message. This disregards context-free
-  /// diagnostics.
-  NullTerminatedStringRef getContextualDiagnosticMessage() const {
-    return DiagnosticMessage;
-  }
-
-  /// Return the contextual diagnostic severity if there was a contextual
-  /// diagnostic. If there is no contextual diagnostic, return the context-free
-  /// diagnostic severity.
-  CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
+  /// Return the contextual diagnostic severity and message if there was a
+  /// contextual diagnostic. If there is no contextual diagnostic, return the
+  /// context-free diagnostic severity and message.
+  std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>
+  getDiagnosticSeverityAndMessage(SmallVectorImpl<char> &Scratch,
+                                  const ASTContext &Ctx) const {
     if (NotRecommended != ContextualNotRecommendedReason::None) {
-      return DiagnosticSeverity;
+      return getContextualDiagnosticSeverityAndMessage(Scratch, Ctx);
     } else {
-      return getContextFreeResult().getDiagnosticSeverity();
-    }
-  }
-
-  /// Return the contextual diagnostic message if there was a contextual
-  /// diagnostic. If there is no contextual diagnostic, return the context-free
-  /// diagnostic message.
-  NullTerminatedStringRef getDiagnosticMessage() const {
-    if (NotRecommended != ContextualNotRecommendedReason::None) {
-      return DiagnosticMessage;
-    } else {
-      return getContextFreeResult().getDiagnosticMessage();
+      return std::make_pair(getContextFreeResult().getDiagnosticSeverity(),
+                            getContextFreeResult().getDiagnosticMessage());
     }
   }
 

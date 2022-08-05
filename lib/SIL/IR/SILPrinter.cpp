@@ -675,7 +675,7 @@ public:
     return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
-    return {Ctx.getID(V), V ? V->getType() : SILType(), V.getOwnershipKind()};
+    return {Ctx.getID(V), V ? V->getType() : SILType(), V->getOwnershipKind()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILFunctionArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
@@ -1644,7 +1644,7 @@ public:
     if (!op)
       return;
 
-    if (inst->getForwardingOwnershipKind() != op.getOwnershipKind()) {
+    if (inst->getForwardingOwnershipKind() != op->getOwnershipKind()) {
       *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
     }
   }
@@ -1812,7 +1812,7 @@ public:
   void visitUncheckedOwnershipConversionInst(
       UncheckedOwnershipConversionInst *UOCI) {
     *this << getIDAndType(UOCI->getOperand()) << ", "
-          << "@" << UOCI->getOperand().getOwnershipKind() << " to "
+          << "@" << UOCI->getOperand()->getOwnershipKind() << " to "
           << "@" << UOCI->getConversionOwnershipKind();
   }
 
@@ -2016,7 +2016,7 @@ public:
     // elements.
     bool SimpleType = true;
     for (auto &Elt : TI->getType().castTo<TupleType>()->getElements()) {
-      if (Elt.hasName() || Elt.isVararg()) {
+      if (Elt.hasName()) {
         SimpleType = false;
         break;
       }

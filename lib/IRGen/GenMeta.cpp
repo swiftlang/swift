@@ -4043,6 +4043,8 @@ namespace {
       // Any bytes before this will be zeroed.  Currently we don't take
       // advantage of this.
       Size patternOffset = Size(0);
+      Size classROData = Size(0);
+      Size metaclassROData = Size(0);
 
       if (IGM.ObjCInterop) {
         // Add the metaclass object.
@@ -4057,13 +4059,27 @@ namespace {
           IGM.getOffsetInWords(patternOffset + roDataPoints.first));
         B.fillPlaceholderWithInt(*MetaclassRODataOffset, IGM.Int16Ty,
           IGM.getOffsetInWords(patternOffset + roDataPoints.second));
+        classROData = patternOffset + roDataPoints.first;
+        metaclassROData = patternOffset + roDataPoints.second;
       }
 
       auto patternSize = subB.getNextOffsetFromGlobal();
 
       auto global = subB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
                                                /*constant*/ true);
+      if (IGM.ObjCInterop) {
+        auto getRODataAtOffset = [&] (Size offset) -> llvm::Constant * {
+          auto t0 = llvm::ConstantExpr::getBitCast(global, IGM.Int8PtrTy);
+          llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, offset.getValue())};
+          return llvm::ConstantExpr::getBitCast(
+            llvm::ConstantExpr::getInBoundsGetElementPtr(IGM.Int8Ty,
+                                                         t0, indices),
+            IGM.Int8PtrTy);
 
+        };
+        IGM.addGenericROData(getRODataAtOffset(classROData));
+        IGM.addGenericROData(getRODataAtOffset(metaclassROData));
+      }
       return { global, patternOffset, patternSize };
     }
 

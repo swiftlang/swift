@@ -148,17 +148,24 @@ public:
     auto silFuncType = function->getLoweredFunctionType();
     auto funcPointerKind =
         FunctionPointerKind(FunctionPointerKind::BasicKind::Function);
-    auto signature = Signature::getUncached(IGM, silFuncType, funcPointerKind);
 
+    auto signature = Signature::getUncached(IGM, silFuncType, funcPointerKind,
+                                            /*shouldComputeABIDetail=*/true);
+
+    for (const auto &reqt : signature.getABIDetails().GenericRequirements) {
+      params.push_back({IRABIDetailsProvider::ABIAdditionalParam::
+                            ABIParameterRole::GenericRequirementRole,
+                        reqt, typeConverter.Context.getOpaquePointerDecl()});
+    }
     for (auto attrSet : signature.getAttributes()) {
       if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftSelf))
         params.push_back(
             {IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self,
-             typeConverter.Context.getOpaquePointerDecl()});
+             llvm::None, typeConverter.Context.getOpaquePointerDecl()});
       if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftError))
         params.push_back(
             {IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Error,
-             typeConverter.Context.getOpaquePointerDecl()});
+             llvm::None, typeConverter.Context.getOpaquePointerDecl()});
     }
     return params;
   }

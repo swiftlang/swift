@@ -256,15 +256,15 @@ ERROR(cannot_pass_rvalue_inout,none,
 ERROR(cannot_provide_default_value_inout,none,
       "cannot provide default value to inout parameter %0", (Identifier))
 
-ERROR(cannot_call_with_params, none,
-      "cannot invoke %select{|initializer for type }2'%0' with an argument list"
-      " of type '%1'", (StringRef, StringRef, bool))
-
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
 
 ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
+      (StringRef, Type))
+
+ERROR(no_overloads_have_result_type_conformance,none,
+      "no '%0' overloads produce result type that conforms to %1",
       (StringRef, Type))
 
 ERROR(no_candidates_match_argument_type,none,
@@ -557,6 +557,10 @@ ERROR(cannot_convert_subscript_assign_nil,none,
 
 NOTE(cannot_convert_candidate_result_to_contextual_type,none,
      "%0 produces %1, not the expected contextual result type %2",
+     (DeclName, Type, Type))
+
+NOTE(overload_result_type_does_not_conform,none,
+     "result type %1 of %0 does not conform to %2",
      (DeclName, Type, Type))
 
 // for ... in expression
@@ -1162,6 +1166,9 @@ NOTE(unwrap_iuo_initializer,none,
 NOTE(unwrap_with_guard,none,
      "short-circuit using 'guard' to exit this function early "
      "if the optional value contains 'nil'", ())
+NOTE(perform_optional_chain_on_function_type, none,
+     "use optional chaining to call this value of function type when optional "
+     "is non-'nil'", ())
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
@@ -2912,6 +2919,17 @@ WARNING(decl_from_hidden_module_warn,none,
       "<<ERROR>>|<<ERROR>>|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+ERROR(typealias_desugars_to_type_from_hidden_module,none,
+      "%0 aliases '%1.%2' and cannot be used %select{here|"
+      "as property wrapper here|"
+      "as result builder here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}3 "
+      "because %select{%4 has been imported as implementation-only|"
+      "it is an SPI imported from %4|"
+      "<<ERROR>>|"
+      "%4 was not imported by this file}5",
+      (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "as result builder here|"
@@ -5800,6 +5818,14 @@ WARNING(inlinable_decl_ref_from_hidden_module_warn,
       "%3 was not imported by this file}4"
       "; this is an error in Swift 6",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+
+ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
+      none, "%0 aliases '%1.%2' and cannot be used in " FRAGILE_FUNC_KIND "3 "
+      "because %select{%4 has been imported as implementation-only|"
+      "it is an SPI imported from %4|"
+      "<<ERROR>>|"
+      "%4 was not imported by this file}5",
+      (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 
 ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",

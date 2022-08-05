@@ -234,7 +234,7 @@ public:
   static SILValue getCanonicalCopiedDef(SILValue v) {
     while (auto *copy = dyn_cast<CopyValueInst>(v)) {
       auto def = copy->getOperand();
-      if (def.getOwnershipKind() != OwnershipKind::Owned) {
+      if (def->getOwnershipKind() != OwnershipKind::Owned) {
         // This guaranteed value cannot be handled, treat the copy as an owned
         // live range def instead.
         return copy;

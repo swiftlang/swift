@@ -65,8 +65,8 @@ SyntaxFactory::countChildren(SyntaxKind Kind){
 % for node in SYNTAX_NODES:
 %   if not node.is_syntax_collection():
   case SyntaxKind::${node.syntax_kind}:
-%     child_count = len(node.children)
-%     non_optional_child_count = sum(0 if child.is_optional else 1 for child in node.children)
+%     child_count = len(node.non_garbage_children)
+%     non_optional_child_count = sum(0 if child.is_optional else 1 for child in node.non_garbage_children)
     return {${non_optional_child_count}, ${child_count}};
 %   end
 % end
@@ -243,9 +243,14 @@ SyntaxFactory::makeBlank${node.syntax_kind}() {
 % end
 
 TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
-  return makeTupleType(makeLeftParenToken({}, {}),
-                       makeBlankTupleTypeElementList(),
-                       makeRightParenToken({}, {}));
+  return makeTupleType(
+    /*GarbageNodes=*/None,
+    /*LeftParen=*/makeLeftParenToken({}, {}),
+    /*GarbageNodes=*/None,
+    /*Elements=*/makeBlankTupleTypeElementList(),
+    /*GarbageNodes=*/None,
+    /*RightParen=*/makeRightParenToken({}, {})
+  );
 }
 
 TupleTypeElementSyntax
@@ -253,29 +258,80 @@ SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
                                     llvm::Optional<TokenSyntax> Colon,
                                     TypeSyntax Type,
                                     llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeTupleTypeElement(None, Label, None, Colon, Type, None, None,
-                              TrailingComma);
+  return makeTupleTypeElement(
+    /*GarbageNodes=*/None,
+    /*InOut=*/None,
+    /*GarbageNodes=*/None,
+    /*Name=*/Label,
+    /*GarbageNodes=*/None,
+    /*SecondName=*/None,
+    /*GarbageNodes=*/None,
+    /*Colon=*/Colon,
+    /*GarbageNodes=*/None,
+    /*Type=*/Type,
+    /*GarbageNodes=*/None,
+    /*Ellipsis=*/None,
+    /*GarbageNodes=*/None,
+    /*Intitializer=*/None,
+    /*GarbageNodes=*/None,
+    /*TrailingComma=*/TrailingComma
+  );
 }
 
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
                                     llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeTupleTypeElement(None, None, None, None, Type, None, None,
-                              TrailingComma);
+  return makeTupleTypeElement(
+    /*GarbageNodes=*/None,
+    /*InOut=*/None,
+    /*GarbageNodes=*/None,
+    /*Name=*/None,
+    /*GarbageNodes=*/None,
+    /*SecondName=*/None,
+    /*GarbageNodes=*/None,
+    /*Colon=*/None,
+    /*GarbageNodes=*/None,
+    /*Type=*/Type,
+    /*GarbageNodes=*/None,
+    /*Ellipsis=*/None,
+    /*GarbageNodes=*/None,
+    /*Initializer=*/None,
+    /*GarbageNodes=*/None,
+    /*TrailingComma=*/TrailingComma
+  );
 }
 
 GenericParameterSyntax
 SyntaxFactory::makeGenericParameter(TokenSyntax Name,
                                     llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeGenericParameter(None, Name, None, None, TrailingComma);
+  return makeGenericParameter(
+    /*GarbageNodes=*/None,
+    /*Attributes=*/None,
+    /*GarbageNodes=*/None,
+    /*Name=*/Name,
+    /*GarbageNodes=*/None,
+    /*Colon=*/None,
+    /*GarbageNodes=*/None,
+    /*InheritedType=*/None,
+    /*GarbageNodes=*/None,
+    /*TrailingComma=*/TrailingComma
+  );
 }
 
 TypeSyntax SyntaxFactory::makeTypeIdentifier(StringRef TypeName,
                                              StringRef LeadingTrivia,
                                              StringRef TrailingTrivia) {
-  auto identifier =
-      makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia);
-  return makeSimpleTypeIdentifier(identifier, None);
+  auto identifier = makeIdentifier(
+    TypeName,
+    LeadingTrivia,
+    TrailingTrivia
+  );
+  return makeSimpleTypeIdentifier(
+    /*GarbageNodes=*/None,
+    /*Name=*/identifier,
+    /*GarbageNodes=*/None,
+    /*GenerigArgumentClause=*/None
+  );
 }
 
 TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(StringRef LeadingTrivia,

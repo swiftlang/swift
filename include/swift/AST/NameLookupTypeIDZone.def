@@ -98,3 +98,9 @@ SWIFT_REQUEST(NameLookup, LookupPostfixOperatorRequest,
 SWIFT_REQUEST(NameLookup, LookupPrecedenceGroupRequest,
               TinyPtrVector<PrecedenceGroupDecl *>(OperatorLookupDescriptor),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, IsCallAsFunctionNominalRequest,
+              bool(NominalTypeDecl *, DeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, HasDynamicMemberLookupAttributeRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, HasDynamicCallableAttributeRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)

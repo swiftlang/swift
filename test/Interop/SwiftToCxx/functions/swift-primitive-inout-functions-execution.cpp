@@ -47,4 +47,13 @@ int main() {
         inoutTypeWithNullability(p);
         assert(*static_cast<const char *>(p) == 'B');
     }
+
+    {
+        int a[2] = {1,2};
+        const int *p = a;
+        assert(*p == 1);
+        inoutUnsafeGenericPointer(p);
+        assert(p == &a[1]);
+        assert(*p == 2);
+    }
 }

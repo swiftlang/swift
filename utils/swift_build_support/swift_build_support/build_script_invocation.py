@@ -31,9 +31,11 @@ from swift_build_support.swift_build_support.productpipeline_list_builder \
     import ProductPipelineListBuilder
 from swift_build_support.swift_build_support.targets \
     import StdlibDeploymentTarget
+from swift_build_support.swift_build_support.utils import clear_log_time
 from swift_build_support.swift_build_support.utils \
     import exit_rejecting_arguments
 from swift_build_support.swift_build_support.utils import fatal_error
+from swift_build_support.swift_build_support.utils import log_time_in_scope
 
 
 class BuildScriptInvocation(object):
@@ -49,6 +51,8 @@ class BuildScriptInvocation(object):
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
         self.build_libparser_only = args.build_libparser_only
+
+        clear_log_time()
 
     @property
     def install_all(self):
@@ -790,10 +794,11 @@ class BuildScriptInvocation(object):
         self._execute_action("merged-hosts-lipo-core")
 
     def _execute_action(self, action_name):
-        shell.call_without_sleeping(
-            [BUILD_SCRIPT_IMPL_PATH] + self.impl_args +
-            ["--only-execute", action_name],
-            env=self.impl_env, echo=self.args.verbose_build)
+        with log_time_in_scope(action_name):
+            shell.call_without_sleeping(
+                [BUILD_SCRIPT_IMPL_PATH] + self.impl_args +
+                ["--only-execute", action_name],
+                env=self.impl_env, echo=self.args.verbose_build)
 
     def execute_product_build_steps(self, product_class, host_target):
         product_source = product_class.product_source_name()
@@ -810,14 +815,20 @@ class BuildScriptInvocation(object):
             source_dir=self.workspace.source_dir(product_source),
             build_dir=build_dir)
         if product.should_clean(host_target):
-            print("--- Cleaning %s ---" % product_name)
-            product.clean(host_target)
+            log_message = "Cleaning %s" % product_name
+            print("--- {} ---".format(log_message))
+            with log_time_in_scope(log_message):
+                product.clean(host_target)
         if product.should_build(host_target):
-            print("--- Building %s ---" % product_name)
-            product.build(host_target)
+            log_message = "Building %s" % product_name
+            print("--- {} ---".format(log_message))
+            with log_time_in_scope(log_message):
+                product.build(host_target)
         if product.should_test(host_target):
-            print("--- Running tests for %s ---" % product_name)
-            product.test(host_target)
+            log_message = "Running tests for %s" % product_name
+            print("--- {} ---".format(log_message))
+            with log_time_in_scope(log_message):
+                product.test(host_target)
             print("--- Finished tests for %s ---" % product_name)
         # Install the product if it should be installed specifically, or
         # if it should be built and `install_all` is set to True.
@@ -827,5 +838,7 @@ class BuildScriptInvocation(object):
         if product.should_install(host_target) or \
            (self.install_all and product.should_build(host_target) and
            not product.is_ignore_install_all_product()):
-            print("--- Installing %s ---" % product_name)
-            product.install(host_target)
+            log_message = "Installing %s" % product_name
+            print("--- {} ---".format(log_message))
+            with log_time_in_scope(log_message):
+                product.install(host_target)

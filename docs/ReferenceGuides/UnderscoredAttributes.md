@@ -852,3 +852,8 @@ the distributed actor isolation checks. This is used for things like `whenLocal`
 where the actor passed to the closure is known-to-be-local, and similarly a 
 `self` of obtained from an _isolated_ function inside a distributed actor is 
 also guaranteed to be local by construction.
+
+
+## `@_alwaysEmitConformanceMetadata`
+
+Forces conformances of the attributed protocol to always have their Type Metadata get emitted into the binary and prevents it from being optimized away or stripped by the linker.

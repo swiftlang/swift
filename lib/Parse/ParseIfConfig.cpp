@@ -77,6 +77,7 @@ static bool isValidVersion(const version::Version &Version,
 }
 
 static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
+                                              SourceManager &SM,
                                               DiagnosticEngine *D,
                                               bool &underlyingVersion) {
   llvm::VersionTuple result;
@@ -99,16 +100,37 @@ static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
     return result;
   }
   StringRef verText;
-  if (auto *nle = dyn_cast<NumberLiteralExpr>(subE)) {
-    verText = nle->getDigitsText();
-  } else if (auto *sle= dyn_cast<StringLiteralExpr>(subE)) {
+  if (auto *sle = dyn_cast<StringLiteralExpr>(subE)) {
     verText = sle->getValue();
+  } else {
+    // Use the raw text for every non-string-literal expression. Versions with
+    // just two components are parsed as number literals, but versions with more
+    // components are parsed as unresolved dot expressions.
+    verText = extractExprSource(SM, subE);
   }
-  if (verText.empty())
+
+  if (verText.empty()) {
+    if (D) {
+      D->diagnose(subE->getLoc(), diag::canimport_empty_version, label.str());
+    }
     return result;
+  }
+
+  // VersionTuple supports a maximum of 4 components.
+  ssize_t excessComponents = verText.count('.') - 3;
+  if (excessComponents > 0) {
+    do {
+      verText = verText.rsplit('.').first;
+    } while (--excessComponents > 0);
+    if (D) {
+      D->diagnose(subE->getLoc(), diag::canimport_version_too_many_components,
+                  verText);
+    }
+  }
+
   if (result.tryParse(verText)) {
     if (D) {
-      D->diagnose(subE->getLoc(), diag::canimport_version, verText);
+      D->diagnose(subE->getLoc(), diag::canimport_invalid_version, verText);
     }
   }
   return result;
@@ -122,12 +144,8 @@ static Expr *getSingleSubExp(ArgumentList *args, StringRef kindName,
   if (auto *unary = args->getUnlabeledUnaryExpr())
     return unary;
 
+  // canImport() has an optional second parameter.
   if (kindName == "canImport") {
-    bool underlyingVersion;
-    if (D) {
-      // Diagnose canImport syntax
-      (void)getCanImportVersion(args, D, underlyingVersion);
-    }
     return args->getExpr(0);
   }
   return nullptr;
@@ -328,6 +346,13 @@ public:
     }
 
     if (*KindName == "canImport") {
+      if (!E->getArgs()->isUnary()) {
+        bool underlyingVersion;
+        // Diagnose canImport(_:_version:) syntax.
+        (void)getCanImportVersion(E->getArgs(), Ctx.SourceMgr, &D,
+                                  underlyingVersion);
+      }
+
       if (!isModulePath(Arg)) {
         D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
                    "module name");
@@ -566,7 +591,8 @@ public:
       bool underlyingModule = false;
       llvm::VersionTuple version;
       if (!E->getArgs()->isUnlabeledUnary()) {
-        version = getCanImportVersion(E->getArgs(), nullptr, underlyingModule);
+        version = getCanImportVersion(E->getArgs(), Ctx.SourceMgr, nullptr,
+                                      underlyingModule);
       }
       ImportPath::Module::Builder builder(Ctx, Str, /*separator=*/'.',
                                           Arg->getStartLoc());
@@ -791,8 +817,20 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     // clause unless we're doing a parse-only pass.
     if (isElse) {
       isActive = !foundActive && shouldEvaluate;
-      if (SyntaxContext->isEnabled())
+      if (SyntaxContext->isEnabled()) {
+        // Because we use the same libSyntax node for #elseif and #else, we need
+        // to disambiguate whether a postfix expression is the condition of
+        // #elseif or a postfix expression of the #else body.
+        // To do this, push three empty syntax nodes onto the stack.
+        //  - First one for garbage nodes between the #else keyword and the
+        //    condition
+        //  - One for the condition itself (whcih doesn't exist)
+        //  - And finally one for the garbage nodes between the condition and
+        //    the elements
         SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+      }
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,

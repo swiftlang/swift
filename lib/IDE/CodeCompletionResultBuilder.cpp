@@ -128,7 +128,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
-        Sink, CCS, AssociatedDecl, ModuleName,
+        Sink, CCS, AssociatedDecl, IsAsync, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
@@ -145,7 +145,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            Sink, Kind, CCS, CodeCompletionOperatorKind::None,
+            Sink, Kind, CCS, CodeCompletionOperatorKind::None, IsAsync,
             NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
@@ -164,35 +164,9 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         *ContextFreeResult, SemanticContextKind::None, CodeCompletionFlair(),
         /*NumBytesToErase=*/0, /*TypeContext=*/nullptr,
         /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
-        ContextualNotRecommendedReason::None,
-        CodeCompletionDiagnosticSeverity::None, "");
+        /*CanCurrDeclContextHandleAsync=*/false,
+        ContextualNotRecommendedReason::None);
   } else {
-    CodeCompletionDiagnosticSeverity ContextualDiagnosticSeverity =
-        CodeCompletionDiagnosticSeverity::None;
-    NullTerminatedStringRef ContextualDiagnosticMessage;
-    if (ContextualNotRecReason != ContextualNotRecommendedReason::None) {
-      // FIXME: We should generate the message lazily.
-      //
-      // NOTE(rdar://95306033): dyn_cast_or_null because 'nullptr' happens in
-      // cases like:
-      //
-      //   func test(fn: () async -> Void) { fn(#HERE#) }
-      //
-      // In this case, it's 'InvalidAsyncContext' but there's no associated decl
-      // because the callee is a random expression.
-      // FIXME: Emit a diagnostic even without an associated decl.
-      if (const auto *VD = dyn_cast_or_null<ValueDecl>(AssociatedDecl)) {
-        CodeCompletionDiagnosticSeverity severity;
-        SmallString<256> message;
-        llvm::raw_svector_ostream messageOS(message);
-        if (!getContextualCompletionDiagnostics(ContextualNotRecReason, VD,
-                                                severity, messageOS)) {
-          ContextualDiagnosticSeverity = severity;
-          ContextualDiagnosticMessage =
-              NullTerminatedStringRef(message, Allocator);
-        }
-      }
-    }
     assert(
         ContextFreeResult != nullptr &&
         "ContextFreeResult should have been constructed by the switch above");
@@ -202,8 +176,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     // for USRTypeContext.
     return new (Allocator) CodeCompletionResult(
         *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
-        TypeContext, DC, /*USRTypeContext=*/nullptr, ContextualNotRecReason,
-        ContextualDiagnosticSeverity, ContextualDiagnosticMessage);
+        TypeContext, DC, /*USRTypeContext=*/nullptr,
+        CanCurrDeclContextHandleAsync, ContextualNotRecReason);
   }
 }
 

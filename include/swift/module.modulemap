@@ -1,6 +1,8 @@
 module BasicBridging {
   header "Basic/BridgedSwiftObject.h"
   header "Basic/BasicBridging.h"
+  header "Basic/SourceLoc.h"
+  requires cplusplus
   export *
 }
 

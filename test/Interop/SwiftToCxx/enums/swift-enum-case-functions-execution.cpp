@@ -9,7 +9,6 @@
 // RUN: %target-run %t/swift-enums-execution
 
 // REQUIRES: executable_test
-// UNSUPPORTED: CPU=arm64e
 
 #include <cassert>
 #include "enums.h"
@@ -37,19 +36,19 @@ void cxxCheckEnum(const CLikeEnum &e) {
     }
 }
 
-void cxxCheckEnum(const CharOrSectionMarker &e) {
+void cxxCheckEnum(const BoolWithCase &e) {
     switch (e) {
-        case CharOrSectionMarker::cases::Paragraph:
-            assert(checkCharOrSectionMarker(e, 1));
-            assert(e.isParagraph());
+        case BoolWithCase::cases::first:
+            assert(checkBoolWithCase(e, 1));
+            assert(e.isFirst());
             break;
-        case CharOrSectionMarker::cases::Char:
-            assert(checkCharOrSectionMarker(e, 2));
-            assert(e.isChar());
+        case BoolWithCase::cases::second:
+            assert(checkBoolWithCase(e, 2));
+            assert(e.isSecond());
             break;
-        case CharOrSectionMarker::cases::Chapter:
-            assert(checkCharOrSectionMarker(e, 3));
-            assert(e.isChapter());
+        case BoolWithCase::cases::third:
+            assert(checkBoolWithCase(e, 3));
+            assert(e.isThird());
             break;
     }
 }
@@ -71,31 +70,23 @@ void cxxCheckEnum(const IntOrInfinity &e) {
     }
 }
 
-void cxxCheckEnum(const TerminalChar &e) {
+void cxxCheckEnum(const MultipleBoolWithCase &e) {
     switch (e) {
-        case TerminalChar::cases::Plain:
-            assert(checkTerminalChar(e, 1));
-            assert(e.isPlain());
+        case MultipleBoolWithCase::cases::first:
+            assert(checkMultipleBoolWithCase(e, 1));
+            assert(e.isFirst());
             break;
-        case TerminalChar::cases::Bold:
-            assert(checkTerminalChar(e, 2));
-            assert(e.isBold());
+        case MultipleBoolWithCase::cases::second:
+            assert(checkMultipleBoolWithCase(e, 2));
+            assert(e.isSecond());
             break;
-        case TerminalChar::cases::Underline:
-            assert(checkTerminalChar(e, 3));
-            assert(e.isUnderline());
+        case MultipleBoolWithCase::cases::third:
+            assert(checkMultipleBoolWithCase(e, 3));
+            assert(e.isThird());
             break;
-        case TerminalChar::cases::Blink:
-            assert(checkTerminalChar(e, 4));
-            assert(e.isBlink());
-            break;
-        case TerminalChar::cases::Empty:
-            assert(checkTerminalChar(e, 5));
-            assert(e.isEmpty());
-            break;
-        case TerminalChar::cases::Cursor:
-            assert(checkTerminalChar(e, 6));
-            assert(e.isCursor());
+        case MultipleBoolWithCase::cases::fourth:
+            assert(checkMultipleBoolWithCase(e, 4));
+            assert(e.isFourth());
             break;
     }
 }
@@ -134,9 +125,9 @@ int main() {
     }
 
     {
-        auto e1 = makeCharOrSectionMarker(1);
-        auto e2 = makeCharOrSectionMarker(2);
-        auto e3 = makeCharOrSectionMarker(3);
+        auto e1 = makeBoolWithCase(1);
+        auto e2 = makeBoolWithCase(2);
+        auto e3 = makeBoolWithCase(3);
 
         cxxCheckEnum(e1);
         cxxCheckEnum(e2);
@@ -154,19 +145,15 @@ int main() {
     }
 
     {
-        auto e1 = makeTerminalChar(1);
-        auto e2 = makeTerminalChar(2);
-        auto e3 = makeTerminalChar(3);
-        auto e4 = makeTerminalChar(4);
-        auto e5 = makeTerminalChar(5);
-        auto e6 = makeTerminalChar(6);
+        auto e1 = makeMultipleBoolWithCase(1);
+        auto e2 = makeMultipleBoolWithCase(2);
+        auto e3 = makeMultipleBoolWithCase(3);
+        auto e4 = makeMultipleBoolWithCase(4);
 
         cxxCheckEnum(e1);
         cxxCheckEnum(e2);
         cxxCheckEnum(e3);
         cxxCheckEnum(e4);
-        cxxCheckEnum(e5);
-        cxxCheckEnum(e6);
     }
 
     {

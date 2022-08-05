@@ -300,6 +300,7 @@ struct ModuleInterfaceLoaderOptions {
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
   bool downgradeInterfaceVerificationError = false;
+  bool ignoreInterfaceProvidedOptions = false;
   std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
@@ -307,6 +308,7 @@ struct ModuleInterfaceLoaderOptions {
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
     disableBuildingInterface(Opts.DisableBuildingInterface),
     downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
+    ignoreInterfaceProvidedOptions(Opts.IgnoreInterfaceProvidedOptions),
     mainExecutablePath(Opts.MainExecutablePath)
   {
     switch (Opts.RequestedAction) {
@@ -452,6 +454,7 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation genericSubInvocation;
+  llvm::Triple ParentInvocationTarget;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -473,7 +476,8 @@ private:
                                            SmallVectorImpl<const char *> &SubArgs,
                                            std::string &CompilerVersion,
                                            StringRef interfacePath,
-                                           SourceLoc diagnosticLoc);
+                                           SourceLoc diagnosticLoc,
+                                           bool ignoreInterfaceProvidedOptions);
 public:
   InterfaceSubContextDelegateImpl(
       SourceManager &SM, DiagnosticEngine *Diags,
@@ -488,6 +492,7 @@ public:
                                   StringRef interfacePath,
                                   StringRef outputPath,
                                   SourceLoc diagLoc,
+                                  bool ignoreInterfaceProvidedOptions,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
                                        ArrayRef<StringRef>, ArrayRef<StringRef>,
                                        StringRef)> action) override;
@@ -495,6 +500,7 @@ public:
                                            StringRef interfacePath,
                                            StringRef outputPath,
                                            SourceLoc diagLoc,
+                                           bool ignoreInterfaceProvidedOptions,
     llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) override;
 
   ~InterfaceSubContextDelegateImpl() = default;

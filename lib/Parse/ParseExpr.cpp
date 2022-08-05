@@ -413,6 +413,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       diagnose(Tok.getLoc(), diag::expected_await_not_async)
         .fixItReplace(Tok.getLoc(), "await");
     }
+    Tok.setKind(tok::contextual_keyword);
     SourceLoc awaitLoc = consumeToken();
     ParserResult<Expr> sub =
       parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
@@ -1687,10 +1688,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       if (SyntaxContext->isEnabled()) {
         ParsedPatternSyntax PatternNode =
             ParsedSyntaxRecorder::makeIdentifierPattern(
-                                    SyntaxContext->popToken(), *SyntaxContext);
+                /*GarbageNodes=*/None,
+                /*Identifier=*/SyntaxContext->popToken(), *SyntaxContext);
         ParsedExprSyntax ExprNode =
-            ParsedSyntaxRecorder::makeUnresolvedPatternExpr(std::move(PatternNode),
-                                                             *SyntaxContext);
+            ParsedSyntaxRecorder::makeUnresolvedPatternExpr(
+                /*GarbageNodes=*/None,
+                /*Pattern=*/std::move(PatternNode), *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));

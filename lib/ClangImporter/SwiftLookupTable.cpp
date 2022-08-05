@@ -1927,22 +1927,35 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // possible to find these decls during deserialization. For any C++ typedef
   // that defines a name for a class template instantiation (e.g. std::string),
   // import the mangled name of this instantiation, and add it to the table.
+  auto addTemplateSpecialization =
+      [&](clang::ClassTemplateSpecializationDecl *specializationDecl) {
+        auto name = nameImporter.importName(specializationDecl, currentVersion);
+
+        // Avoid adding duplicate entries into the table.
+        auto existingEntries =
+            table.lookup(DeclBaseName(name.getDeclName().getBaseName()),
+                         name.getEffectiveContext());
+        if (existingEntries.empty()) {
+          table.addEntry(name.getDeclName(), specializationDecl,
+                         name.getEffectiveContext());
+        }
+      };
   if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
     auto underlyingDecl = typedefNameDecl->getUnderlyingType()->getAsTagDecl();
 
     if (auto specializationDecl =
             dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
                 underlyingDecl)) {
-      auto name = nameImporter.importName(specializationDecl, currentVersion);
+      addTemplateSpecialization(specializationDecl);
+    }
+  }
+  if (auto valueDecl = dyn_cast<clang::ValueDecl>(named)) {
+    auto valueTypeDecl = valueDecl->getType()->getAsTagDecl();
 
-      // Avoid adding duplicate entries into the table.
-      auto existingEntries =
-          table.lookup(DeclBaseName(name.getDeclName().getBaseName()),
-                       name.getEffectiveContext());
-      if (existingEntries.empty()) {
-        table.addEntry(name.getDeclName(), specializationDecl,
-                       name.getEffectiveContext());
-      }
+    if (auto specializationDecl =
+            dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                valueTypeDecl)) {
+      addTemplateSpecialization(specializationDecl);
     }
   }
 
@@ -1960,21 +1973,21 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     llvm::SmallPtrSet<clang::Decl *, 8> alreadyAdded;
     alreadyAdded.insert(named->getCanonicalDecl());
 
-    for (auto redecl : named->redecls()) {
-      auto dc = cast<clang::DeclContext>(redecl);
-      for (auto member : dc->decls()) {
-        auto canonicalMember = member->getCanonicalDecl();
-        if (!alreadyAdded.insert(canonicalMember).second)
-          continue;
+    auto dc = cast<clang::DeclContext>(named);
+    for (auto member : dc->decls()) {
+      auto canonicalMember = isa<clang::NamespaceDecl>(member)
+                                 ? member
+                                 : member->getCanonicalDecl();
+      if (!alreadyAdded.insert(canonicalMember).second)
+        continue;
 
-        if (auto namedMember = dyn_cast<clang::NamedDecl>(canonicalMember)) {
-          // Make sure we're looking at the definition, otherwise, there won't
-          // be any members to add.
-          if (auto recordDecl = dyn_cast<clang::RecordDecl>(namedMember))
-            if (auto def = recordDecl->getDefinition())
-              namedMember = def;
-          addEntryToLookupTable(table, namedMember, nameImporter);
-        }
+      if (auto namedMember = dyn_cast<clang::NamedDecl>(canonicalMember)) {
+        // Make sure we're looking at the definition, otherwise, there won't
+        // be any members to add.
+        if (auto recordDecl = dyn_cast<clang::RecordDecl>(namedMember))
+          if (auto def = recordDecl->getDefinition())
+            namedMember = def;
+        addEntryToLookupTable(table, namedMember, nameImporter);
       }
     }
   }
@@ -2130,19 +2143,6 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
 
   // Add this entry to the lookup table.
   addEntryToLookupTable(table, named, nameImporter);
-  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
-    if (auto typedefType = dyn_cast<clang::TemplateSpecializationType>(
-            typedefDecl->getUnderlyingType())) {
-      if (auto CTSD = dyn_cast<clang::ClassTemplateSpecializationDecl>(
-              typedefType->getAsTagDecl())) {
-        // Adding template instantiation behind typedef as a top-level entry
-        // so the instantiation appears in the API.
-        assert(!isa<clang::ClassTemplatePartialSpecializationDecl>(CTSD) &&
-            "Class template partial specialization cannot appear behind typedef");
-        addEntryToLookupTable(table, CTSD, nameImporter);
-      }
-    }
-  }
 }
 
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,

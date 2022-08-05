@@ -1778,10 +1778,8 @@ public:
     SmallVector<TupleTypeElt, 4> tupleElts;
     for (unsigned i = 0; i < tuple->getNumElements(); ++i) {
       auto elt = tuple->getElement(i);
-      auto substEltTy = visit(elt.getType(),
-                              pattern.getTupleElementType(i));
-      tupleElts.push_back(
-            TupleTypeElt(substEltTy, elt.getName(), elt.getParameterFlags()));
+      auto substEltTy = visit(elt.getType(), pattern.getTupleElementType(i));
+      tupleElts.emplace_back(substEltTy, elt.getName());
     }
     
     return CanType(TupleType::get(tupleElts, TC.Context));

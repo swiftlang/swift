@@ -916,7 +916,10 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   if (SyntaxContext->isEnabled()) {
     if (auto synType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
       auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
-          std::move(*synType), None, *SyntaxContext);
+          /*GarbageNodes=*/None,
+          /*Type=*/std::move(*synType),
+          /*GarbageNodes=*/None,
+          /*Ampersand=*/None, *SyntaxContext);
       SyntaxContext->addSyntax(std::move(LastNode));
     }
   }

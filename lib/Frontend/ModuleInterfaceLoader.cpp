@@ -1018,6 +1018,7 @@ class ModuleInterfaceLoaderImpl {
         builder.addExtraDependency(modulePath);
       failed = builder.buildSwiftModule(cachedOutputPath,
                                         /*shouldSerializeDeps*/true,
+                                        Opts.ignoreInterfaceProvidedOptions,
                                         &moduleBuffer, remarkRebuild);
     }
     if (!failed) {
@@ -1051,7 +1052,10 @@ class ModuleInterfaceLoaderImpl {
       // calculated using the canonical interface file path to make sure we
       // can find it from the canonical interface file.
       auto failedAgain = fallbackBuilder.buildSwiftModule(cachedOutputPath,
-          /*shouldSerializeDeps*/true, &moduleBuffer, remarkRebuild);
+                                                          /*shouldSerializeDeps*/true,
+                                                          Opts.ignoreInterfaceProvidedOptions,
+                                                          &moduleBuffer,
+                                                          remarkRebuild);
       if (failedAgain)
         return std::make_error_code(std::errc::invalid_argument);
       assert(moduleBuffer);
@@ -1233,6 +1237,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   auto failed = builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                         LoaderOpts.ignoreInterfaceProvidedOptions,
                                          /*ModuleBuffer*/nullptr, nullptr,
                                          SearchPathOpts.CandidateCompiledModules);
   if (!failed)
@@ -1253,6 +1258,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   return backupBuilder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                        LoaderOpts.ignoreInterfaceProvidedOptions,
                                         /*ModuleBuffer*/nullptr, nullptr,
                                         SearchPathOpts.CandidateCompiledModules);
 }
@@ -1359,7 +1365,8 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
     SmallVectorImpl<const char *> &SubArgs,
     std::string &CompilerVersion,
     StringRef interfacePath,
-    SourceLoc diagnosticLoc) {
+    SourceLoc diagnosticLoc,
+    bool ignoreInterfaceProvidedOptions) {
   llvm::vfs::FileSystem &fs = *SM.getFileSystem();
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
   if (!FileOrError) {
@@ -1379,10 +1386,13 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
              diag::error_extracting_version_from_module_interface);
     return true;
   }
-  if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
-    diagnose(interfacePath, diagnosticLoc,
-             diag::error_extracting_version_from_module_interface);
-    return true;
+
+  if (!ignoreInterfaceProvidedOptions) {
+    if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
+      diagnose(interfacePath, diagnosticLoc,
+               diag::error_extracting_version_from_module_interface);
+      return true;
+    }
   }
   assert(VersMatches.size() == 2);
   // FIXME We should diagnose this at a location that makes sense:
@@ -1463,6 +1473,9 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getFrontendOptions().DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
   }
+  // Save the parent invocation's Target Triple
+  ParentInvocationTarget = langOpts.Target;
+
   // Pass down -explicit-swift-module-map-file
   // FIXME: we shouldn't need this. Remove it?
   StringRef explicitSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
@@ -1600,9 +1613,11 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                  StringRef interfacePath,
                                                  StringRef outputPath,
                                                  SourceLoc diagLoc,
+                                                 bool ignoreInterfaceProvidedOptions,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                             ArrayRef<StringRef>, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, outputPath, diagLoc,
+                                  ignoreInterfaceProvidedOptions,
                                   [&](SubCompilerInstanceInfo &info){
     return action(info.Instance->getASTContext(),
                   info.Instance->getMainModule(),
@@ -1617,6 +1632,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
                                                           StringRef interfacePath,
                                                           StringRef outputPath,
                                                           SourceLoc diagLoc,
+                                                          bool ignoreInterfaceProvidedOptions,
                   llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) {
   // We are about to mess up the compiler invocation by using the compiler
   // arguments in the textual interface file. So copy to use a new compiler
@@ -1674,9 +1690,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
                                           SubArgs,
                                           CompilerVersion,
                                           interfacePath,
-                                          diagLoc)) {
+                                          diagLoc,
+                                          ignoreInterfaceProvidedOptions)) {
     return std::make_error_code(std::errc::not_supported);
   }
+
   // Insert arguments collected from the interface file.
   BuildArgs.insert(BuildArgs.end(), SubArgs.begin(), SubArgs.end());
   if (subInvocation.parseArgs(SubArgs, *Diags)) {
@@ -1693,9 +1711,13 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
       parsedTargetTriple.getVendor() == originalTargetTriple.getVendor() &&
       parsedTargetTriple.getOS() == originalTargetTriple.getOS() &&
       parsedTargetTriple.getEnvironment()
-        == originalTargetTriple.getEnvironment()) {
+      == originalTargetTriple.getEnvironment()) {
     parsedTargetTriple.setArchName(originalTargetTriple.getArchName());
     subInvocation.setTargetTriple(parsedTargetTriple.str());
+
+    // Overload the target in the BuildArgs as well
+    BuildArgs.push_back("-target");
+    BuildArgs.push_back(parsedTargetTriple.str());
   }
 
   CompilerInstance subInstance;

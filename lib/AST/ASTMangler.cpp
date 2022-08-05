@@ -2749,8 +2749,7 @@ void ASTMangler::appendTypeList(Type listTy, GenericSignature sig,
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      assert(field.getParameterFlags().isNone());
-      appendTypeListElement(field.getName(), field.getRawType(),
+      appendTypeListElement(field.getName(), field.getType(),
                             ParameterTypeFlags(),
                             sig, forDecl);
       appendListSeparator(firstField);

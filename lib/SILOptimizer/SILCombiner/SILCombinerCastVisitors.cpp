@@ -117,7 +117,7 @@ public:
       : SC(SC), front(instructionToFold) {
     // If our initial instruction to fold isn't owned, set it to nullptr to
     // indicate invalid.
-    if (SILValue(instructionToFold).getOwnershipKind() != OwnershipKind::Owned)
+    if (SILValue(instructionToFold)->getOwnershipKind() != OwnershipKind::Owned)
       front = nullptr;
   }
 
@@ -125,7 +125,7 @@ public:
 
   bool add(SingleValueInstruction *next) {
     assert(isValid());
-    if (SILValue(next).getOwnershipKind() != OwnershipKind::Owned)
+    if (SILValue(next)->getOwnershipKind() != OwnershipKind::Owned)
       return false;
 
     if (next->getSingleUse()) {
@@ -202,7 +202,7 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
   //
   // If operandUpcast does not have any further uses, we delete it.
   if (auto *operandAsUpcast = dyn_cast<UpcastInst>(operand)) {
-    if (operand.getOwnershipKind() != OwnershipKind::Owned) {
+    if (operand->getOwnershipKind() != OwnershipKind::Owned) {
       uci->setOperand(operandAsUpcast->getOperand());
       return operandAsUpcast->use_empty()
                  ? eraseInstFromFunction(*operandAsUpcast)
@@ -288,11 +288,13 @@ SILCombiner::optimizeAlignment(PointerToAddressInst *ptrAdrInst) {
                                     m_SILValue(extendedAlignment))))) {
     alignOper = extendedAlignment;
   }
-  MetatypeInst *metatype;
   if (match(alignOper,
-            m_ApplyInst(BuiltinValueKind::Alignof, m_MetatypeInst(metatype)))) {
+            m_ApplyInst(BuiltinValueKind::Alignof))) {
+    CanType formalType = cast<BuiltinInst>(alignOper)->getSubstitutions()
+      .getReplacementTypes()[0]->getCanonicalType(ptrAdrInst->getFunction()->getGenericSignature());
+
     SILType instanceType = ptrAdrInst->getFunction()->getLoweredType(
-        metatype->getType().castTo<MetatypeType>().getInstanceType());
+      Lowering::AbstractionPattern::getOpaque(), formalType);
 
     if (instanceType.getAddressType() != ptrAdrInst->getType())
       return nullptr;
@@ -504,7 +506,7 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   // guarantee that we can eliminate the initial unchecked_ref_cast.
   if (auto *otherURCI = dyn_cast<UncheckedRefCastInst>(urci->getOperand())) {
     SILValue otherURCIOp = otherURCI->getOperand();
-    if (otherURCIOp.getOwnershipKind() != OwnershipKind::Owned) {
+    if (otherURCIOp->getOwnershipKind() != OwnershipKind::Owned) {
       return Builder.createUncheckedRefCast(urci->getLoc(), otherURCIOp,
                                             urci->getType());
     }
@@ -529,7 +531,7 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   if (auto *ui = dyn_cast<UpcastInst>(urci->getOperand())) {
     SILValue uiOp = ui->getOperand();
 
-    if (uiOp.getOwnershipKind() != OwnershipKind::Owned) {
+    if (uiOp->getOwnershipKind() != OwnershipKind::Owned) {
       return Builder.createUncheckedRefCast(urci->getLoc(), uiOp,
                                             urci->getType());
     }
@@ -609,7 +611,7 @@ SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *bori) {
   // (bridge_object_to_ref (unchecked-ref-cast x BridgeObject) y)
   //  -> (unchecked-ref-cast x y)
   if (auto *urc = dyn_cast<UncheckedRefCastInst>(bori->getOperand())) {
-    if (SILValue(urc).getOwnershipKind() != OwnershipKind::Owned) {
+    if (SILValue(urc)->getOwnershipKind() != OwnershipKind::Owned) {
       return Builder.createUncheckedRefCast(
           bori->getLoc(), urc->getOperand(), bori->getType());
     }
@@ -770,7 +772,8 @@ SILInstruction *SILCombiner::visitUnconditionalCheckedCastAddrInst(
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI)) {
+  CastOpt.optimizeUnconditionalCheckedCastInst(UCCI);
+  if (UCCI->isDeleted()) {
     MadeChange = true;
     return nullptr;
   }
@@ -1107,8 +1110,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
         // valid at applySite and also that the applySite does not consume a
         // value. In such a case, just perform the change and continue.
         SILValue newValue = cfi->getConverted();
-        if (newValue.getOwnershipKind() != OwnershipKind::Owned &&
-            newValue.getOwnershipKind() != OwnershipKind::Guaranteed) {
+        if (newValue->getOwnershipKind() != OwnershipKind::Owned &&
+            newValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
           getInstModCallbacks().setUseValue(use, newValue);
           fas.setSubstCalleeType(newValue->getType().castTo<SILFunctionType>());
           continue;

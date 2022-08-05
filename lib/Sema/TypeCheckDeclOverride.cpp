@@ -490,7 +490,8 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     auto *fnType = baseTy->getAs<AnyFunctionType>();
     baseTy = fnType->getResult();
     Type argTy = FunctionType::composeTuple(
-        ctx, baseTy->getAs<AnyFunctionType>()->getParams());
+        ctx, baseTy->getAs<AnyFunctionType>()->getParams(),
+        ParameterFlagHandling::IgnoreNonEmpty);
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
     return computeFixitsForOverriddenDeclaration(
@@ -620,8 +621,7 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   if (baseParams->size() != derivedParams->size())
     return false;
 
-  auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl,
-                                                        /*derivedSubs=*/None);
+  auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl);
 
   for (auto i : indices(baseParams->getArray())) {
     auto *baseParam = baseParams->get(i);
@@ -1613,6 +1613,7 @@ namespace  {
 
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
     UNINTERESTING_ATTR(CompilerInitialized)
+    UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

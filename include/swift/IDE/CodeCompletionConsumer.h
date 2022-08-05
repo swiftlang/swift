@@ -30,7 +30,8 @@ public:
   handleResultsAndModules(CodeCompletionContext &context,
                           ArrayRef<RequestedCachedModule> requestedModules,
                           const ExpectedTypeContext *TypeContext,
-                          const DeclContext *DC) = 0;
+                          const DeclContext *DC,
+                          bool CanCurrDeclContextHandleAsync) = 0;
 };
 
 /// A simplified code completion consumer interface that clients can use to get
@@ -42,7 +43,8 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
   void handleResultsAndModules(CodeCompletionContext &context,
                                ArrayRef<RequestedCachedModule> requestedModules,
                                const ExpectedTypeContext *TypeContext,
-                               const DeclContext *DCForModules) override;
+                               const DeclContext *DCForModules,
+                               bool CanCurrDeclContextHandleAsync) override;
 
   /// Clients should override this method to receive \p Results.
   virtual void handleResults(CodeCompletionContext &context) = 0;

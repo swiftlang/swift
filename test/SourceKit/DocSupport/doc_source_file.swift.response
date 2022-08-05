@@ -242,6 +242,11 @@
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 293,
+    key.length: 1
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.parameter,
     key.offset: 295,
     key.length: 1
@@ -1669,6 +1674,11 @@
     key.length: 7
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 1943,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
@@ -1694,6 +1704,11 @@
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1980,
     key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 1985,
+    key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,

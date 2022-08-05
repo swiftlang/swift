@@ -1087,11 +1087,10 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
       });
 }
 
-static void
-printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
-                               llvm::raw_ostream &OS, bool IncludeKeywords,
-                               bool IncludeComments, bool IncludeSourceText,
-                               bool PrintAnnotatedDescription) {
+static void printCodeCompletionResultsImpl(
+    ArrayRef<CodeCompletionResult *> Results, llvm::raw_ostream &OS,
+    bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
+    bool PrintAnnotatedDescription, const ASTContext &Ctx) {
   unsigned NumResults = 0;
   for (auto Result : Results) {
     if (!IncludeKeywords &&
@@ -1134,10 +1133,13 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
       OS << "; comment=" << comment;
     }
 
-    if (Result->getDiagnosticSeverity() !=
+    SmallString<256> Scratch;
+    auto DiagSeverityAndMessage =
+        Result->getDiagnosticSeverityAndMessage(Scratch, Ctx);
+    if (DiagSeverityAndMessage.first !=
         CodeCompletionDiagnosticSeverity::None) {
       OS << "; diagnostics=" << comment;
-      switch (Result->getDiagnosticSeverity()) {
+      switch (DiagSeverityAndMessage.first) {
       case CodeCompletionDiagnosticSeverity::Error:
         OS << "error";
         break;
@@ -1153,7 +1155,8 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
       case CodeCompletionDiagnosticSeverity::None:
         llvm_unreachable("none");
       }
-      OS << ":" << Result->getDiagnosticMessage();
+      SmallString<256> Scratch;
+      OS << ":" << DiagSeverityAndMessage.second;
     }
 
     OS << "\n";
@@ -1169,7 +1172,8 @@ static int printCodeCompletionResults(
       CancellableResult, [&](CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, llvm::outs(), IncludeKeywords,
-            IncludeComments, IncludeSourceText, PrintAnnotatedDescription);
+            IncludeComments, IncludeSourceText, PrintAnnotatedDescription,
+            Result.Info.compilerInstance->getASTContext());
         return 0;
       });
 }
@@ -1545,10 +1549,11 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           case CancellableResultKind::Success: {
             wasASTContextReused =
                 Result->Info.completionContext->ReusingASTContext;
-            printCodeCompletionResultsImpl(Result->ResultSink.Results, OS,
-                                           IncludeKeywords, IncludeComments,
-                                           IncludeSourceText,
-                                           CodeCompletionAnnotateResults);
+            printCodeCompletionResultsImpl(
+                Result->ResultSink.Results, OS, IncludeKeywords,
+                IncludeComments, IncludeSourceText,
+                CodeCompletionAnnotateResults,
+                Result->Info.compilerInstance->getASTContext());
             break;
           }
           case CancellableResultKind::Failure:
@@ -1821,6 +1826,7 @@ public:
     case SyntaxNodeKind::Keyword: Id = "kw"; break;
     // Skip identifier.
     case SyntaxNodeKind::Identifier: return;
+    case SyntaxNodeKind::Operator: return;
     case SyntaxNodeKind::DollarIdent: Id = "dollar"; break;
     case SyntaxNodeKind::Integer: Id = "int"; break;
     case SyntaxNodeKind::Floating: Id = "float"; break;
@@ -1852,6 +1858,7 @@ public:
     case SyntaxNodeKind::Keyword: Col = llvm::raw_ostream::MAGENTA; break;
     // Skip identifier.
     case SyntaxNodeKind::Identifier: return;
+    case SyntaxNodeKind::Operator: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::DollarIdent: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::Integer: Col = llvm::raw_ostream::BLUE; break;
     case SyntaxNodeKind::Floating: Col = llvm::raw_ostream::BLUE; break;
@@ -4227,14 +4234,16 @@ int main(int argc, char *argv[]) {
             *contextFreeResult, SemanticContextKind::OtherModule,
             CodeCompletionFlair(),
             /*numBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-            /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None,
-            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+            /*USRTypeContext=*/nullptr, /*CanCurrDeclContextHandleAsync=*/false,
+            ContextualNotRecommendedReason::None);
         contextualResults.push_back(contextualResult);
       }
+      auto CompInstance = std::make_unique<CompilerInstance>();
       printCodeCompletionResultsImpl(
           contextualResults, llvm::outs(), options::CodeCompletionKeywords,
           options::CodeCompletionComments, options::CodeCompletionSourceText,
-          options::CodeCompletionAnnotateResults);
+          options::CodeCompletionAnnotateResults,
+          CompInstance->getASTContext());
     }
 
     return 0;

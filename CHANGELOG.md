@@ -10,7 +10,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   The compiler flag `-enable-upcoming-feature X` can now be used to enable a specific feature `X` that has been accepted by the evolution process, but whose introduction into the language is waiting for the next major version (e.g., version 6). The `X` is specified by any proposal that falls into this category:
   * `ConciseMagicFile` enables the new `#file` semantics in [SE-0274][].
   * `ForwardTrailingClosures` disables the "backward" scanning behavior of [SE-0286][].
-  * `BareSlashRegexLiterals` enables the regex literal syntax of [SE-0352][].
+  * `BareSlashRegexLiterals` enables the regex literal syntax of [SE-0354][].
 
   Features can be detected in source code with `#if hasFeature(X)`.
 

@@ -216,7 +216,6 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
     // Otherwise, assign this input to the next output element.
     const auto &elt2 = toTuple[i];
-    assert(!elt2.isVararg());
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.
@@ -2199,98 +2198,6 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   }
 
   return nullptr;
-}
-
-bool
-IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
-                                       DeclContext *dc) const {
-  auto options = defaultMemberLookupOptions;
-  options |= NameLookupFlags::IgnoreAccessControl;
-
-  // Look for a callAsFunction method.
-  auto &ctx = ty->getASTContext();
-  auto results =
-      TypeChecker::lookupMember(dc, ty, DeclNameRef(ctx.Id_callAsFunction),
-                                options);
-  return llvm::any_of(results, [](LookupResultEntry entry) -> bool {
-    if (auto *fd = dyn_cast<FuncDecl>(entry.getValueDecl()))
-      return fd->isCallAsFunctionMethod();
-    return false;
-  });
-}
-
-template <class DynamicAttribute>
-static bool checkForDynamicAttribute(CanType ty,
-                                     llvm::function_ref<bool (Type)> hasAttribute) {
-  // If this is an archetype type, check if any types it conforms to
-  // (superclass or protocols) have the attribute.
-  if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
-    for (auto proto : archetype->getConformsTo()) {
-      if (hasAttribute(proto->getDeclaredInterfaceType()))
-        return true;
-    }
-    if (auto superclass = archetype->getSuperclass()) {
-      if (hasAttribute(superclass))
-        return true;
-    }
-  }
-
-  // If this is an existential type, check if its constraint type
-  // has the attribute.
-  if (auto existential = ty->getAs<ExistentialType>()) {
-    return hasAttribute(existential->getConstraintType());
-  }
-
-  // If this is a protocol composition, check if any of its members have the
-  // attribute.
-  if (auto protocolComp = dyn_cast<ProtocolCompositionType>(ty)) {
-    for (auto member : protocolComp->getMembers()) {
-      if (hasAttribute(member))
-        return true;
-    }
-  }
-
-  // Otherwise, this must be a nominal type.
-  // Neither Dynamic member lookup nor Dynamic Callable doesn't
-  // work for tuples, etc.
-  auto nominal = ty->getAnyNominal();
-  if (!nominal)
-    return false;
-
-  // If this type has the attribute on it, then yes!
-  if (nominal->getAttrs().hasAttribute<DynamicAttribute>())
-    return true;
-
-  // Check the protocols the type conforms to.
-  for (auto proto : nominal->getAllProtocols()) {
-    if (hasAttribute(proto->getDeclaredInterfaceType()))
-      return true;
-  }
-
-  // Check the superclass if present.
-  if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-    if (auto superclass = classDecl->getSuperclass()) {
-      if (hasAttribute(superclass))
-        return true;
-    }
-  }
-  return false;
-}
-
-bool
-HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
-                                                 CanType ty) const {
-  return checkForDynamicAttribute<DynamicMemberLookupAttr>(ty, [](Type type) {
-    return type->hasDynamicMemberLookupAttribute();
-  });
-}
-
-bool
-HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
-                                             CanType ty) const {
-  return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {
-    return type->hasDynamicCallableAttribute();
-  });
 }
 
 void ConstraintSystem::forEachExpr(

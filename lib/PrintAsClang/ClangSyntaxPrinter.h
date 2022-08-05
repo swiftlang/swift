@@ -93,7 +93,7 @@ public:
   /// Print the set of statements to access the value witness table pointer
   /// ('vwTable') from the given type metadata variable.
   void printValueWitnessTableAccessSequenceFromTypeMetadata(
-      StringRef metadataVariable);
+      StringRef metadataVariable, StringRef vwTableVariable, int indent);
 
 protected:
   raw_ostream &os;

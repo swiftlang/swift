@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt -stack-promotion -sil-opt-profile-repeat=10 %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+// CHECK: {{.*}} ms: total runtime of all passes
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class XX {
+	@_hasStorage var x: Int32
+
+	init()
+}
+
+sil @simple_promote : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %l1 = ref_element_addr %o1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %o1 : $XX
+  return %l2 : $Int32
+}
+
