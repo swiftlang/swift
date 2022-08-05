@@ -4,7 +4,6 @@
 // XFAIL: OS=windows-msvc
 
 import StdlibUnittest
-import CxxShim
 import POD
 
 extension IntPair {
