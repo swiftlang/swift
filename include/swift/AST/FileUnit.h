@@ -208,7 +208,15 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
-  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
+  ///
+  /// \param results Vector collecting the top-level decls.
+  ///
+  /// \p minAccessLevel If set, allow implementations to avoid collecting decls
+  /// that are more private than the given access level. This is applied in
+  /// deserialization \c ModuleFile to limit deserialization work. Other
+  /// implementations may still return decls under that access level.
+  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results,
+                                Optional<AccessLevel> minAccessLevel = None) const {}
 
   virtual void
   getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const {}

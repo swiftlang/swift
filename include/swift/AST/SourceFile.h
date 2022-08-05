@@ -429,7 +429,9 @@ protected:
       TinyPtrVector<PrecedenceGroupDecl *> &results) const override;
 
 public:
-  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+  virtual void
+  getTopLevelDecls(SmallVectorImpl<Decl*> &results,
+                   Optional<AccessLevel> minAccessLevel = None) const override;
 
   virtual void
   getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;

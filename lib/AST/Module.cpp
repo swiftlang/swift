@@ -830,8 +830,9 @@ void ModuleDecl::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   FORWARD(getLocalTypeDecls, (Results));
 }
 
-void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
-  FORWARD(getTopLevelDecls, (Results));
+void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results,
+                                  Optional<AccessLevel> minAccessLevel) const {
+  FORWARD(getTopLevelDecls, (Results, minAccessLevel));
 }
 
 void ModuleDecl::dumpDisplayDecls() const {
@@ -863,7 +864,8 @@ void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
   FORWARD(getTopLevelDeclsWhereAttributesMatch, (Results, matchAttributes));
 }
 
-void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
+void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results,
+                                  Optional<AccessLevel> minAccessLevel) const {
   auto decls = getTopLevelDecls();
   Results.append(decls.begin(), decls.end());
 }
@@ -3300,7 +3302,7 @@ void SynthesizedFileUnit::lookupObjCMethods(
 }
 
 void SynthesizedFileUnit::getTopLevelDecls(
-    SmallVectorImpl<swift::Decl *> &results) const {
+    SmallVectorImpl<swift::Decl *> &results, Optional<AccessLevel> minAccessLevel) const {
   results.append(TopLevelDecls.begin(), TopLevelDecls.end());
 }
 

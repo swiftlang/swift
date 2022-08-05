@@ -736,7 +736,8 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
-  void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+  void getTopLevelDecls(SmallVectorImpl<Decl*> &Results,
+                        Optional<AccessLevel> minAccessLevel = None) const;
 
   void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
 

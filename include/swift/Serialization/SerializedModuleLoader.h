@@ -412,7 +412,9 @@ public:
 
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const override;
 
-  virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+  virtual void
+  getTopLevelDecls(SmallVectorImpl<Decl*> &results,
+                   Optional<AccessLevel> minAccessLevel = None) const override;
 
   virtual void getExportedPrespecializations(
       SmallVectorImpl<Decl *> &results) const override;

@@ -1525,8 +1525,8 @@ SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
 }
 
 void
-SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
-  File.getTopLevelDecls(results);
+SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results, Optional<AccessLevel> minAccessLevel) const {
+  File.getTopLevelDecls(results, /*matchAttributes*/ nullptr, minAccessLevel);
 }
 
 void SerializedASTFile::getExportedPrespecializations(

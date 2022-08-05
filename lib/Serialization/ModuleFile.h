@@ -679,9 +679,13 @@ public:
   /// \param matchAttributes Optional check on the attributes of a decl to
   /// filter which decls to fully deserialize. Only decls with accepted
   /// attributes are deserialized and added to Results.
+  ///
+  /// \p minAccessLevel If set, skip deserializing decls that are
+  /// more private than the given access level.
   void getTopLevelDecls(
          SmallVectorImpl<Decl*> &Results,
-         llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
+         llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr,
+         Optional<AccessLevel> minAccessLevel = None);
 
   void getExportedPrespecializations(SmallVectorImpl<Decl *> &results);
 

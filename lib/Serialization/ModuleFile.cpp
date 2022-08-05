@@ -910,14 +910,17 @@ ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
 void ModuleFile::getTopLevelDecls(
        SmallVectorImpl<Decl *> &results,
-       llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
+       llvm::function_ref<bool(DeclAttributes)> matchAttributes,
+       Optional<AccessLevel> minAccessLevel) {
   PrettyStackTraceModuleFile stackEntry(*this);
   for (DeclID entry : Core->OrderedTopLevelDecls) {
-    Expected<Decl *> declOrError = getDeclChecked(entry, matchAttributes);
+    Expected<Decl *> declOrError = getDeclChecked(entry, matchAttributes, minAccessLevel);
     if (!declOrError) {
-      if (declOrError.errorIsA<DeclAttributesDidNotMatch>()) {
+      if (declOrError.errorIsA<DeclAttributesDidNotMatch>() ||
+          declOrError.errorIsA<DeclAccessLevelTooLow>()) {
         // Decl rejected by matchAttributes, ignore it.
-        assert(matchAttributes);
+        assert((declOrError.errorIsA<DeclAttributesDidNotMatch>() && matchAttributes) ||
+               (declOrError.errorIsA<DeclAccessLevelTooLow>() && minAccessLevel));
         consumeError(declOrError.takeError());
         continue;
       }

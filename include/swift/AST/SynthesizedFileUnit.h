@@ -52,7 +52,8 @@ public:
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
 
-  void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+  void getTopLevelDecls(SmallVectorImpl<Decl*> &results,
+                        Optional<AccessLevel> minAccessLevel = None) const override;
 
   ArrayRef<Decl *> getTopLevelDecls() const {
     return TopLevelDecls;
