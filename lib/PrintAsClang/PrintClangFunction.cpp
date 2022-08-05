@@ -78,9 +78,9 @@ bool isKnownCType(Type t, PrimitiveTypeMapping &typeMapping) {
 }
 
 struct CFunctionSignatureTypePrinterModifierDelegate {
-  /// Prefix the indirect value type param being printed in C mode.
+  /// Prefix the indirect value type / class type param being printed in C mode.
   Optional<llvm::function_ref<void(raw_ostream &)>>
-      prefixIndirectParamValueTypeInC = None;
+      prefixIndirectlyPassedParamTypeInC = None;
 };
 
 // Prints types in the C function signature that corresponds to the
@@ -152,6 +152,8 @@ public:
                       bool isInOutParam) {
     // FIXME: handle optionalKind.
     if (languageMode != OutputLanguageMode::Cxx) {
+      if (modifiersDelegate.prefixIndirectlyPassedParamTypeInC)
+        (*modifiersDelegate.prefixIndirectlyPassedParamTypeInC)(os);
       os << "void * _Nonnull";
       if (isInOutParam)
         os << " * _Nonnull";
@@ -188,8 +190,8 @@ public:
       if (languageMode != OutputLanguageMode::Cxx &&
           (decl->isResilient() ||
            interopContext.getIrABIDetails().shouldPassIndirectly(NT))) {
-        if (modifiersDelegate.prefixIndirectParamValueTypeInC)
-          (*modifiersDelegate.prefixIndirectParamValueTypeInC)(os);
+        if (modifiersDelegate.prefixIndirectlyPassedParamTypeInC)
+          (*modifiersDelegate.prefixIndirectlyPassedParamTypeInC)(os);
         // FIXME: it would be nice to print out the C struct type here.
         if (isInOutParam) {
           os << "void * _Nonnull";
@@ -407,13 +409,13 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
       if (param.role == AdditionalParam::Role::Self) {
         CFunctionSignatureTypePrinterModifierDelegate delegate;
-        delegate.prefixIndirectParamValueTypeInC = [](raw_ostream &os) {
+        delegate.prefixIndirectlyPassedParamTypeInC = [](raw_ostream &os) {
           os << "SWIFT_CONTEXT ";
         };
         if (FD->hasThrows())
           os << "SWIFT_CONTEXT ";
         if (param.isIndirect) {
-          (*delegate.prefixIndirectParamValueTypeInC)(os);
+          (*delegate.prefixIndirectlyPassedParamTypeInC)(os);
           os << "void * _Nonnull _self";
         } else {
           print(param.type, OptionalTypeKind::OTK_None, "_self",
@@ -649,7 +651,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   modifiers.isInline = true;
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
-  modifiers.isConst = !isMutating && !isConstructor;
+  modifiers.isConst =
+      !isa<ClassDecl>(typeDeclContext) && !isMutating && !isConstructor;
   printFunctionSignature(
       FD, isConstructor ? "init" : FD->getName().getBaseIdentifier().get(),
       resultTy, FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
@@ -710,7 +713,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
   modifiers.isInline = true;
-  modifiers.isConst = accessor->isGetter();
+  modifiers.isConst = accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
   printFunctionSignature(accessor, remapPropertyName(accessor, resultTy),
                          resultTy, FunctionSignatureKind::CxxInlineThunk, {},
                          modifiers);

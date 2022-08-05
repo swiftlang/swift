@@ -72,6 +72,44 @@ public struct LargeStruct {
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
+public final class PropertiesInClass {
+    public let storedInt: Int32
+
+    init(_ x: Int32) {
+        storedInt = x
+    }
+
+    public var computedInt: Int {
+        return Int(storedInt) - 1
+    }
+
+    public var smallStruct: FirstSmallStruct {
+        return FirstSmallStruct(x: UInt32(-storedInt));
+    }
+}
+
+// CHECK: class PropertiesInClass final : public swift::_impl::RefCountedClass {
+// CHECK: using RefCountedClass::operator=;
+// CHECK-NEXT: inline int32_t getStoredInt();
+// CHECK-NEXT: inline swift::Int getComputedInt();
+// CHECK-NEXT: inline FirstSmallStruct getSmallStruct();
+
+// CHECK: inline int32_t PropertiesInClass::getStoredInt() {
+// CHECK-NEXT: return _impl::$s10Properties0A7InClassC9storedInts5Int32Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: }
+// CHECK-NEXT: inline swift::Int PropertiesInClass::getComputedInt() {
+// CHECK-NEXT: return _impl::$s10Properties0A7InClassC11computedIntSivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: }
+// CHECK-NEXT: inline FirstSmallStruct PropertiesInClass::getSmallStruct() {
+// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   _impl::swift_interop_returnDirect_Properties_FirstSmallStruct(result, _impl::$s10Properties0A7InClassC11smallStructAA010FirstSmallE0Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
+// CHECK-NEXT: });
+// CHECK-NEXT: }
+
+public func createPropsInClass(_ x: Int32) -> PropertiesInClass {
+    return PropertiesInClass(x)
+}
+
 public struct SmallStructWithGetters {
     public let storedInt: UInt32
     public var computedInt: Int {
