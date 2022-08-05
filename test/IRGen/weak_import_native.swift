@@ -164,7 +164,6 @@ func testWeakTypes() -> [Any.Type] {
 
 // CHECK-DAG: @"$s25weak_import_native_helper5WeakCCMn" = extern_weak global %swift.type_descriptor
 // CHECK-DAG: @"$s25weak_import_native_helper5WeakCCACycfCTq" = extern_weak global %swift.method_descriptor
-// CHECK-DAG: @"$s25weak_import_native_helper5WeakCCMm" = extern_weak global %objc_class
 class WeakSub: WeakC {
   deinit {
     // CHECK-DAG: declare extern_weak swiftcc {{.+}} @"$s25weak_import_native_helper5WeakCCfd"
