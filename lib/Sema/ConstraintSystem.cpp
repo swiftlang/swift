@@ -6433,9 +6433,9 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
         .highlight(expr->getSourceRange());
   } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-    auto *wrapper = wrappedVar->getAttachedPropertyWrappers().back();
+    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
     Type propertyType = wrappedVar->getInterfaceType();
-    Type wrapperType = wrapper->getType();
+    Type wrapperType = outerWrapper->getType();
 
     // Emit the property wrapper fallback diagnostic
     wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
