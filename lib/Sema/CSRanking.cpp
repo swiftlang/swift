@@ -55,7 +55,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   if (isDebugMode() && value > 0) {
     if (solverState)
       llvm::errs().indent(solverState->depth * 2);
-    llvm::errs() << "(increasing score due to " << Score::getNameFor(kind)
+    llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "  << value 
                  << ")\n";
   }
 

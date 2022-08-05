@@ -1016,7 +1016,7 @@ struct Score {
   static std::string getNameFor(ScoreKind kind) {
     switch (kind) {
     case SK_Hole:
-      return "hole in the constraint system";
+      return "hole";
 
     case SK_Unavailable:
       return "use of an unavailable declaration";
@@ -1031,7 +1031,7 @@ struct Score {
       return "forward scan when matching a trailing closure";
 
     case SK_Fix:
-      return "attempting to fix the source";
+      return "applied fix";
 
     case SK_DisfavoredOverload:
       return "disfavored overload";
@@ -1055,7 +1055,7 @@ struct Score {
       return "collection upcast conversion";
 
     case SK_ValueToOptional:
-      return "value to optional";
+      return "value to optional promotion";
 
     case SK_EmptyExistentialConversion:
       return "empty-existential conversion";
@@ -1067,13 +1067,13 @@ struct Score {
       return "value-to-pointer conversion";
 
     case SK_FunctionToAutoClosureConversion:
-      return "function to autoclosure parameter";
+      return "function to autoclosure parameter conversion";
 
     case SK_ImplicitValueConversion:
       return "value-to-value conversion";
 
     case SK_UnappliedFunction:
-      return "overloaded unapplied function";
+      return "use of overloaded unapplied function";
     }
   }
 
