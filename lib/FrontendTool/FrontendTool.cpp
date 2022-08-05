@@ -422,17 +422,26 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   StringRef ABIPath = Instance.getPrimarySpecificPathsForAtMostOnePrimary()
-    .SupplementaryOutputs.ABIDescriptorOutputPath;
-  
-  
-  
-  return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
+                          .SupplementaryOutputs.ABIDescriptorOutputPath;
+
+  // If an explicit interface build was requested, bypass the creation of a new
+  // sub-instance from the interface which will build it in a separate thread,
+  // and isntead directly use the current \c Instance for compilation.
+  if (FEOpts.ExplicitInterfaceBuild)
+    return ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
+        Instance, Invocation.getClangModuleCachePath(),
+        FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
+        Invocation.getOutputFilename(),
+        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        Invocation.getSearchPathOptions().CandidateCompiledModules);
+  else
+    return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangImporterOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
-      FEOpts.BackupModuleInterfaceDir,
-      Invocation.getModuleName(), InputPath, Invocation.getOutputFilename(), ABIPath,
+      FEOpts.BackupModuleInterfaceDir, Invocation.getModuleName(), InputPath,
+      Invocation.getOutputFilename(), ABIPath,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
       RequireOSSAModules_t(Invocation.getSILOptions()));
