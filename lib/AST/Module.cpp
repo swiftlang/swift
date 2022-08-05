@@ -1447,7 +1447,8 @@ LookupConformanceInModuleRequest::evaluate(
       auto subMap = type->getContextSubstitutionMap(mod, explicitConformanceDC);
 
       // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type, conformance, subMap);
+      auto result = ctx.getSpecializedConformance(type,
+        cast<RootProtocolConformance>(conformance), subMap);
       return ProtocolConformanceRef(result);
     }
   }

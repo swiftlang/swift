@@ -553,11 +553,11 @@ ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
   PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
   ++NumNormalProtocolConformancesLoaded;
 
-  assert(genericConformance.isConcrete() && "Abstract generic conformance?");
+  auto *rootConformance = cast<RootProtocolConformance>(
+      genericConformance.getConcrete());
+
   auto conformance =
-         ctx.getSpecializedConformance(conformingType,
-                                       genericConformance.getConcrete(),
-                                       subMap);
+         ctx.getSpecializedConformance(conformingType, rootConformance, subMap);
   return conformance;
 }
 

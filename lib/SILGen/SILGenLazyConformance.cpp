@@ -37,16 +37,17 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance))
     conformance = inherited->getInheritedConformance();
 
+  // Emit any conformances implied by conditional requirements.
+  if (auto *specialized = dyn_cast<SpecializedProtocolConformance>(conformance)) {
+    useConformancesFromSubstitutions(specialized->getSubstitutionMap());
+    conformance = specialized->getGenericConformance();
+  }
+
   // Get the normal conformance. If we don't have one, this is a self
   // conformance, which we can ignore.
-  auto normal = dyn_cast<NormalProtocolConformance>(
-      conformance->getRootConformance());
+  auto normal = dyn_cast<NormalProtocolConformance>(conformance);
   if (normal == nullptr)
     return;
-
-  // Emit any conformances implied by conditional requirements.
-  if (auto *specialized = dyn_cast<SpecializedProtocolConformance>(conformance))
-    useConformancesFromSubstitutions(specialized->getSubstitutionMap());
 
   // If this conformance was not synthesized by the ClangImporter, we're not
   // going to be emitting it lazily either, so we can avoid doing anything
