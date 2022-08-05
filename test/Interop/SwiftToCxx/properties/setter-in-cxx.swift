@@ -79,6 +79,46 @@ public struct LargeStructWithProps {
 // CHECK-NEXT:   return _impl::$s10Properties20LargeStructWithPropsV011storedSmallC0AA05FirstgC0Vvs(_impl::swift_interop_passDirect_Properties_FirstSmallStruct(_impl::_impl_FirstSmallStruct::getOpaquePointer(value)), _getOpaquePointer());
 // CHECK-NEXT:   }
 
+public final class PropertiesInClass {
+    public var storedInt: Int32
+
+    init(_ x: Int32) {
+        storedInt = x
+    }
+
+    public var computedInt: Int {
+        get {
+            return Int(storedInt) + 2
+        } set {
+            storedInt = Int32(newValue - 2)
+        }
+    }
+}
+
+// CHECK: class PropertiesInClass final : public swift::_impl::RefCountedClass {
+// CHECK: using RefCountedClass::operator=;
+// CHECK-NEXT: inline int32_t getStoredInt();
+// CHECK-NEXT: inline void setStoredInt(int32_t value);
+// CHECK-NEXT: inline swift::Int getComputedInt();
+// CHECK-NEXT: inline void setComputedInt(swift::Int newValue);
+
+// CHECK: inline int32_t PropertiesInClass::getStoredInt() {
+// CHECK-NEXT: return _impl::$s10Properties0A7InClassC9storedInts5Int32Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: }
+// CHECK-NEXT: inline void PropertiesInClass::setStoredInt(int32_t value) {
+// CHECK-NEXT: return _impl::$s10Properties0A7InClassC9storedInts5Int32Vvs(value, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: }
+// CHECK-NEXT: inline swift::Int PropertiesInClass::getComputedInt() {
+// CHECK-NEXT: return _impl::$s10Properties0A7InClassC11computedIntSivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: }
+// CHECK-NEXT: inline void PropertiesInClass::setComputedInt(swift::Int newValue) {
+// CHECK-NEXT: return _impl::$s10Properties0A7InClassC11computedIntSivs(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: }
+
+public func createPropsInClass(_ x: Int32) -> PropertiesInClass {
+    return PropertiesInClass(x)
+}
+
 public struct SmallStructWithProps {
     public var storedInt: UInt32
     public var computedInt: Int {

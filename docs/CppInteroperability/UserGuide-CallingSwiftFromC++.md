@@ -7,7 +7,7 @@ A Swift library author might want to expose their interface to C++, to allow a C
 **NOTE:** This document does not go over the following Swift language features yet:
 
 * Closures
-* inheritance
+* overriden methods/properties in classes
 * Existential types (any P)
 * Nested types
 * Operators
@@ -625,6 +625,46 @@ void createAndUsePerson() {
 The Swift `Person` class instance that C++ variable `p` referenced gets deallocated
 at the end of `createAndUsePerson` as the two C++ values that referenced it
 inside of `createAndUsePerson` were destroyed.
+
+### Class inheritance
+
+A Swift class that inherits from another class is bridged to C++ with that inheritance
+relationship preserved in the C++ class hierarchy generated for these Swift classes. For example, given the following two Swift classes:
+
+```swift
+// Swift module 'Transport'
+public class Vehicle {
+}
+public final class Bicycle: Vehicle {
+}
+```
+
+Get a corresponding C++ class hierachy in C++:
+
+```c++
+class Vehicle { ... };
+class Bicycle final : public Vehicle {};
+```
+
+This allows C++ code to implicitly cast derived class instances to base class reference values, like in the example below:
+
+```c++
+#include "Transport-Swift.h"
+
+using namespace Transport;
+
+void doSomethingWithVehicle(Transport::Vehicle vehicle) {
+  ...
+}
+
+void useBicycle() {
+  auto bike = Bicycle::init();
+  doSomethingWithVehicle(bike);
+}
+```
+
+Swift classes that are marked as `final` are also marked `final` in C++.
+Swift classes that are not marked as `final` should not be derived from in C++.
 
 ## Accessing Properties In C++
 
