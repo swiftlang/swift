@@ -1,0 +1,4 @@
+framework module objc_init_redundant_Private {
+  header "objc_init_redundant_priv.h"
+  export *
+}
