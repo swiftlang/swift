@@ -2048,44 +2048,15 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
   // Apply the result builder transform, if there is one.
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
-    NullablePtr<BraceStmt> newBody;
+    BraceStmt *transformedBody =
+        const_cast<BraceStmt *>(transform->transformedBody.get());
 
-    if (Context.LangOpts.hasFeature(Feature::ResultBuilderASTTransform)) {
-      BraceStmt *transformedBody =
-          const_cast<BraceStmt *>(transform->transformedBody.get());
+    fn.setParsedBody(transformedBody, /*singleExpression=*/false);
 
-      fn.setParsedBody(transformedBody, /*singleExpression=*/false);
+    ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
 
-      ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
-
-      return rewriter.apply() ? SolutionApplicationToFunctionResult::Failure
-                              : SolutionApplicationToFunctionResult::Success;
-    }
-
-    // Apply the result builder to the closure. We want to be in the
-    // context of the closure for subsequent transforms.
-    newBody = applyResultBuilderTransform(
-        solution, *transform, fn.getBody(), fn.getAsDeclContext(),
-        [&](SolutionApplicationTarget target) {
-          auto resultTarget = rewriteTarget(target);
-          if (resultTarget) {
-            if (auto expr = resultTarget->getAsExpr())
-              solution.setExprTypes(expr);
-          }
-
-          return resultTarget;
-        });
-
-    if (!newBody)
-      return SolutionApplicationToFunctionResult::Failure;
-
-    fn.setTypecheckedBody(newBody.get(), /*isSingleExpression=*/false);
-    if (closure) {
-      solution.setExprTypes(closure);
-    }
-
-    return SolutionApplicationToFunctionResult::Success;
-
+    return rewriter.apply() ? SolutionApplicationToFunctionResult::Failure
+                            : SolutionApplicationToFunctionResult::Success;
   }
   assert(closure && "Can only get here with a closure at the moment");
 
