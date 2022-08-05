@@ -94,7 +94,7 @@ public:
 
       if (auto *wrappedVar = var->getOriginalWrappedProperty()) {
         auto outermostWrapperAttr =
-            wrappedVar->getAttachedPropertyWrappers().front();
+            wrappedVar->getOutermostAttachedPropertyWrapper();
 
         // If the attribute doesn't have a type it could only mean
         // that the declaration was incorrect.

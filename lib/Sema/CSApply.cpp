@@ -8564,8 +8564,8 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
         wrappedVar, initType->mapTypeOutOfContext());
 
     // Record the semantic initializer on the outermost property wrapper.
-    wrappedVar->getAttachedPropertyWrappers().front()
-        ->setSemanticInit(initializer);
+    wrappedVar->getOutermostAttachedPropertyWrapper()->setSemanticInit(
+        initializer);
 
     // If this is a wrapped parameter, we're done.
     if (isa<ParamDecl>(wrappedVar))
@@ -8983,7 +8983,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     return target;
   } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
     // Get the outermost wrapper type from the solution
-    auto outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
+    auto outermostWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
     auto backingType = solution.simplifyType(
         solution.getType(outermostWrapper->getTypeExpr()));
 
