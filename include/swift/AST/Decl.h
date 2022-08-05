@@ -5447,6 +5447,20 @@ public:
   /// is provided first.
   llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
 
+  /// Retrieve the outermost property wrapper attribute associated with
+  /// this declaration. For example:
+  ///
+  /// \code
+  /// @A @B @C var <name>: Bool = ...
+  /// \endcode
+  ///
+  /// The outermost attribute in this case is `@A` and it has
+  /// complete wrapper type `A<B<C<Bool>>>`.
+  CustomAttr *getOutermostAttachedPropertyWrapper() const {
+    auto wrappers = getAttachedPropertyWrappers();
+    return wrappers.empty() ? nullptr : wrappers.front();
+  }
+
   /// Whether this property has any attached property wrappers.
   bool hasAttachedPropertyWrapper() const;
 
