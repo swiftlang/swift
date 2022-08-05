@@ -39,10 +39,7 @@ public let benchmarks = [
 ]
 
 // Number of iterations for each benchmark.
-let numberOfIterationsForNestedStructs = 20000
-let numberOfIterationsForDirectAccess = 1_000_000
-let numberOfIterationsForKeyPathReadPerformance = 2000
-let numberOfIterationsForKeyPathWritePerformance = 12000
+let numberOfElementsForNestedStructs = 20000
 
 // Make it easy to switch between primitives of different types (Int, Float, Double, etc.).
 typealias ElementType = Double
@@ -78,7 +75,7 @@ class FixedSizeArrayHolder {
 // Setup Functions.
 public func setupKeyPathNestedStructs() {
   FixedSizeArrayHolder.shared.forceInstantiation()
-  for _ in 0 ..< numberOfIterationsForNestedStructs {
+  for _ in 0 ..< numberOfElementsForNestedStructs {
     let instance = A(a: 0, b: B(b: 0, c: C(c: 0, d: D(d: 0, e: E(e: expectedIntForNestedStructs)))))
     FixedSizeArrayHolder.shared.mainArrayForNestedStructs.append(instance)
   }
@@ -884,21 +881,26 @@ func returnKeyPathArray() -> [AnyKeyPath] {
 }
 
 @inline(never)
-public func run_KeyPathNestedStructs(n _: Int) {
+public func run_KeyPathNestedStructs(n: Int) {
   var sum = 0
-  for el in FixedSizeArrayHolder.shared.mainArrayForNestedStructs {
-    sum += el[keyPath: appendedKeyPath]
+  var index = 0
+  let iterationMultipier = 200
+  for _ in 1 ... iterationMultipier * n {
+    let element = FixedSizeArrayHolder.shared.mainArrayForNestedStructs[index]
+    sum += element[keyPath: appendedKeyPath]
+    index = (index + 1) % FixedSizeArrayHolder.shared.mainArrayForNestedStructs.count
   }
-  assert(sum == numberOfIterationsForNestedStructs * expectedIntForNestedStructs)
+  assert(sum == iterationMultipier * n * expectedIntForNestedStructs)
 }
 
 // This is meant as a baseline, from a timing perspective,
 // for run_testKeyPathReadPerformance() and run_testKeyPathWritePerformance().
 @inline(never)
-public func run_testDirectAccess(n _: Int) {
+public func run_testDirectAccess(n: Int) {
   arrayHolder.reset()
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
-  for t in 0 ..< numberOfIterationsForDirectAccess {
+  let iterationMultipier = 3000
+  for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
     fixedSizeArray100.element46 += fixedSizeArray100.element63 - fixedSizeArray100.element99
     fixedSizeArray100.element43 += fixedSizeArray100.element39 * fixedSizeArray100.element27
@@ -932,10 +934,11 @@ public func run_testDirectAccess(n _: Int) {
 
 // This measures read performance of keypaths.
 @inline(never)
-public func run_testKeyPathReadPerformance(n _: Int) {
+public func run_testKeyPathReadPerformance(n: Int) {
   arrayHolder.reset()
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
-  for t in 0 ..< numberOfIterationsForKeyPathReadPerformance {
+  let iterationMultipier = 25
+  for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
     fixedSizeArray100.element46 += fixedSizeArray100.element63 - fixedSizeArray100[keyPath: kp99]
     fixedSizeArray100.element43 += fixedSizeArray100.element39 * fixedSizeArray100[keyPath: kp27]
@@ -969,10 +972,11 @@ public func run_testKeyPathReadPerformance(n _: Int) {
 
 // This measures write performance of keypaths.
 @inline(never)
-public func run_testKeyPathWritePerformance(n _: Int) {
+public func run_testKeyPathWritePerformance(n: Int) {
   arrayHolder.reset()
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
-  for t in 0 ..< numberOfIterationsForKeyPathWritePerformance {
+  let iterationMultipier = 150
+  for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
     fixedSizeArray100[keyPath: kp46] += fixedSizeArray100.element63 - fixedSizeArray100.element99
     fixedSizeArray100[keyPath: kp43] += fixedSizeArray100.element39 * fixedSizeArray100.element27
