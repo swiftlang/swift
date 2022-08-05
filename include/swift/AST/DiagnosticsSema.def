@@ -1454,6 +1454,8 @@ NOTE(fixit_rename_in_swift,none,
      "change Swift name to %0", (DeclName))
 NOTE(fixit_rename_in_objc,none,
      "change Objective-C selector to %0", (ObjCSelector))
+NOTE(remove_async_add_task,none,
+     "remove 'async' and wrap in 'Task' to use concurrency in %0", (DeclName))
 ERROR(no_objc_tagged_pointer_not_class_protocol,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())
@@ -1467,11 +1469,12 @@ ERROR(cdecl_empty_name,none,
       "@_cdecl symbol name cannot be empty", ())
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
-ERROR(cdecl_async,none,
-      "@_cdecl functions cannot be asynchronous", ())
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
+ERROR(attr_decl_async,none,
+      "@%0 %1 cannot be asynchronous", (StringRef, DescriptiveDeclKind))
+
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 NOTE(access_control_in_protocol_detail,none,
