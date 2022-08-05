@@ -5,9 +5,9 @@ struct S {
   private func f() {}
 
   func test() {
-    // expected-error@+1 {{static method 'buildBlock' requires that 'ForEach<[String], ()>' conform to 'View'}}
     ForEach(data) { group in
-      ForEach(group) { month in
+      ForEach(group) { month in // expected-error {{type '()' cannot conform to 'View'}}
+        // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
         self.f()
       }
     }
@@ -19,7 +19,7 @@ struct Wrapper<T> {}
 protocol View {}
 
 @resultBuilder struct Builder {
-  // expected-note@+1 {{where 'Content' = 'ForEach<[String], ()>'}}
+  // expected-note@+1 {{required by static method 'buildBlock' where 'Content' = '()'}}
   static func buildBlock<Content: View>(_ content: Content) -> Content { fatalError() }
 }
 

@@ -70,6 +70,6 @@ struct SplitView: View2 {
 }
 
 // COMPLETE: Begin completions
-// COMPLETE-DAG: Decl[InstanceMethod]/Super:         frame()[#Never#]; name=frame()
-// COMPLETE-DAG: Decl[InstanceMethod]/Super:         frame({#width: Int?#}, {#height: Int?#})[#Never#]; name=frame(width:height:)
+// COMPLETE-DAG: Decl[InstanceMethod]/Super/TypeRelation[Convertible]: frame()[#Never#]; name=frame()
+// COMPLETE-DAG: Decl[InstanceMethod]/Super/TypeRelation[Convertible]: frame({#width: Int?#}, {#height: Int?#})[#Never#]; name=frame(width:height:)
 // COMPLETE: End completions

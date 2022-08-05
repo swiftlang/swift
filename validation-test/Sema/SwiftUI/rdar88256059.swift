@@ -9,7 +9,7 @@ struct MyView: View {
 
   var body: some View {
     Table(self.data) {
-      // expected-error@-1 {{cannot infer return type of empty closure}} {{23-23=<#result#>}}
+      // expected-error@-1 {{missing argument for parameter #1 in call}}
     }
   }
 }

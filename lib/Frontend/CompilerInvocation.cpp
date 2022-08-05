@@ -694,6 +694,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
     Opts.Features.insert(Feature::OpaqueTypeErasure);
 
+  Opts.Features.insert(Feature::ResultBuilderASTTransform);
+
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
   Opts.EnableSwift3ObjCInference =
