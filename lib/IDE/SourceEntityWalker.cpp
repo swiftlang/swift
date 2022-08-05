@@ -386,18 +386,32 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     }
   }
 
-  if (!isa<InOutExpr>(E) &&
-      !isa<LoadExpr>(E) &&
-      !isa<OpenExistentialExpr>(E) &&
+  if (!isa<InOutExpr>(E) && !isa<LoadExpr>(E) && !isa<OpenExistentialExpr>(E) &&
       !isa<MakeTemporarilyEscapableExpr>(E) &&
-      !isa<CollectionUpcastConversionExpr>(E) &&
-      !isa<OpaqueValueExpr>(E) &&
-      !isa<SubscriptExpr>(E) &&
-      !isa<KeyPathExpr>(E) &&
-      E->isImplicit())
-    return { true, E };
+      !isa<CollectionUpcastConversionExpr>(E) && !isa<OpaqueValueExpr>(E) &&
+      !isa<SubscriptExpr>(E) && !isa<KeyPathExpr>(E) && !isa<LiteralExpr>(E) &&
+      !isa<CollectionExpr>(E) && E->isImplicit())
+    return {true, E};
 
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+  if (auto LE = dyn_cast<LiteralExpr>(E)) {
+    if (LE->getInitializer() &&
+        !passReference(LE->getInitializer().getDecl(), LE->getType(), {},
+                       LE->getSourceRange(),
+                       ReferenceMetaData(SemaReferenceKind::DeclRef, OpAccess,
+                                         /*isImplicit=*/true))) {
+      return doStopTraversal();
+    }
+    return {true, E};
+  } else if (auto CE = dyn_cast<CollectionExpr>(E)) {
+    if (CE->getInitializer() &&
+        !passReference(CE->getInitializer().getDecl(), CE->getType(), {},
+                       CE->getSourceRange(),
+                       ReferenceMetaData(SemaReferenceKind::DeclRef, OpAccess,
+                                         /*isImplicit=*/true))) {
+      return doStopTraversal();
+    }
+    return {true, E};
+  } else if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
                          {module->getName(), E->getLoc()}))
