@@ -183,15 +183,6 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   return dc->getParentModule();
 }
 
-/// Bind the given extension to the given nominal type.
-static void bindExtensionToNominal(ExtensionDecl *ext,
-                                   NominalTypeDecl *nominal) {
-  if (ext->alreadyBoundToNominal())
-    return;
-
-  nominal->addExtension(ext);
-}
-
 void swift::bindExtensions(ModuleDecl &mod) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
@@ -199,7 +190,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
     if (auto nominal = ext->computeExtendedNominal()) {
-      bindExtensionToNominal(ext, nominal);
+      nominal->addExtension(ext);
       return true;
     }
 

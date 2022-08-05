@@ -4384,7 +4384,7 @@ ExtensionRange NominalTypeDecl::getExtensions() {
 }
 
 void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
-  assert(!extension->alreadyBoundToNominal() && "Already added extension");
+  assert(!extension->NextExtension.getInt() && "Already added extension");
   extension->NextExtension.setInt(true);
   
   // First extension; set both first and last.
