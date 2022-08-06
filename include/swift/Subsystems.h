@@ -48,8 +48,8 @@ namespace swift {
   class Evaluator;
   class FileUnit;
   class GeneratedModule;
-  class GenericEnvironment;
   class GenericParamList;
+  class GenericSignature;
   class IRGenOptions;
   class LangOptions;
   class SILOptions;
@@ -169,13 +169,13 @@ namespace swift {
   /// \returns A well-formed type on success, or an \c ErrorType.
   Type performTypeResolution(TypeRepr *TyR, ASTContext &Ctx, bool isSILMode,
                              bool isSILType,
-                             GenericEnvironment *GenericEnv,
+                             GenericSignature GenericSig,
                              GenericParamList *GenericParams,
                              DeclContext *DC, bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
-                                             DeclContext *DC);
+  GenericSignature handleSILGenericParams(GenericParamList *genericParams,
+                                          DeclContext *DC);
 
   /// Turn the given module into SIL IR.
   ///
