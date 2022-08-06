@@ -345,19 +345,19 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
   } </CodeBlock></CatchClause><CatchClause>catch <CatchItem><ExpressionPattern><FunctionCallExpr><MemberAccessExpr>.a</MemberAccessExpr>(<TupleExprElement><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>a</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr></TupleExprElement>)</FunctionCallExpr></ExpressionPattern>, </CatchItem><CatchItem><ExpressionPattern><FunctionCallExpr><MemberAccessExpr>.b</MemberAccessExpr>(<TupleExprElement><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>b</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr></TupleExprElement>) </FunctionCallExpr></ExpressionPattern><WhereClause>where <SequenceExpr><IdentifierExpr>b </IdentifierExpr><BinaryOperatorExpr>== </BinaryOperatorExpr><StringLiteralExpr>"<StringSegment></StringSegment>" </StringLiteralExpr></SequenceExpr></WhereClause></CatchItem><CodeBlock>{
   } </CodeBlock></CatchClause><CatchClause>catch <CatchItem></CatchItem><CodeBlock>{
   }</CodeBlock></CatchClause></DoStmt><RepeatWhileStmt>
-  repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>true</BooleanLiteralExpr></RepeatWhileStmt><RepeatWhileStmt>
-  LABEL: repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>false</BooleanLiteralExpr></RepeatWhileStmt><WhileStmt>
-  while <ConditionElement><BooleanLiteralExpr>true </BooleanLiteralExpr></ConditionElement><CodeBlock>{ }</CodeBlock></WhileStmt><WhileStmt>
-  LABEL: while <ConditionElement><BooleanLiteralExpr>true </BooleanLiteralExpr></ConditionElement><CodeBlock>{ }</CodeBlock></WhileStmt><DoStmt>
-  LABEL: do <CodeBlock>{}</CodeBlock></DoStmt><SwitchStmt>
-  LABEL: switch <IdentifierExpr>foo </IdentifierExpr>{<SwitchCase><SwitchCaseLabel>
+  repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>true</BooleanLiteralExpr></RepeatWhileStmt><LabeledStmt>
+  LABEL: <RepeatWhileStmt>repeat <CodeBlock>{ } </CodeBlock>while <BooleanLiteralExpr>false</BooleanLiteralExpr></RepeatWhileStmt></LabeledStmt><WhileStmt>
+  while <ConditionElement><BooleanLiteralExpr>true </BooleanLiteralExpr></ConditionElement><CodeBlock>{ }</CodeBlock></WhileStmt><LabeledStmt>
+  LABEL: <WhileStmt>while <ConditionElement><BooleanLiteralExpr>true </BooleanLiteralExpr></ConditionElement><CodeBlock>{ }</CodeBlock></WhileStmt></LabeledStmt><LabeledStmt>
+  LABEL: <DoStmt>do <CodeBlock>{}</CodeBlock></DoStmt></LabeledStmt><LabeledStmt>
+  LABEL: <SwitchStmt>switch <IdentifierExpr>foo </IdentifierExpr>{<SwitchCase><SwitchCaseLabel>
     case <CaseItem><ExpressionPattern><IntegerLiteralExpr>1</IntegerLiteralExpr></ExpressionPattern></CaseItem>:</SwitchCaseLabel><FallthroughStmt>
       fallthrough</FallthroughStmt></SwitchCase><SwitchCase><SwitchCaseLabel>
     case <CaseItem><ExpressionPattern><IntegerLiteralExpr>2</IntegerLiteralExpr></ExpressionPattern></CaseItem>:</SwitchCaseLabel><BreakStmt>
       break LABEL</BreakStmt></SwitchCase><SwitchCase><SwitchCaseLabel>
     case <CaseItem><ExpressionPattern><IntegerLiteralExpr>3</IntegerLiteralExpr></ExpressionPattern></CaseItem>:</SwitchCaseLabel><BreakStmt>
       break</BreakStmt></SwitchCase>
-  }</SwitchStmt><ForInStmt>
+  }</SwitchStmt></LabeledStmt><ForInStmt>
 
   for <IdentifierPattern>a </IdentifierPattern>in <IdentifierExpr>b </IdentifierExpr><CodeBlock>{<DeferStmt>
     defer <CodeBlock>{ <TupleExpr>() </TupleExpr>}</CodeBlock></DeferStmt><IfStmt>
