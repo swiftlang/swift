@@ -2,6 +2,14 @@ from .Child import Child
 from .Node import Node  # noqa: I201
 
 STMT_NODES = [
+    # labeled-stmt -> label ':' stmt
+    Node('LabeledStmt', kind='Stmt',
+         children=[
+             Child('LabelName', kind='IdentifierToken'),
+             Child('LabelColon', kind='ColonToken'),
+             Child('Statement', kind='Stmt'),
+         ]),
+
     # continue-stmt -> 'continue' label? ';'?
     Node('ContinueStmt', kind='Stmt',
          children=[
@@ -12,12 +20,8 @@ STMT_NODES = [
 
     # while-stmt -> label? ':'? 'while' condition-list code-block ';'?
     Node('WhileStmt', kind='Stmt',
-         traits=['WithCodeBlock', 'Labeled'],
+         traits=['WithCodeBlock'],
          children=[
-             Child('LabelName', kind='IdentifierToken',
-                   is_optional=True),
-             Child('LabelColon', kind='ColonToken',
-                   is_optional=True),
              Child('WhileKeyword', kind='WhileToken'),
              Child('Conditions', kind='ConditionElementList',
                    collection_element_name='Condition'),
@@ -46,12 +50,8 @@ STMT_NODES = [
 
     # repeat-while-stmt -> label? ':'? 'repeat' code-block 'while' expr ';'?
     Node('RepeatWhileStmt', kind='Stmt',
-         traits=['WithCodeBlock', 'Labeled'],
+         traits=['WithCodeBlock'],
          children=[
-             Child('LabelName', kind='IdentifierToken',
-                   is_optional=True),
-             Child('LabelColon', kind='ColonToken',
-                   is_optional=True),
              Child('RepeatKeyword', kind='RepeatToken'),
              Child('Body', kind='CodeBlock'),
              Child('WhileKeyword', kind='WhileToken'),
@@ -79,12 +79,8 @@ STMT_NODES = [
     #   'for' 'try'? 'await'? 'case'? pattern 'in' expr 'where'?
     #   expr code-block ';'?
     Node('ForInStmt', kind='Stmt',
-         traits=['WithCodeBlock', 'Labeled'],
+         traits=['WithCodeBlock'],
          children=[
-             Child('LabelName', kind='IdentifierToken',
-                   is_optional=True),
-             Child('LabelColon', kind='ColonToken',
-                   is_optional=True),
              Child('ForKeyword', kind='ForToken'),
              Child('TryKeyword', kind='TryToken', 
                    is_optional=True),
@@ -106,12 +102,8 @@ STMT_NODES = [
     # switch-stmt -> identifier? ':'? 'switch' expr '{'
     #   switch-case-list '}' ';'?
     Node('SwitchStmt', kind='Stmt',
-         traits=['Braced', 'Labeled'],
+         traits=['Braced'],
          children=[
-             Child('LabelName', kind='IdentifierToken',
-                   is_optional=True),
-             Child('LabelColon', kind='ColonToken',
-                   is_optional=True),
              Child('SwitchKeyword', kind='SwitchToken'),
              Child('Expression', kind='Expr'),
              Child('LeftBrace', kind='LeftBraceToken'),
@@ -127,12 +119,8 @@ STMT_NODES = [
 
     # do-stmt -> identifier? ':'? 'do' code-block catch-clause-list ';'?
     Node('DoStmt', kind='Stmt',
-         traits=['WithCodeBlock', 'Labeled'],
+         traits=['WithCodeBlock'],
          children=[
-             Child('LabelName', kind='IdentifierToken',
-                   is_optional=True),
-             Child('LabelColon', kind='ColonToken',
-                   is_optional=True),
              Child('DoKeyword', kind='DoToken'),
              Child('Body', kind='CodeBlock'),
              Child('CatchClauses', kind='CatchClauseList',
@@ -272,12 +260,8 @@ STMT_NODES = [
     # if-stmt -> identifier? ':'? 'if' condition-list code-block
     #   else-clause ';'?
     Node('IfStmt', kind='Stmt',
-         traits=['WithCodeBlock', 'Labeled'],
+         traits=['WithCodeBlock'],
          children=[
-             Child('LabelName', kind='IdentifierToken',
-                   is_optional=True),
-             Child('LabelColon', kind='ColonToken',
-                   is_optional=True),
              Child('IfKeyword', kind='IfToken'),
              Child('Conditions', kind='ConditionElementList',
                    collection_element_name='Condition'),
