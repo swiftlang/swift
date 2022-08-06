@@ -12,12 +12,12 @@ protocol P {
 
 sil hidden [ossa] @caller : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P
-  %3 = witness_method $@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P, #P.f7, %2 : $*@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_owned () -> @out τ_0_0
-  %4 = apply %3<@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_owned () -> @out τ_0_0
+  %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0", P) Self
+  %3 = witness_method $@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0", P) Self, #P.f7, %2 : $*@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_owned () -> @out τ_0_0
+  %4 = apply %3<@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0", P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_owned () -> @out τ_0_0
 
   %5 = function_ref @callee : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> @out P
-  %6 = partial_apply %5<@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> @out P
+  %6 = partial_apply %5<@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0", P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> @out P
   %9 = alloc_stack $P
   %8 = copy_value %6 : $@callee_owned () -> @out P
   %10 = apply %8(%9) : $@callee_owned () -> @out P

@@ -84,7 +84,7 @@ bb1:
   %4 = load %1 : $*MyBool
   retain_value %3 : $MyArray<MyClass>
   %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
-  %11 = open_existential_ref %10 : $AProtocol to $@opened("B538073C-2428-11E5-AC93-C82A1428F987") AProtocol
+  %11 = open_existential_ref %10 : $AProtocol to $@opened("B538073C-2428-11E5-AC93-C82A1428F987", AProtocol) Self
   switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb5, case #MyBool.True!enumelt: bb2
 
 bb2:
@@ -101,7 +101,7 @@ bb5:
   br bb6
 
 bb6:
-  release_value %11 : $@opened("B538073C-2428-11E5-AC93-C82A1428F987") AProtocol
+  release_value %11 : $@opened("B538073C-2428-11E5-AC93-C82A1428F987", AProtocol) Self
   return %4 : $MyBool
 }
 

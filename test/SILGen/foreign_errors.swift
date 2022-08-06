@@ -216,12 +216,12 @@ class VeryErrorProne : ErrorProne {
 // CHECK: sil hidden [ossa] @$s14foreign_errors12testProtocolyySo010ErrorProneD0_pKF : $@convention(thin) (@guaranteed ErrorProneProtocol) -> @error Error
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $ErrorProneProtocol):
 func testProtocol(_ p: ErrorProneProtocol) throws {
-  // CHECK:   [[T0:%.*]] = open_existential_ref [[ARG0]] : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
+  // CHECK:   [[T0:%.*]] = open_existential_ref [[ARG0]] : $ErrorProneProtocol to $[[OPENED:@opened\(.*, ErrorProneProtocol\) Self]]
   // CHECK:   [[T1:%.*]] = objc_method [[T0]] : $[[OPENED]], #ErrorProneProtocol.obliterate!foreign : {{.*}}
   // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, τ_0_0) -> ObjCBool
   try p.obliterate()
 
-  // CHECK:   [[T0:%.*]] = open_existential_ref [[ARG0]] : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
+  // CHECK:   [[T0:%.*]] = open_existential_ref [[ARG0]] : $ErrorProneProtocol to $[[OPENED:@opened\(.*, ErrorProneProtocol\) Self]]
   // CHECK:   [[T1:%.*]] = objc_method [[T0]] : $[[OPENED]], #ErrorProneProtocol.invigorate!foreign : {{.*}}
   // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, {{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, Optional<@convention(block) () -> ()>, τ_0_0) -> ObjCBool
   try p.invigorate(callback: {})

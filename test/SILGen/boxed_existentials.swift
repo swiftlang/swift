@@ -34,7 +34,7 @@ func test_composition_erasure(_ x: HairType & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials24test_composition_erasureys5Error_psAC_AA8HairTypepF
-// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr immutable_access [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
+// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr immutable_access [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*, Error & HairType\) Self]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
 // CHECK:         store [[NEW_EXISTENTIAL]] to [init] [[NEW_EXISTENTIALBUF:%.*]] :
@@ -49,7 +49,7 @@ func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials30test_class_composition_erasureys5Error_psAC_AA9HairClasspF
-// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*\) Error & HairClass]]
+// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*, Error & HairClass\) Self]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
 // CHECK:         store [[NEW_EXISTENTIAL]] to [init] [[NEW_EXISTENTIALBUF:%.*]] :
@@ -63,7 +63,7 @@ func test_property(_ x: Error) -> String {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials13test_propertyySSs5Error_pF
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// CHECK:         [[VALUE:%.*]] = open_existential_box [[ARG]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
+// CHECK:         [[VALUE:%.*]] = open_existential_box [[ARG]] : $Error to $*[[VALUE_TYPE:@opened\(.*, Error\) Self]]
 // FIXME: Extraneous copy here
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]] : $*[[VALUE_TYPE]]
@@ -89,7 +89,7 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:         [[ACCESS:%.*]] = begin_access [read] [unknown] [[PVAR]] : $*Error
 // CHECK:         [[VALUE_BOX:%.*]] = load [copy] [[ACCESS]]
 // CHECK:         [[BORROWED_VALUE_BOX:%.*]] = begin_borrow [[VALUE_BOX]]
-// CHECK:         [[VALUE:%.*]] = open_existential_box [[BORROWED_VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
+// CHECK:         [[VALUE:%.*]] = open_existential_box [[BORROWED_VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*, Error\) Self]]
 // CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
 // CHECK:         destroy_value [[VALUE_BOX]]

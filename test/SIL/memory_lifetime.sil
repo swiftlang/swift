@@ -587,11 +587,11 @@ bb0(%0 : $*U):
   %s = alloc_stack $P
   %i = init_existential_addr %s : $*P, $U
   copy_addr %0 to [initialization] %i : $*U
-  %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
-  %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
-  copy_addr %o to [initialization] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
-  destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
-  dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  copy_addr %o to [initialization] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
   destroy_addr %s : $*P
   dealloc_stack %s : $*P
   %5 = tuple ()

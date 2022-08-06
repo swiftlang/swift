@@ -26,6 +26,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
@@ -6307,14 +6308,25 @@ public:
   }
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
-    if (auto parent = T->getParent()) {
-      printArchetypeCommon(T);
-      return;
-    }
+    if (Options.PrintForSIL) {
+      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\", ";
+      visit(T->getGenericEnvironment()->getOpenedExistentialType());
+      Printer << ") ";
 
-    if (Options.PrintForSIL)
-      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
-    visit(T->getExistentialType());
+      llvm::DenseMap<CanType, Identifier> newAlternativeTypeNames;
+
+      auto interfaceTy = T->getInterfaceType();
+      auto selfTy = interfaceTy->getRootGenericParam();
+      auto &ctx = selfTy->getASTContext();
+      newAlternativeTypeNames[selfTy->getCanonicalType()] = ctx.Id_Self;
+
+      PrintOptions subOptions = Options;
+      subOptions.AlternativeTypeNames = &newAlternativeTypeNames;
+      TypePrinter sub(Printer, subOptions);
+      sub.visit(interfaceTy);
+    } else {
+      visit(T->getExistentialType());
+    }
   }
 
   void printDependentMember(DependentMemberType *T) {

@@ -716,7 +716,7 @@ bb0:
 sil [transparent] @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () {
 bb0(%0 : $CP):
   strong_retain %0 : $CP                          // id: %2
-  %3 = open_existential_ref %0 : $CP to $@opened("01234567-89ab-cdef-0123-000000000000") CP // user: %5
+  %3 = open_existential_ref %0 : $CP to $@opened("01234567-89ab-cdef-0123-000000000000", CP) Self // user: %5
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
 }
@@ -726,11 +726,11 @@ sil @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ : $@convention(thin
 bb0(%0 : $CP, %1 : $CP):
   %4 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () // user: %6
   strong_retain %0 : $CP                          // id: %5
-  // CHECK: open_existential_ref %0 : $CP to $@opened([[N1:".*"]]) CP
+  // CHECK: open_existential_ref %0 : $CP to $@opened([[N1:".*"]], CP) Self
   %6 = apply %4(%0) : $@convention(thin) (@owned CP) -> ()
   %7 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () // user: %9
   strong_retain %1 : $CP                          // id: %8
-  // CHECK: open_existential_ref %1 : $CP to $@opened([[N2:".*"]]) CP
+  // CHECK: open_existential_ref %1 : $CP to $@opened([[N2:".*"]], CP) Self
   %9 = apply %7(%1) : $@convention(thin) (@owned CP) -> ()
   strong_release %1 : $CP                         // id: %10
   strong_release %0 : $CP                         // id: %11
@@ -988,7 +988,7 @@ bb0(%0 : $*Self):
 // Check that P2_s call can be properly inlined and the resulting witness_method instruction
 // uses the opened archetype from the caller.
 // CHECK-LABEL: sil hidden @L_start
-// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+"\) P2]]
+// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+", P2\) Self]]
 // CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter : {{.*}}, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
 // CHECK: return
 sil hidden @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
@@ -996,9 +996,9 @@ bb0(%0 : $*L):
   %2 = struct_element_addr %0 : $*L, #L.o
   %3 = alloc_stack $P2
   copy_addr %2 to [initialization] %3 : $*P2
-  %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2
+  %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60", P2) Self
   %6 = function_ref @P2_s : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
-  %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60", P2) Self>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %3 : $*P2
   dealloc_stack %3 : $*P2
   return %7 : $Int32

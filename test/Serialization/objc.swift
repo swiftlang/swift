@@ -9,7 +9,7 @@ import def_objc
 
 // SIL: sil hidden [ossa] @$s4objc9testProto3objy04def_A09ObjCProto_p_tF : $@convention(thin) (@guaranteed ObjCProto) -> () {
 func testProto(obj obj: ObjCProto) {
-  // SIL: = objc_method {{%.*}} : $@opened({{.*}}) ObjCProto, #ObjCProto.doSomething!foreign
+  // SIL: = objc_method {{%.*}} : $@opened({{.*}}, ObjCProto) Self, #ObjCProto.doSomething!foreign
   obj.doSomething()
 }
 

@@ -331,6 +331,10 @@ struct ASTContext::Implementation {
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
 
+  /// A fake generic parameter list <Self> for parsing @opened archetypes
+  /// in textual SIL.
+  GenericParamList *SelfGenericParamList = nullptr;
+
   /// The single-parameter generic signature with no constraints, <T>.
   CanGenericSignature SingleGenericParameterSignature;
 
@@ -5150,6 +5154,26 @@ ASTContext::getSwiftDeclForExportedClangDecl(const clang::Decl *decl) {
 const clang::Type *
 ASTContext::getClangTypeForIRGen(Type ty) {
   return getClangTypeConverter().convert(ty).getTypePtrOrNull();
+}
+
+GenericParamList *ASTContext::getSelfGenericParamList(DeclContext *dc) const {
+  auto *theParamList = getImpl().SelfGenericParamList;
+  if (theParamList)
+    return theParamList;
+
+  // Note: we always return a GenericParamList rooted at the first
+  // DeclContext this was called with. Since this is just a giant
+  // hack for SIL mode, that should be OK.
+  auto *selfParam = GenericTypeParamDecl::create(
+      dc, Id_Self, SourceLoc(),
+      /*isTypeSequence=*/false, /*depth=*/0, /*index=*/0,
+      /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+
+  theParamList = GenericParamList::create(
+      const_cast<ASTContext &>(*this), SourceLoc(), {selfParam}, SourceLoc());
+  getImpl().SelfGenericParamList = theParamList;
+
+  return theParamList;
 }
 
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {

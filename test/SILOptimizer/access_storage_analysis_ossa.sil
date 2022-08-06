@@ -479,9 +479,9 @@ bb0(%out : $*Int, %i : $Int, %e : @owned $Error):
   end_access %pebAccess : $*SomeError
 
   %borrow = begin_borrow %e : $Error
-  %oeb = open_existential_box %borrow : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  %oebAccess = begin_access [read] [dynamic] %oeb : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  end_access %oebAccess : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  %oeb = open_existential_box %borrow : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  %oebAccess = begin_access [read] [dynamic] %oeb : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  end_access %oebAccess : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
   end_borrow %borrow : $Error
 
   destroy_value %e : $Error

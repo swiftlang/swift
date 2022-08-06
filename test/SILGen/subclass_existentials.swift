@@ -58,13 +58,13 @@ func conversions(
 
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]]
-  // CHECK: [[BASE:%.*]] = upcast [[REF]] : $@opened("{{.*}}") Base<Int> & P to $Base<Int>
+  // CHECK: [[BASE:%.*]] = upcast [[REF]] : $@opened("{{.*}}", Base<Int> & P) Self to $Base<Int>
   // CHECK: destroy_value [[BASE]] : $Base<Int>
   let _: Base<Int> = baseAndP
 
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P
   // CHECK: [[RESULT:%.*]] = alloc_stack $P
-  // CHECK: [[RESULT_PAYLOAD:%.*]] = init_existential_addr [[RESULT]] : $*P, $@opened("{{.*}}") Base<Int> & P
+  // CHECK: [[RESULT_PAYLOAD:%.*]] = init_existential_addr [[RESULT]] : $*P, $@opened("{{.*}}", Base<Int> & P) Self
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]]
   // CHECK: store [[REF]] to [init] [[RESULT_PAYLOAD]]
   // CHECK: destroy_addr [[RESULT]] : $*P
@@ -73,7 +73,7 @@ func conversions(
 
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P
   // CHECK: [[RESULT:%.*]] = alloc_stack $Q
-  // CHECK: [[RESULT_PAYLOAD:%.*]] = init_existential_addr [[RESULT]] : $*Q, $@opened("{{.*}}") Base<Int> & P
+  // CHECK: [[RESULT_PAYLOAD:%.*]] = init_existential_addr [[RESULT]] : $*Q, $@opened("{{.*}}", Base<Int> & P) Self
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]]
   // CHECK: store [[REF]] to [init] [[RESULT_PAYLOAD]]
   // CHECK: destroy_addr [[RESULT]] : $*Q
@@ -82,29 +82,29 @@ func conversions(
 
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG2:%.*]] : $Derived & R
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]]
-  // CHECK: [[RESULT:%.*]] = init_existential_ref [[REF]] : $@opened("{{.*}}") Derived & R : $@opened("{{.*}}") Derived & R, $Base<Int> & P
+  // CHECK: [[RESULT:%.*]] = init_existential_ref [[REF]] : $@opened("{{.*}}", Derived & R) Self : $@opened("{{.*}}", Derived & R) Self, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]]
   let _: Base<Int> & P = derivedAndR
 
   // Metatypes
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
-  // CHECK: [[RESULT:%.*]] = upcast [[PAYLOAD]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type to $@thick Base<Int>.Type
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type
+  // CHECK: [[RESULT:%.*]] = upcast [[PAYLOAD]] : $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type to $@thick Base<Int>.Type
   let _: Base<Int>.Type = baseAndPType
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
-  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type, $@thick P.Type
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type
+  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type, $@thick P.Type
   let _: P.Type = baseAndPType
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
-  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type, $@thick Q.Type
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type
+  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type, $@thick Q.Type
   let _: Q.Type = baseAndPType
 
   // CHECK: [[RESULT:%.*]] = init_existential_metatype %4 : $@thick Derived.Type, $@thick (Base<Int> & P).Type
   let _: (Base<Int> & P).Type = derivedType
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %5 : $@thick (Derived & R).Type to $@thick (@opened("{{.*}}") Derived & R).Type
-  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") Derived & R).Type, $@thick (Base<Int> & P).Type
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %5 : $@thick (Derived & R).Type to $@thick (@opened("{{.*}}", Derived & R) Self).Type
+  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}", Derived & R) Self).Type, $@thick (Base<Int> & P).Type
   let _: (Base<Int> & P).Type = derivedAndRType
 
   // CHECK: return
@@ -116,50 +116,50 @@ func methodCalls(
   baseAndP: Base<Int> & P,
   baseAndPType: (Base<Int> & P).Type) {
   // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P,
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[CLASS_REF:%.*]] = upcast [[REF]] : $@opened("{{.*}}") Base<Int> & P to $Base<Int>
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]] : $@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[CLASS_REF:%.*]] = upcast [[REF]] : $@opened("{{.*}}", Base<Int> & P) Self to $Base<Int>
   // CHECK: [[METHOD:%.*]] = class_method [[CLASS_REF]] : $Base<Int>, #Base.classSelfReturn : <T> (Base<T>) -> () -> @dynamic_self Base<T>, $@convention(method) <τ_0_0> (@guaranteed Base<τ_0_0>) -> @owned Base<τ_0_0>
   // CHECK: [[RESULT_CLASS_REF:%.*]] = apply [[METHOD]]<Int>([[CLASS_REF]]) : $@convention(method) <τ_0_0> (@guaranteed Base<τ_0_0>) -> @owned Base<τ_0_0>
   // CHECK: destroy_value [[CLASS_REF]] : $Base<Int>
-  // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_CLASS_REF]] : $Base<Int> to $@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
+  // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_CLASS_REF]] : $Base<Int> to $@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}", Base<Int> & P) Self, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]] : $Base<Int> & P
   let _: Base<Int> & P = baseAndP.classSelfReturn()
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[SELF_BOX:%.*]] = alloc_stack $@opened("{{.*}}") Base<Int> & P
-  // CHECK: store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") Base<Int> & P, #P.protocolSelfReturn : <Self where Self : P> (Self) -> () -> Self, [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[SELF_BOX:%.*]] = alloc_stack $@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", Base<Int> & P) Self, #P.protocolSelfReturn : <Self where Self : P> (Self) -> () -> Self, [[PAYLOAD]] : $@opened("{{.*}}", Base<Int> & P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
   // CHECK: [[RESULT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[RESULT_BOX]]
   // CHECK: [[RESULT_BUF:%.*]] = project_box [[RESULT_LIFETIME]]
-  // CHECK: apply [[METHOD]]<@opened("{{.*}}") Base<Int> & P>([[RESULT_BUF]], [[SELF_BOX]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  // CHECK: dealloc_stack [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
+  // CHECK: apply [[METHOD]]<@opened("{{.*}}", Base<Int> & P) Self>([[RESULT_BUF]], [[SELF_BOX]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK: dealloc_stack [[SELF_BOX]] : $*@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}", Base<Int> & P) Self : $@opened("{{.*}}", Base<Int> & P) Self, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]] : $Base<Int> & P
   // CHECK: end_borrow [[RESULT_LIFETIME]]
   // CHECK: dealloc_box [[RESULT_BOX]]
   let _: Base<Int> & P = baseAndP.protocolSelfReturn()
 
-  // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
-  // CHECK: [[METATYPE_REF:%.*]] = upcast [[METATYPE]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type to $@thick Base<Int>.Type
+  // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type
+  // CHECK: [[METATYPE_REF:%.*]] = upcast [[METATYPE]] : $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type to $@thick Base<Int>.Type
   // CHECK: [[METHOD:%.*]] = function_ref @$s21subclass_existentials4BaseC15classSelfReturnACyxGXDyFZ : $@convention(method) <τ_0_0> (@thick Base<τ_0_0>.Type) -> @owned Base<τ_0_0>
   // CHECK: [[RESULT_REF2:%.*]] = apply [[METHOD]]<Int>([[METATYPE_REF]])
-  // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_REF2]] : $Base<Int> to $@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
+  // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_REF2]] : $Base<Int> to $@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}", Base<Int> & P) Self : $@opened("{{.*}}", Base<Int> & P) Self, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]]
   let _: Base<Int> & P = baseAndPType.classSelfReturn()
 
-  // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
-  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") Base<Int> & P, #P.protocolSelfReturn : <Self where Self : P> (Self.Type) -> () -> Self, [[METATYPE]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type
+  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", Base<Int> & P) Self, #P.protocolSelfReturn : <Self where Self : P> (Self.Type) -> () -> Self, [[METATYPE]] : $@thick (@opened("{{.*}}", Base<Int> & P) Self).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
   // CHECK: [[RESULT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[RESULT_BOX]]
   // CHECK: [[RESULT_BUF:%.*]] = project_box
-  // CHECK: apply [[METHOD]]<@opened("{{.*}}") Base<Int> & P>([[RESULT_BUF]], [[METATYPE]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
-  // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[RESULT_VALUE:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
+  // CHECK: apply [[METHOD]]<@opened("{{.*}}", Base<Int> & P) Self>([[RESULT_BUF]], [[METATYPE]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[RESULT_VALUE:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}", Base<Int> & P) Self : $@opened("{{.*}}", Base<Int> & P) Self, $Base<Int> & P
   // CHECK: destroy_value [[RESULT_VALUE]]
   // CHECK: end_borrow [[RESULT_LIFETIME]]
   // CHECK: dealloc_box [[RESULT_BOX]]
@@ -195,7 +195,7 @@ func methodCalls(
 //
 // CHECK: sil private [ossa] @$[[THUNK2_NAME]] : $@convention(thin) (@guaranteed Base<Int> & P) -> @owned Base<Int> & P {
 // CHECK: bb0(%0 : @guaranteed $Base<Int> & P):
-// CHECK:  [[OPENED:%[0-9]+]] = open_existential_ref %0 : $Base<Int> & P to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) Base<Int> & P]]
+// CHECK:  [[OPENED:%[0-9]+]] = open_existential_ref %0 : $Base<Int> & P to $[[OPENED_TY:@opened\("[-A-F0-9]+", Base<Int> & P\) Self]]
 // CHECK:  [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]
 // CHECK:  [[CLASS:%[0-9]+]] = upcast [[OPENED_COPY]] : $[[OPENED_TY]] to $Base<Int>
 // CHECK:  [[METHOD:%[0-9]+]] = class_method [[CLASS]] : $Base<Int>, #Base.classSelfReturn

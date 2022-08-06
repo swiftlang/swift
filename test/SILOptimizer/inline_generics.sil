@@ -155,12 +155,12 @@ sil_vtable MyNumber {}
 sil @test_inlining : $@convention(objc_method) (@owned MyNumber) -> () {
 bb0(%0 : $MyNumber):
   %12 = init_existential_ref %0 : $MyNumber : $MyNumber, $MyNumber & SomeProto
-  %14 = open_existential_ref %12 : $MyNumber & SomeProto to $@opened("B9711AE4-946E-11EA-A871-ACDE48001122") MyNumber & SomeProto
+  %14 = open_existential_ref %12 : $MyNumber & SomeProto to $@opened("B9711AE4-946E-11EA-A871-ACDE48001122", MyNumber & SomeProto) Self
   %15 = alloc_stack $OtherProto
-  %16 = init_existential_addr %15 : $*OtherProto, $@opened("B9711AE4-946E-11EA-A871-ACDE48001122") MyNumber & SomeProto
-  store %14 to %16 : $*@opened("B9711AE4-946E-11EA-A871-ACDE48001122") MyNumber & SomeProto
+  %16 = init_existential_addr %15 : $*OtherProto, $@opened("B9711AE4-946E-11EA-A871-ACDE48001122", MyNumber & SomeProto) Self
+  store %14 to %16 : $*@opened("B9711AE4-946E-11EA-A871-ACDE48001122", MyNumber & SomeProto) Self
   %18 = function_ref @doStuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
-  %20 = apply %18<@opened("B9711AE4-946E-11EA-A871-ACDE48001122") MyNumber & SomeProto>(%16) : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
+  %20 = apply %18<@opened("B9711AE4-946E-11EA-A871-ACDE48001122", MyNumber & SomeProto) Self>(%16) : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %15 : $*OtherProto
   dealloc_stack %15 : $*OtherProto
   %27 = tuple ()
