@@ -882,7 +882,7 @@ Type TypeBase::lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals){
 }
 
 unsigned int TypeBase::getOptionalityDepth() {
-  SmallVector<Type> types;
+  SmallVector<Type, 4> types;
   lookThroughAllOptionalTypes(types);
   return types.size();
 }

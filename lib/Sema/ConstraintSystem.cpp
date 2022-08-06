@@ -6131,7 +6131,7 @@ void SolutionApplicationTargetsKey::dump(raw_ostream &OS) const {
 
   case Kind::functionRef:
     OS << "<function>\n";
-    storage.functionRef->dumpContext();
+    storage.functionRef->printContext(OS);
     return;
   }
   llvm_unreachable("invalid statement kind");
