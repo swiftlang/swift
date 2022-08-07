@@ -590,7 +590,7 @@ public:
 
   /// Print the type variable to the given output stream.
   void print(llvm::raw_ostream &OS);
-  
+
 private:
   StringRef getTypeVariableOptions(TypeVariableOptions TVO) const {
   #define ENTRY(Kind, String) case TypeVariableOptions::Kind: return String

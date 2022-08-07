@@ -352,6 +352,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
     if (CS.isDebugMode() && bindings.hasViableBindings()) {
       bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
+      bos << "\n";
     }
   });
 

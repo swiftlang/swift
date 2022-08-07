@@ -1657,9 +1657,11 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
 
   out.indent(indent);
   out << "(";
-  if (auto typeVar = getTypeVariable())
-    out << "$T" << typeVar->getImpl().getID() << " ";
-  
+  if (auto typeVar = getTypeVariable()) {
+    typeVar->print(out, PO);
+    out << " ";
+  }
+
   std::vector<std::string> attributes;
   if (isDirectHole())
     attributes.push_back("hole");
@@ -1722,7 +1724,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
 
   auto numDefaultable = getNumViableDefaultableBindings();
   if (numDefaultable > 0)
-    out << "#defaultable_bindings: " << numDefaultable << " ";
+    out << "[#defaultable_bindings: " << numDefaultable << "] ";
 
   auto printBinding = [&](const PotentialBinding &binding) {
     auto type = binding.BindingType;
@@ -1769,9 +1771,9 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
                                AllowedBindingKind::Exact, constraint};
       printBinding(binding);
     }
-    out << "] ";
+    out << "]";
   }
-  out << ")\n";
+  out << ")";
 }
 
 // Given a possibly-Optional type, return the direct superclass of the
