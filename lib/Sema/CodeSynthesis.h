@@ -28,6 +28,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class AbstractStorageDecl;
+class Argument;
 class ArgumentList;
 class ASTContext;
 class ClassDecl;
@@ -61,6 +62,18 @@ enum class SelfAccessorKind {
 /// super, this can be a superclass type to upcast to.
 Expr *buildSelfReference(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
                          bool isLValue, Type convertTy = Type());
+
+/// Builds a reference to the \c self decl in a function, for use as an argument
+/// to a function.
+///
+/// \param selfDecl The self decl to reference.
+/// \param selfAccessorKind The kind of access being performed.
+/// \param isMutable Whether the resulting argument is for a mutable self
+/// argument. Such an argument is passed 'inout'.
+/// \param convertTy The type of the resulting argument. For a reference to
+/// super, this can be a superclass type to upcast to.
+Argument buildSelfArgument(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
+                           bool isMutable);
 
 /// Build an argument list that forwards references to the specified parameter
 /// list.

@@ -4736,8 +4736,13 @@ class DotSyntaxCallExpr : public SelfApplyExpr {
   }
 
 public:
+  /// Create a new method reference to \p fnExpr on the base value \p baseArg.
+  /// 
+  /// If this is for a 'mutating' method, \p baseArg should be created using
+  /// \c Argument::implicitInOut. Otherwise, \p Argument::unlabeled should be
+  /// used. \p baseArg must not be labeled.
   static DotSyntaxCallExpr *create(ASTContext &ctx, Expr *fnExpr,
-                                   SourceLoc dotLoc, Expr *baseExpr,
+                                   SourceLoc dotLoc, Argument baseArg,
                                    Type ty = Type());
 
   SourceLoc getDotLoc() const { return DotLoc; }

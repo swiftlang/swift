@@ -5457,8 +5457,9 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
                                             /*implicit*/ true);
     constantRef->setType(enumElt->getInterfaceType());
 
-    auto instantiate = DotSyntaxCallExpr::create(Impl.SwiftContext, constantRef,
-                                                 SourceLoc(), typeRef);
+    auto instantiate =
+        DotSyntaxCallExpr::create(Impl.SwiftContext, constantRef, SourceLoc(),
+                                  Argument::unlabeled(typeRef));
     instantiate->setType(importedEnumTy);
     instantiate->setThrows(false);
 

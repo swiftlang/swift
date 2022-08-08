@@ -68,6 +68,11 @@ public:
   /// The argument label written in the call.
   Identifier getLabel() const { return Label; }
 
+  /// Whether the argument has a non-empty label. Note that this returns `false`
+  /// for an explicitly specified empty label e.g `_: {}` for a trailing
+  /// closure.
+  bool hasLabel() const { return !Label.empty(); }
+
   /// Set a new argument label.
   ///
   /// Note this is marked \c & to prevent its use on an rvalue Argument vended
