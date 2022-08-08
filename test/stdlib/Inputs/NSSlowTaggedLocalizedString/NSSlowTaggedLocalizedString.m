@@ -1,25 +1,53 @@
 #import <string.h>
 #import "NSSlowTaggedLocalizedString.h"
 #import <dlfcn.h>
+#import <objc/runtime.h>
+
+//If and when CF starts linking Swift we may need to rethink this
+#import <CoreFoundation/CoreFoundation.h>
 
 @implementation NSSlowTaggedLocalizedString
 
-uintptr_t *obfuscator;
-void (*_objc_registerTaggedPointerClass)(uint16_t tag, Class cls);
+typedef struct _NSRange {
+  uint64_t location;
+  uint64_t length;
+} NSRange;
 
 + (instancetype) createTestString {
 #if __LP64__
-  if (obfuscator == NULL) {
-    obfuscator = dlsym(RTLD_DEFAULT, "objc_debug_taggedpointer_obfuscator");
-    *obfuscator = 0;
-    _objc_registerTaggedPointerClass = dlsym(RTLD_DEFAULT, "_objc_registerTaggedPointerClass");
-    (*_objc_registerTaggedPointerClass)(0, self); //0 would be unsafe if we loaded Foundation, but we aren't doing that
-  }
-#if __x86_64__
-  return (id)(void *)(uintptr_t)1; //x86_64 uses the LSB as the tag bit, and we want tag 0
-#else
-  return (id)(void *)(uintptr_t)(1llu << 63); //MSB everywhere else
-#endif
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    Class tagClass = objc_lookUpClass("NSTaggedPointerString");
+    Class ourClass = [NSSlowTaggedLocalizedString class];
+    
+    Method fastCString = class_getInstanceMethod(ourClass, @selector(_fastCStringContents:));
+    class_replaceMethod(tagClass, @selector(_fastCStringContents:), method_getImplementation(fastCString), method_getTypeEncoding(fastCString));
+    
+    Method length = class_getInstanceMethod(ourClass, @selector(length));
+    class_replaceMethod(tagClass, @selector(length), method_getImplementation(length), method_getTypeEncoding(length));
+    
+    Method charIndex = class_getInstanceMethod(ourClass, @selector(characterAtIndex:));
+    class_replaceMethod(tagClass, @selector(characterAtIndex:), method_getImplementation(charIndex), method_getTypeEncoding(charIndex));
+    
+    Method fastChars = class_getInstanceMethod(ourClass, @selector(_fastCharacterContents));
+    class_replaceMethod(tagClass, @selector(_fastCharacterContents), method_getImplementation(fastChars), method_getTypeEncoding(fastChars));
+    
+    Method retain = class_getInstanceMethod(ourClass, @selector(retain));
+    class_replaceMethod(tagClass, @selector(retain), method_getImplementation(retain), method_getTypeEncoding(retain));
+    
+    Method release = class_getInstanceMethod(ourClass, @selector(release));
+    class_replaceMethod(tagClass, @selector(release), method_getImplementation(release), method_getTypeEncoding(release));
+    
+    Method typeID = class_getInstanceMethod(ourClass, @selector(_cfTypeID));
+    class_replaceMethod(tagClass, @selector(_cfTypeID), method_getImplementation(typeID), method_getTypeEncoding(typeID));
+    
+    Method description = class_getInstanceMethod(ourClass, @selector(description));
+    class_replaceMethod(tagClass, @selector(description), method_getImplementation(description), method_getTypeEncoding(description));
+    
+    Method getBytes = class_getInstanceMethod(ourClass, @selector(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:));
+    class_replaceMethod(tagClass, @selector(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:), method_getImplementation(getBytes), method_getTypeEncoding(getBytes));
+  });
+  return (NSSlowTaggedLocalizedString *)(void *)CFStringCreateWithCString(NULL, "a", kCFStringEncodingASCII); //make a tagged pointer string
 #else
   return nil;
 #endif
@@ -29,7 +57,11 @@ static const char *contents = NULL;
 
 + (void) setContents: (const char *)newContents {
   const char *oldContents = contents;
-  contents = strdup(newContents);
+  if (newContents) {
+    contents = strdup(newContents);
+  } else {
+    contents = NULL;
+  }
   free((void *)oldContents);
 }
 
@@ -46,6 +78,7 @@ static const char *contents = NULL;
 }
 
 - (uint16_t)characterAtIndex:(NSUInteger)index {
+  abort();
   if (index >= [self length]) {
     //throw the appropriate exception
     abort();
@@ -55,6 +88,29 @@ static const char *contents = NULL;
 
 - (void *) _fastCharacterContents {
   return nil;
+}
+
+- (id) retain { return self; }
+- (oneway void) release {}
+
+- (uint64_t)_cfTypeID {
+  return 7; //CFString
+}
+
+- (id) description {
+  return self;
+}
+
+- (BOOL)getBytes:(void *)buffer maxLength:(uint64_t)max usedLength:(uint64_t *)used encoding:(uint64_t)encoding options:(uint64_t)options range:(NSRange)range remainingRange:(NSRange *)leftover {
+  strncpy(buffer, contents, max);
+  if (strlen(contents) > max) {
+    leftover->location = max;
+    leftover->length = strlen(contents) - max;
+    return false;
+  }
+  leftover->location = 0;
+  leftover->length = 0;
+  return true;
 }
 
 @end
