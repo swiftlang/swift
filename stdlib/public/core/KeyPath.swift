@@ -204,7 +204,7 @@ internal enum KeyPathKind { case readOnly, value, reference }
 /// The most common way to make an instance of this type
 /// is by using a key-path expression like `\SomeClass.someProperty`.
 /// For more information,
-/// see [Key-Path Expressions[keypath] in *[The Swift Programming Language][tspl]*.
+/// see [Key-Path Expressions][keypath] in *[The Swift Programming Language][tspl]*.
 ///
 /// [keypath]: https://docs.swift.org/swift-book/ReferenceManual/Expressions.html#ID563
 /// [tspl]: https://docs.swift.org/swift-book/
