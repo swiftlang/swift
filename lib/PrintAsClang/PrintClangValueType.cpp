@@ -80,19 +80,6 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
   os << "};\n\n";
 }
 
-void printCTypeMetadataTypeFunction(raw_ostream &os,
-                                    const NominalTypeDecl *typeDecl,
-                                    StringRef typeMetadataFuncName) {
-  os << "// Type metadata accessor for " << typeDecl->getNameStr() << "\n";
-  os << "SWIFT_EXTERN ";
-  ClangSyntaxPrinter printer(os);
-  printer.printSwiftImplQualifier();
-  os << "MetadataResponseTy " << typeMetadataFuncName << '(';
-  printer.printSwiftImplQualifier();
-  os << "MetadataRequestTy)";
-  os << " SWIFT_NOEXCEPT SWIFT_CALL;\n\n";
-}
-
 void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl,
     llvm::function_ref<void(void)> bodyPrinter) {
@@ -124,8 +111,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
                            // Print out special functions, like functions that
                            // access type metadata.
-                           printCTypeMetadataTypeFunction(os, typeDecl,
-                                                          typeMetadataFuncName);
+                           printer.printCTypeMetadataTypeFunction(
+                               typeDecl, typeMetadataFuncName);
                          });
 
   auto printEnumVWTableVariable = [&](StringRef metadataName = "metadata",

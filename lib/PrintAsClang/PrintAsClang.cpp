@@ -105,6 +105,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
+        out << "#include <type_traits>\n";
         // FIXME: Look for the header in the SDK.
         out << "// Look for the C++ interop support header relative to clang's resource dir:\n";
         out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.\n";

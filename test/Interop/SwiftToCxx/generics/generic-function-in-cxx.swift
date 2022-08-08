@@ -31,6 +31,15 @@ public func genericRet<T>(_ x: T) -> T {
     return x
 }
 
+public class TestClass {
+    let field: Int
+
+    init() { field = 0 }
+    deinit { print("deinit TestClass") }
+}
+
+public func createTestClass() -> TestClass { return TestClass() }
+
 // CHECK: SWIFT_EXTERN void $s9Functions20genericPrintFunctionyyxlF(const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunction(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF(ptrdiff_t x, const void * _Nonnull t1, const void * _Nonnull t1p, ptrdiff_t y, const void * _Nonnull t2, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionMultiGeneric(_:_:_:_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions26genericPrintFunctionTwoArgyyx_SitlF(const void * _Nonnull x, ptrdiff_t y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionTwoArg(_:_:)
@@ -60,10 +69,16 @@ public func genericRet<T>(_ x: T) -> T {
 // CHECK:      template<class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>
 // CHECK-NEXT: inline T genericRet(const T & x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   T returnValue;
-// CHECK-NEXT: _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
-// CHECK-NEXT:   return returnValue;
-// CHECK-NEXT: }
+// CHECK-NEXT:    if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T>::value) {
+// CHECK-NEXT:    void *returnValue;
+// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
+// CHECK-NEXT:    return ::swift::_impl::implClassFor<T>::type::makeRetained(returnValue);
+// CHECK-NEXT:    } else {
+// CHECK-NEXT:    T returnValue;
+// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
+// CHECK-NEXT:    return returnValue;
+// CHECK-NEXT:    }
+// CHECK-NEXT:  }
 
 // CHECK:      template<class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>

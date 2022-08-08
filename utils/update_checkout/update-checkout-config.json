@@ -430,7 +430,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.4",
                 "sourcekit-lsp": "release/5.4",
-                "swift-format": "main",
+                "swift-format": "swift-5.4-branch",
                 "swift-installer-scripts": "main"
             }
         }
