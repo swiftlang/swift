@@ -31,6 +31,7 @@
 // CHECK-NEXT:  #include <cstring>
 // CHECK-NEXT:  #include <stdlib.h>
 // CHECK-NEXT:  #include <new>
+// CHECK-NEXT:  #include <type_traits>
 // CHECK-NEXT:  // Look for the C++ interop support header relative to clang's resource dir:
 // CHECK-NEXT:  // '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.
 // CHECK-NEXT:  #if __has_include(<../../../swift/shims/_SwiftCxxInteroperability.h>)
