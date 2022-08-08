@@ -919,8 +919,6 @@ class ResultBuilderTransform
 
   using UnsupportedElt = SkipUnhandledConstructInResultBuilder::UnhandledNode;
 
-  /// The constraint system this transform is associated with.
-  ConstraintSystem &CS;
   /// The result type of this result builder body.
   Type ResultType;
 
@@ -930,8 +928,7 @@ class ResultBuilderTransform
 public:
   ResultBuilderTransform(ConstraintSystem &cs, DeclContext *dc,
                          Type builderType, Type resultTy)
-      : BuilderTransformerBase(&cs, dc, builderType), CS(cs),
-        ResultType(resultTy) {}
+      : BuilderTransformerBase(&cs, dc, builderType), ResultType(resultTy) {}
 
   UnsupportedElt getUnsupportedElement() const { return FirstUnsupported; }
 
@@ -1179,10 +1176,6 @@ protected:
             builder.buildCall(resultLoc, ctx.Id_buildFinalResult,
                               {buildBlockResult}, {Identifier()});
       }
-
-      // Type erase return if the result type requires it.
-      buildBlockResult = CS.buildTypeErasedExpr(buildBlockResult, dc,
-                                                ResultType, CTP_ReturnStmt);
 
       elements.push_back(new (ctx) ReturnStmt(resultLoc, buildBlockResult,
                                               /*Implicit=*/true));
