@@ -63,11 +63,6 @@ protocol HasAssoc {
   associatedtype Assoc
   func foo()
 }
-struct foo {
-    func existentialArray() -> [HasAssoc] {}
-    func existentialcSequence() ->  Sequence<HasAssoc> {}
-
-}
 
 do {
   enum MyError: Error {
@@ -207,7 +202,7 @@ protocol RawRepresentable {
 enum E1: RawRepresentable {
   typealias RawValue = P1
 
-  var rawValue: P1 {
+  var rawValue: P1 { // expected-error {{use of protocol 'P1' as a type must be written 'any P1'}}{{17-19=any P1}}
     return ConcreteComposition()
   }
 }
@@ -282,8 +277,8 @@ func testFunctionAlias(fn: ExistentialFunction) {}
 typealias Constraint = Input
 typealias ConstraintB = Input & InputB
 
-// expected-error@+2{{use of 'Constraint' (aka 'Input') as a type must be written 'any Constraint'}}{{29-39=any Constraint}}
-// expected-error@+1{{use of 'ConstraintB' (aka 'InputB & Input') as a type must be written 'any ConstraintB' (aka 'any InputB & Input')'}}{{44-55=any Constraint}}
+//expected-error@+2{{use of 'Constraint' (aka 'Input') as a type must be written 'any Constraint' (aka 'any Input')}}
+//expected-error@+1 2{{use of 'ConstraintB' (aka 'Input & InputB') as a type must be written 'any ConstraintB' (aka 'any Input & InputB')}}
 func testConstraintAlias(x: Constraint, y: ConstraintB) {}
 
 typealias Existential = any Input
@@ -358,6 +353,7 @@ func testEnumAssociatedValue() {
     case c1((any HasAssoc) -> Void)
     // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
     case c2((HasAssoc) -> Void)
+    // expected-error@+1 {{use of protocol 'P' as a type must be written 'any P'}}
     case c3((P) -> Void)
   }
 }
