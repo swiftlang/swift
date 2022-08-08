@@ -281,6 +281,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
   if (!isOpaqueLayout)
     printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
+
+  printTypeGenericTraits(os, typeDecl, typeMetadataFuncName);
 }
 
 /// Print the name of the C stub struct for passing/returning a value type
@@ -455,4 +457,53 @@ void ClangValueTypePrinter::printValueTypeDirectReturnScaffold(
   bodyPrinter();
   os << ");\n";
   os << "  });\n";
+}
+
+void ClangValueTypePrinter::printTypeGenericTraits(
+    raw_ostream &os, const NominalTypeDecl *typeDecl,
+    StringRef typeMetadataFuncName) {
+  ClangSyntaxPrinter printer(os);
+  // FIXME: avoid popping out of the module's namespace here.
+  os << "} // end namespace \n\n";
+  os << "namespace swift {\n";
+
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
+  os << "template<>\n";
+  os << "static inline const constexpr bool isUsableInGenericContext<";
+  printer.printBaseName(typeDecl->getModuleContext());
+  os << "::";
+  printer.printBaseName(typeDecl);
+  os << "> = true;\n";
+  os << "#pragma clang diagnostic pop\n";
+
+  os << "template<>\n";
+  os << "inline void * _Nonnull getTypeMetadata<";
+  printer.printBaseName(typeDecl->getModuleContext());
+  os << "::";
+  printer.printBaseName(typeDecl);
+  os << ">() {\n";
+  os << "  return ";
+  printer.printBaseName(typeDecl->getModuleContext());
+  os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+     << "::" << typeMetadataFuncName << "(0)._0;\n";
+  os << "}\n";
+  if (isa<ClassDecl>(typeDecl)) {
+    os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
+    os << "template<>\n";
+    os << "struct implClassFor<";
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::";
+    printer.printBaseName(typeDecl);
+    os << "> { using type = ";
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+    printCxxImplClassName(os, typeDecl);
+    os << "; };\n";
+    os << "} // namespace\n";
+  }
+  os << "} // namespace swift\n";
+  os << "\nnamespace ";
+  printer.printBaseName(typeDecl->getModuleContext());
+  os << " {\n";
 }

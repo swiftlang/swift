@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-public-decls -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/functions.h)
+// RUN: %check-generic-interop-cxx-header-in-clang(%t/functions.h -Wno-unused-function)
 
 
 public func genericPrintFunctionTwoArg<T>(_ x: T, _ y: Int) {
@@ -40,11 +40,40 @@ public class TestClass {
 
 public func createTestClass() -> TestClass { return TestClass() }
 
+public struct TestLargeStruct {
+    var x1, x2, x3, x4, x5, x6: Int
+
+    init(_ x: Int) {
+        x1 = x
+        x2 = x+1
+        x3 = x-1
+        x4 = x
+        x5 = x+2
+        x6 = x-2
+    }
+}
+
+public func createTestLargeStruct(_ x: Int) -> TestLargeStruct {
+    return TestLargeStruct(x)
+}
+
+public struct TestSmallStruct {
+    var x1: UInt32
+}
+
+public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
+    return TestSmallStruct(x1: x)
+}
+
 // CHECK: SWIFT_EXTERN void $s9Functions20genericPrintFunctionyyxlF(const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunction(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF(ptrdiff_t x, const void * _Nonnull t1, const void * _Nonnull t1p, ptrdiff_t y, const void * _Nonnull t2, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionMultiGeneric(_:_:_:_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions26genericPrintFunctionTwoArgyyx_SitlF(const void * _Nonnull x, ptrdiff_t y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionTwoArg(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions10genericRetyxxlF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericRet(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions11genericSwapyyxz_xztlF(void * _Nonnull x, void * _Nonnull y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericSwap(_:_:)
+
+// Skip templates in impl classes.
+// CHECK: _impl_TestSmallStruct
+// CHECK:      template<class T>
 
 // CHECK:      template<class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>
