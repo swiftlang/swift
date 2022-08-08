@@ -269,6 +269,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'MissingPattern': 265,
     'GarbageNodes' : 266,
     'LabeledStmt': 267,
+    'InfixOperatorExpr': 268,
 }
 
 
