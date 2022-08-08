@@ -43,8 +43,8 @@ public protocol DangerousEscaper {
 // CHECK:   destroy_addr [[CLOSURE_ADDR]] : $*@callee_guaranteed () -> ()
 // CHECK:   dealloc_stack [[BLOCK_STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
 
-// CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}") DangerousEscaper, #DangerousEscaper.malicious!foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
-// CHECK:   apply [[METH]]<@opened("{{.*}}") DangerousEscaper>([[BLOCK_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}", DangerousEscaper) Self, #DangerousEscaper.malicious!foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:   apply [[METH]]<@opened("{{.*}}", DangerousEscaper) Self>([[BLOCK_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 
 // Release sentinel closure copy (5).
 // CHECK:   strong_release [[BLOCK_COPY]] : $@convention(block) @noescape () -> ()

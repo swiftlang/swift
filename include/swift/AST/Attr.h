@@ -2493,6 +2493,9 @@ public:
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
 
+  // For an opened existential type, the constraint type.
+  Optional<TypeRepr *> ConstraintType;
+
   // For a reference to an opaque return type, the mangled name and argument
   // index into the generic signature.
   struct OpaqueReturnTypeRef {
@@ -2580,6 +2583,9 @@ public:
 
   bool hasOpenedID() const { return OpenedID.hasValue(); }
   UUID getOpenedID() const { return *OpenedID; }
+
+  bool hasConstraintType() const { return ConstraintType.hasValue(); }
+  TypeRepr *getConstraintType() const { return *ConstraintType; }
 
   /// Given a name like "autoclosure", return the type attribute ID that
   /// corresponds to it.  This returns TAK_Count on failure.

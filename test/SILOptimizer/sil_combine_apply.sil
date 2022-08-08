@@ -263,11 +263,11 @@ bb6(%5 : $Error):
 sil @sil_combine_dead_partial_apply_with_opened_existential : $@convention(thin) () -> ((), @error Error) {
 bb0:
   %0b = alloc_stack $SwiftP
-  %1 = open_existential_addr mutable_access %0b : $*SwiftP to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  %2 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP, #SwiftP.foo, %1 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
-  %0c = alloc_stack $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  %3 = partial_apply %2<@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
-  dealloc_stack %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %1 = open_existential_addr mutable_access %0b : $*SwiftP to $*@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
+  %2 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self, #SwiftP.foo, %1 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  %0c = alloc_stack $@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
+  %3 = partial_apply %2<@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
   strong_release %3 : $@callee_owned () -> ()
   dealloc_stack %0b : $*SwiftP
   %9999 = tuple()
@@ -335,12 +335,12 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK: } // end sil function 'sil_combine_applied_partialapply_to_apply_with_dependent_type'
 sil @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in_guaranteed SwiftP) -> () {
 bb0(%0 : $*SwiftP):
-  %1 = open_existential_addr immutable_access %0 : $*SwiftP to $*@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  %2 = witness_method $@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP, #SwiftP.foo, %1 : $*@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
-  %0c = alloc_stack $@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  copy_addr %1 to [initialization] %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  %3 = partial_apply %2<@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
-  dealloc_stack %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %1 = open_existential_addr immutable_access %0 : $*SwiftP to $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
+  %2 = witness_method $@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self, #SwiftP.foo, %1 : $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  %0c = alloc_stack $@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
+  copy_addr %1 to [initialization] %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
+  %3 = partial_apply %2<@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
   %4 = apply %3() : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()
@@ -366,12 +366,12 @@ bb0(%0 : $*MutatingProto, %1 : $MStruct):
   %9 = alloc_stack $MutatingProto
   copy_addr %2 to [initialization] %9 : $*MutatingProto
   // CHECK: [[E:%[0-9]+]] = open_existential_addr
-  %11 = open_existential_addr mutable_access %9 : $*MutatingProto to $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto
+  %11 = open_existential_addr mutable_access %9 : $*MutatingProto to $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self
   // CHECK: [[M:%[0-9]+]] = witness_method $MStruct,
-  %12 = witness_method $@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %11 : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
-  // CHECK:  [[C:%[0-9]+]] = unchecked_addr_cast [[E]] : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto to $*MStruct
+  %12 = witness_method $@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %11 : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  // CHECK:  [[C:%[0-9]+]] = unchecked_addr_cast [[E]] : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self to $*MStruct
   // CHECK: apply [[M]]<MStruct>([[C]]) :
-  %13 = apply %12<@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto>(%11) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  %13 = apply %12<@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self>(%11) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   copy_addr [take] %9 to [initialization] %0 : $*MutatingProto
   dealloc_stack %9 : $*MutatingProto
   destroy_addr %2 : $*MutatingProto
@@ -384,14 +384,14 @@ bb0(%0 : $*MutatingProto, %1 : $MStruct):
 sil @dont_replace_copied_self_in_mutating_method_call2 : $@convention(thin) (@thick MutatingProto.Type) -> (@out MutatingProto) {
 bb0(%0 : $*MutatingProto, %1 : $@thick MutatingProto.Type):
   %alloc1 = alloc_stack $MutatingProto, let, name "p"
-  %openType = open_existential_metatype %1 : $@thick MutatingProto.Type to $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto).Type
-  %initType =  init_existential_addr %alloc1 : $*MutatingProto, $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto
+  %openType = open_existential_metatype %1 : $@thick MutatingProto.Type to $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self).Type
+  %initType =  init_existential_addr %alloc1 : $*MutatingProto, $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self
   %alloc2 = alloc_stack $MutatingProto
   copy_addr %alloc1 to [initialization] %alloc2 : $*MutatingProto
-  %oeaddr = open_existential_addr mutable_access %alloc2 : $*MutatingProto to $*@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto
-  %witmethod = witness_method $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %openType : $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto).Type : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
-  // CHECK: apply {{%.*}}<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto>({{%.*}}) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> () // type-defs
-  %apply = apply %witmethod<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto>(%oeaddr) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  %oeaddr = open_existential_addr mutable_access %alloc2 : $*MutatingProto to $*@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self
+  %witmethod = witness_method $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %openType : $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self).Type : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
+  // CHECK: apply {{%.*}}<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self>({{%.*}}) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> () // type-defs
+  %apply = apply %witmethod<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self>(%oeaddr) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   dealloc_stack %alloc2 : $*MutatingProto
   dealloc_stack %alloc1 : $*MutatingProto
   %27 = tuple ()
@@ -962,15 +962,15 @@ bb2:
 // CHECK: bb0(%0 : $*FakeProtocol):
 // CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr immutable_access
 // CHECK-NEXT: [[FN:%.*]] = witness_method
-// CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>([[OPEN]])
+// CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0", FakeProtocol) Self>([[OPEN]])
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
 bb0(%0: $*FakeProtocol):
-  %o = open_existential_addr immutable_access %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
-  %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
-  %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
-  %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol) -> ()
+  %o = open_existential_addr immutable_access %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0", FakeProtocol) Self
+  %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0", FakeProtocol) Self, #FakeProtocol.requirement, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0", FakeProtocol) Self : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0", FakeProtocol) Self>() : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0", FakeProtocol) Self) -> ()
 
   %r = tuple ()
   return %r : $()

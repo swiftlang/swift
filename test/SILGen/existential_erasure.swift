@@ -25,7 +25,7 @@ func throwingFunc() throws -> Bool { return true }
 
 // CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure5PQtoPyyF : $@convention(thin) () -> () {
 func PQtoP() {
-  // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr immutable_access [[PQ:%.*]] : $*P & Q to $*[[OPENED_TYPE:@opened(.*) P & Q]]
+  // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr immutable_access [[PQ:%.*]] : $*P & Q to $*[[OPENED_TYPE:@opened\(.*, P & Q\) Self]]
   // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]] : $*P, $[[OPENED_TYPE]]
   // CHECK: copy_addr [[PQ_PAYLOAD]] to [initialization] [[P_PAYLOAD]]
   // CHECK: destroy_addr [[PQ]]
@@ -42,7 +42,7 @@ func PQtoP() {
 // CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure19openExistentialToP1yyAA1P_pKF
 func openExistentialToP1(_ p: P) throws {
 // CHECK: bb0(%0 : $*P):
-// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
+// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*, P\) Self]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
 // CHECK:   [[FUNC:%.*]] = function_ref @$s19existential_erasure12throwingFuncSbyKF
 // CHECK:   try_apply [[FUNC]]()
@@ -64,7 +64,7 @@ func openExistentialToP1(_ p: P) throws {
 // CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure19openExistentialToP2yyAA1P_pKF
 func openExistentialToP2(_ p: P) throws {
 // CHECK: bb0(%0 : $*P):
-// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
+// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*, P\) Self]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.upgrade : {{.*}}, [[OPEN]]
 // CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
@@ -94,7 +94,7 @@ extension Error {
 func errorHandler(_ e: Error) throws -> Error {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
 // CHECK:  debug_value [[ARG]] : $Error
-// CHECK:  [[OPEN:%.*]] = open_existential_box [[ARG]] : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
+// CHECK:  [[OPEN:%.*]] = open_existential_box [[ARG]] : $Error to $*[[OPEN_TYPE:@opened\(.*, Error\) Self]]
 // CHECK:  [[FUNC:%.*]] = function_ref @$ss5ErrorP19existential_erasureE17returnOrThrowSelf{{[_0-9a-zA-Z]*}}F
 // CHECK:  [[RESULT:%.*]] = alloc_existential_box $Error, $[[OPEN_TYPE]]
 // CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $Error

@@ -5089,8 +5089,10 @@ ERROR(differentiable_function_type_no_differentiability_parameters,
       (/*isLinear*/ bool))
 
 // SIL
-ERROR(opened_non_protocol,none,
-      "@opened cannot be applied to non-protocol type %0", (Type))
+ERROR(opened_bad_constraint_type,none,
+      "@opened constraint type %0 is not a protocol or protocol composition", (Type))
+ERROR(opened_bad_interface_type,none,
+      "@opened interface type %0 is not a type parameter", (Type))
 ERROR(sil_function_ellipsis,PointsToFirstBadToken,
       "SIL function types cannot be variadic", ())
 ERROR(sil_function_input_label,PointsToFirstBadToken,
