@@ -239,8 +239,12 @@ CUSTOM_LOCATOR_PATH_ELT(SyntacticElement)
 /// The element of the pattern binding declaration.
 CUSTOM_LOCATOR_PATH_ELT(PatternBindingElement)
 
-/// The variable declared by a named pattern.
-SIMPLE_LOCATOR_PATH_ELT(NamedPatternDecl)
+/// A declaration introduced by a pattern: name (i.e. `x`) or `_`
+ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
+  /// The variable declared by a named pattern.
+  CUSTOM_LOCATOR_PATH_ELT(NamedPatternDecl)
+  /// The anonymous variable declared by a `_` pattern.
+  CUSTOM_LOCATOR_PATH_ELT(AnyPatternDecl)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

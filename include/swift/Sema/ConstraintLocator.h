@@ -1076,6 +1076,39 @@ public:
   }
 };
 
+class LocatorPathElt::PatternDecl : public StoredIntegerElement<1> {
+public:
+  PatternDecl(ConstraintLocator::PathElementKind kind)
+      : StoredIntegerElement(kind, /*placeholder=*/0) {
+    assert(classof(this) && "classof needs updating");
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::NamedPatternDecl ||
+           elt->getKind() == ConstraintLocator::AnyPatternDecl;
+  }
+};
+
+class LocatorPathElt::NamedPatternDecl final
+    : public LocatorPathElt::PatternDecl {
+public:
+  NamedPatternDecl() : PatternDecl(ConstraintLocator::NamedPatternDecl) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::NamedPatternDecl;
+  }
+};
+
+class LocatorPathElt::AnyPatternDecl final
+    : public LocatorPathElt::PatternDecl {
+public:
+  AnyPatternDecl() : PatternDecl(ConstraintLocator::AnyPatternDecl) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::AnyPatternDecl;
+  }
+};
+
 namespace details {
   template <typename CustomPathElement>
   class PathElement {
