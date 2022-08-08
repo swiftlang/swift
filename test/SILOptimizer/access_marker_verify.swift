@@ -277,7 +277,7 @@ func testInitLValue(p: HasIntGetter) -> Int {
 // CHECK-NOT: begin_access
 // CHECK:   copy_addr %{{.*}} to [initialization] [[X]] : $*@opened
 // CHECK:   witness_method $@opened
-// CHECK:   apply %{{.*}}<@opened("{{.*}}") HasIntGetter>([[X]]) : $@convention(witness_method: HasIntGetter) <τ_0_0 where τ_0_0 : HasIntGetter> (@in_guaranteed τ_0_0) -> Int
+// CHECK:   apply %{{.*}}<@opened("{{.*}}", HasIntGetter) Self>([[X]]) : $@convention(witness_method: HasIntGetter) <τ_0_0 where τ_0_0 : HasIntGetter> (@in_guaranteed τ_0_0) -> Int
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]] : $*Int
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]] : $*Int
 // CHECK:   end_access
@@ -955,9 +955,9 @@ func testOpenExistential(p: PBar) {
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [take] [[OPT_Q_ADR]] to [initialization] [[Q]] : $*Q
 // CHECK-NOT: begin_access
-// CHECK: [[Q_ADR:%.*]] = open_existential_addr immutable_access [[Q]] : $*Q to $*@opened("{{.*}}") Q
-// CHECK: witness_method $@opened("{{.*}}") Q, #PBar.bar
-// CHECK: apply %{{.*}}<@opened("{{.*}}") Q>([[Q_ADR]])
+// CHECK: [[Q_ADR:%.*]] = open_existential_addr immutable_access [[Q]] : $*Q to $*@opened("{{.*}}", Q) Self
+// CHECK: witness_method $@opened("{{.*}}", Q) Self, #PBar.bar
+// CHECK: apply %{{.*}}<@opened("{{.*}}", Q) Self>([[Q_ADR]])
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF'
 
 // --- local existential

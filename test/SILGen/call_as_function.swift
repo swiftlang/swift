@@ -23,10 +23,10 @@ func test_call_as_function<T : C>(_ s: S, _ p1: P1, _ p2: P2, _ t: T) {
   let _: Int = s(0)
 
   // SR-12590: SILGen crash on existential callAsFunction.
-  // CHECK: witness_method $@opened({{.+}}) P1, #P1.callAsFunction : <Self where Self : P1> (Self) -> () -> ()
+  // CHECK: witness_method $@opened({{.+}}, P1) Self, #P1.callAsFunction : <Self where Self : P1> (Self) -> () -> ()
   p1()
 
-  // CHECK: witness_method $@opened({{.+}}) P2, #P2.callAsFunction : <Self where Self : P2> (Self) -> () -> Self
+  // CHECK: witness_method $@opened({{.+}}, P2) Self, #P2.callAsFunction : <Self where Self : P2> (Self) -> () -> Self
   _ = p2()
 
   // CHECK: class_method %{{.+}} : $C, #C.callAsFunction : (C) -> (String) -> @dynamic_self C, $@convention(method) (@guaranteed String, @guaranteed C) -> @owned C

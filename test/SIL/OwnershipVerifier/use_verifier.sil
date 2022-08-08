@@ -230,8 +230,8 @@ bb0(%0 : @owned $SomeError):
   %2 = project_existential_box $SomeError in %1 : $Error
   store %0 to [init] %2 : $*SomeError
   %1a = begin_borrow %1 : $Error
-  %4 = open_existential_box %1a : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  %4 = open_existential_box %1a : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
   end_borrow %1a : $Error
   dealloc_existential_box %1 : $Error, $SomeError
   %9999 = tuple()
@@ -789,21 +789,21 @@ bb9:
 
 sil [ossa] @dynamic_method_br_test : $@convention(thin) (@owned AnyObject, @thick AnyObject.Type) -> () {
 bb0(%0 : @owned $AnyObject, %1 : $@thick AnyObject.Type):
-  %2 = open_existential_ref %0 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
-  dynamic_method_br %2 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject, #X.f!foreign, bb1, bb2
+  %2 = open_existential_ref %0 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000", AnyObject) Self
+  dynamic_method_br %2 : $@opened("01234567-89ab-cdef-0123-000000000000", AnyObject) Self, #X.f!foreign, bb1, bb2
 
-bb1(%4 : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-000000000000") AnyObject) -> ()):
+bb1(%4 : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-000000000000", AnyObject) Self) -> ()):
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  destroy_value %2 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
-  %5 = open_existential_metatype %1 : $@thick AnyObject.Type to $@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type
-  dynamic_method_br %5 : $@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type, #X.g!foreign, bb4, bb5
+  destroy_value %2 : $@opened("01234567-89ab-cdef-0123-000000000000", AnyObject) Self
+  %5 = open_existential_metatype %1 : $@thick AnyObject.Type to $@thick (@opened("01234567-89ab-cdef-0123-000000000001", AnyObject) Self).Type
+  dynamic_method_br %5 : $@thick (@opened("01234567-89ab-cdef-0123-000000000001", AnyObject) Self).Type, #X.g!foreign, bb4, bb5
 
-bb4(%6 : $@convention(objc_method) (@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type) -> ()):
+bb4(%6 : $@convention(objc_method) (@thick (@opened("01234567-89ab-cdef-0123-000000000001", AnyObject) Self).Type) -> ()):
   br bb6
 
 bb5:
@@ -1029,10 +1029,10 @@ bb0:
 sil [ossa] @dependent_type : $@convention(thin) (@owned SwiftKlassP) -> () {
 bb0(%0 : @owned $SwiftKlassP):
   %1 = begin_borrow %0 : $SwiftKlassP
-  %2 = open_existential_ref %1 : $SwiftKlassP to $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP
-  %cast = unchecked_ref_cast %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP to $Builtin.NativeObject
-  %3 = witness_method $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP, #SwiftKlassP.foo, %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
-  apply %3<@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP>(%2) : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
+  %2 = open_existential_ref %1 : $SwiftKlassP to $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self
+  %cast = unchecked_ref_cast %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self to $Builtin.NativeObject
+  %3 = witness_method $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self, #SwiftKlassP.foo, %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
+  apply %3<@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self>(%2) : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
   end_borrow %1 : $SwiftKlassP
   destroy_value %0 : $SwiftKlassP
   %9999 = tuple()

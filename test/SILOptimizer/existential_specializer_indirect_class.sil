@@ -33,9 +33,9 @@ bb0(%0 : $*ClassProtocol):
 sil @test_indirect_class_protocol_guaranteed : $@convention(thin) (@in_guaranteed ClassProtocol) -> () {
 bb0(%0 : $*ClassProtocol):
   %1 = load %0 : $*ClassProtocol
-  %2 = open_existential_ref %1 : $ClassProtocol to $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol
-  %f = witness_method $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol, #ClassProtocol.method : <Self: ClassProtocol> (Self) -> () -> (), %2 : $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
-  apply %f<@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol>(%2) : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
+  %2 = open_existential_ref %1 : $ClassProtocol to $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF", ClassProtocol) Self
+  %f = witness_method $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF", ClassProtocol) Self, #ClassProtocol.method : <Self: ClassProtocol> (Self) -> () -> (), %2 : $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF", ClassProtocol) Self : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
+  apply %f<@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF", ClassProtocol) Self>(%2) : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
   return undef : $()
 }
 

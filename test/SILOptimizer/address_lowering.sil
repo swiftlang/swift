@@ -900,16 +900,16 @@ bb0(%0 : @owned $T):
 // CHECK: bb0(%0 : $*P):
 // CHECK:   [[ALLOC:%.*]] = alloc_stack $P, var, name "q"
 // CHECK:   copy_addr %0 to [initialization] [[ALLOC]] : $*P
-// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[ARCHETYPE:@opened(.*)]] P
-// CHECK:   [[CP:%.*]] = alloc_stack $[[ARCHETYPE]] P // type-defs: [[OPEN]];
-// CHECK:   [[WT:%.*]] = witness_method $[[ARCHETYPE]] P, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*[[ARCHETYPE]] P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   copy_addr [[OPEN]] to [initialization] [[CP]] : $*[[ARCHETYPE]] P
-// CHECK:   %{{.*}} = apply [[WT]]<[[ARCHETYPE]] P>([[CP]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   destroy_addr [[CP]] : $*[[ARCHETYPE]] P
+// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[ARCHETYPE:@opened\(.*, P\) Self]]
+// CHECK:   [[CP:%.*]] = alloc_stack $[[ARCHETYPE]] // type-defs: [[OPEN]];
+// CHECK:   [[WT:%.*]] = witness_method $[[ARCHETYPE]], #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*[[ARCHETYPE]] : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   copy_addr [[OPEN]] to [initialization] [[CP]] : $*[[ARCHETYPE]]
+// CHECK:   %{{.*}} = apply [[WT]]<[[ARCHETYPE]]>([[CP]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   destroy_addr [[CP]] : $*[[ARCHETYPE]]
 // CHECK:   destroy_addr [[ALLOC]] : $*P
 // CHECK:   destroy_addr %0 : $*P
 // CHECK:   %{{.*}} = tuple ()
-// CHECK:   dealloc_stack [[CP]] : $*[[ARCHETYPE]] P
+// CHECK:   dealloc_stack [[CP]] : $*[[ARCHETYPE]]
 // CHECK:   dealloc_stack [[ALLOC]] : $*P
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'f160_testOpenedArchetype'
@@ -919,13 +919,13 @@ bb0(%0 : @owned $P):
   %3 = copy_value %0 : $P
   store %3 to [init] %2 : $*P
   %b = begin_borrow %0 : $P
-  %8 = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
-  %9 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P, #P.foo, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %8 = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %9 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.foo, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   // Test that we can handle owned value of type opened archetype.
-  %10 = copy_value %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  %10 = copy_value %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
   end_borrow %b : $P
-  %11 = apply %9<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  destroy_value %10 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  %11 = apply %9<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %10 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   destroy_value %0 : $P
@@ -937,18 +937,18 @@ bb0(%0 : @owned $P):
 // CHECK: bb0(%0 : $*P):
 // CHECK:   [[ALLOCP:%.*]] = alloc_stack $P, var, name "q"
 // CHECK:   copy_addr %0 to [initialization] [[ALLOCP]] : $*P
-// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
-// CHECK:   [[OPTIONAL:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>
-// CHECK:   witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   [[INIT:%.*]] = init_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt
-// CHECK:   copy_addr [[OPEN]] to [initialization] [[INIT]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
-// CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt
-// CHECK:   [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt
-// CHECK:   %10 = apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   destroy_addr %9 : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+// CHECK:   [[OPTIONAL:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>
+// CHECK:   witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   [[INIT:%.*]] = init_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt
+// CHECK:   copy_addr [[OPEN]] to [initialization] [[INIT]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+// CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt
+// CHECK:   [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt
+// CHECK:   %10 = apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   destroy_addr %9 : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
 // CHECK:   destroy_addr [[ALLOCP]] : $*P
 // CHECK:   destroy_addr %0 : $*P
-// CHECK:   dealloc_stack [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>
+// CHECK:   dealloc_stack [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>
 // CHECK:   dealloc_stack [[ALLOCP]] : $*P
 // CHECK-LABEL: } // end sil function 'f161_testOpenedArchetype'
 sil [ossa] @f161_testOpenedArchetype : $@convention(thin) (@in P) -> () {
@@ -957,15 +957,15 @@ bb0(%0 : @owned $P):
   %3 = copy_value %0 : $P
   store %3 to [init] %2 : $*P
   %b = begin_borrow %0 : $P
-  %8 = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
-  %9 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P, #P.foo, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %cpy = copy_value %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  %8 = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %9 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.foo, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %cpy = copy_value %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
   end_borrow %b : $P
   // This optional is an aggregate that contains an opened existential. Make sure it is allocated after open_existential_addr.
-  %opt = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt, %cpy : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
-  %some = unchecked_enum_data %opt : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt
-  %11 = apply %9<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>(%some) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  destroy_value %some : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  %opt = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt, %cpy : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %some = unchecked_enum_data %opt : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt
+  %11 = apply %9<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%some) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %some : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   destroy_value %0 : $P
@@ -974,9 +974,9 @@ bb0(%0 : @owned $P):
 }
 
 // CHECK-LABEL: sil [ossa] @f162_testOpenedArchetype :
-// CHECK:  [[STK:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>
+// CHECK:  [[STK:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>
 // CHECK: bb6:
-// CHECK:   dealloc_stack [[STK]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>
+// CHECK:   dealloc_stack [[STK]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>
 // CHECK:   br bb7
 // CHECK-LABEL: } // end sil function 'f162_testOpenedArchetype'
 sil [ossa] @f162_testOpenedArchetype : $@convention(thin) (@in P) -> () {
@@ -988,14 +988,14 @@ bb1:
   %3 = copy_value %0 : $P
   store %3 to [init] %2 : $*P
   %5 = begin_borrow %0 : $P
-  %6 = open_existential_value %5 : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
-  %7 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %6 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %8 = copy_value %6 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  %6 = open_existential_value %5 : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %7 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %6 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %8 = copy_value %6 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
   end_borrow %5 : $P
-  %10 = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
-  %11 = unchecked_enum_data %10 : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt
-  %12 = apply %7<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  destroy_value %11 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  %10 = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %11 = unchecked_enum_data %10 : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt
+  %12 = apply %7<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %11 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   cond_br undef, bb2, bb3

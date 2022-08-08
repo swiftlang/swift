@@ -80,7 +80,7 @@ func optionalMethodUnboundRefGeneric<T : P1>(t: T) {
 
 // CHECK: sil private [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed P1) -> @owned Optional<@callee_guaranteed () -> @owned P1> {
 // CHECK: bb0([[EXIST:%[0-9]+]] : @guaranteed $P1):
-// CHECK:   [[OPENED:%[0-9]+]] = open_existential_ref [[EXIST]] : $P1 to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) P1]]
+// CHECK:   [[OPENED:%[0-9]+]] = open_existential_ref [[EXIST]] : $P1 to $[[OPENED_TY:@opened\("[-A-F0-9]+", P1\) Self]]
 // CHECK:   [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]
 // CHECK:   alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : AnyObject> () -> @owned τ_0_0 for <[[OPENED_TY]]>>
 // CHECK:   dynamic_method_br [[OPENED_COPY]] : $[[OPENED_TY]], #P1.methodReturnsSelf!foreign, bb1, bb2
