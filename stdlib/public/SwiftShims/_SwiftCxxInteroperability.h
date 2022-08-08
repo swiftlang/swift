@@ -109,6 +109,16 @@ static inline const constexpr bool isUsableInGenericContext = false;
 /// Returns the type metadat for the given Swift type T.
 template <class T> inline void *_Nonnull getTypeMetadata();
 
+namespace _impl {
+
+/// Type trait that returns the `_impl::_impl_<T>` class type for the given
+/// class T.
+template <class T> struct implClassFor {
+  // using type = ...;
+};
+
+} // namespace _impl
+
 } // namespace swift
 #endif
 
