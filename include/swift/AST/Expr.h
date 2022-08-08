@@ -2106,6 +2106,33 @@ public:
   }
 };
 
+/// MoveExpr - A 'move' surrounding an lvalue expression marking the lvalue as
+/// needing to be moved.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'move' was written.
+class MoveExpr final : public IdentityExpr {
+  SourceLoc MoveLoc;
+
+public:
+  MoveExpr(SourceLoc moveLoc, Expr *sub, Type type = Type(),
+           bool implicit = false)
+      : IdentityExpr(ExprKind::Move, sub, type, implicit), MoveLoc(moveLoc) {}
+
+  static MoveExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc, Expr *sub,
+                                  Type type = Type()) {
+    return new (ctx) MoveExpr(moveLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return MoveLoc; }
+
+  SourceLoc getStartLoc() const { return MoveLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) { return e->getKind() == ExprKind::Move; }
+};
+
 /// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'. Note
 /// that expressions like '(4)' are represented with a ParenExpr.
 class TupleExpr final : public Expr,

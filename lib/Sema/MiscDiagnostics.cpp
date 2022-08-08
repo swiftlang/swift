@@ -19,13 +19,16 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -97,6 +100,7 @@ bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
 ///   - KeyPath expressions cannot refer to effectful properties / subscripts
+///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
@@ -317,7 +321,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
         checkCheckedCastExpr(cast);
       }
-      
+
+      // Diagnose move expression uses where the sub expression is not a declref
+      // expr.
+      if (auto *moveExpr = dyn_cast<MoveExpr>(E)) {
+        checkMoveExpr(moveExpr);
+      }
+
       return { true, E };
     }
 
@@ -354,6 +364,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
                              proto->getName());
         }
+      }
+    }
+
+    void checkMoveExpr(MoveExpr *moveExpr) {
+      if (!isa<DeclRefExpr>(moveExpr->getSubExpr())) {
+        Ctx.Diags.diagnose(moveExpr->getLoc(),
+                           diag::move_expression_not_passed_lvalue);
       }
     }
 

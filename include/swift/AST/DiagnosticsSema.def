@@ -6428,6 +6428,8 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
 
 ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' may only be applied to classes, structs, and enums", ())
+ERROR(move_expression_not_passed_lvalue,none,
+      "'move' can only be applied to lvalues", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

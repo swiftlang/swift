@@ -270,6 +270,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'GarbageNodes' : 266,
     'LabeledStmt': 267,
     'InfixOperatorExpr': 268,
+    'MoveExpr': 269,
 }
 
 
