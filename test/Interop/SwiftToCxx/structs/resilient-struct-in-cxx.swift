@@ -18,6 +18,13 @@ public struct FirstSmallStruct {
         print("x = \(x)")
 #endif
     }
+
+    public mutating func mutate() {
+        x = x * 2
+#if CHANGE_LAYOUT
+        y = ~y
+#endif
+    }
 }
 
 // CHECK: class FirstSmallStruct final {
@@ -60,6 +67,9 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: }
 // CHECK-NEXT: inline void FirstSmallStruct::dump() const {
 // CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
+// CHECK-NEXT: }
+// CHECK-NEXT: inline void FirstSmallStruct::mutate() {
+// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV6mutateyyF(_getOpaquePointer());
 // CHECK-NEXT: }
 
 @frozen public struct FrozenStruct {

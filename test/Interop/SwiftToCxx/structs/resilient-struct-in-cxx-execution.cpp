@@ -40,6 +40,11 @@ int main() {
 // CHECK: find - small dump
 // CURRENT-NEXT: x = 66
 // CHANGE-NEXT: x&y = 0&65
+  copySmallStruct.mutate();
+  copySmallStruct.dump();
+// CHECK: find - small dump
+// CURRENT-NEXT: x = 132
+// CHANGE-NEXT: x&y = 0&4294967230
 
   printSmallAndLarge(smallStruct, largeStruct);
 // CHECK: find - small dump
