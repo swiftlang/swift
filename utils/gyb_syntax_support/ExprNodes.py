@@ -199,6 +199,17 @@ EXPR_NODES = [
              Child('ArrowToken', kind='ArrowToken'),
          ]),
 
+    # An infix binary expression like x + y.
+    # NOTE: This won't come directly out of the parser. Rather, it is the
+    # result of "folding" a SequenceExpr based on knowing the precedence
+    # relationships amongst the different infix operators.
+    Node('InfixOperatorExpr', kind='Expr',
+         children=[
+             Child('LeftOperand', kind='Expr'),
+             Child('OperatorOperand', kind='Expr'),
+             Child('RightOperand', kind='Expr'),
+         ]),
+
     # A floating-point literal
     # 4.0
     # -3.9
