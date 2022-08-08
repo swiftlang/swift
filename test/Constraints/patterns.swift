@@ -486,6 +486,7 @@ func rdar63510989() {
   }
 
   func test(e: E) {
+    if case .single(_) = e {} // Ok
     if case .single(_ as Value) = e {} // Ok
     if case .single(let v as Value) = e {} // Ok
     // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}

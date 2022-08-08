@@ -126,5 +126,35 @@ int main() {
     double x = -19.75;
     assert(genericRet(x) == -19.75);
   }
+
+  {
+    auto tc = createTestClass();
+    genericPrintFunction(tc);
+  }
+// CHECK-NEXT: TestClass value=Functions.TestClass
+// CHECK-NEXT: deinit TestClass
+
+  {
+    auto tc = createTestClass();
+    auto tc2 = genericRet(tc);
+    assert(swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc) ==
+           swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc2));
+    genericPrintFunction(tc2);
+  }
+// CHECK-NEXT: TestClass value=Functions.TestClass
+// CHECK-NEXT: deinit TestClass
+
+  {
+    auto tc = createTestClass();
+    auto tc2 = createTestClass();
+    const auto p1 = swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc);
+    const auto p2 = swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc2);
+    assert(p1 != p2);
+    genericSwap(tc, tc2);
+    assert(p2 == swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc));
+    assert(p1 == swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc2));
+  }
+// CHECK-NEXT: deinit TestClass
+// CHECK-NEXT: deinit TestClass
   return 0;
 }
