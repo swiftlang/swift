@@ -899,7 +899,7 @@ public func run_KeyPathNestedStructs(n: Int) {
 public func run_testDirectAccess(n: Int) {
   arrayHolder.reset()
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
-  let iterationMultipier = 75000
+  let iterationMultipier = 125000
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
     fixedSizeArray100.element46 += fixedSizeArray100.element63 - fixedSizeArray100.element99
