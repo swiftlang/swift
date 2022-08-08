@@ -984,13 +984,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   // Build self
   Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isBaseLValue,
                                      /*convertTy*/ selfTypeForAccess);
-  if (isBaseLValue)
-    selfTypeForAccess = LValueType::get(selfTypeForAccess);
-
-  if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
-    assert(selfAccessKind == SelfAccessorKind::Super);
-    selfDRE = new (ctx) DerivedToBaseExpr(selfDRE, selfTypeForAccess);
-  }
 
   // Build self.member or equivalent
 
