@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Workspace
    version = "1.0">
-   <FileRef
-      location = "group:../../../../swift-syntax">
-   </FileRef>
-   <FileRef
-      location = "group:../../../../swift-stress-tester/SourceKitStressTester">
-   </FileRef>
-   <FileRef
-      location = "group:../../../../swift-format">
-   </FileRef>
-   <FileRef
-      location = "group:../../../../swift-stress-tester/SwiftEvolve">
-   </FileRef>
-   <FileRef
-      location = "group:../../../../swift-docc">
-   </FileRef>
+   <FileRef location = "group:../../../../indexstore-db"></FileRef>
+   <FileRef location = "group:../../../../llbuild"></FileRef>
+   <FileRef location = "group:../../../../sourcekit-lsp"></FileRef>
+   <FileRef location = "group:../../../../swift-argument-parser"></FileRef>
+   <FileRef location = "group:../../../../swift-collections"></FileRef>
+   <FileRef location = "group:../../../../swift-crypto"></FileRef>
+   <FileRef location = "group:../../../../swift-docc"></FileRef>
+   <FileRef location = "group:../../../../swift-driver"></FileRef>
+   <FileRef location = "group:../../../../swift-format"></FileRef>
+   <FileRef location = "group:../../../../swift-stress-tester/SourceKitStressTester"></FileRef>
+   <FileRef location = "group:../../../../swift-stress-tester/SwiftEvolve"></FileRef>
+   <FileRef location = "group:../../../../swift-syntax"></FileRef>
+   <FileRef location = "group:../../../../swift-system"></FileRef>
+   <FileRef location = "group:../../../../swift-tools-support-core"></FileRef>
+   <FileRef location = "group:../../../../swiftpm"></FileRef>
+   <FileRef location = "group:../../../../yams"></FileRef>
 </Workspace>
