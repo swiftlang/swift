@@ -30,11 +30,11 @@ func testClonable(c: Clonable) {
   // CHECK: [[THUNK:%.*]] = apply [[THUNK_FN]]({{.*}})
   let _: () -> Clonable.Type = c.cloneMetatype
 
-  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn :
-  // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}") Clonable>({{.*}})
+  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}", Clonable) Self, #Clonable.getCloneFn :
+  // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}", Clonable) Self>({{.*}})
   // CHECK: [[CONV_RESULT:%.*]] = convert_function [[RESULT]]
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
-  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>([[CONV_RESULT]])
+  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}", Clonable) Self>([[CONV_RESULT]])
   let _: () -> Clonable = c.getCloneFn()
 
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$s22partial_apply_protocol12testClonable1cyAA0E0_p_tFAaD_pycycAaD_pcfu5_
@@ -72,11 +72,11 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
   // CHECK: [[THUNK:%.*]] = apply [[THUNK_FN]]({{.*}})
   let _: () -> Clonable.Type = c.cloneMetatype
 
-  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn :
-  // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}") Clonable>({{.*}})
+  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}", Clonable) Self, #Clonable.getCloneFn :
+  // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}", Clonable) Self>({{.*}})
   // CHECK: [[RESULT_CONV:%.*]] = convert_function [[RESULT]]
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
-  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>([[RESULT_CONV]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
+  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}", Clonable) Self>([[RESULT_CONV]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
   let _: () -> Clonable = c.getCloneFn()
 
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$s22partial_apply_protocol28testClonableInGenericContext1c1tyAA0E0_p_xtlFAaE_pycycAaE_pcfu5_ : $@convention(thin) (@in_guaranteed Clonable) -> @owned @callee_guaranteed () -> @owned @callee_guaranteed () -> @out Clonable

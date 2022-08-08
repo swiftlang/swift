@@ -157,18 +157,18 @@ protocol P {
 // CHECK-LABEL: @existentials : $@convention(thin) (@in P) -> () {
 sil [transparent] [serialized] @existentials : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  %1 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P // CHECK: open_existential_addr  mutable_access %0
-  %imm = open_existential_addr immutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-100000000000") P // CHECK: open_existential_addr  immutable_access %0
-  %meth = witness_method $@opened("01234567-89ab-cdef-0123-100000000000") P, #P.doIt, %imm : $*@opened("01234567-89ab-cdef-0123-100000000000") P : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
-  %call = apply %meth<@opened("01234567-89ab-cdef-0123-100000000000") P>(%imm) : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
+  %1 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000", P) Self // CHECK: open_existential_addr  mutable_access %0
+  %imm = open_existential_addr immutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-100000000000", P) Self // CHECK: open_existential_addr  immutable_access %0
+  %meth = witness_method $@opened("01234567-89ab-cdef-0123-100000000000", P) Self, #P.doIt, %imm : $*@opened("01234567-89ab-cdef-0123-100000000000", P) Self : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
+  %call = apply %meth<@opened("01234567-89ab-cdef-0123-100000000000", P) Self>(%imm) : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
 
   // CHECK: witness_method ${{.*}}, #P.doIt
-  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) <T: P> (@inout T) -> ()
+  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", P) Self, #P.doIt, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000", P) Self : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   // Make sure we have the correct scope for generic parameters.
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.doIt
-  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) <T: P> (@inout T) -> ()
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.doIt
+  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", P) Self, #P.doIt, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000", P) Self : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   // CHECK: apply
-  %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@convention(witness_method: P) <T: P> (@inout T) -> ()
+  %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000", P) Self>(%1) : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   return %4 : $()                // CHECK: return
@@ -277,11 +277,11 @@ bb0(%0 : $ClassBound):
   store %0 to %1a : $*ClassBound
   %3 = load %1a : $*ClassBound
   strong_retain %3 : $ClassBound              // CHECK: strong_retain
-  // CHECK: open_existential_ref {{%.*}} : $ClassBound to $@opened({{.*}}) ClassBound
-  %5 = open_existential_ref %3 : $ClassBound to $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound
+  // CHECK: open_existential_ref {{%.*}} : $ClassBound to $@opened({{.*}}, ClassBound) Self
+  %5 = open_existential_ref %3 : $ClassBound to $@opened("01234567-89ab-cdef-0123-111111111111", ClassBound) Self
   // CHECK: witness_method
-  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
-  %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
+  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111", ClassBound) Self, #ClassBound.classBoundMethod, %5 : $@opened("01234567-89ab-cdef-0123-111111111111", ClassBound) Self : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
+  %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111", ClassBound) Self>(%5) : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
   %8 = tuple ()
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <ClassBound>
   return %8 : $()
@@ -984,11 +984,11 @@ bb0(%0 : $AnyObject):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
-  // CHECK: open_existential_ref %{{.*}} : $AnyObject to $@opened([[EXISTENTIAL_UUID:.*]]) AnyObject
-  %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject
-  // CHECK: dynamic_method_br %{{.*}} : $@opened([[EXISTENTIAL_UUID]]) AnyObject, #X.f!foreign, bb{{.*}}, bb{{.*}}
-  dynamic_method_br %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject, #X.f!foreign, bb1, bb2
-bb1(%z : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-222222222222") AnyObject) -> ()):
+  // CHECK: open_existential_ref %{{.*}} : $AnyObject to $@opened([[EXISTENTIAL_UUID:.*]], AnyObject) Self
+  %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222", AnyObject) Self
+  // CHECK: dynamic_method_br %{{.*}} : $@opened([[EXISTENTIAL_UUID]], AnyObject) Self, #X.f!foreign, bb{{.*}}, bb{{.*}}
+  dynamic_method_br %6 : $@opened("01234567-89ab-cdef-0123-222222222222", AnyObject) Self, #X.f!foreign, bb1, bb2
+bb1(%z : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-222222222222", AnyObject) Self) -> ()):
   br bb3
 
 bb2:
@@ -1231,10 +1231,10 @@ bb0(%0 : $SomeError):
   %2 = project_existential_box $SomeError in %1 : $Error
   // CHECK: store %0 to %2 : $*SomeError
   store %0 to %2 : $*SomeError
-  // CHECK: %4 = open_existential_box %1 : $Error to $*[[OPENED:@opened\(".*"\)]] Error
-  %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  // CHECK: destroy_addr %4 : $*[[OPENED]] Error
-  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  // CHECK: %4 = open_existential_box %1 : $Error to $*[[OPENED:@opened\(".*", Error\) Self]]
+  %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  // CHECK: destroy_addr %4 : $*[[OPENED]]
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
   // CHECK: dealloc_existential_box %1 : $Error, $SomeError
   dealloc_existential_box %1 : $Error, $SomeError
   return undef : $()

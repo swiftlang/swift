@@ -83,7 +83,7 @@ var _type: P.Type { get {return S.self } set {} }
 func getterResultStaticStorageAccess() {
   // CHECK:      [[GET_TYPE:%.*]] = function_ref @$s21existential_metatypes5_typeAA1P_pXpvg
   // CHECK-NEXT: [[TYPE:%.*]] = apply [[GET_TYPE]]() : $@convention(thin) () -> @thick P.Type
-  // CHECK-NEXT: [[OPEN:%.*]] = open_existential_metatype [[TYPE]] : $@thick P.Type to $@thick ([[ARCHETYPE:@opened(.*) P]]).Type
+  // CHECK-NEXT: [[OPEN:%.*]] = open_existential_metatype [[TYPE]] : $@thick P.Type to $@thick ([[ARCHETYPE:@opened\(.*, P\) Self]]).Type
   // CHECK-NEXT: [[GET_VALUE:%.*]] = witness_method $[[ARCHETYPE]], #P.value!getter
   // CHECK-NEXT: [[VALUE:%.*]] = apply [[GET_VALUE]]<[[ARCHETYPE]]>([[OPEN]])
   // CHECK-NEXT: // function_ref

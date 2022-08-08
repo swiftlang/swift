@@ -33,7 +33,7 @@ func upcast(_ x: S) -> any P {
   // CHECK: [[Q_INT_STRING_FLOAT:%.*]] = alloc_stack $Q<Int, String, Float>
   // CHECK: [[INIT_Q_INT_STRING_FLOAT:%.*]] = init_existential_addr [[Q_INT_STRING_FLOAT]] : $*Q<Int, String, Float>, $S
   // CHECK: store [[CONCRETE_VAL]] to [trivial] [[INIT_Q_INT_STRING_FLOAT]] : $*S
-  // CHECK: [[OPEN_Q_INT_STRING_FLOAT:%.*]] = open_existential_addr immutable_access [[Q_INT_STRING_FLOAT]] : $*Q<Int, String, Float> to $*[[OPENED_Q_INT_STRING_FLOAT:@opened(.*) Q<Int, String, Float>]]
+  // CHECK: [[OPEN_Q_INT_STRING_FLOAT:%.*]] = open_existential_addr immutable_access [[Q_INT_STRING_FLOAT]] : $*Q<Int, String, Float> to $*[[OPENED_Q_INT_STRING_FLOAT:@opened\(.*, Q<Int, String, Float>\) Self]]
   // CHECK: [[RESULT_INIT:%.*]] = init_existential_addr [[RESULT_PARAM]] : $*P, $[[OPENED_Q_INT_STRING_FLOAT]]
   // CHECK: copy_addr [[OPEN_Q_INT_STRING_FLOAT]] to [initialization] [[RESULT_INIT]] : $*[[OPENED_Q_INT_STRING_FLOAT]]
 
@@ -47,7 +47,7 @@ func upupupupcast(_ x: S) -> any P {
   // CHECK: [[P_INT_STRING_FLOAT:%.*]] = alloc_stack $P<Int, String, Float>
   // CHECK: [[INIT_INT_STRING_FLOAT:%.*]] = init_existential_addr [[P_INT_STRING_FLOAT]] : $*P<Int, String, Float>, $S
   // CHECK: store [[CONCRETE_VAL]] to [trivial] [[INIT_INT_STRING_FLOAT]] : $*S
-  // CHECK: [[OPEN_INT_STRING_FLOAT:%.*]] = open_existential_addr immutable_access %3 : $*P<Int, String, Float> to $*[[OPENED_P_INT_STRING_FLOAT:@opened(.*) P<Int, String, Float>]]
+  // CHECK: [[OPEN_INT_STRING_FLOAT:%.*]] = open_existential_addr immutable_access %3 : $*P<Int, String, Float> to $*[[OPENED_P_INT_STRING_FLOAT:@opened\(.*, P<Int, String, Float>\) Self]]
 
   // CHECK: [[RESULT_INIT:%.*]] = init_existential_addr [[RESULT_PARAM]] : $*P, $[[OPENED_P_INT_STRING_FLOAT]]
   // CHECK: copy_addr [[OPEN_INT_STRING_FLOAT]] to [initialization] [[RESULT_INIT]] : $*[[OPENED_P_INT_STRING_FLOAT]]

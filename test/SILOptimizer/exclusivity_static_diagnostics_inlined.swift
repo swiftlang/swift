@@ -24,7 +24,7 @@ struct Some : SomeP {
 // INLINE: [[OUTER:%.*]] = begin_access [modify] [static] %0 : $*SomeP
 // INLINE: [[INNERREAD:%.*]] = begin_access [read] [static] [[OUTER]] : $*SomeP
 // INLINE: [[INNERMOD:%.*]] = begin_access [modify] [static] [[OUTER]] : $*SomeP
-// INLINE: %{{.*}} = open_existential_addr mutable_access [[INNERMOD]] : $*SomeP to $*@opened("{{.*}}") SomeP
+// INLINE: %{{.*}} = open_existential_addr mutable_access [[INNERMOD]] : $*SomeP to $*@opened("{{.*}}", SomeP) Self
 //
 public func testNestedAccess() {
   var s: SomeP = Some()

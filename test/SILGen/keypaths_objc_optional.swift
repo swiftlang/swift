@@ -26,13 +26,13 @@ import Foundation
 // CHECK: } // end sil function '${{.*}}testKeyPathAccessorsForOptionalStorageComponentsyyF'
 //
 // CHECK: sil shared [thunk] [ossa] @$[[SWIFT_PROP_GETTER]] : $@convention(thin) (@in_guaranteed SwiftProtocol) -> @out Optional<Object> {
-// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $SwiftProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) SwiftProtocol]]
+// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $SwiftProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+", SwiftProtocol\) Self]]
 // CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #SwiftProtocol.object!getter.foreign, bb1
 // CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) ([[OPENED_TY]]) -> @autoreleased Object)
 // CHECK: } // end sil function '$[[SWIFT_PROP_GETTER]]'
 //
 // CHECK: sil shared [thunk] [ossa] @$[[SWIFT_SUBSCR_GETTER]] : $@convention(thin) (@in_guaranteed SwiftProtocol, UnsafeRawPointer) -> @out Optional<Object> {
-// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $SwiftProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) SwiftProtocol]]
+// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $SwiftProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+", SwiftProtocol\) Self]]
 // CHECK:   [[INDEX:%[0-9]+]] = load [trivial] {{%[0-9]+}} : $*Bool
 // CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #SwiftProtocol.subscript!getter.foreign, bb1, bb2
 // CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) (ObjCBool, [[OPENED_TY]]) -> @autoreleased Object):
@@ -42,7 +42,7 @@ import Foundation
 //
 // CHECK: sil shared [thunk] [ossa] @$[[OBJC_PROP_GETTER]] : $@convention(thin) (@in_guaranteed ObjCProtocol) -> @out Optional<Bool> {
 // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Bool>,
-// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $ObjCProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) ObjCProtocol]]
+// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $ObjCProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+", ObjCProtocol\) Self]]
 // CHECK:   [[DEST:%[0-9]+]] = alloc_stack $Optional<Bool>
 // CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #ObjCProtocol.flag!getter.foreign, bb1, bb2
 // CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) ([[OPENED_TY]]) -> {{ObjCBool|Bool}}):

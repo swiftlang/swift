@@ -66,10 +66,10 @@ func test_dynamic_callables<T : C>(_ s: S, _ p1: P1, _ p2: P2, _ t: T) {
   // CHECK: switch_enum %{{.+}} : $Optional<Int>
   let _: Int = s(0)
 
-  // CHECK: witness_method $@opened({{.+}}) P1, #P1.dynamicallyCall : <Self where Self : P1> (Self) -> ([String : Any]) -> ()
+  // CHECK: witness_method $@opened({{.+}} P1) Self, #P1.dynamicallyCall : <Self where Self : P1> (Self) -> ([String : Any]) -> ()
   p1(x: 5)
 
-  // CHECK: witness_method $@opened({{.+}}) P2, #P2.dynamicallyCall : <Self where Self : P2> (Self) -> ([Int]) -> Self
+  // CHECK: witness_method $@opened({{.+}} P2) Self, #P2.dynamicallyCall : <Self where Self : P2> (Self) -> ([Int]) -> Self
   _ = p2()
 
   // CHECK: class_method %{{.+}} : $C, #C.dynamicallyCall : (C) -> ([String : String]) -> @dynamic_self C, $@convention(method) (@guaranteed Dictionary<String, String>, @guaranteed C) -> @owned C
