@@ -3568,7 +3568,7 @@ bool InvalidProjectedValueArgument::diagnoseAsError() {
   if (!param->hasAttachedPropertyWrapper()) {
     param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
   } else if (!param->hasImplicitPropertyWrapper() &&
-             param->getAttachedPropertyWrappers().front()->hasArgs()) {
+             param->getOutermostAttachedPropertyWrapper()->hasArgs()) {
     param->diagnose(diag::property_wrapper_param_attr_arg);
   } else {
     Type backingType;

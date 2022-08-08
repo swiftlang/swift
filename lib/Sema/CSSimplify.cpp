@@ -9989,7 +9989,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         wrappedValueType = createTypeVariable(getConstraintLocator(paramDecl),
                                               TVO_CanBindToHole | TVO_CanBindToLValue);
       } else {
-        auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
+        auto *wrapperAttr = paramDecl->getOutermostAttachedPropertyWrapper();
         auto wrapperType = paramDecl->getAttachedPropertyWrapperType(0);
         backingType = replaceInferableTypesWithTypeVars(
             wrapperType, getConstraintLocator(wrapperAttr->getTypeRepr()));
