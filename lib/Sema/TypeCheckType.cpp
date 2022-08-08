@@ -72,24 +72,24 @@ TypeResolution
 TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
                              HandlePlaceholderTypeReprFn placeholderHandler) {
-  return forInterface(dc, dc->getGenericEnvironmentOfContext(), options,
+  return forInterface(dc, dc->getGenericSignatureOfContext(), options,
                       unboundTyOpener, placeholderHandler);
 }
 
 TypeResolution
-TypeResolution::forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
+TypeResolution::forInterface(DeclContext *dc, GenericSignature genericSig,
                              TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
                              HandlePlaceholderTypeReprFn placeholderHandler) {
   TypeResolution result(dc, TypeResolutionStage::Interface, options,
                         unboundTyOpener, placeholderHandler);
-  result.genericEnv = genericEnv;
+  result.genericSig = genericSig;
   return result;
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
   TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler);
-  result.genericEnv = genericEnv;
+  result.genericSig = genericSig;
   return result;
 }
 
@@ -102,8 +102,8 @@ GenericSignature TypeResolution::getGenericSignature() const {
       stage == TypeResolutionStage::Interface &&
       "Structural resolution shouldn't require generic signature computation");
 
-  if (genericEnv)
-    return genericEnv->getGenericSignature();
+  if (genericSig)
+    return genericSig;
 
   return dc->getGenericSignatureOfContext();
 }
@@ -2016,17 +2016,17 @@ Type TypeResolution::resolveContextualType(
     OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
     GenericParamList *silParams) {
-  return resolveContextualType(TyR, dc, dc->getGenericEnvironmentOfContext(),
+  return resolveContextualType(TyR, dc, dc->getGenericSignatureOfContext(),
                                opts, unboundTyOpener, placeholderHandler);
 }
 
 Type TypeResolution::resolveContextualType(
-    TypeRepr *TyR, DeclContext *dc, GenericEnvironment *genericEnv,
+    TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
     TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
     GenericParamList *silParams) {
   const auto resolution = TypeResolution::forInterface(
-      dc, genericEnv, opts, unboundTyOpener, placeholderHandler);
+      dc, genericSig, opts, unboundTyOpener, placeholderHandler);
   const auto ty = resolution.resolveType(TyR, silParams);
 
   return GenericEnvironment::mapTypeIntoContext(
@@ -3171,9 +3171,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
-  if (auto genericEnv = repr->getGenericEnvironment()) {
-    return GenericFunctionType::get(genericEnv->getGenericSignature(),
-                                    params, outputTy, extInfo);
+  if (auto genericSig = repr->getGenericSignature()) {
+    return GenericFunctionType::get(genericSig, params, outputTy, extInfo);
   }
 
   auto fnTy = FunctionType::get(params, outputTy, extInfo);
@@ -3200,12 +3199,12 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     // outside the box's own environment; we should really validate that...)
     TypeResolution fieldResolution{resolution};
 
-    auto *genericEnv = repr->getGenericEnvironment();
+    auto genericSig = repr->getGenericSignature();
     auto *genericParams = repr->getGenericParams();
 
     if (genericParams) {
       fieldResolution =
-          TypeResolution::forInterface(getDeclContext(), genericEnv, options,
+          TypeResolution::forInterface(getDeclContext(), genericSig, options,
                                        resolution.getUnboundTypeOpener(),
                                        resolution.getPlaceholderHandler());
     }
@@ -3219,10 +3218,7 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   }
 
   // Substitute out parsed context types into interface types.
-  CanGenericSignature genericSig;
-  if (auto *genericEnv = repr->getGenericEnvironment()) {
-    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
-  }
+  auto genericSig = repr->getGenericSignature().getCanonicalSignature();
   
   // Resolve the generic arguments.
   // Start by building a TypeSubstitutionMap.
@@ -3277,11 +3273,10 @@ NeverNullType TypeResolver::resolveSILFunctionType(
   if (componentGenericParams == nullptr)
     componentGenericParams = genericParams;
 
-  GenericEnvironment *genericEnv = repr->getGenericEnvironment();
-  GenericEnvironment *componentTypeEnv =
-    repr->getPatternGenericEnvironment()
-      ? repr->getPatternGenericEnvironment()
-      : genericEnv;
+  auto genericSig = repr->getGenericSignature();
+  auto componentTypeSig = repr->getPatternGenericSignature();
+  if (!componentTypeSig)
+    componentTypeSig = genericSig;
 
   {
     auto argsTuple = repr->getArgsTypeRepr();
@@ -3296,9 +3291,9 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     }
 
     TypeResolution functionResolution{resolution};
-    if (componentTypeEnv) {
+    if (componentTypeSig) {
       functionResolution = TypeResolution::forInterface(
-          getDeclContext(), componentTypeEnv, options,
+          getDeclContext(), componentTypeSig, options,
           resolution.getUnboundTypeOpener(),
           resolution.getPlaceholderHandler());
     }
@@ -3330,10 +3325,10 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     }
   }
 
-  auto resolveSubstitutions = [&](GenericEnvironment *env,
+  auto resolveSubstitutions = [&](GenericSignature sig,
                                   ArrayRef<TypeRepr*> args,
                                   TypeResolver &&parameterResolver) {
-    auto sig = env->getGenericSignature().getCanonicalSignature();
+    sig = sig.getCanonicalSignature();
     TypeSubstitutionMap subsMap;
     auto params = sig.getGenericParams();
     for (unsigned i : indices(args)) {
@@ -3350,17 +3345,17 @@ NeverNullType TypeResolver::resolveSILFunctionType(
   // applicable.
   SubstitutionMap patternSubs;
   if (!repr->getPatternSubstitutions().empty()) {
-    if (genericEnv) {
+    if (genericSig) {
       auto resolveSILParameters =
-          TypeResolution::forInterface(getDeclContext(), genericEnv, options,
+          TypeResolution::forInterface(getDeclContext(), genericSig, options,
                                        resolution.getUnboundTypeOpener(),
                                        resolution.getPlaceholderHandler());
-      patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
+      patternSubs = resolveSubstitutions(repr->getPatternGenericSignature(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
                                                       genericParams});
     } else {
-      patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
+      patternSubs = resolveSubstitutions(repr->getPatternGenericSignature(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolution,
                                                       genericParams});
@@ -3370,7 +3365,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(
   // Resolve invocation substitutions if we have them.
   SubstitutionMap invocationSubs;
   if (!repr->getInvocationSubstitutions().empty()) {
-    invocationSubs = resolveSubstitutions(repr->getGenericEnvironment(),
+    invocationSubs = resolveSubstitutions(repr->getGenericSignature(),
                                           repr->getInvocationSubstitutions(),
                                           TypeResolver{resolution,
                                                        genericParams});
@@ -3400,7 +3395,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
 
     // Only once we've done all the necessary substitutions, map the type
     // into the function's environment.
-    selfType = GenericEnvironment::mapTypeIntoContext(genericEnv, selfType);
+    selfType = GenericEnvironment::mapTypeIntoContext(
+        genericSig.getGenericEnvironment(), selfType);
 
     // The Self type can be nested in a few layers of metatypes (etc.).
     while (auto metatypeType = selfType->getAs<MetatypeType>()) {
@@ -3428,11 +3424,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
   }
 
-  CanGenericSignature genericSig =
-      genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
-                 : CanGenericSignature();
-
-  return SILFunctionType::get(genericSig, extInfoBuilder.build(), coroutineKind,
+  return SILFunctionType::get(genericSig.getCanonicalSignature(),
+                              extInfoBuilder.build(), coroutineKind,
                               callee, params, yields, results, errorResult,
                               patternSubs, invocationSubs, getASTContext(),
                               witnessMethodConformance);

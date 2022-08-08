@@ -253,7 +253,7 @@ void swift::ide::collectPossibleReturnTypesFromContext(
           const auto type = swift::performTypeResolution(
               CE->getExplicitResultTypeRepr(), DC->getASTContext(),
               /*isSILMode=*/false, /*isSILType=*/false,
-              DC->getGenericEnvironmentOfContext(), /*GenericParams=*/nullptr,
+              DC->getGenericSignatureOfContext(), /*GenericParams=*/nullptr,
               const_cast<DeclContext *>(DC), /*diagnostics=*/false);
 
           if (!type->hasError()) {
