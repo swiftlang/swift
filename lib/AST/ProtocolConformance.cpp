@@ -1570,8 +1570,22 @@ bool ProtocolConformance::isCanonical() const {
 
   switch (getKind()) {
   case ProtocolConformanceKind::Self:
-  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Normal: {
+    return true;
+  }
   case ProtocolConformanceKind::Builtin: {
+    // Check that the generic signature of the conformance is canonical.
+    auto builtinConformance = cast<BuiltinProtocolConformance>(this);
+    if (builtinConformance->getGenericSignature()
+        && !builtinConformance->getGenericSignature()->isCanonical()) {
+      return false;
+    }
+    // Check that the satisfied conditional requirements are canonical.
+    for (auto &requirement : builtinConformance->getConditionalRequirements()) {
+      if (!requirement.isCanonical()) {
+        return false;
+      }
+    }
     return true;
   }
   case ProtocolConformanceKind::Inherited: {
@@ -1600,10 +1614,24 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
 
   switch (getKind()) {
   case ProtocolConformanceKind::Self:
-  case ProtocolConformanceKind::Normal:
-  case ProtocolConformanceKind::Builtin: {
+  case ProtocolConformanceKind::Normal: {
     // Root conformances are always canonical by construction.
     return this;
+  }
+  case ProtocolConformanceKind::Builtin: {
+    // Canonicalize the subject type of the builtin conformance.
+    auto &Ctx = getType()->getASTContext();
+    auto builtinConformance = cast<BuiltinProtocolConformance>(this);
+    SmallVector<Requirement, 4> canonicalRequirements;
+    for (auto &reqt : builtinConformance->getConditionalRequirements()) {
+      canonicalRequirements.push_back(reqt.getCanonical());
+    }
+    return Ctx.getBuiltinConformance(
+      builtinConformance->getType()->getCanonicalType(),
+      builtinConformance->getProtocol(),
+      builtinConformance->getGenericSignature().getCanonicalSignature(),
+      canonicalRequirements,
+      builtinConformance->getBuiltinConformanceKind());
   }
 
   case ProtocolConformanceKind::Inherited: {
