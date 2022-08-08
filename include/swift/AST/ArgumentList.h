@@ -51,6 +51,9 @@ public:
     return Argument(SourceLoc(), Identifier(), expr);
   }
 
+  /// Make an implicit unlabeled 'inout' argument.
+  static Argument implicitInOut(ASTContext &ctx, Expr *expr);
+
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   SourceRange getSourceRange() const;

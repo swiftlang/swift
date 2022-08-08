@@ -1821,26 +1821,22 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto methodDecl =
       static_cast<FuncDecl *>(context); /* Swift version of CXXMethod */
 
-  SmallVector<Expr *, 8> forwardingParams;
+  SmallVector<Argument, 8> forwardingArgs;
 
   // We start from +1 since the first param is our lhs. All other params are
   // forwarded
   for (auto itr = funcDecl->getParameters()->begin() + 1;
        itr != funcDecl->getParameters()->end(); itr++) {
     auto param = *itr;
+    auto isInOut = param->isInOut();
+    auto paramTy = param->getType();
     Expr *paramRefExpr =
         new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit*/ true);
-    paramRefExpr->setType(param->getType());
+    paramRefExpr->setType(isInOut ? LValueType::get(paramTy) : paramTy);
 
-    if (param->isInOut()) {
-      paramRefExpr->setType(LValueType::get(param->getType()));
-
-      paramRefExpr = new (ctx) InOutExpr(SourceLoc(), paramRefExpr,
-                                         param->getType(), /*isImplicit*/ true);
-      paramRefExpr->setType(InOutType::get(param->getType()));
-    }
-
-    forwardingParams.push_back(paramRefExpr);
+    auto arg = isInOut ? Argument::implicitInOut(ctx, paramRefExpr)
+                       : Argument::unlabeled(paramRefExpr);
+    forwardingArgs.push_back(arg);
   }
 
   auto methodExpr =
@@ -1865,7 +1861,7 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   dotCallExpr->setType(methodDecl->getMethodInterfaceType());
   dotCallExpr->setThrows(false);
 
-  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
+  auto *argList = ArgumentList::createImplicit(ctx, forwardingArgs);
   auto callExpr = CallExpr::createImplicit(ctx, dotCallExpr, argList);
   callExpr->setType(funcDecl->getResultInterfaceType());
   callExpr->setThrows(false);
