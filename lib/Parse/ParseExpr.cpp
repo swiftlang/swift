@@ -393,6 +393,7 @@ done:
 ///     'try' expr-sequence-element(Mode)
 ///     'try' '?' expr-sequence-element(Mode)
 ///     'try' '!' expr-sequence-element(Mode)
+///     '_move' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
 ///
 /// 'try' is not actually allowed at an arbitrary position of a
@@ -430,6 +431,19 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     }
 
    return sub;
+  }
+
+  if (Tok.isContextualKeyword("_move")) {
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc awaitLoc = consumeToken();
+    ParserResult<Expr> sub =
+        parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      ElementContext.setCreateSyntax(SyntaxKind::MoveExpr);
+      sub = makeParserResult(new (Context) MoveExpr(awaitLoc, sub.get()));
+    }
+
+    return sub;
   }
 
   SourceLoc tryLoc;

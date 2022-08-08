@@ -54,6 +54,14 @@ EXPR_NODES = [
              Child('Expression', kind='Expr'),
          ]),
 
+    # The move expr
+    Node('MoveExpr', kind='Expr',
+         children=[
+             Child('MoveKeyword', kind='ContextualKeywordToken',
+                   text_choices=['_move']),
+             Child('Expression', kind='Expr'),
+         ]),
+
     # declname-arguments -> '(' declname-argument-list ')'
     # declname-argument-list -> declname-argument*
     # declname-argument -> identifier ':'
