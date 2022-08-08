@@ -12,6 +12,8 @@
 
 import os
 
+from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
+
 from . import cmark
 from . import foundation
 from . import libcxx
@@ -40,6 +42,10 @@ class IndexStoreDB(product.Product):
     @classmethod
     def is_before_build_script_impl_product(cls):
         return False
+
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        return True
 
     def should_build(self, host_target):
         return True
@@ -95,6 +101,7 @@ def run_build_script_helper(action, host_target, product, args,
         '--configuration', configuration,
         '--toolchain', toolchain_path,
         '--ninja-bin', product.toolchain.ninja,
+        '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
     ]
     if args.verbose_build:
         helper_cmd.append('--verbose')
