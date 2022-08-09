@@ -2,21 +2,22 @@
 #import "NSSlowTaggedLocalizedString.h"
 #import <dlfcn.h>
 #import <objc/runtime.h>
+#import <Foundation/Foundation.h>
 
-//If and when CF starts linking Swift we may need to rethink this
-#import <CoreFoundation/CoreFoundation.h>
+/*
+ This horrific mess is simulating the new-in-macOS-Ventura tagged pointer strings,
+ which can have lengths >15 characters, which can cause problems in SmallString,
+ which used to assume that would never happen. Once CI is running on Ventura or
+ later, this can be rewritten to use a regular NSLocalizedString.
+ */
 
 @implementation NSSlowTaggedLocalizedString
-
-typedef struct _NSRange {
-  uint64_t location;
-  uint64_t length;
-} NSRange;
 
 + (instancetype) createTestString {
 #if __LP64__
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
+    [[[NSString alloc] init] release]; //Make sure NSString is initialized
     Class tagClass = objc_lookUpClass("NSTaggedPointerString");
     Class ourClass = [NSSlowTaggedLocalizedString class];
     
