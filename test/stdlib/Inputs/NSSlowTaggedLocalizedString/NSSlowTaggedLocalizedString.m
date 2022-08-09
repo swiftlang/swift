@@ -78,9 +78,7 @@ static const char *contents = NULL;
 }
 
 - (uint16_t)characterAtIndex:(NSUInteger)index {
-  abort();
   if (index >= [self length]) {
-    //throw the appropriate exception
     abort();
   }
   return (uint16_t)contents[index];
@@ -102,6 +100,7 @@ static const char *contents = NULL;
 }
 
 - (BOOL)getBytes:(void *)buffer maxLength:(uint64_t)max usedLength:(uint64_t *)used encoding:(uint64_t)encoding options:(uint64_t)options range:(NSRange)range remainingRange:(NSRange *)leftover {
+  assert(encoding == kCFStringEncodingASCII || encoding == kCFStringEncodingUTF8);
   strncpy(buffer, contents, max);
   if (strlen(contents) > max) {
     leftover->location = max;
