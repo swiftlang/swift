@@ -11,6 +11,16 @@
 // RUN: not %target-interop-build-clangxx -c %s -I %t -o %t/swift-class-execution.o -DERROR1
 // RUN: not %target-interop-build-clangxx -c %s -I %t -o %t/swift-class-execution.o -DERROR2
 
+// RUN: %empty-directory(%t-evo)
+
+// RUN: %target-swift-frontend %S/swift-class-inheritance-in-cxx.swift -typecheck -module-name Class -enable-library-evolution -clang-header-expose-public-decls -emit-clang-header-path %t-evo/class.h
+
+// RUN: %target-interop-build-clangxx -c %s -I %t-evo -o %t-evo/swift-class-execution.o
+// RUN: %target-interop-build-swift %S/swift-class-inheritance-in-cxx.swift -o %t-evo/swift-class-execution-evo -Xlinker %t-evo/swift-class-execution.o -module-name Class -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+
+// RUN: %target-codesign %t-evo/swift-class-execution-evo
+// RUN: %target-run %t-evo/swift-class-execution-evo | %FileCheck %s
+
 // REQUIRES: executable_test
 
 #include <assert.h>
