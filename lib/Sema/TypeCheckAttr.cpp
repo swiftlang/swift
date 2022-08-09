@@ -5862,6 +5862,16 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       }
     }
 
+    // We do not support 'nonisolated' on wrapped properties, because
+    // the backing property is a 'var' and so we cannot mark it as
+    // 'nonisolated'. In the future, we could support it by allowing
+    // users to mark the backing property as a 'let' and then it could
+    // also be marked as 'nonisolated'.
+    if (var->hasAttachedPropertyWrapper()) {
+      diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property);
+      return;
+    }
+
     // nonisolated can not be applied to local properties.
     if (dc->isLocalContext()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_local_var);
