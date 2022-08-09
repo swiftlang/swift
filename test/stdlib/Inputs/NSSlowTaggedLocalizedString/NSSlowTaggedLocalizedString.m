@@ -100,7 +100,7 @@ static const char *contents = NULL;
 }
 
 - (BOOL)getBytes:(void *)buffer maxLength:(uint64_t)max usedLength:(uint64_t *)used encoding:(uint64_t)encoding options:(uint64_t)options range:(NSRange)range remainingRange:(NSRange *)leftover {
-  assert(encoding == kCFStringEncodingASCII || encoding == kCFStringEncodingUTF8);
+  assert(encoding == 1 /* ASCII */ || encoding == 4 /* UTF8 */);
   strncpy(buffer, contents, max);
   if (strlen(contents) > max) {
     leftover->location = max;
