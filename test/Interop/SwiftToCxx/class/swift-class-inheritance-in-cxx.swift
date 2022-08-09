@@ -4,6 +4,11 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class.h)
 
+// RUN: %target-swift-frontend %s -typecheck -module-name Class -enable-library-evolution -clang-header-expose-public-decls -emit-clang-header-path %t/class-evo.h
+// RUN: %FileCheck %s < %t/class-evo.h
+
+// RUN: %check-interop-cxx-header-in-clang(%t/class-evo.h)
+
 public class BaseClass {
   var field: Int64
     

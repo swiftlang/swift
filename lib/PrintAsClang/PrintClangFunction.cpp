@@ -347,7 +347,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   bool isIndirectReturnType =
       kind == FunctionSignatureKind::CFunctionProto &&
       !isKnownCType(resultTy, typeMapping) &&
-      (isResilientType(resultTy) || isGenericType(resultTy) ||
+      ((isResilientType(resultTy) && !resultTy->isAnyClassReferenceType()) ||
+       isGenericType(resultTy) ||
        interopContext.getIrABIDetails().shouldReturnIndirectly(resultTy));
   if (!isIndirectReturnType) {
     OptionalTypeKind retKind;
