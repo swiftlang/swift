@@ -1988,7 +1988,7 @@ typeEraseExistentialSelfReferences(
 
       // If the type parameter is beyond the domain of the existential generic
       // signature, ignore it.
-      if (!existentialSig->isValidTypeInContext(t)) {
+      if (!existentialSig->isValidTypeParameter(t)) {
         return Type(t);
       }
 
@@ -6540,7 +6540,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
         return Action::SkipChildren;
       }
 
-      if (!Sig->isValidTypeInContext(ty)) {
+      if (!Sig->isValidTypeParameter(ty)) {
         return Action::SkipChildren;
       }
 

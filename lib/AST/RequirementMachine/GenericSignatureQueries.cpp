@@ -20,12 +20,12 @@
 // Each query is generally implemented in the same manner:
 //
 // - First, convert the subject type parameter into a Term.
-// - Simplify the Term to obtain a canonical Term.
+// - Simplify the Term to obtain a reduced Term.
 // - Perform a property map lookup on the Term.
 // - Return the appropriate piece of information from the property map.
 //
-// A few are slightly different; for example, getCanonicalTypeInContext() takes
-// an arbitrary type, not just a type parameter, and recursively transforms the
+// A few are slightly different; for example, getReducedType() takes an
+// arbitrary type, not just a type parameter, and recursively transfozms the
 // type parameters it contains, if any.
 //
 // Also, getConformanceAccessPath() is another one-off operation.
@@ -214,7 +214,7 @@ getConcreteType(Type depType,
   return props->getConcreteType(genericParams, term, Map);
 }
 
-bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
+bool RequirementMachine::areReducedTypeParametersEqual(Type depType1,
                                                        Type depType2) const {
   auto term1 = Context.getMutableTermForType(depType1->getCanonicalType(),
                                              /*proto=*/nullptr);
@@ -282,11 +282,10 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
 /// type parameter.
 ///
 /// Returns true if all structural components that are type parameters are
-/// in their canonical form, and are not concrete (in which case they're
-/// not considered canonical, since they can be replaced with their
-/// concrete type).
-bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
-  // Look for non-canonical type parameters.
+/// reduced, and in particular not concrete (in which case they're not
+/// considered reduced, since they can be replaced with their concrete type).
+bool RequirementMachine::isReducedType(Type type) const {
+  // Look for non-reduced type parameters.
   class Walker : public TypeWalker {
     const RequirementMachine &Self;
 
@@ -315,7 +314,7 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
       if (props && props->isConcreteType())
         return Action::Stop;
 
-      // The parent of a canonical type parameter might be non-canonical
+      // The parent of a reduced type parameter might be non-reduced
       // because it is concrete.
       return Action::SkipChildren;
     }
@@ -343,11 +342,11 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
 /// type parameter.
 ///
 /// Replaces all structural components that are type parameters with their
-/// most canonical form, which is either a (possibly different)
-/// type parameter, or a concrete type, in which case we recursively
-/// simplify any type parameters appearing in structural positions of
-/// that concrete type as well, and so on.
-Type RequirementMachine::getCanonicalTypeInContext(
+/// reduced form, which is either a (possibly different) type parameter,
+/// or a concrete type, in which case we recursively reduce any type
+/// parameters appearing in structural positions of that concrete type
+/// as well, and so on.
+Type RequirementMachine::getReducedType(
     Type type,
     TypeArrayView<GenericTypeParamType> genericParams) const {
 
@@ -364,21 +363,21 @@ Type RequirementMachine::getCanonicalTypeInContext(
     System.simplify(term);
 
     // We need to handle "purely concrete" member types, eg if I have a
-    // signature <T where T == Foo>, and we're asked to canonicalize the
+    // signature <T where T == Foo>, and we're asked to reduce the
     // type T.[P:A] where Foo : A.
     //
     // This comes up because we can derive the signature <T where T == Foo>
     // from a generic signature like <T where T : P>; adding the
     // concrete requirement 'T == Foo' renders 'T : P' redundant. We then
     // want to take interface types written against the original signature
-    // and canonicalize them with respect to the derived signature.
+    // and reduce them with respect to the derived signature.
     //
     // The problem is that T.[P:A] is not a valid term in the rewrite system
     // for <T where T == Foo>, since we do not have the requirement T : P.
     //
     // A more principled solution would build a substitution map when
     // building a derived generic signature that adds new requirements;
-    // interface types would first be substituted before being canonicalized
+    // interface types would first be substituted before being reduced
     // in the new signature.
     //
     // For now, we handle this with a two-step process; we split a term up
@@ -406,7 +405,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
             return concreteType;
 
           // FIXME: Recursion guard is needed here
-          return getCanonicalTypeInContext(concreteType, genericParams);
+          return getReducedType(concreteType, genericParams);
         }
 
         // Skip this part if the entire input term is valid, because in that
@@ -421,7 +420,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
             return superclass;
 
           // FIXME: Recursion guard is needed here
-          return getCanonicalTypeInContext(superclass, genericParams);
+          return getReducedType(superclass, genericParams);
         }
       }
 
@@ -438,7 +437,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
     // If U is not concrete, we have an invalid member type of a dependent
     // type, which is not valid in this generic signature. Give up.
     if (prefixType->isTypeParameter()) {
-      llvm::errs() << "Invalid type parameter in getCanonicalTypeInContext()\n";
+      llvm::errs() << "Invalid type parameter in getReducedType()\n";
       llvm::errs() << "Original type: " << type << "\n";
       llvm::errs() << "Simplified term: " << term << "\n";
       llvm::errs() << "Longest valid prefix: " << prefix << "\n";
@@ -453,13 +452,13 @@ Type RequirementMachine::getCanonicalTypeInContext(
                                      prefixType, Sig);
 
     // FIXME: Recursion guard is needed here
-    return getCanonicalTypeInContext(substType, genericParams);
+    return getReducedType(substType, genericParams);
   });
 }
 
 /// Determine if the given type parameter is valid with respect to this
 /// requirement machine's generic signature.
-bool RequirementMachine::isValidTypeInContext(Type type) const {
+bool RequirementMachine::isValidTypeParameter(Type type) const {
   assert(type->isTypeParameter());
 
   auto term = Context.getMutableTermForType(type->getCanonicalType(),
@@ -557,7 +556,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
   }
 
   // We enumerate conformance access paths in shortlex order until we find the
-  // path whose corresponding type canonicalizes to the one we are looking for.
+  // path whose corresponding type reduces to the one we are looking for.
   while (true) {
     auto found = ConformanceAccessPaths.find(
         std::make_pair(term, protocol));

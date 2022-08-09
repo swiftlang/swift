@@ -3488,7 +3488,7 @@ void ASTMangler::appendConcreteProtocolConformance(
       auto type = conditionalReq.getFirstType();
       if (type->hasArchetype())
         type = type->mapTypeOutOfContext();
-      CanType canType = type->getCanonicalType(sig);
+      CanType canType = type->getReducedType(sig);
       auto proto = conditionalReq.getProtocolDecl();
       
       ProtocolConformanceRef conformance;

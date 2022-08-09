@@ -18,7 +18,7 @@
 // type parameters expressed by this set of generic requirements. These are
 // called "generic signature queries", and are defined as methods on the
 // GenericSignature class; for example, two of the more common ones are
-// getCanonicalTypeInContext() and requiresProtocol().
+// getReducedType() and requiresProtocol().
 //
 // The terms of the rewrite system describe all possible type parameters that
 // can be written -- the generic parameters themselves, together with all nested

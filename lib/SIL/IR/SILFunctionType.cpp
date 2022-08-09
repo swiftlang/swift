@@ -485,7 +485,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -513,7 +513,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -633,7 +633,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -664,7 +664,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -801,7 +801,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
   newParameters.reserve(original->getNumParameters());
   for (auto &param : original->getParameters()) {
     newParameters.push_back(
-        param.getWithInterfaceType(param.getInterfaceType()->getCanonicalType(
+        param.getWithInterfaceType(param.getInterfaceType()->getReducedType(
             constrainedInvocationGenSig)));
   }
 
@@ -809,7 +809,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
   newResults.reserve(original->getNumResults());
   for (auto &result : original->getResults()) {
     newResults.push_back(
-        result.getWithInterfaceType(result.getInterfaceType()->getCanonicalType(
+        result.getWithInterfaceType(result.getInterfaceType()->getReducedType(
             constrainedInvocationGenSig)));
   }
   return SILFunctionType::get(
@@ -1680,7 +1680,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto selfMetatype = MetatypeType::get(dynamicSelfInterfaceType,
                                             MetatypeRepresentation::Thick);
 
-      auto canSelfMetatype = selfMetatype->getCanonicalType(origGenericSig);
+      auto canSelfMetatype = selfMetatype->getReducedType(origGenericSig);
       SILParameterInfo param(canSelfMetatype, convention);
       inputs.push_back(param);
 
@@ -1690,7 +1690,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     if (capture.isOpaqueValue()) {
       OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
       auto canType = opaqueValue->getType()->mapTypeOutOfContext()
-          ->getCanonicalType(origGenericSig);
+          ->getReducedType(origGenericSig);
       auto &loweredTL =
           TC.getTypeLowering(AbstractionPattern(genericSig, canType),
                              canType, expansion);
@@ -1710,7 +1710,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     auto *VD = capture.getDecl();
     auto type = VD->getInterfaceType();
-    auto canType = type->getCanonicalType(origGenericSig);
+    auto canType = type->getReducedType(origGenericSig);
 
     auto &loweredTL =
         TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
@@ -1962,7 +1962,7 @@ static CanSILFunctionType getSILFunctionType(
       valueType = valueType.subst(*reqtSubs);
     }
 
-    coroutineSubstYieldType = valueType->getCanonicalType(genericSig);
+    coroutineSubstYieldType = valueType->getReducedType(genericSig);
   }
 
   bool shouldBuildSubstFunctionType = [&]{
@@ -2645,7 +2645,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   }
 
   auto mapTypeOutOfContext = [&](CanType type) -> CanType {
-    return type->mapTypeOutOfContext()->getCanonicalType(genericSig);
+    return type->mapTypeOutOfContext()->getCanonicalType();
   };
 
   // Map the parameter and expected types out of context to get the interface
