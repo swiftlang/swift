@@ -411,8 +411,6 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
     } else if (value.equals("5.5")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
-    } else if (value.equals("5.6")) {
-      runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = None;
     } else {

@@ -39,8 +39,6 @@ include(StdlibOptions)
 # End of user-configurable options.
 #
 
-set(SWIFT_STDLIB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-
 # Remove llvm-project/llvm/include directory from -I search part when building
 # the stdlib. We have our own fork of LLVM includes (Support, ADT) in
 # stdlib/include/llvm and we don't want to silently use headers from LLVM.
