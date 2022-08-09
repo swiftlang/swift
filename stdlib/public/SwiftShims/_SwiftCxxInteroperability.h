@@ -154,6 +154,24 @@ template <class T> struct implClassFor {
 /// True if the given type is a Swift value type.
 template <class T> static inline const constexpr bool isValueType = false;
 
+/// True if the given type is a Swift value type with opaque layout that can be
+/// boxed.
+template <class T> static inline const constexpr bool isOpaqueLayout = false;
+
+/// Returns the opaque pointer to the given value.
+template <class T>
+inline const void *_Nonnull getOpaquePointer(const T &value) {
+  if constexpr (isOpaqueLayout<T>)
+    return reinterpret_cast<const OpaqueStorage &>(value).getOpaquePointer();
+  return reinterpret_cast<const void *>(&value);
+}
+
+template <class T> inline void *_Nonnull getOpaquePointer(T &value) {
+  if constexpr (isOpaqueLayout<T>)
+    return reinterpret_cast<OpaqueStorage &>(value).getOpaquePointer();
+  return reinterpret_cast<void *>(&value);
+}
+
 } // namespace _impl
 
 #pragma clang diagnostic pop

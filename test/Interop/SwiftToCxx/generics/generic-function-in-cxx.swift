@@ -4,6 +4,10 @@
 
 // RUN: %check-generic-interop-cxx-header-in-clang(%t/functions.h -Wno-unused-function)
 
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -enable-library-evolution -clang-header-expose-public-decls -emit-clang-header-path %t/functions-evo.h
+// RUN: %FileCheck %s < %t/functions-evo.h
+
+// RUN: %check-generic-interop-cxx-header-in-clang(%t/functions-evo.h -Wno-unused-function)
 
 public func genericPrintFunctionTwoArg<T>(_ x: T, _ y: Int) {
     print("X:", x)
@@ -87,21 +91,21 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK:      template<class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>
 // CHECK-NEXT: inline void genericPrintFunction(const T & x) noexcept {
-// CHECK-NEXT:   return _impl::$s9Functions20genericPrintFunctionyyxlF(reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
+// CHECK-NEXT:   return _impl::$s9Functions20genericPrintFunctionyyxlF(swift::_impl::getOpaquePointer(x), swift::getTypeMetadata<T>());
 // CHECK-NEXT: }
 
 
 // CHECK:      template<class T1, class T2>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T1> && swift::isUsableInGenericContext<T2>
 // CHECK-NEXT: inline void genericPrintFunctionMultiGeneric(swift::Int x, const T1 & t1, const T1 & t1p, swift::Int y, const T2 & t2) noexcept {
-// CHECK-NEXT:   return _impl::$s9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF(x, reinterpret_cast<const void *>(&t1), reinterpret_cast<const void *>(&t1p), y, reinterpret_cast<const void *>(&t2), swift::getTypeMetadata<T1>(), swift::getTypeMetadata<T2>());
+// CHECK-NEXT:   return _impl::$s9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF(x, swift::_impl::getOpaquePointer(t1), swift::_impl::getOpaquePointer(t1p), y, swift::_impl::getOpaquePointer(t2), swift::getTypeMetadata<T1>(), swift::getTypeMetadata<T2>());
 // CHECK-NEXT: }
 
 
 // CHECK:      template<class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>
 // CHECK-NEXT: inline void genericPrintFunctionTwoArg(const T & x, swift::Int y) noexcept {
-// CHECK-NEXT:   return _impl::$s9Functions26genericPrintFunctionTwoArgyyx_SitlF(reinterpret_cast<const void *>(&x), y, swift::getTypeMetadata<T>());
+// CHECK-NEXT:   return _impl::$s9Functions26genericPrintFunctionTwoArgyyx_SitlF(swift::_impl::getOpaquePointer(x), y, swift::getTypeMetadata<T>());
 // CHECK-NEXT: }
 
 // CHECK:      template<class T>
@@ -109,15 +113,15 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: inline T genericRet(const T & x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:    if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T>::value) {
 // CHECK-NEXT:    void *returnValue;
-// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
+// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::getTypeMetadata<T>());
 // CHECK-NEXT:    return ::swift::_impl::implClassFor<T>::type::makeRetained(returnValue);
 // CHECK-NEXT:    } else if constexpr (::swift::_impl::isValueType<T>) {
 // CHECK-NEXT:    return ::swift::_impl::implClassFor<T>::type::returnNewValue([&](void * _Nonnull returnValue) {
-// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(returnValue, reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
+// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(returnValue, swift::_impl::getOpaquePointer(x), swift::getTypeMetadata<T>());
 // CHECK-NEXT:    });
 // CHECK-NEXT:    } else {
 // CHECK-NEXT:    T returnValue;
-// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
+// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::getTypeMetadata<T>());
 // CHECK-NEXT:    return returnValue;
 // CHECK-NEXT:    }
 // CHECK-NEXT:  }
@@ -125,5 +129,5 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK:      template<class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T>
 // CHECK-NEXT: inline void genericSwap(T & x, T & y) noexcept {
-// CHECK-NEXT:   return _impl::$s9Functions11genericSwapyyxz_xztlF(reinterpret_cast<void *>(&x), reinterpret_cast<void *>(&y), swift::getTypeMetadata<T>());
+// CHECK-NEXT:   return _impl::$s9Functions11genericSwapyyxz_xztlF(swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T>());
 // CHECK-NEXT: }

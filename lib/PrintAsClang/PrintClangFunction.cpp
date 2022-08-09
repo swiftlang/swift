@@ -451,13 +451,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     if (type->getAs<ArchetypeType>() && type->getAs<ArchetypeType>()
                                             ->getInterfaceType()
                                             ->is<GenericTypeParamType>()) {
-      // FIXME: NEED to handle boxed resilient type.
-      // os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() <<
-      // "::getOpaquePointer(";
-      os << "reinterpret_cast<";
-      if (!isInOut)
-        os << "const ";
-      os << "void *>(&";
+      os << "swift::" << cxx_synthesis::getCxxImplNamespaceName()
+         << "::getOpaquePointer(";
       namePrinter();
       os << ')';
       return;

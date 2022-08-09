@@ -499,6 +499,14 @@ void ClangValueTypePrinter::printTypeGenericTraits(
       os << "::";
       printer.printBaseName(typeDecl);
       os << "> = true;\n";
+      if (typeDecl->isResilient()) {
+        os << "template<>\n";
+        os << "static inline const constexpr bool isOpaqueLayout<";
+        printer.printBaseName(typeDecl->getModuleContext());
+        os << "::";
+        printer.printBaseName(typeDecl);
+        os << "> = true;\n";
+      }
     }
 
     os << "template<>\n";
