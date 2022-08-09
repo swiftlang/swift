@@ -708,6 +708,10 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
 bool
 ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::ExistentialAny))
+    return true;
+
   // ObjC protocols do not require `any`.
   if (decl->isObjC())
     return false;
