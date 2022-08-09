@@ -2517,7 +2517,7 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
 
   for (auto *paramTy : specializedSig.getGenericParams()) {
     auto canTy = paramTy->getCanonicalType();
-    if (specializedSig->isCanonicalTypeInContext(canTy) &&
+    if (specializedSig->isReducedType(canTy) &&
         (!specializedSig->getLayoutConstraint(canTy) ||
          originalSig->getLayoutConstraint(canTy))) {
       unspecializedParams.push_back(paramTy);
@@ -4547,7 +4547,7 @@ static bool checkFunctionSignature(
                     auto xInstanceTy = x.getOldType()->getMetatypeInstanceType();
                     auto yInstanceTy = y.getOldType()->getMetatypeInstanceType();
                     return xInstanceTy->isEqual(
-                        requiredGenSig.getCanonicalTypeInContext(yInstanceTy));
+                        requiredGenSig.getReducedType(yInstanceTy));
                   }))
     return false;
 
@@ -4555,7 +4555,7 @@ static bool checkFunctionSignature(
   // match exactly.
   auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
   auto candidateResultTy =
-      requiredGenSig.getCanonicalTypeInContext(candidateFnTy.getResult());
+      requiredGenSig.getReducedType(candidateFnTy.getResult());
   if (!requiredResultFnTy) {
     auto requiredResultTupleTy = dyn_cast<TupleType>(required.getResult());
     auto candidateResultTupleTy = dyn_cast<TupleType>(candidateResultTy);

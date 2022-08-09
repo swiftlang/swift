@@ -145,7 +145,7 @@ private:
   SILType getLoweredType(Type type) {
     auto jvpGenSig = jvp->getLoweredFunctionType()->getSubstGenericSignature();
     Lowering::AbstractionPattern pattern(jvpGenSig,
-                                         type->getCanonicalType(jvpGenSig));
+                                         type->getReducedType(jvpGenSig));
     return jvp->getLoweredType(pattern, type);
   }
 
@@ -352,7 +352,7 @@ private:
   /// Find the tangent space of a given canonical type.
   Optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
-    type = witness->getDerivativeGenericSignature().getCanonicalTypeInContext(
+    type = witness->getDerivativeGenericSignature().getReducedType(
         type);
     return type->getAutoDiffTangentSpace(
         LookUpConformanceInModule(getModule().getSwiftModule()));
@@ -1627,12 +1627,12 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       // Handle formal original result.
       auto origResult = origTy->getResults()[resultIndex];
       origResult = origResult.getWithInterfaceType(
-          origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+          origResult.getInterfaceType()->getReducedType(witnessCanGenSig));
       dfResults.push_back(
           SILResultInfo(origResult.getInterfaceType()
                             ->getAutoDiffTangentSpace(lookupConformance)
                             ->getType()
-                            ->getCanonicalType(witnessCanGenSig),
+                            ->getReducedType(witnessCanGenSig),
                         origResult.getConvention()));
     } else {
       // Handle original `inout` parameter.
@@ -1659,12 +1659,12 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   for (auto i : config.parameterIndices->getIndices()) {
     auto origParam = origParams[i];
     origParam = origParam.getWithInterfaceType(
-        origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+        origParam.getInterfaceType()->getReducedType(witnessCanGenSig));
     dfParams.push_back(
         SILParameterInfo(origParam.getInterfaceType()
                              ->getAutoDiffTangentSpace(lookupConformance)
                              ->getType()
-                             ->getCanonicalType(witnessCanGenSig),
+                             ->getReducedType(witnessCanGenSig),
                          origParam.getConvention()));
   }
 
@@ -1673,7 +1673,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto *origEntry = original->getEntryBlock();
   auto *dfStruct = linearMapInfo->getLinearMapStruct(origEntry);
   auto dfStructType =
-      dfStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
+      dfStruct->getDeclaredInterfaceType()->getReducedType(witnessCanGenSig);
   dfParams.push_back({dfStructType, ParameterConvention::Direct_Owned});
 
   Mangle::DifferentiationMangler mangler;

@@ -1902,8 +1902,8 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
     assert(!decl->isStatic());
     
     baseTy = decl->getDeclContext()->getSelfInterfaceType()
-                 ->getCanonicalType(decl->getInnermostDeclContext()
-                                        ->getGenericSignatureOfContext());
+                 ->getReducedType(decl->getInnermostDeclContext()
+                                      ->getGenericSignatureOfContext());
   } else {
     // TODO: Global variables should eventually be referenceable as
     // key paths from (), viz. baseTy = TupleType::getEmpty(getASTContext());
