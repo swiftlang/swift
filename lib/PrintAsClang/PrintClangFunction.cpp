@@ -576,10 +576,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (!isKnownCxxType(resultTy, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(resultTy)) {
     if (isGenericType(resultTy)) {
-      // FIXME: Support returning value types.
       std::string returnAddress;
       llvm::raw_string_ostream ros(returnAddress);
       ros << "reinterpret_cast<void *>(&returnValue)";
+      StringRef resultTyName = "T"; // FIXME
 
       os << "  if constexpr (std::is_base_of<::swift::"
          << cxx_synthesis::getCxxImplNamespaceName()
@@ -589,6 +589,14 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       os << ";\n";
       os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
          << "::implClassFor<T>::type::makeRetained(returnValue);\n";
+      os << "  } else if constexpr (::swift::"
+         << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
+         << resultTyName << ">) {\n";
+      os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+         << "::implClassFor<" << resultTyName
+         << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
+      printCallToCFunc(/*additionalParam=*/StringRef("returnValue"));
+      os << ";\n  });\n";
       os << "  } else {\n";
       os << "  T returnValue;\n";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));

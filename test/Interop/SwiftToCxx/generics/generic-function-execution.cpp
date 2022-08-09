@@ -171,11 +171,19 @@ int main() {
     genericSwap(x, y);
     genericPrintFunction(x);
     genericPrintFunction(y);
+    auto xy = genericRet(x);
+    genericPrintFunction(xy);
+    xy.mut();
+    genericPrintFunction(xy);
+    genericPrintFunction(x);
   }
 // CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: 11, x2: 12, x3: 10, x4: 11, x5: 13, x6: 9)
 // CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: -9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -11)
 // CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: -9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -11)
-    // CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: 11, x2: 12, x3: 10, x4: 11, x5: 13, x6: 9)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: 11, x2: 12, x3: 10, x4: 11, x5: 13, x6: 9)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: -9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -11)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: 9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -7)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: -9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -11)
 
   {
     auto x = createTestSmallStruct(45);
@@ -185,12 +193,18 @@ int main() {
     genericSwap(y, x);
     genericPrintFunction(x);
     genericPrintFunction(y);
+    auto xy = genericRet(x);
+    genericPrintFunction(xy);
+    xy.mut();
+    genericPrintFunction(xy);
+    genericPrintFunction(x);
   }
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 45)
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 45)
-
-// FIXME: return struct.
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 4294902062)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
   return 0;
 }

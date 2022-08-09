@@ -51,6 +51,11 @@ public struct TestLargeStruct {
         x5 = x+2
         x6 = x-2
     }
+
+    public mutating func mut() {
+        x1 = -x1
+        x6 = x5
+    }
 }
 
 public func createTestLargeStruct(_ x: Int) -> TestLargeStruct {
@@ -59,6 +64,10 @@ public func createTestLargeStruct(_ x: Int) -> TestLargeStruct {
 
 public struct TestSmallStruct {
     var x1: UInt32
+
+    public mutating func mut() {
+        x1 = ~x1
+    }
 }
 
 public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
@@ -102,6 +111,10 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT:    void *returnValue;
 // CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
 // CHECK-NEXT:    return ::swift::_impl::implClassFor<T>::type::makeRetained(returnValue);
+// CHECK-NEXT:    } else if constexpr (::swift::_impl::isValueType<T>) {
+// CHECK-NEXT:    return ::swift::_impl::implClassFor<T>::type::returnNewValue([&](void * _Nonnull returnValue) {
+// CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(returnValue, reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());
+// CHECK-NEXT:    });
 // CHECK-NEXT:    } else {
 // CHECK-NEXT:    T returnValue;
 // CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), reinterpret_cast<const void *>(&x), swift::getTypeMetadata<T>());

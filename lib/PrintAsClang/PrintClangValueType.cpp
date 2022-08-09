@@ -475,8 +475,6 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "::";
   printer.printBaseName(typeDecl);
   os << "> = true;\n";
-  os << "#pragma clang diagnostic pop\n";
-
   os << "template<>\n";
   os << "inline void * _Nonnull getTypeMetadata<";
   printer.printBaseName(typeDecl->getModuleContext());
@@ -488,8 +486,18 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "::" << cxx_synthesis::getCxxImplNamespaceName()
      << "::" << typeMetadataFuncName << "(0)._0;\n";
   os << "}\n";
-  if (isa<ClassDecl>(typeDecl)) {
+
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
+
+    if (!isa<ClassDecl>(typeDecl)) {
+      os << "template<>\n";
+      os << "static inline const constexpr bool isValueType<";
+      printer.printBaseName(typeDecl->getModuleContext());
+      os << "::";
+      printer.printBaseName(typeDecl);
+      os << "> = true;\n";
+    }
+
     os << "template<>\n";
     os << "struct implClassFor<";
     printer.printBaseName(typeDecl->getModuleContext());
@@ -501,9 +509,9 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     printCxxImplClassName(os, typeDecl);
     os << "; };\n";
     os << "} // namespace\n";
-  }
-  os << "} // namespace swift\n";
-  os << "\nnamespace ";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << " {\n";
+    os << "#pragma clang diagnostic pop\n";
+    os << "} // namespace swift\n";
+    os << "\nnamespace ";
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << " {\n";
 }

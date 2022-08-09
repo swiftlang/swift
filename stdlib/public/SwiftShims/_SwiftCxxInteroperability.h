@@ -104,8 +104,6 @@ using UInt = size_t;
 template <class T>
 static inline const constexpr bool isUsableInGenericContext = false;
 
-#pragma clang diagnostic pop
-
 /// Returns the type metadat for the given Swift type T.
 template <class T> inline void *_Nonnull getTypeMetadata();
 
@@ -117,7 +115,12 @@ template <class T> struct implClassFor {
   // using type = ...;
 };
 
+/// True if the given type is a Swift value type.
+template <class T> static inline const constexpr bool isValueType = false;
+
 } // namespace _impl
+
+#pragma clang diagnostic pop
 
 } // namespace swift
 #endif
