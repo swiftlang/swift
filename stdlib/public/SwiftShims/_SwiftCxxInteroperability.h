@@ -53,6 +53,42 @@ inline void opaqueFree(void *_Nonnull p) noexcept {
 #endif
 }
 
+/// Base class for a container for an opaque Swift value, like resilient struct.
+class OpaqueStorage {
+public:
+  inline OpaqueStorage() noexcept : storage(nullptr) {}
+  inline OpaqueStorage(size_t size, size_t alignment) noexcept
+      : storage(reinterpret_cast<char *>(opaqueAlloc(size, alignment))) {}
+  inline OpaqueStorage(OpaqueStorage &&other) noexcept
+      : storage(other.storage) {
+    other.storage = nullptr;
+  }
+  inline OpaqueStorage(const OpaqueStorage &) noexcept = delete;
+
+  inline ~OpaqueStorage() noexcept {
+    if (storage) {
+      opaqueFree(static_cast<char *_Nonnull>(storage));
+    }
+  }
+
+  void operator=(OpaqueStorage &&other) noexcept {
+    auto temp = storage;
+    storage = other.storage;
+    other.storage = temp;
+  }
+  void operator=(const OpaqueStorage &) noexcept = delete;
+
+  inline char *_Nonnull getOpaquePointer() noexcept {
+    return static_cast<char *_Nonnull>(storage);
+  }
+  inline const char *_Nonnull getOpaquePointer() const noexcept {
+    return static_cast<char *_Nonnull>(storage);
+  }
+
+private:
+  char *_Nullable storage;
+};
+
 /// Base class for a Swift reference counted class value.
 class RefCountedClass {
 public:

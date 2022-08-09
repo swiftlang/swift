@@ -152,7 +152,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (isOpaqueLayout) {
     os << "    _storage = ";
     printer.printSwiftImplQualifier();
-    os << cxx_synthesis::getCxxOpaqueStorageClassName() << "(vwTable);\n";
+    os << cxx_synthesis::getCxxOpaqueStorageClassName()
+       << "(vwTable->size, vwTable->getAlignment());\n";
   }
   os << "    vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char "
         "*>(other._getOpaquePointer()), metadata._0);\n";
@@ -172,10 +173,12 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // Print out private default constructor.
   os << "  inline ";
   printer.printBaseName(typeDecl);
+  // FIXME: make noexcept.
   if (isOpaqueLayout) {
     os << "(";
     printer.printSwiftImplQualifier();
-    os << "ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}\n";
+    os << "ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable->size, "
+          "vwTable->getAlignment()) {}\n";
   } else {
     os << "() {}\n";
   }

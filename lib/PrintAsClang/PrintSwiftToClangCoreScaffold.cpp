@@ -111,6 +111,8 @@ static void printValueWitnessTable(raw_ostream &os) {
 #define VOID_TYPE "void"
 #include "swift/ABI/ValueWitness.def"
 
+  membersOS << "\n  constexpr size_t getAlignment() const { return (flags & "
+            << TargetValueWitnessFlags<uint64_t>::AlignmentMask << ") + 1; }\n";
   os << "\nstruct ValueWitnessTable {\n" << membersOS.str() << "};\n\n";
   membersOS.str().clear();
 
@@ -154,43 +156,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
                  funcSig.parameterTypes[0]);
 }
 
-static void printSwiftResilientStorageClass(raw_ostream &os) {
-  auto name = cxx_synthesis::getCxxOpaqueStorageClassName();
-  static_assert(TargetValueWitnessFlags<uint64_t>::AlignmentMask ==
-                    TargetValueWitnessFlags<uint32_t>::AlignmentMask,
-                "alignment mask doesn't match");
-  os << "/// Container for an opaque Swift value, like resilient struct.\n";
-  os << "class " << name << " {\n";
-  os << "public:\n";
-  os << "  inline " << name << "() noexcept : storage(nullptr) { }\n";
-  os << "  inline " << name
-     << "(ValueWitnessTable * _Nonnull vwTable) noexcept : storage("
-        "reinterpret_cast<char *>(opaqueAlloc(vwTable->size, (vwTable->flags &"
-     << TargetValueWitnessFlags<uint64_t>::AlignmentMask << ") + 1))) { }\n";
-  os << "  inline " << name << "(" << name
-     << "&& other) noexcept : storage(other.storage) { other.storage = "
-        "nullptr; }\n";
-  os << "  inline " << name << "(const " << name << "&) noexcept = delete;\n";
-  os << "  inline ~" << name
-     << "() noexcept { if (storage) { opaqueFree(static_cast<char "
-        "* _Nonnull>(storage)); } }\n";
-  os << "  void operator =(" << name
-     << "&& other) noexcept { auto temp = storage; storage = other.storage; "
-        "other.storage = temp; }\n";
-  os << "  void operator =(const " << name << "&) noexcept = delete;\n";
-  os << "  inline char * _Nonnull getOpaquePointer() noexcept { return "
-        "static_cast<char "
-        "* _Nonnull>(storage); }\n";
-  os << "  inline const char * _Nonnull getOpaquePointer() const noexcept { "
-        "return "
-        "static_cast<char * _Nonnull>(storage); }\n";
-  os << "private:\n";
-  os << "  char * _Nullable storage;\n";
-  os << "};\n";
-}
-
 void printCxxNaiveException(raw_ostream &os) {
-  os << "\n";
   os << "/// Naive exception class that should be thrown\n";
   os << "class NaiveException {\n";
   os << "public:\n";
@@ -273,7 +239,6 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                             /*isCForwardDefinition=*/true);
           });
           os << "\n";
-          printSwiftResilientStorageClass(os);
           printCxxNaiveException(os);
         });
     os << "\n";
