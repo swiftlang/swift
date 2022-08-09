@@ -877,6 +877,10 @@ def compile_module_from_interface :
   HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
   ModeOpt;
 
+def ignore_interface_provided_options :
+  Flag<["-"], "ignore-interface-provided-options">,
+  HelpText<"Ignore all module flags specified in the swiftinterface being built">;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
@@ -1065,9 +1069,11 @@ def clang_header_expose_public_decls:
   HelpText<"Expose all public declarations in the generated clang header">,
   Flags<[FrontendOption, HelpHidden]>;
   
-def enable_ad_hoc_availability :
-  Flag<["-"], "enable-ad-hoc-availability">,
-  HelpText<"Enable experimental support for ad hoc availability">;
+def weak_link_at_target :
+  Flag<["-"], "weak-link-at-target">,
+  HelpText<"Weakly link symbols for declarations that were introduced at the "
+           "deployment target. Symbols introduced before the deployment "
+           "target are still strongly linked.">;
 
 def concurrency_model :
     Separate<["-"], "concurrency-model">,
@@ -1077,10 +1083,26 @@ def concurrency_model_EQ :
     Joined<["-"], "concurrency-model=">,
     Alias<concurrency_model>;
 
+def enable_stack_protector :
+  Flag<["-"], "enable-stack-protector">,
+  HelpText<"Enable the stack protector">;
+def disable_stack_protector :
+  Flag<["-"], "disable-stack-protector">,
+  HelpText<"Disable the stack-protector">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
 def disable_new_llvm_pass_manager :
   Flag<["-"], "disable-new-llvm-pass-manager">,
   HelpText<"Disable the new llvm pass manager">;
+
+def disable_emit_generic_class_ro_t_list :
+  Flag<["-"], "disable-emit-generic-class-ro_t-list">,
+  HelpText<"Disable emission of a section with references to class_ro_t of "
+           "generic class patterns">;
+def enable_emit_generic_class_ro_t_list :
+  Flag<["-"], "enable-emit-generic-class-ro_t-list">,
+  HelpText<"Enable emission of a section with references to class_ro_t of "
+           "generic class patterns">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

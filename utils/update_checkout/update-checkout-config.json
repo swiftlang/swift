@@ -78,6 +78,8 @@
             "remote": { "id": "apple/swift-nio-ssl" } },
         "swift-experimental-string-processing": {
             "remote": { "id": "apple/swift-experimental-string-processing" } },
+        "swift-llvm-bindings": {
+            "remote": { "id": "apple/swift-llvm-bindings" } },
         "llvm-project": {
             "remote": { "id": "apple/llvm-project" } }
     },
@@ -129,6 +131,7 @@
             "aliases": ["swift/main", "main", "stable/20211026"],
             "repos": {
                 "llvm-project": "stable/20211026",
+                "swift-llvm-bindings": "stable/20211026",
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -170,6 +173,7 @@
             "aliases": ["rebranch", "stable/20220421"],
             "repos": {
                 "llvm-project": "stable/20220421",
+                "swift-llvm-bindings": "stable/20220421",
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -412,6 +416,7 @@
                         "next-upstream", "upstream-with-swift"],
             "repos": {
                 "llvm-project": "next",
+                "swift-llvm-bindings": "llvm.org/main",
                 "swift": "next",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -466,7 +471,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.4",
                 "sourcekit-lsp": "release/5.4",
-                "swift-format": "main",
+                "swift-format": "swift-5.4-branch",
                 "swift-installer-scripts": "main"
             }
         }

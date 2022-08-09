@@ -15,7 +15,6 @@
 // slightly differently on other platforms.
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64 || CPU=arm64
-// REQUIRES: optimized_stdlib
 
 //////////////////
 // Declarations //
@@ -83,7 +82,7 @@ public func forceSplit5() async {}
 // DWARF-NEXT:            DW_AT_name	("msg")
 public func letSimpleTest<T>(_ msg: __owned T) async {
     await forceSplit()
-    use(_move(msg))
+    use(_move msg)
 }
 
 // CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async13varSimpleTestyyxz_xtYalF"(%swift.context* swiftasync %0, %swift.opaque* %1, %swift.opaque* noalias %2, %swift.type* %T)
@@ -147,7 +146,7 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF: DW_TAG_formal_parameter
 // DWARF-NEXT: DW_AT_name ("msg")
 //
-// We reinitialize our value in this funclet and then move it and then
+// We reinitialize our value in this funclet and then _move it and then
 // reinitialize it again. So we have two different live ranges. Sadly, we don't
 // validate that the first live range doesn't start at the beginning of the
 // function. But we have lldb tests to validate that.
@@ -162,7 +161,7 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF-SAME:        DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref
 // DWARF-NEXT: DW_AT_name	("msg")
 //
-// We did not move the value again here, so we just get a normal entry value for
+// We did not _move the value again here, so we just get a normal entry value for
 // the entire function.
 //
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTQ4_")
@@ -180,10 +179,10 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // Change name to varSimpleTestArg
 public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
     await forceSplit()
-    use(_move(msg))
+    use(_move msg)
     await forceSplit()
     msg = msg2
-    let msg3 = _move(msg)
+    let msg3 = _move msg
     let _ = msg3
     msg = msg2
     await forceSplit()
@@ -278,7 +277,7 @@ public func varSimpleTestVar() async {
     var k = Klass()
     k.doSomething()
     await forceSplit()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
     await forceSplit()
     k = Klass()
@@ -384,7 +383,7 @@ public func varSimpleTestVar() async {
 public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
     await forceSplit1()
     if trueValue {
-        use(_move(msg))
+        use(_move msg)
         await forceSplit2()
     } else {
         await forceSplit3()
@@ -535,7 +534,7 @@ public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
 public func varArgCCFlowTrueTest<T : P>(_ msg: inout T) async {
     await forceSplit1()
     if trueValue {
-        use(_move(msg))
+        use(_move msg)
         await forceSplit2()
     } else {
         await forceSplit3()

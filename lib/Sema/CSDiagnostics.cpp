@@ -809,6 +809,20 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         }
       }
 
+      if (purpose == CTP_ReturnStmt) {
+        if (auto *DRE = getAsExpr<DeclRefExpr>(anchor)) {
+          auto *decl = DRE->getDecl();
+          if (decl && decl->hasName()) {
+            auto baseName = DRE->getDecl()->getBaseIdentifier();
+            if (baseName.str().startswith("$__builder")) {
+              diagnostic =
+                  diag::cannot_convert_result_builder_result_to_return_type;
+              break;
+            }
+          }
+        }
+      }
+
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
@@ -1551,6 +1565,26 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   emitDiagnosticAt(unwrappedExpr->getLoc(), diag::optional_not_unwrapped,
                    baseType, unwrappedType);
+
+  // If this is a function type, suggest using optional chaining to
+  // call it.
+  if (unwrappedType->lookThroughAllOptionalTypes()->is<FunctionType>()) {
+    bool isDeclRefExpr = false;
+    if (isa<DeclRefExpr>(unwrappedExpr)) {
+      isDeclRefExpr = true;
+    } else if (auto fve = dyn_cast<ForceValueExpr>(unwrappedExpr)) {
+      isDeclRefExpr = isa<DeclRefExpr>(fve->getSubExpr());
+    } else if (auto boe = dyn_cast<BindOptionalExpr>(unwrappedExpr)) {
+      isDeclRefExpr = isa<DeclRefExpr>(boe->getSubExpr());
+    }
+    if (isDeclRefExpr) {
+      auto depth = baseType->getOptionalityDepth();
+      auto diag = emitDiagnosticAt(unwrappedExpr->getLoc(),
+                                   diag::perform_optional_chain_on_function_type);
+      auto fixItString = std::string(depth, '?');
+      diag.fixItInsertAfter(unwrappedExpr->getEndLoc(), fixItString);
+    }
+  }
 
   // If the expression we're unwrapping is the only reference to a
   // local variable whose type isn't explicit in the source, then
@@ -3581,7 +3615,7 @@ bool InvalidProjectedValueArgument::diagnoseAsError() {
   if (!param->hasAttachedPropertyWrapper()) {
     param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
   } else if (!param->hasImplicitPropertyWrapper() &&
-             param->getAttachedPropertyWrappers().front()->hasArgs()) {
+             param->getOutermostAttachedPropertyWrapper()->hasArgs()) {
     param->diagnose(diag::property_wrapper_param_attr_arg);
   } else {
     Type backingType;
@@ -6274,6 +6308,27 @@ void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
 }
 
 bool SkipUnhandledConstructInResultBuilderFailure::diagnoseAsError() {
+  // Following errors are already diagnosed:
+  //  - brace statement - error related to absence of appropriate buildBlock
+  //  - switch/case statements - empty body
+  if (auto *stmt = unhandled.dyn_cast<Stmt *>()) {
+    if (isa<BraceStmt>(stmt))
+      return true;
+
+    if (auto *switchStmt = getAsStmt<SwitchStmt>(stmt)) {
+      auto caseStmts = switchStmt->getCases();
+      if (caseStmts.empty())
+        return true;
+    }
+
+    // Empty case statements are diagnosed by parser.
+    if (auto *caseStmt = getAsStmt<CaseStmt>(stmt)) {
+      auto *body = caseStmt->getBody();
+      if (body->getNumElements() == 0)
+        return true;
+    }
+  }
+
   diagnosePrimary(/*asNote=*/false);
   emitDiagnosticAt(builder, diag::kind_declname_declared_here,
                    builder->getDescriptiveKind(), builder->getName());

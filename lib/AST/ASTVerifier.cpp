@@ -1130,13 +1130,6 @@ public:
           Out << elt->getType() << "\n";
           abort();
         }
-        if (!field.getParameterFlags().isNone()) {
-          Out << "TupleExpr has non-empty parameter flags?\n";
-          Out << "sub expr: \n";
-          elt->dump(Out);
-          Out << "\n";
-          abort();
-        }
       });
       verifyCheckedBase(E);
     }
@@ -1980,10 +1973,6 @@ public:
       auto ty = dyn_cast<ParenType>(E->getType().getPointer());
       if (!ty) {
         Out << "ParenExpr not of ParenType\n";
-        abort();
-      }
-      if (!ty->getParameterFlags().isNone()) {
-        Out << "ParenExpr has non-empty parameter flags?\n";
         abort();
       }
       verifyCheckedBase(E);
@@ -2853,6 +2842,11 @@ public:
         verifyConformance(ext, conformance);
       }
 
+      // Make sure extension binding succeeded.
+      if (!ext->hasBeenBound()) {
+        Out << "ExtensionDecl was not bound\n";
+        abort();
+      }
       verifyCheckedBase(ext);
     }
 

@@ -1150,7 +1150,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
       auto genericParam = GenericTypeParamType::get(/*type sequence*/ false, 0,
                                                     genericParams.size(), ctx);
       genericParams.push_back(genericParam);
-      typeSubstitutions.push_back(elt.getRawType());
+      typeSubstitutions.push_back(elt.getType());
       genericElements.push_back(elt.getWithType(genericParam));
       conditionalRequirements.push_back(
           Requirement(RequirementKind::Conformance, genericParam,
@@ -1447,7 +1447,8 @@ LookupConformanceInModuleRequest::evaluate(
       auto subMap = type->getContextSubstitutionMap(mod, explicitConformanceDC);
 
       // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type, conformance, subMap);
+      auto result = ctx.getSpecializedConformance(type,
+        cast<RootProtocolConformance>(conformance), subMap);
       return ProtocolConformanceRef(result);
     }
   }

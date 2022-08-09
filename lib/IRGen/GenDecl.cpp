@@ -556,7 +556,7 @@ static llvm::GlobalVariable *
 emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
                StringRef name, StringRef section,
                llvm::GlobalValue::LinkageTypes linkage, llvm::Type *eltTy,
-               bool isConstant, bool asContiguousArray) {
+               bool isConstant, bool asContiguousArray, bool canBeStrippedByLinker = false) {
   // Do nothing if the list is empty.
   if (handles.empty()) return nullptr;
 
@@ -578,8 +578,12 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
       var->setSection(section);
       var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
       disableAddressSanitizer(IGM, var);
-      if (llvm::GlobalValue::isLocalLinkage(linkage))
-        IGM.addUsedGlobal(var);
+      if (llvm::GlobalValue::isLocalLinkage(linkage)) {
+        if (canBeStrippedByLinker)
+          IGM.addCompilerUsedGlobal(var);
+        else
+          IGM.addUsedGlobal(var);
+      }
 
       if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
         // Allow dead-stripping `var` (the runtime record from the global list)
@@ -616,8 +620,12 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
   // Mark the variable as used if doesn't have external linkage.
   // (Note that we'd specifically like to not put @llvm.used in itself.)
-  if (llvm::GlobalValue::isLocalLinkage(linkage))
-    IGM.addUsedGlobal(var);
+  if (llvm::GlobalValue::isLocalLinkage(linkage)) {
+    if (canBeStrippedByLinker)
+      IGM.addCompilerUsedGlobal(var);
+    else
+      IGM.addUsedGlobal(var);
+  }
   return var;
 }
 
@@ -962,6 +970,10 @@ void IRGenModule::addCompilerUsedGlobal(llvm::GlobalValue *global) {
   LLVMCompilerUsed.push_back(global);
 }
 
+void IRGenModule::addGenericROData(llvm::Constant *RODataAddr) {
+  GenericRODatas.push_back(RODataAddr);
+}
+
 /// Add the given global value to the Objective-C class list.
 void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
   ObjCClasses.push_back(classPtr);
@@ -1067,6 +1079,14 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
 
 void IRGenModule::emitGlobalLists() {
   if (ObjCInterop) {
+    if (IRGen.Opts.EmitGenericRODatas) {
+      emitGlobalList(
+          *this, GenericRODatas, "generic_ro_datas",
+          GetObjCSectionName("__swift_rodatas", "regular"),
+          llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
+          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ true);
+    }
+
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
     emitGlobalList(
@@ -2226,11 +2246,11 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 }
 
 /// Get or create an LLVM function with these linkage rules.
-llvm::Function *irgen::createFunction(IRGenModule &IGM,
-                                      LinkInfo &linkInfo,
+llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
                                       const Signature &signature,
                                       llvm::Function *insertBefore,
-                                      OptimizationMode FuncOptMode) {
+                                      OptimizationMode FuncOptMode,
+                                      StackProtectorMode stackProtect) {
   auto name = linkInfo.getName();
 
   llvm::Function *existing = IGM.Module.getFunction(name);
@@ -2262,7 +2282,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
       .to(fn, linkInfo.isForDefinition());
 
   llvm::AttrBuilder initialAttrs;
-  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
+  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode, stackProtect);
   // Merge initialAttrs with attrs.
   auto updatedAttrs = signature.getAttributes().addFnAttributes(
       IGM.getLLVMContext(), initialAttrs);
@@ -3039,7 +3059,7 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   LinkInfo implLink = LinkInfo::get(*this, entity, ForDefinition);
   auto implFn =
       createFunction(*this, implLink, signature, nullptr /*insertBefore*/,
-                     f->getOptimizationMode());
+                     f->getOptimizationMode(), shouldEmitStackProtector(f));
   implFn->addFnAttr(llvm::Attribute::NoInline);
 
   IRGenFunction IGF(*this, implFn);
@@ -3148,6 +3168,10 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   return thunk;
 }
 
+StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
+  return IRGen.Opts.getStackProtectorMode();
+}
+
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(
     SILFunction *f, ForDefinition_t forDefinition,
@@ -3243,7 +3267,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   fn = createFunction(*this, link, signature, insertBefore,
-                      f->getOptimizationMode());
+                      f->getOptimizationMode(), shouldEmitStackProtector(f));
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition

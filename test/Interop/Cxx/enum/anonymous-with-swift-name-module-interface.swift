@@ -60,10 +60,11 @@
 // Test rename with "swift_name" attr:
 // CHECK: struct ParentStruct
 
-// CHECK: @available(swift, obsoleted: 3, renamed: "ParentStruct.NewName")
-// CHECK: @available(*, unavailable, message: "Not available in Swift")
-// CHECK: typealias OldName = ParentStruct.NewName
+// CHECK: @available(swift, obsoleted: 3, renamed: "ParentStruct.childFn(self:)")
+// CHECK: func renameCFColorMask(_ parent: ParentStruct) -> CFColorMask
+
 // CHECK: extension ParentStruct {
+// CHECK:     func childFn() -> CFColorMask
 // CHECK:     @available(*, unavailable, message: "Not available in Swift")
 // CHECK:     typealias NewName = UInt32
 // CHECK:     struct NewName : OptionSet, @unchecked Sendable {
@@ -80,6 +81,10 @@
 // CHECK:         static var Two: ParentStruct.NewName { get }
 // CHECK:     }
 // CHECK: }
+
+// CHECK: @available(swift, obsoleted: 3, renamed: "ParentStruct.NewName")
+// CHECK: @available(*, unavailable, message: "Not available in Swift")
+// CHECK: typealias OldName = ParentStruct.NewName
 
 // CHECK: @available(swift, obsoleted: 3, renamed: "ParentStruct.NewName")
 // CHECK: typealias OldName = ParentStruct.NewName

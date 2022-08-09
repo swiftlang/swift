@@ -5,6 +5,7 @@ add_swift_host_library(swiftPrintAsClang STATIC
   ModuleContentsWriter.cpp
   PrimitiveTypeMapping.cpp
   PrintAsClang.cpp
+  PrintClangClassType.cpp
   PrintClangFunction.cpp
   PrintClangValueType.cpp
   PrintSwiftToClangCoreScaffold.cpp

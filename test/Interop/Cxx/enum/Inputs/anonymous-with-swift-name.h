@@ -24,6 +24,10 @@ inline CFColorMask useCFColorMask(CFColorMask mask) { return mask; }
 
 struct ParentStruct { };
 
+inline CFColorMask renameCFColorMask(ParentStruct parent)
+    __attribute__((swift_name("ParentStruct.childFn(self:)")))
+{ return kSOColorMaskRed; }
+
 typedef __attribute__((availability(swift, unavailable))) __attribute__((swift_name("ParentStruct.NewName"))) unsigned OldName;
 
 enum __attribute__((flag_enum,enum_extensibility(open))) : OldName {

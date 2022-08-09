@@ -1166,6 +1166,9 @@ NOTE(unwrap_iuo_initializer,none,
 NOTE(unwrap_with_guard,none,
      "short-circuit using 'guard' to exit this function early "
      "if the optional value contains 'nil'", ())
+NOTE(perform_optional_chain_on_function_type, none,
+     "use optional chaining to call this value of function type when optional "
+     "is non-'nil'", ())
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
@@ -1919,7 +1922,7 @@ NOTE(extension_stored_property_fixit,none,
      "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
-      (Identifier))
+      (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause",
       (Identifier))
@@ -1935,6 +1938,8 @@ ERROR(invalid_nominal_extension,none,
       (Type, Type))
 NOTE(invalid_nominal_extension_rewrite,none,
      "did you mean to extend %0 instead?", (Type))
+ERROR(synthesized_nominal_extension,none,
+      "cannot extend synthesized type %0", (Type))
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -2916,6 +2921,17 @@ WARNING(decl_from_hidden_module_warn,none,
       "<<ERROR>>|<<ERROR>>|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+ERROR(typealias_desugars_to_type_from_hidden_module,none,
+      "%0 aliases '%1.%2' and cannot be used %select{here|"
+      "as property wrapper here|"
+      "as result builder here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}3 "
+      "because %select{%4 has been imported as implementation-only|"
+      "it is an SPI imported from %4|"
+      "<<ERROR>>|"
+      "%4 was not imported by this file}5",
+      (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "as result builder here|"
@@ -5073,8 +5089,10 @@ ERROR(differentiable_function_type_no_differentiability_parameters,
       (/*isLinear*/ bool))
 
 // SIL
-ERROR(opened_non_protocol,none,
-      "@opened cannot be applied to non-protocol type %0", (Type))
+ERROR(opened_bad_constraint_type,none,
+      "@opened constraint type %0 is not a protocol or protocol composition", (Type))
+ERROR(opened_bad_interface_type,none,
+      "@opened interface type %0 is not a type parameter", (Type))
 ERROR(sil_function_ellipsis,PointsToFirstBadToken,
       "SIL function types cannot be variadic", ())
 ERROR(sil_function_input_label,PointsToFirstBadToken,
@@ -5805,6 +5823,14 @@ WARNING(inlinable_decl_ref_from_hidden_module_warn,
       "; this is an error in Swift 6",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
+ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
+      none, "%0 aliases '%1.%2' and cannot be used in " FRAGILE_FUNC_KIND "3 "
+      "because %select{%4 has been imported as implementation-only|"
+      "it is an SPI imported from %4|"
+      "<<ERROR>>|"
+      "%4 was not imported by this file}5",
+      (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
+
 ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
       (unsigned))
@@ -6402,6 +6428,8 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
 
 ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' may only be applied to classes, structs, and enums", ())
+ERROR(move_expression_not_passed_lvalue,none,
+      "'move' can only be applied to lvalues", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

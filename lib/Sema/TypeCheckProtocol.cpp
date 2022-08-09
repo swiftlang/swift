@@ -874,7 +874,7 @@ swift::matchWitness(
 static const RequirementEnvironment &getOrCreateRequirementEnvironment(
     WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     DeclContext *dc, GenericSignature reqSig, ProtocolDecl *proto,
-    ClassDecl *covariantSelf, ProtocolConformance *conformance) {
+    ClassDecl *covariantSelf, RootProtocolConformance *conformance) {
   WitnessChecker::RequirementEnvironmentCacheKey cacheKey(reqSig.getPointer(),
                                                           covariantSelf);
   auto cacheIter = reqEnvCache.find(cacheKey);
@@ -992,7 +992,7 @@ static PossibleEffects getEffects(ValueDecl *value) {
 
 RequirementMatch
 swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
-                    ProtocolDecl *proto, ProtocolConformance *conformance,
+                    ProtocolDecl *proto, RootProtocolConformance *conformance,
                     DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
   using namespace constraints;
 
@@ -2267,10 +2267,10 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
   // For a constructor, we only care about the parameter types.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    return AnyFunctionType::composeTuple(module->getASTContext(),
-                                         ctor->getMethodInterfaceType()
-                                             ->castTo<FunctionType>()
-                                             ->getParams());
+    return AnyFunctionType::composeTuple(
+        module->getASTContext(),
+        ctor->getMethodInterfaceType()->castTo<FunctionType>()->getParams(),
+        ParameterFlagHandling::IgnoreNonEmpty);
   }
 
   Type type = decl->getInterfaceType();
@@ -6834,7 +6834,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (accessorKind)
           witnessToMatch = cast<AccessorDecl>(witness)->getStorage();
 
-        if (matchWitness(reqEnvCache, proto, *conformance,
+        if (matchWitness(reqEnvCache, proto, normal,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .isWellFormed()) {

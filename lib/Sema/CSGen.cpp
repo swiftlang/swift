@@ -868,7 +868,7 @@ namespace {
       case TypeKind::Tuple: {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
-          result.emplace_back(elt.getRawType(), elt.getName());
+          result.emplace_back(elt.getType(), elt.getName());
         return;
       }
       case TypeKind::Paren: {
@@ -1762,11 +1762,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-
-      auto &ctx = CS.getASTContext();
-      auto parenType = CS.getType(expr->getSubExpr())->getInOutObjectType();
-      auto parenFlags = ParameterTypeFlags().withInOut(expr->isSemanticallyInOutExpr());
-      return ParenType::get(ctx, parenType, parenFlags);
+      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -2269,9 +2265,11 @@ namespace {
               ->getUnderlyingType();
         }
 
-        auto underlyingType =
-            getTypeForPattern(paren->getSubPattern(), locator,
-                              externalPatternType, bindPatternVarsOneWay);
+        auto *subPattern = paren->getSubPattern();
+        auto underlyingType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            externalPatternType, bindPatternVarsOneWay);
 
         if (!underlyingType)
           return Type();
@@ -2290,11 +2288,34 @@ namespace {
         return setType(type);
       }
       case PatternKind::Any: {
-        return setType(
-            externalPatternType
-                ? externalPatternType
-                : CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        TVO_CanBindToNoEscape));
+        Type type;
+
+        // If this is a situation like `[let] _ = <expr>`, return
+        // initializer expression.
+        auto getInitializerExpr = [&locator]() -> Expr * {
+          auto last = locator.last();
+          if (!last)
+            return nullptr;
+
+          auto contextualTy = last->getAs<LocatorPathElt::ContextualType>();
+          return (contextualTy && contextualTy->isFor(CTP_Initialization))
+                     ? locator.trySimplifyToExpr()
+                     : nullptr;
+        };
+
+        // Always prefer a contextual type when it's available.
+        if (externalPatternType) {
+          type = externalPatternType;
+        } else if (auto *initializer = getInitializerExpr()) {
+          // For initialization always assume a type of initializer.
+          type = CS.getType(initializer)->getRValueType();
+        } else {
+          type = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      ConstraintLocator::AnyPatternDecl),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
+        }
+        return setType(type);
       }
 
       case PatternKind::Named: {
@@ -2675,7 +2696,9 @@ namespace {
           // and we're matching the type of that subpattern to the parameter
           // types.
           Type subPatternType = getTypeForPattern(
-              subPattern, locator, Type(), bindPatternVarsOneWay);
+              subPattern,
+              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+              Type(), bindPatternVarsOneWay);
 
           if (!subPatternType)
             return Type();
@@ -3522,6 +3545,26 @@ namespace {
       }
 
       return tv;
+    }
+
+    Type visitTypeJoinExpr(TypeJoinExpr *expr) {
+      auto *locator = CS.getConstraintLocator(expr);
+      SmallVector<std::pair<Type, ConstraintLocator *>, 4> elements;
+      elements.reserve(expr->getNumElements());
+
+      for (auto *element : expr->getElements()) {
+        elements.emplace_back(CS.getType(element),
+                              CS.getConstraintLocator(element));
+      }
+
+      auto resultTy = CS.getType(expr->getVar());
+      // The type of a join expression is obtained by performing
+      // a "join-meet" operation on deduced types of its elements
+      // and the underlying variable.
+      auto joinedTy = CS.addJoinConstraint(locator, elements);
+
+      CS.addConstraint(ConstraintKind::Equal, resultTy, joinedTy, locator);
+      return resultTy;
     }
 
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,

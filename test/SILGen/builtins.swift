@@ -221,7 +221,7 @@ func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
 // CHECK-NEXT:   debug_value
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[ARG_COPY]] : $ClassProto
-// CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
+// CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}, ClassProto) Self to $Builtin.NativeObject
 // CHECK-NEXT:   return [[PTR]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
   return Builtin.unsafeCastToNativeObject(t as ClassProto)

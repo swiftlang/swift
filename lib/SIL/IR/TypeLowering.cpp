@@ -2227,26 +2227,11 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
     auto origEltType = origType.getTupleElementType(i);
     auto substEltType = substType.getElementType(i);
 
-    auto &substElt = substType->getElement(i);
-
-    // Make sure we don't have something non-materializable.
-    auto Flags = substElt.getParameterFlags();
-    assert(Flags.getValueOwnership() == ValueOwnership::Default);
-    assert(!Flags.isVariadic());
-
-    CanType loweredSubstEltType =
+    CanType loweredTy =
         tc.getLoweredRValueType(context, origEltType, substEltType);
-    changed = (changed || substEltType != loweredSubstEltType ||
-               !Flags.isNone());
+    changed = (changed || substEltType != loweredTy);
 
-    // Note: we drop @escaping and @autoclosure which can still appear on
-    // materializable tuple types.
-    //
-    // FIXME: Replace this with an assertion that the original tuple element
-    // did not have any flags.
-    loweredElts.emplace_back(loweredSubstEltType,
-                             substElt.getName(),
-                             ParameterTypeFlags());
+    loweredElts.push_back(substType->getElement(i).getWithType(loweredTy));
   }
 
   if (!changed) return substType;

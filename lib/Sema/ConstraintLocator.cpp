@@ -98,6 +98,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PackElement:
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
+  case ConstraintLocator::AnyPatternDecl:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -445,6 +446,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::NamedPatternDecl: {
     out << "named pattern decl";
+    break;
+  }
+
+  case ConstraintLocator::AnyPatternDecl: {
+    out << "'_' pattern decl";
     break;
   }
   }

@@ -36,7 +36,7 @@ RequirementEnvironment::RequirementEnvironment(
                                            GenericSignature reqSig,
                                            ProtocolDecl *proto,
                                            ClassDecl *covariantSelf,
-                                           ProtocolConformance *conformance)
+                                           RootProtocolConformance *conformance)
     : reqSig(reqSig) {
   ASTContext &ctx = conformanceDC->getASTContext();
 

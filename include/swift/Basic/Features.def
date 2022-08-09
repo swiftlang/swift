@@ -93,6 +93,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)"
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
 UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
+UPCOMING_FEATURE(ExistentialAny, 335, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert)
 EXPERIMENTAL_FEATURE(VariadicGenerics)
@@ -101,6 +102,7 @@ EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures)
 EXPERIMENTAL_FEATURE(MoveOnly)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
+EXPERIMENTAL_FEATURE(ResultBuilderASTTransform)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.

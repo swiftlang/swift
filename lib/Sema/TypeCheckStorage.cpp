@@ -60,9 +60,6 @@ Expr *TypeChecker::buildDefaultInitializer(Type type) {
   if (auto tupleType = type->getAs<TupleType>()) {
     SmallVector<Expr *, 2> inits;
     for (const auto &elt : tupleType->getElements()) {
-      if (elt.isVararg())
-        return nullptr;
-
       auto eltInit = TypeChecker::buildDefaultInitializer(elt.getType());
       if (!eltInit)
         return nullptr;
@@ -2685,6 +2682,13 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
     var->getAttrs().add(
         new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
                                              /*Implicit=*/true));
+
+  // If the wrapped property has a nonisolated attribute, propagate it to
+  // the synthesized projectedValue as well.
+  if (var->getAttrs().getAttribute<NonisolatedAttr>()) {
+    property->getAttrs().add(new (ctx) NonisolatedAttr(/*Implicit=*/true));
+  }
+
   return property;
 }
 

@@ -142,7 +142,7 @@ func address_only_materialize() -> Int {
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @$s18address_only_types05some_a1_B11_function_1{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]([[TEMP]])
-  // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
+  // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*Unloadable to $*[[OPENED:@opened\(.*, Unloadable\) Self]]
   // CHECK: [[FOO_METHOD:%[0-9]+]] = witness_method $[[OPENED]], #Unloadable.foo :
   // CHECK: [[RET:%[0-9]+]] = apply [[FOO_METHOD]]<[[OPENED]]>([[TEMP_PROJ]])
   // CHECK: destroy_addr [[TEMP]]

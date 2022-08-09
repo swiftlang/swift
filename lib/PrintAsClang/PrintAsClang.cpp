@@ -105,7 +105,14 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
-        out << "#if __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <type_traits>\n";
+        // FIXME: Look for the header in the SDK.
+        out << "// Look for the C++ interop support header relative to clang's resource dir:\n";
+        out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.\n";
+        out << "#if __has_include(<../../../swift/shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <../../../swift/shims/_SwiftCxxInteroperability.h>\n";
+        out << "// Alternatively, allow user to find the header using additional include path into 'swift'.\n";
+        out << "#elif __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
         out << "#include <shims/_SwiftCxxInteroperability.h>\n";
         out << "#endif\n";
       },
@@ -337,15 +344,6 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
       [&] { emitMacro("SWIFT_NOEXCEPT"); });
-  emitCxxConditional(out, [&] {
-    out << "#if !defined(SWIFT_CXX_INT_DEFINED)\n";
-    out << "#define SWIFT_CXX_INT_DEFINED\n";
-    out << "namespace swift {\n";
-    out << "using Int = ptrdiff_t;\n";
-    out << "using UInt = size_t;\n";
-    out << "}\n";
-    out << "#endif\n";
-  });
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 }

@@ -37,11 +37,13 @@ class Keyword(Token):
     """
 
     def __init__(self, name, text, serialization_code,
-                 classification='Keyword'):
+                 classification='Keyword',
+                 requires_leading_space=False, requires_trailing_space=True):
         Token.__init__(self, name, 'kw_' + text, serialization_code,
                        unprefixed_kind=text, text=text,
                        classification=classification, is_keyword=True,
-                       requires_trailing_space=True)
+                       requires_leading_space=requires_leading_space,
+                       requires_trailing_space=requires_trailing_space)
 
     def macro_name(self):
         return "KEYWORD"
@@ -171,7 +173,8 @@ SYNTAX_TOKENS = [
     StmtKeyword('Defer', 'defer', serialization_code=23),
     StmtKeyword('If', 'if', serialization_code=24),
     StmtKeyword('Guard', 'guard', serialization_code=25),
-    StmtKeyword('Do', 'do', serialization_code=26),
+    StmtKeyword('Do', 'do', requires_trailing_space=False,
+                serialization_code=26),
     StmtKeyword('Repeat', 'repeat', serialization_code=27),
     StmtKeyword('Else', 'else', serialization_code=28),
     StmtKeyword('For', 'for', serialization_code=29),
@@ -184,8 +187,10 @@ SYNTAX_TOKENS = [
     StmtKeyword('Switch', 'switch', serialization_code=36),
     StmtKeyword('Case', 'case', serialization_code=37),
     StmtKeyword('Default', 'default', serialization_code=38),
-    StmtKeyword('Where', 'where', serialization_code=39),
-    StmtKeyword('Catch', 'catch', serialization_code=40),
+    StmtKeyword('Where', 'where', requires_leading_space=True,
+                serialization_code=39),
+    StmtKeyword('Catch', 'catch', requires_leading_space=True,
+                requires_trailing_space=False, serialization_code=40),
     StmtKeyword('Throw', 'throw', serialization_code=50),
 
     # Expression keywords

@@ -400,8 +400,7 @@ class TypeResolution {
   HandlePlaceholderTypeReprFn placeholderHandler;
 
 private:
-  /// The generic environment used to map to archetypes.
-  GenericEnvironment *genericEnv;
+  GenericSignature genericSig;
 
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
@@ -409,8 +408,7 @@ private:
                  HandlePlaceholderTypeReprFn placeholderHandler)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
-        placeholderHandler(placeholderHandler),
-        genericEnv(nullptr) {}
+        placeholderHandler(placeholderHandler) {}
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -431,7 +429,7 @@ public:
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution
-  forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
+  forInterface(DeclContext *dc, GenericSignature genericSig,
                TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler);
@@ -447,7 +445,7 @@ public:
                         GenericParamList *silParams = nullptr);
 
   static Type resolveContextualType(
-      TypeRepr *TyR, DeclContext *dc, GenericEnvironment *genericEnv,
+      TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
       TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
       HandlePlaceholderTypeReprFn placeholderHandler,
       GenericParamList *silParams = nullptr);

@@ -49,3 +49,16 @@ func testAsyncSequence3<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, 
 func testAsyncSequence4<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, Seq.Element == Int { // expected-note{{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{28-28=: Sendable}}
    async let _ = seq // expected-warning{{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
 }
+
+func search(query: String, entities: [String]) async throws -> [String] {
+  async let r = entities.filter { $0.contains(query) }.map { String($0) }
+  return await r // OK
+}
+
+// https://github.com/apple/swift/issues/60351
+func foo() async {
+    let stream = AsyncStream<Int>{ _ in }
+    async let bar = stream.first { _ in true}
+
+    _ = await bar // OK
+}

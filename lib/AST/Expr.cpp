@@ -365,6 +365,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnresolvedMemberChainResult, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Await, getSubExpr);
+  PASS_THROUGH_REFERENCE(Move, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
@@ -460,6 +461,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(Pack);
+  NO_REFERENCE(TypeJoin);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -702,6 +704,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::Await:
+  case ExprKind::Move:
   case ExprKind::Try:
   case ExprKind::ForceTry:
   case ExprKind::OptionalTry:
@@ -788,6 +791,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
   case ExprKind::Pack:
+  case ExprKind::TypeJoin:
     return false;
 
   case ExprKind::Tap:
@@ -879,6 +883,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Sequence:
   case ExprKind::Paren:
   case ExprKind::Await:
+  case ExprKind::Move:
   case ExprKind::UnresolvedMemberChainResult:
   case ExprKind::Try:
   case ExprKind::ForceTry:
@@ -956,6 +961,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Tap:
   case ExprKind::ReifyPack:
   case ExprKind::Pack:
+  case ExprKind::TypeJoin:
     return false;
   }
 
@@ -2352,6 +2358,23 @@ PackExpr *PackExpr::create(ASTContext &ctx,
 
 PackExpr *PackExpr::createEmpty(ASTContext &ctx) {
   return create(ctx, {}, PackType::getEmpty(ctx));
+}
+
+TypeJoinExpr::TypeJoinExpr(DeclRefExpr *varRef, ArrayRef<Expr *> elements)
+  : Expr(ExprKind::TypeJoin, /*implicit=*/true, Type()), Var(varRef) {
+  assert(Var);
+
+  Bits.TypeJoinExpr.NumElements = elements.size();
+  // Copy elements.
+  std::uninitialized_copy(elements.begin(), elements.end(),
+                          getTrailingObjects<Expr *>());
+}
+
+TypeJoinExpr *TypeJoinExpr::create(ASTContext &ctx, DeclRefExpr *var,
+                                   ArrayRef<Expr *> elements) {
+  size_t size = totalSizeToAlloc<Expr *>(elements.size());
+  void *mem = ctx.Allocate(size, alignof(TypeJoinExpr));
+  return new (mem) TypeJoinExpr(var, elements);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {

@@ -28,6 +28,10 @@
 namespace swift {
 namespace _impl {
 
+extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
+
+extern "C" void swift_release(void *_Nonnull) noexcept;
+
 inline void *_Nonnull opaqueAlloc(size_t size, size_t align) noexcept {
 #if defined(_WIN32)
   void *r = _aligned_malloc(size, align);
@@ -49,7 +53,48 @@ inline void opaqueFree(void *_Nonnull p) noexcept {
 #endif
 }
 
+/// Base class for a Swift reference counted class value.
+class RefCountedClass {
+public:
+  inline ~RefCountedClass() { swift_release(_opaquePointer); }
+  inline RefCountedClass(const RefCountedClass &other) noexcept
+      : _opaquePointer(other._opaquePointer) {
+    swift_retain(_opaquePointer);
+  }
+  inline RefCountedClass &operator=(const RefCountedClass &other) noexcept {
+    swift_retain(other._opaquePointer);
+    swift_release(_opaquePointer);
+    _opaquePointer = other._opaquePointer;
+    return *this;
+  }
+  // FIXME: What to do in 'move'?
+  inline RefCountedClass(RefCountedClass &&) noexcept = default;
+
+protected:
+  inline RefCountedClass(void *_Nonnull ptr) noexcept : _opaquePointer(ptr) {}
+
+private:
+  void *_Nonnull _opaquePointer;
+  friend class _impl_RefCountedClass;
+};
+
+class _impl_RefCountedClass {
+public:
+  static inline void *_Nonnull getOpaquePointer(const RefCountedClass &object) {
+    return object._opaquePointer;
+  }
+  static inline void *_Nonnull &getOpaquePointerRef(RefCountedClass &object) {
+    return object._opaquePointer;
+  }
+};
+
 } // namespace _impl
+
+/// Swift's Int type.
+using Int = ptrdiff_t;
+
+/// Swift's UInt type.
+using UInt = size_t;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc++17-extensions"
@@ -63,6 +108,16 @@ static inline const constexpr bool isUsableInGenericContext = false;
 
 /// Returns the type metadat for the given Swift type T.
 template <class T> inline void *_Nonnull getTypeMetadata();
+
+namespace _impl {
+
+/// Type trait that returns the `_impl::_impl_<T>` class type for the given
+/// class T.
+template <class T> struct implClassFor {
+  // using type = ...;
+};
+
+} // namespace _impl
 
 } // namespace swift
 #endif

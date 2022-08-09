@@ -240,7 +240,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PADDR]]
   // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
   // CHECK: copy_addr [[READ]] to [initialization] [[TEMP]]
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened\(.*, SomeProtocol\) Self]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method :
@@ -249,7 +249,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: dealloc_stack [[TEMP]]
   p.method(i)
 
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened\(.*, SomeProtocol\) Self]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method :
@@ -257,7 +257,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   var sp : SomeProtocol = ConformsToSomeProtocol()
   sp.method(i)
 
-  // FIXME: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED:@opened(.*) SomeProtocol]], #SomeProtocol.static_method :
+  // FIXME: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED:@opened(.*, SomeProtocol) Self]], #SomeProtocol.static_method :
   // FIXME: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // FIXME: apply [[PMETHOD]]([[I]], [[PMETA]])
   // Needs existential metatypes

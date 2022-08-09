@@ -271,8 +271,8 @@ func convExistentialMetatype(_ em: @escaping (Q.Type?) -> Trivial.Type) {
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s19function_conversion1Q_pXmTSgAA7TrivialVXMtIegyd_AA1P_pXmTAaF_pXmTIegyd_TR : $@convention(thin) (@thick P.Type, @guaranteed @callee_guaranteed (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
-// CHECK:         open_existential_metatype %0 : $@thick P.Type to $@thick (@opened({{.*}}) P).Type
-// CHECK-NEXT:    init_existential_metatype %2 : $@thick (@opened({{.*}}) P).Type, $@thick Q.Type
+// CHECK:         open_existential_metatype %0 : $@thick P.Type to $@thick (@opened({{.*}}, P) Self).Type
+// CHECK-NEXT:    init_existential_metatype %2 : $@thick (@opened({{.*}}, P) Self).Type, $@thick Q.Type
 // CHECK-NEXT:    enum $Optional<@thick Q.Type>
 // CHECK-NEXT:    apply %1
 // CHECK-NEXT:    metatype $@thick Trivial.Type

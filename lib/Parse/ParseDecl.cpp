@@ -3715,6 +3715,17 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
       } else {
         diagnose(Tok, diag::opened_attribute_id_value);
       }
+
+      if (Tok.is(tok::comma)) {
+        consumeToken(tok::comma);
+
+        auto constraintType = parseType(diag::expected_type);
+        if (constraintType.isNonNull())
+          Attributes.ConstraintType = constraintType.getPtrOrNull();
+      } else {
+        diagnose(Tok, diag::attr_expected_comma, "@opened", false);
+      }
+
       parseMatchingToken(tok::r_paren, endLoc,
                          diag::opened_attribute_expected_rparen,
                          beginLoc);

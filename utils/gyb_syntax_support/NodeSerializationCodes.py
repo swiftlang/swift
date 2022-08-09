@@ -166,7 +166,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AvailabilityVersionRestriction': 161,
     'VersionTuple': 162,
     'CodeBlockItemList': 163,
-    # removed: 'FunctionCallArgumentList': 164,
+    'LayoutRequirement': 164,
     'TupleExprElementList': 165,
     'ArrayElementList': 166,
     'DictionaryElementList': 167,
@@ -261,6 +261,16 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'BackDeployAttributeSpecList' : 257,
     'BackDeployVersionList' : 258,
     'BackDeployVersionArgument' : 259,
+    'Missing': 260,
+    'MissingDecl': 261,
+    'MissingExpr': 262,
+    'MissingStmt': 263,
+    'MissingType': 264,
+    'MissingPattern': 265,
+    'GarbageNodes' : 266,
+    'LabeledStmt': 267,
+    'InfixOperatorExpr': 268,
+    'MoveExpr': 269,
 }
 
 

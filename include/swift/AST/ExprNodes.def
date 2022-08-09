@@ -107,6 +107,7 @@ ABSTRACT_EXPR(Identity, Expr)
   EXPR(Paren, IdentityExpr)
   EXPR(DotSelf, IdentityExpr)
   EXPR(Await, IdentityExpr)
+  EXPR(Move, IdentityExpr)
   EXPR(UnresolvedMemberChainResult, IdentityExpr)
   EXPR_RANGE(Identity, Paren, UnresolvedMemberChainResult)
 ABSTRACT_EXPR(AnyTry, Expr)
@@ -205,7 +206,8 @@ UNCHECKED_EXPR(KeyPathDot, Expr)
 UNCHECKED_EXPR(OneWay, Expr)
 EXPR(Tap, Expr)
 EXPR(Pack, Expr)
-LAST_EXPR(Pack)
+UNCHECKED_EXPR(TypeJoin, Expr)
+LAST_EXPR(TypeJoin)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR

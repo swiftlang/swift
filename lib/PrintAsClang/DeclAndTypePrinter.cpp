@@ -13,6 +13,7 @@
 #include "DeclAndTypePrinter.h"
 #include "ClangSyntaxPrinter.h"
 #include "PrimitiveTypeMapping.h"
+#include "PrintClangClassType.h"
 #include "PrintClangFunction.h"
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
@@ -295,6 +296,16 @@ private:
 
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
+
+    if (outputLang == OutputLanguageMode::Cxx) {
+      // FIXME: Non objc class.
+      // FIXME: Print availability.
+      ClangClassTypePrinter(os).printClassTypeDecl(
+          CD, [&]() { printMembers(CD->getMembers()); });
+      os << outOfLineDefinitions;
+      outOfLineDefinitions.clear();
+      return;
+    }
 
     // This is just for testing, so we check explicitly for the attribute instead
     // of asking if the class is weak imported. If the class has availability,

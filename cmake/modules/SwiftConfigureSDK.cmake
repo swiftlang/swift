@@ -86,10 +86,6 @@ function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
   foreach(arch ${${architectures_var}})
     if(sdk_supported_archs MATCHES "${arch}\n")
       list(APPEND architectures ${arch})
-    elseif(arch MATCHES "^armv7(s)?$" AND os STREQUAL "iphoneos")
-      # 32-bit iOS is not listed explicitly in SDK settings.
-      message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
-      list(APPEND architectures ${arch})
     elseif(arch STREQUAL "i386" AND os STREQUAL "iphonesimulator")
       # 32-bit iOS simulator is not listed explicitly in SDK settings.
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")

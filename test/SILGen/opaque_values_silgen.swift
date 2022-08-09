@@ -62,8 +62,8 @@ func forEachStmt() {
 // ---
 // CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed Error) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
-// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}, Error) Self
+// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, Error) Self
 // CHECK:   [[COPY:%.*]] = copy_value [[OPAQUE_ARG]]
 // CHECK:   store [[COPY]] to [init] [[ALLOC_OPEN]]
 // CHECK:   destroy_addr [[ALLOC_OPEN]]
@@ -136,11 +136,11 @@ func addrOnlyIf(x: Bool) -> EmptyP {
 // HECK:   store [[COPY_ARG]] to [init] [[PROJ_BOX]]
 // HECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*Error
 // HECK:   [[LOAD_BOX:%.*]] = load [copy] [[READ]]
-// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $Error to $*@opened({{.*}}) Error
+// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $Error to $*@opened({{.*}}, Error) Self
 // HECK:   [[LOAD_OPAQUE:%.*]] = load [copy] [[OPAQUE_ARG]]
-// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, Error) Self
 // HECK:   store [[LOAD_OPAQUE]] to [init] [[ALLOC_OPEN]]
-// HECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}) Error>([[ALLOC_OPEN]])
+// HECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}, Error) Self>([[ALLOC_OPEN]])
 // HECK:   return [[RET_VAL]] : $String
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen12propOfLValueySSs5Error_pF'
 func propOfLValue(_ x: Error) -> String {
@@ -282,7 +282,7 @@ public enum FloatingPointSign {
 // CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
 // CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX:   end_borrow [[BORROW2]] : $Any
-// CHECK-OSX:   [[RESULT:%.*]] = apply %{{.*}}<@opened("{{.*}}") Any>([[COPY2]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-OSX:   [[RESULT:%.*]] = apply %{{.*}}<@opened("{{.*}}", Any) Self>([[COPY2]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
 // CHECK-OSX:   destroy_value [[COPY2]] : $@opened
 // CHECK-OSX:   destroy_value [[COPY]] : $Any
 // CHECK-OSX-NOT:   destroy_value %0 : $Any

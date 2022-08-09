@@ -2076,6 +2076,12 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitMoveExpr(MoveExpr *E) {
+    printCommon(E, "move_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitUnresolvedMemberChainResultExpr(UnresolvedMemberChainResultExpr *E){
     printCommon(E, "unresolved_member_chain_expr");
     OS << '\n';
@@ -2905,6 +2911,21 @@ public:
     printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitTypeJoinExpr(TypeJoinExpr *E) {
+    printCommon(E, "type_join_expr");
+
+    PrintWithColorRAII(OS, DeclColor) << " var=";
+    printRec(E->getVar());
+    OS << '\n';
+
+    for (auto *member : E->getElements()) {
+      printRec(member);
+      OS << '\n';
+    }
+
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 };
 
 } // end anonymous namespace
@@ -3649,7 +3670,6 @@ namespace {
 
     void visitParenType(ParenType *T, StringRef label) {
       printCommon(label, "paren_type");
-      dumpParameterFlags(T->getParameterFlags());
       printRec(T->getUnderlyingType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3664,7 +3684,6 @@ namespace {
         PrintWithColorRAII(OS, TypeFieldColor) << "tuple_type_elt";
         if (elt.hasName())
           printField("name", elt.getName().str());
-        dumpParameterFlags(elt.getParameterFlags());
         printRec(elt.getType());
         OS << ")";
       }

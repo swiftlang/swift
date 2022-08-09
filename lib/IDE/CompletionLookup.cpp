@@ -824,14 +824,15 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   }
   bool implicitlyAsync = false;
   analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
-  if (!isForCaching() && !NotRecommended && implicitlyAsync &&
-      !CanCurrDeclContextHandleAsync) {
-    NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
+  bool explicitlyAsync = false;
+  if (auto accessor = VD->getEffectfulGetAccessor()) {
+    explicitlyAsync = accessor->hasAsync();
   }
-
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResultKind::Declaration,
       getSemanticContext(VD, Reason, dynamicLookupInfo));
+  Builder.setIsAsync(explicitlyAsync || implicitlyAsync);
+  Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(VD);
   addLeadingDot(Builder);
   addValueBaseName(Builder, Name);
@@ -1228,11 +1229,8 @@ void CompletionLookup::addFunctionCallPattern(
     else
       addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-    if (!isForCaching() && AFT->hasExtInfo() && AFT->isAsync() &&
-        !CanCurrDeclContextHandleAsync) {
-      Builder.setContextualNotRecommended(
-          ContextualNotRecommendedReason::InvalidAsyncContext);
-    }
+    Builder.setIsAsync(AFT->hasExtInfo() && AFT->isAsync());
+    Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   };
 
   if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
@@ -1346,19 +1344,17 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
   bool implictlyAsync = false;
   analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
-  if (!isForCaching() && !NotRecommended &&
-      !IsImplicitlyCurriedInstanceMethod &&
-      ((AFT && AFT->isAsync()) || implictlyAsync) &&
-      !CanCurrDeclContextHandleAsync) {
-    NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
-  }
-
   // Add the method, possibly including any default arguments.
   auto addMethodImpl = [&](bool includeDefaultArgs = true,
                            bool trivialTrailingClosure = false) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResultKind::Declaration,
         getSemanticContext(FD, Reason, dynamicLookupInfo));
+    Builder.setIsAsync(implictlyAsync || (AFT->hasExtInfo() && AFT->isAsync()));
+    Builder.setHasAsyncAlternative(
+        FD->getAsyncAlternative() &&
+        !FD->getAsyncAlternative()->shouldHideFromEditor());
+    Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
     Builder.setAssociatedDecl(FD);
 
     if (IsSuperRefExpr && CurrentMethod &&
@@ -1547,11 +1543,9 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
       addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
     }
 
-    if (!isForCaching() && ConstructorType->isAsync() &&
-        !CanCurrDeclContextHandleAsync) {
-      Builder.setContextualNotRecommended(
-          ContextualNotRecommendedReason::InvalidAsyncContext);
-    }
+    Builder.setIsAsync(ConstructorType->hasExtInfo() &&
+                       ConstructorType->isAsync());
+    Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   };
 
   if (ConstructorType && shouldAddItemWithoutDefaultArgs(CD))
@@ -1610,14 +1604,11 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   bool implictlyAsync = false;
   analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
-  if (!isForCaching() && !NotRecommended && implictlyAsync &&
-      !CanCurrDeclContextHandleAsync) {
-    NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
-  }
-
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResultKind::Declaration,
       getSemanticContext(SD, Reason, dynamicLookupInfo));
+  Builder.setIsAsync(implictlyAsync);
+  Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(SD);
 
   if (NotRecommended)

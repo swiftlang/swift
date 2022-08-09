@@ -40,9 +40,9 @@
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/CompletionOverrideLookup.h"
-#include "swift/IDE/DotExprCompletion.h"
 #include "swift/IDE/ExprCompletion.h"
 #include "swift/IDE/KeyPathCompletion.h"
+#include "swift/IDE/PostfixCompletion.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/IDE/UnresolvedMemberCompletion.h"
 #include "swift/IDE/Utils.h"
@@ -184,7 +184,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
         ParsedTypeLoc.getTypeRepr(), P.Context,
         /*isSILMode=*/false,
         /*isSILType=*/false,
-        CurDeclContext->getGenericEnvironmentOfContext(),
+        CurDeclContext->getGenericSignatureOfContext(),
         /*GenericParams=*/nullptr,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
@@ -1369,7 +1369,8 @@ void swift::ide::deliverCompletionResults(
                                /*Sink=*/nullptr);
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
-                                   Lookup.getExpectedTypeContext(), DC);
+                                   Lookup.getExpectedTypeContext(), DC,
+                                   Lookup.canCurrDeclContextHandleAsync());
 }
 
 bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
@@ -1412,8 +1413,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
-                                              CurDeclContext);
+    PostfixCompletionCallback Lookup(CodeCompleteTokenExpr, CurDeclContext);
     typeCheckWithLookup(Lookup);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);

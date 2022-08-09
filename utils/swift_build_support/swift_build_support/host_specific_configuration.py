@@ -304,9 +304,6 @@ class HostSpecificConfiguration(object):
 
     def __platforms_archs_to_skip_test(self, args, stage_dependent_args, host_target):
         platforms_archs_to_skip_test = set()
-        if not stage_dependent_args.test_ios_32bit_simulator:
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator.i386)
         if not stage_dependent_args.test_watchos_32bit_simulator:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator.i386)
@@ -318,8 +315,6 @@ class HostSpecificConfiguration(object):
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator.arm64)
         if host_target == StdlibDeploymentTarget.OSX.arm64.name:
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator.i386)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.x86_64)
             platforms_archs_to_skip_test.add(
