@@ -490,39 +490,39 @@ void ClangValueTypePrinter::printTypeGenericTraits(
      << "::" << typeMetadataFuncName << "(0)._0;\n";
   os << "}\n";
 
-    os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
+  os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
 
-    if (!isa<ClassDecl>(typeDecl)) {
+  if (!isa<ClassDecl>(typeDecl)) {
+    os << "template<>\n";
+    os << "static inline const constexpr bool isValueType<";
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::";
+    printer.printBaseName(typeDecl);
+    os << "> = true;\n";
+    if (typeDecl->isResilient()) {
       os << "template<>\n";
-      os << "static inline const constexpr bool isValueType<";
+      os << "static inline const constexpr bool isOpaqueLayout<";
       printer.printBaseName(typeDecl->getModuleContext());
       os << "::";
       printer.printBaseName(typeDecl);
       os << "> = true;\n";
-      if (typeDecl->isResilient()) {
+    }
+  }
+
         os << "template<>\n";
-        os << "static inline const constexpr bool isOpaqueLayout<";
+        os << "struct implClassFor<";
         printer.printBaseName(typeDecl->getModuleContext());
         os << "::";
         printer.printBaseName(typeDecl);
-        os << "> = true;\n";
-      }
-    }
-
-    os << "template<>\n";
-    os << "struct implClassFor<";
-    printer.printBaseName(typeDecl->getModuleContext());
-    os << "::";
-    printer.printBaseName(typeDecl);
-    os << "> { using type = ";
-    printer.printBaseName(typeDecl->getModuleContext());
-    os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
-    printCxxImplClassName(os, typeDecl);
-    os << "; };\n";
-    os << "} // namespace\n";
-    os << "#pragma clang diagnostic pop\n";
-    os << "} // namespace swift\n";
-    os << "\nnamespace ";
-    printer.printBaseName(typeDecl->getModuleContext());
-    os << " {\n";
+        os << "> { using type = ";
+        printer.printBaseName(typeDecl->getModuleContext());
+        os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+        printCxxImplClassName(os, typeDecl);
+        os << "; };\n";
+        os << "} // namespace\n";
+        os << "#pragma clang diagnostic pop\n";
+        os << "} // namespace swift\n";
+        os << "\nnamespace ";
+        printer.printBaseName(typeDecl->getModuleContext());
+        os << " {\n";
 }
