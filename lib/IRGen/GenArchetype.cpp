@@ -437,7 +437,7 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
           auto ty = reqt.TypeParameter.subst(archetype->getSubstitutions())
-                        ->getCanonicalType(opaqueDecl->getGenericSignature());
+                        ->getReducedType(opaqueDecl->getGenericSignature());
           if (reqt.Protocol) {
             auto ref =
                 ProtocolConformanceRef(reqt.Protocol)

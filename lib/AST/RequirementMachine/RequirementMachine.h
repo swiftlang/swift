@@ -153,11 +153,11 @@ public:
   Type getConcreteType(Type depType,
                        TypeArrayView<GenericTypeParamType> genericParams,
                        const ProtocolDecl *proto=nullptr) const;
-  bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
-  bool isCanonicalTypeInContext(Type type) const;
-  Type getCanonicalTypeInContext(Type type,
+  bool areReducedTypeParametersEqual(Type depType1, Type depType2) const;
+  bool isReducedType(Type type) const;
+  Type getReducedType(Type type,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
-  bool isValidTypeInContext(Type type) const;
+  bool isValidTypeParameter(Type type) const;
   ConformanceAccessPath getConformanceAccessPath(Type type,
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;

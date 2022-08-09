@@ -5945,8 +5945,8 @@ void SILProperty::verify(const SILModule &M) const {
   // TODO: base type for global/static descriptors
   auto sig = dc->getGenericSignatureOfContext();
   auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
-                  ->getCanonicalType(sig);
-  auto leafTy = decl->getValueInterfaceType()->getCanonicalType(sig);
+                  ->getReducedType(sig);
+  auto leafTy = decl->getValueInterfaceType()->getReducedType(sig);
   SubstitutionMap subs;
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
