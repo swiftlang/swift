@@ -104,7 +104,7 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
 
     // If completion failed, we'll have a totally empty requirement signature,
     // but to maintain invariants around what constitutes a valid rewrite term
-    // between getTypeForTerm() and isValidTypeInContext(), we need to add rules
+    // between getTypeForTerm() and isValidTypeParameter(), we need to add rules
     // for inherited protocols.
     if (reqs.getErrors().contains(GenericSignatureErrorFlags::CompletionFailed)) {
       for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {

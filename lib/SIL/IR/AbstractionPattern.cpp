@@ -50,7 +50,7 @@ TypeConverter::getAbstractionPattern(AbstractStorageDecl *decl,
 AbstractionPattern
 TypeConverter::getAbstractionPattern(SubscriptDecl *decl, bool isNonObjC) {
   auto sig = decl->getGenericSignatureOfContext().getCanonicalSignature();
-  auto type = sig.getCanonicalTypeInContext(decl->getElementInterfaceType());
+  auto type = sig.getReducedType(decl->getElementInterfaceType());
   return AbstractionPattern(sig, type);
 }
 
@@ -79,7 +79,7 @@ TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
   auto sig = var->getDeclContext()
                  ->getGenericSignatureOfContext()
                  .getCanonicalSignature();
-  auto swiftType = sig.getCanonicalTypeInContext(var->getInterfaceType());
+  auto swiftType = sig.getReducedType(var->getInterfaceType());
 
   if (isNonObjC)
     return AbstractionPattern(sig, swiftType);
@@ -111,7 +111,7 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   auto sig = decl->getParentEnum()
                  ->getGenericSignatureOfContext()
                  .getCanonicalSignature();
-  auto type = sig.getCanonicalTypeInContext(decl->getArgumentInterfaceType());
+  auto type = sig.getReducedType(decl->getArgumentInterfaceType());
 
   return AbstractionPattern(sig, type);
 }
@@ -1231,7 +1231,7 @@ const {
   case Kind::Discard:
     auto memberTy = getType()->getTypeOfMember(member->getModuleContext(),
                                       member, origMemberInterfaceType)
-                             ->getCanonicalType(getGenericSignature());
+                             ->getReducedType(getGenericSignature());
       
     return AbstractionPattern(getGenericSignature(), memberTy);
   }
@@ -1253,7 +1253,7 @@ AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
     assert(derivativeFnTy);
     return AbstractionPattern(
         getGenericSignature(),
-        derivativeFnTy->getCanonicalType(getGenericSignature()));
+        derivativeFnTy->getReducedType(getGenericSignature()));
   }
   case Kind::Opaque:
     return getOpaqueDerivativeFunction();
@@ -1882,10 +1882,10 @@ const {
 
   auto yieldType = visitor.substYieldType;
   if (yieldType)
-    yieldType = yieldType->getCanonicalType(substSig);
+    yieldType = yieldType->getReducedType(substSig);
   
   return std::make_tuple(
-          AbstractionPattern(substSig, substTy->getCanonicalType(substSig)),
+          AbstractionPattern(substSig, substTy->getReducedType(substSig)),
           subMap,
           yieldType
             ? AbstractionPattern(substSig, yieldType)

@@ -4106,7 +4106,7 @@ findGenericParameterReferences(CanGenericSignature genericSig,
 
   // If the type parameter is beyond the domain of the existential generic
   // signature, ignore it.
-  if (!genericSig->isValidTypeInContext(type)) {
+  if (!genericSig->isValidTypeParameter(type)) {
     return GenericParameterReferenceInfo();
   }
 

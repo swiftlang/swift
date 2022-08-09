@@ -334,7 +334,7 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
     for (auto *EED : ED->getAllElements()) {
       if (EED->hasAssociatedValues()) {
         useConformancesFromType(EED->getArgumentInterfaceType()
-                                   ->getCanonicalType(genericSig));
+                                   ->getReducedType(genericSig));
       }
     }
   }
@@ -342,13 +342,13 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
   if (isa<StructDecl>(NTD) || isa<ClassDecl>(NTD)) {
     for (auto *VD : NTD->getStoredProperties()) {
       useConformancesFromType(VD->getValueInterfaceType()
-                                ->getCanonicalType(genericSig));
+                                ->getReducedType(genericSig));
     }
   }
 
   if (auto *CD = dyn_cast<ClassDecl>(NTD))
     if (auto superclass = CD->getSuperclass())
-      useConformancesFromType(superclass->getCanonicalType(genericSig));
+      useConformancesFromType(superclass->getReducedType(genericSig));
 
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
     for (auto reqt : PD->getRequirementSignature().getRequirements()) {

@@ -503,9 +503,9 @@ public:
     return const_cast<TypeBase*>(this)->computeCanonicalType();
   }
 
-  /// getCanonicalType - Stronger canonicalization which folds away equivalent
+  /// getReducedType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature sig);
+  CanType getReducedType(GenericSignature sig);
 
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing

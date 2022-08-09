@@ -213,9 +213,9 @@ public:
   SmallVector<Requirement, 4>
   requirementsNotSatisfiedBy(GenericSignature otherSig) const;
 
-  /// Return the canonical version of the given type under this generic
+  /// Return the reduced version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type) const;
+  CanType getReducedType(Type type) const;
 
   /// Check invariants.
   void verify() const;
@@ -383,7 +383,7 @@ public:
   /// generic signature.
   ///
   /// The type parameters must be known to not be concrete within the context.
-  bool areSameTypeParameterInContext(Type type1, Type type2) const;
+  bool areReducedTypeParametersEqual(Type type1, Type type2) const;
 
   /// Determine if \c sig can prove \c requirement, meaning that it can deduce
   /// T: Foo or T == U (etc.) with the information it knows. This includes
@@ -392,11 +392,11 @@ public:
   bool isRequirementSatisfied(
       Requirement requirement, bool allowMissing = false) const;
 
-  bool isCanonicalTypeInContext(Type type) const;
+  bool isReducedType(Type type) const;
 
   /// Determine whether the given type parameter is defined under this generic
   /// signature.
-  bool isValidTypeInContext(Type type) const;
+  bool isValidTypeParameter(Type type) const;
 
   /// Retrieve the conformance access path used to extract the conformance of
   /// interface \c type to the given \c protocol.
@@ -487,9 +487,9 @@ private:
   SmallVector<Requirement, 4>
   requirementsNotSatisfiedBy(GenericSignature otherSig) const;
 
-  /// Return the canonical version of the given type under this generic
+  /// Return the reduced version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type) const;
+  CanType getReducedType(Type type) const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);
