@@ -138,6 +138,9 @@ EXPERIMENTAL_FEATURE(ParserValidation)
 /// Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserSequenceFolding)
 
+/// Enables implicit some while also enabling existential `any`
+EXPERIMENTAL_FEATURE(ImplicitSome)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
