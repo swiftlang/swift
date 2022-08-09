@@ -295,8 +295,6 @@ else()
       set(compatibility_libs
           "swiftCompatibility50-${platform}"
           "swiftCompatibility51-${platform}"
-          "swiftCompatibility56-${platform}"
-          "swiftCompatibilityConcurrency-${platform}"
           "swiftCompatibilityDynamicReplacements-${platform}")
 
       list(APPEND b0_deps ${compatibility_libs})
