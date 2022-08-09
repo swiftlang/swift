@@ -49,7 +49,7 @@ thunk helpers" sometimes seen in Swift backtraces come from.)
 
 Broadly, an "access path" is a list of "accesses" which must be chained together
 to compute some output from an input. For instance, the generics system has a
-type called a `ConformanceAccessPath` which explains how to, for example,
+type called a `ConformancePath` which explains how to, for example,
 walk from `T: Collection` to `T: Sequence` to `T.Iterator: IteratorProtocol`.
 There are several different kinds of "access path" in different parts of the compiler,
 but they all follow this basic theme.

@@ -482,7 +482,7 @@ RequirementMachine::computeMinimalGenericSignature(
   auto sig = GenericSignature::get(getGenericParams(), reqs);
 
   // Remember the signature for generic signature queries. In particular,
-  // getConformanceAccessPath() needs the current requirement machine's
+  // getConformancePath() needs the current requirement machine's
   // generic signature.
   Sig = sig.getCanonicalSignature();
 

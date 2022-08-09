@@ -70,7 +70,7 @@ namespace rewriting {
 /// \c Sequence conformance of \c C (because \c Collection inherits
 /// \c Sequence). Finally, it extracts the conformance of the associated type
 /// \c Iterator to \c IteratorProtocol from the \c Sequence protocol.
-class ConformanceAccessPath {
+class ConformancePath {
 public:
   /// An entry in the conformance access path, which is described by the
   /// dependent type on which the conformance is stated as the protocol to
@@ -80,7 +80,7 @@ public:
 private:
   ArrayRef<Entry> path;
 
-  ConformanceAccessPath(ArrayRef<Entry> path) : path(path) {}
+  ConformancePath(ArrayRef<Entry> path) : path(path) {}
 
   friend class GenericSignatureImpl;
   friend class rewriting::RequirementMachine;
@@ -398,20 +398,20 @@ public:
   /// signature.
   bool isValidTypeParameter(Type type) const;
 
-  /// Retrieve the conformance access path used to extract the conformance of
+  /// Retrieve the conformance path used to extract the conformance of
   /// interface \c type to the given \c protocol.
   ///
-  /// \param type The interface type whose conformance access path is to be
+  /// \param type The type parameter whose conformance path is to be
   /// queried.
   /// \param protocol A protocol to which \c type conforms.
   ///
-  /// \returns the conformance access path that starts at a requirement of
+  /// \returns the conformance path that starts at a requirement of
   /// this generic signature and ends at the conformance that makes \c type
   /// conform to \c protocol.
   ///
-  /// \seealso ConformanceAccessPath
-  ConformanceAccessPath getConformanceAccessPath(Type type,
-                                                 ProtocolDecl *protocol) const;
+  /// \seealso ConformancePath
+  ConformancePath getConformancePath(Type type,
+                                     ProtocolDecl *protocol) const;
 
   /// Lookup a nested type with the given name within this type parameter.
   TypeDecl *lookupNestedType(Type type, Identifier name) const;
