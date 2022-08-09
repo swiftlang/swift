@@ -2576,8 +2576,18 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
 
 bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
   for (auto &import : *Imports) {
-    if (import.options.contains(ImportFlags::WeakLinked) &&
-        module == import.module.importedModule)
+    if (!import.options.contains(ImportFlags::WeakLinked))
+      continue;
+
+    const ModuleDecl *importedModule = import.module.importedModule;
+    if (module == importedModule)
+      return true;
+
+    // Also check whether the target module is actually the underlyingClang
+    // module for this @_weakLinked import.
+    const ModuleDecl *clangModule =
+        importedModule->getUnderlyingModuleIfOverlay();
+    if (module == clangModule)
       return true;
   }
   return false;
@@ -2608,10 +2618,10 @@ bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
   return importedSPIGroups.count(spiGroup);
 }
 
-bool ModuleDecl::importsModuleAsWeakLinked(
-    const ModuleDecl *importedModule) const {
+bool ModuleDecl::isImportedAsWeakLinked(const Decl *targetDecl) const {
+  const auto *declaringModule = targetDecl->getModuleContext();
   for (auto file : getFiles()) {
-    if (file->importsModuleAsWeakLinked(importedModule))
+    if (file->importsModuleAsWeakLinked(declaringModule))
       return true;
   }
   return false;

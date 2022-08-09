@@ -453,6 +453,9 @@ bool SILFunction::isTypeABIAccessible(SILType type) const {
 }
 
 bool SILFunction::isWeakImported() const {
+  if (isWeakImportedByModule())
+    return true;
+
   // For imported functions check the Clang declaration.
   if (ClangNodeOwner)
     return ClangNodeOwner->getClangDecl()->isWeakImported();
@@ -462,7 +465,7 @@ bool SILFunction::isWeakImported() const {
   if (!isAvailableExternally())
     return false;
 
-  if (isAlwaysWeakImported() || isWeakImportedByModule())
+  if (isAlwaysWeakImported())
     return true;
 
   if (Availability.isAlwaysAvailable())
