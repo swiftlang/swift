@@ -1607,6 +1607,8 @@ private:
   }
 
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
+    auto &cs = solution.getConstraintSystem();
+
     if (!returnStmt->hasResult()) {
       // If contextual is not optional, there is nothing to do here.
       if (resultType->isVoid())
@@ -1620,8 +1622,6 @@ private:
 
       assert(resultType->getOptionalObjectType() &&
              resultType->lookThroughAllOptionalTypes()->isVoid());
-
-      auto &cs = solution.getConstraintSystem();
 
       auto target = *cs.getSolutionApplicationTarget(returnStmt);
       returnStmt->setResult(target.getAsExpr());
@@ -1652,13 +1652,24 @@ private:
       mode = convertToResult;
     }
 
-    SolutionApplicationTarget resultTarget(
-        resultExpr, context.getAsDeclContext(),
-        mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
-        mode == convertToResult ? resultType : Type(),
-        /*isDiscarded=*/false);
-    if (auto newResultTarget = rewriteTarget(resultTarget))
+    Optional<SolutionApplicationTarget> resultTarget;
+    if (auto target = cs.getSolutionApplicationTarget(returnStmt)) {
+      resultTarget = *target;
+    } else {
+      // Single-expression closures have to handle returns in a special
+      // way so the target has to be created for them during solution
+      // application based on the resolved type.
+      assert(isSingleExpression);
+      resultTarget = SolutionApplicationTarget(
+          resultExpr, context.getAsDeclContext(),
+          mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
+          mode == convertToResult ? resultType : Type(),
+          /*isDiscarded=*/false);
+    }
+
+    if (auto newResultTarget = rewriteTarget(*resultTarget)) {
       resultExpr = newResultTarget->getAsExpr();
+    }
 
     switch (mode) {
     case convertToResult:
