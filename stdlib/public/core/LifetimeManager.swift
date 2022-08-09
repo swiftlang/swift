@@ -166,35 +166,6 @@ extension String {
   }
 }
 
-/// Takes in a value at +1 and performs a Builtin.move upon it.
-///
-/// IMPLEMENTATION NOTES: During transparent inlining, Builtin.move becomes the
-/// move_value instruction if we are inlining into a context where the
-/// specialized type is loadable. If the transparent function is called in a
-/// context where the inlined function specializes such that the specialized
-/// type is still not loadable, the compiler aborts (a). Once we have opaque
-/// values, this restriction will be lifted since after that address only types
-/// at SILGen time will be loadable objects.
-///
-/// (a). This is implemented by requiring that Builtin.move only be called
-/// within a function marked with the semantic tag "lifetimemanagement.move"
-/// which conveniently is only the function we are defining here: _move.
-///
-/// NOTE: We mark this _alwaysEmitIntoClient to ensure that we are not creating
-/// new ABI that the stdlib must maintain if a user calls this ignoring the '_'
-/// implying it is stdlib SPI.
-@_alwaysEmitIntoClient
-@inlinable
-@_transparent
-@_semantics("lifetimemanagement.move")
-public func _move<T>(_ value: __owned T) -> T {
-    #if $BuiltinMove
-        Builtin.move(value)
-    #else
-        value
-    #endif
-}
-
 /// Takes in a value at +0 and performs a Builtin.copy upon it.
 ///
 /// IMPLEMENTATION NOTES: During transparent inlining, Builtin.copy becomes the

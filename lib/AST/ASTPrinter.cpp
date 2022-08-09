@@ -3010,6 +3010,10 @@ static bool usesFeatureConciseMagicFile(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureExistentialAny(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
   return false;
 }
@@ -4523,6 +4527,11 @@ void PrintAST::visitArrowExpr(ArrowExpr *expr) {
 
 void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
   Printer << "await ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitMoveExpr(MoveExpr *expr) {
+  Printer << "move ";
   visit(expr->getSubExpr());
 }
 
