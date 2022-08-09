@@ -4788,6 +4788,9 @@ ERROR(nonisolated_local_var,none,
 ERROR(nonisolated_actor_sync_init,none,
       "'nonisolated' on an actor's synchronous initializer is invalid",
       ())
+ERROR(nonisolated_wrapped_property,none,
+      "'nonisolated' is not supported on wrapped properties",
+      ())
 
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
