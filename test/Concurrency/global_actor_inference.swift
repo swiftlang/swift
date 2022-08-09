@@ -457,51 +457,7 @@ func testInferredFromWrapper(x: InferredFromPropertyWrapper) { // expected-note{
   _ = x.test() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'test()' in a synchronous nonisolated context}}
 }
 
-// https://github.com/apple/swift/issues/59380
-// https://github.com/apple/swift/issues/59494
 
-// Make sure the nonisolated attribute propagates to the synthesized projectedValue
-// variable as well.
-
-@propertyWrapper 
-struct SimplePropertyWrapper {
-  var wrappedValue: Int { .zero }
-  var projectedValue: Int { .max }
-}
-
-@MainActor
-class HasNonIsolatedProperty {
-  @SimplePropertyWrapper nonisolated var value
-
-  deinit {
-    _ = value
-    _ = $value // Ok
-  }
-}
-
-@propertyWrapper
-struct SimplePropertyWrapper2 {
-  var wrappedValue: Int
-  var projectedValue: SimplePropertyWrapper2 { self }
-}
-
-@MainActor
-class HasNonIsolatedProperty2 {
-  @SimplePropertyWrapper2 nonisolated var value = 0
-  nonisolated init() {}
-}
-
-let hasNonIsolatedProperty2 = HasNonIsolatedProperty2()
-
-Task { @MainActor in
-  hasNonIsolatedProperty2.value = 10
-  _ = hasNonIsolatedProperty2.$value.wrappedValue
-}
-
-Task.detached {
-  hasNonIsolatedProperty2.value = 10
-  _ = hasNonIsolatedProperty2.$value.wrappedValue // Ok
-}
 
 // ----------------------------------------------------------------------
 // Unsafe global actors
