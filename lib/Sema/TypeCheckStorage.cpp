@@ -2682,13 +2682,6 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
     var->getAttrs().add(
         new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
                                              /*Implicit=*/true));
-
-  // If the wrapped property has a nonisolated attribute, propagate it to
-  // the synthesized projectedValue as well.
-  if (var->getAttrs().getAttribute<NonisolatedAttr>()) {
-    property->getAttrs().add(new (ctx) NonisolatedAttr(/*Implicit=*/true));
-  }
-
   return property;
 }
 
