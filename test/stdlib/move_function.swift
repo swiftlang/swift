@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift(-Xllvm -sil-disable-pass=DestroyHoisting)
+// RUN: %target-run-stdlib-swift(-Xllvm -sil-disable-pass=DestroyHoisting -Xfrontend -enable-experimental-move-only)
 //
 // NOTE ON ABOVE: I am disabling destroy hoisting on this test since we are
 // going to move it out of the mandatory pipeline eventually and it causes the
