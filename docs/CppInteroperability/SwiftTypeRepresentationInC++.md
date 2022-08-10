@@ -8,7 +8,7 @@ C++.
 
 ### Value Types
 
-1) Primitive Swift types like `Int`, `Float` , `OpaquePointer`, `UnsafePointer<int>?` are mapped to primitive C++ types. `int` , `float`, `void *`, int `* _Nullable` .
+1) Primitive Swift types like `Int`, `Float` , `OpaquePointer`, `UnsafePointer<int>?` are mapped to primitive C++ types. `int` , `float`, `void *`, `int * _Nullable`.
 
 * Debug info: Does C++ debug info suffices?
 
@@ -29,11 +29,21 @@ class swift::String {
 ```c++
 class Foundation::URL {
   ...
-  union {
-    alignas(8) char buffer[8]; // Swift value is stored here.
-    void *resilientPtr;
-  };
+  uintptr_t pointer;         // pointer has alignment to compute buffer offset?
+  alignas(N) char buffer[M]; // Swift value is stored here.
 };
+```
+
+concrete examples:
+
+```c++
+// representation for buffer aligned at 8:
+{/*pointer=*/0x3, ....}; // buffer is alignas(2^3 = 8)
+
+// representation for buffer aligned at 16:
+{/*pointer=*/0x4, ....}; // buffer is alignas(2^4 = 16)
+
+// where pointer < 10 for inline stores.
 ```
 
 * Debug info: ...
@@ -44,10 +54,8 @@ class Foundation::URL {
 ```c++
 class CryptoKit::SHA256 {
   ...
-  union {
-    alignas(8) char buffer[8]; 
-    void *resilientPtr;        // Swift value is stored on the heap pointed by this pointer.
-  };
+  uintptr_t pointer;         // Swift value is stored on the heap pointed by this pointer.
+  alignas(8) char buffer[8];
 };
 ```
 
@@ -66,15 +74,13 @@ class swift::Array<swift::Int> {
 * Debug info: ...
 
 
-6) Generic opaque-layout / resilient / opaque-layout template type params Swift value type, e.g. SHA256`?`, is mapped to a C++ class that stores the value boxed up on the heap, e.g.:
+6) Generic opaque-layout / resilient / opaque-layout template type params Swift value type, e.g. `SHA256?`, is mapped to a C++ class that stores the value boxed up on the heap, e.g.:
 
 ```c++
 class swift::Optional<CryptoKit::SHA256> {
   ...
-  union {
-    alignas(8) char buffer[8]; 
-    void *resilientPtr;        // Swift value is stored on the heap pointed by this pointer.
-  };
+  uintptr_t pointer;        // Swift value is stored on the heap pointed by this pointer.
+  alignas(N) char buffer[M];
 }
 ```
 

@@ -51,6 +51,8 @@
 // CHECK-NEXT:  size_t stride;
 // CHECK-NEXT:  unsigned flags;
 // CHECK-NEXT:  unsigned extraInhabitantCount;
+// CHECK-EMPTY:
+// CHECK-NEXT:  constexpr size_t getAlignment() const { return (flags & 255) + 1; }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: using EnumValueWitnessGetEnumTagTy = int(* __ptrauth_swift_value_witness_function_pointer(41909))(const void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
@@ -95,22 +97,6 @@
 // CHECK-NEXT: #ifdef __cplusplus
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
-// CHECK-EMPTY:
-// CHECK-NEXT: /// Container for an opaque Swift value, like resilient struct.
-// CHECK-NEXT: class OpaqueStorage {
-// CHECK-NEXT: public:
-// CHECK-NEXT:   inline OpaqueStorage() noexcept : storage(nullptr) { }
-// CHECK-NEXT:   inline OpaqueStorage(ValueWitnessTable * _Nonnull vwTable) noexcept : storage(reinterpret_cast<char *>(opaqueAlloc(vwTable->size, (vwTable->flags &255) + 1))) { }
-// CHECK-NEXT:   inline OpaqueStorage(OpaqueStorage&& other) noexcept : storage(other.storage) { other.storage = nullptr; }
-// CHECK-NEXT:   inline OpaqueStorage(const OpaqueStorage&) noexcept = delete;
-// CHECK-NEXT:   inline ~OpaqueStorage() noexcept { if (storage) { opaqueFree(static_cast<char * _Nonnull>(storage)); } }
-// CHECK-NEXT:   void operator =(OpaqueStorage&& other) noexcept { auto temp = storage; storage = other.storage; other.storage = temp; }
-// CHECK-NEXT:   void operator =(const OpaqueStorage&) noexcept = delete;
-// CHECK-NEXT:   inline char * _Nonnull getOpaquePointer() noexcept { return static_cast<char * _Nonnull>(storage); }
-// CHECK-NEXT:   inline const char * _Nonnull getOpaquePointer() const noexcept { return static_cast<char * _Nonnull>(storage); }
-// CHECK-NEXT: private:
-// CHECK-NEXT:   char * _Nullable storage;
-// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: /// Naive exception class that should be thrown
 // CHECK-NEXT: class NaiveException {

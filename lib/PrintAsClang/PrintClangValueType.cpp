@@ -152,7 +152,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (isOpaqueLayout) {
     os << "    _storage = ";
     printer.printSwiftImplQualifier();
-    os << cxx_synthesis::getCxxOpaqueStorageClassName() << "(vwTable);\n";
+    os << cxx_synthesis::getCxxOpaqueStorageClassName()
+       << "(vwTable->size, vwTable->getAlignment());\n";
   }
   os << "    vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char "
         "*>(other._getOpaquePointer()), metadata._0);\n";
@@ -172,10 +173,12 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // Print out private default constructor.
   os << "  inline ";
   printer.printBaseName(typeDecl);
+  // FIXME: make noexcept.
   if (isOpaqueLayout) {
     os << "(";
     printer.printSwiftImplQualifier();
-    os << "ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}\n";
+    os << "ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable->size, "
+          "vwTable->getAlignment()) {}\n";
   } else {
     os << "() {}\n";
   }
@@ -281,6 +284,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
   if (!isOpaqueLayout)
     printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
+
+  printTypeGenericTraits(os, typeDecl, typeMetadataFuncName);
 }
 
 /// Print the name of the C stub struct for passing/returning a value type
@@ -455,4 +460,69 @@ void ClangValueTypePrinter::printValueTypeDirectReturnScaffold(
   bodyPrinter();
   os << ");\n";
   os << "  });\n";
+}
+
+void ClangValueTypePrinter::printTypeGenericTraits(
+    raw_ostream &os, const NominalTypeDecl *typeDecl,
+    StringRef typeMetadataFuncName) {
+  ClangSyntaxPrinter printer(os);
+  // FIXME: avoid popping out of the module's namespace here.
+  os << "} // end namespace \n\n";
+  os << "namespace swift {\n";
+
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
+  os << "template<>\n";
+  os << "static inline const constexpr bool isUsableInGenericContext<";
+  printer.printBaseName(typeDecl->getModuleContext());
+  os << "::";
+  printer.printBaseName(typeDecl);
+  os << "> = true;\n";
+  os << "template<>\n";
+  os << "inline void * _Nonnull getTypeMetadata<";
+  printer.printBaseName(typeDecl->getModuleContext());
+  os << "::";
+  printer.printBaseName(typeDecl);
+  os << ">() {\n";
+  os << "  return ";
+  printer.printBaseName(typeDecl->getModuleContext());
+  os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+     << "::" << typeMetadataFuncName << "(0)._0;\n";
+  os << "}\n";
+
+  os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
+
+  if (!isa<ClassDecl>(typeDecl)) {
+    os << "template<>\n";
+    os << "static inline const constexpr bool isValueType<";
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::";
+    printer.printBaseName(typeDecl);
+    os << "> = true;\n";
+    if (typeDecl->isResilient()) {
+      os << "template<>\n";
+      os << "static inline const constexpr bool isOpaqueLayout<";
+      printer.printBaseName(typeDecl->getModuleContext());
+      os << "::";
+      printer.printBaseName(typeDecl);
+      os << "> = true;\n";
+    }
+  }
+
+        os << "template<>\n";
+        os << "struct implClassFor<";
+        printer.printBaseName(typeDecl->getModuleContext());
+        os << "::";
+        printer.printBaseName(typeDecl);
+        os << "> { using type = ";
+        printer.printBaseName(typeDecl->getModuleContext());
+        os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+        printCxxImplClassName(os, typeDecl);
+        os << "; };\n";
+        os << "} // namespace\n";
+        os << "#pragma clang diagnostic pop\n";
+        os << "} // namespace swift\n";
+        os << "\nnamespace ";
+        printer.printBaseName(typeDecl->getModuleContext());
+        os << " {\n";
 }

@@ -65,7 +65,6 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
-// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: template<>
 // CHECK-NEXT: inline void * _Nonnull getTypeMetadata<Class::ClassWithIntField>() {
 // CHECK-NEXT:   return Class::_impl::$s5Class0A12WithIntFieldCMa(0)._0;
@@ -74,6 +73,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct implClassFor<Class::ClassWithIntField> { using type = Class::_impl::_impl_ClassWithIntField; };
 // CHECK-NEXT: } // namespace
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace Class {
