@@ -88,7 +88,7 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
   // If no member `func ==` was found, look for out-of-class definitions in the
   // same module.
   auto module = decl->getModuleContext();
-  llvm::SmallVector<ValueDecl *> nonMemberResults;
+  SmallVector<ValueDecl *> nonMemberResults;
   module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
   for (const auto &nonMember : nonMemberResults) {
     if (isValid(nonMember))
