@@ -3357,9 +3357,9 @@ void ASTMangler::appendProtocolConformanceRef(
 }
 
 /// Retrieve the index of the conformance requirement indicated by the
-/// conformance access path entry within the given set of requirements.
+/// conformance path entry within the given set of requirements.
 static unsigned conformanceRequirementIndex(
-                                      const ConformanceAccessPath::Entry &entry,
+                                      const ConformancePath::Entry &entry,
                                       ArrayRef<Requirement> requirements) {
   unsigned result = 0;
   for (const auto &req : requirements) {
@@ -3377,7 +3377,7 @@ static unsigned conformanceRequirementIndex(
 }
 
 void ASTMangler::appendDependentProtocolConformance(
-                                            const ConformanceAccessPath &path,
+                                            const ConformancePath &path,
                                             GenericSignature sig) {
   ProtocolDecl *currentProtocol = nullptr;
   for (const auto &entry : path) {
@@ -3441,19 +3441,19 @@ void ASTMangler::appendAnyProtocolConformance(
 
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
-    auto path = genericSig->getConformanceAccessPath(conformingType,
-                                                     conformance.getAbstract());
+    auto path = genericSig->getConformancePath(conformingType,
+                                               conformance.getAbstract());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     GenericSignature opaqueSignature =
         opaqueType->getDecl()->getOpaqueInterfaceGenericSignature();
-    ConformanceAccessPath conformanceAccessPath =
-        opaqueSignature->getConformanceAccessPath(
+    ConformancePath conformancePath =
+        opaqueSignature->getConformancePath(
           opaqueType->getInterfaceType(),
           conformance.getAbstract());
 
-    // Append the conformance access path with the signature of the opaque type.
-    appendDependentProtocolConformance(conformanceAccessPath, opaqueSignature);
+    // Append the conformance path with the signature of the opaque type.
+    appendDependentProtocolConformance(conformancePath, opaqueSignature);
     appendType(conformingType, genericSig);
     appendOperator("HO");
   } else {

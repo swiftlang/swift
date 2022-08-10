@@ -29,7 +29,7 @@
 
 using namespace swift;
 
-void ConformanceAccessPath::print(raw_ostream &out) const {
+void ConformancePath::print(raw_ostream &out) const {
   llvm::interleave(
       begin(), end(),
       [&](const Entry &entry) {
@@ -39,7 +39,7 @@ void ConformanceAccessPath::print(raw_ostream &out) const {
       [&] { out << " -> "; });
 }
 
-void ConformanceAccessPath::dump() const {
+void ConformancePath::dump() const {
   print(llvm::errs());
   llvm::errs() << "\n";
 }
@@ -475,10 +475,10 @@ CanGenericSignature::getGenericParams() const {
   return {base, params.size()};
 }
 
-ConformanceAccessPath
-GenericSignatureImpl::getConformanceAccessPath(Type type,
-                                               ProtocolDecl *protocol) const {
-  return getRequirementMachine()->getConformanceAccessPath(type, protocol);
+ConformancePath
+GenericSignatureImpl::getConformancePath(Type type,
+                                         ProtocolDecl *protocol) const {
+  return getRequirementMachine()->getConformancePath(type, protocol);
 }
 
 TypeDecl *
