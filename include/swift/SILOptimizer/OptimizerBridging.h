@@ -77,12 +77,14 @@ typedef struct {
   void * _Nonnull functionInfo;
 } BridgedRCIdentityFunctionInfo;
 
+typedef void (* _Nonnull BridgedModulePassRunFn)(BridgedPassContext);
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
 typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
 
+void SILPassManager_registerModulePass(llvm::StringRef name,
+                                       BridgedModulePassRunFn runFn);
 void SILPassManager_registerFunctionPass(llvm::StringRef name,
                                          BridgedFunctionPassRunFn runFn);
-
 void SILCombine_registerInstructionPass(llvm::StringRef name,
                                         BridgedInstructionPassRunFn runFn);
 
@@ -155,6 +157,15 @@ void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
 BridgedSubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType);
+
+void PassContext_beginTransformFunction(BridgedFunction function,
+                                        BridgedPassContext ctxt);
+void PassContext_endTransformFunction(BridgedPassContext ctxt);
+
+OptionalBridgedFunction
+PassContext_firstFunctionInModule(BridgedPassContext context);
+OptionalBridgedFunction
+PassContext_nextFunctionInModule(BridgedFunction function);
 
 OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);

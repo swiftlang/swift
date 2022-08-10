@@ -727,11 +727,14 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
     verifyAnalyses();
   }
 
+  swiftPassInvocation.startModulePassRun(SMT);
+
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   SMT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->flushDeletedInsts();
+  swiftPassInvocation.finishedModulePassRun();
 
   std::chrono::nanoseconds duration = std::chrono::system_clock::now() - StartTime;
   totalPassRuntime += duration;
@@ -1279,6 +1282,12 @@ void SwiftPassInvocation::freeNodeSet(NodeSet *set) {
   }
 }
 
+void SwiftPassInvocation::startModulePassRun(SILModuleTransform *transform) {
+  assert(!this->function && !this->transform && "a pass is already running");
+  this->function = nullptr;
+  this->transform = transform;
+}
+
 void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
   assert(!this->function && !this->transform && "a pass is already running");
   this->function = transform->getFunction();
@@ -1288,6 +1297,12 @@ void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) 
 void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
   assert(inst->getFunction() == function &&
          "running instruction pass on wrong function");
+}
+
+void SwiftPassInvocation::finishedModulePassRun() {
+  endPassRunChecks();
+  assert(!function && transform && "not running a pass");
+  transform = nullptr;
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
@@ -1531,6 +1546,31 @@ PassContext_getContextSubstitutionMap(BridgedPassContext context,
   auto *m = pm->getModule()->getSwiftModule();
   
   return {type.getASTType()->getContextSubstitutionMap(m, ntd).getOpaqueValue()};
+}
+
+void PassContext_beginTransformFunction(BridgedFunction function, BridgedPassContext ctxt) {
+  castToPassInvocation(ctxt)->beginTransformFunction(castToFunction(function));
+}
+
+void PassContext_endTransformFunction(BridgedPassContext ctxt) {
+  castToPassInvocation(ctxt)->endTransformFunction();
+}
+
+OptionalBridgedFunction
+PassContext_firstFunctionInModule(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  if (mod->getFunctions().empty())
+    return {nullptr};
+  return {&*mod->getFunctions().begin()};
+}
+
+OptionalBridgedFunction
+PassContext_nextFunctionInModule(BridgedFunction function) {
+  auto *f = castToFunction(function);
+  auto nextIter = std::next(f->getIterator());
+  if (nextIter == f->getModule().getFunctions().end())
+    return {nullptr};
+  return {&*nextIter};
 }
 
 OptionalBridgedFunction

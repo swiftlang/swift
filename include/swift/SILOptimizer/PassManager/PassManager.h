@@ -109,16 +109,34 @@ public:
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
 
   /// Called by the pass manager before the pass starts running.
+  void startModulePassRun(SILModuleTransform *transform);
+
+  /// Called by the pass manager before the pass starts running.
   void startFunctionPassRun(SILFunctionTransform *transform);
 
   /// Called by the SILCombiner before the instruction pass starts running.
   void startInstructionPassRun(SILInstruction *inst);
 
   /// Called by the pass manager when the pass has finished.
+  void finishedModulePassRun();
+
+  /// Called by the pass manager when the pass has finished.
   void finishedFunctionPassRun();
 
   /// Called by the SILCombiner when the instruction pass has finished.
   void finishedInstructionPassRun();
+  
+  void beginTransformFunction(SILFunction *function) {
+    assert(!this->function && transform && "not running a module pass");
+    this->function = function;
+  }
+
+  void endTransformFunction() {
+    assert(function && "beginTransformFunction not called");
+    function = nullptr;
+    assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
+    assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  }
 };
 
 /// The SIL pass manager.
