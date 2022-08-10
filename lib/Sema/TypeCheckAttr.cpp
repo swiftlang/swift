@@ -6026,11 +6026,9 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       }
     }
 
-    // We do not support 'nonisolated' on wrapped properties, because
-    // the backing property is a 'var' and so we cannot mark it as
-    // 'nonisolated'. In the future, we could support it by allowing
-    // users to mark the backing property as a 'let' and then it could
-    // also be marked as 'nonisolated'.
+    // Using 'nonisolated' with wrapped properties is unsupported, because
+    // backing storage is a stored 'var' that is part of the internal state
+    // of the actor which could only be accessed in actor's isolation context.
     if (var->hasAttachedPropertyWrapper()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property);
       return;

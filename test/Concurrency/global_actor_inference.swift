@@ -466,7 +466,7 @@ struct SimplePropertyWrapper {
 @MainActor
 class WrappedContainsNonisolatedAttr {
   @SimplePropertyWrapper nonisolated var value 
-  // expected-error@-1 {{'nonisolated' is not supported on wrapped properties}}
+  // expected-error@-1 {{'nonisolated' is not supported on properties with property wrappers}}
   // expected-note@-2 2{{property declared here}}
 
   nonisolated func test() {
