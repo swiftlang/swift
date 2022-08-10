@@ -1135,7 +1135,7 @@ namespace {
             if (cs.isDebugMode()) {
               auto &log = llvm::errs();
               if (cs.solverState)
-                log.indent(cs.solverState->depth * 2);
+                log.indent(cs.solverState->getCurrentIndent());
 
               log << "Collapsing one-way components for $T"
                   << edge.first->getID() << " and $T" << edge.second->getID()
@@ -1440,7 +1440,7 @@ bool ConstraintGraph::contractEdges() {
     if (CS.isDebugMode()) {
       auto &log = llvm::errs();
       if (CS.solverState)
-        log.indent(CS.solverState->depth * 2);
+        log.indent(CS.solverState->getCurrentIndent());
 
       log << "Contracting constraint ";
       constraint->print(log, &CS.getASTContext().SourceMgr);
