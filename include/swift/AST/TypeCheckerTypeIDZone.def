@@ -169,8 +169,8 @@ SWIFT_REQUEST(TypeChecker, HasCircularInheritedProtocolsRequest,
               bool(ProtocolDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasCircularRawValueRequest,
               bool(EnumDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
-              bool(SourceFile *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasImportsMatchingFlagRequest,
+              bool(SourceFile *, ImportOptions), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ModuleLibraryLevelRequest,
               LibraryLevel(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,

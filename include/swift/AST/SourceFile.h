@@ -174,6 +174,16 @@ private:
   ParserStatePtr DelayedParserState =
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
+  friend class HasImportsMatchingFlagRequest;
+
+  /// Indicates which import options have a valid caches. Storage for
+  /// \c HasImportsMatchingFlagRequest.
+  ImportOptions validCachedImportOptions;
+
+  /// The cached computation of which import flags are present in the file.
+  /// Storage for \c HasImportsMatchingFlagRequest.
+  ImportOptions cachedImportOptions;
+
   friend ASTContext;
 
 public:

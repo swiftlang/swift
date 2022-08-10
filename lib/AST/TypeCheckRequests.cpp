@@ -1474,6 +1474,12 @@ void swift::simple_display(llvm::raw_ostream &out,
     out << ")";
   }
 
+  if (import.options.contains(ImportFlags::Preconcurrency))
+    out << " preconcurrency";
+
+  if (import.options.contains(ImportFlags::WeakLinked))
+    out << " weak-linked";
+
   out << " ]";
 }
 

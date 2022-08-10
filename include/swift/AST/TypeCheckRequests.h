@@ -3202,21 +3202,24 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Checks whether a file performs an implementation-only import.
-class HasImplementationOnlyImportsRequest
-    : public SimpleRequest<HasImplementationOnlyImportsRequest,
-                           bool(SourceFile *), RequestFlags::Cached> {
+/// Checks whether a file contains any import declarations with the given flag.
+class HasImportsMatchingFlagRequest
+    : public SimpleRequest<HasImportsMatchingFlagRequest,
+                           bool(SourceFile *, ImportFlags),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, SourceFile *SF) const;
+  bool evaluate(Evaluator &evaluator, SourceFile *SF, ImportFlags flag) const;
 
 public:
   // Cached.
   bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
 };
 
 /// Get the library level of a module.
