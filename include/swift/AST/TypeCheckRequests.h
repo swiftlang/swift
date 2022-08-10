@@ -3655,6 +3655,22 @@ public:
   bool isCached() const { return true; }
 };
 
+class SynthesizeTypeWrapperInitializerBody
+    : public SimpleRequest<SynthesizeTypeWrapperInitializerBody,
+                           BraceStmt *(ConstructorDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  BraceStmt *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);

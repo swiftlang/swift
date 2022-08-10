@@ -1496,63 +1496,6 @@ void swift::addNonIsolatedToSynthesized(
   value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
 }
 
-static std::pair<BraceStmt *, bool>
-synthesizeTypeWrapperInitializerBody(AbstractFunctionDecl *fn, void *context) {
-  auto *ctor = cast<ConstructorDecl>(fn);
-  auto &ctx = ctor->getASTContext();
-  auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
-
-  // self.$_storage = .init(memberwise: $Storage(...))
-  auto *storageType =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperStorage{parent}, nullptr);
-  assert(storageType);
-
-  auto *typeWrapperVar =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperProperty{parent}, nullptr);
-  assert(typeWrapperVar);
-
-  auto *storageVarRef = UnresolvedDotExpr::createImplicit(
-      ctx,
-      new (ctx) DeclRefExpr({ctor->getImplicitSelfDecl()},
-                            /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
-      typeWrapperVar->getName());
-
-  SmallVector<Argument, 4> arguments;
-  {
-    for (auto *param : *ctor->getParameters()) {
-      arguments.push_back({/*labelLoc=*/SourceLoc(), param->getName(),
-                           new (ctx) DeclRefExpr(param, /*Loc=*/DeclNameLoc(),
-                                                 /*Implicit=*/true)});
-    }
-  }
-
-  auto *storageInit = CallExpr::createImplicit(
-      ctx,
-      TypeExpr::createImplicitForDecl(
-          /*Loc=*/DeclNameLoc(), storageType, ctor,
-          ctor->mapTypeIntoContext(storageType->getInterfaceType())),
-      ArgumentList::createImplicit(ctx, arguments));
-
-  auto *initRef = new (ctx) UnresolvedMemberExpr(
-      /*dotLoc=*/SourceLoc(), /*declNameLoc=*/DeclNameLoc(),
-      DeclNameRef::createConstructor(), /*implicit=*/true);
-  { initRef->setFunctionRefKind(FunctionRefKind::DoubleApply); }
-
-  // .init($Storage(...))
-  Expr *typeWrapperInit = CallExpr::createImplicit(
-      ctx, initRef,
-      ArgumentList::forImplicitSingle(ctx, ctx.Id_memberwise, storageInit));
-
-  auto *assignment = new (ctx)
-      AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(), typeWrapperInit,
-                 /*Implicit=*/true);
-
-  return {BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(),
-                            /*body=*/{assignment},
-                            /*rbloc=*/ctor->getLoc(), /*implicit=*/true),
-          /*isTypeChecked=*/false};
-}
-
 ConstructorDecl *
 SynthesizeTypeWrapperInitializer::evaluate(Evaluator &evaluator,
                                            NominalTypeDecl *wrappedType) const {
@@ -1565,6 +1508,11 @@ SynthesizeTypeWrapperInitializer::evaluate(Evaluator &evaluator,
       wrappedType, ImplicitConstructorKind::TypeWrapper, ctx);
   wrappedType->addMember(ctor);
 
-  ctor->setBodySynthesizer(synthesizeTypeWrapperInitializerBody);
+  auto *body = evaluateOrDefault(
+      evaluator, SynthesizeTypeWrapperInitializerBody{ctor}, nullptr);
+  if (!body)
+    return nullptr;
+
+  ctor->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
   return ctor;
 }

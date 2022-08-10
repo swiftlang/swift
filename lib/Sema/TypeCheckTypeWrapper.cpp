@@ -365,3 +365,58 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
 
   return true;
 }
+
+BraceStmt *
+SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
+                                               ConstructorDecl *ctor) const {
+  auto &ctx = ctor->getASTContext();
+  auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
+
+  // self.$_storage = .init(memberwise: $Storage(...))
+  auto *storageType =
+      evaluateOrDefault(ctx.evaluator, GetTypeWrapperStorage{parent}, nullptr);
+  assert(storageType);
+
+  auto *typeWrapperVar = parent->getTypeWrapperProperty();
+  assert(typeWrapperVar);
+
+  auto *storageVarRef = UnresolvedDotExpr::createImplicit(
+      ctx,
+      new (ctx) DeclRefExpr({ctor->getImplicitSelfDecl()},
+                            /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
+      typeWrapperVar->getName());
+
+  SmallVector<Argument, 4> arguments;
+  {
+    for (auto *param : *ctor->getParameters()) {
+      arguments.push_back({/*labelLoc=*/SourceLoc(), param->getName(),
+                           new (ctx) DeclRefExpr(param, /*Loc=*/DeclNameLoc(),
+                                                 /*Implicit=*/true)});
+    }
+  }
+
+  auto *storageInit = CallExpr::createImplicit(
+      ctx,
+      TypeExpr::createImplicitForDecl(
+          /*Loc=*/DeclNameLoc(), storageType, ctor,
+          ctor->mapTypeIntoContext(storageType->getInterfaceType())),
+      ArgumentList::createImplicit(ctx, arguments));
+
+  auto *initRef = new (ctx) UnresolvedMemberExpr(
+      /*dotLoc=*/SourceLoc(), /*declNameLoc=*/DeclNameLoc(),
+      DeclNameRef::createConstructor(), /*implicit=*/true);
+  { initRef->setFunctionRefKind(FunctionRefKind::DoubleApply); }
+
+  // .init($Storage(...))
+  Expr *typeWrapperInit = CallExpr::createImplicit(
+      ctx, initRef,
+      ArgumentList::forImplicitSingle(ctx, ctx.Id_memberwise, storageInit));
+
+  auto *assignment = new (ctx)
+      AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(), typeWrapperInit,
+                 /*Implicit=*/true);
+
+  return BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(),
+                           /*body=*/{assignment},
+                           /*rbloc=*/ctor->getLoc(), /*implicit=*/true);
+}
