@@ -35,6 +35,7 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -137,12 +138,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.TrapFuncName = Opts.TrapFuncName;
   }
 
+  auto &VFS = Importer->getClangInstance().getVirtualFileSystem();
   auto &HSI = Importer->getClangPreprocessor()
                   .getHeaderSearchInfo()
                   .getHeaderSearchOpts();
   auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, HSI, PPO, CGO,
+                                                ModuleName, &VFS, HSI, PPO, CGO,
                                                 LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
   return ClangCodeGen;
