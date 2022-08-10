@@ -5583,6 +5583,8 @@ independent of the operand. In terms of specific types:
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
 
+It is illegal in non-Raw SIL to `copy_value`_ a value that is "move only".
+
 explicit_copy_value
 ```````````````````
 
