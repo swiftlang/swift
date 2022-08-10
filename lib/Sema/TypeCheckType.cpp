@@ -2846,6 +2846,19 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   }
 
   if (hasFunctionAttr && !fnRepr) {
+
+    if (attrs.has(TAK_Sendable)) {
+      // A Sendable closure must be attached to a function type. If the
+      // attribute is attached to a typealias that points to a function type,
+      // then we won't have a FunctionTypeRepr. So just ignore the repr and just
+      // check whether we have a function type. If we don't, the code below will
+      // emit a diagnostic later on.
+      if (ty->is<FunctionType>()) {
+        // Ok, remove the attribute from the set so we don't diagnose.
+        attrs.clearAttribute(TAK_Sendable);
+      }
+    }
+
     const auto diagnoseInvalidAttr = [&](TypeAttrKind kind) {
       if (kind == TAK_escaping) {
         Type optionalObjectType = ty->getOptionalObjectType();

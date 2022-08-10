@@ -113,3 +113,9 @@ class SendableSubclass: NSClass, @unchecked Sendable { }
 func testSubclassing(obj: SendableSubclass) async {
   acceptCV(obj) // okay!
 }
+
+// https://github.com/apple/swift/issues/60488
+typealias VoidFunction = () -> Void
+func testSendableTypealiasClosure1(callback: @Sendable VoidFunction) {} // ok
+func testSendableTypealiasClosure2(callback: @Sendable () -> Void) {} // ok
+func testSendableTypealiasClosure3(callback: @Sendable Void) {} // expected-error {{@Sendable attribute only applies to function types}}
