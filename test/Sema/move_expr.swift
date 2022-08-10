@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -enable-experimental-move-only
 
 class Klass {
     var k: Klass? = nil
