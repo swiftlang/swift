@@ -565,8 +565,8 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   System.dump(out);
   Map.dump(out);
 
-  out << "Conformance access paths: {\n";
-  for (auto pair : ConformanceAccessPaths) {
+  out << "Conformance paths: {\n";
+  for (auto pair : ConformancePaths) {
     out << "- " << pair.first.first << " : ";
     out << pair.first.second->getName() << " => ";
     pair.second.print(out);
