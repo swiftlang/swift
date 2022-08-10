@@ -777,7 +777,7 @@ public:
 
 #ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
   RuntimeEffect effectOfRuntimeFuncs = RuntimeEffect::NoEffect;
-  llvm::SmallVector<const char *> emittedRuntimeFuncs;
+  SmallVector<const char *> emittedRuntimeFuncs;
 
   void registerRuntimeEffect(ArrayRef<RuntimeEffect> realtime,
                              const char *funcName);
@@ -1263,7 +1263,7 @@ private:
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
-  llvm::SmallVector<llvm::MDNode *> UsedConditionals;
+  SmallVector<llvm::MDNode *> UsedConditionals;
   void emitUsedConditionals();
 
   void emitGlobalLists();

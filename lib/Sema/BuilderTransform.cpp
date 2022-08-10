@@ -1348,7 +1348,7 @@ protected:
         }
       } else {
         auto *elseBraceStmt = cast<BraceStmt>(elseStmt);
-        SmallVector<ASTNode, 4> elseBody;
+        SmallVector<ASTNode> elseBody;
 
         std::tie(elseVar, unsupported) = transform(elseBraceStmt, elseBody);
         if (unsupported) {
