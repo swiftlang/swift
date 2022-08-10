@@ -1408,7 +1408,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                        prop->getDecl()->getInnermostDeclContext()
                                       ->getInnermostTypeContext()
                                       ->getSelfInterfaceType()
-                                      ->getCanonicalType(genericSig),
+                                      ->getReducedType(genericSig),
                        {},
                        hasSubscriptIndices);
   

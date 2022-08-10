@@ -3298,7 +3298,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         = GenericEnvironment::mapConformanceRefIntoContext(genericEnv,
                                                            formalTy,
                                                            hashable);
-      auto formalCanTy = formalTy->getCanonicalType(genericSig);
+      auto formalCanTy = formalTy->getReducedType(genericSig);
       
       // Get the Equatable conformance from the Hashable conformance.
       auto equatable = hashable.getAssociatedConformance(
@@ -3724,8 +3724,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
           ->getTypeOfMember(SwiftModule, var)
           ->getReferenceStorageReferent()
           ->mapTypeOutOfContext()
-          ->getCanonicalType(
-                      genericEnv ? genericEnv->getGenericSignature() : nullptr);
+          ->getCanonicalType();
 
       // The component type for an @objc optional requirement needs to be
       // wrapped in an optional.

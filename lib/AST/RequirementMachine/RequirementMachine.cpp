@@ -18,7 +18,7 @@
 // type parameters expressed by this set of generic requirements. These are
 // called "generic signature queries", and are defined as methods on the
 // GenericSignature class; for example, two of the more common ones are
-// getCanonicalTypeInContext() and requiresProtocol().
+// getReducedType() and requiresProtocol().
 //
 // The terms of the rewrite system describe all possible type parameters that
 // can be written -- the generic parameters themselves, together with all nested
@@ -565,8 +565,8 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   System.dump(out);
   Map.dump(out);
 
-  out << "Conformance access paths: {\n";
-  for (auto pair : ConformanceAccessPaths) {
+  out << "Conformance paths: {\n";
+  for (auto pair : ConformancePaths) {
     out << "- " << pair.first.first << " : ";
     out << pair.first.second->getName() << " => ";
     pair.second.print(out);

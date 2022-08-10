@@ -71,16 +71,15 @@ class RequirementMachine final {
 
   UnifiedStatsReporter *Stats;
 
-  /// All conformance access paths computed so far.
+  /// All conformance paths computed so far.
   llvm::DenseMap<std::pair<Term, ProtocolDecl *>,
-                 ConformanceAccessPath> ConformanceAccessPaths;
+                 ConformancePath> ConformancePaths;
 
   /// Conformance access paths computed during the last round. All elements
   /// have the same length. If a conformance access path of greater length
-  /// is requested, we refill CurrentConformanceAccessPaths with all paths of
-  /// length N+1, and add them to the ConformanceAccessPaths map.
-  std::vector<std::pair<Term, ConformanceAccessPath>>
-      CurrentConformanceAccessPaths;
+  /// is requested, we refill CurrentConformancePaths with all paths of
+  /// length N+1, and add them to the ConformancePaths map.
+  std::vector<std::pair<Term, ConformancePath>> CurrentConformancePaths;
 
   explicit RequirementMachine(RewriteContext &rewriteCtx);
 
@@ -153,13 +152,12 @@ public:
   Type getConcreteType(Type depType,
                        TypeArrayView<GenericTypeParamType> genericParams,
                        const ProtocolDecl *proto=nullptr) const;
-  bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
-  bool isCanonicalTypeInContext(Type type) const;
-  Type getCanonicalTypeInContext(Type type,
+  bool areReducedTypeParametersEqual(Type depType1, Type depType2) const;
+  bool isReducedType(Type type) const;
+  Type getReducedType(Type type,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
-  bool isValidTypeInContext(Type type) const;
-  ConformanceAccessPath getConformanceAccessPath(Type type,
-                                                 ProtocolDecl *protocol);
+  bool isValidTypeParameter(Type type) const;
+  ConformancePath getConformancePath(Type type, ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
   llvm::DenseMap<const ProtocolDecl *, RequirementSignature>

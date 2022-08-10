@@ -2055,7 +2055,7 @@ namespace {
         // would, we use the substituted field type in order to accurately
         // preserve the properties of the aggregate.
         auto sig = field->getDeclContext()->getGenericSignatureOfContext();
-        auto interfaceTy = field->getInterfaceType()->getCanonicalType(sig);
+        auto interfaceTy = field->getInterfaceType()->getReducedType(sig);
         auto origFieldType = origType.unsafeGetSubstFieldType(field,
                                                               interfaceTy);
         
@@ -2116,7 +2116,7 @@ namespace {
         
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
                               elt->getArgumentInterfaceType()
-                                 ->getCanonicalType(D->getGenericSignature()));
+                                 ->getReducedType(D->getGenericSignature()));
         properties.addSubobject(classifyType(origEltType, substEltType,
                                              TC, Expansion));
       }
@@ -2734,7 +2734,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // The result type might be written in terms of type parameters
   // that have been made fully concrete.
-  CanType canResultTy = resultTy->getCanonicalType(
+  CanType canResultTy = resultTy->getReducedType(
                             vd->getInnermostDeclContext()
                               ->getGenericSignatureOfContext());
 
@@ -2812,7 +2812,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                                                      bool isDeallocating,
                                                      bool isForeign) {
   auto classType = dd->getDeclContext()->getDeclaredInterfaceType()
-    ->getCanonicalType(dd->getGenericSignatureOfContext());
+    ->getReducedType(dd->getGenericSignatureOfContext());
 
   assert((!isForeign || isDeallocating)
          && "There are no foreign destroying destructors");
@@ -2848,7 +2848,7 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
                                                             bool isObjC,
                                                             bool isDestroyer) {
   auto classType = cd->getDeclaredInterfaceType()
-    ->getCanonicalType(cd->getGenericSignatureOfContext());
+    ->getReducedType(cd->getGenericSignatureOfContext());
 
   auto resultType = (isDestroyer
                      ? TupleType::getEmpty(cd->getASTContext())
@@ -3778,12 +3778,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
                                /*captures generics*/ false);
   
   // Instantiate the layout with identity substitutions.
-  auto subMap = SubstitutionMap::get(
-      signature,
-      [&](SubstitutableType *type) -> Type {
-        return signature.getCanonicalTypeInContext(type);
-      },
-      MakeAbstractConformanceForGenericType());
+  auto subMap = signature->getIdentitySubstitutionMap();
 
   auto boxTy = SILBoxType::get(C, layout, subMap);
 #ifndef NDEBUG
@@ -3817,7 +3812,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
         ->getGenericSignatureOfContext();
     loweredInterfaceType =
       loweredInterfaceType->mapTypeOutOfContext()
-        ->getCanonicalType(homeSig);
+        ->getReducedType(homeSig);
   }
   
   auto boxType = getInterfaceBoxTypeForCapture(captured,

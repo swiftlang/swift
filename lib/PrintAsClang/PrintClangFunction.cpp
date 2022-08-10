@@ -347,7 +347,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   bool isIndirectReturnType =
       kind == FunctionSignatureKind::CFunctionProto &&
       !isKnownCType(resultTy, typeMapping) &&
-      (isResilientType(resultTy) || isGenericType(resultTy) ||
+      ((isResilientType(resultTy) && !resultTy->isAnyClassReferenceType()) ||
+       isGenericType(resultTy) ||
        interopContext.getIrABIDetails().shouldReturnIndirectly(resultTy));
   if (!isIndirectReturnType) {
     OptionalTypeKind retKind;
@@ -450,13 +451,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     if (type->getAs<ArchetypeType>() && type->getAs<ArchetypeType>()
                                             ->getInterfaceType()
                                             ->is<GenericTypeParamType>()) {
-      // FIXME: NEED to handle boxed resilient type.
-      // os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() <<
-      // "::getOpaquePointer(";
-      os << "reinterpret_cast<";
-      if (!isInOut)
-        os << "const ";
-      os << "void *>(&";
+      os << "swift::" << cxx_synthesis::getCxxImplNamespaceName()
+         << "::getOpaquePointer(";
       namePrinter();
       os << ')';
       return;
@@ -575,10 +571,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (!isKnownCxxType(resultTy, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(resultTy)) {
     if (isGenericType(resultTy)) {
-      // FIXME: Support returning value types.
       std::string returnAddress;
       llvm::raw_string_ostream ros(returnAddress);
       ros << "reinterpret_cast<void *>(&returnValue)";
+      StringRef resultTyName = "T"; // FIXME
 
       os << "  if constexpr (std::is_base_of<::swift::"
          << cxx_synthesis::getCxxImplNamespaceName()
@@ -588,6 +584,14 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       os << ";\n";
       os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
          << "::implClassFor<T>::type::makeRetained(returnValue);\n";
+      os << "  } else if constexpr (::swift::"
+         << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
+         << resultTyName << ">) {\n";
+      os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+         << "::implClassFor<" << resultTyName
+         << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
+      printCallToCFunc(/*additionalParam=*/StringRef("returnValue"));
+      os << ";\n  });\n";
       os << "  } else {\n";
       os << "  T returnValue;\n";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));
