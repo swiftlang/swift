@@ -9124,9 +9124,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       
       auto &log = llvm::errs();
       if (isPartial) {
-        log << "---Partially type-checked expression---\n";
+        log << "\n---Partially type-checked expression---\n";
       } else {
-        log << "---Type-checked expression---\n";
+        log << "\n---Type-checked expression---\n";
       }
       resultExpr->dump(log);
       log << "\n";
@@ -9204,7 +9204,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     auto node = target.getAsASTNode();
     if (node && needsPostProcessing) {
       auto &log = llvm::errs();
-      log << "---Fully type-checked target---\n";
+      log << "\n---Fully type-checked target---\n";
       node.dump(log);
       log << "\n";
     }
