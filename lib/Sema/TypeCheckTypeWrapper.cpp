@@ -322,9 +322,27 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
   if (property->getAttrs().hasAttribute<LazyAttr>())
     return false;
 
-  // properties with attached property wrappers are not yet supported.
-  if (property->hasAttachedPropertyWrapper())
-    return false;
+  // Properties with attached property wrappers are not considered
+  // accessible via type wrapper directly, only their backing storage is.
+  {
+    // Wrapped property itself `<name>`
+    if (property->hasAttachedPropertyWrapper())
+      return false;
+
+    // Projection - `$<name>`
+    if (property->getOriginalWrappedProperty(
+          PropertyWrapperSynthesizedPropertyKind::Projection))
+      return false;
+
+    // Backing storage (or wrapper property) - `_<name>`.
+    //
+    // This is the only thing that wrapper needs to handle because
+    // all access to the wrapped variable and it's projection
+    // is routed through it.
+    if (property->getOriginalWrappedProperty(
+          PropertyWrapperSynthesizedPropertyKind::Backing))
+      return true;
+  }
 
   // Check whether this is a computed property.
   {

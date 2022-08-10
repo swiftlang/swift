@@ -923,7 +923,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
       }
     }
-    semantics = AccessSemantics::DirectToStorage;
+    semantics = backing->isAccessedViaTypeWrapper()
+                    ? AccessSemantics::DirectToImplementation
+                    : AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
   }
@@ -952,7 +954,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         { var->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar,
           isLValue });
     }
-    semantics = AccessSemantics::DirectToStorage;
+    semantics = backing->isAccessedViaTypeWrapper()
+                    ? AccessSemantics::DirectToImplementation
+                    : AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
   }
