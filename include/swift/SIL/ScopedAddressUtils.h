@@ -19,6 +19,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Utils/InstModCallbacks.h"
 
 namespace swift {
 
@@ -90,6 +91,12 @@ struct ScopedAddressValue {
   /// unkown address use. Add this scope's live blocks into the PrunedLiveness
   /// result.
   bool computeLiveness(PrunedLiveness &liveness) const;
+
+  /// Create appropriate scope ending instruction at \p insertPt.
+  void createScopeEnd(SILBasicBlock::iterator insertPt, SILLocation loc) const;
+
+  /// Create scope ending instructions at \p liveness boundary.
+  void endScopeAtLivenessBoundary(PrunedLiveness *liveness) const;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -100,6 +107,12 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 bool hasOtherStoreBorrowsInLifetime(StoreBorrowInst *sbi,
                                     PrunedLiveness *liveness,
                                     DeadEndBlocks *deadEndBlocks);
+
+/// Extend the store_borrow \p sbi's scope such that it encloses \p newUsers.
+bool extendStoreBorrow(StoreBorrowInst *sbi,
+                       SmallVectorImpl<Operand *> &newUses,
+                       DeadEndBlocks *deadEndBlocks,
+                       InstModCallbacks callbacks = InstModCallbacks());
 } // namespace swift
 
 #endif
