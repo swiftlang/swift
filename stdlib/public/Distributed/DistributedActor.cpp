@@ -109,8 +109,7 @@ static void ::swift_distributed_execute_target_resume(
   return resumeInParent(parentCtx, error);
 }
 
-SWIFT_CC(swift)
-SWIFT_EXPORT_FROM(swiftDistributed)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError(
     const char *targetNameStart, size_t targetNameLength);
 
