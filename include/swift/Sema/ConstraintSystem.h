@@ -946,6 +946,10 @@ struct AppliedBuilderTransform {
   Expr *returnExpr = nullptr;
 };
 
+struct Score;
+/// Display a score.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
+
 /// Describes the fixed score of a solution to the constraint system.
 struct Score {
   unsigned Data[NumScoreKinds] = {};
@@ -1016,11 +1020,94 @@ struct Score {
   friend bool operator>=(const Score &x, const Score &y) {
     return !(x < y);
   }
+  
+  /// Return ScoreKind descriptions for printing alongside non-zero ScoreKinds
+  /// in debug output.
+  static std::string getNameFor(ScoreKind kind) {
+    switch (kind) {
+    case SK_Hole:
+      return "hole";
 
+    case SK_Unavailable:
+      return "use of an unavailable declaration";
+
+    case SK_AsyncInSyncMismatch:
+      return "async-in-synchronous mismatch";
+
+    case SK_SyncInAsync:
+      return "sync-in-asynchronous";
+
+    case SK_ForwardTrailingClosure:
+      return "forward scan when matching a trailing closure";
+
+    case SK_Fix:
+      return "applied fix";
+
+    case SK_DisfavoredOverload:
+      return "disfavored overload";
+
+    case SK_UnresolvedMemberViaOptional:
+      return "unwrapping optional at unresolved member base";
+
+    case SK_ForceUnchecked:
+      return "force of an implicitly unwrapped optional";
+
+    case SK_UserConversion:
+      return "user conversion";
+
+    case SK_FunctionConversion:
+      return "function conversion";
+
+    case SK_NonDefaultLiteral:
+      return "non-default literal";
+
+    case SK_CollectionUpcastConversion:
+      return "collection upcast conversion";
+
+    case SK_ValueToOptional:
+      return "value to optional promotion";
+
+    case SK_EmptyExistentialConversion:
+      return "empty-existential conversion";
+
+    case SK_KeyPathSubscript:
+      return "key path subscript";
+
+    case SK_ValueToPointerConversion:
+      return "value-to-pointer conversion";
+
+    case SK_FunctionToAutoClosureConversion:
+      return "function to autoclosure parameter conversion";
+
+    case SK_ImplicitValueConversion:
+      return "value-to-value conversion";
+
+    case SK_UnappliedFunction:
+      return "use of overloaded unapplied function";
+    }
+  }
+
+  /// Print Score list a with brief description of any non-zero ScoreKinds.
+  void print(llvm::raw_ostream &out) const {
+    bool hasNonDefault = false;
+    for (unsigned int i = 0; i < NumScoreKinds; ++i) {
+      if (Data[i] != 0) {
+        out << " [";
+        out << getNameFor(ScoreKind(i));
+        out << "(s) = ";
+        out << std::to_string(Data[i]);
+        out << "]";
+        hasNonDefault = true;
+      }
+    }
+
+    if (!hasNonDefault) {
+      out << " <default ";
+      out << *this;
+      out << ">";
+    }
+  }
 };
-
-/// Display a score.
-llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
 /// Describes a dependent type that has been opened to a particular type
 /// variable.

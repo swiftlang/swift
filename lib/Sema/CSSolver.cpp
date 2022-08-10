@@ -790,7 +790,7 @@ bool ConstraintSystem::Candidate::solve(
       log << "--- Solutions ---\n";
       for (unsigned i = 0, n = solutions.size(); i != n; ++i) {
         auto &solution = solutions[i];
-        log << "--- Solution #" << i << " ---\n";
+        log << "\n--- Solution #" << i << " ---\n";
         solution.dump(log);
       }
     }
@@ -1275,12 +1275,12 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
     // Debug-print the set of solutions.
     if (isDebugMode()) {
       if (result.getKind() == SolutionResult::Success) {
-        llvm::errs() << "---Solution---\n";
+        llvm::errs() << "\n---Solution---\n";
         result.getSolution().dump(llvm::errs());
       } else if (result.getKind() == SolutionResult::Ambiguous) {
         auto solutions = result.getAmbiguousSolutions();
         for (unsigned i : indices(solutions)) {
-          llvm::errs() << "--- Solution #" << i << " ---\n";
+          llvm::errs() << "\n--- Solution #" << i << " ---\n";
           solutions[i].dump(llvm::errs());
         }
       }
@@ -1418,7 +1418,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "---Solver statistics---\n";
+    log << "\n---Solver statistics---\n";
     log << "Total number of scopes explored: " << solverState->NumStatesExplored << "\n";
     log << "Maximum depth reached while exploring solutions: " << solverState->maxDepth << "\n";
     if (Timer) {
