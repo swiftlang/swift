@@ -207,6 +207,10 @@ extension DistributedActorSystem {
   ///           some other mismatch between them happens. In general, this
   ///           method is allowed to throw in any situation that might otherwise
   ///           result in an illegal or unexpected invocation being performed.
+  ///
+  ///           Throws ``ExecuteDistributedTargetMissingAccessorError`` if the `target`
+  ///           does not resolve to a valid distributed function accessor, i.e. the
+  ///           call identifier is incorrect, corrupted, or simply not present in this process.
   public func executeDistributedTarget<Act>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -242,7 +246,8 @@ extension DistributedActorSystem {
       let subs = try invocationDecoder.decodeGenericSubstitutions()
       if subs.isEmpty {
         throw ExecuteDistributedTargetError(
-          message: "Cannot call generic method without generic argument substitutions")
+          message: "Cannot call generic method without generic argument substitutions",
+          errorCode: .missingGenericSubstitutions)
       }
 
       substitutionsBuffer = .allocate(capacity: subs.count)
@@ -256,7 +261,8 @@ extension DistributedActorSystem {
                                                                      genericArguments: substitutionsBuffer!)
       if numWitnessTables < 0 {
         throw ExecuteDistributedTargetError(
-          message: "Generic substitutions \(subs) do not satisfy generic requirements of \(target) (\(targetName))")
+          message: "Generic substitutions \(subs) do not satisfy generic requirements of \(target) (\(targetName))",
+          errorCode: .invalidGenericSubstitutions)
       }
     }
 
@@ -270,7 +276,8 @@ extension DistributedActorSystem {
                  Failed to decode distributed invocation target expected parameter count,
                  error code: \(paramCount)
                  mangled name: \(targetName)
-                 """)
+                 """,
+        errorCode: .invalidParameterCount)
     }
 
     // Prepare buffer for the parameter types to be decoded into:
@@ -295,7 +302,8 @@ extension DistributedActorSystem {
                  Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
                  (decoded: \(decodedNum), expected params: \(paramCount)
                  mangled name: \(targetName)
-                 """)
+                 """,
+        errorCode: .invalidParameterCount)
     }
 
     // Copy the types from the buffer into a Swift Array
@@ -316,12 +324,14 @@ extension DistributedActorSystem {
                                                                     genericEnv: genericEnv,
                                                                     genericArguments: substitutionsBuffer) else {
       throw ExecuteDistributedTargetError(
-        message: "Failed to decode distributed target return type")
+        message: "Failed to decode distributed target return type",
+        errorCode: .typeDeserializationFailure)
     }
 
     guard let resultBuffer = _openExistential(returnTypeFromTypeInfo, do: allocateReturnTypeBuffer) else {
       throw ExecuteDistributedTargetError(
-        message: "Failed to allocate buffer for distributed target return type")
+        message: "Failed to allocate buffer for distributed target return type",
+        errorCode: .typeDeserializationFailure)
     }
 
     func destroyReturnTypeBuffer<R>(_: R.Type) {
@@ -567,12 +577,49 @@ public protocol DistributedTargetInvocationResultHandler {
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystemError: Error {}
 
+/// Error thrown by ``DistributedActorSystem/executeDistributedTarget(on:target:invocationDecoder:handler:)``.
+///
+/// Inspect the ``errorCode`` for details about the underlying reason this error was thrown.
 @available(SwiftStdlib 5.7, *)
 public struct ExecuteDistributedTargetError: DistributedActorSystemError {
-  let message: String
+  public let errorCode: ErrorCode
+  public let message: String
+
+  public enum ErrorCode {
+    /// Unable to resolve the target identifier to a function accessor.
+    /// This can happen when the identifier is corrupt, illegal, or wrong in the
+    /// sense that the caller and callee do not have the called function recorded
+    /// using the same identifier.
+    case targetAccessorNotFound
+
+    /// Call target has different number of parameters than arguments
+    /// provided by the invocation decoder.
+    case invalidParameterCount
+
+    /// Target expects generic environment information, but invocation decoder
+    /// provided no generic substitutions.
+    case missingGenericSubstitutions
+
+    /// Generic substitutions provided by invocation decoder are incompatible
+    /// with target of the call. E.g. the generic requirements on the actual
+    /// target could not be fulfilled by the obtained generic substitutions.
+    case invalidGenericSubstitutions
+
+    // Failed to deserialize type or obtain type information for call.
+    case typeDeserializationFailure
+
+    /// A general issue during the execution of the distributed call target occurred.
+    case other
+  }
 
   public init(message: String) {
     self.message = message
+    self.errorCode = .other
+  }
+
+  public init(message: String, errorCode: ErrorCode) {
+    self.message = message
+    self.errorCode = errorCode
   }
 }
 
