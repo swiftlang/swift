@@ -4,6 +4,8 @@
 //
 // RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir | %FileCheck %s
 
+// UNSUPPORTED: OS=windows-msvc
+
 @_weakLinked import weaklinked_import_helper
 
 // CHECK-DAG: @"$s24weaklinked_import_helper12ConcreteTypeVAA13OtherProtocolAAWP" = extern_weak global i8*
