@@ -94,6 +94,10 @@ public:
       StringRef metadataVarName = "metadata",
       StringRef vwTableVarName = "vwTable");
 
+  static void printTypeGenericTraits(raw_ostream &os,
+                                     const NominalTypeDecl *typeDecl,
+                                     StringRef typeMetadataFuncName);
+
 private:
   /// Prints out the C stub name used to pass/return value directly for the
   /// given value type.

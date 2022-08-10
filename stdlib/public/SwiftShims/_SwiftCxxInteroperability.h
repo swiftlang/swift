@@ -53,6 +53,42 @@ inline void opaqueFree(void *_Nonnull p) noexcept {
 #endif
 }
 
+/// Base class for a container for an opaque Swift value, like resilient struct.
+class OpaqueStorage {
+public:
+  inline OpaqueStorage() noexcept : storage(nullptr) {}
+  inline OpaqueStorage(size_t size, size_t alignment) noexcept
+      : storage(reinterpret_cast<char *>(opaqueAlloc(size, alignment))) {}
+  inline OpaqueStorage(OpaqueStorage &&other) noexcept
+      : storage(other.storage) {
+    other.storage = nullptr;
+  }
+  inline OpaqueStorage(const OpaqueStorage &) noexcept = delete;
+
+  inline ~OpaqueStorage() noexcept {
+    if (storage) {
+      opaqueFree(static_cast<char *_Nonnull>(storage));
+    }
+  }
+
+  void operator=(OpaqueStorage &&other) noexcept {
+    auto temp = storage;
+    storage = other.storage;
+    other.storage = temp;
+  }
+  void operator=(const OpaqueStorage &) noexcept = delete;
+
+  inline char *_Nonnull getOpaquePointer() noexcept {
+    return static_cast<char *_Nonnull>(storage);
+  }
+  inline const char *_Nonnull getOpaquePointer() const noexcept {
+    return static_cast<char *_Nonnull>(storage);
+  }
+
+private:
+  char *_Nullable storage;
+};
+
 /// Base class for a Swift reference counted class value.
 class RefCountedClass {
 public:
@@ -104,8 +140,6 @@ using UInt = size_t;
 template <class T>
 static inline const constexpr bool isUsableInGenericContext = false;
 
-#pragma clang diagnostic pop
-
 /// Returns the type metadat for the given Swift type T.
 template <class T> inline void *_Nonnull getTypeMetadata();
 
@@ -117,7 +151,30 @@ template <class T> struct implClassFor {
   // using type = ...;
 };
 
+/// True if the given type is a Swift value type.
+template <class T> static inline const constexpr bool isValueType = false;
+
+/// True if the given type is a Swift value type with opaque layout that can be
+/// boxed.
+template <class T> static inline const constexpr bool isOpaqueLayout = false;
+
+/// Returns the opaque pointer to the given value.
+template <class T>
+inline const void *_Nonnull getOpaquePointer(const T &value) {
+  if constexpr (isOpaqueLayout<T>)
+    return reinterpret_cast<const OpaqueStorage &>(value).getOpaquePointer();
+  return reinterpret_cast<const void *>(&value);
+}
+
+template <class T> inline void *_Nonnull getOpaquePointer(T &value) {
+  if constexpr (isOpaqueLayout<T>)
+    return reinterpret_cast<OpaqueStorage &>(value).getOpaquePointer();
+  return reinterpret_cast<void *>(&value);
+}
+
 } // namespace _impl
+
+#pragma clang diagnostic pop
 
 } // namespace swift
 #endif

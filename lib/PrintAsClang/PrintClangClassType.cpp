@@ -94,47 +94,8 @@ void ClangClassTypePrinter::printClassTypeDecl(
         os << "};\n";
       });
 
-  // FIXME: avoid popping out of the module's namespace here.
-  os << "} // end namespace \n\n";
-  os << "namespace swift {\n";
-
-  os << "#pragma clang diagnostic push\n";
-  os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
-  os << "template<>\n";
-  os << "static inline const constexpr bool isUsableInGenericContext<";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << "::";
-  printer.printBaseName(typeDecl);
-  os << "> = true;\n";
-  os << "#pragma clang diagnostic pop\n";
-
-  os << "template<>\n";
-  os << "inline void * _Nonnull getTypeMetadata<";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << "::";
-  printer.printBaseName(typeDecl);
-  os << ">() {\n";
-  os << "  return ";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << "::" << cxx_synthesis::getCxxImplNamespaceName()
-     << "::" << typeMetadataFuncName << "(0)._0;\n";
-  os << "}\n";
-  os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
-  os << "template<>\n";
-  os << "struct implClassFor<";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << "::";
-  printer.printBaseName(typeDecl);
-  os << "> { using type = ";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  printCxxImplClassName(os, typeDecl);
-  os << "; };\n";
-  os << "} // namespace\n";
-  os << "} // namespace swift\n";
-  os << "\nnamespace ";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << " {\n";
+  ClangValueTypePrinter::printTypeGenericTraits(os, typeDecl,
+                                                typeMetadataFuncName);
 }
 
 void ClangClassTypePrinter::printClassTypeReturnScaffold(
