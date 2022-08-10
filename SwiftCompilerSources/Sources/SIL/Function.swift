@@ -41,6 +41,11 @@ final public class Function : CustomStringConvertible, HasShortDescription {
     entryBlock.arguments.lazy.map { $0 as! FunctionArgument }
   }
 
+  /// All instructions of all blocks.
+  public var instructions: LazySequence<FlattenSequence<LazyMapSequence<List<BasicBlock>, List<Instruction>>>> {
+    blocks.lazy.flatMap { $0.instructions }
+  }
+
   public var numIndirectResultArguments: Int {
     SILFunction_numIndirectResultArguments(bridged)
   }

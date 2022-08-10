@@ -44,23 +44,21 @@ let stackPromotion = FunctionPass(name: "stack-promotion", {
   let deadEndBlocks = context.deadEndBlocks
 
   var changed = false
-  for block in function.blocks {
-    for inst in block.instructions {
-      if let ar = inst as? AllocRefInstBase {
-        if deadEndBlocks.isDeadEnd(block) {
-          // Don't stack promote any allocation inside a code region which ends up
-          // in a no-return block. Such allocations may missing their final release.
-          // We would insert the deallocation too early, which may result in a
-          // use-after-free problem.
-          continue
-        }
-        if !context.continueWithNextSubpassRun(for: ar) {
-          break
-        }
+  for inst in function.instructions {
+    if let ar = inst as? AllocRefInstBase {
+      if deadEndBlocks.isDeadEnd(ar.block) {
+        // Don't stack promote any allocation inside a code region which ends up
+        // in a no-return block. Such allocations may missing their final release.
+        // We would insert the deallocation too early, which may result in a
+        // use-after-free problem.
+        continue
+      }
+      if !context.continueWithNextSubpassRun(for: ar) {
+        break
+      }
 
-        if tryPromoteAlloc(ar, deadEndBlocks, context) {
-          changed = true
-        }
+      if tryPromoteAlloc(ar, deadEndBlocks, context) {
+        changed = true
       }
     }
   }

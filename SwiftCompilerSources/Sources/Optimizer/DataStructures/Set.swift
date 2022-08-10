@@ -150,11 +150,9 @@ struct InstructionSet : CustomStringConvertible, CustomReflectable {
   var description: String {
     let function = NodeSet_getFunction(bridged).function
     var d = "{\n"
-    for block in function.blocks {
-      for inst in block.instructions {
-        if contains(inst) {
-          d += inst.description
-        }
+    for inst in function.instructions {
+      if contains(inst) {
+        d += inst.description
       }
     }
     d += "}\n"

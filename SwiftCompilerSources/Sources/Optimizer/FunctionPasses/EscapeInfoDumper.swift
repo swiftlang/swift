@@ -43,24 +43,22 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
   }
   
   
-  for block in function.blocks {
-    for inst in block.instructions {
-      if let allocRef = inst as? AllocRefInst {
-        
-        var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: Visitor())
-        let escapes = walker.isEscaping(object: allocRef)
-        let results = walker.visitor.results
-        
-        let res: String
-        if escapes {
-          res = "global"
-        } else if results.isEmpty {
-          res = " -    "
-        } else {
-          res = Array(results).sorted().joined(separator: ",")
-        }
-        print("\(res): \(allocRef)")
+  for inst in function.instructions {
+    if let allocRef = inst as? AllocRefInst {
+      
+      var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: Visitor())
+      let escapes = walker.isEscaping(object: allocRef)
+      let results = walker.visitor.results
+      
+      let res: String
+      if escapes {
+        res = "global"
+      } else if results.isEmpty {
+        res = " -    "
+      } else {
+        res = Array(results).sorted().joined(separator: ",")
       }
+      print("\(res): \(allocRef)")
     }
   }
   print("End function \(function.name)\n")
@@ -81,16 +79,14 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
   var valuesToCheck = [Value]()
   var applies = [Instruction]()
   
-  for block in function.blocks {
-    for inst in block.instructions {
-      switch inst {
-        case let fli as FixLifetimeInst:
-          valuesToCheck.append(fli.operand)
-        case is FullApplySite:
-          applies.append(inst)
-        default:
-          break
-      }
+  for inst in function.instructions {
+    switch inst {
+      case let fli as FixLifetimeInst:
+        valuesToCheck.append(fli.operand)
+      case is FullApplySite:
+        applies.append(inst)
+      default:
+        break
     }
   }
   
