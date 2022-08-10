@@ -3072,6 +3072,30 @@ void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
   decl->getBody()->walk(checker);
 }
 
+static bool checkDuplicateIsolatedParameter(AbstractFunctionDecl *decl) {
+  // If we have already seen at least one 'isolated' parameter,
+  // and we see another one, this is invalid as only one 'isolated' param
+  // per function is allowed.
+  // See:
+  // https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md#multiple-isolated-parameters
+  ParamDecl* previousIsolatedParam = nullptr;
+  for (size_t i = 0; i < decl->getParameters()->size(); ++i) {
+    auto param = decl->getParameters()->get(i);
+    if (param->isIsolated()) {
+      if (auto previous = previousIsolatedParam) {
+        decl->diagnose(diag::isolated_parameter_second_isolated_param,
+                       previous->getParameterName(),
+                       param->getParameterName());
+        return true;
+      }
+
+      previousIsolatedParam = const_cast<ParamDecl*>(param);
+    }
+  }
+
+  return false;
+}
+
 void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   // Disable this check for @LLDBDebuggerFunction functions.
   if (decl->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
@@ -3085,6 +3109,8 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
     if (auto superInit = ctor->getSuperInitCall())
       superInit->walk(checker);
   }
+
+  checkDuplicateIsolatedParameter(decl);
   if (decl->getAttrs().hasAttribute<DistributedActorAttr>()) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       checkDistributedFunction(func);

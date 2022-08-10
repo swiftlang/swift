@@ -12,7 +12,7 @@ extension Actor {
 }
 
 @available(SwiftStdlib 5.1, *)
-func testA<T: Actor>(
+func testA<T: Actor>( // expected-error{{function cannot have more than one 'isolated' parameter ('a' and 'b')}}
   a: isolated A,
   b: isolated T,
   c: isolated Int // expected-error{{'isolated' parameter has non-actor type 'Int'}}
@@ -20,6 +20,29 @@ func testA<T: Actor>(
   a.f()
   a.g()
   b.g()
+}
+
+actor Other {
+  func inc() {}
+  func pass(_ f: @Sendable  (Self) async -> Void) {}
+}
+actor Counter {
+  func inc() {}
+  func pass(_ f: @Sendable  (Self) async -> Void) {}
+}
+
+@available(SwiftStdlib 5.1, *)
+func testDoubleIsolatedParams(a: isolated Counter, b: isolated Other) async { // expected-error{{function cannot have more than one 'isolated' parameter ('a' and 'b')}}
+  a.inc()
+  b.inc()
+}
+
+func taaaa() async {
+  await Counter().pass { isoC in
+    await Other().pass { isoO in
+      await testDoubleIsolatedParams(a: isoC, b: isoO)
+    }
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -106,7 +129,7 @@ func redecl(_: isolated TestActor) { } // expected-error{{invalid redeclaration 
 func tuplify<Ts>(_ fn: (Ts) -> Void) {} // expected-note {{in call to function 'tuplify'}}
 
 @available(SwiftStdlib 5.1, *)
-func testTuplingIsolated(_ a: isolated A, _ b: isolated A) {
+func testTuplingIsolated(_ a: isolated A, _ b: isolated A) { // expected-error{{function cannot have more than one 'isolated' parameter ('a' and 'b')}}
   tuplify(testTuplingIsolated)
   // expected-error@-1 {{generic parameter 'Ts' could not be inferred}}
   // expected-error@-2 {{cannot convert value of type '(isolated A, isolated A) -> ()' to expected argument type '(Ts) -> Void'}}
