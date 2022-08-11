@@ -286,7 +286,8 @@ public:
   void cloneInline(ArrayRef<SILValue> AppliedArgs);
 
 protected:
-  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI);
+  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI,
+                                  unsigned index);
 
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitHopToExecutorInst(HopToExecutorInst *Inst);
@@ -466,7 +467,7 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       } else {
         // Insert begin/end borrow for guaranteed arguments.
         if (paramInfo.isGuaranteed()) {
-          if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
+          if (SILValue newValue = borrowFunctionArgument(callArg, Apply, idx)) {
             callArg = newValue;
             borrowedArgs[idx] = true;
           }
@@ -612,7 +613,8 @@ void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
 }
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
-                                                 FullApplySite AI) {
+                                                 FullApplySite AI,
+                                                 unsigned index) {
   auto &mod = Apply.getFunction()->getModule();
   auto enableLexicalLifetimes =
       mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
@@ -631,9 +633,13 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
     return SILValue();
   }
 
+  SILFunctionArgument *argument = cast<SILFunctionArgument>(
+      getCalleeFunction()->getEntryBlock()->getArgument(index));
+
   SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
-  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg,
-                                        /*isLexical=*/enableLexicalLifetimes);
+  auto isLexical =
+      enableLexicalLifetimes && argument->getLifetime().isLexical();
+  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg, isLexical);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
