@@ -946,6 +946,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
       bool isNoImplicitCopy = (Args[I + 1] >> 16) & 0x1;
       fArg->setNoImplicitCopy(isNoImplicitCopy);
+      auto lifetime = (LifetimeAnnotation::Case)((Args[I + 1] >> 17) & 0x3);
+      fArg->setLifetimeAnnotation(lifetime);
       Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
