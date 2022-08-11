@@ -25,6 +25,7 @@
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -971,16 +972,16 @@ void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
 }
 
 bool swift::collectDestroys(SingleValueInstruction *inst,
-                            SmallVectorImpl<SILInstruction *> &destroys) {
+                            SmallVectorImpl<Operand *> &destroys) {
   bool isDead = true;
   for (Operand *use : inst->getUses()) {
     SILInstruction *user = use->getUser();
     if (useHasTransitiveOwnership(user)) {
       if (!collectDestroys(cast<SingleValueInstruction>(user), destroys))
         isDead = false;
-      destroys.push_back(user);
+      destroys.push_back(use);
     } else if (useDoesNotKeepValueAlive(user)) {
-      destroys.push_back(user);
+      destroys.push_back(use);
     } else {
       isDead = false;
     }
@@ -996,7 +997,7 @@ bool swift::collectDestroys(SingleValueInstruction *inst,
 ///       weirdness of the old retain/release ARC model. Most likely this will
 ///       not be needed anymore with OSSA.
 static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
-                                        ArrayRef<SILInstruction *> paiUsers,
+                                        ArrayRef<Operand *> paiUses,
                                         SILBuilderContext &builderCtxt,
                                         InstModCallbacks callbacks) {
   SmallVector<Operand *, 8> argsToHandle;
@@ -1008,7 +1009,7 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
   // Compute the set of endpoints, which will be used to insert destroys of
   // temporaries. This may fail if the frontier is located on a critical edge
   // which we may not split.
-  ValueLifetimeAnalysis vla(pai, paiUsers);
+  ValueLifetimeAnalysis vla(pai, paiUses);
 
   ValueLifetimeAnalysis::Frontier partialApplyFrontier;
   if (!vla.computeFrontier(partialApplyFrontier,
@@ -1068,7 +1069,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
 
   // Collect all destroys of the closure (transitively including destorys of
   // copies) and check if those are the only uses of the closure.
-  SmallVector<SILInstruction *, 16> closureDestroys;
+  SmallVector<Operand *, 16> closureDestroys;
   if (!collectDestroys(closure, closureDestroys))
     return false;
 
@@ -1102,7 +1103,8 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
 
   // Delete all copy and destroy instructions in order so that leaf uses are
   // deleted first.
-  for (SILInstruction *user : closureDestroys) {
+  for (auto *use : closureDestroys) {
+    auto *user = use->getUser();
     assert(
         (useDoesNotKeepValueAlive(user) || useHasTransitiveOwnership(user)) &&
         "We expect only ARC operations without "
