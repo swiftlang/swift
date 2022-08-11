@@ -554,6 +554,9 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     import.options |= ImportFlags::Preconcurrency;
     import.preconcurrencyRange = attr->getRangeWithAt();
   }
+
+  if (auto attr = ID->getAttrs().getAttribute<WeakLinkedAttr>())
+    import.options |= ImportFlags::WeakLinked;
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {

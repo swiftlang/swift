@@ -64,6 +64,11 @@ enum IsDistributed_t {
   IsNotDistributed,
   IsDistributed,
 };
+enum IsWeakImported_t {
+  IsNotWeakImported,
+  IsWeakImportedByModule,
+  IsAlwaysWeakImported,
+};
 
 enum class PerformanceConstraints : uint8_t {
   None = 0,
@@ -317,9 +322,8 @@ private:
   /// would indicate.
   unsigned HasCReferences : 1;
 
-  /// Whether cross-module references to this function should always use
-  /// weak linking.
-  unsigned IsWeakImported : 1;
+  /// Whether cross-module references to this function should use weak linking.
+  unsigned IsWeakImported : 2;
 
   /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
@@ -797,11 +801,17 @@ public:
 
   /// Returns whether this function's symbol must always be weakly referenced
   /// across module boundaries.
-  bool isAlwaysWeakImported() const { return IsWeakImported; }
-
-  void setAlwaysWeakImported(bool value) {
-    IsWeakImported = value;
+  bool isAlwaysWeakImported() const {
+    return IsWeakImported == IsWeakImported_t::IsAlwaysWeakImported;
   }
+
+  /// Returns whether this function's symbol was referenced by a module that
+  /// imports the defining module \c @_weakLinked.
+  bool isWeakImportedByModule() const {
+    return IsWeakImported == IsWeakImported_t::IsWeakImportedByModule;
+  }
+
+  void setIsWeakImported(IsWeakImported_t value) { IsWeakImported = value; }
 
   bool isWeakImported() const;
 

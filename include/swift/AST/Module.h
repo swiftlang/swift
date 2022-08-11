@@ -414,11 +414,10 @@ private:
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
 
+public:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
   ///  module if one exists.
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
-
-public:
 
   /// Returns true if this module is an underscored cross import overlay
   /// declared by \p other or its underlying clang module, either directly or
@@ -685,6 +684,10 @@ public:
 
   // Is \p spiGroup accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(Identifier spiGroup, const ModuleDecl *fromModule) const;
+
+  /// Is \p targetDecl from a module that is imported as \c @_weakLinked from
+  /// this module?
+  bool isImportedAsWeakLinked(const Decl *targetDecl) const;
 
   /// \sa getImportedModules
   enum class ImportFilterKind {
