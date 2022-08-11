@@ -919,7 +919,7 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSetVector &phiBlocks,
 
   LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << def.stored);
 
-  llvm::SmallVector<SILValue> vals;
+  SmallVector<SILValue> vals;
   vals.push_back(def.stored);
   if (shouldAddLexicalLifetime(asi)) {
     vals.push_back(def.borrow);
@@ -964,7 +964,7 @@ void StackAllocationPromoter::propagateLiveness(
   // If liveness has not been propagated, go over the incoming operands and mark
   // any operand values that are proactivePhis as live
   livePhis.insert(proactivePhi);
-  SmallVector<SILValue, 4> incomingPhiVals;
+  SmallVector<SILValue> incomingPhiVals;
   proactivePhi->getIncomingPhiValues(incomingPhiVals);
   for (auto &inVal : incomingPhiVals) {
     auto *inPhi = dyn_cast<SILPhiArgument>(inVal);
