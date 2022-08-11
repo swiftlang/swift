@@ -693,6 +693,57 @@ void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
   attr->setInvalid();
 }
 
+/// Finds all import declarations for a single module that inconsistently match
+/// \c predicate and passes each pair of inconsistent imports to \c diagnose.
+template <typename Pred, typename Diag>
+static void findInconsistentImports(ModuleDecl *mod, Pred predicate,
+                                    Diag diagnose) {
+  llvm::DenseMap<ModuleDecl *, const ImportDecl *> matchingImports;
+  llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> otherImports;
+
+  for (const FileUnit *file : mod->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    for (auto *topLevelDecl : SF->getTopLevelDecls()) {
+      auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
+      if (!nextImport)
+        continue;
+
+      ModuleDecl *module = nextImport->getModule();
+      if (!module)
+        continue;
+
+      if (predicate(nextImport)) {
+        // We found a matching import.
+        bool isNew = matchingImports.insert({module, nextImport}).second;
+        if (!isNew)
+          continue;
+
+        auto seenOtherImportPosition = otherImports.find(module);
+        if (seenOtherImportPosition != otherImports.end()) {
+          for (auto *seenOtherImport : seenOtherImportPosition->getSecond())
+            diagnose(seenOtherImport, nextImport);
+
+          // We're done with these; keep the map small if possible.
+          otherImports.erase(seenOtherImportPosition);
+        }
+        continue;
+      }
+
+      // We saw a non-matching import. Is that in conflict with what we've seen?
+      if (auto *seenMatchingImport = matchingImports.lookup(module)) {
+        diagnose(nextImport, seenMatchingImport);
+        continue;
+      }
+
+      // Otherwise, record it for later.
+      otherImports[module].push_back(nextImport);
+    }
+  }
+}
+
 evaluator::SideEffect
 CheckInconsistentImplementationOnlyImportsRequest::evaluate(
     Evaluator &evaluator, ModuleDecl *mod) const {
@@ -724,53 +775,11 @@ CheckInconsistentImplementationOnlyImportsRequest::evaluate(
                    diag::implementation_only_conflict_here);
   };
 
-  llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> normalImports;
-  llvm::DenseMap<ModuleDecl *, const ImportDecl *> implementationOnlyImports;
+  auto predicate = [](ImportDecl *decl) {
+    return decl->getAttrs().hasAttribute<ImplementationOnlyAttr>();
+  };
 
-  for (const FileUnit *file : mod->getFiles()) {
-    auto *SF = dyn_cast<SourceFile>(file);
-    if (!SF)
-      continue;
-
-    for (auto *topLevelDecl : SF->getTopLevelDecls()) {
-      auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
-      if (!nextImport)
-        continue;
-
-      ModuleDecl *module = nextImport->getModule();
-      if (!module)
-        continue;
-
-      if (nextImport->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
-        // We saw an implementation-only import.
-        bool isNew =
-            implementationOnlyImports.insert({module, nextImport}).second;
-        if (!isNew)
-          continue;
-
-        auto seenNormalImportPosition = normalImports.find(module);
-        if (seenNormalImportPosition != normalImports.end()) {
-          for (auto *seenNormalImport : seenNormalImportPosition->getSecond())
-            diagnose(seenNormalImport, nextImport);
-
-          // We're done with these; keep the map small if possible.
-          normalImports.erase(seenNormalImportPosition);
-        }
-        continue;
-      }
-
-      // We saw a non-implementation-only import. Is that in conflict with what
-      // we've seen?
-      if (auto *seenImplementationOnlyImport =
-            implementationOnlyImports.lookup(module)) {
-        diagnose(nextImport, seenImplementationOnlyImport);
-        continue;
-      }
-
-      // Otherwise, record it for later.
-      normalImports[module].push_back(nextImport);
-    }
-  }
+  findInconsistentImports(mod, predicate, diagnose);
   return {};
 }
 
