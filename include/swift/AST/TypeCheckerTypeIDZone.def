@@ -33,6 +33,8 @@ SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
               Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckInconsistentImplementationOnlyImportsRequest,
               evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckInconsistentWeakLinkedImportsRequest,
+              evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
               evaluator::SideEffect(ValueDecl *),
               Uncached, NoLocationInfo)

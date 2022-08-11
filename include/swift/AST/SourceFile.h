@@ -176,7 +176,7 @@ private:
 
   friend class HasImportsMatchingFlagRequest;
 
-  /// Indicates which import options have a valid caches. Storage for
+  /// Indicates which import options have valid caches. Storage for
   /// \c HasImportsMatchingFlagRequest.
   ImportOptions validCachedImportOptions;
 
@@ -352,9 +352,9 @@ public:
   hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
                              ImportQueryKind kind = TestableAndPrivate) const;
 
-  /// Does this source file have any implementation-only imports?
+  /// Does this source file have any imports with \c flag?
   /// If not, we can fast-path module checks.
-  bool hasImplementationOnlyImports() const;
+  bool hasImportsWithFlag(ImportFlags flag) const;
 
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;

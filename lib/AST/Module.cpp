@@ -2442,13 +2442,11 @@ void swift::simple_display(llvm::raw_ostream &out, ImportOptions options) {
   out << " }";
 }
 
-bool SourceFile::hasImplementationOnlyImports() const {
+bool SourceFile::hasImportsWithFlag(ImportFlags flag) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
-  return evaluateOrDefault(ctx.evaluator,
-                           HasImportsMatchingFlagRequest{
-                               mutableThis, ImportFlags::ImplementationOnly},
-                           false);
+  return evaluateOrDefault(
+      ctx.evaluator, HasImportsMatchingFlagRequest{mutableThis, flag}, false);
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
