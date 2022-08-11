@@ -336,6 +336,8 @@ private:
   /// Check whether this is a distributed method.
   unsigned IsDistributed : 1;
 
+  unsigned stackProtection : 1;
+
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
   unsigned Inlined : 1;
@@ -831,6 +833,9 @@ public:
   setIsDistributed(IsDistributed_t value = IsDistributed_t::IsDistributed) {
     IsDistributed = value;
   }
+
+  bool needsStackProtection() const { return stackProtection; }
+  void setNeedStackProtection(bool needSP) { stackProtection = needSP; }
 
   /// Get the DeclContext of this function.
   DeclContext *getDeclContext() const { return DeclCtxt; }

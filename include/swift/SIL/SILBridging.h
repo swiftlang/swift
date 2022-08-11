@@ -266,6 +266,9 @@ SwiftInt SILFunction_isPossiblyUsedExternally(BridgedFunction function);
 SwiftInt SILFunction_isAvailableExternally(BridgedFunction function);
 SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
                                       llvm::StringRef attrName);
+SwiftInt SILFunction_needsStackProtection(BridgedFunction function);
+void SILFunction_setNeedStackProtection(BridgedFunction function,
+                                        SwiftInt needSP);
 
 llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);

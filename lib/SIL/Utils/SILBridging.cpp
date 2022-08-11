@@ -231,6 +231,15 @@ SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
   return f->hasSemanticsAttr(attrName) ? 1 : 0;
 }
 
+SwiftInt SILFunction_needsStackProtection(BridgedFunction function) {
+  return castToFunction(function)->needsStackProtection() ? 1 : 0;
+}
+
+void SILFunction_setNeedStackProtection(BridgedFunction function,
+                                        SwiftInt needSP) {
+  castToFunction(function)->setNeedStackProtection(needSP != 0);
+}
+
 //===----------------------------------------------------------------------===//
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//

@@ -1055,6 +1055,12 @@ the top-level `switch_enum`_.
 Cross-module references to this function should always use weak linking.
 ::
 
+  sil-function-attribute ::= '[stack_protection]'
+
+Stack protectors are inserted into this function to detect stack related
+buffer overflows.
+::
+
   sil-function-attribute ::= '[available' sil-version-tuple ']'
   sil-version-tuple ::= [0-9]+ ('.' [0-9]+)*
 
