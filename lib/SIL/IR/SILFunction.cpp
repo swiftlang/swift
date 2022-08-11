@@ -950,14 +950,18 @@ visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const {
   // effects with index -1 are effects that are not tied to a specific argument
   int idx = -1;
   BridgedFunction bridgedFn = {const_cast<SILFunction *>(this)};
+  #define WITHOUT_DERIVED(flags) (flags & (~1U))
   while (int flags = getEffectFlagsFunction(bridgedFn, idx)) {
     ArgEffectKind kind = ArgEffectKind::Unknown;
-    if (flags & EffectsFlag_Escape)
+    if (WITHOUT_DERIVED(flags) == WITHOUT_DERIVED(EffectsFlag_Escape))
       kind = ArgEffectKind::Escape;
-    else if (flags & EffectsFlag_SideEffect)
+    else if (WITHOUT_DERIVED(flags) == WITHOUT_DERIVED(EffectsFlag_SideEffect))
       kind = ArgEffectKind::SideEffect;
-
-    c(idx, (flags & EffectsFlag_Derived) != 0, kind);
+    else if (WITHOUT_DERIVED(flags) == WITHOUT_DERIVED(EffectsFlag_Memory))
+      kind = ArgEffectKind::Memory;
+    else if (WITHOUT_DERIVED(flags) == WITHOUT_DERIVED(EffectsFlag_Ownership))
+      kind = ArgEffectKind::Ownership;
+    c(idx, (flags & (EffectsFlag_Derived)) != 0, kind);
     idx++;
   }
 }

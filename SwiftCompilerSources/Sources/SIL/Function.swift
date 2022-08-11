@@ -58,6 +58,10 @@ final public class Function : CustomStringConvertible, HasShortDescription {
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
   public var resultType: Type { SILFunction_getSILResultType(bridged).type }
 
+  public func getArgumentConvention(for index: Int) -> ArgumentConvention {
+    return SILFunction_getSILArgumentConvention(bridged, index).convention
+  }
+
   public var returnInstruction: ReturnInst? {
     for block in blocks.reversed() {
       if let retInst = block.terminator as? ReturnInst { return retInst }
@@ -168,6 +172,10 @@ final public class Function : CustomStringConvertible, HasShortDescription {
             flags |= Int(EffectsFlag_Escape)
           case .sideEffect:
             flags |= Int(EffectsFlag_SideEffect)
+          case .memory:
+            flags |= Int(EffectsFlag_Memory)
+          case .ownership:
+            flags |= Int(EffectsFlag_Ownership)
         }
         if effect.isDerived {
           flags |= Int(EffectsFlag_Derived)

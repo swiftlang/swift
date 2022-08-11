@@ -180,12 +180,16 @@ typedef enum {
 
 enum {
   // Least significant bit is set to `1` if the effect is derived
-  // 0b010 -> "define_escapes"
-  // 0b011 -> "escapes"
-  // 0b101 -> "sideeffects", currently always derived
+  // 0b0010 -> "define_escapes"
+  // 0b0011 -> "escapes"
+  // 0b0101 -> "sideeffects", currently always derived
+  // 0b0110 -> "memory", currently always derived
+  // 0b1000 -> "ownership", currently always derived
   EffectsFlag_Derived = 0x1,
   EffectsFlag_Escape = 0x2,
   EffectsFlag_SideEffect = 0x5,
+  EffectsFlag_Memory = 0x6,
+  EffectsFlag_Ownership = 0x8
 };
 
 void registerBridgedClass(llvm::StringRef className, SwiftMetatype metatype);
@@ -226,6 +230,7 @@ SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
 SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function);
 SwiftInt SILFunction_getNumSILArguments(BridgedFunction function);
 BridgedType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx);
+BridgedArgumentConvention SILFunction_getSILArgumentConvention(BridgedFunction function, SwiftInt idx);
 BridgedType SILFunction_getSILResultType(BridgedFunction function);
 SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function);
 SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,

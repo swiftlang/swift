@@ -176,6 +176,8 @@ private func getArgIndicesWithDefinedEffects(of function: Function) -> Set<Int> 
     case .sideEffect:
       // TODO: update this depending on whether sideEffects are computed with escapeinfo or not
       break
+    default:
+      fatalError("TODO")
     }
   }
   return argsWithDefinedEffects

@@ -779,6 +779,8 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
           }
         case .sideEffect:
           break
+        default:
+          fatalError("TODO")
         }
       }
       if !matched {

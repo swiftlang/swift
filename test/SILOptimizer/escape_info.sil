@@ -679,6 +679,7 @@ bb0(%0 : $*X, %1 : $*X):
   cond_br undef, bb1, bb2
 bb1:
   store %2 to [init] %4 : $*X
+  store %2 to [assign] %1 : $*X
   br bb3
 bb2:
   destroy_value %2 : $X

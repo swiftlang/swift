@@ -3027,7 +3027,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
       } else {
         definedEscapesIndices.push_back(effectIdx);
       }
-    } else if (kind == ArgEffectKind::SideEffect) {
+    } else if (kind == ArgEffectKind::SideEffect || kind == ArgEffectKind::Memory || kind == ArgEffectKind::Ownership) {
       sideeffectIndices.push_back(effectIdx);
     }
   });

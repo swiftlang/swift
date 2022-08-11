@@ -2,6 +2,8 @@
 
 // REQUIRES: swift_in_compiler
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Builtin
@@ -321,4 +323,33 @@ bb0(%0 : $MyArray<String>):
   %13 = load %10 : $*String
   %14 = tuple ()
   return %14 : $()
+}
+
+class C {}
+sil [ossa] @testRootPhiCycle : $@convention(thin) (@guaranteed Builtin.BridgeObject, @guaranteed Builtin.BridgeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.BridgeObject, %1 : @guaranteed $Builtin.BridgeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow0 = begin_borrow %0 : $Builtin.BridgeObject
+  br bb3(%borrow0 : $Builtin.BridgeObject)
+
+bb2:
+  %borrow1 = begin_borrow %1 : $Builtin.BridgeObject
+  br bb3(%borrow1 : $Builtin.BridgeObject)
+
+bb3(%820 : @guaranteed $Builtin.BridgeObject):
+  %834 = unchecked_ref_cast %820 : $Builtin.BridgeObject to $C
+  %844 = ref_tail_addr [immutable] %834 : $C, $Double
+  %853 = load [trivial] %844 : $*Double
+  %943 = load [trivial] %844 : $*Double
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb3(%820 : $Builtin.BridgeObject)
+
+bb5:
+  end_borrow %820 : $Builtin.BridgeObject
+  %999 = tuple ()
+  return %999 : $()
 }

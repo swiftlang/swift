@@ -20,6 +20,28 @@ let accessDumper = FunctionPass(name: "dump-access", {
   (function: Function, context: PassContext) in
   print("Accesses for \(function.name)")
 
+  struct PrintArgUses : AccessUseVisitor {
+    var walkDownCache = WalkerCache<SmallProjectionPath>()
+
+    mutating func visitUse(value: Operand, path: Path) -> WalkResult {
+      print("ValueUse(\(path)): \(value)")
+      return .continueWalk
+    }
+    mutating func visitUse(address: Operand, path: Path) -> WalkResult {
+      print("AddressUse(\(path)): \(address)")
+      return .continueWalk
+    }
+  }
+  var printArgUses = PrintArgUses()
+
+  for arg in function.arguments {
+    if arg.type.isAddress {
+      _ = printArgUses.visitAccesses(toAddress: arg)
+    } else {
+      _ = printArgUses.visitUses(ofValue: arg)
+    }
+  }
+
   var apw = AccessPathWalker()
   var arw = AccessStoragePathVisitor()
   for block in function.blocks {

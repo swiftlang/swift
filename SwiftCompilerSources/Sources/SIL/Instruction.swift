@@ -526,9 +526,16 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var isStatic: Bool { BeginAccessInst_isStatic(bridged) != 0 }
 }
 
+// An instruction that is always paired with a scope ending instruction
+// such as `begin_access` (ending with `end_access`) and `alloc_stack`
+// (ending with `dealloc_stack`).
 public protocol ScopedInstruction {
+  // The type of the ending instructions (while `IteratorProtocol` would be
+  // ideal, for performance reasons we allow the user to specify any type as return)
   associatedtype EndInstructions
 
+  // The instructions that end the scope of the instruction denoted
+  // by `self`.
   var endInstructions: EndInstructions { get }
 }
 

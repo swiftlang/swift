@@ -47,6 +47,65 @@ public struct SideEffect : CustomStringConvertible {
   }
 }
 
+public struct MemoryEffect : CustomStringConvertible {
+  public let read: Bool
+  public let write: Bool
+
+  public init(read: Bool, write: Bool) {
+    self.read = read
+    self.write = write
+  }
+
+  public var description: String {
+    let desc = "\(read ? "r" : "")\(write ? "w" : "")"
+    return "mem:\(desc.isEmpty ? "_" : desc)"
+  }
+
+  public func merge(with other: Self) -> Self {
+    return Self(read: read || other.read, write: write || other.write)
+  }
+}
+
+public struct OwnershipEffect : CustomStringConvertible {
+  public let copy: Bool
+  public let destroy: Bool
+
+  public init(copy: Bool, destroy: Bool) {
+    self.copy = copy
+    self.destroy = destroy
+  }
+
+  public var description: String {
+    let desc = "\(copy ? "c" : "")\(destroy ? "d" : "")"
+    return "own:\(desc.isEmpty ? "_" : desc)"
+  }
+
+  public func merge(with other: Self) -> Self {
+    return Self(copy: copy || other.copy, destroy: destroy || other.destroy)
+  }
+}
+
+public func worstEffects(for convention: ArgumentConvention) -> (MemoryEffect, OwnershipEffect) {
+  switch convention {
+  case .indirectIn:
+    return (MemoryEffect(read: true, write: true), OwnershipEffect(copy: true, destroy: true))
+  case .indirectInConstant:
+    return (MemoryEffect(read: true, write: false), OwnershipEffect(copy: true, destroy: /*TODO: doublecheck*/false))
+  case .indirectInGuaranteed:
+    return (MemoryEffect(read: true, write: false), OwnershipEffect(copy: true, destroy: false))
+  case .indirectInout, .indirectInoutAliasable:
+    return (MemoryEffect(read: true, write: true), OwnershipEffect(copy: true, destroy: false))
+  case .indirectOut:
+    return (MemoryEffect(read: false, write: true), OwnershipEffect(copy: false, destroy: false))
+  case .directOwned:
+    return (MemoryEffect(read: true, write: true), OwnershipEffect(copy: true, destroy: true))
+  case .directUnowned:
+    return (MemoryEffect(read: true, write: true), OwnershipEffect(copy: true, destroy: true))
+  case .directGuaranteed:
+    return (MemoryEffect(read: true, write: true), OwnershipEffect(copy: true, destroy: false))
+  }
+}
+
 public struct GlobalEffects : CustomStringConvertible {
   public var sideEffect = SideEffect()
 
@@ -196,6 +255,10 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
     case escaping(Selection, Bool)  // to, exclusive
     
     case sideEffect(SideEffect)
+
+    case memory(MemoryEffect)
+
+    case ownership(OwnershipEffect)
   }
 
   /// To which argument (and projection) does this effect apply to?
@@ -235,6 +298,8 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
       
       case .sideEffect(let eff):
         self.kind = .sideEffect(eff)
+      default:
+        fatalError("TODO")
     }
   }
 
@@ -247,6 +312,10 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
       case .sideEffect(let effect):
         let s = effect.description
         return "\(s)(\(selectedArg.description))"
+      case .memory(let memoryEffect):
+        return "\(memoryEffect)(\(selectedArg))"
+      case .ownership(let ownershipEffect):
+        return "\(ownershipEffect)(\(selectedArg))"
     }
   }
 

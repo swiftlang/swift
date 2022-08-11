@@ -13,7 +13,7 @@
 import SILBridging
 
 /// An operand of an instruction.
-public struct Operand : CustomStringConvertible, CustomReflectable {
+public struct Operand : CustomStringConvertible, CustomReflectable, Hashable {
   fileprivate let bridged: BridgedOperand
 
   init(_ bridged: BridgedOperand) {
@@ -33,6 +33,11 @@ public struct Operand : CustomStringConvertible, CustomReflectable {
   }
   
   public var index: Int { instruction.operands.getIndex(of: self) }
+
+  public func hash(into: inout Hasher) {
+    into.combine(instruction)
+    into.combine(index)
+  }
   
   /// True if the operand is used to describe a type dependency, but it's not
   /// used as value.

@@ -1,0 +1,84 @@
+import Swift
+import Builtin
+
+class Tree {
+  var left: Tree
+  var right: Tree
+  var value: Int
+}
+
+struct Pair {
+  var x: Int = 0
+  var y: Int = 0
+}
+
+class List {
+  var next: List?
+  var elem: Pair = Pair()
+}
+
+sil [escapes !%1.**] @store0 : $@convention(thin) (Bool, @guaranteed Tree) -> Int {
+bb0(%0 : $Bool, %1 : $Tree):
+  %4 = struct_extract %0 : $Bool, #Bool._value
+  cond_br %4, bb2, bb1
+
+bb1:
+  %11 = ref_element_addr %1 : $Tree, #Tree.right
+  %12 = begin_access [read] [dynamic] [no_nested_conflict] %11 : $*Tree
+  %13 = load %12 : $*Tree
+  end_access %12 : $*Tree
+  br bb3(%13 : $Tree)
+
+bb2:
+  %6 = ref_element_addr %1 : $Tree, #Tree.left
+  %7 = begin_access [read] [dynamic] [no_nested_conflict] %6 : $*Tree
+  %8 = load %7 : $*Tree
+  end_access %7 : $*Tree
+  br bb3(%8 : $Tree)
+
+// %16
+bb3(%16 : $Tree):
+  %18 = ref_element_addr %16 : $Tree, #Tree.value
+  %19 = begin_access [read] [dynamic] [no_nested_conflict] %18 : $*Int
+  %20 = load %19 : $*Int
+  end_access %19 : $*Int
+  %23 = integer_literal $Builtin.Int64, 0
+  %24 = struct $Int (%23 : $Builtin.Int64)
+  %25 = begin_access [modify] [dynamic] [no_nested_conflict] %18 : $*Int
+  store %24 to %25 : $*Int
+  end_access %25 : $*Int
+  return %20 : $Int
+}
+
+sil [escapes !%0] @writeToSecond : $@convention(thin) (@guaranteed List) -> () {
+bb0(%0 : $List):
+  %2 = ref_element_addr %0 : $List, #List.next
+  %3 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Optional<List>
+  %4 = load %3 : $*Optional<List>
+  end_access %3 : $*Optional<List>
+  switch_enum %4 : $Optional<List>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %17 = integer_literal $Builtin.Int64, 0
+  %18 = struct $Int (%17 : $Builtin.Int64)
+  %19 = ref_element_addr %0 : $List, #List.elem
+  %20 = begin_access [modify] [dynamic] [no_nested_conflict] %19 : $*Pair
+  %21 = struct_element_addr %20 : $*Pair, #Pair.x
+  store %18 to %21 : $*Int
+  end_access %20 : $*Pair
+  br bb3
+
+bb2(%7 : $List):
+  %9 = integer_literal $Builtin.Int64, 0
+  %10 = struct $Int (%9 : $Builtin.Int64)
+  %11 = ref_element_addr %7 : $List, #List.elem
+  %12 = begin_access [modify] [dynamic] [no_nested_conflict] %11 : $*Pair
+  %13 = struct_element_addr %12 : $*Pair, #Pair.x
+  store %10 to %13 : $*Int
+  end_access %12 : $*Pair
+  br bb3
+
+bb3:
+  %25 = tuple ()
+  return %25 : $()
+}
