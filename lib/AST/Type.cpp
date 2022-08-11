@@ -6555,9 +6555,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       SmallVector<TupleTypeElt, 2> differentialResults;
       for (auto i : range(resultTanTypes.size())) {
         auto resultTanType = resultTanTypes[i];
-        auto flags = ParameterTypeFlags().withInOut(false);
         differentialResults.push_back(
-            TupleTypeElt(resultTanType, Identifier(), flags));
+            TupleTypeElt(resultTanType, Identifier()));
       }
       differentialResult = TupleType::get(differentialResults, ctx);
     }

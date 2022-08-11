@@ -533,6 +533,44 @@ func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
 // CHECK: [ACTIVE]   %13 = begin_access [read] [static] %2 : $*Float
 // CHECK: [ACTIVE]   %14 = load [trivial] %13 : $*Float
 
+public struct ArrayWrapper: Differentiable {
+  var values: [Float]
+
+  @differentiable(reverse)
+  mutating func get(index: Int) -> Float {
+    self.values[index]
+  }
+
+  // Check `inout` with result.
+
+  // CHECK-LABEL: [AD] Activity info for ${{.*}}get{{.*}} at parameter indices (1) and result indices (0, 1)
+  // CHECK: bb0:
+  // CHECK: [USEFUL] %0 = argument of bb0 : $Int
+  // CHECK: [ACTIVE] %1 = argument of bb0 : $*ArrayWrapper
+  // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %1 : $*ArrayWrapper
+  // CHECK: [ACTIVE]   %5 = struct_element_addr %4 : $*ArrayWrapper, #ArrayWrapper.values
+  // CHECK: [ACTIVE]   %6 = load_borrow %5 : $*Array<Float>
+  // CHECK: [ACTIVE]   %7 = alloc_stack $Float
+  // CHECK: [NONE]   // function_ref Array.subscript.getter
+  // CHECK:   %8 = function_ref @$sSayxSicig : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+  // CHECK: [NONE]   %9 = apply %8<Float>(%7, %0, %6) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+  // CHECK: [ACTIVE]   %10 = load [trivial] %7 : $*Float
+}
+
+@differentiable(reverse)
+func testInoutAndResult(x: Int, y: inout ArrayWrapper) {
+  let _ = y.get(index: x)
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testInoutAndResult{{.*}} at parameter indices (1) and result indices (0)
+// CHECK: bb0:
+// CHECK: [USEFUL] %0 = argument of bb0 : $Int
+// CHECK: [ACTIVE] %1 = argument of bb0 : $*ArrayWrapper
+// CHECK: [ACTIVE]   %4 = begin_access [modify] [static] %1 : $*ArrayWrapper
+// CHECK: [NONE]   // function_ref ArrayWrapper.get(index:)
+// CHECK:   %5 = function_ref @$s17activity_analysis12ArrayWrapperV3get5indexSfSi_tF : $@convention(method) (Int, @inout ArrayWrapper) -> Float
+// CHECK: [VARIED]   %6 = apply %5(%0, %4) : $@convention(method) (Int, @inout ArrayWrapper) -> Float
+
 //===----------------------------------------------------------------------===//
 // Throwing function differentiation (`try_apply`)
 //===----------------------------------------------------------------------===//

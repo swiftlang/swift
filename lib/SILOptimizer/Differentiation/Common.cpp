@@ -232,7 +232,8 @@ void collectMinimalIndicesForFunctionCall(
     auto &param = paramAndIdx.value();
     if (!param.isIndirectMutating())
       continue;
-    unsigned idx = paramAndIdx.index();
+    unsigned idx =
+        paramAndIdx.index() + calleeFnTy->getNumIndirectFormalResults();
     auto inoutArg = ai->getArgument(idx);
     results.push_back(inoutArg);
     resultIndices.push_back(inoutParamResultIndex++);
