@@ -6483,7 +6483,9 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     if (!objCReplacementFor.empty())
       FunctionState.F->setObjCReplacement(objCReplacementFor);
     FunctionState.F->setSpecialPurpose(specialPurpose);
-    FunctionState.F->setAlwaysWeakImported(isWeakImported);
+    FunctionState.F->setIsWeakImported(
+        isWeakImported ? IsWeakImported_t::IsAlwaysWeakImported
+                       : IsWeakImported_t::IsNotWeakImported);
     FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(
       isWithoutActuallyEscapingThunk);

@@ -661,7 +661,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setPerfConstraints((PerformanceConstraints)perfConstr);
-    fn->setAlwaysWeakImported(isWeakImported);
+    fn->setIsWeakImported(isWeakImported
+                              ? IsWeakImported_t::IsAlwaysWeakImported
+                              : IsWeakImported_t::IsNotWeakImported);
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
 
