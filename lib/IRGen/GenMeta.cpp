@@ -6168,7 +6168,7 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     }
 
     CanGenericSignature reqSig =
-      IGM.Context.getOpenedArchetypeSignature(existentialType, genSig);
+      IGM.Context.getOpenedExistentialSignature(existentialType, genSig);
 
     CanType typeExpression;
     if (metatypeDepth > 0) {

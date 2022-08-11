@@ -556,8 +556,11 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
     out << " ]";
   } else {
     out << "fresh signature <";
-    for (auto paramTy : Params)
-      out << " " << Type(paramTy);
+    for (auto paramTy : Params) {
+      out << " " << paramTy;
+      if (paramTy->castTo<GenericTypeParamType>()->isTypeSequence())
+        out << "…";
+    }
     out << " >";
   }
   out << "\n";
