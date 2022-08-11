@@ -102,7 +102,7 @@ cmake --version
 
 if [ -z $(which sccache) ]; then
   sudo mkdir /opt/sccache && cd /opt/sccache
-  wget -O - "https://github.com/mozilla/sccache/releases/download/0.2.14/sccache-0.2.14-$(uname -m)-unknown-linux-musl.tar.gz" | \
+  wget -O - "https://github.com/mozilla/sccache/releases/download/v0.3.0/sccache-v0.3.0-$(uname -m)-unknown-linux-musl.tar.gz" | \
     sudo tar xz --strip-components 1
   sudo ln -sf /opt/sccache/sccache /usr/local/bin
 fi
