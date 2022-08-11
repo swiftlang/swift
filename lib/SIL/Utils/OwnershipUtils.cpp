@@ -20,6 +20,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 
 using namespace swift;

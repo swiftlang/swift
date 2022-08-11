@@ -38,6 +38,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/TypeLowering.h"
 
 #include "llvm/ADT/DenseSet.h"
@@ -363,6 +364,14 @@ bool SILValueOwnershipChecker::gatherUsers(
         reborrowVerifier.verifyReborrows(scopedOperand, value);
       }
 
+      if (auto *svi = dyn_cast<SingleValueInstruction>(op->getUser())) {
+        if (auto scopedAddress = ScopedAddressValue(svi)) {
+          scopedAddress.visitScopeEndingUses([&](Operand *endOp) {
+            nonLifetimeEndingUsers.push_back(endOp);
+            return true;
+          });
+        }
+      }
       // Next see if our use is an interior pointer operand. If we have an
       // interior pointer, we need to add all of its address uses as "implicit
       // regular users" of our consumed value.
