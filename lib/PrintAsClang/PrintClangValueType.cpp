@@ -113,6 +113,22 @@ void ClangValueTypePrinter::printValueTypeDecl(
                            // access type metadata.
                            printer.printCTypeMetadataTypeFunction(
                                typeDecl, typeMetadataFuncName);
+                           // Print out global variables for resilient enum
+                           // cases
+                           if (isa<EnumDecl>(typeDecl) && isOpaqueLayout) {
+                             auto elementTagMapping =
+                                 interopContext.getIrABIDetails()
+                                     .getEnumTagMapping(
+                                         cast<EnumDecl>(typeDecl));
+                             os << "// Tags for resilient enum ";
+                             os << typeDecl->getName().str() << '\n';
+                             os << "extern \"C\" {\n";
+                             for (const auto &pair : elementTagMapping) {
+                               os << "extern int "
+                                  << pair.second.globalVariableName << ";\n";
+                             }
+                             os << "}\n";
+                           }
                          });
 
   auto printEnumVWTableVariable = [&](StringRef metadataName = "metadata",
@@ -268,17 +284,13 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "    return result;\n";
         os << "  }\n";
         // Print out helper function for initializeWithTake
-        // TODO: (tongjie) support opaque layout
-        if (!isOpaqueLayout) {
-          os << "  static inline void initializeWithTake(char * _Nonnull "
-                "destStorage, char * _Nonnull srcStorage) {\n";
-          ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-              os, typeMetadataFuncName);
-          os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
-                "metadata._0);\n";
-          os << "  }\n";
-        }
-
+        os << "  static inline void initializeWithTake(char * _Nonnull "
+              "destStorage, char * _Nonnull srcStorage) {\n";
+        ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+            os, typeMetadataFuncName);
+        os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
+              "metadata._0);\n";
+        os << "  }\n";
         os << "};\n";
       });
 
