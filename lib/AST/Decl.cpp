@@ -6733,7 +6733,8 @@ bool VarDecl::hasStorageOrWrapsStorage() const {
 }
 
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
-  if (getDeclContext()->isTypeContext() || isImplicit())
+  if (getDeclContext()->isTypeContext() ||
+      (isImplicit() && !isa<ParamDecl>(this)))
     return;
 
   if (getAttrs().hasAttribute<LazyAttr>()) {

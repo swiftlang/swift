@@ -2981,7 +2981,8 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
 PropertyWrapperInitializerInfo
 PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
                                                 VarDecl *var) const {
-  if (!var->hasAttachedPropertyWrapper() || var->isImplicit())
+  if (!var->hasAttachedPropertyWrapper() ||
+      (var->isImplicit() && !isa<ParamDecl>(var)))
     return PropertyWrapperInitializerInfo();
 
   auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
