@@ -1,5 +1,13 @@
 public func fn() {}
 
+@usableFromInline
+func usableFromInlineFn() {}
+
+@_alwaysEmitIntoClient
+public func alwaysEmitIntoClientFn() {
+  usableFromInlineFn()
+}
+
 public var globalStored = 0
 
 public var globalComputed: Int {

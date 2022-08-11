@@ -157,3 +157,12 @@ protocol RefinesP: BaseP {}
 // CHECK-DAG: @"$s24weaklinked_import_helper1SVAA5BasePAAWP" = extern_weak global i8*
 // CHECK-DAG: @"$s24weaklinked_import_helper1SVMn" = extern_weak global %swift.type_descriptor
 extension S: RefinesP {}
+
+func testInlining() {
+  // FIXME: usableFromInlineFn() should be extern_weak but isn't because
+  //        inlining doesn't respect @_weakLinked import yet.
+
+  // CHECK-DAG: define linkonce_odr hidden {{.+}} @"$s24weaklinked_import_helper22alwaysEmitIntoClientFnyyF"()
+  // CHECK-DAG: declare swiftcc {{.+}} @"$s24weaklinked_import_helper18usableFromInlineFnyyF"
+  alwaysEmitIntoClientFn()
+}
