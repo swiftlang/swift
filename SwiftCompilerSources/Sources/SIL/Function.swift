@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-final public class Function : CustomStringConvertible, HasShortDescription {
+final public class Function : CustomStringConvertible, HasShortDescription, Hashable {
   public private(set) var effects = FunctionEffects()
 
   public var name: StringRef {
@@ -26,6 +26,10 @@ final public class Function : CustomStringConvertible, HasShortDescription {
   }
 
   public var shortDescription: String { name.string }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
 
   public var hasOwnership: Bool { SILFunction_hasOwnership(bridged) != 0 }
 
