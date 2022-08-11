@@ -85,6 +85,7 @@
 #include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
+#include "llvm/Transforms/Scalar.h"
 
 #include <thread>
 
@@ -808,10 +809,29 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
     EmitPasses.add(createPrintModulePass(out));
     break;
   case IRGenOutputKind::LLVMBitcode: {
+    // Emit a module summary by default for Regular LTO except ld64-based ones
+    // (which use the legacy LTO API).
+    bool EmitRegularLTOSummary =
+        targetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
+
+    if (EmitRegularLTOSummary || opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
+      // Rename anon globals to be able to export them in the summary.
+      EmitPasses.add(createNameAnonGlobalPass());
+    }
+
     if (opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
       EmitPasses.add(createWriteThinLTOBitcodePass(out));
     } else {
-      EmitPasses.add(createBitcodeWriterPass(out));
+      if (EmitRegularLTOSummary) {
+        module->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
+        // Assume other sources are compiled with -fsplit-lto-unit (it's enabled
+        // by default when -flto is specified on platforms that support regular
+        // lto summary.)
+        module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
+                              uint32_t(1));
+      }
+      EmitPasses.add(createBitcodeWriterPass(
+          out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
     }
     break;
   }
