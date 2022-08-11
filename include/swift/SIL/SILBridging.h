@@ -29,7 +29,8 @@ enum {
 enum ChangeNotificationKind {
   instructionsChanged,
   callsChanged,
-  branchesChanged
+  branchesChanged,
+  functionDataChanged
 };
 
 typedef struct {
