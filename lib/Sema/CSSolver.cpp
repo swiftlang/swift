@@ -1619,7 +1619,7 @@ ConstraintSystem::filterDisjunction(
     }
 
     if (isDebugMode()) {
-      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
+      llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 0)
         << "(disabled disjunction term ";
       constraint->print(llvm::errs(), &ctx.SourceMgr);
       llvm::errs() << ")\n";
@@ -1678,7 +1678,7 @@ ConstraintSystem::filterDisjunction(
     }
 
     if (isDebugMode()) {
-      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
+      llvm::errs().indent(solverState ? solverState->getCurrentIndent(): 0)
         << "(introducing single enabled disjunction term ";
       choice->print(llvm::errs(), &ctx.SourceMgr);
       llvm::errs() << ")\n";
