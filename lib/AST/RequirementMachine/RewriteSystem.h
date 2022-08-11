@@ -357,9 +357,17 @@ private:
   /// minimization.
   std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
 
+  /// A 'recursive' rule is a concrete type or superclass rule where the right
+  /// hand side occurs as a prefix of one of its substitutions.
+  ///
+  /// Populated by computeRecursiveRules().
+  std::vector<unsigned> RecursiveRules;
+
   void propagateExplicitBits();
 
   void propagateRedundantRequirementIDs();
+
+  void computeRecursiveRules();
 
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
