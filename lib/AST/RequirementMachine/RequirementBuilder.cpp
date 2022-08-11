@@ -86,9 +86,7 @@ void ConnectedComponent::buildRequirements(Type subjectType,
       subjectType = constraintType;
     }
 
-  // For compatibility with the old GenericSignatureBuilder, drop requirements
-  // containing ErrorTypes.
-  } else if (!ConcreteType->hasError()) {
+  } else {
     // If there are multiple protocol typealiases in the connected component,
     // lower them all to a series of identical concrete-type aliases.
     for (auto name : Aliases) {
@@ -190,11 +188,6 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
             return;
         }
 
-        // Requirements containing error types originate from invalid code
-        // and should not appear in the generic signature.
-        if (prop->getConcreteType()->hasError())
-          return;
-
         Type superclassType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
@@ -215,11 +208,6 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
           if (term.containsUnresolvedSymbols())
             return;
         }
-
-        // Requirements containing error types originate from invalid code
-        // and should not appear in the generic signature.
-        if (prop->getConcreteType()->hasError())
-          return;
 
         Type concreteType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
@@ -290,11 +278,6 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
         if (term.containsUnresolvedSymbols())
           continue;
       }
-
-      // Requirements containing error types originate from invalid code
-      // and should not appear in the generic signature.
-      if (prop->getConcreteType()->hasError())
-        continue;
 
       Type concreteType = Map.getTypeFromSubstitutionSchema(
                                prop->getConcreteType(),
