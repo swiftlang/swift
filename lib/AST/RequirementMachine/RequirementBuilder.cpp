@@ -161,6 +161,14 @@ public:
 
 }  // end namespace
 
+static Type replaceTypeParametersWithErrorTypes(Type type) {
+  return type.transformRec([](Type t) -> Optional<Type> {
+      if (t->isTypeParameter())
+        return ErrorType::get(t->getASTContext());
+      return None;
+    });
+}
+
 void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
   // Convert a rewrite rule into a requirement.
   auto createRequirementFromRule = [&](const Rule &rule) {
@@ -192,6 +200,8 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
+        if (rule.isRecursive())
+          superclassType = replaceTypeParametersWithErrorTypes(superclassType);
 
         if (ReconstituteSugar)
           superclassType = superclassType->reconstituteSugar(/*recursive=*/true);
@@ -213,6 +223,8 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
+        if (rule.isRecursive())
+          concreteType = replaceTypeParametersWithErrorTypes(concreteType);
 
         if (ReconstituteSugar)
           concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
@@ -283,6 +295,8 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
                                prop->getConcreteType(),
                                prop->getSubstitutions(),
                                GenericParams, MutableTerm());
+      if (rule.isRecursive())
+        concreteType = replaceTypeParametersWithErrorTypes(concreteType);
 
       if (ReconstituteSugar)
         concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
