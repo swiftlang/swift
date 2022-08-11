@@ -2173,6 +2173,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         IsTake_t(isTake), IsInitialization_t(isInit));
     break;
   }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
+    bool isInit = (Attr & 0x2) > 0;
+    bool isTake = (Attr & 0x1) > 0;
+    ResultInst = Builder.createExplicitCopyAddr(
+        Loc, getLocalValue(ValID, addrType), getLocalValue(ValID2, addrType),
+        IsTake_t(isTake), IsInitialization_t(isInit));
+    break;
+  }
 
   case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
     auto Ty = MF->getType(TyID);

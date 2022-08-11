@@ -4920,6 +4920,37 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                    IsInitialization_t(IsInit));
       break;
     }
+    case SILInstructionKind::ExplicitCopyAddrInst: {
+      bool IsTake = false, IsInit = false;
+      UnresolvedValueName SrcLName;
+      SILValue DestLVal;
+      SourceLoc ToLoc, DestLoc;
+      Identifier ToToken;
+      if (parseSILOptional(IsTake, *this, "take") || parseValueName(SrcLName) ||
+          parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
+                             "to") ||
+          parseSILOptional(IsInit, *this, "initialization") ||
+          parseTypedValueRef(DestLVal, DestLoc, B) ||
+          parseSILDebugLocation(InstLoc, B))
+        return true;
+
+      if (ToToken.str() != "to") {
+        P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+        return true;
+      }
+
+      if (!DestLVal->getType().isAddress()) {
+        P.diagnose(DestLoc, diag::sil_invalid_instr_operands);
+        return true;
+      }
+
+      SILValue SrcLVal =
+          getLocalValue(SrcLName, DestLVal->getType(), InstLoc, B);
+      ResultVal =
+          B.createExplicitCopyAddr(InstLoc, SrcLVal, DestLVal, IsTake_t(IsTake),
+                                   IsInitialization_t(IsInit));
+      break;
+    }
     case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
       UnresolvedValueName SrcLName;
       SILValue DestLVal;
