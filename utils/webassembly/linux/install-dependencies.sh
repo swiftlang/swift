@@ -104,5 +104,6 @@ if [ -z $(which sccache) ]; then
   sudo mkdir /opt/sccache && cd /opt/sccache
   wget -O - "https://github.com/mozilla/sccache/releases/download/v0.3.0/sccache-v0.3.0-$(uname -m)-unknown-linux-musl.tar.gz" | \
     sudo tar xz --strip-components 1
+  sudo chmod +x /opt/sccache/sccache
   sudo ln -sf /opt/sccache/sccache /usr/local/bin
 fi
