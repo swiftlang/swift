@@ -2487,9 +2487,22 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forSILGlobalVariable(var, *this);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+
   if (auto clangDecl = var->getClangDecl()) {
     auto addr = getAddrOfClangGlobalDecl(cast<clang::VarDecl>(clangDecl),
                                          forDefinition);
+
+    // Override the linkage computed by Clang if the decl is from another
+    // module that imported @_weakLinked.
+    //
+    // FIXME: We should be able to set the linkage unconditionally here but
+    //        some fixes are needed for Cxx interop.
+    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr)) {
+      if (getSwiftModule()->isImportedAsWeakLinked(var->getDecl()))
+        globalVar->setLinkage(link.getLinkage());
+    }
 
     // If we're not emitting this to define it, make sure we cast it to the
     // right type.
@@ -2503,7 +2516,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     return Address(addr, alignment);
   }
 
-  LinkEntity entity = LinkEntity::forSILGlobalVariable(var, *this);
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
   llvm::Type *storageType;
@@ -2549,7 +2561,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   auto gvar = Module.getGlobalVariable(link.getName(), /*allowInternal*/ true);
   if (gvar) {
     if (forDefinition)
@@ -3222,6 +3233,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     }
   }
 
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   bool isDefinition = f->isDefinition();
   bool hasOrderNumber =
       isDefinition && !shouldCallPreviousImplementation;
@@ -3242,8 +3254,16 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   if (clangAddr) {
     fn = dyn_cast<llvm::Function>(clangAddr->stripPointerCasts());
 
-    // If we have a function, move it to the appropriate position.
     if (fn) {
+      // Override the linkage computed by Clang if the decl is from another
+      // module that imported @_weakLinked.
+      //
+      // FIXME: We should be able to set the linkage unconditionally here but
+      //        some fixes are needed for Cxx interop.
+      if (!forDefinition && f->isWeakImportedByModule())
+        fn->setLinkage(link.getLinkage());
+
+      // If we have a function, move it to the appropriate position.
       if (hasOrderNumber) {
         auto &fnList = Module.getFunctionList();
         fnList.remove(fn);
@@ -3263,8 +3283,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   Signature signature =
       getSignature(f->getLoweredFunctionType(), fpKind);
   addLLVMFunctionAttributes(f, signature);
-
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode(), shouldEmitStackProtector(f));

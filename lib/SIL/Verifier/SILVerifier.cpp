@@ -2189,6 +2189,10 @@ public:
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
+      require(LI->getModule().getStage() == SILStage::Raw ||
+                  !LI->getOperand()->getType().isMoveOnly(),
+              "'MoveOnly' types can only be copied in Raw SIL?!");
+      [[fallthrough]];
     case LoadOwnershipQualifier::Take:
       require(F.hasOwnership(),
               "Load with qualified ownership in an unqualified function");
@@ -2655,15 +2659,17 @@ public:
       require(Elt->getType().isAddress(), "MFE must refer to variable addrs");
   }
 
-  void checkCopyAddrInst(CopyAddrInst *SI) {
-    require(SI->getSrc()->getType().isAddress(),
-            "Src value should be lvalue");
-    require(SI->getDest()->getType().isAddress(),
+  void checkCopyAddrInst(CopyAddrInst *cai) {
+    require(cai->getSrc()->getType().isAddress(), "Src value should be lvalue");
+    require(cai->getDest()->getType().isAddress(),
             "Dest address should be lvalue");
-    requireSameType(SI->getDest()->getType(), SI->getSrc()->getType(),
+    requireSameType(cai->getDest()->getType(), cai->getSrc()->getType(),
                     "Store operand type and dest type mismatch");
-    require(F.isTypeABIAccessible(SI->getDest()->getType()),
+    require(F.isTypeABIAccessible(cai->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
+    require(cai->getModule().getStage() == SILStage::Raw ||
+                (cai->isTakeOfSrc() || !cai->getSrc()->getType().isMoveOnly()),
+            "'MoveOnly' types can only be copied in Raw SIL?!");
   }
 
   void checkMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *SI) {

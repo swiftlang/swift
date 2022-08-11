@@ -781,6 +781,8 @@ BRIDGED_NON_VALUE_INST(DebugValueInst, debug_value,
 #include "swift/AST/ReferenceStorage.def"
 BRIDGED_NON_VALUE_INST(CopyAddrInst, copy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
+BRIDGED_NON_VALUE_INST(ExplicitCopyAddrInst, explicit_copy_addr,
+               SILInstruction, MayHaveSideEffects, MayRelease)
 BRIDGED_NON_VALUE_INST(DestroyAddrInst, destroy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(EndLifetimeInst, end_lifetime,
