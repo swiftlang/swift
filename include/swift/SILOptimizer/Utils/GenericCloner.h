@@ -41,6 +41,8 @@ class GenericCloner
       RemappedScopeCache;
 
   llvm::SmallVector<AllocStackInst *, 8> AllocStacks;
+  llvm::SmallVector<StoreBorrowInst *, 8> StoreBorrowsToCleanup;
+  llvm::SmallVector<TermInst *, 8> FunctionExits;
   AllocStackInst *ReturnValueAddr = nullptr;
 
 public:
@@ -92,6 +94,11 @@ protected:
     if (Callback)
       Callback(Orig, Cloned);
 
+    if (auto *termInst = dyn_cast<TermInst>(Cloned)) {
+      if (termInst->isFunctionExiting()) {
+        FunctionExits.push_back(termInst);
+      }
+    }
     SILClonerWithScopes<GenericCloner>::postProcess(Orig, Cloned);
   }
 
