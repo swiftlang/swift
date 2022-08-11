@@ -48,7 +48,9 @@ enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 class OpaqueReturnTypeRepr;
-using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
+//using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
+using CollectedOpaqueReprs = SmallVector<TypeRepr *, 2>; //change to TypeRepr
+
 
 /// Representation of a type as written in source.
 class alignas(1 << TypeReprAlignInBits) TypeRepr
@@ -168,6 +170,10 @@ public:
   /// Walk the type representation recursively, collecting any
   /// `OpaqueReturnTypeRepr`s.
   CollectedOpaqueReprs collectOpaqueReturnTypeReprs();
+
+  /// Walk the type representation recursively, collecting any
+  /// `CompositionTypeRepr`s and `IdentTypeRepr`s.
+  CollectedOpaqueReprs collectTypeReprs();
 
   /// Retrieve the type repr without any parentheses around it.
   ///
@@ -844,7 +850,7 @@ private:
 ///   Foo & Bar
 /// \endcode
 class CompositionTypeRepr final : public TypeRepr,
-    private llvm::TrailingObjects<CompositionTypeRepr, TypeRepr*> {
+  private llvm::TrailingObjects<CompositionTypeRepr, TypeRepr*> {
   friend TrailingObjects;
   SourceLoc FirstTypeLoc;
   SourceRange CompositionRange;

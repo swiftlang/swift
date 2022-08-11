@@ -4592,7 +4592,7 @@ AbstractTypeParamDecl::getConformingProtocols() const {
 GenericTypeParamDecl::GenericTypeParamDecl(
     DeclContext *dc, Identifier name, SourceLoc nameLoc,
     bool isTypeSequence, unsigned depth, unsigned index,
-    bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr
+    bool isOpaqueType, TypeRepr *typeRepr
   ) : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
@@ -4600,9 +4600,9 @@ GenericTypeParamDecl::GenericTypeParamDecl(
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
   Bits.GenericTypeParamDecl.TypeSequence = isTypeSequence;
   Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
-  assert(isOpaqueType || !opaqueTypeRepr);
+  assert(isOpaqueType || !typeRepr);
   if (isOpaqueType)
-    *getTrailingObjects<OpaqueReturnTypeRepr *>() = opaqueTypeRepr;
+    *getTrailingObjects<TypeRepr *>() = typeRepr;
 
   auto &ctx = dc->getASTContext();
   RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
@@ -4616,14 +4616,14 @@ GenericTypeParamDecl *
 GenericTypeParamDecl::create(
     DeclContext *dc, Identifier name, SourceLoc nameLoc,
     bool isTypeSequence, unsigned depth, unsigned index,
-    bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr) {
+    bool isOpaqueType, TypeRepr *typeRepr) {
   ASTContext &ctx = dc->getASTContext();
   auto mem = ctx.Allocate(
-      totalSizeToAlloc<OpaqueReturnTypeRepr *>(isOpaqueType ? 1 : 0),
+      totalSizeToAlloc<TypeRepr *>(isOpaqueType ? 1 : 0),
       alignof(GenericTypeParamDecl));
   return new (mem) GenericTypeParamDecl(
       dc, name, nameLoc, isTypeSequence, depth, index, isOpaqueType,
-      opaqueTypeRepr);
+      typeRepr);
 }
 
 
@@ -8252,7 +8252,7 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericParamList *GenericParams, DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
-                               ArrayRef<OpaqueReturnTypeRepr *>
+                               ArrayRef<TypeRepr *>
                                    OpaqueReturnTypeReprs)
     : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
                       GenericParams),
@@ -8269,16 +8269,16 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
             OpaqueInterfaceGenericSignature.getInnermostGenericParams().size());
   std::uninitialized_copy(
       OpaqueReturnTypeReprs.begin(), OpaqueReturnTypeReprs.end(),
-      getTrailingObjects<OpaqueReturnTypeRepr *>());
+      getTrailingObjects<TypeRepr *>());
 }
 
 OpaqueTypeDecl *OpaqueTypeDecl::get(
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
-      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs) {
+      ArrayRef<TypeRepr *> OpaqueReturnTypeReprs) {
   ASTContext &ctx = DC->getASTContext();
-  auto size = totalSizeToAlloc<OpaqueReturnTypeRepr *>(
+  auto size = totalSizeToAlloc<TypeRepr *>(
       OpaqueReturnTypeReprs.size());
   auto mem = ctx.Allocate(size, alignof(OpaqueTypeDecl));
   return new (mem) OpaqueTypeDecl(

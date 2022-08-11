@@ -2764,6 +2764,19 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
   return true;
 }
 
+/// Whether there are only protocol decl types in the set of declarations.
+static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
+  if (decls.empty())
+    return false;
+
+  for (auto decl : decls) {
+    if (!isa<ProtocolDecl>(decl))
+        return false;
+  }
+
+  return true;
+}
+
 static GenericParamList *
 createExtensionGenericParams(ASTContext &ctx,
                              ExtensionDecl *ext,
@@ -2789,6 +2802,7 @@ static SmallVector<GenericTypeParamDecl *, 2>
 createOpaqueParameterGenericParams(
     GenericContext *genericContext, GenericParamList *parsedGenericParams) {
   ASTContext &ctx = genericContext->getASTContext();
+    
   auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
   if (!value)
     return { };
@@ -2811,21 +2825,33 @@ createOpaqueParameterGenericParams(
     if (!typeRepr)
       continue;
 
-    auto opaqueTypeReprs = typeRepr->collectOpaqueReturnTypeReprs();
-    for (auto opaqueRepr : opaqueTypeReprs) {
+    // Plain protocols should imply 'some' with experimetal feature
+    CollectedOpaqueReprs typeReprs;
+    if (ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+        typeReprs = typeRepr->collectTypeReprs();
+    } else {  typeReprs = typeRepr->collectOpaqueReturnTypeReprs(); }
+
+      for (auto repr : typeReprs) {
+        if (isa<IdentTypeRepr>(repr)){
+              DirectlyReferencedTypeDecls d = directReferencesForTypeRepr(ctx.evaluator, ctx, repr, dc, true);
+              if(!declsAreProtocols(d))
+                  continue;
+        }
       // Allocate a new generic parameter to represent this opaque type.
-      auto gp = GenericTypeParamDecl::create(
+        auto gp = GenericTypeParamDecl::create(
           dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
           GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
-          opaqueRepr);
-      gp->setImplicit();
+          repr);
+        gp->setImplicit();
 
       // Use the underlying constraint as the constraint on the generic parameter.
-      InheritedEntry inherited[1] = {
-        { TypeLoc(opaqueRepr->getConstraint()) }
-      };
-      gp->setInherited(ctx.AllocateCopy(inherited));
-
+      //  The underlying constraint is only present for OpaqueReturnTypeReprs
+        if( auto opaque = dyn_cast<OpaqueReturnTypeRepr>(repr)){
+              InheritedEntry inherited[1] = {
+                  { TypeLoc(opaque->getConstraint()) }
+              };
+              gp->setInherited(ctx.AllocateCopy(inherited));
+        }
       implicitGenericParams.push_back(gp);
     }
   }

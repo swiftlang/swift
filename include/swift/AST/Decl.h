@@ -2822,7 +2822,7 @@ public:
 /// (opaque archetype 1))`.
 class OpaqueTypeDecl final :
     public GenericTypeDecl,
-    private llvm::TrailingObjects<OpaqueTypeDecl, OpaqueReturnTypeRepr *> {
+    private llvm::TrailingObjects<OpaqueTypeDecl, TypeRepr *> {
   friend TrailingObjects;
 
 public:
@@ -2866,7 +2866,7 @@ private:
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
-                 ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs);
+                 ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
 
   unsigned getNumOpaqueReturnTypeReprs() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
@@ -2883,7 +2883,7 @@ public:
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
-      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs);
+      ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
 
   ValueDecl *getNamingDecl() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
@@ -2928,9 +2928,9 @@ public:
 
   /// Retrieve the buffer containing the opaque return type
   /// representations that correspond to the opaque generic parameters.
-  ArrayRef<OpaqueReturnTypeRepr *> getOpaqueReturnTypeReprs() const {
+  ArrayRef<TypeRepr *> getOpaqueReturnTypeReprs() const {
     return {
-      getTrailingObjects<OpaqueReturnTypeRepr *>(),
+      getTrailingObjects<TypeRepr *>(),
       getNumOpaqueReturnTypeReprs()
     };
   }
@@ -3163,7 +3163,7 @@ public:
 /// \endcode
 class GenericTypeParamDecl final :
     public AbstractTypeParamDecl,
-    private llvm::TrailingObjects<GenericTypeParamDecl, OpaqueReturnTypeRepr *>{
+    private llvm::TrailingObjects<GenericTypeParamDecl, TypeRepr *>{
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<OpaqueReturnTypeRepr *>) const {
@@ -3180,7 +3180,7 @@ class GenericTypeParamDecl final :
   /// \param nameLoc The location of the name.
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
                        bool isTypeSequence, unsigned depth, unsigned index,
-                       bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr);
+                       bool isOpaqueType, TypeRepr *typeRepr);
 
 public:
   /// Construct a new generic type parameter.
@@ -3201,7 +3201,7 @@ public:
   static GenericTypeParamDecl *
   create(DeclContext *dc, Identifier name, SourceLoc nameLoc,
          bool isTypeSequence, unsigned depth, unsigned index,
-         bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr);
+         bool isOpaqueType, TypeRepr *typeRepr);
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
@@ -3249,11 +3249,11 @@ public:
   ///     extension, meaning that it was specified explicitly
   ///   - the enclosing declaration was deserialized, in which case it lost
   ///     the source location information and has no type representation.
-  OpaqueReturnTypeRepr *getOpaqueTypeRepr() const {
+  TypeRepr *getOpaqueTypeRepr() const {
     if (!isOpaqueType())
       return nullptr;
 
-    return *getTrailingObjects<OpaqueReturnTypeRepr *>();
+    return *getTrailingObjects<TypeRepr *>();
   }
 
   /// The index of this generic type parameter within its generic parameter

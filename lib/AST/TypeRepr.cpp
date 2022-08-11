@@ -137,6 +137,30 @@ CollectedOpaqueReprs TypeRepr::collectOpaqueReturnTypeReprs() {
   return reprs;
 }
 
+CollectedOpaqueReprs TypeRepr::collectTypeReprs() {
+  class Walker : public ASTWalker {
+    CollectedOpaqueReprs &Reprs;
+
+  public:
+    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
+
+    bool walkToTypeReprPre(TypeRepr *repr) override {
+      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)){
+            Reprs.push_back(opaqueRepr);
+      } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)){
+          Reprs.push_back(compositionRepr);
+      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)){
+              Reprs.push_back(identRepr);
+      }
+    return true;
+    }
+  };
+
+  CollectedOpaqueReprs reprs;
+  walk(Walker(reprs));
+  return reprs;
+}
+
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
