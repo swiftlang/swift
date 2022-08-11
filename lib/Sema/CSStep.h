@@ -229,7 +229,7 @@ protected:
 
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
     auto &log = llvm::errs();
-    return indent ? log.indent(CS.solverState->depth * 2) : log;
+    return indent ? log.indent(CS.solverState->getCurrentIndent()) : log;
   }
 };
 
@@ -519,7 +519,7 @@ public:
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "(attempting ";
-        choice->print(log, &CS.getASTContext().SourceMgr, CS.solverState->depth * 2 + 2);
+        choice->print(log, &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent() + 2);
         log << '\n';
       }
 

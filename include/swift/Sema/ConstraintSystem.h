@@ -3053,9 +3053,9 @@ private:
     ConstraintSystem &CS;
 
     FreeTypeVariableBinding AllowFreeTypeVariables;
-
-    /// Depth of the solution stack.
-    unsigned depth = 0;
+    
+    /// Return current depth of solution stack for debug printing.
+    unsigned int getCurrentIndent() const { return depth * 2; }
 
     /// Maximum depth reached so far in exploring solutions.
     unsigned maxDepth = 0;
@@ -3238,6 +3238,9 @@ private:
 
     SmallVector<Constraint *, 4> disabledConstraints;
     SmallVector<Constraint *, 4> favoredConstraints;
+    
+    /// Depth of the solution stack.
+    unsigned depth = 0;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -4341,7 +4344,7 @@ public:
 
     if (isDebugMode()) {
       auto &log = llvm::errs();
-      log.indent(solverState ? solverState->depth * 2 : 0)
+      log.indent(solverState ? solverState->getCurrentIndent() : 0)
           << "(failed constraint ";
       constraint->print(log, &getASTContext().SourceMgr);
       log << ")\n";
