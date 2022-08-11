@@ -808,7 +808,7 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
       continue;
 
     if (isDebugMode()) {
-      bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
+      bindings.dump(typeVar, llvm::errs(), solverState->getCurrentIndent());
     }
 
     // If these are the first bindings, or they are better than what

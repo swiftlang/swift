@@ -54,7 +54,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 
   if (isDebugMode() && value > 0) {
     if (solverState)
-      llvm::errs().indent(solverState->depth * 2);
+      llvm::errs().indent(solverState->getCurrentIndent());
     llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "  << value 
                  << ")\n";
   }
@@ -72,7 +72,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
     return false;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->depth * 2)
+    llvm::errs().indent(solverState->getCurrentIndent())
       << "(solution is worse than the best solution)\n";
   }
 
@@ -795,7 +795,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
   if (cs.isDebugMode()) {
-    llvm::errs().indent(cs.solverState->depth * 2)
+    llvm::errs().indent(cs.solverState->getCurrentIndent())
       << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
   }
 
@@ -1352,13 +1352,13 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return 0;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->depth * 2)
+    llvm::errs().indent(solverState->getCurrentIndent())
         << "Comparing " << viable.size() << " viable solutions\n";
 
     for (unsigned i = 0, n = viable.size(); i != n; ++i) {
-      llvm::errs().indent(solverState->depth * 2)
+      llvm::errs().indent(solverState->getCurrentIndent())
           << "\n--- Solution #" << i << " ---\n";
-      viable[i].dump(llvm::errs().indent(solverState->depth * 2));
+      viable[i].dump(llvm::errs().indent(solverState->getCurrentIndent()));
     }
   }
 
