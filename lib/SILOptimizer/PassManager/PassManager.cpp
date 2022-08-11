@@ -1573,6 +1573,12 @@ PassContext_nextFunctionInModule(BridgedFunction function) {
   return {&*nextIter};
 }
 
+BridgedVTableArray PassContext_getVTables(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  auto vTables = mod->getVTables();
+  return {(const BridgedVTable *)vTables.data(), vTables.size()};
+}
+
 OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, StringRef name) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();

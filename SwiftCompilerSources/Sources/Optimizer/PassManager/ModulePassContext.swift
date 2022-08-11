@@ -15,8 +15,8 @@ import OptimizerBridging
 
 /// The context which is passed to a `ModulePass`'s run-function.
 ///
-/// It provides access to all functions of a module, but it doesn't provide any
-/// APIs to modify functions.
+/// It provides access to all functions, v-tables and witness tables of a module,
+/// but it doesn't provide any APIs to modify functions.
 /// In order to modify a function, a module pass must use `transform(function:)`.
 struct ModulePassContext {
   let _bridged: BridgedPassContext
@@ -34,9 +34,25 @@ struct ModulePassContext {
       return nil
     }
   }
-  
+
+  struct VTableArray : BridgedRandomAccessCollection {
+    fileprivate let bridged: BridgedVTableArray
+    
+    var startIndex: Int { return 0 }
+    var endIndex: Int { return Int(bridged.count) }
+    
+    subscript(_ index: Int) -> VTable {
+      precondition(index >= 0 && index < bridged.count)
+      return VTable(bridged: bridged.vTables![index])
+    }
+  }
+
   var functions: FunctionList {
     FunctionList(first: PassContext_firstFunctionInModule(_bridged).function)
+  }
+  
+  var vTables: VTableArray {
+    VTableArray(bridged: PassContext_getVTables(_bridged))
   }
   
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.

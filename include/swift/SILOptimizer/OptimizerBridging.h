@@ -28,6 +28,11 @@ typedef struct {
 } BridgedInstructionPassCtxt;
 
 typedef struct {
+  const BridgedVTable * _Nullable vTables;
+  size_t count;
+} BridgedVTableArray;
+
+typedef struct {
   const void * _Nonnull aliasAnalysis;
 } BridgedAliasAnalysis;
 
@@ -166,6 +171,7 @@ OptionalBridgedFunction
 PassContext_firstFunctionInModule(BridgedPassContext context);
 OptionalBridgedFunction
 PassContext_nextFunctionInModule(BridgedFunction function);
+BridgedVTableArray PassContext_getVTables(BridgedPassContext context);
 
 OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);

@@ -23,7 +23,8 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 enum {
   BridgedOperandSize = 4 * sizeof(uintptr_t),
-  BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t)
+  BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t),
+  BridgedVTableEntrySize = 5 * sizeof(uintptr_t)
 };
 
 enum ChangeNotificationKind {
@@ -67,6 +68,14 @@ typedef struct {
 typedef struct {
   const void * _Nullable succ;
 } OptionalBridgedSuccessor;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedVTable;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedVTableEntry;
 
 typedef struct {
   SwiftObject obj;
@@ -232,6 +241,11 @@ SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
 llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global);
+
+std::string SILVTable_debugDescription(BridgedVTable vTable);
+BridgedArrayRef SILVTable_getEntries(BridgedVTable vTable);
+std::string SILVTableEntry_debugDescription(BridgedVTableEntry entry);
+BridgedFunction SILVTableEntry_getFunction(BridgedVTableEntry entry);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);

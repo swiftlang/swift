@@ -16,6 +16,7 @@
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILVTable.h"
 #include "llvm/ADT/StringRef.h"
 
 #include <string>
@@ -82,6 +83,14 @@ inline SILFunction *castToFunction(BridgedFunction function) {
 
 inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
   return static_cast<SILGlobalVariable *>(global.obj);
+}
+
+inline const SILVTable *castToVTable(BridgedVTable vTable) {
+  return static_cast<const SILVTable *>(vTable.ptr);
+}
+
+inline const SILVTableEntry *castToVTableEntry(BridgedVTableEntry entry) {
+  return static_cast<const SILVTableEntry *>(entry.ptr);
 }
 
 inline ValueOwnershipKind castToOwnership(BridgedOwnership ownership) {

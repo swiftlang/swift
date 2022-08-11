@@ -550,6 +550,38 @@ SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global) {
 }
 
 //===----------------------------------------------------------------------===//
+//                            SILVTable
+//===----------------------------------------------------------------------===//
+
+static_assert(BridgedVTableEntrySize == sizeof(SILVTableEntry),
+              "wrong bridged VTableEntry size");
+
+std::string SILVTable_debugDescription(BridgedVTable vTable) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToVTable(vTable)->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+BridgedArrayRef SILVTable_getEntries(BridgedVTable vTable) {
+  auto entries = castToVTable(vTable)->getEntries();
+  return {(const unsigned char *)entries.data(), entries.size()};
+}
+
+std::string SILVTableEntry_debugDescription(BridgedVTableEntry entry) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToVTableEntry(entry)->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+BridgedFunction SILVTableEntry_getFunction(BridgedVTableEntry entry) {
+  return {castToVTableEntry(entry)->getImplementation()};
+}
+
+//===----------------------------------------------------------------------===//
 //                               SILInstruction
 //===----------------------------------------------------------------------===//
 
