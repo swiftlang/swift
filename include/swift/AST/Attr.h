@@ -2244,9 +2244,8 @@ public:
   }
 };
 
-/// The `@_documentation(...)` attribute, used to note a "category" for a
-/// symbol to be associated with, with special cases for forcing a symbol to be
-/// hidden or visible.
+/// The `@_documentation(...)` attribute, used to override a symbol's visibility
+/// in symbol graphs, and/or adding arbitrary metadata to it.
 class DocumentationAttr: public DeclAttribute {
 public:
   DocumentationAttr(SourceLoc AtLoc, SourceRange Range,
