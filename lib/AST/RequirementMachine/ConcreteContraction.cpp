@@ -164,6 +164,15 @@ static Type stripBoundDependentMemberTypes(Type t) {
   return t;
 }
 
+/// Returns true if \p lhs appears as the base of a member type in \p rhs.
+static bool typeOccursIn(Type lhs, Type rhs) {
+  return rhs.findIf([lhs](Type t) -> bool {
+    if (auto *memberType = t->getAs<DependentMemberType>())
+      return memberType->getBase()->isEqual(lhs);
+    return false;
+  });
+}
+
 namespace {
 
 /// Utility class to store some shared state.
@@ -550,6 +559,15 @@ bool ConcreteContraction::performConcreteContraction(
         break;
 
       subjectType = stripBoundDependentMemberTypes(subjectType);
+      if (typeOccursIn(subjectType,
+                       stripBoundDependentMemberTypes(constraintType))) {
+        if (Debug) {
+          llvm::dbgs() << "@ Subject type of same-type requirement "
+                       << subjectType << " == " << constraintType << " "
+                       << "occurs in the constraint type, skipping\n";
+        }
+        break;
+      }
       ConcreteTypes[subjectType->getCanonicalType()].insert(constraintType);
       break;
     }
@@ -559,6 +577,15 @@ bool ConcreteContraction::performConcreteContraction(
              "You forgot to call desugarRequirement()");
 
       subjectType = stripBoundDependentMemberTypes(subjectType);
+      if (typeOccursIn(subjectType,
+                       stripBoundDependentMemberTypes(constraintType))) {
+        if (Debug) {
+          llvm::dbgs() << "@ Subject type of superclass requirement "
+                       << subjectType << " : " << constraintType << " "
+                       << "occurs in the constraint type, skipping\n";
+        }
+        break;
+      }
       Superclasses[subjectType->getCanonicalType()].insert(constraintType);
       break;
     }
