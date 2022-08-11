@@ -21,7 +21,7 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "KeyPathDirectAccess",
     runFunction: run_testDirectAccess,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: setupSingleton
   ),
   BenchmarkInfo(
@@ -36,53 +36,58 @@ public let benchmarks = [
     tags: [.validation, .api],
     setUpFunction: setupSingleton
   ),
+  BenchmarkInfo(
+    name: "KeyPathInlined",
+    runFunction: run_testKeyPathsInlined,
+    tags: [.validation, .api],
+    setUpFunction: setupSingleton
+  ),
+  BenchmarkInfo(
+    name: "KeyPathsNotInlined",
+    runFunction: run_testKeyPathsNotInlined,
+    tags: [.validation, .api],
+    setUpFunction: setupSingleton
+  ),
+  BenchmarkInfo(
+    name: "KeyPathsSmallStruct",
+    runFunction: run_testKeyPathSmallStruct,
+    tags: [.validation, .api],
+    setUpFunction: setupSingleton
+  ),
 ]
 
-// Number of iterations for each benchmark.
 let numberOfElementsForNestedStructs = 20000
+let expectedIntForNestedStructs = 3
 
 // Make it easy to switch between primitives of different types (Int, Float, Double, etc.).
 typealias ElementType = Double
 
-// Variables used across the benchmarks
-let expectedIntForNestedStructs = 3
-let arrayHolder = FixedSizeArrayHolder()
-
-let appendedKeyPath = singleHopKeyPath0.appending(path: singleHopKeyPath1)
-  .appending(path: singleHopKeyPath2).appending(path: singleHopKeyPath3)
-  .appending(path: singleHopKeyPath4)
-
 // The purpose of this class is to hold arrays used during the course of the benchmarks.
 // This is to avoid storing them in the global scope, which can slow things down.
-// We force instantiation in the setUpFunction so that we exclude the setup time from the benchmark time itself,
-// otherwise the instance would be lazily instantiated, and thereby add to the benchmark time.
 class FixedSizeArrayHolder {
   var fixedSizeArray100: FixedSizeArray100<ElementType>
+  var fixedSizeArray10: FixedSizeArray10<ElementType>
   var mainArrayForNestedStructs: [A]
+
   static let shared = FixedSizeArrayHolder()
   init() {
     fixedSizeArray100 = initializeFixedSizeArray100()
+    fixedSizeArray10 = initializeFixedSizeArray10()
     mainArrayForNestedStructs = [A]()
   }
-
-  func reset() {
-    fixedSizeArray100 = initializeFixedSizeArray100()
-  }
-
-  func forceInstantiation() {}
 }
 
 // Setup Functions.
 public func setupKeyPathNestedStructs() {
-  FixedSizeArrayHolder.shared.forceInstantiation()
+  let holder = FixedSizeArrayHolder.shared
   for _ in 0 ..< numberOfElementsForNestedStructs {
     let instance = A(a: 0, b: B(b: 0, c: C(c: 0, d: D(d: 0, e: E(e: expectedIntForNestedStructs)))))
-    FixedSizeArrayHolder.shared.mainArrayForNestedStructs.append(instance)
+    holder.mainArrayForNestedStructs.append(instance)
   }
 }
 
 public func setupSingleton() {
-  FixedSizeArrayHolder.shared.forceInstantiation()
+  blackHole(FixedSizeArrayHolder.shared)
 }
 
 func computeSumOfFixedSizeArray100(fixedSizeArray100: inout FixedSizeArray100<ElementType>)
@@ -92,6 +97,20 @@ func computeSumOfFixedSizeArray100(fixedSizeArray100: inout FixedSizeArray100<El
   withUnsafeBytes(of: fixedSizeArray100) {
     var pointer = $0.baseAddress.unsafelyUnwrapped
     for _ in 0 ..< fixedSizeArray100.count {
+      sum += pointer.assumingMemoryBound(to: ElementType.self).pointee
+      pointer = pointer.advanced(by: MemoryLayout<ElementType>.size)
+    }
+  }
+  return sum
+}
+
+func computeSumOfFixedSizeArray10(fixedSizeArray10: inout FixedSizeArray10<ElementType>)
+  -> ElementType
+{
+  var sum = ElementType(0)
+  withUnsafeBytes(of: fixedSizeArray10) {
+    var pointer = $0.baseAddress.unsafelyUnwrapped
+    for _ in 0 ..< fixedSizeArray10.count {
       sum += pointer.assumingMemoryBound(to: ElementType.self).pointee
       pointer = pointer.advanced(by: MemoryLayout<ElementType>.size)
     }
@@ -123,12 +142,6 @@ struct D {
 struct E {
   var e: Int
 }
-
-let singleHopKeyPath0: WritableKeyPath<A, B> = \A.b
-let singleHopKeyPath1: WritableKeyPath<B, C> = \B.c
-let singleHopKeyPath2: WritableKeyPath<C, D> = \C.d
-let singleHopKeyPath3: WritableKeyPath<D, E> = \D.e
-let singleHopKeyPath4: WritableKeyPath<E, Int> = \E.e
 
 // Used for run_KeyPathFixedSizeArrayAccess() and run_testDirectAccess().
 struct FixedSizeArray100<Element>: Sequence, IteratorProtocol {
@@ -660,106 +673,101 @@ struct FixedSizeArray100<Element>: Sequence, IteratorProtocol {
   }
 }
 
-let kp0 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 0)
-let kp1 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 1)
-let kp2 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 2)
-let kp3 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 3)
-let kp4 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 4)
-let kp5 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 5)
-let kp6 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 6)
-let kp7 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 7)
-let kp8 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 8)
-let kp9 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 9)
-let kp10 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 10)
-let kp11 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 11)
-let kp12 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 12)
-let kp13 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 13)
-let kp14 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 14)
-let kp15 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 15)
-let kp16 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 16)
-let kp17 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 17)
-let kp18 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 18)
-let kp19 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 19)
-let kp20 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 20)
-let kp21 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 21)
-let kp22 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 22)
-let kp23 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 23)
-let kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
-let kp25 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 25)
-let kp26 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 26)
-let kp27 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 27)
-let kp28 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 28)
-let kp29 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 29)
-let kp30 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 30)
-let kp31 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 31)
-let kp32 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 32)
-let kp33 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 33)
-let kp34 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 34)
-let kp35 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 35)
-let kp36 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 36)
-let kp37 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 37)
-let kp38 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 38)
-let kp39 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 39)
-let kp40 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 40)
-let kp41 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 41)
-let kp42 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 42)
-let kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
-let kp44 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 44)
-let kp45 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 45)
-let kp46 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 46)
-let kp47 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 47)
-let kp48 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 48)
-let kp49 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 49)
-let kp50 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 50)
-let kp51 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 51)
-let kp52 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 52)
-let kp53 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 53)
-let kp54 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 54)
-let kp55 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 55)
-let kp56 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 56)
-let kp57 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 57)
-let kp58 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 58)
-let kp59 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 59)
-let kp60 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 60)
-let kp61 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 61)
-let kp62 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 62)
-let kp63 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 63)
-let kp64 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 64)
-let kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
-let kp66 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 66)
-let kp67 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 67)
-let kp68 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 68)
-let kp69 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 69)
-let kp70 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 70)
-let kp71 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 71)
-let kp72 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 72)
-let kp73 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 73)
-let kp74 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 74)
-let kp75 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 75)
-let kp76 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 76)
-let kp77 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 77)
-let kp78 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 78)
-let kp79 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 79)
-let kp80 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 80)
-let kp81 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 81)
-let kp82 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 82)
-let kp83 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 83)
-let kp84 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 84)
-let kp85 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 85)
-let kp86 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 86)
-let kp87 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 87)
-let kp88 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 88)
-let kp89 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 89)
-let kp90 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 90)
-let kp91 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 91)
-let kp92 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 92)
-let kp93 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 93)
-let kp94 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 94)
-let kp95 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 95)
-let kp96 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 96)
-let kp97 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 97)
-let kp98 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 98)
-let kp99 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 99)
+struct FixedSizeArray10<Element>: Sequence, IteratorProtocol {
+  let count: Int = 10
+
+  public init(
+    element0: Element,
+    element1: Element,
+    element2: Element,
+    element3: Element,
+    element4: Element,
+    element5: Element,
+    element6: Element,
+    element7: Element,
+    element8: Element,
+    element9: Element
+
+  ) {
+    self.element0 = element0
+    self.element1 = element1
+    self.element2 = element2
+    self.element3 = element3
+    self.element4 = element4
+    self.element5 = element5
+    self.element6 = element6
+    self.element7 = element7
+    self.element8 = element8
+    self.element9 = element9
+  }
+
+  var element0: Element
+  var element1: Element
+  var element2: Element
+  var element3: Element
+  var element4: Element
+  var element5: Element
+  var element6: Element
+  var element7: Element
+  var element8: Element
+  var element9: Element
+
+  static func getKeypathToElement(index: Int)
+    -> WritableKeyPath<FixedSizeArray10<Element>, Element>
+  {
+    switch index {
+    case 0:
+      return \FixedSizeArray10.element0
+    case 1:
+      return \FixedSizeArray10.element1
+    case 2:
+      return \FixedSizeArray10.element2
+    case 3:
+      return \FixedSizeArray10.element3
+    case 4:
+      return \FixedSizeArray10.element4
+    case 5:
+      return \FixedSizeArray10.element5
+    case 6:
+      return \FixedSizeArray10.element6
+    case 7:
+      return \FixedSizeArray10.element7
+    case 8:
+      return \FixedSizeArray10.element8
+    case 9:
+      return \FixedSizeArray10.element9
+
+    default:
+      fatalError()
+    }
+  }
+
+  // Conformance to Iterator.
+  mutating func next() -> Element? {
+    var iter_count = 0
+    if iter_count == count {
+      return nil
+    } else {
+      defer { iter_count += 1 }
+      return self[keyPath: FixedSizeArray10.getKeypathToElement(index: iter_count)]
+    }
+  }
+}
+
+func initializeFixedSizeArray10() -> FixedSizeArray10<ElementType> {
+  return FixedSizeArray10<ElementType>(
+    element0: 0,
+    element1: 1,
+    element2: 2,
+    element3: 3,
+    element4: 4,
+    element5: 5,
+    element6: 6,
+    element7: 7,
+    element8: 8,
+    element9: 9
+  )
+}
 
 func initializeFixedSizeArray100() -> FixedSizeArray100<ElementType> {
   return FixedSizeArray100<ElementType>(
@@ -866,40 +874,38 @@ func initializeFixedSizeArray100() -> FixedSizeArray100<ElementType> {
   )
 }
 
-func returnKeyPathArray() -> [AnyKeyPath] {
-  var arrayOfKeyPaths = [kp0, kp1, kp2, kp3, kp4, kp5, kp6, kp7, kp8, kp9]
-  arrayOfKeyPaths.append(contentsOf: [kp10, kp11, kp12, kp13, kp14, kp15, kp16, kp17, kp18, kp19])
-  arrayOfKeyPaths.append(contentsOf: [kp20, kp21, kp22, kp23, kp24, kp25, kp26, kp27, kp28, kp29])
-  arrayOfKeyPaths.append(contentsOf: [kp30, kp31, kp32, kp33, kp34, kp35, kp36, kp37, kp38, kp39])
-  arrayOfKeyPaths.append(contentsOf: [kp40, kp41, kp42, kp43, kp44, kp45, kp46, kp47, kp48, kp49])
-  arrayOfKeyPaths.append(contentsOf: [kp50, kp51, kp52, kp53, kp54, kp55, kp56, kp57, kp58, kp59])
-  arrayOfKeyPaths.append(contentsOf: [kp60, kp61, kp62, kp63, kp64, kp65, kp66, kp67, kp68, kp69])
-  arrayOfKeyPaths.append(contentsOf: [kp70, kp71, kp72, kp73, kp74, kp75, kp76, kp77, kp78, kp79])
-  arrayOfKeyPaths.append(contentsOf: [kp80, kp81, kp82, kp83, kp84, kp85, kp86, kp87, kp88, kp89])
-  arrayOfKeyPaths.append(contentsOf: [kp90, kp91, kp92, kp93, kp94, kp95, kp96, kp97, kp98, kp99])
-  return arrayOfKeyPaths
-}
-
 @inline(never)
 public func run_KeyPathNestedStructs(n: Int) {
   var sum = 0
   var index = 0
   let iterationMultipier = 200
+
+  let singleHopKeyPath0: WritableKeyPath<A, B> = \A.b
+  let singleHopKeyPath1: WritableKeyPath<B, C> = \B.c
+  let singleHopKeyPath2: WritableKeyPath<C, D> = \C.d
+  let singleHopKeyPath3: WritableKeyPath<D, E> = \D.e
+  let singleHopKeyPath4: WritableKeyPath<E, Int> = \E.e
+
+  let appendedKeyPath = singleHopKeyPath0.appending(path: singleHopKeyPath1)
+    .appending(path: singleHopKeyPath2).appending(path: singleHopKeyPath3)
+    .appending(path: singleHopKeyPath4)
+
+  let elementCount = FixedSizeArrayHolder.shared.mainArrayForNestedStructs.count
   for _ in 1 ... iterationMultipier * n {
     let element = FixedSizeArrayHolder.shared.mainArrayForNestedStructs[index]
-    sum += element[keyPath: appendedKeyPath]
-    index = (index + 1) % FixedSizeArrayHolder.shared.mainArrayForNestedStructs.count
+    sum += element[keyPath: identity(appendedKeyPath)]
+    index = (index + 1) % elementCount
   }
-  assert(sum == iterationMultipier * n * expectedIntForNestedStructs)
+  check(sum == iterationMultipier * n * expectedIntForNestedStructs)
 }
 
 // This is meant as a baseline, from a timing perspective,
 // for run_testKeyPathReadPerformance() and run_testKeyPathWritePerformance().
+// It's currently set to ".skip", but is useful for comparing the performance between keypath operations and direct dot-notation.
 @inline(never)
 public func run_testDirectAccess(n: Int) {
-  arrayHolder.reset()
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
-  let iterationMultipier = 125000
+  let iterationMultipier = 125_000
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
     fixedSizeArray100.element46 += fixedSizeArray100.element63 - fixedSizeArray100.element99
@@ -929,81 +935,415 @@ public func run_testDirectAccess(n: Int) {
     fixedSizeArray100.element83 += fixedSizeArray100.element78 - fixedSizeArray100.element50
   }
   let sum = computeSumOfFixedSizeArray100(fixedSizeArray100: &fixedSizeArray100)
-  assert(sum > ElementType(0))
+  check(sum > ElementType(0))
 }
 
-// This measures read performance of keypaths.
 @inline(never)
 public func run_testKeyPathReadPerformance(n: Int) {
-  arrayHolder.reset()
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
   let iterationMultipier = 25
+
+  let kp99 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 99)
+  let kp27 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 27)
+  let kp09 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 09)
+  let kp84 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 84)
+  let kp22 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 22)
+  let kp82 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 82)
+  let kp86 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 86)
+  let kp49 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 49)
+  let kp18 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 18)
+  let kp97 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 97)
+  let kp69 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 69)
+  let kp76 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 76)
+  let kp32 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 32)
+  let kp52 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 52)
+  let kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
+  let kp87 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 87)
+  let kp67 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 67)
+  let kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
+  let kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
+  let kp12 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 12)
+  let kp21 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 21)
+  let kp77 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 77)
+  let kp40 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 40)
+  let kp60 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 60)
+  let kp50 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 50)
+
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
-    fixedSizeArray100.element46 += fixedSizeArray100.element63 - fixedSizeArray100[keyPath: kp99]
-    fixedSizeArray100.element43 += fixedSizeArray100.element39 * fixedSizeArray100[keyPath: kp27]
-    fixedSizeArray100.element81 += fixedSizeArray100.element49 / fixedSizeArray100[keyPath: kp9]
-    fixedSizeArray100.element31 += fixedSizeArray100.element90 + fixedSizeArray100[keyPath: kp84]
-    fixedSizeArray100.element35 += fixedSizeArray100.element6 - fixedSizeArray100[keyPath: kp22]
-    fixedSizeArray100.element14 += fixedSizeArray100.element67 * fixedSizeArray100[keyPath: kp82]
-    fixedSizeArray100.element51 += fixedSizeArray100.element40 / fixedSizeArray100[keyPath: kp86]
-    fixedSizeArray100.element24 += fixedSizeArray100.element23 + fixedSizeArray100[keyPath: kp49]
-    fixedSizeArray100.element90 += fixedSizeArray100.element95 - fixedSizeArray100[keyPath: kp18]
-    fixedSizeArray100.element80 += fixedSizeArray100.element45 * fixedSizeArray100[keyPath: kp97]
-    fixedSizeArray100.element47 += fixedSizeArray100.element65 / fixedSizeArray100[keyPath: kp69]
-    fixedSizeArray100.element92 += fixedSizeArray100.element80 + fixedSizeArray100[keyPath: kp76]
-    fixedSizeArray100.element78 += fixedSizeArray100.element32 - fixedSizeArray100[keyPath: kp32]
-    fixedSizeArray100.element79 += fixedSizeArray100.element59 * fixedSizeArray100[keyPath: kp52]
-    fixedSizeArray100.element46 += fixedSizeArray100.element60 / fixedSizeArray100[keyPath: kp24]
-    fixedSizeArray100.element64 += fixedSizeArray100.element41 + fixedSizeArray100[keyPath: kp87]
-    fixedSizeArray100.element65 += fixedSizeArray100.element72 - fixedSizeArray100[keyPath: kp67]
-    fixedSizeArray100.element19 += fixedSizeArray100.element81 * fixedSizeArray100[keyPath: kp65]
-    fixedSizeArray100.element66 += fixedSizeArray100.element55 / fixedSizeArray100[keyPath: kp43]
-    fixedSizeArray100.element10 += fixedSizeArray100.element52 + fixedSizeArray100[keyPath: kp12]
-    fixedSizeArray100.element81 += fixedSizeArray100.element50 - fixedSizeArray100[keyPath: kp21]
-    fixedSizeArray100.element16 += fixedSizeArray100.element80 * fixedSizeArray100[keyPath: kp77]
-    fixedSizeArray100.element6 += fixedSizeArray100.element62 / fixedSizeArray100[keyPath: kp40]
-    fixedSizeArray100.element26 += fixedSizeArray100.element65 + fixedSizeArray100[keyPath: kp65]
-    fixedSizeArray100.element83 += fixedSizeArray100.element78 - fixedSizeArray100[keyPath: kp50]
+    fixedSizeArray100.element46 += fixedSizeArray100
+      .element63 - fixedSizeArray100[keyPath: identity(kp99)]
+    fixedSizeArray100.element43 += fixedSizeArray100
+      .element39 * fixedSizeArray100[keyPath: identity(kp27)]
+    fixedSizeArray100.element81 += fixedSizeArray100
+      .element49 / fixedSizeArray100[keyPath: identity(kp09)]
+    fixedSizeArray100.element31 += fixedSizeArray100
+      .element90 + fixedSizeArray100[keyPath: identity(kp84)]
+    fixedSizeArray100.element35 += fixedSizeArray100
+      .element6 - fixedSizeArray100[keyPath: identity(kp22)]
+    fixedSizeArray100.element14 += fixedSizeArray100
+      .element67 * fixedSizeArray100[keyPath: identity(kp82)]
+    fixedSizeArray100.element51 += fixedSizeArray100
+      .element40 / fixedSizeArray100[keyPath: identity(kp86)]
+    fixedSizeArray100.element24 += fixedSizeArray100
+      .element23 + fixedSizeArray100[keyPath: identity(kp49)]
+    fixedSizeArray100.element90 += fixedSizeArray100
+      .element95 - fixedSizeArray100[keyPath: identity(kp18)]
+    fixedSizeArray100.element80 += fixedSizeArray100
+      .element45 * fixedSizeArray100[keyPath: identity(kp97)]
+    fixedSizeArray100.element47 += fixedSizeArray100
+      .element65 / fixedSizeArray100[keyPath: identity(kp69)]
+    fixedSizeArray100.element92 += fixedSizeArray100
+      .element80 + fixedSizeArray100[keyPath: identity(kp76)]
+    fixedSizeArray100.element78 += fixedSizeArray100
+      .element32 - fixedSizeArray100[keyPath: identity(kp32)]
+    fixedSizeArray100.element79 += fixedSizeArray100
+      .element59 * fixedSizeArray100[keyPath: identity(kp52)]
+    fixedSizeArray100.element46 += fixedSizeArray100
+      .element60 / fixedSizeArray100[keyPath: identity(kp24)]
+    fixedSizeArray100.element64 += fixedSizeArray100
+      .element41 + fixedSizeArray100[keyPath: identity(kp87)]
+    fixedSizeArray100.element65 += fixedSizeArray100
+      .element72 - fixedSizeArray100[keyPath: identity(kp67)]
+    fixedSizeArray100.element19 += fixedSizeArray100
+      .element81 * fixedSizeArray100[keyPath: identity(kp65)]
+    fixedSizeArray100.element66 += fixedSizeArray100
+      .element55 / fixedSizeArray100[keyPath: identity(kp43)]
+    fixedSizeArray100.element10 += fixedSizeArray100
+      .element52 + fixedSizeArray100[keyPath: identity(kp12)]
+    fixedSizeArray100.element81 += fixedSizeArray100
+      .element50 - fixedSizeArray100[keyPath: identity(kp21)]
+    fixedSizeArray100.element16 += fixedSizeArray100
+      .element80 * fixedSizeArray100[keyPath: identity(kp77)]
+    fixedSizeArray100.element6 += fixedSizeArray100
+      .element62 / fixedSizeArray100[keyPath: identity(kp40)]
+    fixedSizeArray100.element26 += fixedSizeArray100
+      .element65 + fixedSizeArray100[keyPath: identity(kp60)]
+    fixedSizeArray100.element83 += fixedSizeArray100
+      .element78 - fixedSizeArray100[keyPath: identity(kp50)]
   }
   let sum = computeSumOfFixedSizeArray100(fixedSizeArray100: &fixedSizeArray100)
-  assert(sum > ElementType(0))
+  check(sum > ElementType(0))
 }
 
 // This measures write performance of keypaths.
 @inline(never)
 public func run_testKeyPathWritePerformance(n: Int) {
-  arrayHolder.reset()
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
   let iterationMultipier = 150
+
+  let kp46 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 46)
+  let kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
+  let kp81 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 81)
+  let kp31 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 31)
+  let kp35 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 35)
+  let kp14 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 14)
+  let kp51 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 51)
+  let kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
+  let kp90 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 90)
+  let kp80 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 80)
+  let kp47 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 47)
+  let kp92 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 92)
+  let kp78 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 78)
+  let kp79 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 79)
+  let kp48 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 48)
+  let kp64 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 64)
+  let kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
+  let kp19 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 19)
+  let kp66 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 66)
+  let kp10 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 10)
+  let kp89 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 89)
+  let kp16 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 16)
+  let kp06 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 06)
+  let kp26 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 26)
+  let kp83 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 83)
+
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
-    fixedSizeArray100[keyPath: kp46] += fixedSizeArray100.element63 - fixedSizeArray100.element99
-    fixedSizeArray100[keyPath: kp43] += fixedSizeArray100.element39 * fixedSizeArray100.element27
-    fixedSizeArray100[keyPath: kp81] += fixedSizeArray100.element49 / fixedSizeArray100.element9
-    fixedSizeArray100[keyPath: kp31] += fixedSizeArray100.element90 + fixedSizeArray100.element84
-    fixedSizeArray100[keyPath: kp35] += fixedSizeArray100.element6 - fixedSizeArray100.element22
-    fixedSizeArray100[keyPath: kp14] += fixedSizeArray100.element67 * fixedSizeArray100.element82
-    fixedSizeArray100[keyPath: kp51] += fixedSizeArray100.element40 / fixedSizeArray100.element86
-    fixedSizeArray100[keyPath: kp24] += fixedSizeArray100.element23 + fixedSizeArray100.element49
-    fixedSizeArray100[keyPath: kp90] += fixedSizeArray100.element95 - fixedSizeArray100.element18
-    fixedSizeArray100[keyPath: kp80] += fixedSizeArray100.element45 * fixedSizeArray100.element97
-    fixedSizeArray100[keyPath: kp47] += fixedSizeArray100.element65 / fixedSizeArray100.element69
-    fixedSizeArray100[keyPath: kp92] += fixedSizeArray100.element80 + fixedSizeArray100.element76
-    fixedSizeArray100[keyPath: kp78] += fixedSizeArray100.element32 - fixedSizeArray100.element32
-    fixedSizeArray100[keyPath: kp79] += fixedSizeArray100.element59 * fixedSizeArray100.element52
-    fixedSizeArray100[keyPath: kp46] += fixedSizeArray100.element60 / fixedSizeArray100.element24
-    fixedSizeArray100[keyPath: kp64] += fixedSizeArray100.element41 + fixedSizeArray100.element87
-    fixedSizeArray100[keyPath: kp65] += fixedSizeArray100.element72 - fixedSizeArray100.element67
-    fixedSizeArray100[keyPath: kp19] += fixedSizeArray100.element81 * fixedSizeArray100.element65
-    fixedSizeArray100[keyPath: kp66] += fixedSizeArray100.element55 / fixedSizeArray100.element43
-    fixedSizeArray100[keyPath: kp10] += fixedSizeArray100.element52 + fixedSizeArray100.element12
-    fixedSizeArray100[keyPath: kp81] += fixedSizeArray100.element50 - fixedSizeArray100.element21
-    fixedSizeArray100[keyPath: kp16] += fixedSizeArray100.element80 * fixedSizeArray100.element77
-    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100.element62 / fixedSizeArray100.element40
-    fixedSizeArray100[keyPath: kp26] += fixedSizeArray100.element65 + fixedSizeArray100.element65
-    fixedSizeArray100[keyPath: kp83] += fixedSizeArray100.element78 - fixedSizeArray100.element50
+    fixedSizeArray100[keyPath: identity(kp46)] += fixedSizeArray100.element63 - fixedSizeArray100
+      .element99
+    fixedSizeArray100[keyPath: identity(kp43)] += fixedSizeArray100.element39 * fixedSizeArray100
+      .element27
+    fixedSizeArray100[keyPath: identity(kp81)] += fixedSizeArray100.element49 / fixedSizeArray100
+      .element9
+    fixedSizeArray100[keyPath: identity(kp31)] += fixedSizeArray100.element90 + fixedSizeArray100
+      .element84
+    fixedSizeArray100[keyPath: identity(kp35)] += fixedSizeArray100.element6 - fixedSizeArray100
+      .element22
+    fixedSizeArray100[keyPath: identity(kp14)] += fixedSizeArray100.element67 * fixedSizeArray100
+      .element82
+    fixedSizeArray100[keyPath: identity(kp51)] += fixedSizeArray100.element40 / fixedSizeArray100
+      .element86
+    fixedSizeArray100[keyPath: identity(kp24)] += fixedSizeArray100.element23 + fixedSizeArray100
+      .element49
+    fixedSizeArray100[keyPath: identity(kp90)] += fixedSizeArray100.element95 - fixedSizeArray100
+      .element18
+    fixedSizeArray100[keyPath: identity(kp80)] += fixedSizeArray100.element45 * fixedSizeArray100
+      .element97
+    fixedSizeArray100[keyPath: identity(kp47)] += fixedSizeArray100.element65 / fixedSizeArray100
+      .element69
+    fixedSizeArray100[keyPath: identity(kp92)] += fixedSizeArray100.element80 + fixedSizeArray100
+      .element76
+    fixedSizeArray100[keyPath: identity(kp78)] += fixedSizeArray100.element32 - fixedSizeArray100
+      .element32
+    fixedSizeArray100[keyPath: identity(kp79)] += fixedSizeArray100.element59 * fixedSizeArray100
+      .element52
+    fixedSizeArray100[keyPath: identity(kp48)] += fixedSizeArray100.element60 / fixedSizeArray100
+      .element24
+    fixedSizeArray100[keyPath: identity(kp64)] += fixedSizeArray100.element41 + fixedSizeArray100
+      .element87
+    fixedSizeArray100[keyPath: identity(kp65)] += fixedSizeArray100.element72 - fixedSizeArray100
+      .element67
+    fixedSizeArray100[keyPath: identity(kp19)] += fixedSizeArray100.element81 * fixedSizeArray100
+      .element65
+    fixedSizeArray100[keyPath: identity(kp66)] += fixedSizeArray100.element55 / fixedSizeArray100
+      .element43
+    fixedSizeArray100[keyPath: identity(kp10)] += fixedSizeArray100.element52 + fixedSizeArray100
+      .element12
+    fixedSizeArray100[keyPath: identity(kp89)] += fixedSizeArray100.element50 - fixedSizeArray100
+      .element21
+    fixedSizeArray100[keyPath: identity(kp16)] += fixedSizeArray100.element80 * fixedSizeArray100
+      .element77
+    fixedSizeArray100[keyPath: identity(kp06)] += fixedSizeArray100.element62 / fixedSizeArray100
+      .element40
+    fixedSizeArray100[keyPath: identity(kp26)] += fixedSizeArray100.element65 + fixedSizeArray100
+      .element65
+    fixedSizeArray100[keyPath: identity(kp83)] += fixedSizeArray100.element78 - fixedSizeArray100
+      .element50
   }
   let sum = computeSumOfFixedSizeArray100(fixedSizeArray100: &fixedSizeArray100)
-  assert(sum > ElementType(0))
+  check(sum > ElementType(0))
+}
+
+/*
+ The two benchmarks below demonstrate an issue where, after a certain point, a collection of
+ nearby keypaths no longer get inlined by the compiler. Namely, if the memory addresses end
+ up being too far apart, the inlining process won't proceed. This divergence occurs during
+ one of the SIL optimization passes. The "@inline(never)" directive has been intentionally
+ omitted, as well as wrapping the KeyPaths in the identity() function in order to highlight
+ this issue. These two benchmarks will only differ in performance when compiled in release
+ mode, namely, "swift build --configuration release". Inlining will happen if "lastKeyPathIndex"
+ is set to any integer from 0 to 13, but will not happen if set to 14 to 49.
+ */
+
+public func run_testKeyPathsInlined(n: Int) {
+  var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
+  let iterationMultipier = 1250
+
+  let lastKeyPathIndex = 9
+  let kp0 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 0)
+  let kp1 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 1)
+  let kp2 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 2)
+  let kp3 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 3)
+  let kp4 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 4)
+  let kp5 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 5)
+  let kp6 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 6)
+  let kp7 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 7)
+  let kp8 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 8)
+  let kp9 = FixedSizeArray100<ElementType>.getKeypathToElement(index: lastKeyPathIndex)
+
+  for t in 1 ... iterationMultipier * n {
+    fixedSizeArray100[keyPath: kp0] += fixedSizeArray100[keyPath: kp1] + ElementType(t)
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp3] +
+      fixedSizeArray100[keyPath: kp9]
+    fixedSizeArray100[keyPath: kp3] += fixedSizeArray100[keyPath: kp9] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp1] += fixedSizeArray100[keyPath: kp9] +
+      fixedSizeArray100[keyPath: kp9]
+    fixedSizeArray100[keyPath: kp1] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp4]
+    fixedSizeArray100[keyPath: kp5] += fixedSizeArray100[keyPath: kp6] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp4] += fixedSizeArray100[keyPath: kp7] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp1] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp6]
+    fixedSizeArray100[keyPath: kp4] += fixedSizeArray100[keyPath: kp3] +
+      fixedSizeArray100[keyPath: kp9]
+    fixedSizeArray100[keyPath: kp0] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp8]
+    fixedSizeArray100[keyPath: kp0] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp7] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp9]
+    fixedSizeArray100[keyPath: kp2] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp6]
+    fixedSizeArray100[keyPath: kp8] += fixedSizeArray100[keyPath: kp2] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp9] += fixedSizeArray100[keyPath: kp9] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp4]
+    fixedSizeArray100[keyPath: kp4] += fixedSizeArray100[keyPath: kp1] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp5] += fixedSizeArray100[keyPath: kp2] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp9] += fixedSizeArray100[keyPath: kp1] +
+      fixedSizeArray100[keyPath: kp5]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp3]
+    fixedSizeArray100[keyPath: kp0] += fixedSizeArray100[keyPath: kp2] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp1] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp1]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp2] +
+      fixedSizeArray100[keyPath: kp0]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp5]
+    fixedSizeArray100[keyPath: kp3] += fixedSizeArray100[keyPath: kp8] +
+      fixedSizeArray100[keyPath: kp0]
+  }
+  let sum = computeSumOfFixedSizeArray100(fixedSizeArray100: &fixedSizeArray100)
+
+  blackHole(sum)
+}
+
+public func run_testKeyPathsNotInlined(n: Int) {
+  var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
+  let iterationMultipier = 100
+
+  let lastKeyPathIndex = 44
+  let kp0 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 0)
+  let kp1 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 1)
+  let kp2 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 2)
+  let kp3 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 3)
+  let kp4 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 4)
+  let kp5 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 5)
+  let kp6 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 6)
+  let kp7 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 7)
+  let kp8 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 8)
+  let kp9 = FixedSizeArray100<ElementType>.getKeypathToElement(index: lastKeyPathIndex)
+
+  for t in 1 ... iterationMultipier * n {
+    fixedSizeArray100[keyPath: kp0] += fixedSizeArray100[keyPath: kp1] + ElementType(t)
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp3] +
+      fixedSizeArray100[keyPath: kp9]
+    fixedSizeArray100[keyPath: kp3] += fixedSizeArray100[keyPath: kp9] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp1] += fixedSizeArray100[keyPath: kp9] +
+      fixedSizeArray100[keyPath: kp9]
+    fixedSizeArray100[keyPath: kp1] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp4]
+    fixedSizeArray100[keyPath: kp5] += fixedSizeArray100[keyPath: kp6] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp4] += fixedSizeArray100[keyPath: kp7] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp1] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp6]
+    fixedSizeArray100[keyPath: kp4] += fixedSizeArray100[keyPath: kp3] +
+      fixedSizeArray100[keyPath: kp9]
+    fixedSizeArray100[keyPath: kp0] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp8]
+    fixedSizeArray100[keyPath: kp0] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp7] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp9]
+    fixedSizeArray100[keyPath: kp2] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp6]
+    fixedSizeArray100[keyPath: kp8] += fixedSizeArray100[keyPath: kp2] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp9] += fixedSizeArray100[keyPath: kp9] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp4]
+    fixedSizeArray100[keyPath: kp4] += fixedSizeArray100[keyPath: kp1] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp5] += fixedSizeArray100[keyPath: kp2] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp9] += fixedSizeArray100[keyPath: kp1] +
+      fixedSizeArray100[keyPath: kp5]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp3]
+    fixedSizeArray100[keyPath: kp0] += fixedSizeArray100[keyPath: kp2] +
+      fixedSizeArray100[keyPath: kp2]
+    fixedSizeArray100[keyPath: kp1] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp1]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp0] +
+      fixedSizeArray100[keyPath: kp7]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp2] +
+      fixedSizeArray100[keyPath: kp0]
+    fixedSizeArray100[keyPath: kp6] += fixedSizeArray100[keyPath: kp5] +
+      fixedSizeArray100[keyPath: kp5]
+    fixedSizeArray100[keyPath: kp3] += fixedSizeArray100[keyPath: kp8] +
+      fixedSizeArray100[keyPath: kp0]
+  }
+  let sum = computeSumOfFixedSizeArray100(fixedSizeArray100: &fixedSizeArray100)
+  blackHole(sum)
+}
+
+
+// Intended to showcase the difference in performance between 10 and 100-element structs.
+@inline(never)
+public func run_testKeyPathSmallStruct(n: Int) {
+  var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray10
+  let iterationMultipier = 25
+
+  let kp0 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 0)
+  let kp1 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 1)
+  let kp2 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 2)
+  let kp3 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 3)
+  let kp4 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 4)
+  let kp5 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 5)
+  let kp6 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 6)
+  let kp7 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 7)
+  let kp8 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 8)
+  let kp9 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 9)
+
+  for t in 1 ... iterationMultipier * n {
+    fixedSizeArray100.element0 += fixedSizeArray100.element1 + ElementType(t)
+    fixedSizeArray100.element6 += fixedSizeArray100
+      .element3 - fixedSizeArray100[keyPath: identity(kp9)]
+    fixedSizeArray100.element3 += fixedSizeArray100
+      .element9 * fixedSizeArray100[keyPath: identity(kp7)]
+    fixedSizeArray100.element1 += fixedSizeArray100
+      .element9 / fixedSizeArray100[keyPath: identity(kp9)]
+    fixedSizeArray100.element1 += fixedSizeArray100
+      .element0 + fixedSizeArray100[keyPath: identity(kp4)]
+    fixedSizeArray100.element5 += fixedSizeArray100
+      .element6 - fixedSizeArray100[keyPath: identity(kp2)]
+    fixedSizeArray100.element4 += fixedSizeArray100
+      .element7 * fixedSizeArray100[keyPath: identity(kp2)]
+    fixedSizeArray100.element1 += fixedSizeArray100
+      .element0 / fixedSizeArray100[keyPath: identity(kp6)]
+    fixedSizeArray100.element4 += fixedSizeArray100
+      .element3 + fixedSizeArray100[keyPath: identity(kp9)]
+    fixedSizeArray100.element0 += fixedSizeArray100
+      .element5 - fixedSizeArray100[keyPath: identity(kp8)]
+    fixedSizeArray100.element0 += fixedSizeArray100
+      .element5 * fixedSizeArray100[keyPath: identity(kp7)]
+    fixedSizeArray100.element7 += fixedSizeArray100
+      .element5 / fixedSizeArray100[keyPath: identity(kp9)]
+    fixedSizeArray100.element2 += fixedSizeArray100
+      .element0 + fixedSizeArray100[keyPath: identity(kp6)]
+    fixedSizeArray100.element8 += fixedSizeArray100
+      .element2 - fixedSizeArray100[keyPath: identity(kp2)]
+    fixedSizeArray100.element9 += fixedSizeArray100
+      .element9 * fixedSizeArray100[keyPath: identity(kp2)]
+    fixedSizeArray100.element6 += fixedSizeArray100
+      .element0 / fixedSizeArray100[keyPath: identity(kp4)]
+    fixedSizeArray100.element4 += fixedSizeArray100
+      .element1 + fixedSizeArray100[keyPath: identity(kp7)]
+    fixedSizeArray100.element5 += fixedSizeArray100
+      .element2 - fixedSizeArray100[keyPath: identity(kp7)]
+    fixedSizeArray100.element9 += fixedSizeArray100
+      .element1 * fixedSizeArray100[keyPath: identity(kp5)]
+    fixedSizeArray100.element6 += fixedSizeArray100
+      .element5 / fixedSizeArray100[keyPath: identity(kp3)]
+    fixedSizeArray100.element0 += fixedSizeArray100
+      .element2 + fixedSizeArray100[keyPath: identity(kp2)]
+    fixedSizeArray100.element1 += fixedSizeArray100
+      .element0 - fixedSizeArray100[keyPath: identity(kp1)]
+    fixedSizeArray100.element6 += fixedSizeArray100
+      .element0 * fixedSizeArray100[keyPath: identity(kp7)]
+    fixedSizeArray100.element6 += fixedSizeArray100
+      .element2 / fixedSizeArray100[keyPath: identity(kp0)]
+    fixedSizeArray100.element6 += fixedSizeArray100
+      .element5 + fixedSizeArray100[keyPath: identity(kp0)]
+    fixedSizeArray100.element3 += fixedSizeArray100
+      .element8 - fixedSizeArray100[keyPath: identity(kp0)]
+  }
+  let sum = computeSumOfFixedSizeArray10(fixedSizeArray10: &fixedSizeArray100)
+  blackHole(sum)
 }
