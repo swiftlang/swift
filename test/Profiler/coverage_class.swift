@@ -10,7 +10,7 @@ class C {
   // CHECK-NEXT: [[@LINE+1]]:10 -> [[@LINE+1]]:12
   init() {}
 
-  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.__deallocating_deinit
+  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.deinit
   // CHECK-NEXT: [[@LINE+1]]:10 -> [[@LINE+1]]:12
   deinit {}
 }
