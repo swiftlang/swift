@@ -86,9 +86,7 @@ void ConnectedComponent::buildRequirements(Type subjectType,
       subjectType = constraintType;
     }
 
-  // For compatibility with the old GenericSignatureBuilder, drop requirements
-  // containing ErrorTypes.
-  } else if (!ConcreteType->hasError()) {
+  } else {
     // If there are multiple protocol typealiases in the connected component,
     // lower them all to a series of identical concrete-type aliases.
     for (auto name : Aliases) {
@@ -163,6 +161,14 @@ public:
 
 }  // end namespace
 
+static Type replaceTypeParametersWithErrorTypes(Type type) {
+  return type.transformRec([](Type t) -> Optional<Type> {
+      if (t->isTypeParameter())
+        return ErrorType::get(t->getASTContext());
+      return None;
+    });
+}
+
 void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
   // Convert a rewrite rule into a requirement.
   auto createRequirementFromRule = [&](const Rule &rule) {
@@ -190,15 +196,12 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
             return;
         }
 
-        // Requirements containing error types originate from invalid code
-        // and should not appear in the generic signature.
-        if (prop->getConcreteType()->hasError())
-          return;
-
         Type superclassType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
+        if (rule.isRecursive())
+          superclassType = replaceTypeParametersWithErrorTypes(superclassType);
 
         if (ReconstituteSugar)
           superclassType = superclassType->reconstituteSugar(/*recursive=*/true);
@@ -216,15 +219,12 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
             return;
         }
 
-        // Requirements containing error types originate from invalid code
-        // and should not appear in the generic signature.
-        if (prop->getConcreteType()->hasError())
-          return;
-
         Type concreteType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
+        if (rule.isRecursive())
+          concreteType = replaceTypeParametersWithErrorTypes(concreteType);
 
         if (ReconstituteSugar)
           concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
@@ -291,15 +291,12 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
           continue;
       }
 
-      // Requirements containing error types originate from invalid code
-      // and should not appear in the generic signature.
-      if (prop->getConcreteType()->hasError())
-        continue;
-
       Type concreteType = Map.getTypeFromSubstitutionSchema(
                                prop->getConcreteType(),
                                prop->getSubstitutions(),
                                GenericParams, MutableTerm());
+      if (rule.isRecursive())
+        concreteType = replaceTypeParametersWithErrorTypes(concreteType);
 
       if (ReconstituteSugar)
         concreteType = concreteType->reconstituteSugar(/*recursive=*/true);

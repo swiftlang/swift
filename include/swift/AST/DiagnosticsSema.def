@@ -2508,6 +2508,10 @@ ERROR(recursive_generic_signature,none,
       "%0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_generic_signature_extension,none,
       "extension of %0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
+ERROR(recursive_same_type_constraint,none,
+      "same-type constraint %0 == %1 is recursive", (Type, Type))
+ERROR(recursive_superclass_constraint,none,
+      "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,

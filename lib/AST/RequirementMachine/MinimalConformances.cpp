@@ -447,6 +447,17 @@ void RewriteSystem::computeCandidateConformancePaths(
       continue;
     }
 
+    // A concrete conformance rule (T.[concrete: C : P] => T) implies
+    // the existence of a conformance rule (V.[P] => V) where T == U.V.
+    //
+    // Record an equation allowing the concrete conformance to be
+    // expressed in terms of the abstract conformance:
+    //
+    //     (T.[concrete: C : P]) := (U.[domain(V)])(V.[P])
+    //
+    // and also vice versa in the case |V| == 0:
+    //
+    //     (T.[P]) := (T.[concrete: C : P])
     if (lhs.isAnyConformanceRule() &&
         lhs.getLHS().back().getKind() == Symbol::Kind::ConcreteConformance) {
       MutableTerm t(lhs.getLHS().begin(), lhs.getLHS().end() - 1);
