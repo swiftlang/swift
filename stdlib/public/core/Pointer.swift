@@ -286,8 +286,13 @@ extension _Pointer /*: Strideable*/ {
   ///   `Pointee` type.
   @_transparent
   public func advanced(by n: Int) -> Self {
-    return Self(Builtin.gep_Word(
-      self._rawValue, n._builtinWordValue, Pointee.self))
+    _debugPrecondition(
+      n == 0 ||
+      (n > 0 ? (self < Self(bitPattern: -n*MemoryLayout<Pointee>.stride)!)
+             : (Self(bitPattern: -n*MemoryLayout<Pointee>.stride)! < self) ),
+      "Overflow in pointer arithmetic"
+    )
+    return Self(Builtin.gep_Word(_rawValue, n._builtinWordValue, Pointee.self))
   }
 }
 
