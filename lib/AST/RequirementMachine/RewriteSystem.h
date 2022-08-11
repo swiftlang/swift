@@ -229,10 +229,15 @@ public:
 
   void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
-  void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
-                                  SourceLoc signatureLoc,
-                                  const PropertyMap &map,
-                                  TypeArrayView<GenericTypeParamType> genericParams);
+  void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                                SourceLoc signatureLoc,
+                                                const PropertyMap &map,
+                                                TypeArrayView<GenericTypeParamType> genericParams);
+
+  void computeRecursiveRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                              SourceLoc signatureLoc,
+                                              const PropertyMap &map,
+                                              TypeArrayView<GenericTypeParamType> genericParams);
 
 private:
   struct CriticalPair {
