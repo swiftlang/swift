@@ -411,7 +411,7 @@ private:
           owningPrinter.interopContext.getIrABIDetails().getEnumTagMapping(ED);
       // Sort cases based on their assigned tag indices
       llvm::stable_sort(elementTagMapping, [](const auto &p1, const auto &p2) {
-        return p1.second < p2.second;
+        return p1.second.tag < p2.second.tag;
       });
 
       if (elementTagMapping.empty()) {
@@ -429,17 +429,43 @@ private:
 
       // Printing operator cases()
       os << "  inline operator cases() const {\n";
-      os << "    switch (_getEnumTag()) {\n";
-      for (const auto &pair : elementTagMapping) {
-        // TODO: have to use global variable for resilient enum
-        os << "      case " << pair.second << ": return cases::";
-        syntaxPrinter.printIdentifier(pair.first->getNameStr());
-        os << ";\n";
+      if (ED->isResilient()) {
+        os << "    auto tag = _getEnumTag();\n";
+        for (const auto &pair : elementTagMapping) {
+          os << "    if (tag == " << cxx_synthesis::getCxxImplNamespaceName();
+          os << "::" << pair.second.globalVariableName << ") return cases::";
+          syntaxPrinter.printIdentifier(pair.first->getNameStr());
+          os << ";\n";
+        }
+        // TODO: change to Swift's fatalError when it's available in C++
+        os << "    abort();\n";
+      } else { // non-resilient enum
+        os << "    switch (_getEnumTag()) {\n";
+        for (const auto &pair : elementTagMapping) {
+          os << "      case " << pair.second.tag << ": return cases::";
+          syntaxPrinter.printIdentifier(pair.first->getNameStr());
+          os << ";\n";
+        }
+        // TODO: change to Swift's fatalError when it's available in C++
+        os << "      default: abort();\n";
+        os << "    }\n"; // switch's closing bracket
       }
-      // TODO: change to Swift's fatalError when it's available in C++
-      os << "      default: abort();\n";
-      os << "    }\n"; // switch's closing bracket
       os << "  }\n";   // operator cases()'s closing bracket
+
+      if (ED->isResilient()) {
+        os << "  inline bool inResilientUnknownCase() const {\n";
+        os << "    auto tag = _getEnumTag();\n";
+        os << "    return";
+        llvm::interleave(
+            elementTagMapping, os,
+            [&](const auto &pair) {
+              os << "\n      tag != " << cxx_synthesis::getCxxImplNamespaceName()
+                 << "::" << pair.second.globalVariableName;
+            },
+            " &&");
+        os << ";\n";
+        os << "  }\n";
+      }
 
       // Printing case-related functions
       DeclAndTypeClangFunctionPrinter clangFuncPrinter(
@@ -451,8 +477,13 @@ private:
         auto name = pair.first->getNameStr().str();
         name[0] = std::toupper(name[0]);
         os << name << "() const {\n";
-        os << "    return *this == cases::";
-        syntaxPrinter.printIdentifier(pair.first->getNameStr());
+        os << "    return _getEnumTag() == ";
+        if (ED->isResilient()) {
+          os << cxx_synthesis::getCxxImplNamespaceName()
+             << "::" << pair.second.globalVariableName;
+        } else {
+          os << pair.second.tag;
+        }
         os << ";\n  }\n";
 
         if (!pair.first->hasAssociatedValues()) {

@@ -162,13 +162,13 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isSecond() const {
-// CHECK-NEXT:   return *this == cases::second;
+// CHECK-NEXT:   return _getEnumTag() == 0;
 // CHECK-NEXT: }
 // CHECK:      inline bool isFirst() const {
-// CHECK-NEXT:   return *this == cases::first;
+// CHECK-NEXT:   return _getEnumTag() == 1;
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isThird() const {
-// CHECK-NEXT:     return *this == cases::third;
+// CHECK-NEXT:   return _getEnumTag() == 2;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums12BoolWithCaseOMa(0);
@@ -193,13 +193,13 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isOne() const {
-// CHECK-NEXT:   return *this == cases::one;
+// CHECK-NEXT:   return _getEnumTag() == 0;
 // CHECK-NEXT: }
 // CHECK:      inline bool isTwo() const {
-// CHECK-NEXT:   return *this == cases::two;
+// CHECK-NEXT:   return _getEnumTag() == 1;
 // CHECK-NEXT: }
 // CHECK:      inline bool isThree() const {
-// CHECK-NEXT:   return *this == cases::three;
+// CHECK-NEXT:   return _getEnumTag() == 2;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums9CLikeEnumOMa(0);
@@ -222,7 +222,7 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isOne() const {
-// CHECK-NEXT:   return *this == cases::one;
+// CHECK-NEXT:   return _getEnumTag() == 0;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums8DataCaseOMa(0);
@@ -247,13 +247,13 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isInt() const {
-// CHECK-NEXT:   return *this == cases::Int;
+// CHECK-NEXT:   return _getEnumTag() == 0;
 // CHECK-NEXT: }
 // CHECK:      inline bool isDouble() const {
-// CHECK-NEXT:   return *this == cases::Double;
+// CHECK-NEXT:   return _getEnumTag() == 1;
 // CHECK-NEXT: }
 // CHECK:      inline bool isBignum() const {
-// CHECK-NEXT:   return *this == cases::Bignum;
+// CHECK-NEXT:   return _getEnumTag() == 2;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums17IntDoubleOrBignumOMa(0);
@@ -278,13 +278,13 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isInt() const {
-// CHECK-NEXT:   return *this == cases::Int;
+// CHECK-NEXT:   return _getEnumTag() == 0;
 // CHECK-NEXT: }
 // CHECK:      inline bool isNegInfinity() const {
-// CHECK-NEXT:   return *this == cases::NegInfinity;
+// CHECK-NEXT:   return _getEnumTag() == 1;
 // CHECK-NEXT: }
 // CHECK:      inline bool isPosInfinity() const {
-// CHECK-NEXT:   return *this == cases::PosInfinity;
+// CHECK-NEXT:   return _getEnumTag() == 2;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums13IntOrInfinityOMa(0);
@@ -310,16 +310,16 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isSecond() const {
-// CHECK-NEXT:     return *this == cases::second;
+// CHECK-NEXT:   return _getEnumTag() == 0;
 // CHECK-NEXT: }
 // CHECK:      inline bool isThird() const {
-// CHECK-NEXT:     return *this == cases::third;
+// CHECK-NEXT:   return _getEnumTag() == 1;
 // CHECK-NEXT: }
 // CHECK:      inline bool isFirst() const {
-// CHECK-NEXT:     return *this == cases::first;
+// CHECK-NEXT:   return _getEnumTag() == 2;
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isFourth() const {
-// CHECK-NEXT:     return *this == cases::fourth;
+// CHECK-NEXT:   return _getEnumTag() == 3;
 // CHECK-NEXT: }
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums20MultipleBoolWithCaseOMa(0);
