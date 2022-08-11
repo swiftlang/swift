@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only)
 
 // REQUIRES: executable_test
 

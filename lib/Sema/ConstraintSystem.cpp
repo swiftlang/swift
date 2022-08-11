@@ -4624,7 +4624,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         << " solutions with fixes ---\n";
     int i = 0;
     for (auto &solution : solutions) {
-      log << "--- Solution #" << i++ << "---\n";
+      log << "\n--- Solution #" << i++ << "---\n";
       solution.dump(log);
       log << "\n";
     }
@@ -5227,7 +5227,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::PlaceholderType:
     case ConstraintLocator::SequenceElementType:
     case ConstraintLocator::ConstructorMemberType:
-    case ConstraintLocator::ExistentialSuperclassType:
+    case ConstraintLocator::ExistentialConstraintType:
+    case ConstraintLocator::ProtocolCompositionSuperclassType:
       break;
 
     case ConstraintLocator::GenericArgument:

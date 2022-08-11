@@ -18,7 +18,7 @@ var a: String? = nil
 
 // CHECK: attempting disjunction choice $T0 bound to decl async_overload_filtering.(file).filter_async(fn2:)
 // CHECK-NEXT: overload set choice binding $T0 := {{.*}}
-// CHECK-NEXT: increasing score due to sync-in-asynchronous
+// CHECK-NEXT: increasing 'sync-in-asynchronous' score by 1
 // CHECK-NEXT: solution is worse than the best solution
 filter_async {
   Obj()

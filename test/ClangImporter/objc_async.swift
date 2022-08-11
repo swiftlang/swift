@@ -397,3 +397,11 @@ extension SomeWrapper: Sendable where T: Sendable {}
     }
   }
 }
+
+// rdar://97646309 -- lookup and direct call of an optional global-actor constrained method would crash in SILGen
+@available(SwiftStdlib 5.5, *)
+extension CoffeeDelegate  {
+    @MainActor func test() async -> (NSObject?, NSObject, NSObject) {
+        return await self.icedMochaServiceGenerateMocha!(NSObject())
+    }
+}
