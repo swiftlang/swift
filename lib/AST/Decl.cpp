@@ -4168,7 +4168,7 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
   // Note: a non-null GenericSignature would violate the invariant that
   // the protocol 'Self' type referenced from the requirement's interface
   // type is the same as the existential 'Self' type.
-  auto sig = getASTContext().getOpenedArchetypeSignature(baseTy,
+  auto sig = getASTContext().getOpenedExistentialSignature(baseTy,
       GenericSignature());
 
   auto genericParam = sig.getGenericParams().front();

@@ -1343,8 +1343,8 @@ public:
   /// particular, the opened archetype signature does not have requirements for
   /// conformances inherited from superclass constraints while existential
   /// values do.
-  CanGenericSignature getOpenedArchetypeSignature(Type type,
-                                                  GenericSignature parentSig);
+  CanGenericSignature getOpenedExistentialSignature(Type type,
+                                                    GenericSignature parentSig);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

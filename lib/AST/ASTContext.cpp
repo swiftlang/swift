@@ -4655,7 +4655,7 @@ GenericEnvironment *
 GenericEnvironment::forOpenedExistential(
     Type existential, GenericSignature parentSig, UUID uuid) {
   auto &ctx = existential->getASTContext();
-  auto signature = ctx.getOpenedArchetypeSignature(existential, parentSig);
+  auto signature = ctx.getOpenedExistentialSignature(existential, parentSig);
   return GenericEnvironment::forOpenedArchetypeSignature(existential, signature, uuid);
 }
 
@@ -5199,7 +5199,7 @@ Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(GenericSignature paren
 }
 
 CanGenericSignature
-ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
+ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig) {
   assert(type->isExistentialType());
 
   if (auto existential = type->getAs<ExistentialType>())
