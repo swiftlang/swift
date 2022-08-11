@@ -232,6 +232,13 @@ public:
     return value.getPointer()->isVoid();
   }
 
+  /// Whether the type is an enum, struct, or tuple.
+  bool isAggregate() {
+    return is<TupleType>() || is<StructType>() ||
+           is<BoundGenericStructType>() || is<EnumType>() ||
+           is<BoundGenericEnumType>();
+  }
+
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
   ClassDecl *getClassOrBoundGenericClass() const {
