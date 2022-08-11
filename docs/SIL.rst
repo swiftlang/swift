@@ -4245,6 +4245,25 @@ operations::
 If ``T`` is a trivial type, then ``copy_addr`` is always equivalent to its
 take-initialization form.
 
+It is illegal in non-Raw SIL to apply ``copy_addr [init]`` to a value that is
+move only.
+
+explicit_copy_addr
+``````````````````
+::
+
+  sil-instruction ::= 'explicit_copy_addr' '[take]'? sil-value
+                        'to' '[initialization]'? sil-operand
+
+  explicit_copy_addr [take] %0 to [initialization] %1 : $*T
+  // %0 and %1 must be of the same $*T address type
+
+This instruction is exactly the same as `copy_addr`_ except that it has special
+behavior for move only types. Specifically, an `explicit_copy_addr`_ is viewed
+as a copy_addr that is allowed on values that are move only. This is only used
+by a move checker after it has emitted an error diagnostic to preserve the
+general ``copy_addr [init]`` ban in Canonical SIL on move only types.
+
 destroy_addr
 ````````````
 ::
