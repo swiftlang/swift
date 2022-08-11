@@ -219,6 +219,10 @@ protected:
       isTakeOfSrc : 1,
       isInitializationOfDest : 1);
 
+    SHARED_FIELD(ExplicitCopyAddrInst, uint8_t
+      isTakeOfSrc : 1,
+      isInitializationOfDest : 1);
+
     SHARED_FIELD(PointerToAddressInst, uint8_t
       isStrict : 1,
       isInvariant : 1);

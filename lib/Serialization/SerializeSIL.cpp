@@ -1921,6 +1921,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::CopyAddrInst:
+  case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst: {
@@ -1945,6 +1946,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = (CAI->isInitializationOfDest() << 1) | CAI->isTakeOfSrc();
       operand = cast<CopyAddrInst>(&SI)->getDest();
       value = cast<CopyAddrInst>(&SI)->getSrc();
+    } else if (SI.getKind() == SILInstructionKind::ExplicitCopyAddrInst) {
+      const auto *CAI = cast<ExplicitCopyAddrInst>(&SI);
+      Attr = (CAI->isInitializationOfDest() << 1) | CAI->isTakeOfSrc();
+      operand = cast<ExplicitCopyAddrInst>(&SI)->getDest();
+      value = cast<ExplicitCopyAddrInst>(&SI)->getSrc();
     } else if (SI.getKind() == SILInstructionKind::MarkUnresolvedMoveAddrInst) {
       auto *mai = cast<MarkUnresolvedMoveAddrInst>(&SI);
       operand = mai->getDest();

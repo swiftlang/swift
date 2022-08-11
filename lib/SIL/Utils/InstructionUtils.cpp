@@ -630,6 +630,15 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
     return RuntimeEffect::MetaData;
   }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto *ca = cast<ExplicitCopyAddrInst>(inst);
+    impactType = ca->getSrc()->getType();
+    if (!ca->isInitializationOfDest())
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
+    if (!ca->isTakeOfSrc())
+      return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
+    return RuntimeEffect::MetaData;
+  }
   // Equivalent to a copy_addr [init]
   case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
     return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
