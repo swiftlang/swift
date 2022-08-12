@@ -4637,8 +4637,7 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
   return newSig;
 }
 
-GenericEnvironment *GenericEnvironment::getIncomplete(
-                                             GenericSignature signature) {
+GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   auto &ctx = signature->getASTContext();
 
   // Allocate and construct the new environment.

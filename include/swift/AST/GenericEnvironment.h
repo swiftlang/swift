@@ -73,7 +73,7 @@ public:
   enum class Kind {
     /// A normal generic environment, determined only by its generic
     /// signature.
-    Normal,
+    Primary,
     /// A generic environment describing an opened existential archetype.
     OpenedExistential,
     /// A generic environment describing an opaque type archetype.
@@ -84,7 +84,7 @@ public:
 
 private:
   mutable llvm::PointerIntPair<GenericSignature, 2, Kind> SignatureAndKind{
-      GenericSignature(), Kind::Normal};
+      GenericSignature(), Kind::Primary};
   NestedTypeStorage *nestedTypeStorage = nullptr;
 
   friend TrailingObjects;
@@ -151,10 +151,8 @@ public:
   /// create a generic environment.
   SubstitutionMap getOpaqueSubstitutions() const;
 
-  /// Create a new, "incomplete" generic environment that will be populated
-  /// by calls to \c addMapping().
-  static
-  GenericEnvironment *getIncomplete(GenericSignature signature);
+  /// Create a new, primary generic environment.
+  static GenericEnvironment *forPrimary(GenericSignature signature);
 
   /// Create a new generic environment for an opened existential.
   ///

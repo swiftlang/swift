@@ -26,7 +26,7 @@ using namespace swift;
 size_t GenericEnvironment::numTrailingObjects(
     OverloadToken<OpaqueTypeDecl *>) const {
   switch (getKind()) {
-  case Kind::Normal:
+  case Kind::Primary:
   case Kind::OpenedExistential:
     return 0;
 
@@ -38,7 +38,7 @@ size_t GenericEnvironment::numTrailingObjects(
 size_t GenericEnvironment::numTrailingObjects(
     OverloadToken<SubstitutionMap>) const {
   switch (getKind()) {
-  case Kind::Normal:
+  case Kind::Primary:
   case Kind::OpenedExistential:
     return 0;
 
@@ -50,7 +50,7 @@ size_t GenericEnvironment::numTrailingObjects(
 size_t GenericEnvironment::numTrailingObjects(
     OverloadToken<OpenedGenericEnvironmentData>) const {
   switch (getKind()) {
-  case Kind::Normal:
+  case Kind::Primary:
   case Kind::Opaque:
     return 0;
 
@@ -105,7 +105,7 @@ UUID GenericEnvironment::getOpenedExistentialUUID() const {
 }
 
 GenericEnvironment::GenericEnvironment(GenericSignature signature)
-  : SignatureAndKind(signature, Kind::Normal)
+  : SignatureAndKind(signature, Kind::Primary)
 {
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -209,7 +209,7 @@ struct SubstituteOuterFromSubstitutionMap {
 
 Type GenericEnvironment::maybeApplyOpaqueTypeSubstitutions(Type type) const {
   switch (getKind()) {
-  case Kind::Normal:
+  case Kind::Primary:
   case Kind::OpenedExistential:
     return type;
 
@@ -283,7 +283,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   /// Substitute a type for the purpose of requirements.
   auto substForRequirements = [&](Type type) {
     switch (getKind()) {
-    case Kind::Normal:
+    case Kind::Primary:
     case Kind::OpenedExistential:
       if (type->hasTypeParameter()) {
         return mapTypeIntoContext(type, conformanceLookupFn);
@@ -334,13 +334,13 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
   auto rootGP = requirements.anchor->getRootGenericParam();
   if (rootGP->isTypeSequence()) {
-    assert(getKind() == Kind::Normal);
+    assert(getKind() == Kind::Primary);
     result = SequenceArchetypeType::get(ctx, this, requirements.anchor,
                                         requirements.protos, superclass,
                                         requirements.layout);
   } else {
     switch (getKind()) {
-    case Kind::Normal:
+    case Kind::Primary:
       result = PrimaryArchetypeType::getNew(ctx, this, requirements.anchor,
                                             requirements.protos, superclass,
                                             requirements.layout);
