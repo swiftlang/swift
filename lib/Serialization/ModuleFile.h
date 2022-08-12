@@ -256,6 +256,9 @@ private:
   /// Generic signatures referenced by this module.
   MutableArrayRef<Serialized<GenericSignature>> GenericSignatures;
 
+  /// Generic environments referenced by this module.
+  MutableArrayRef<Serialized<GenericEnvironment *>> GenericEnvironments;
+
   /// Substitution maps referenced by this module.
   MutableArrayRef<Serialized<SubstitutionMap>> SubstitutionMaps;
 
@@ -858,6 +861,10 @@ public:
   /// Returns the generic signature for the given ID or the first error.
   llvm::Expected<GenericSignature>
   getGenericSignatureChecked(serialization::GenericSignatureID ID);
+
+  /// Returns the generic environment for the given ID or the first error.
+  llvm::Expected<GenericEnvironment *>
+  getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID);
 
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.

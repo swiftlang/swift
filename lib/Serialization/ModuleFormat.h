@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 698; // revert selector table changes
+const uint16_t SWIFTMODULE_VERSION_MINOR = 699; // opened archetype serialization
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -142,6 +142,9 @@ using ProtocolConformanceIDField = DeclIDField;
 // same way.
 using GenericSignatureID = DeclID;
 using GenericSignatureIDField = DeclIDField;
+
+using GenericEnvironmentID = unsigned;
+using GenericEnvironmentIDField = BCFixed<32>;
 
 // SubstitutionMapID must be the same as DeclID because it is stored in the
 // same way.
@@ -1077,9 +1080,8 @@ namespace decls_block {
 
   using OpenedArchetypeTypeLayout = BCRecordLayout<
     OPENED_ARCHETYPE_TYPE,
-    TypeIDField,            // the existential type
-    TypeIDField,            // the interface type
-    GenericSignatureIDField // generic signature
+    TypeIDField,              // the interface type
+    GenericEnvironmentIDField // generic environment ID
   >;
 
   using OpaqueArchetypeTypeLayout = BCRecordLayout<
@@ -1636,6 +1638,12 @@ namespace decls_block {
     BCArray<TypeIDField>         // generic parameter types
   >;
 
+  using GenericEnvironmentLayout = BCRecordLayout<
+    GENERIC_ENVIRONMENT,
+    TypeIDField,                 // existential type
+    GenericSignatureIDField      // parent signature
+  >;
+
   using SubstitutionMapLayout = BCRecordLayout<
     SUBSTITUTION_MAP,
     GenericSignatureIDField,     // generic signature
@@ -2119,6 +2127,7 @@ namespace index_block {
     LOCAL_TYPE_DECLS,
     OPAQUE_RETURN_TYPE_DECLS,
     GENERIC_SIGNATURE_OFFSETS,
+    GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 
