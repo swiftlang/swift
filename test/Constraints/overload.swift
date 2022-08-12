@@ -258,13 +258,6 @@ func rdar79672230() {
   test(&t) // expected-error {{no exact matches in call to local function 'test'}}
 }
 
-// https://github.com/apple/swift/issues/60029
-for (key, values) in oldName { // expected-error{{cannot find 'oldName' in scope}}
-  for (idx, value) in values.enumerated() {
-    print(key, idx, value)
-  }
-}
-
 // rdar://97396399 - crash in swift::DiagnosticEngine::formatDiagnosticText
 func rdar97396399() {
   // Has to be overloaded to make sure that contextual type is not recorded during constraint generation
