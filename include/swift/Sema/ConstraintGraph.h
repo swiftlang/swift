@@ -458,6 +458,7 @@ private:
   /// Each change can be undone (once, and in reverse order) by calling the
   /// undo() method.
   class Change {
+  public:
     /// The kind of change.
     ChangeKind Kind;
 
@@ -482,7 +483,6 @@ private:
       } Binding;
     };
 
-  public:
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
 
     /// Create a change that added a type variable.
