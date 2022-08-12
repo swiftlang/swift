@@ -920,6 +920,12 @@ static bool hasDependentTypeWitness(
   return false;
 }
 
+static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
+  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
+    return normal->isSynthesizedNonUnique();
+  return false;
+}
+
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
@@ -961,11 +967,15 @@ static bool isDependentConformance(
     if (assocConformance.isInvalid())
       return false;
 
-    if (assocConformance.isAbstract() ||
-        isDependentConformance(IGM,
-                               assocConformance.getConcrete()
-                                 ->getRootConformance(),
-                               visited))
+    if (assocConformance.isAbstract())
+      return true;
+
+    auto rootConformance = assocConformance.getConcrete()->getRootConformance();
+
+    // [*] This condition must be true if getConformanceInfo() would return
+    //     an AccessorConformanceInfo().
+    if (isSynthesizedNonUnique(rootConformance) ||
+        isDependentConformance(IGM, rootConformance, visited))
       return true;
   }
 
@@ -984,12 +994,6 @@ bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(*this, conformance, visited);
-}
-
-static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
-    return normal->isSynthesizedNonUnique();
-  return false;
 }
 
 static llvm::Value *
@@ -2142,6 +2146,9 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   // so in theory we could allocate them on a BumpPtrAllocator. But there's not
   // a good one for us to use. (The ASTContext's outlives the IRGenModule in
   // batch mode.)
+  //
+  // N.B. If you change this condition, you may need to update the condition
+  //      marked [*] in isDependentConformance().
   if (isDependentConformance(rootConformance) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
