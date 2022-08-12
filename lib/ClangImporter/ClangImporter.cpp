@@ -4692,7 +4692,7 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
 
     auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {paramRefExpr});
     storedRef = SubscriptExpr::create(ctx, pointeePropertyRefExpr, argList, subscript);
-    storedRef->setType(subscript->getElementInterfaceType());
+    storedRef->setType(LValueType::get(subscript->getElementInterfaceType()));
   } else {
     // If the base class var has a clang decl, that means it's an access into a
     // stored field. Otherwise, we're looking into another base class, so it's a
