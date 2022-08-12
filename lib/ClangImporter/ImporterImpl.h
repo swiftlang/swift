@@ -621,6 +621,10 @@ public:
                      llvm::DenseSet<clang::FunctionDecl *>>>>
       cxxMethods;
 
+  // Keep track of the decls that were already cloned for this specific class.
+  llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
+      clonedBaseMembers;
+
   // Cache for already-specialized function templates and any thunks they may
   // have.
   llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
