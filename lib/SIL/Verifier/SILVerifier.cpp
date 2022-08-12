@@ -2223,6 +2223,31 @@ public:
             "Found load borrow that is invalidated by a local write?!");
   }
 
+  void checkBeginBorrowInst(BeginBorrowInst *bbi) {
+    if (!bbi->isLexical())
+      return;
+    // Lexical begin_borrows of instances of some SILBoxType must derive from
+    // alloc_boxes or captures.
+    auto value = bbi->getOperand();
+    if (!value->getType().is<SILBoxType>())
+      return;
+    while (true) {
+      // Inlining may introduce additional begin_borrow instructions.
+      if (auto bbi = dyn_cast<BeginBorrowInst>(value))
+        value = bbi->getOperand();
+      // SILGen introduces copy_value instructions.
+      else if (auto cvi = dyn_cast<CopyValueInst>(value))
+        value = cvi->getOperand();
+      // SILGen inserts mark_uninitialized instructions of alloc_boxes.
+      else if (auto *mui = dyn_cast<MarkUninitializedInst>(value))
+        value = mui->getOperand();
+      else
+        break;
+    }
+    require(isa<AllocBoxInst>(value) || isa<SILFunctionArgument>(value),
+            "Lexical borrows of SILBoxTypes must be of vars or captures.");
+  }
+
   void checkEndBorrowInst(EndBorrowInst *EBI) {
     require(
         F.hasOwnership(),
