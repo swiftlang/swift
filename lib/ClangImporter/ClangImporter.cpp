@@ -4946,11 +4946,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   // Find the results that are actually a member of "recordDecl".
   TinyPtrVector<ValueDecl *> result;
+  ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (auto found : allResults) {
     auto named = found.get<clang::NamedDecl *>();
     if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
         recordDecl->getClangDecl()) {
-      if (auto import = ctx.getClangModuleLoader()->importDeclDirectly(named))
+      if (auto import = clangModuleLoader->importDeclDirectly(named))
         result.push_back(cast<ValueDecl>(import));
     }
   }
@@ -4966,16 +4967,32 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         continue;
 
       auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
-      if (auto import =
-              ctx.getClangModuleLoader()->importDeclDirectly(baseRecord)) {
+      if (auto import = clangModuleLoader->importDeclDirectly(baseRecord)) {
         // If we are looking up the base class, go no further. We will have
         // already found it during the other lookup.
         if (cast<ValueDecl>(import)->getName() == name)
           continue;
 
-        auto baseResults = cast<NominalTypeDecl>(import)->lookupDirect(name);
+        // Add Clang members that are imported lazily.
+        auto baseResults = evaluateOrDefault(
+            ctx.evaluator,
+            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name}), {});
+        // Add members that are synthesized eagerly, such as subscripts.
+        for (auto member :
+             cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
+          if (auto namedMember = dyn_cast<ValueDecl>(member)) {
+            if (namedMember->hasName() &&
+                namedMember->getName().getBaseName() == name &&
+                // Make sure we don't add duplicate entries, as that would
+                // wrongly imply that lookup is ambiguous.
+                !llvm::is_contained(baseResults, namedMember)) {
+              baseResults.push_back(namedMember);
+            }
+          }
+        }
         for (auto foundInBase : baseResults) {
-          if (auto newDecl = cloneBaseMemberDecl(foundInBase, recordDecl)) {
+          if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
+                  foundInBase, recordDecl)) {
             result.push_back(newDecl);
           }
         }
@@ -5770,6 +5787,18 @@ ClangImporter::getEffectiveClangContext(const NominalTypeDecl *nominal) {
 
 Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
+}
+
+ValueDecl *ClangImporter::importBaseMemberDecl(ValueDecl *decl,
+                                               DeclContext *newContext) {
+  // Make sure we don't clone the decl again for this class, as that would
+  // result in multiple definitions of the same symbol.
+  std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
+  if (!Impl.clonedBaseMembers.count(key)) {
+    ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext);
+    Impl.clonedBaseMembers[key] = cloned;
+  }
+  return Impl.clonedBaseMembers[key];
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
