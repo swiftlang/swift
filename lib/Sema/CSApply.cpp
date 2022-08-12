@@ -919,6 +919,15 @@ namespace {
 
       auto &context = cs.getASTContext();
 
+      // turn LValues into RValues first
+      if (openedType->hasLValueType()) {
+        assert(adjustedOpenedType->hasLValueType() && "lvalue-ness mismatch?");
+        return adjustTypeForDeclReference(cs.coerceToRValue(expr),
+                  openedType->getRValueType(),
+                  adjustedOpenedType->getRValueType(),
+                  getNewType);
+      }
+
       // If we have an optional type, wrap it up in a monadic '?' and recurse.
       if (Type objectType = openedType->getOptionalObjectType()) {
         Type adjustedRefType = getNewType(adjustedOpenedType);
@@ -1669,10 +1678,17 @@ namespace {
           adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
               containerTy, 1);
         }
-        cs.setType(memberRefExpr, refTy->castTo<FunctionType>()->getResult());
+
+        // \returns result of the given function type
+        auto resultType = [](Type fnTy) -> Type {
+          return fnTy->castTo<FunctionType>()->getResult();
+        };
+
+        cs.setType(memberRefExpr, resultType(refTy));
 
         Expr *result = memberRefExpr;
-        result = adjustTypeForDeclReference(result, refTy, adjustedRefTy);
+        result = adjustTypeForDeclReference(result, resultType(refTy),
+                                                    resultType(adjustedRefTy));
         closeExistentials(result, locator);
 
         // If the property is of dynamic 'Self' type, wrap an implicit

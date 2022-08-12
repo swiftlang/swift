@@ -1259,7 +1259,8 @@ ClosureIsolatedByPreconcurrency::operator()(const ClosureExpr *expr) const {
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
-    ConstraintLocator *memberLocator, bool wantInterfaceType) {
+    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    bool adjustForPreconcurrency) {
   return ConstraintSystem::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
@@ -1272,22 +1273,25 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      memberLocator, wantInterfaceType, GetClosureType{*this},
+      memberLocator, wantInterfaceType, adjustForPreconcurrency,
+      GetClosureType{*this},
       ClosureIsolatedByPreconcurrency{*this});
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType,
-    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    ConstraintLocator *memberLocator,
+    bool wantInterfaceType, bool adjustForPreconcurrency,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType,
     llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
-  // Adjust the type for concurrency.
-  requestedType = adjustVarTypeForConcurrency(
-      requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
+  // Adjust the type for concurrency if requested.
+  if (adjustForPreconcurrency)
+    requestedType = adjustVarTypeForConcurrency(
+        requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -2309,9 +2313,14 @@ ConstraintSystem::getTypeOfMemberReference(
       FunctionType::ExtInfo info;
       refType = FunctionType::get(indices, elementTy, info);
     } else {
+      // Delay the adjustment for preconcurrency until after we've formed
+      // the function type for this kind of reference. Otherwise we will lose
+      // track of the adjustment in the formed function's return type.
+
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            locator,
-                                           /*wantInterfaceType=*/true);
+                                           /*wantInterfaceType=*/true,
+                                           /*adjustForPreconcurrency=*/false);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
@@ -2432,6 +2441,16 @@ ConstraintSystem::getTypeOfMemberReference(
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<AnyFunctionType>(), subscript, useDC,
         /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements);
+  } else if (auto var = dyn_cast<VarDecl>(value)) {
+    // Adjust the function's result type, since that's the Var's actual type.
+    auto origFnType = origOpenedType->castTo<AnyFunctionType>();
+
+    auto resultTy = adjustVarTypeForConcurrency(
+          origFnType->getResult(), var, useDC, GetClosureType{*this},
+          ClosureIsolatedByPreconcurrency{*this});
+
+    openedType = FunctionType::get(
+                  origFnType->getParams(), resultTy, origFnType->getExtInfo());
   }
 
   // Compute the type of the reference.
