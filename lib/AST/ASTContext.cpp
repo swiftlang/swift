@@ -5340,9 +5340,8 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     };
 
     for (auto reqt : baseGenericSig.getRequirements()) {
-      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
-        addedRequirements.push_back(*substReqt);
-      }
+      auto substReqt = reqt.subst(substFn, lookupConformanceFn);
+      addedRequirements.push_back(substReqt);
     }
   }
 

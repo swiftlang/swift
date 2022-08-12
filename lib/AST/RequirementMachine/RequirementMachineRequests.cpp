@@ -599,7 +599,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
           },
           MakeAbstractConformanceForGenericType(),
           SubstFlags::AllowLoweredTypes);
-      resugaredRequirements.push_back(*resugaredReq);
+      resugaredRequirements.push_back(resugaredReq);
     }
 
     return GenericSignatureWithError(

@@ -5169,8 +5169,8 @@ public:
       auto decl = TypeAlias->getDecl();
       auto subMap = TypeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
-        if (auto req = rawReq.subst(subMap))
-          Builder.addRequirement(*req, source, nullptr);
+        auto req = rawReq.subst(subMap);
+        Builder.addRequirement(req, source, nullptr);
       }
 
       return Action::Continue;
@@ -5237,8 +5237,8 @@ public:
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
-      if (auto req = rawReq.subst(subMap))
-        Builder.addRequirement(*req, source, nullptr);
+      auto req = rawReq.subst(subMap);
+      Builder.addRequirement(req, source, nullptr);
     }
 
     return Action::Continue;
@@ -8402,7 +8402,7 @@ AbstractGenericSignatureRequestGSB::evaluate(
           },
           MakeAbstractConformanceForGenericType(),
           SubstFlags::AllowLoweredTypes);
-      resugaredRequirements.push_back(*resugaredReq);
+      resugaredRequirements.push_back(resugaredReq);
     }
 
     return GenericSignatureWithError(

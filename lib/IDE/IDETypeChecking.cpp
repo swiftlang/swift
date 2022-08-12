@@ -323,15 +323,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         if (!BaseType->isExistentialType()) {
           // Apply any substitutions we need to map the requirements from a
           // a protocol extension to an extension on the conforming type.
-          auto SubstReq = Req.subst(subMap);
-          if (!SubstReq) {
+          Req = Req.subst(subMap);
+          if (Req.hasError()) {
             // Substitution with interface type bases can only fail
             // if a concrete type fails to conform to a protocol.
             // In this case, just give up on the extension altogether.
             return true;
           }
-
-          Req = *SubstReq;
         }
 
         assert(!Req.getFirstType()->hasArchetype());
@@ -346,13 +344,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             return type;
           },
           LookUpConformanceInModule(M));
-        if (!SubstReq)
+        if (SubstReq.hasError())
           return true;
 
         // FIXME: Need to handle conditional requirements here!
         ArrayRef<Requirement> conditionalRequirements;
-        if (!SubstReq->isSatisfied(conditionalRequirements)) {
-          if (!SubstReq->canBeSatisfied())
+        if (!SubstReq.isSatisfied(conditionalRequirements)) {
+          if (!SubstReq.canBeSatisfied())
             return true;
 
           MergeInfo.addRequirement(Req);

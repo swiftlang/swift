@@ -181,9 +181,9 @@ RequirementEnvironment::RequirementEnvironment(
 
   if (conformanceSig) {
     for (auto &rawReq : conformanceSig.getRequirements()) {
-      if (auto req = rawReq.subst(conformanceToSyntheticTypeFn,
-                                  conformanceToSyntheticConformanceFn))
-        requirements.push_back(*req);
+      auto req = rawReq.subst(conformanceToSyntheticTypeFn,
+                              conformanceToSyntheticConformanceFn);
+      requirements.push_back(req);
     }
   }
 
@@ -207,8 +207,8 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
   for (auto &rawReq : reqSig.getRequirements()) {
-    if (auto req = rawReq.subst(reqToSyntheticEnvMap))
-      requirements.push_back(*req);
+    auto req = rawReq.subst(reqToSyntheticEnvMap);
+    requirements.push_back(req);
   }
 
   // Produce the generic signature and environment.
