@@ -529,6 +529,10 @@ std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
   return str;
 }
 
+SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global) {
+  return castToGlobal(global)->isLet();
+}
+
 //===----------------------------------------------------------------------===//
 //                               SILInstruction
 //===----------------------------------------------------------------------===//
@@ -673,6 +677,10 @@ SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai) {
   return castToInst<RefElementAddrInst>(reai)->getFieldIndex();
 }
 
+SwiftInt RefElementAddrInst_fieldIsLet(BridgedInstruction reai) {
+  return castToInst<RefElementAddrInst>(reai)->getField()->isLet();
+}
+
 SwiftInt PartialApplyInst_numArguments(BridgedInstruction pai) {
   return castToInst<PartialApplyInst>(pai)->getNumArguments();
 }
@@ -721,6 +729,20 @@ SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx) {
 
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
   return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
+}
+
+BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess) {
+  auto kind = castToInst<BeginAccessInst>(beginAccess)->getAccessKind();
+  switch (kind) {
+    case SILAccessKind::Init:
+      return BridgedAccessKind::AccessKind_Init;
+    case SILAccessKind::Read:
+      return BridgedAccessKind::AccessKind_Read;
+    case SILAccessKind::Modify:
+      return BridgedAccessKind::AccessKind_Modify;
+    case SILAccessKind::Deinit:
+      return BridgedAccessKind::AccessKind_Deinit;
+  }
 }
 
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr) {
