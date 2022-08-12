@@ -389,8 +389,18 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
   SmallVector<Argument, 4> arguments;
   {
     for (auto *param : *ctor->getParameters()) {
-      arguments.push_back({/*labelLoc=*/SourceLoc(), param->getName(),
-                           new (ctx) DeclRefExpr(param, /*Loc=*/DeclNameLoc(),
+      VarDecl *arg = param;
+
+      // type wrappers wrap only backing storage of a wrapped
+      // property, so in this case we need to pass `_<name>` to
+      // `$Storage` constructor.
+      if (param->hasAttachedPropertyWrapper()) {
+        arg = param->getPropertyWrapperBackingProperty();
+        (void)param->getPropertyWrapperBackingPropertyType();
+      }
+
+      arguments.push_back({/*labelLoc=*/SourceLoc(), arg->getName(),
+                           new (ctx) DeclRefExpr(arg, /*Loc=*/DeclNameLoc(),
                                                  /*Implicit=*/true)});
     }
   }

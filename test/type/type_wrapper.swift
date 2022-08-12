@@ -162,3 +162,173 @@ func testTypeWrapperWithDefaults() {
   _ = A(question: "")
   _ = A(answer: 0)
 }
+
+/// Properties with property wrappers
+
+@propertyWrapper
+struct Wrapper<Value> {
+  public var value: Value
+
+  init(wrappedValue: Value) {
+    self.value = wrappedValue
+  }
+
+  var projectedValue: Self { return self }
+
+  var wrappedValue: Value {
+    get {
+      self.value
+    }
+    set {
+      self.value = newValue
+    }
+  }
+}
+
+@propertyWrapper
+struct WrapperWithoutInit<Value> {
+  public var value: Value
+
+  var projectedValue: Self { return self }
+
+  var wrappedValue: Value {
+    get {
+      self.value
+    }
+    set {
+      self.value = newValue
+    }
+  }
+}
+
+@propertyWrapper
+struct WrapperWithoutProjection<Value> {
+  public var value: Value
+
+  init(wrappedValue: Value) {
+    self.value = wrappedValue
+  }
+
+  var wrappedValue: Value {
+    get {
+      self.value
+    }
+    set {
+      self.value = newValue
+    }
+  }
+}
+
+func propertyWrapperTests() {
+  @NoopWrapper
+  struct WrapperTest {
+    @Wrapper var test: Int
+  }
+
+  _ = WrapperTest(test: 42) // Ok
+
+  @NoopWrapper
+  struct DefaultedWrapperTest {
+    @Wrapper var test: Int = 42
+  }
+
+  _ = DefaultedWrapperTest() // Ok
+  _ = DefaultedWrapperTest(test: 42) // Ok
+
+  @NoopWrapper
+  struct NoInitTest {
+    @WrapperWithoutInit var test: Int
+  }
+
+  _ = NoInitTest(test: WrapperWithoutInit(value: 42)) // Ok
+
+  @NoopWrapper
+  struct DefaultedNoInitTest {
+    @WrapperWithoutInit(value: 42) var test: Int
+  }
+
+  _ = DefaultedNoInitTest() // Ok
+  _ = DefaultedNoInitTest(test: WrapperWithoutInit(value: 0)) // Ok
+
+  @NoopWrapper
+  struct NoProjection {
+    @WrapperWithoutProjection var test: Int // expected-note {{'test' declared here}}
+  }
+
+  let noProj = NoProjection(test: 42) // Ok
+  _ = noProj.test // Ok
+  _ = noProj.$test // expected-error {{value of type 'NoProjection' has no member '$test'}}
+
+  @NoopWrapper
+  struct NoInitComposition1 {
+    @Wrapper @WrapperWithoutInit var test: Int
+  }
+
+  _ = NoInitComposition1(test: Wrapper(wrappedValue: WrapperWithoutInit(value: 42))) // Ok
+
+  @NoopWrapper
+  struct NoInitComposition2 {
+    @WrapperWithoutInit @Wrapper var test: Int
+  }
+
+  _ = NoInitComposition2(test: WrapperWithoutInit(value: Wrapper(wrappedValue: 42))) // Ok
+
+  @NoopWrapper
+  struct NoInitCompositionWithDefault {
+    @Wrapper(wrappedValue: WrapperWithoutInit(value: 42)) @WrapperWithoutInit var test: Int
+  }
+
+  _ = NoInitCompositionWithDefault() // Ok
+  _ = NoInitCompositionWithDefault(test: Wrapper(wrappedValue: WrapperWithoutInit(value: 0))) // Ok
+
+  @NoopWrapper
+  struct Complex1 {
+    @Wrapper var a: Int = 42
+    var b: String = ""
+  }
+
+  _ = Complex1()
+  _ = Complex1(b: "hello") // Ok
+  _ = Complex1(a: 0) // Ok
+  _ = Complex1(a: 0, b: "") // Ok
+
+  @NoopWrapper
+  struct Complex2 {
+    @Wrapper var a: Int = 42
+    @WrapperWithoutInit @Wrapper var b: String
+  }
+
+  _ = Complex2(b: WrapperWithoutInit(value: Wrapper(wrappedValue: "hello"))) // Ok
+  _ = Complex2(a: 0, b: WrapperWithoutInit(value: Wrapper(wrappedValue: "hello"))) // Ok
+  _ = Complex2(b: WrapperWithoutInit(value: Wrapper(wrappedValue: "wrong")), a: 0) // expected-error {{argument 'a' must precede argument 'b'}}
+
+  @NoopWrapper
+  struct Complex3 {
+    @Wrapper var a: Int = 42
+    var b: String = ""
+    @WrapperWithoutProjection var c: [Int] = []
+  }
+
+  _ = Complex3()
+  _ = Complex3(b: "hello") // Ok
+  _ = Complex3(c: [1, 2, 3]) // Ok
+  _ = Complex3(a: 0) // Ok
+  _ = Complex3(a: 0, b: "") // Ok
+  _ = Complex3(a: 0, b: "", c: [1, 2, 3]) // Ok
+
+  @NoopWrapper
+  struct Invalid {
+    @Wrapper(wrappedValue: "") var a: Int
+    // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    @Wrapper var b: Int = ""
+    // expected-error@-1 {{cannot convert value of type 'String' to specified type 'Int'}}
+
+    @Wrapper(wrappedValue: 0) var c: Int = 1
+    // expected-error@-1 {{extra argument 'wrappedValue' in call}}
+
+    @Wrapper(other: "") var d: Float
+    // expected-error@-1 {{incorrect argument label in call (have 'other:', expected 'wrappedValue:')}}
+    // expected-error@-2 {{cannot convert value of type 'String' to expected argument type 'Float'}}
+  }
+}

@@ -190,23 +190,44 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
 
 static void maybeAddTypeWrapperDefaultArg(ParamDecl *arg, VarDecl *var,
                                           ASTContext &ctx) {
-  assert(var->isAccessedViaTypeWrapper());
+  assert(var->isAccessedViaTypeWrapper() || var->hasAttachedPropertyWrapper());
 
-  if (!var->getParentPattern()->getSingleVar())
+  if (!(var->getParentPattern() && var->getParentPattern()->getSingleVar()))
     return;
 
   auto *PBD = var->getParentPatternBinding();
 
-  auto *initExpr = PBD->getInit(/*index=*/0);
+  Expr *initExpr = nullptr;
+
+  if (var->hasAttachedPropertyWrapper()) {
+    auto initInfo = var->getPropertyWrapperInitializerInfo();
+
+    if (initInfo.hasInitFromWrappedValue()) {
+      initExpr =
+          initInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue();
+    }
+  } else {
+    initExpr = PBD->getInit(/*index=*/0);
+  }
+
   if (!initExpr)
     return;
 
   // Type wrapper variables are never initialized directly,
   // initialization expression (if any) becomes an default
   // argument of the initializer synthesized by the type wrapper.
-  PBD->setInitializerSubsumed(/*index=*/0);
+  {
+    // Since type wrapper is applied to backing property, that's
+    // the the initializer it subsumes.
+    if (var->hasAttachedPropertyWrapper()) {
+      auto *backingVar = var->getPropertyWrapperBackingProperty();
+      PBD = backingVar->getParentPatternBinding();
+    }
 
-  arg->setDefaultExpr(initExpr, /*isTypeChecked=*/false);
+    PBD->setInitializerSubsumed(/*index=*/0);
+  }
+
+  arg->setDefaultExpr(initExpr, PBD->isInitializerChecked(/*index=*/0));
   arg->setDefaultArgumentKind(DefaultArgumentKind::Normal);
 }
 
@@ -354,11 +375,51 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       if (!(var && var->isAccessedViaTypeWrapper()))
         continue;
 
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, var->getName(), Loc,
-                                      var->getName(), decl);
+      Identifier argName = var->getName();
+      Identifier paramName = argName;
 
+      auto paramInterfaceType = var->getValueInterfaceType();
+      DeclAttributes attrs;
+
+      // If this is a backing storage of a property wrapped property
+      // let's use wrapped property as a parameter and synthesize
+      // appropriate property wrapper initialization upon assignment.
+      if (auto *wrappedVar = var->getOriginalWrappedProperty(
+              PropertyWrapperSynthesizedPropertyKind::Backing)) {
+        // If there is `init(wrappedValue:)` or default value for a wrapped
+        // property we should use wrapped type, otherwise let's proceed with
+        // wrapper type.
+        if (wrappedVar->isPropertyMemberwiseInitializedWithWrappedType()) {
+          var = wrappedVar;
+          // If parameter have to get wrapped type, let's re-map both argument
+          // and parameter name to match wrapped property and let property
+          // wrapper attributes generate wrapped value and projection variables.
+          argName = wrappedVar->getName();
+          paramName = argName;
+
+          paramInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+          // The parameter needs to have all of the property wrapper
+          // attributes to generate projection and wrapper variables.
+          for (auto *attr : wrappedVar->getAttachedPropertyWrappers())
+            attrs.add(attr);
+        } else {
+          // If parameter has to have wrapper type then argument type should
+          // match that of a wrapped property but parameter name stays the same
+          // since it represents the type of backing storage and could be passed
+          // to `$Storage` constructor directly.
+          argName = wrappedVar->getName();
+        }
+      }
+
+      if (!paramInterfaceType || paramInterfaceType->hasError())
+        continue;
+
+      auto *arg =
+          new (ctx) ParamDecl(SourceLoc(), Loc, argName, Loc, paramName, decl);
+
+      arg->getAttrs().add(attrs);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(var->getValueInterfaceType());
+      arg->setInterfaceType(paramInterfaceType);
       arg->setImplicit();
 
       maybeAddTypeWrapperDefaultArg(arg, var, ctx);
