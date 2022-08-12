@@ -4530,7 +4530,8 @@ public:
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   ConstraintLocator *memberLocator = nullptr,
-                                  bool wantInterfaceType = false);
+                                  bool wantInterfaceType = false,
+                                  bool adjustForPreconcurrency = true);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -4552,6 +4553,7 @@ public:
       llvm::function_ref<Type(VarDecl *)> getType,
       ConstraintLocator *memberLocator = nullptr,
       bool wantInterfaceType = false,
+      bool adjustForPreconcurrency = true,
       llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
         [](const AbstractClosureExpr *) {
           return Type();
