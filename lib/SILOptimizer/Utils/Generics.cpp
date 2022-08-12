@@ -2280,11 +2280,8 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
       builder.setInsertionPoint(resultBlock->begin());
       fixUsedVoidType(resultBlock->getArgument(0), loc, builder);
 
-      SILValue returnValue;
-      if (!typeReplacements.hasIndirectResultTypes()) {
-        returnValue = resultBlock->replacePhiArgument(
+      SILValue returnValue = resultBlock->replacePhiArgument(
             0, resultOut->getType().getObjectType(), OwnershipKind::Owned);
-      }
 
       // Store the direct result to the original result address.
       builder.emitStoreValueOperation(loc, returnValue, resultOut,
