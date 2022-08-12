@@ -1579,6 +1579,40 @@ BridgedVTableArray PassContext_getVTables(BridgedPassContext context) {
   return {(const BridgedVTable *)vTables.data(), vTables.size()};
 }
 
+OptionalBridgedWitnessTable
+PassContext_firstWitnessTableInModule(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  if (mod->getWitnessTables().empty())
+    return {nullptr};
+  return {&*mod->getWitnessTables().begin()};
+}
+
+OptionalBridgedWitnessTable
+PassContext_nextWitnessTableInModule(BridgedWitnessTable table) {
+  auto *t = castToWitnessTable(table);
+  auto nextIter = std::next(t->getIterator());
+  if (nextIter == t->getModule().getWitnessTables().end())
+    return {nullptr};
+  return {&*nextIter};
+}
+
+OptionalBridgedDefaultWitnessTable
+PassContext_firstDefaultWitnessTableInModule(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  if (mod->getDefaultWitnessTables().empty())
+    return {nullptr};
+  return {&*mod->getDefaultWitnessTables().begin()};
+}
+
+OptionalBridgedDefaultWitnessTable
+PassContext_nextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
+  auto *t = castToDefaultWitnessTable(table);
+  auto nextIter = std::next(t->getIterator());
+  if (nextIter == t->getModule().getDefaultWitnessTables().end())
+    return {nullptr};
+  return {&*nextIter};
+}
+
 OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, StringRef name) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();

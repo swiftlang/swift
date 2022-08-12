@@ -172,6 +172,14 @@ PassContext_firstFunctionInModule(BridgedPassContext context);
 OptionalBridgedFunction
 PassContext_nextFunctionInModule(BridgedFunction function);
 BridgedVTableArray PassContext_getVTables(BridgedPassContext context);
+OptionalBridgedWitnessTable
+PassContext_firstWitnessTableInModule(BridgedPassContext context);
+OptionalBridgedWitnessTable
+PassContext_nextWitnessTableInModule(BridgedWitnessTable table);
+OptionalBridgedDefaultWitnessTable
+PassContext_firstDefaultWitnessTableInModule(BridgedPassContext context);
+OptionalBridgedDefaultWitnessTable
+PassContext_nextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table);
 
 OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);

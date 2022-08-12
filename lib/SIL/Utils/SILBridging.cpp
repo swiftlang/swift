@@ -582,6 +582,67 @@ BridgedFunction SILVTableEntry_getFunction(BridgedVTableEntry entry) {
 }
 
 //===----------------------------------------------------------------------===//
+//                    SILVWitnessTable, SILDefaultWitnessTable
+//===----------------------------------------------------------------------===//
+
+static_assert(BridgedWitnessTableEntrySize == sizeof(SILWitnessTable::Entry),
+              "wrong bridged WitnessTable entry size");
+
+std::string SILWitnessTable_debugDescription(BridgedWitnessTable table) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToWitnessTable(table)->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+BridgedArrayRef SILWitnessTable_getEntries(BridgedWitnessTable table) {
+  auto entries = castToWitnessTable(table)->getEntries();
+  return {(const unsigned char *)entries.data(), entries.size()};
+}
+
+std::string SILDefaultWitnessTable_debugDescription(BridgedDefaultWitnessTable table) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToDefaultWitnessTable(table)->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+BridgedArrayRef SILDefaultWitnessTable_getEntries(BridgedDefaultWitnessTable table) {
+  auto entries = castToDefaultWitnessTable(table)->getEntries();
+  return {(const unsigned char *)entries.data(), entries.size()};
+}
+
+std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToWitnessTableEntry(entry)->print(os, /*verbose=*/ false,
+                                        PrintOptions::printSIL());
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+SILWitnessTableEntryKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry) {
+  switch (castToWitnessTableEntry(entry)->getKind()) {
+    case SILWitnessTable::Method:
+      return SILWitnessTableEntry_Method;
+    case SILWitnessTable::AssociatedType:
+      return SILWitnessTableEntry_AssociatedType;
+    case SILWitnessTable::AssociatedTypeProtocol:
+      return SILWitnessTableEntry_AssociatedTypeProtocol;
+    case SILWitnessTable::BaseProtocol:
+      return SILWitnessTableEntry_BaseProtocol;
+    default:
+      llvm_unreachable("wrong witness table entry kind");
+  }
+}
+
+OptionalBridgedFunction SILWitnessTableEntry_getMethodFunction(BridgedWitnessTableEntry entry) {
+  return {castToWitnessTableEntry(entry)->getMethodWitness().Witness};
+}
+
+//===----------------------------------------------------------------------===//
 //                               SILInstruction
 //===----------------------------------------------------------------------===//
 

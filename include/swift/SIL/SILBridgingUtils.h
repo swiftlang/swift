@@ -17,6 +17,8 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILVTable.h"
+#include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILDefaultWitnessTable.h"
 #include "llvm/ADT/StringRef.h"
 
 #include <string>
@@ -91,6 +93,20 @@ inline const SILVTable *castToVTable(BridgedVTable vTable) {
 
 inline const SILVTableEntry *castToVTableEntry(BridgedVTableEntry entry) {
   return static_cast<const SILVTableEntry *>(entry.ptr);
+}
+
+inline const SILWitnessTable *castToWitnessTable(BridgedWitnessTable table) {
+  return static_cast<const SILWitnessTable *>(table.ptr);
+}
+
+inline const SILDefaultWitnessTable *
+castToDefaultWitnessTable(BridgedDefaultWitnessTable table) {
+  return static_cast<const SILDefaultWitnessTable *>(table.ptr);
+}
+
+inline const SILWitnessTable::Entry *
+castToWitnessTableEntry(BridgedWitnessTableEntry entry) {
+  return static_cast<const SILWitnessTable::Entry *>(entry.ptr);
 }
 
 inline ValueOwnershipKind castToOwnership(BridgedOwnership ownership) {

@@ -47,6 +47,34 @@ struct ModulePassContext {
     }
   }
 
+  struct WitnessTableList : CollectionLikeSequence, IteratorProtocol {
+    private var currentTable: WitnessTable?
+    
+    fileprivate init(first: WitnessTable?) { currentTable = first }
+
+    mutating func next() -> WitnessTable? {
+      if let t = currentTable {
+        currentTable = PassContext_nextWitnessTableInModule(t.bridged).table
+        return t
+      }
+      return nil
+    }
+  }
+
+  struct DefaultWitnessTableList : CollectionLikeSequence, IteratorProtocol {
+    private var currentTable: DefaultWitnessTable?
+    
+    fileprivate init(first: DefaultWitnessTable?) { currentTable = first }
+
+    mutating func next() -> DefaultWitnessTable? {
+      if let t = currentTable {
+        currentTable = PassContext_nextDefaultWitnessTableInModule(t.bridged).table
+        return t
+      }
+      return nil
+    }
+  }
+
   var functions: FunctionList {
     FunctionList(first: PassContext_firstFunctionInModule(_bridged).function)
   }
@@ -55,6 +83,14 @@ struct ModulePassContext {
     VTableArray(bridged: PassContext_getVTables(_bridged))
   }
   
+  var witnessTables: WitnessTableList {
+    WitnessTableList(first: PassContext_firstWitnessTableInModule(_bridged).table)
+  }
+
+  var defaultWitnessTables: DefaultWitnessTableList {
+    DefaultWitnessTableList(first: PassContext_firstDefaultWitnessTableInModule(_bridged).table)
+  }
+
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
   ///
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest

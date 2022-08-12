@@ -26,5 +26,5 @@ add_swift_compiler_module(SIL
     Type.swift
     Utils.swift
     Value.swift
-    VTable.swift)
-
+    VTable.swift
+    WitnessTable.swift)

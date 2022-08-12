@@ -24,7 +24,8 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 enum {
   BridgedOperandSize = 4 * sizeof(uintptr_t),
   BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t),
-  BridgedVTableEntrySize = 5 * sizeof(uintptr_t)
+  BridgedVTableEntrySize = 5 * sizeof(uintptr_t),
+  BridgedWitnessTableEntrySize = 5 * sizeof(uintptr_t)
 };
 
 enum ChangeNotificationKind {
@@ -76,6 +77,33 @@ typedef struct {
 typedef struct {
   const void * _Nonnull ptr;
 } BridgedVTableEntry;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedWitnessTable;
+
+typedef struct {
+  const void * _Nullable ptr;
+} OptionalBridgedWitnessTable;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedDefaultWitnessTable;
+
+typedef struct {
+  const void * _Nullable ptr;
+} OptionalBridgedDefaultWitnessTable;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedWitnessTableEntry;
+
+typedef enum {
+  SILWitnessTableEntry_Method,
+  SILWitnessTableEntry_AssociatedType,
+  SILWitnessTableEntry_AssociatedTypeProtocol,
+  SILWitnessTableEntry_BaseProtocol
+} SILWitnessTableEntryKind;
 
 typedef struct {
   SwiftObject obj;
@@ -246,6 +274,14 @@ std::string SILVTable_debugDescription(BridgedVTable vTable);
 BridgedArrayRef SILVTable_getEntries(BridgedVTable vTable);
 std::string SILVTableEntry_debugDescription(BridgedVTableEntry entry);
 BridgedFunction SILVTableEntry_getFunction(BridgedVTableEntry entry);
+
+std::string SILWitnessTable_debugDescription(BridgedWitnessTable table);
+BridgedArrayRef SILWitnessTable_getEntries(BridgedWitnessTable table);
+std::string SILDefaultWitnessTable_debugDescription(BridgedDefaultWitnessTable table);
+BridgedArrayRef SILDefaultWitnessTable_getEntries(BridgedDefaultWitnessTable table);
+std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry);
+SILWitnessTableEntryKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry);
+OptionalBridgedFunction SILWitnessTableEntry_getMethodFunction(BridgedWitnessTableEntry entry);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
