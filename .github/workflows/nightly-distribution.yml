@@ -10,7 +10,8 @@ jobs:
         include:
           - branch: "swiftwasm"
             channel: "DEVELOPMENT"
-            targets: "amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 ubuntu22.04_x86_64 macos_x86_64 macos_arm64"
+#           targets: "amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 ubuntu22.04_x86_64 macos_x86_64 macos_arm64"
+            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 ubuntu22.04_x86_64 macos_x86_64 macos_arm64"
           - branch: "swiftwasm-release/5.3"
             channel: "5.3"
             targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"

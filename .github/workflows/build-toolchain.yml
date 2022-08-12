@@ -26,9 +26,9 @@ jobs:
     if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'check-self-hosted-ci') }}
     outputs:
       ubuntu20_04_aarch64-label: ${{ steps.start-ubuntu20_04_aarch64-runner.outputs.label }}
-      amazonlinux2_x86_64-label: ${{ steps.start-amazonlinux2_x86_64-runner.outputs.label }}
+#     amazonlinux2_x86_64-label: ${{ steps.start-amazonlinux2_x86_64-runner.outputs.label }}
       ubuntu20_04_aarch64-ec2-instance-id: ${{ steps.start-ubuntu20_04_aarch64-runner.outputs.ec2-instance-id }}
-      amazonlinux2_x86_64-ec2-instance-id: ${{ steps.start-amazonlinux2_x86_64-runner.outputs.ec2-instance-id }}
+#     amazonlinux2_x86_64-ec2-instance-id: ${{ steps.start-amazonlinux2_x86_64-runner.outputs.ec2-instance-id }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -46,16 +46,16 @@ jobs:
           ec2-instance-type: c6g.large
           subnet-id: subnet-327f4a13
           security-group-id: sg-0429f5ec2bee9dc0c
-      - name: Start EC2 runner (amazonlinux2_x86_64)
-        id: start-amazonlinux2_x86_64-runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: start
-          github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
-          ec2-image-id: ami-059fc55111c686d49 # swiftwasm-ci/amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2
-          ec2-instance-type: c6i.large
-          subnet-id: subnet-327f4a13
-          security-group-id: sg-0429f5ec2bee9dc0c
+#     - name: Start EC2 runner (amazonlinux2_x86_64)
+#       id: start-amazonlinux2_x86_64-runner
+#       uses: machulav/ec2-github-runner@v2
+#       with:
+#         mode: start
+#         github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
+#         ec2-image-id: ami-059fc55111c686d49 # swiftwasm-ci/amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2
+#         ec2-instance-type: c6i.large
+#         subnet-id: subnet-327f4a13
+#         security-group-id: sg-0429f5ec2bee9dc0c
   stop-runner:
     name: Stop self-hosted EC2 runner
     needs: [start-runner, build-toolchain]
@@ -76,13 +76,13 @@ jobs:
           github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
           label: ${{ needs.start-runner.outputs.ubuntu20_04_aarch64-label }}
           ec2-instance-id: ${{ needs.start-runner.outputs.ubuntu20_04_aarch64-ec2-instance-id }}
-      - name: Stop EC2 runner (amazonlinux2_x86_64)
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: stop
-          github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
-          label: ${{ needs.start-runner.outputs.amazonlinux2_x86_64-label }}
-          ec2-instance-id: ${{ needs.start-runner.outputs.amazonlinux2_x86_64-ec2-instance-id }}
+#     - name: Stop EC2 runner (amazonlinux2_x86_64)
+#       uses: machulav/ec2-github-runner@v2
+#       with:
+#         mode: stop
+#         github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
+#         label: ${{ needs.start-runner.outputs.amazonlinux2_x86_64-label }}
+#         ec2-instance-id: ${{ needs.start-runner.outputs.amazonlinux2_x86_64-ec2-instance-id }}
 
   build-matrix:
     name: Build matrix
@@ -154,21 +154,21 @@ jobs:
           )
 
           if [[ ${{ needs.start-runner.result }} == "success" ]]; then
-            MATRIX_ENTRIES="$MATRIX_ENTRIES,"
-            MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
-          {
-            "build_os": "amazon-linux-2",
-            "agent_query": "${{ needs.start-runner.outputs.amazonlinux2_x86_64-label }}",
-            "target": "amazonlinux2_x86_64",
-            "run_stdlib_test": false,
-            "run_full_test": false,
-            "run_e2e_test": false,
-            "build_hello_wasm": true,
-            "clean_build_dir": false
-          }
-          EOS
-            )
-
+          #   MATRIX_ENTRIES="$MATRIX_ENTRIES,"
+          #   MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
+          # {
+          #   "build_os": "amazon-linux-2",
+          #   "agent_query": "${{ needs.start-runner.outputs.amazonlinux2_x86_64-label }}",
+          #   "target": "amazonlinux2_x86_64",
+          #   "run_stdlib_test": false,
+          #   "run_full_test": false,
+          #   "run_e2e_test": false,
+          #   "build_hello_wasm": true,
+          #   "clean_build_dir": false
+          # }
+          # EOS
+          #   )
+ 
             MATRIX_ENTRIES="$MATRIX_ENTRIES,"
             MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
           {
