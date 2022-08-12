@@ -28,8 +28,6 @@ class NonSub {}
 @_specialize(where T == S<Int>)
 @_specialize(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}},
 @_specialize(where T == T1) // expected-error{{cannot find type 'T1' in scope}}
-// expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
-// expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
 public func oneGenericParam<T>(_ t: T) -> T {
   return t
 }
