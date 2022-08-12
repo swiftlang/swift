@@ -424,7 +424,7 @@ int main() {
 
 ## Using Swift Enumeration Types
 
-A Swift enumeration is imported as class in C++. That allows C++ to invoke methods and access properties that the enumeration provides. Each enumeration case that doesn’t have associated value is exposed as a static variable in the structure.
+A Swift enumeration is imported as class in C++. That allows C++ to invoke methods and access properties that the enumeration provides. Each enumeration case is represented by a static variable that can be used in a switch to match the case of the enum, and to construct new enums values as well.
 
 For example, given the following enum:
 
@@ -444,16 +444,29 @@ The following interface will be generated:
 // "Navigation-Swift.h" - C++ interface for Swift's Navigation module.
 class CompassDirection {
 public:
-  static const CompassDirection north;
-  static const CompassDirection south;
-  static const CompassDirection east;
-  static const CompassDirection west;
+  static const struct { ... } north;
+  static const struct { ... } south;
+  static const struct { ... } east;
+  static const struct { ... } west;
+private:
+  // type representation details.
+  ...
 };
+```
+
+This will let you construct enumeration values from C++ using the C++ call operator on the case:
+
+```c++
+#include "Navigation-Swift.h"
+
+void testConstructEnumValue() {
+  auto direction = CompassDirection::north();
+}
 ```
 
 ### Matching Swift Enumeration Values with a C++ Switch Statement
 
-Swift’s enumerations can not be used directly in a switch, as C++ does not allow a `switch` to operate on C++ classes. However, For Swift enumerations that have an underlying integer representation, the generated C++ interface provides a convenience  C++ enum called `cases` inside of the generated C++ class that represents the enumeration. This C++ enum can then be used in a switch, as the class that represents the enumeration implicitly converts to it. The `cases` C++ enum allows us to switch over the `CompassDirection` class from the example above in the following manner:
+The C++ values that correspond to Swift enumeration case values can be used directly inside the switch statement. The generated C++ interface provides a convenience C++ enum called cases inside of the generated C++ class that represents the enumeration that the switch actually operates over. This C++ enum can then be used in a switch, as the class that represents the enumeration implicitly converts to it, and so do the C++ case values. This allows us to switch over the CompassDirection class from the example above in the following manner:
 
 ```c++
 #include "Navigation-Swift.h"
@@ -461,15 +474,14 @@ using namespace Navigation;
 
 CompassDirection getOpposite(CompassDirection cd) {
   switch (cd) {                       // implicit conversion to CompassDirection::cases
-  using enum CompassDirection::cases; // allow name lookup to find enum cases.
-  case north:
-    return CompassDirection::south;
-  case south:
-    return CompassDirection::north;
-  case east:
-    return CompassDirection::west;
-  case west:
-    return CompassDirection::east;
+  case CompassDirection::north:
+    return CompassDirection::south();
+  case CompassDirection::south:
+    return CompassDirection::north();
+  case CompassDirection::east:
+    return CompassDirection::west();
+  case CompassDirection::west:
+    return CompassDirection::east();
   }
 }
 ```
@@ -533,6 +545,9 @@ Will get a C++ interface that resembles this class:
 class Barcode {
 public:
   Barcode() = delete;
+
+  static const struct { ... } qrCode;
+  static const struct { ... } upc;
  
   bool isUpc() const;
 
@@ -547,28 +562,69 @@ public:
 
   // Extracts an associated value from Barcode.qrCode enum case
   swift::String getQrCode() const;
-
-  static Barcode initUpc(swift::Int, swift::Int, swift::Int, swift::Int);
-  static Barcode initQrCode(swift::String);
 };
 ```
 
-The C++ user of this enumeration can then use it by checking the type of the value and getting the associated value using the `is` and `get` member functions:
+The C++ user of this enumeration can then use it by checking the type of the value in a switch and getting the associated value using the get member functions:
 
 ```c++
 #include "Store-Swift.h"
 using namespace Store;
 
 Barcode normalizeBarcode(Barcode barcode) {
-  if (barcode.isQrCode()) {
+  switch (barcode) {
+  case Barcode::qrCode: {
     auto qrCode = barcode.getQrCode();
     swift::Array<swift::Int> loadedBarcode = loadQrCode(qrCode);
-    return Barcode::initUpc(loadedBarcode[0], loadedBarcode[1], loadedBarcode[2], loadedBarcode[3]);
+    return Barcode::upc(loadedBarcode[0], loadedBarcode[1], loadedBarcode[2], loadedBarcode[3]);
   }
-
-  return barcode;
+  case Barcode::upc:
+    return barcode;
+  }
 }
 ```
+
+The use of a `get` associated value accessor for an invalid enum case for the given
+enum value will abort the program.
+
+### Resilient Enums
+
+A resilient Swift enumeration value could represent a case that's unknown to the client.
+Swift forces the client to check if the value is `@uknown default` when switching over
+the enumeration to account for that. C++ follows a similar principle,
+by exposing an `unknown_default` case that can then be matched in a switch.
+
+For example, given the following resilient enumeration:
+
+```swift
+// Swift module 'DateTime'
+enum DateFormatStyle {
+  case medium
+  case full
+}
+```
+
+In C++, you need do an exhaustive switch over all cases and the unknown default
+case to avoid any compiler warnings:
+
+```c++
+using namespace DateTime;
+void test(const DateFormatStyle &style) {
+  switch (style) {
+  case DateFormatStyle::medium:
+    ...
+    break;
+  case DateFormatStyle::full:
+    ...
+    break;
+  case DateFormatStyle::unknown_default: // just like Swift's @unknown default
+    // Some case value added in a future version of enum.
+    break;
+  }
+}
+```
+
+The `unknown_default` case value is not a constructible case and you will get a compiler error if you try to construct it in C++.
 
 ## Using Swift Class Types
 
