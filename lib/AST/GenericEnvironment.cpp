@@ -273,15 +273,6 @@ auto GenericEnvironment::getOrCreateNestedTypeStorage() -> NestedTypeStorage & {
   return *nestedTypeStorage;
 }
 
-static Type stripBoundDependentMemberTypes(Type t) {
-  if (auto *depMemTy = t->getAs<DependentMemberType>()) {
-    return DependentMemberType::get(
-      stripBoundDependentMemberTypes(depMemTy->getBase()),
-      depMemTy->getName());
-  }
-
-  return t;
-}
 Type
 GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   auto genericSig = getGenericSignature();
@@ -315,12 +306,11 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   // First, write an ErrorType to the location where this type is cached,
   // to catch re-entrant lookups that might arise from an invalid generic
   // signature (eg, <X where X == Array<X>>).
-  CanDependentMemberType nestedDependentMemberType;
+  CanDependentMemberType nestedType;
   GenericTypeParamType *genericParam = nullptr;
   if (auto depMemTy = requirements.anchor->getAs<DependentMemberType>()) {
-    nestedDependentMemberType = cast<DependentMemberType>(
-        stripBoundDependentMemberTypes(depMemTy)->getCanonicalType());
-    auto &entry = getOrCreateNestedTypeStorage()[nestedDependentMemberType];
+    nestedType = cast<DependentMemberType>(depMemTy->getCanonicalType());
+    auto &entry = getOrCreateNestedTypeStorage()[nestedType];
     if (entry)
       return entry;
 
@@ -342,7 +332,9 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
   Type result;
 
-  if (requirements.anchor->getRootGenericParam()->isTypeSequence()) {
+  auto rootGP = requirements.anchor->getRootGenericParam();
+  if (rootGP->isTypeSequence()) {
+    assert(getKind() == Kind::Normal);
     result = SequenceArchetypeType::get(ctx, this, requirements.anchor,
                                         requirements.protos, superclass,
                                         requirements.layout);
@@ -384,7 +376,6 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       // If the anchor type isn't rooted in a generic parameter that
       // represents an opaque declaration, then apply the outer substitutions.
       // It would be incorrect to build an opaque type archetype here.
-      auto rootGP = requirements.anchor->getRootGenericParam();
       unsigned opaqueDepth =
           getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
       if (rootGP->getDepth() < opaqueDepth) {
@@ -403,7 +394,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   if (genericParam)
     addMapping(genericParam, result);
   else
-    getOrCreateNestedTypeStorage()[nestedDependentMemberType] = result;
+    getOrCreateNestedTypeStorage()[nestedType] = result;
 
   return result;
 }
