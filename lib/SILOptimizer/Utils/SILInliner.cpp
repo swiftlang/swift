@@ -518,50 +518,56 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
 }
 
 void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
+  TermInst *Terminator = BB->getTerminator();
   // Coroutine terminators need special handling.
   if (BeginApply) {
     if (BeginApply->processTerminator(
-            BB->getTerminator(), ReturnToBB,
+            Terminator, ReturnToBB,
             [=](SILBasicBlock *Block) -> SILBasicBlock * {
               return this->remapBasicBlock(Block);
             },
-            [=](SILValue Val) -> SILValue { return this->getMappedValue(Val); }))
+            [=](SILValue Val) -> SILValue {
+              return this->getMappedValue(Val);
+            }))
       return;
   }
 
-  // Modify return terminators to branch to the return-to BB, rather than
-  // trying to clone the ReturnInst.
-  if (auto *RI = dyn_cast<ReturnInst>(BB->getTerminator())) {
+  // Modify return terminators to branch to the return-to BB, rather
+  // than trying to clone the ReturnInst.  Because of that, the scope
+  // needs to be remapped manually.
+  getBuilder().setCurrentDebugScope(getOpScope(Terminator->getDebugScope()));
+  if (auto *RI = dyn_cast<ReturnInst>(Terminator)) {
     auto returnedValue = getMappedValue(RI->getOperand());
-    getBuilder().createBranch(Loc.getValue(), ReturnToBB, returnedValue);
+    getBuilder().createBranch(getOpLocation(RI->getLoc()), ReturnToBB,
+                              returnedValue);
     return;
   }
 
   // Modify throw terminators to branch to the error-return BB, rather than
   // trying to clone the ThrowInst.
-  if (auto *TI = dyn_cast<ThrowInst>(BB->getTerminator())) {
+  if (auto *TI = dyn_cast<ThrowInst>(Terminator)) {
+    SILLocation Loc = getOpLocation(TI->getLoc());
     switch (Apply.getKind()) {
     case FullApplySiteKind::ApplyInst:
       assert(cast<ApplyInst>(Apply)->isNonThrowing()
              && "apply of a function with error result must be non-throwing");
-      getBuilder().createUnreachable(Loc.getValue());
+      getBuilder().createUnreachable(Loc);
       return;
     case FullApplySiteKind::BeginApplyInst:
       assert(cast<BeginApplyInst>(Apply)->isNonThrowing()
              && "apply of a function with error result must be non-throwing");
-      getBuilder().createUnreachable(Loc.getValue());
+      getBuilder().createUnreachable(Loc);
       return;
     case FullApplySiteKind::TryApplyInst:
       auto tryAI = cast<TryApplyInst>(Apply);
       auto returnedValue = getMappedValue(TI->getOperand());
-      getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),
-                                returnedValue);
+      getBuilder().createBranch(Loc, tryAI->getErrorBB(), returnedValue);
       return;
     }
   }
   // Otherwise use normal visitor, which clones the existing instruction
   // but remaps basic blocks and values.
-  visit(BB->getTerminator());
+  visit(Terminator);
 }
 
 void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
