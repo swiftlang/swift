@@ -1924,8 +1924,8 @@ typeEraseExistentialSelfReferences(
   }
 
   const auto existentialSig =
-      baseTy->getASTContext().getOpenedArchetypeSignature(baseTy,
-                                                          GenericSignature());
+      baseTy->getASTContext().getOpenedExistentialSignature(baseTy,
+                                                            GenericSignature());
 
   unsigned metatypeDepth = 0;
 
@@ -3528,7 +3528,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   if (isDebugMode()) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    llvm::errs().indent(solverState ? solverState->depth * 2 : 2)
+    llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 2)
       << "(overload set choice binding "
       << boundType->getString(PO) << " := "
       << adjustedRefType->getString(PO) << ")\n";
@@ -6561,7 +6561,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
 
       return Action::Stop;
     }
-  } isDependentOnSelfWalker(member->getASTContext().getOpenedArchetypeSignature(
+  } isDependentOnSelfWalker(member->getASTContext().getOpenedExistentialSignature(
       baseTy, GenericSignature()));
 
   for (const auto &req : sig.getRequirements()) {

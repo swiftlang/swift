@@ -105,9 +105,15 @@ public:
   /// access function.
   FunctionABISignature getTypeMetadataAccessFunctionSignature();
 
+  struct EnumElementInfo {
+    unsigned tag;
+    StringRef globalVariableName;
+  };
+
   /// Returns EnumElementDecls (enum cases) in their declaration order with
   /// their tag indices from the given EnumDecl
-  llvm::MapVector<EnumElementDecl *, unsigned> getEnumTagMapping(EnumDecl *ED);
+  llvm::MapVector<EnumElementDecl *, EnumElementInfo>
+  getEnumTagMapping(const EnumDecl *ED);
 
   /// Returns the additional params if they exist after lowering the function.
   SmallVector<ABIAdditionalParam, 1>

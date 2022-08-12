@@ -1749,6 +1749,15 @@ public:
     *this << getIDAndType(CI->getDest());
   }
 
+  void visitExplicitCopyAddrInst(ExplicitCopyAddrInst *CI) {
+    if (CI->isTakeOfSrc())
+      *this << "[take] ";
+    *this << Ctx.getID(CI->getSrc()) << " to ";
+    if (CI->isInitializationOfDest())
+      *this << "[initialization] ";
+    *this << getIDAndType(CI->getDest());
+  }
+
   void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *CI) {
     *this << Ctx.getID(CI->getSrc()) << " to ";
     *this << getIDAndType(CI->getDest());

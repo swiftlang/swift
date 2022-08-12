@@ -1384,6 +1384,17 @@ SILCloner<ImplClass>::visitCopyAddrInst(CopyAddrInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitExplicitCopyAddrInst(
+    ExplicitCopyAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createExplicitCopyAddr(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
+                getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
+                Inst->isInitializationOfDest()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitMarkUnresolvedMoveAddrInst(
     MarkUnresolvedMoveAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

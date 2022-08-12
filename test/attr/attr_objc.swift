@@ -2572,7 +2572,7 @@ class NeverReturningMethod {
   func doesNotReturn() -> Never {}
 }
 
-// SR-5025
+// https://github.com/apple/swift/issues/47601
 class User: NSObject {
 }
 
@@ -2640,20 +2640,21 @@ private extension MyObjCClass {
   private func notExposedToObjC() {}
 }
 
-// SR-9035
+// https://github.com/apple/swift/issues/51538
 
-class SR_9035_C {}
+class issue51538_C {}
 
-@objc // access-note-move{{SR_9035_P}}
-protocol SR_9035_P {
+@objc // access-note-move{{issue51538_P}}
+protocol issue51538_P {
   func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
-  func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
+  func throwingMethod2() throws -> Unmanaged<issue51538_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 }
 
-// SR-12801: Make sure we reject an @objc generic subscript.
-class SR12801 {
-  @objc // bad-access-note-move{{SR12801.subscript(_:)}}
+// https://github.com/apple/swift/issues/55246
+// Make sure we reject an @objc generic subscript.
+class issue55246 {
+  @objc // bad-access-note-move{{issue55246.subscript(_:)}}
   subscript<T>(foo : [T]) -> Int { return 0 }
   // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
 }

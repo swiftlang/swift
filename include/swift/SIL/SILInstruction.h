@@ -5000,6 +5000,48 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
+/// ExplicitCopyAddrInst - A copy_addr that should not be optimized and should
+/// be viewed
+class ExplicitCopyAddrInst
+    : public InstructionBase<SILInstructionKind::ExplicitCopyAddrInst,
+                             NonValueInstruction>,
+      public CopyLikeInstruction {
+  friend SILBuilder;
+
+private:
+  FixedOperandList<2> Operands;
+  USE_SHARED_UINT8;
+
+  ExplicitCopyAddrInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+                       IsTake_t isTakeOfSrc,
+                       IsInitialization_t isInitializationOfDest);
+
+public:
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  void setSrc(SILValue V) { Operands[Src].set(V); }
+  void setDest(SILValue V) { Operands[Dest].set(V); }
+
+  IsTake_t isTakeOfSrc() const {
+    return IsTake_t(sharedUInt8().ExplicitCopyAddrInst.isTakeOfSrc);
+  }
+  IsInitialization_t isInitializationOfDest() const {
+    return IsInitialization_t(
+        sharedUInt8().ExplicitCopyAddrInst.isInitializationOfDest);
+  }
+
+  void setIsTakeOfSrc(IsTake_t T) {
+    sharedUInt8().ExplicitCopyAddrInst.isTakeOfSrc = (bool)T;
+  }
+  void setIsInitializationOfDest(IsInitialization_t I) {
+    sharedUInt8().ExplicitCopyAddrInst.isInitializationOfDest = (bool)I;
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
+
 /// "%token = bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
 ///
 /// Binds memory at the raw pointer %0 to type $T with enough capacity

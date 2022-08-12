@@ -356,6 +356,9 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
+  /// Is \p module imported as \c @_weakLinked by this file?
+  bool importsModuleAsWeakLinked(const ModuleDecl *module) const override;
+
   // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 

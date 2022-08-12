@@ -2762,6 +2762,32 @@ sil-opt, one will see that we actually have an ownership violation due to the
 two uses of "value", one for initializing value2 and the other for the return
 value.
 
+Move Only Types
+---------------
+
+NOTE: This is experimental and is just an attempt to describe where the design
+is currently for others reading SIL today. It should not be interpreted as
+final.
+
+Currently there are two kinds of "move only types" in SIL: pure move only types
+that are always move only and move only wrapped types that are move only
+versions of copyable types. The invariant that values of Move Only type obey is
+that they can only be copied (e.x.: operand to a `copy_value`_, ``copy_addr [init]``) during the
+guaranteed passes when we are in Raw SIL. Once we are in non-Raw SIL though
+(i.e. Canonical and later SIL stages), a program is ill formed if one copies a
+move only type.
+
+The reason why we have this special rule for move only types is that this allows
+for SIL code generators to insert copies and then have a later guaranteed
+checker optimization pass recover the underlying move only semantics by
+reconstructing needed copies and removing unneeded copies using Ownership
+SSA. If any such copies are actually needed according to Ownership SSA, the
+checker pass emits a diagnostic stating that move semantics have been
+violated. If such a diagnostic is emitted then the checker pass transforms all
+copies on move only types to their explicit copy forms to ensure that once we
+leave the diagnostic passes and enter canonical SIL, our "copy" invariant is
+maintained.
+
 Runtime Failure
 ---------------
 
@@ -4219,6 +4245,25 @@ operations::
 If ``T`` is a trivial type, then ``copy_addr`` is always equivalent to its
 take-initialization form.
 
+It is illegal in non-Raw SIL to apply ``copy_addr [init]`` to a value that is
+move only.
+
+explicit_copy_addr
+``````````````````
+::
+
+  sil-instruction ::= 'explicit_copy_addr' '[take]'? sil-value
+                        'to' '[initialization]'? sil-operand
+
+  explicit_copy_addr [take] %0 to [initialization] %1 : $*T
+  // %0 and %1 must be of the same $*T address type
+
+This instruction is exactly the same as `copy_addr`_ except that it has special
+behavior for move only types. Specifically, an `explicit_copy_addr`_ is viewed
+as a copy_addr that is allowed on values that are move only. This is only used
+by a move checker after it has emitted an error diagnostic to preserve the
+general ``copy_addr [init]`` ban in Canonical SIL on move only types.
+
 destroy_addr
 ````````````
 ::
@@ -5557,6 +5602,8 @@ independent of the operand. In terms of specific types:
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
 
+It is illegal in non-Raw SIL to `copy_value`_ a value that is "move only".
+
 explicit_copy_value
 ```````````````````
 
@@ -5566,26 +5613,17 @@ explicit_copy_value
 
    %1 = explicit_copy_value %0 : $A
 
-Performs a copy of a loadable value as if by the value's type lowering and
-returns the copy. The returned copy semantically is a value that is completely
-independent of the operand. In terms of specific types:
-
-1. For trivial types, this is equivalent to just propagating through the trivial
-   value.
-2. For reference types, this is equivalent to performing a ``strong_retain``
-   operation and returning the reference.
-3. For ``@unowned`` types, this is equivalent to performing an
-   ``unowned_retain`` and returning the operand.
-4. For aggregate types, this is equivalent to recursively performing a
-   ``copy_value`` on its components, forming a new aggregate from the copied
-   components, and then returning the new aggregate.
-
-In ownership qualified functions, a ``explicit_copy_value`` produces a +1 value
-that must be consumed at most once along any path through the program.
-
-When move only variable checking is performed, ``explicit_copy_value`` is
+This is exactly the same instruction semantically as `copy_value`_ with the
+exception that when move only checking is performed, `explicit_copy_value`_ is
 treated as an explicit copy asked for by the user that should not be rewritten
 and should be treated as a non-consuming use.
+
+This is used for two things:
+
+1. Implementing a copy builtin for no implicit copy types.
+2. To enable the move checker, once it has emitted an error diagnostic, to still
+   produce valid Ownership SSA SIL at the end of the guaranteed optimization
+   pipeline when we enter the Canonical SIL stage.
 
 move_value
 ``````````
