@@ -1002,7 +1002,7 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (isAlwaysWeakImported())
     return true;
 
-  if (fromModule->isImportedAsWeakLinked(this))
+  if (fromModule->isImportedAsWeakLinked(this->getModuleContext()))
     return true;
 
   auto availability = getAvailabilityForLinkage();
