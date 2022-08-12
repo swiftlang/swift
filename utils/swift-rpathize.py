@@ -62,7 +62,7 @@ def rpathize(filename):
         dylibsOutput = subprocess.check_output(
             ['xcrun', 'dyld_info', '-dependents', filename],
             universal_newlines=True)
-    except exceptions:
+    except:
         dylibsOutput = subprocess.check_output(
             ['xcrun', 'dyldinfo', '-dylibs', filename],
             universal_newlines=True)
