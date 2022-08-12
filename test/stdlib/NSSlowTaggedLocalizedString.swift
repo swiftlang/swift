@@ -16,6 +16,11 @@ let longTaggedTests = TestSuite("NonContiguousTaggedStrings")
 var constant = "Send Message to different Team"
 
 func runEqualLongTagged() {
+  
+  if MemoryLayout<AnyObject>.size != 8 {
+    return //no tagged pointers
+  }
+  
   let native = constant.withUTF8 { String(decoding: $0, as: UTF8.self) }
   let longTagged = NSSlowTaggedLocalizedString.createTest()!
   constant.withCString {
