@@ -387,6 +387,7 @@ public:
   /// Print the graph.
   void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);
   void dump(llvm::raw_ostream &out);
+  void dumpActiveScopeChanges(llvm::raw_ostream &out, unsigned indent = 0);
 
   // FIXME: Potentially side-effectful.
   SWIFT_DEBUG_HELPER(void dump());

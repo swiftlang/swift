@@ -545,6 +545,13 @@ public:
         auto scope = std::make_unique<Scope>(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
+
+          if (CS.isDebugMode()) {
+            auto &log = llvm::errs();
+            auto &CG = CS.getConstraintGraph();
+            CG.dumpActiveScopeChanges(log, CS.solverState->getCurrentIndent());
+          }
+          
           return suspend(std::make_unique<SplitterStep>(CS, Solutions));
         }
       }
