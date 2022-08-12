@@ -13,7 +13,12 @@ COMMON_NODES = [
     Node('UnknownType', kind='Type'),
     Node('UnknownPattern', kind='Pattern'),
     Node('Missing', kind='Syntax'),
-    Node('MissingDecl', kind='Decl'),
+    Node('MissingDecl', kind='Decl', children=[
+        Child('Attributes', kind='AttributeList',
+              collection_element_name='Attribute', is_optional=True),
+        Child('Modifiers', kind='ModifierList',
+              collection_element_name='Modifier', is_optional=True),
+    ]),
     Node('MissingExpr', kind='Expr'),
     Node('MissingStmt', kind='Stmt'),
     Node('MissingType', kind='Type'),
