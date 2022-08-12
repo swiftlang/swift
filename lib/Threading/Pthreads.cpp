@@ -101,6 +101,7 @@ swift::threading_impl::thread_get_current_stack_bounds() {
 #if defined(__FreeBSD__)
   if (pthread_attr_init(&attr))
     return {};
+#define pthread_getattr_np pthread_attr_get_np
 #endif
 
   if (!pthread_getattr_np(pthread_self(), &attr)) {

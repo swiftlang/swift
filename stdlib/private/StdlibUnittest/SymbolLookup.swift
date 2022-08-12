@@ -23,7 +23,7 @@
 #error("Unsupported platform")
 #endif
 
-#if canImport(Darwin) || os(OpenBSD)
+#if canImport(Darwin) || os(FreeBSD) || os(OpenBSD)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 #elseif os(Linux) || os(WASI)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)

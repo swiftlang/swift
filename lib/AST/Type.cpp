@@ -6454,7 +6454,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
   if (!resultTan) {
     return llvm::make_error<DerivativeFunctionTypeError>(
         this, DerivativeFunctionTypeError::Kind::NonDifferentiableResult,
-        std::make_pair(originalResultType, /*index*/ 0));
+        DerivativeFunctionTypeError::TypeAndIndex(
+            originalResultType, /*index*/ 0));
   }
   auto resultTanType = resultTan->getType();
 
@@ -6487,7 +6488,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
             this,
             DerivativeFunctionTypeError::Kind::
                 NonDifferentiableDifferentiabilityParameter,
-            std::make_pair(paramType, i));
+            DerivativeFunctionTypeError::TypeAndIndex(
+                paramType, 0));
       }
       differentialParams.push_back(AnyFunctionType::Param(
           paramTan->getType(), Identifier(), diffParam.getParameterFlags()));
@@ -6528,7 +6530,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
             this,
             DerivativeFunctionTypeError::Kind::
                 NonDifferentiableDifferentiabilityParameter,
-            std::make_pair(paramType, i));
+            DerivativeFunctionTypeError::TypeAndIndex(paramType, i));
       }
       if (diffParam.isInOut()) {
         hasInoutDiffParameter = true;

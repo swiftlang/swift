@@ -7,6 +7,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: OS=linux-gnu
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=freebsd
 
 // REQUIRES: rdar83246843
 

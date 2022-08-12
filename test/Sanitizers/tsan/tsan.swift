@@ -11,6 +11,8 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
+// XFAIL: freebsd
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
@@ -47,7 +49,7 @@ var racey_x: Int;
 
 // TSan %deflake as part of the test.
 for _ in 1...5 {
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(FreeBSD)
   var t : pthread_t?
 #else
   var t : pthread_t = 0
@@ -58,7 +60,7 @@ for _ in 1...5 {
 
     return nil
   }, nil)
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(FreeBSD)
   threads.append(t!)
 #else
   threads.append(t)
@@ -70,6 +72,7 @@ for t in threads {
     print("nil thread")
     continue
   }
+  print("Thread \(t)")
   pthread_join(t, nil)
 }
 

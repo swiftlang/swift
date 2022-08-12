@@ -1,4 +1,4 @@
-// XFAIL: OS=linux-gnu, OS=openbsd, OS=windows-msvc, OS=linux-android, OS=linux-androideabi
+// XFAIL: OS=linux-gnu, OS=openbsd, OS=windows-msvc, OS=linux-android, OS=linux-androideabi, OS=freebsd
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/only-skip-once/* %t

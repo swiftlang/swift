@@ -58,6 +58,7 @@ actor MyGlobalActor {
 // AVAILABILITY1-NEXT: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
+// AVAILABILITY1-NEXT: Keyword/None:                       FreeBSD[#Platform#]; name=FreeBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       Windows[#Platform#]; name=Windows{{$}}
 // AVAILABILITY1-NEXT: End completions

@@ -626,7 +626,7 @@ importer::getNormalInvocationArguments(
     // using Glibc or a libc that respects that flag. This will cause some
     // source breakage however (specifically with strerror_r()) on Linux
     // without a workaround.
-    if (triple.isOSFuchsia() || triple.isAndroid()) {
+    if (triple.isOSFuchsia() || triple.isAndroid() || triple.isOSFreeBSD()) {
       // Many of the modern libc features are hidden behind feature macros like
       // _GNU_SOURCE or _XOPEN_SOURCE.
       invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -655,7 +655,7 @@ importer::getNormalInvocationArguments(
     }
   }
 
-  if (searchPathOpts.getSDKPath().empty()) {
+  if (searchPathOpts.getSDKPath().empty() && !triple.isOSFreeBSD()) {
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
   } else {
@@ -2108,6 +2108,10 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     deprecatedAsUnavailableMessage = "";
     break;
 
+  case PlatformKind::FreeBSD:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
   case PlatformKind::Windows:
     deprecatedAsUnavailableMessage = "";
     break;
@@ -2147,6 +2151,9 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
 
   case PlatformKind::OpenBSD:
     return name == "openbsd";
+
+  case PlatformKind::FreeBSD:
+    return name == "freebsd";
 
   case PlatformKind::Windows:
     return name == "windows";
@@ -2213,6 +2220,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
 
   case PlatformKind::OpenBSD:
     // No deprecation filter on OpenBSD
+    return false;
+
+  case PlatformKind::FreeBSD:
+    // No deprecation filter on FreeBSD
     return false;
 
   case PlatformKind::Windows:

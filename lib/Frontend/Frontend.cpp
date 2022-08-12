@@ -786,6 +786,8 @@ static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
     return true;
   if (target.isOSOpenBSD())
     return true;
+  if (target.isOSFreeBSD())
+    return true;
 #endif
   return false;
 }
