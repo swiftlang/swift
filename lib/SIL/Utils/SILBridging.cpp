@@ -217,6 +217,14 @@ SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
     ctxt.getSwift51Availability());
 }
 
+SwiftInt SILFunction_isPossiblyUsedExternally(BridgedFunction function) {
+  return castToFunction(function)->isPossiblyUsedExternally() ? 1 : 0;
+}
+
+SwiftInt SILFunction_isAvailableExternally(BridgedFunction function) {
+  return castToFunction(function)->isAvailableExternally() ? 1 : 0;
+}
+
 SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
                                       StringRef attrName) {
   SILFunction *f = castToFunction(function);

@@ -74,6 +74,22 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return nil
   }
 
+  /// True, if the linkage of the function indicates that it is visible outside the current
+  /// compilation unit and therefore not all of its uses are known.
+  ///
+  /// For example, `public` linkage.
+  public var isPossiblyUsedExternally: Bool {
+    return SILFunction_isPossiblyUsedExternally(bridged) != 0
+  }
+
+  /// True, if the linkage of the function indicates that it has a definition outside the
+  /// current compilation unit.
+  ///
+  /// For example, `public_external` linkage.
+  public var isAvailableExternally: Bool {
+    return SILFunction_isAvailableExternally(bridged) != 0
+  }
+
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
       SILFunction_hasSemanticsAttr(bridged, llvm.StringRef(buffer.baseAddress!, buffer.count)) != 0
