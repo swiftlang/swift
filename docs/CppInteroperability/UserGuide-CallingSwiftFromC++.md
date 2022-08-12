@@ -74,7 +74,7 @@ Fundamental primitive types have a C++ fundamental type that represents them in 
 |---    |---    |---    |---    |---    |
 |Void (or no return)    |void    |    |    |    |
 |Int    |swift::Int    |ptrdiff_t    |long or long long (windows)    |YES    |
-|UInt    |size_t    |    |unsigned long or unsigned long long (windows)    |YES    |
+|UInt    |swift::UInt    |  size_t  |unsigned long or unsigned long long (windows)    |YES    |
 |Float    |float    |    |    |    |
 |Double    |double    |    |    |    |
 |    |    |    |    |    |
