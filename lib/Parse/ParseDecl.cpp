@@ -1985,18 +1985,22 @@ bool Parser::parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
     consumeToken();
     Visibility = ParsedVisibility;
   } else if (ArgumentName == "metadata") {
-    if (Tok.isNot(tok::identifier)) {
-      diagnose(Tok.getLoc(), diag::documentation_attr_metadata_expected_identifier);
+    if (!Tok.isAny(tok::identifier, tok::string_literal)) {
+      diagnose(Tok.getLoc(), diag::documentation_attr_metadata_expected_text);
       return false;
     }
     auto ArgumentValue = Tok.getText();
+    if (ArgumentValue.front() == '\"' && ArgumentValue.back() == '\"') {
+      // String literals get saved with surrounding quotes. Trim them off if they're present.
+      ArgumentValue = ArgumentValue.slice(1, ArgumentValue.size() - 1);
+    }
 
     if (Metadata) {
       diagnose(Tok.getLoc(), diag::documentation_attr_duplicate_metadata);
       return false;
     }
 
-    consumeToken(tok::identifier);
+    consumeToken();
     Metadata = ArgumentValue;
   } else {
     llvm_unreachable("unimplemented @_documentation attr argument");

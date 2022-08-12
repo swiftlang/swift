@@ -1778,8 +1778,9 @@ ERROR(documentation_attr_unknown_access_level,none,
       (StringRef))
 ERROR(documentation_attr_duplicate_visibility,none,
       "cannot give more than one visibility to the same item", ())
-ERROR(documentation_attr_metadata_expected_identifier,none,
-      "@_documentation attribute's 'metadata' argument expected a plain identifier",
+ERROR(documentation_attr_metadata_expected_text,none,
+      "@_documentation attribute's 'metadata' argument expected an identifier or "
+      "quoted string",
       ())
 ERROR(documentation_attr_duplicate_metadata,none,
       "cannot give more than one metadata argument to the same item", ())
