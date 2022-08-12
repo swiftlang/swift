@@ -1798,6 +1798,18 @@ static Type applyNonEscapingIfNecessary(Type ty,
   return ty;
 }
 
+static Type applySendableIfNecessary(Type ty, TypeResolutionOptions options) {
+  if (!options.is(TypeResolverContext::FunctionInput)) {
+    return ty;
+  }
+
+  auto *funcTy = ty->castTo<FunctionType>();
+  auto extInfo = funcTy->getExtInfo();
+  assert(!extInfo.isSendable());
+  extInfo = extInfo.withConcurrent();
+  return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
+}
+
 /// Validate whether type associated with @autoclosure attribute is correct,
 /// it supposed to be a function type with no parameters.
 /// \returns true if there was an error, false otherwise.
@@ -2846,16 +2858,15 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   }
 
   if (hasFunctionAttr && !fnRepr) {
-
     if (attrs.has(TAK_Sendable)) {
-      // A Sendable closure must be attached to a function type. If the
+      // A Sendable attr must be attached to a function type. If the
       // attribute is attached to a typealias that points to a function type,
-      // then we won't have a FunctionTypeRepr. So just ignore the repr and just
-      // check whether we have a function type. If we don't, the code below will
-      // emit a diagnostic later on.
+      // then we won't have a FunctionTypeRepr. So just ignore the repr and
+      // check if we have a function type. If we do, add the Sendable bit
+      // to it and remove the attribute from the set, so we don't diagnose it.
       if (ty->is<FunctionType>()) {
-        // Ok, remove the attribute from the set so we don't diagnose.
         attrs.clearAttribute(TAK_Sendable);
+        ty = applySendableIfNecessary(ty, options);
       }
     }
 

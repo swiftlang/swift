@@ -115,7 +115,33 @@ func testSubclassing(obj: SendableSubclass) async {
 }
 
 // https://github.com/apple/swift/issues/60488
+
 typealias VoidFunction = () -> Void
-func testSendableTypealiasClosure1(callback: @Sendable VoidFunction) {} // ok
-func testSendableTypealiasClosure2(callback: @Sendable () -> Void) {} // ok
-func testSendableTypealiasClosure3(callback: @Sendable Void) {} // expected-error {{@Sendable attribute only applies to function types}}
+typealias GenericVoidFunction<T> = () -> T
+typealias NotAFunctionType = Int
+
+// Make sure we accept @Sendable on a typealias that points to a function type
+
+func a1(callback: @Sendable VoidFunction) {} // Okay
+func a2(callback: @Sendable GenericVoidFunction<Int>) {} // Okay
+
+enum E {
+  case fn(@Sendable VoidFunction) // Okay
+}
+
+func a3(e: E) {}
+
+// Make sure we reject @Sendable on non-function types
+
+func b1(callback: @Sendable NotAFunctionType) {} // expected-error {{@Sendable attribute only applies to function types}}
+func b2(value: @Sendable Int) {} // expected-error {{@Sendable attribute only applies to function types}}
+
+// A simple validation test to make sure we're not dropping @Sendable on the typealias
+func testPassingNonSendableFn() {
+  let nonSendableFn: () -> Void = {}
+  let nonSendableIntFn: () -> Int = { 0 }
+
+  a1(callback: nonSendableFn) // expected-warning {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+  a2(callback: nonSendableIntFn) // expected-warning {{converting non-sendable function value to '@Sendable () -> Int' may introduce data races}}
+  a3(e: .fn(nonSendableFn)) // expected-warning {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+}
