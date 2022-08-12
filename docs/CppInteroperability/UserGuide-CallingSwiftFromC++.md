@@ -2,7 +2,10 @@
 
 A Swift library author might want to expose their interface to C++, to allow a C++ codebase to interoperate with the Swift library.  This document describes how this can be accomplished, by first describing how Swift can expose its interface to C++, and then going into the details on how to use Swift APIs from C++.
 
-**NOTE:** This is a work-in-progress, living guide document for how Swift APIs can be imported and used from C++.
+
+**NOTE:** This is a work-in-progress, living guide document for how Swift APIs can be imported and used from C++. This document reflects the current state of the experimental design, and it will evolve over time
+as this feature will go through Swift's evolution process. This document does not specify the final target
+design for the Swift to C++ interoperability layer.
 
 **NOTE:** This document does not go over the following Swift language features yet:
 
