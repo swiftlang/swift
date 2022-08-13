@@ -984,13 +984,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   // Build self
   Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isBaseLValue,
                                      /*convertTy*/ selfTypeForAccess);
-  if (isBaseLValue)
-    selfTypeForAccess = LValueType::get(selfTypeForAccess);
-
-  if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
-    assert(selfAccessKind == SelfAccessorKind::Super);
-    selfDRE = new (ctx) DerivedToBaseExpr(selfDRE, selfTypeForAccess);
-  }
 
   // Build self.member or equivalent
 
@@ -1170,7 +1163,8 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // Drop the self type
   copyMethodType = copyMethodType->getResult()->castTo<FunctionType>();
 
-  auto DSCE = DotSyntaxCallExpr::create(Ctx, DRE, SourceLoc(), Val);
+  auto DSCE = DotSyntaxCallExpr::create(Ctx, DRE, SourceLoc(),
+                                        Argument::unlabeled(Val));
   DSCE->setImplicit();
   DSCE->setType(copyMethodType);
   DSCE->setThrows(false);
@@ -1654,10 +1648,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     }
 
     if (SelfDecl) {
-      auto *SelfDRE =
-          buildSelfReference(SelfDecl, SelfAccessorKind::Peer, IsSelfLValue);
-      SelfDRE = maybeWrapInOutExpr(SelfDRE, Ctx);
-      auto *DSCE = DotSyntaxCallExpr::create(Ctx, Callee, SourceLoc(), SelfDRE);
+      auto SelfArg = buildSelfArgument(SelfDecl, SelfAccessorKind::Peer,
+                                       /*isMutable*/ IsSelfLValue);
+      auto *DSCE = DotSyntaxCallExpr::create(Ctx, Callee, SourceLoc(), SelfArg);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
@@ -1836,10 +1829,10 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
     Callee->setType(type);
 
     if (SelfDecl) {
-      auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
-                                         storage->isSetterMutating());
-      SelfDRE = maybeWrapInOutExpr(SelfDRE, ctx);
-      auto *DSCE = DotSyntaxCallExpr::create(ctx, Callee, SourceLoc(), SelfDRE);
+      auto SelfArg =
+          buildSelfArgument(SelfDecl, SelfAccessorKind::Peer,
+                            /*isMutable*/ storage->isSetterMutating());
+      auto *DSCE = DotSyntaxCallExpr::create(ctx, Callee, SourceLoc(), SelfArg);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();

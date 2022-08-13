@@ -1574,9 +1574,10 @@ BinaryExpr *BinaryExpr::create(ASTContext &ctx, Expr *lhs, Expr *fn, Expr *rhs,
 }
 
 DotSyntaxCallExpr *DotSyntaxCallExpr::create(ASTContext &ctx, Expr *fnExpr,
-                                             SourceLoc dotLoc, Expr *baseExpr,
+                                             SourceLoc dotLoc, Argument baseArg,
                                              Type ty) {
-  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseExpr});
+  assert(!baseArg.hasLabel());
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseArg.getExpr()});
   return new (ctx) DotSyntaxCallExpr(fnExpr, dotLoc, argList, ty);
 }
 
