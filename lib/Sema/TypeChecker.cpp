@@ -329,11 +329,15 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   diagnoseUnnecessaryPreconcurrencyImports(*SF);
 
-  // Check to see if there's any inconsistent @_implementationOnly imports.
+  // Check to see if there are any inconsistent imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentImplementationOnlyImportsRequest{SF->getParentModule()},
       {});
+
+  evaluateOrDefault(
+      Ctx.evaluator,
+      CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
 
   // Perform various AST transforms we've been asked to perform.
   if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)

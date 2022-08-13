@@ -2978,6 +2978,13 @@ ERROR(implementation_only_override_import_without_attr,none,
       "override of %0 imported as implementation-only must be declared "
       "'@_implementationOnly'", (DescriptiveDeclKind))
 
+ERROR(import_attr_conflict,none,
+      "%0 inconsistently imported with %1",
+      (Identifier, DeclAttribute))
+NOTE(import_attr_conflict_here,none,
+     "imported with %0 here",
+     (DeclAttribute))
+
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "

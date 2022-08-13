@@ -1,0 +1,324 @@
+// RUN: %target-sil-opt %s -dump-access -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class List {
+  var x: Int
+  let next: List
+}
+
+struct S {
+  var l: List
+  var y: Int
+}
+
+struct Ptr {
+  var p: Int64
+}
+
+// CHECK-LABEL: Accesses for readIdentifiedArg
+// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Int
+// CHECK-NEXT:     Path: ""
+// CHECK-NEXT: End accesses for readIdentifiedArg
+sil [ossa] @readIdentifiedArg : $@convention(thin) (@in Int) -> Int {
+bb0(%0 : $*Int):
+  %res = load [trivial] %0 : $*Int
+  return %res : $Int
+}
+
+// CHECK-LABEL: Accesses for writeIdentifiedArg
+// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Int
+// CHECK-NEXT:     Path: ""
+// CHECK-NEXT: End accesses for writeIdentifiedArg
+sil [ossa] @writeIdentifiedArg : $@convention(thin) (@inout Int) -> () {
+bb0(%0 : $*Int):
+  %2 = integer_literal $Builtin.Int64, 42
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  store %3 to [trivial] %0 : $*Int
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: Accesses for $writeToHead
+// CHECK-NEXT: Value:   %7 = begin_access [modify] [dynamic] %6 : $*Int
+// CHECK-NEXT:   Scope:   %7 = begin_access [modify] [dynamic] %6 : $*Int
+// CHECK-NEXT:   Base: class -   %6 = ref_element_addr %5 : $List, #List.x
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $S
+// CHECK-NEXT:     Path: "s0.c0"
+// CHECK-NEXT: End accesses for $writeToHead
+sil [ossa] @$writeToHead : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  debug_value %0 : $S, let, name "s", argno 1
+  %2 = struct_extract %0 : $S, #S.l
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $Int (%3 : $Builtin.Int64)
+  %5 = begin_borrow [lexical] %2 : $List
+  %6 = ref_element_addr %5 : $List, #List.x
+  %7 = begin_access [modify] [dynamic] %6 : $*Int
+  store %4 to [trivial] %7 : $*Int
+  end_access %7 : $*Int
+  end_borrow %5 : $List
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Accesses for storeToArgs
+// CHECK-NEXT: Value:   %6 = begin_access [modify] [dynamic] %5 : $*Int
+// CHECK-NEXT:   Scope:   %6 = begin_access [modify] [dynamic] %5 : $*Int
+// CHECK-NEXT:   Base: class -   %5 = ref_element_addr %0 : $List, #List.x
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $List
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: Value:   %14 = begin_access [modify] [dynamic] %13 : $*Int
+// CHECK-NEXT:   Scope:   %14 = begin_access [modify] [dynamic] %13 : $*Int
+// CHECK-NEXT:   Base: class -   %13 = ref_element_addr %1 : $List, #List.x
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %1 = argument of bb0 : $List
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: End accesses for storeToArgs
+sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
+bb0(%1 : @guaranteed $List, %2 : @guaranteed $List):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = integer_literal $Builtin.Int64, 10
+  %9 = struct $Int (%8 : $Builtin.Int64)
+  %10 = ref_element_addr %1 : $List, #List.x
+  %11 = begin_access [modify] [dynamic] %10 : $*Int
+  store %9 to [trivial] %11 : $*Int
+  end_access %11 : $*Int
+  %14 = tuple ()
+  br bb3
+
+bb2:
+  %16 = integer_literal $Builtin.Int64, 20
+  %17 = struct $Int (%16 : $Builtin.Int64)
+  %18 = ref_element_addr %2 : $List, #List.x
+  %19 = begin_access [modify] [dynamic] %18 : $*Int
+  store %17 to [trivial] %19 : $*Int
+  end_access %19 : $*Int
+  %22 = tuple ()
+  br bb3
+
+bb3:
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: Accesses for storeMaybeLocalPhi
+// CHECK-NEXT: Value:   %10 = begin_access [modify] [dynamic] %9 : $*Int
+// CHECK-NEXT:   Scope:   %10 = begin_access [modify] [dynamic] %9 : $*Int
+// CHECK-NEXT:   Base: class -   %9 = ref_element_addr %6 : $List, #List.x
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage:   %4 = alloc_ref $List
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $List
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: End accesses for storeMaybeLocalPhi
+sil @storeMaybeLocalPhi : $@convention(thin) (@guaranteed List) -> () {
+bb0(%1 : $List):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %1 : $List
+  br bb3(%1 : $List)
+
+bb2:
+  %10 = alloc_ref $List
+  br bb3(%10 : $List)
+
+bb3(%12 : $List):
+  %14 = integer_literal $Builtin.Int64, 20
+  %15 = struct $Int (%14 : $Builtin.Int64)
+  %16 = ref_element_addr %12 : $List, #List.x
+  %17 = begin_access [modify] [dynamic] %16 : $*Int
+  store %15 to %17 : $*Int
+  end_access %17 : $*Int
+  %20 = tuple ()
+  strong_release %12 : $List
+  %22 = tuple ()
+  return %22 : $()
+}
+
+
+// CHECK-LABEL: Accesses for testStructPhiCommon
+// CHECK-NEXT: Value:   %8 = pointer_to_address %7 : $Builtin.RawPointer to $*Int64
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Ptr
+// CHECK-NEXT:   Path: "s0"
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Ptr
+// CHECK-NEXT:     Path: "s0"
+// CHECK-NEXT: End accesses for testStructPhiCommon
+sil [ossa] @testStructPhiCommon : $@convention(thin) (@inout Ptr) -> () {
+bb0(%0 : $*Ptr):
+  %2 = struct_element_addr %0 : $*Ptr, #Ptr.p
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
+  br bb3(%3 : $Builtin.RawPointer)
+
+bb2:
+  %5 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
+  br bb3(%5 : $Builtin.RawPointer)
+
+bb3(%6 : $Builtin.RawPointer) :
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Int64
+  %8 = integer_literal $Builtin.Int64, 2
+  %9 = struct $Int64 (%8 : $Builtin.Int64)
+  store %9 to [trivial] %7 : $*Int64
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// CHECK-LABEL: Accesses for testStructPhiDivergent
+// CHECK-NEXT: Value:   %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64 // user: %13
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: pointer - %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64 // user: %13
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64 // user: %13
+// CHECK-NEXT:     Path: ""
+// CHECK-NEXT: End accesses for testStructPhiDivergent
+sil [ossa] @testStructPhiDivergent : $@convention(thin) (@inout Ptr) -> () {
+bb0(%0 : $*Ptr):
+  %ptr = alloc_stack $Ptr
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct_element_addr %ptr : $*Ptr, #Ptr.p
+  %3 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
+  br bb3(%3 : $Builtin.RawPointer)
+
+bb2:
+  %4 = struct_element_addr %0 : $*Ptr, #Ptr.p
+  %5 = address_to_pointer %4 : $*Int64 to $Builtin.RawPointer
+  br bb3(%5 : $Builtin.RawPointer)
+
+bb3(%6 : $Builtin.RawPointer) :
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Int64
+  %8 = integer_literal $Builtin.Int64, 2
+  %9 = struct $Int64 (%8 : $Builtin.Int64)
+  store %9 to [trivial] %7 : $*Int64
+  dealloc_stack %ptr : $*Ptr
+  %22 = tuple ()
+  return %22 : $()
+}
+
+
+// CHECK-LABEL: Accesses for readIdentifiedBoxArg
+// CHECK-NEXT: Value:   %2 = begin_access [read] [dynamic] %1 : $*Int
+// CHECK-NEXT:   Scope:   %2 = begin_access [read] [dynamic] %1 : $*Int
+// CHECK-NEXT:   Base: box -   %1 = project_box %0 : ${ var Int }, 0
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : ${ var Int }
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: End accesses for readIdentifiedBoxArg
+sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }) -> Int {
+bb0(%0 : @guaranteed ${ var Int }):
+  %1 = project_box %0 : ${ var Int }, 0
+  %5 = begin_access [read] [dynamic] %1 : $*Int
+  %6 = load [trivial] %5 : $*Int
+  end_access %5 : $*Int
+  return %6 : $Int
+}
+
+
+class A {
+  var prop0: Int64
+}
+class B : A {
+  var prop1: Int64
+}
+
+// CHECK-LABEL: Accesses for testNonUniquePropertyIndex
+// CHECK-NEXT: Value:   %2 = ref_element_addr %1 : $B, #B.prop1
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: class -   %2 = ref_element_addr %1 : $B, #B.prop1
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage:   %1 = alloc_ref $B
+// CHECK-NEXT:     Path: "c1"
+// CHECK-NEXT: Value:   %5 = ref_element_addr %4 : $A, #A.prop0
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: class -   %5 = ref_element_addr %4 : $A, #A.prop0
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage:   %1 = alloc_ref $B
+// CHECK-NEXT:     Path: "c0"
+// CHECK-NEXT: End accesses for testNonUniquePropertyIndex
+sil @testNonUniquePropertyIndex : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_ref $B
+  %2 = ref_element_addr %1 : $B, #B.prop1
+  store %0 to %2 : $*Int64
+  %4 = upcast %1 : $B to $A
+  %5 = ref_element_addr %4 : $A, #A.prop0
+  store %0 to %5 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+struct _MyBridgeStorage {
+  @_hasStorage var rawValue : Builtin.BridgeObject
+}
+
+struct _MyArrayBuffer<T> {
+  @_hasStorage var _storage : _MyBridgeStorage
+}
+
+
+struct MyArray<T> {
+  @_hasStorage var _buffer : _MyArrayBuffer<T>
+}
+
+// CHECK-LABEL: Accesses for testRefTailAndStruct0
+// CHECK-NEXT: Value:   %8 = struct_element_addr %7 : $*Int, #Int._value // user: %9
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: class -   %5 = ref_element_addr [immutable] %4 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+// CHECK-NEXT:   Path: "s0.s0.s0"
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
+// CHECK-NEXT:     Path: "s0.s0.s0.c0.s0.s0.s0"
+// CHECK-NEXT: Value:   %11 = struct_element_addr %10 : $*String, #String._guts
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: tail -   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT:   Path: "s0"
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
+// CHECK-NEXT:     Path: "s0.s0.s0.ct.s0"
+// CHECK-NEXT: Value:   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT:   Scope: base
+// CHECK-NEXT:   Base: tail -   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT:   Path: ""
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
+// CHECK-NEXT:     Path: "s0.s0.s0.ct"
+// CHECK-NEXT: End accesses for testRefTailAndStruct0
+sil hidden [noinline] @testRefTailAndStruct0 : $@convention(thin) (@owned MyArray<String>) -> () {
+bb0(%0 : $MyArray<String>):
+  %1 = struct_extract %0 : $MyArray<String>, #MyArray._buffer
+  %2 = struct_extract %1 : $_MyArrayBuffer<String>, #_MyArrayBuffer._storage
+  %3 = struct_extract %2 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+  %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %5 = ref_element_addr [immutable] %4 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %6 = struct_element_addr %5 : $*_ArrayBody, #_ArrayBody._storage
+  %7 = struct_element_addr %6 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %8 = struct_element_addr %7 : $*Int, #Int._value
+  %9 = load %8 : $*Builtin.Int64
+  %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+  %11 = struct_element_addr %10 : $*String, #String._guts
+  %12 = load %11 : $*_StringGuts
+  %13 = load %10 : $*String
+  %14 = tuple ()
+  return %14 : $()
+}

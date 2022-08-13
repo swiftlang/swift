@@ -94,6 +94,8 @@ enum class ImportFlags {
 /// \see ImportFlags
 using ImportOptions = OptionSet<ImportFlags>;
 
+void simple_display(llvm::raw_ostream &out, ImportOptions options);
+
 // MARK: - Import Paths
 
 namespace detail {

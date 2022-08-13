@@ -228,6 +228,8 @@ SWIFT_FUNCTION_PASS(EscapeInfoDumper, "dump-escape-info",
      "Dumps escape information")
 SWIFT_FUNCTION_PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
      "Dumps address escape information")
+SWIFT_FUNCTION_PASS(AccessDumper, "dump-access",
+     "Dump access information")
 SWIFT_FUNCTION_PASS(ComputeEffects, "compute-effects",
      "Computes function effects")
 PASS(FlowIsolation, "flow-isolation",

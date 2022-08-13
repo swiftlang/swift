@@ -521,3 +521,16 @@ func rdar80797176 () {
   for x: Int in [1, 2] where x.bitWidth == 32 { // Ok
   }
 }
+
+// https://github.com/apple/swift/issues/60029
+for (key, values) in oldName { // expected-error{{cannot find 'oldName' in scope}}
+  for (idx, value) in values.enumerated() {
+    print(key, idx, value)
+  }
+}
+
+// https://github.com/apple/swift/issues/60503
+func f60503() {
+  let (key, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
+  let (_, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
+}

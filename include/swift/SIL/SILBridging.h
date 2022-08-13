@@ -141,6 +141,13 @@ typedef enum {
 } BridgedMemoryBehavior;
 
 typedef enum {
+  AccessKind_Init,
+  AccessKind_Read,
+  AccessKind_Modify,
+  AccessKind_Deinit
+} BridgedAccessKind;
+
+typedef enum {
   Ownership_Unowned,
   Ownership_Owned,
   Ownership_Guaranteed,
@@ -221,6 +228,7 @@ SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
 
 llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
+SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
@@ -309,6 +317,7 @@ SwiftInt InitEnumDataAddrInst_caseIndex(BridgedInstruction idea);
 SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex(BridgedInstruction utedi);
 SwiftInt InjectEnumAddrInst_caseIndex(BridgedInstruction ieai);
 SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai);
+SwiftInt RefElementAddrInst_fieldIsLet(BridgedInstruction reai);
 SwiftInt PartialApplyInst_numArguments(BridgedInstruction ai);
 SwiftInt ApplyInst_numArguments(BridgedInstruction ai);
 SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg(BridgedInstruction pai);
@@ -321,6 +330,7 @@ BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
 SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
+BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess);
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr);
 SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr);
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);
