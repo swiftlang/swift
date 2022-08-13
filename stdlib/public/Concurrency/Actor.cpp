@@ -589,20 +589,6 @@ public:
       : Flags(), FirstJob(JobRef()) {}
 #endif
 
-  bool isDistributedRemote() const {
-    return Flags & concurrency::ActorFlagConstants::DistributedRemote;
-  }
-  ActiveActorStatus withDistributedRemote() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveActorStatus(
-        Flags | concurrency::ActorFlagConstants::DistributedRemote, DrainLock,
-        FirstJob);
-#else
-    return ActiveActorStatus(
-        Flags | concurrency::ActorFlagConstants::DistributedRemote, FirstJob);
-#endif
-  }
-
   bool isIdle() const {
     bool isIdle = (getActorState() == concurrency::ActorFlagConstants::Idle);
     if (isIdle) {
@@ -775,8 +761,8 @@ public:
     }
     concurrency::trace::actor_state_changed(
         actor, getFirstJob().getRawJob(), getFirstJob().needsPreprocessing(),
-        traceState, isDistributedRemote(), isMaxPriorityEscalated(),
-        static_cast<uint8_t>(getMaxPriority()));
+        traceState, swift_distributed_actor_is_remote((DefaultActor *) actor),
+        isMaxPriorityEscalated(), static_cast<uint8_t>(getMaxPriority()));
   }
 };
 
@@ -843,15 +829,14 @@ class DefaultActorImpl : public HeapObject {
   // enforce alignment. This is space that is available for us to use in
   // the future
   alignas(sizeof(ActiveActorStatus)) char StatusStorage[sizeof(ActiveActorStatus)];
+#endif
+  // TODO(rokhinip): Make this a flagset
+  bool isDistributedRemoteActor;
 
 public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
-    ActiveActorStatus status = ActiveActorStatus();
-    if (isDistributedRemote) {
-      status = status.withDistributedRemote();
-    }
-    _status().store(status, std::memory_order_relaxed);
+    this->isDistributedRemoteActor = isDistributedRemote;
 
     SWIFT_TASK_DEBUG_LOG("Creating default actor %p", this);
     concurrency::trace::actor_create(this);
@@ -1774,6 +1759,5 @@ bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
 }
 
 bool DefaultActorImpl::isDistributedRemote() {
-  auto state = _status().load(std::memory_order_relaxed);
-  return state.isDistributedRemote();
+  return this->isDistributedRemoteActor;
 }
