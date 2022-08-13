@@ -587,8 +587,9 @@ namespace {
                                                    ctx);
                     cs.setType(base, MetatypeType::get(baseTy));
 
-                    refExpr = DotSyntaxCallExpr::create(ctx, declRefExpr,
-                                                        SourceLoc(), base);
+                    refExpr =
+                        DotSyntaxCallExpr::create(ctx, declRefExpr, SourceLoc(),
+                                                  Argument::unlabeled(base));
                     auto refType = adjustedFullType->castTo<FunctionType>()->getResult();
                     cs.setType(refExpr, refType);
                   } else {
@@ -1121,7 +1122,8 @@ namespace {
                                           fnTy->getExtInfo()));
         cs.cacheType(fnExpr);
 
-        fnExpr = DotSyntaxCallExpr::create(ctx, fnExpr, SourceLoc(), baseExpr);
+        fnExpr = DotSyntaxCallExpr::create(ctx, fnExpr, SourceLoc(),
+                                           Argument::unlabeled(baseExpr));
       }
       fnExpr->setType(newCalleeFnTy);
       cs.cacheType(fnExpr);
@@ -1833,7 +1835,7 @@ namespace {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
         ref = forceUnwrapIfExpected(ref, memberLocator);
-        apply = DotSyntaxCallExpr::create(context, ref, dotLoc, base);
+        apply = DotSyntaxCallExpr::create(context, ref, dotLoc, Argument::unlabeled(base));
         if (Implicit) {
           apply->setImplicit();
         }
@@ -3125,7 +3127,8 @@ namespace {
                                                base, nameLoc, ctorLocator,
                                                implicit);
       auto *call =
-          DotSyntaxCallExpr::create(cs.getASTContext(), ctorRef, dotLoc, base);
+          DotSyntaxCallExpr::create(cs.getASTContext(), ctorRef, dotLoc,
+                                    Argument::unlabeled(base));
 
       return finishApply(call, cs.getType(expr), locator, ctorLocator);
     }
