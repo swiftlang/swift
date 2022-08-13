@@ -54,9 +54,18 @@ def main(arguments):
 
 
 def rpathize(filename):
-    dylibsOutput = subprocess.check_output(
-        ['xcrun', 'dyldinfo', '-dylibs', filename],
-        universal_newlines=True)
+    dylibsOutput = None
+
+    try:
+        # `dyldinfo` has been replaced with `dyld_info`, so we try it first
+        # before falling back to `dyldinfo`
+        dylibsOutput = subprocess.check_output(
+            ['xcrun', 'dyld_info', '-dependents', filename],
+            universal_newlines=True)
+    except subprocess.CalledProcessError:
+        dylibsOutput = subprocess.check_output(
+            ['xcrun', 'dyldinfo', '-dylibs', filename],
+            universal_newlines=True)
 
     # The output from dyldinfo -dylibs is a line of header followed by one
     # install name per line, indented with spaces.
