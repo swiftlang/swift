@@ -428,13 +428,32 @@ namespace {
                                      IsTypeExpansionSensitive_t isSensitive) {
       if (origType.isTypeParameterOrOpaqueArchetype() ||
           origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
-        if (origType.requiresClass()) {
-          return asImpl().handleReference(
-              type, getReferenceRecursiveProperties(isSensitive));
-        } else {
-          return asImpl().handleAddressOnly(
-              type, getOpaqueRecursiveProperties(isSensitive));
+        // Some layout constraints allow us to use more efficient type lowerings
+        // than fully opaque.
+        if (auto layout = origType.getLayoutConstraint()) {
+          switch (layout->getKind()) {
+          case LayoutConstraintKind::Class:
+          case LayoutConstraintKind::RefCountedObject:
+          case LayoutConstraintKind::NativeClass:
+          case LayoutConstraintKind::NativeRefCountedObject:
+            return asImpl().handleReference(
+                type, getReferenceRecursiveProperties(isSensitive));
+              
+          case LayoutConstraintKind::TrivialOfExactSize:
+          case LayoutConstraintKind::TrivialOfAtMostSize:
+            return asImpl().handleTrivial(
+                type, getTrivialRecursiveProperties(isSensitive));
+          
+          case LayoutConstraintKind::Trivial:
+            // TODO: We could handle these as trivial with opaque value SIL.
+            LLVM_FALLTHROUGH;
+          case LayoutConstraintKind::UnknownLayout:
+            /*fall into below*/;
+          }
         }
+
+        return asImpl().handleAddressOnly(
+            type, getOpaqueRecursiveProperties(isSensitive));
       } else {
         // If the abstraction pattern provides a concrete type, lower as that
         // type. This can occur if the abstraction pattern provides a more

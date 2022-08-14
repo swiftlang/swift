@@ -940,6 +940,9 @@ public:
 
   bool requiresClass() const;
   LayoutConstraint getLayoutConstraint() const;
+  /// True if the abstraction pattern has a layout constraint that would
+  /// give it a fixed size and loadable representation.
+  bool hasLoadableLayoutConstraint() const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.

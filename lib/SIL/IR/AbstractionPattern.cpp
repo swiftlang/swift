@@ -273,6 +273,27 @@ LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   }
 }
 
+bool AbstractionPattern::hasLoadableLayoutConstraint() const {
+  auto layout = getLayoutConstraint();
+  if (!layout)
+    return false;
+  
+  switch (layout->getKind()) {
+  case LayoutConstraintKind::Class:
+  case LayoutConstraintKind::TrivialOfExactSize:
+  case LayoutConstraintKind::TrivialOfAtMostSize:
+  case LayoutConstraintKind::NativeRefCountedObject:
+  case LayoutConstraintKind::RefCountedObject:
+  case LayoutConstraintKind::NativeClass:
+    return true;
+      
+  case LayoutConstraintKind::Trivial:
+  case LayoutConstraintKind::UnknownLayout:
+    return false;
+  }
+  llvm_unreachable("uncovered switch");
+}
+
 bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   switch (getKind()) {
   case Kind::Invalid:
@@ -1439,11 +1460,6 @@ public:
       // Look at the layout constraint on this position in the abstraction pattern
       // and carry it over, with some generalization to the point it affects
       // calling convention.
-      // TODO: We should do this once we surface more interesting layout
-      // constraints in the language. There are several places in type lowering
-      // that need to be changed to allow for this and generate correct calling
-      // convention lowering.
-#if WE_MAKE_LAYOUT_CONSTRAINTS_AVAILABLE_IN_THE_SURFACE_LANGUAGE
       switch (layout->getKind()) {
       // Keep these layout constraints as is.
       case LayoutConstraintKind::RefCountedObject:
@@ -1473,10 +1489,9 @@ public:
            LayoutConstraintKind::TrivialOfAtMostSize,
            layout->getTrivialSizeInBits(),
            layout->getAlignmentInBits(),
-           C);
+           TC.Context);
         break;
       }
-#endif
       
       if (layout) {
         substRequirements.push_back(
