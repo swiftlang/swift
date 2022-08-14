@@ -80,6 +80,30 @@ extension String {
   ) { fatalError() }
 }
 
+// The grapheme cache was removed in Swift 5.7 but these functions must be kept
+// because references to them have been inlined in Foundation and other places.
+extension String.Index {
+  @available(*, unavailable)
+  @usableFromInline
+  internal var characterStride: Int? {
+    return nil
+  }
+
+  @available(*, unavailable)
+  @usableFromInline
+  internal init(
+    encodedOffset: Int, transcodedOffset: Int, characterStride: Int
+  ) {
+    self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
+  }
+
+  @available(*, unavailable)
+  @usableFromInline
+  internal init(encodedOffset pos: Int, characterStride char: Int) {
+    self.init(encodedOffset: pos, transcodedOffset: 0)
+  }
+}
+
 extension String.UTF16View {
   // Swift 5.x: This was accidentally shipped as inlinable, but was never used
   // from an inlinable context. The definition is kept around for technical ABI

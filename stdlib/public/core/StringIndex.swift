@@ -16,20 +16,18 @@ import SwiftShims
 
 String's Index has the following layout:
 
- ┌──────────┬────────────────╥────────────────┬───────╥───────┐
- │ b63:b16  │      b15:b14   ║     b13:b8     │ b7:b4 ║ b3:b0 │
- ├──────────┼────────────────╫────────────────┼───────╫───────┤
- │ position │ transc. offset ║ grapheme cache │ rsvd  ║ flags │
- └──────────┴────────────────╨────────────────┴───────╨───────┘
+ ┌──────────┬────────────────╥────────────────────────╥───────┐
+ │ b63:b16  │      b15:b14   ║         b13:b4         ║ b3:b0 │
+ ├──────────┼────────────────╫────────────────────────╫───────┤
+ │ position │ transc. offset ║        reserved        ║ flags │
+ └──────────┴────────────────╨────────────────────────╨───────┘
                              └────── resilient ───────┘
 
-Position, transcoded offset, and flags are fully exposed in the ABI. Grapheme
-cache and reserved bits are partially resilient: the fact that there are 11 bits
-with a default value of `0` is ABI, but not the layout, construction, or
-interpretation of those bits. All use of grapheme cache should be behind
-non-inlinable function calls. Inlinable code should not set a non-zero value to
-resilient bits: doing so breaks future evolution as the meaning of those bits
-isn't frozen.
+Position, transcoded offset, and flags are fully exposed in the ABI. Reserved 
+bits are partially resilient: the fact that there are 11 bits with a default 
+value of `0` is ABI, but not the layout, construction, or interpretation of 
+those bits. Inlinable code should not set a non-zero value to resilient bits: 
+doing so breaks future evolution as the meaning of those bits isn't frozen.
 
 - position aka `encodedOffset`: A 48-bit offset into the string's code units
 
@@ -37,13 +35,10 @@ isn't frozen.
 
 <resilience barrier>
 
-- grapheme cache: A 6-bit value remembering the distance to the next extended
-  grapheme cluster boundary, or 0 if unknown. The value stored (if any) must be
-  calculated assuming that the index addresses a boundary itself, i.e., without
-  looking back at scalars preceding the index. (Substrings that don't start on a
-  `Character` boundary heavily rely on this.)
+- Previously b13:8 contained a cache of the stride to the next character 
+  boundary (Removed in Swift 5.7)
 
-- reserved: 4 unused bits available for future flags etc. The meaning of each
+- reserved: 10 unused bits available for future flags etc. The meaning of each
   bit may change between stdlib versions. These must be set to zero if
   constructing an index in inlinable code.
 
@@ -121,12 +116,6 @@ extension String.Index {
     return Int(truncatingIfNeeded: orderingValue & 0x3)
   }
 
-  @usableFromInline
-  internal var characterStride: Int? {
-    let value = (_rawBits & 0x3F00) &>> 8
-    return value > 0 ? Int(truncatingIfNeeded: value) : nil
-  }
-
   @inlinable @inline(__always)
   internal init(encodedOffset: Int, transcodedOffset: Int) {
     let pos = UInt64(truncatingIfNeeded: encodedOffset)
@@ -166,21 +155,6 @@ extension String.Index {
   @inlinable @inline(__always)
   internal init(_encodedOffset offset: Int) {
     self.init(encodedOffset: offset, transcodedOffset: 0)
-  }
-
-  @usableFromInline
-  internal init(
-    encodedOffset: Int, transcodedOffset: Int, characterStride: Int
-  ) {
-    self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
-    if _slowPath(characterStride > 0x3F) { return }
-    self._rawBits |= UInt64(truncatingIfNeeded: characterStride &<< 8)
-    self._invariantCheck()
-  }
-
-  @usableFromInline
-  internal init(encodedOffset pos: Int, characterStride char: Int) {
-    self.init(encodedOffset: pos, transcodedOffset: 0, characterStride: char)
   }
 
   #if !INTERNAL_CHECKS_ENABLED

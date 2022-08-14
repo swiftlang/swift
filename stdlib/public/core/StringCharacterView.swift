@@ -71,10 +71,8 @@ extension String: BidirectionalCollection {
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
-    let nextIndex = Index(_encodedOffset: nextOffset)._characterAligned
-    let nextStride = _characterStride(startingAt: nextIndex)
-    let r = Index(encodedOffset: nextOffset, characterStride: nextStride)
-    return _guts.markEncoding(r._characterAligned)
+    let r = Index(_encodedOffset: nextOffset)._characterAligned
+    return _guts.markEncoding(r)
   }
 
   /// Returns the position immediately before the given index.
@@ -111,7 +109,7 @@ extension String: BidirectionalCollection {
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
 
-    let r = Index(encodedOffset: priorOffset, characterStride: stride)
+    let r = Index(_encodedOffset: priorOffset)
     return _guts.markEncoding(r._characterAligned)
   }
 
@@ -330,9 +328,6 @@ extension String: BidirectionalCollection {
   internal func _characterStride(startingAt i: Index) -> Int {
     // Prior to Swift 5.7, this function used to be inlinable.
     _internalInvariant_5_1(i._isScalarAligned)
-
-    // Fast check if it's already been measured, otherwise check resiliently
-    if let d = i.characterStride { return d }
 
     if i == endIndex { return 0 }
 

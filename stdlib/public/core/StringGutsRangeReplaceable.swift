@@ -483,14 +483,10 @@ extension _StringGuts {
       let newUTF8Count =
         oldUTF8Count + newUTF8Subrange.count - oldUTF8SubrangeCount
 
-      // Get the character stride in the entire string, not just the substring.
-      // (Characters in a substring may end beyond the bounds of it.)
-      let newStride = _opaqueCharacterStride(startingAt: utf8StartOffset)
-
       startIndex = String.Index(
         encodedOffset: utf8StartOffset,
-        transcodedOffset: 0,
-        characterStride: newStride)._scalarAligned._knownUTF8
+        transcodedOffset: 0)._scalarAligned._knownUTF8
+
       if isOnGraphemeClusterBoundary(startIndex) {
         startIndex = startIndex._characterAligned
       }
@@ -512,33 +508,15 @@ extension _StringGuts {
         oldBounds.lowerBound,
         oldBounds.upperBound &+ newRange.count &- oldRange.count))
 
-    // Update `startIndex` if necessary. The replacement may have invalidated
-    // its cached character stride and character alignment flag, but not its
-    // stored offset, encoding, or scalar alignment.
-    //
-    // We are exploiting the fact that mutating the string _after_ the scalar
-    // following the end of the character at `startIndex` cannot possibly change
-    // the length of that character. (This is true because `index(after:)` never
-    // needs to look ahead by more than one Unicode scalar.)
-    let oldStride = startIndex.characterStride ?? 0
-    if oldRange.lowerBound <= oldBounds.lowerBound &+ oldStride {
-      // Get the character stride in the entire string, not just the substring.
-      // (Characters in a substring may end beyond the bounds of it.)
-      let newStride = _opaqueCharacterStride(startingAt: newBounds.lowerBound)
-      var newStart = String.Index(
-        encodedOffset: newBounds.lowerBound,
-        characterStride: newStride
-      )._scalarAligned._knownUTF8
+    var newStart = String.Index(
+      _encodedOffset: newBounds.lowerBound
+    )._scalarAligned._knownUTF8
 
-      // Preserve character alignment flag if possible
-      if startIndex._isCharacterAligned,
-        (oldRange.lowerBound > oldBounds.lowerBound ||
-         isOnGraphemeClusterBoundary(newStart)) {
-        newStart = newStart._characterAligned
-      }
-
-      startIndex = newStart
+    if isOnGraphemeClusterBoundary(newStart) {
+      newStart = newStart._characterAligned
     }
+
+    startIndex = newStart
 
     // Update `endIndex`.
     if newBounds.upperBound != endIndex._encodedOffset {

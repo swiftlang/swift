@@ -233,11 +233,8 @@ extension Substring: StringProtocol {
     let nextOffset = Swift.min(
       i._encodedOffset &+ stride,
       endIndex._encodedOffset)
-    let nextIndex = Index(_encodedOffset: nextOffset)._scalarAligned
-    let nextStride = _characterStride(startingAt: nextIndex)
 
-    var r = Index(
-      encodedOffset: nextOffset, characterStride: nextStride)._scalarAligned
+    var r = Index(_encodedOffset: nextOffset)._scalarAligned
 
     // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
     // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
@@ -287,9 +284,7 @@ extension Substring: StringProtocol {
     let priorOffset = i._encodedOffset &- priorStride
     _internalInvariant(priorOffset >= startIndex._encodedOffset)
 
-    var r = Index(
-      encodedOffset: priorOffset, characterStride: priorStride
-    )._scalarAligned
+    var r = Index(_encodedOffset: priorOffset)._scalarAligned
 
     // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
     // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
@@ -564,10 +559,6 @@ extension Substring {
   internal func _characterStride(startingAt i: Index) -> Int {
     _internalInvariant(i._isScalarAligned)
     _internalInvariant(i._encodedOffset <= _wholeGuts.count)
-
-    // If the index has a character stride, it reflects the stride assuming that
-    // it addresses a `Character` boundary, which is exactly what we want.
-    if let d = i.characterStride { return d }
 
     if i._encodedOffset == endIndex._encodedOffset { return 0 }
 
