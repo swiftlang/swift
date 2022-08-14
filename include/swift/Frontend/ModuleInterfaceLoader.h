@@ -435,7 +435,8 @@ public:
   static bool buildSwiftModuleFromSwiftInterface(
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
       const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
-      const ClangImporterOptions &ClangOpts, StringRef CacheDir,
+      const ClangImporterOptions &ClangOpts,
+      const TypeCheckerOptions &TypeCheckerOpts, StringRef CacheDir,
       StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
       StringRef ModuleName, StringRef InPath,
       StringRef OutPath, StringRef ABIOutputPath,
@@ -471,6 +472,7 @@ private:
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
+                                     const TypeCheckerOptions &TypeCheckerOpts,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SmallVectorImpl<const char *> &SubArgs,
@@ -483,6 +485,7 @@ public:
       SourceManager &SM, DiagnosticEngine *Diags,
       const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
       const ClangImporterOptions &clangImporterOpts,
+      const TypeCheckerOptions &typeCheckerOpts,
       ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
       StringRef moduleCachePath, StringRef prebuiltCachePath,
       StringRef backupModuleInterfaceDir,

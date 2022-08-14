@@ -916,7 +916,7 @@ class ModuleInterfaceLoaderImpl {
     }
     InterfaceSubContextDelegateImpl astDelegate(
         ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
-        ctx.ClangImporterOpts, Opts,
+        ctx.ClangImporterOpts, ctx.TypeCheckerOpts, Opts,
         /*buildModuleCacheDirIfAbsent*/ true, cacheDir, prebuiltCacheDir,
         backupInterfaceDir,
         /*serializeDependencyHashes*/ false, trackSystemDependencies,
@@ -1218,7 +1218,8 @@ bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
 bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
-    const ClangImporterOptions &ClangOpts, StringRef CacheDir,
+    const ClangImporterOptions &ClangOpts,
+    const TypeCheckerOptions &TypeCheckerOpts, StringRef CacheDir,
     StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
     StringRef ModuleName, StringRef InPath,
     StringRef OutPath, StringRef ABIOutputPath,
@@ -1226,8 +1227,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     bool TrackSystemDependencies, ModuleInterfaceLoaderOptions LoaderOpts,
     RequireOSSAModules_t RequireOSSAModules) {
   InterfaceSubContextDelegateImpl astDelegate(
-      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, LoaderOpts,
-      /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
+      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, TypeCheckerOpts,
+      LoaderOpts, /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
       BackupInterfaceDir,
       SerializeDependencyHashes, TrackSystemDependencies, RequireOSSAModules);
   ModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
@@ -1272,6 +1273,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
 
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    const TypeCheckerOptions &TypeCheckerOpts,
     RequireOSSAModules_t RequireOSSAModules) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
@@ -1358,6 +1360,15 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       std::string pair = (llvm::Twine(lhs) + "=" + rhs).str();
       GenericArgs.push_back(ArgSaver.save(pair));
   });
+
+  genericSubInvocation.getTypeCheckerOptions().SkipFunctionBodies =
+      TypeCheckerOpts.SkipFunctionBodies;
+
+  // It could be the case that building a swiftinterface depends on a local
+  // module, which may have errors. This will *always* crash unless allowing
+  // errors is passed down.
+  genericSubInvocation.getLangOptions().AllowModuleWithCompilerErrors =
+      LangOpts.AllowModuleWithCompilerErrors;
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -1437,6 +1448,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     SourceManager &SM, DiagnosticEngine *Diags,
     const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
     const ClangImporterOptions &clangImporterOpts,
+    const TypeCheckerOptions &typeCheckerOpts,
     ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
     StringRef moduleCachePath, StringRef prebuiltCachePath,
     StringRef backupModuleInterfaceDir,
@@ -1444,7 +1456,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     RequireOSSAModules_t requireOSSAModules)
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
-  inheritOptionsForBuildingInterface(searchPathOpts, langOpts,
+  inheritOptionsForBuildingInterface(searchPathOpts, langOpts, typeCheckerOpts,
                                      requireOSSAModules);
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();

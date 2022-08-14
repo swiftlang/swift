@@ -1416,7 +1416,7 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   InterfaceSubContextDelegateImpl ASTDelegate(
       ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
-      ctx.ClangImporterOpts, LoaderOpts,
+      ctx.ClangImporterOpts, ctx.TypeCheckerOpts, LoaderOpts,
       /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
       FEOpts.PrebuiltModuleCachePath,
       FEOpts.BackupModuleInterfaceDir,
@@ -1516,7 +1516,7 @@ swift::dependencies::performBatchModuleScan(
             allModules;
         InterfaceSubContextDelegateImpl ASTDelegate(
             ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
-            ctx.ClangImporterOpts, LoaderOpts,
+            ctx.ClangImporterOpts, ctx.TypeCheckerOpts, LoaderOpts,
             /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
             FEOpts.BackupModuleInterfaceDir,
@@ -1586,7 +1586,7 @@ swift::dependencies::performBatchModulePrescan(
             allModules;
         InterfaceSubContextDelegateImpl ASTDelegate(
             ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
-            ctx.ClangImporterOpts, LoaderOpts,
+            ctx.ClangImporterOpts, ctx.TypeCheckerOpts, LoaderOpts,
             /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
             FEOpts.BackupModuleInterfaceDir,
