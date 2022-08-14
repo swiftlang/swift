@@ -5705,14 +5705,35 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (dc->isTypeContext() && !getterName.getSelfIndex())
     isStatic = true;
 
-  // Compute the property type.
-  bool isFromSystemModule = isInSystemModule(dc);
-  auto importedType = Impl.importType(
-      propertyType, ImportTypeKind::Property,
-      ImportDiagnosticAdder(Impl, getter, getter->getLocation()),
-      Impl.shouldAllowNSUIntegerAsInt(isFromSystemModule, getter),
-      Bridgeability::Full, getImportTypeAttrs(accessor),
-      OTK_ImplicitlyUnwrappedOptional);
+  ImportedType importedType;
+
+  // Sometimes we import unavailable typedefs as enums. If that's the case,
+  // use the enum, not the typedef here.
+  if (auto typedefType = dyn_cast<clang::TypedefType>(propertyType.getTypePtr())) {
+    if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
+      if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
+        // If this fails, it means that we need a stronger predicate for
+        // determining the relationship between an enum and typedef.
+        assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
+               typedefType->getCanonicalTypeInternal());
+        if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
+          importedType = {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};
+        }
+      }
+    }
+  }
+
+  if (!importedType) {
+    // Compute the property type.
+    bool isFromSystemModule = isInSystemModule(dc);
+    importedType = Impl.importType(
+        propertyType, ImportTypeKind::Property,
+        ImportDiagnosticAdder(Impl, getter, getter->getLocation()),
+        Impl.shouldAllowNSUIntegerAsInt(isFromSystemModule, getter),
+        Bridgeability::Full, getImportTypeAttrs(accessor),
+        OTK_ImplicitlyUnwrappedOptional);
+  }
+
   if (!importedType)
     return nullptr;
 
