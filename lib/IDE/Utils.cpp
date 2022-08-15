@@ -199,7 +199,6 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   llvm::SmallString<128> PrimaryFile;
   if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
     PrimaryFile = UnresolvedPrimaryFile;
-  llvm::sys::path::native(PrimaryFile);
 
   unsigned primaryCount = 0;
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
@@ -209,7 +208,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     llvm::SmallString<128> newFilename;
     if (auto err = FileSystem->getRealPath(input.getFileName(), newFilename))
       newFilename = input.getFileName();
-    llvm::sys::path::native(newFilename);
+    llvm::sys::path::native(newFilename, llvm::sys::path::Style::posix);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {
