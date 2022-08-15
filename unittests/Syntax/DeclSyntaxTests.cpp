@@ -19,10 +19,10 @@ DeclModifierSyntax getCannedDeclModifier(const RC<SyntaxArena> &Arena) {
   auto Set = Factory.makeIdentifier("set", "", "");
   auto RParen = Factory.makeRightParenToken("", "");
   auto DeclModifierDetail = Factory.makeDeclModifierDetail(
-      /*GarbageNodes=*/None, LParen, /*GarbageNodes=*/None, Set,
-      /*GarbageNodes=*/None, RParen);
-  return Factory.makeDeclModifier(/*GarbageNodes=*/None, Private,
-                                  /*GarbageNodes=*/None, DeclModifierDetail);
+      /*UnexpectedNodes=*/None, LParen, /*UnexpectedNodes=*/None, Set,
+      /*UnexpectedNodes=*/None, RParen);
+  return Factory.makeDeclModifier(/*UnexpectedNodes=*/None, Private,
+                                  /*UnexpectedNodes=*/None, DeclModifierDetail);
 }
 
 TEST(DeclSyntaxTests, DeclModifierMakeAPIs) {
@@ -50,11 +50,11 @@ TEST(DeclSyntaxTests, DeclModifierGetAPIs) {
   auto Set = Factory.makeIdentifier("set", "", "");
   auto RParen = Factory.makeRightParenToken("", "");
   auto DeclModifierDetail = Factory.makeDeclModifierDetail(
-      /*GarbageNodes=*/None, LParen, /*GarbageNodes=*/None, Set,
-      /*GarbageNodes=*/None, RParen);
+      /*UnexpectedNodes=*/None, LParen, /*UnexpectedNodes=*/None, Set,
+      /*UnexpectedNodes=*/None, RParen);
   auto Mod =
-      Factory.makeDeclModifier(/*GarbageNodes=*/None, Private,
-                               /*GarbageNodes=*/None, DeclModifierDetail);
+      Factory.makeDeclModifier(/*UnexpectedNodes=*/None, Private,
+                               /*UnexpectedNodes=*/None, DeclModifierDetail);
 
   ASSERT_EQ(Private.getRaw(), Mod.getName().getRaw());
   ASSERT_EQ(LParen.getRaw(), Mod.getDetail()->getLeftParen().getRaw());
@@ -74,9 +74,9 @@ TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
   llvm::raw_svector_ostream OS(Scratch);
   Factory.makeBlankDeclModifier()
       .withName(Private)
-      .withDetail(Factory.makeDeclModifierDetail(/*GarbageNodes=*/None, LParen,
-                                                 /*GarbageNodes=*/None, Set,
-                                                 /*GarbageNodes=*/None, RParen))
+      .withDetail(Factory.makeDeclModifierDetail(/*UnexpectedNodes=*/None, LParen,
+                                                 /*UnexpectedNodes=*/None, Set,
+                                                 /*UnexpectedNodes=*/None, RParen))
       .print(OS);
   ASSERT_EQ(OS.str().str(), "private(set)");
 }
@@ -99,9 +99,9 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto Subsequence = Factory.makeIdentifier("MyCollection", "", "");
     auto ElementName = Factory.makeIdentifier("Element", "", "");
     auto ElementParam = Factory.makeGenericParameter(
-        /*GarbageNodes=*/None, /*Attributes=*/None, /*GarbageNodes=*/None,
-        /*Name=*/ElementName, /*GarbageNodes=*/None, /*Colon=*/None,
-        /*GarbageNodes=*/None, /*InheritedType=*/None, /*GarbageNodes=*/None,
+        /*UnexpectedNodes=*/None, /*Attributes=*/None, /*UnexpectedNodes=*/None,
+        /*Name=*/ElementName, /*UnexpectedNodes=*/None, /*Colon=*/None,
+        /*UnexpectedNodes=*/None, /*InheritedType=*/None, /*UnexpectedNodes=*/None,
         /*TrailingComma=*/None);
     auto LeftAngle = Factory.makeLeftAngleToken("", "");
     auto RightAngle = Factory.makeRightAngleToken("", " ");
@@ -113,8 +113,8 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto Assignment = Factory.makeEqualToken("", " ");
     auto ElementType = Factory.makeTypeIdentifier("Element", "", "");
     auto ElementArg = Factory.makeGenericArgument(
-        /*GarbageNodes=*/None, /*ArgumentType=*/ElementType,
-        /*GarbageNodes=*/None, /*TrailingComma=*/None);
+        /*UnexpectedNodes=*/None, /*ArgumentType=*/ElementType,
+        /*UnexpectedNodes=*/None, /*TrailingComma=*/None);
 
     auto GenericArgs =
         GenericArgumentClauseSyntaxBuilder(Arena)
@@ -125,19 +125,19 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
 
     auto Array = Factory.makeIdentifier("Array", "", "");
     auto Array_Int = Factory.makeSimpleTypeIdentifier(
-        /*GarbageNodes=*/None, /*Name=*/Array, /*GarbageNodes=*/None,
+        /*UnexpectedNodes=*/None, /*Name=*/Array, /*UnexpectedNodes=*/None,
         /*GenericArgumentClause=*/GenericArgs);
     auto TypeInit = Factory.makeTypeInitializerClause(
-        /*GarbageNodes=*/None, /*Equal=*/Assignment, /*GarbageNodes=*/None,
+        /*UnexpectedNodes=*/None, /*Equal=*/Assignment, /*UnexpectedNodes=*/None,
         /*Value=*/Array_Int);
     Factory
         .makeTypealiasDecl(
-            /*GarbageNodes=*/None, /*Attributes=*/None, /*GarbageNodes=*/None,
-            /*Modifiers=*/None, /*GarbageNodes=*/None,
-            /*TypealiasKeyword=*/Typealias, /*GarbageNodes=*/None,
-            /*Identifier=*/Subsequence, /*GarbageNodes=*/None,
-            /*GenericParameterClause=*/GenericParams, /*GarbageNodes=*/None,
-            /*Initializer=*/TypeInit, /*GarbageNodes=*/None,
+            /*UnexpectedNodes=*/None, /*Attributes=*/None, /*UnexpectedNodes=*/None,
+            /*Modifiers=*/None, /*UnexpectedNodes=*/None,
+            /*TypealiasKeyword=*/Typealias, /*UnexpectedNodes=*/None,
+            /*Identifier=*/Subsequence, /*UnexpectedNodes=*/None,
+            /*GenericParameterClause=*/GenericParams, /*UnexpectedNodes=*/None,
+            /*Initializer=*/TypeInit, /*UnexpectedNodes=*/None,
             /*GenericWhereClause=*/None)
         .print(OS);
     ASSERT_EQ(OS.str().str(),
@@ -152,9 +152,9 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto MyCollection = Factory.makeIdentifier("MyCollection", "", "");
   auto ElementName = Factory.makeIdentifier("Element", "", "");
   auto ElementParam = Factory.makeGenericParameter(
-      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, ElementName,
-      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None,
-      /*GarbageNodes=*/None, None);
+      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, ElementName,
+      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None);
   auto LeftAngle = Factory.makeLeftAngleToken("", "");
   auto RightAngle = Factory.makeRightAngleToken("", " ");
   auto GenericParams = GenericParameterClauseSyntaxBuilder(Arena)
@@ -166,7 +166,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
 
   auto ElementType = Factory.makeTypeIdentifier("Element", "", "");
   auto ElementArg = Factory.makeGenericArgument(
-      /*GarbageNodes=*/None, ElementType, /*GarbageNodes=*/None, None);
+      /*UnexpectedNodes=*/None, ElementType, /*UnexpectedNodes=*/None, None);
   auto GenericArgs =
       GenericArgumentClauseSyntaxBuilder(Arena)
           .useLeftAngleBracket(LeftAngle)
@@ -176,9 +176,9 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
 
   auto Array = Factory.makeIdentifier("Array", "", "");
   auto Array_Int = Factory.makeSimpleTypeIdentifier(
-      /*GarbageNodes=*/None, Array, /*GarbageNodes=*/None, GenericArgs);
+      /*UnexpectedNodes=*/None, Array, /*UnexpectedNodes=*/None, GenericArgs);
   auto Type_Init = Factory.makeTypeInitializerClause(
-      /*GarbageNodes=*/None, Equal, /*GarbageNodes=*/None, Array_Int);
+      /*UnexpectedNodes=*/None, Equal, /*UnexpectedNodes=*/None, Array_Int);
   {
     SmallString<1> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -214,7 +214,7 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
 
   auto ElementType = Factory.makeTypeIdentifier("Element", "", "");
   auto ElementArg = Factory.makeGenericArgument(
-      /*GarbageNodes=*/None, ElementType, /*GarbageNodes=*/None, None);
+      /*UnexpectedNodes=*/None, ElementType, /*UnexpectedNodes=*/None, None);
 
   auto GenericArgs =
       GenericArgumentClauseSyntaxBuilder(Arena)
@@ -225,9 +225,9 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
 
   auto Array = Factory.makeIdentifier("Array", "", "");
   auto Array_Int = Factory.makeSimpleTypeIdentifier(
-      /*GarbageNodes=*/None, Array, /*GarbageNodes=*/None, GenericArgs);
+      /*UnexpectedNodes=*/None, Array, /*UnexpectedNodes=*/None, GenericArgs);
   auto Type_Init = Factory.makeTypeInitializerClause(
-      /*GarbageNodes=*/None, Equal, /*GarbageNodes=*/None, Array_Int);
+      /*UnexpectedNodes=*/None, Equal, /*UnexpectedNodes=*/None, Array_Int);
   TypealiasDeclSyntaxBuilder(Arena)
       .useTypealiasKeyword(Typealias)
       .useIdentifier(MyCollection)
@@ -253,18 +253,18 @@ FunctionParameterSyntax getCannedFunctionParameter(const RC<SyntaxArena> &Arena)
   auto Sign = Factory.makePrefixOperator("-", "", "");
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
   auto OneLiteral =
-      Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
-  auto One = Factory.makePrefixOperatorExpr(/*GarbageNodes=*/None, Sign,
-                                            /*GarbageNodes=*/None, OneLiteral);
-  auto DefaultArg = Factory.makeInitializerClause(/*GarbageNodes=*/None, Equal,
-                                                  /*GarbageNodes=*/None, One);
+      Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, OneDigits);
+  auto One = Factory.makePrefixOperatorExpr(/*UnexpectedNodes=*/None, Sign,
+                                            /*UnexpectedNodes=*/None, OneLiteral);
+  auto DefaultArg = Factory.makeInitializerClause(/*UnexpectedNodes=*/None, Equal,
+                                                  /*UnexpectedNodes=*/None, One);
   auto Comma = Factory.makeCommaToken("", " ");
 
   return Factory.makeFunctionParameter(
-      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, ExternalName,
-      /*GarbageNodes=*/None, LocalName, /*GarbageNodes=*/None, Colon,
-      /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, NoEllipsis,
-      /*GarbageNodes=*/None, DefaultArg, /*GarbageNodes=*/None, Comma);
+      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, ExternalName,
+      /*UnexpectedNodes=*/None, LocalName, /*UnexpectedNodes=*/None, Colon,
+      /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, NoEllipsis,
+      /*UnexpectedNodes=*/None, DefaultArg, /*UnexpectedNodes=*/None, Comma);
 }
 
 TEST(DeclSyntaxTests, FunctionParameterMakeAPIs) {
@@ -297,18 +297,18 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
   auto Sign = Factory.makePrefixOperator("-", "", "");
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
   auto OneLiteral =
-      Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
-  auto One = Factory.makePrefixOperatorExpr(/*GarbageNodes=*/None, Sign,
-                                            /*GarbageNodes=*/None, OneLiteral);
-  auto DefaultArg = Factory.makeInitializerClause(/*GarbageNodes=*/None, Equal,
-                                                  /*GarbageNodes=*/None, One);
+      Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, OneDigits);
+  auto One = Factory.makePrefixOperatorExpr(/*UnexpectedNodes=*/None, Sign,
+                                            /*UnexpectedNodes=*/None, OneLiteral);
+  auto DefaultArg = Factory.makeInitializerClause(/*UnexpectedNodes=*/None, Equal,
+                                                  /*UnexpectedNodes=*/None, One);
   auto Comma = Factory.makeCommaToken("", "");
 
   auto Param = Factory.makeFunctionParameter(
-      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, ExternalName,
-      /*GarbageNodes=*/None, LocalName, /*GarbageNodes=*/None, Colon,
-      /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, NoEllipsis,
-      /*GarbageNodes=*/None, DefaultArg, /*GarbageNodes=*/None, Comma);
+      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, ExternalName,
+      /*UnexpectedNodes=*/None, LocalName, /*UnexpectedNodes=*/None, Colon,
+      /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, NoEllipsis,
+      /*UnexpectedNodes=*/None, DefaultArg, /*UnexpectedNodes=*/None, Comma);
 
   ASSERT_EQ(ExternalName.getRaw(), Param.getFirstName()->getRaw());
   ASSERT_EQ(LocalName.getRaw(), Param.getSecondName()->getRaw());
@@ -346,9 +346,9 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
 
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "", Arena);
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
-  auto One = Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
-  auto DefaultArg = Factory.makeInitializerClause(/*GarbageNodes=*/None, Equal,
-                                                  /*GarbageNodes=*/None, One);
+  auto One = Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, OneDigits);
+  auto DefaultArg = Factory.makeInitializerClause(/*UnexpectedNodes=*/None, Equal,
+                                                  /*UnexpectedNodes=*/None, One);
   auto Comma = Factory.makeCommaToken("", "");
 
   {
@@ -435,18 +435,18 @@ FunctionSignatureSyntax getCannedFunctionSignature(const RC<SyntaxArena> &Arena)
                   .appending(Param)
                   .castTo<FunctionParameterListSyntax>();
   auto RParen = Factory.makeRightParenToken("", " ");
-  auto Parameter = Factory.makeParameterClause(/*GarbageNodes=*/None, LParen,
-                                               /*GarbageNodes=*/None, List,
-                                               /*GarbageNodes=*/None, RParen);
+  auto Parameter = Factory.makeParameterClause(/*UnexpectedNodes=*/None, LParen,
+                                               /*UnexpectedNodes=*/None, List,
+                                               /*UnexpectedNodes=*/None, RParen);
   auto Throws = Factory.makeThrowsKeyword("", " ");
   auto Arrow = Factory.makeArrowToken("", " ");
   auto Int = Factory.makeTypeIdentifier("Int", "", " ");
-  auto Return = Factory.makeReturnClause(/*GarbageNodes=*/None, Arrow,
-                                         /*GarbageNodes=*/None, Int);
+  auto Return = Factory.makeReturnClause(/*UnexpectedNodes=*/None, Arrow,
+                                         /*UnexpectedNodes=*/None, Int);
 
   return Factory.makeFunctionSignature(
-      /*GarbageNodes=*/None, Parameter, /*GarbageNodes=*/None, None,
-      /*GarbageNodes=*/None, Throws, /*GarbageNodes=*/None, Return);
+      /*UnexpectedNodes=*/None, Parameter, /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, Throws, /*UnexpectedNodes=*/None, Return);
 }
 
 TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
@@ -485,14 +485,14 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
 
   auto Int = Factory.makeTypeIdentifier("Int", "", "");
 
-  auto ParamClause = Factory.makeParameterClause(/*GarbageNodes=*/None, LParen,
-                                                 /*GarbageNodes=*/None, List,
-                                                 /*GarbageNodes=*/None, RParen);
-  auto ReturnClause = Factory.makeReturnClause(/*GarbageNodes=*/None, Arrow,
-                                               /*GarbageNodes=*/None, Int);
+  auto ParamClause = Factory.makeParameterClause(/*UnexpectedNodes=*/None, LParen,
+                                                 /*UnexpectedNodes=*/None, List,
+                                                 /*UnexpectedNodes=*/None, RParen);
+  auto ReturnClause = Factory.makeReturnClause(/*UnexpectedNodes=*/None, Arrow,
+                                               /*UnexpectedNodes=*/None, Int);
   auto Sig = Factory.makeFunctionSignature(
-      /*GarbageNodes=*/None, ParamClause, /*GarbageNodes=*/None, None,
-      /*GarbageNodes=*/None, Throws, /*GarbageNodes=*/None, ReturnClause);
+      /*UnexpectedNodes=*/None, ParamClause, /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, Throws, /*UnexpectedNodes=*/None, ReturnClause);
 
   ASSERT_EQ(LParen.getRaw(), Sig.getInput().getLeftParen().getRaw());
 
@@ -540,11 +540,11 @@ TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
   auto Arrow = Factory.makeArrowToken("", " ");
   auto Int = Factory.makeTypeIdentifier("Int", "", "");
 
-  auto Parameter = Factory.makeParameterClause(/*GarbageNodes=*/None, LParen,
-                                               /*GarbageNodes=*/None, List,
-                                               /*GarbageNodes=*/None, RParen);
-  auto Return = Factory.makeReturnClause(/*GarbageNodes=*/None, Arrow,
-                                         /*GarbageNodes=*/None, Int);
+  auto Parameter = Factory.makeParameterClause(/*UnexpectedNodes=*/None, LParen,
+                                               /*UnexpectedNodes=*/None, List,
+                                               /*UnexpectedNodes=*/None, RParen);
+  auto Return = Factory.makeReturnClause(/*UnexpectedNodes=*/None, Arrow,
+                                         /*UnexpectedNodes=*/None, Int);
   SmallString<48> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   Factory.makeBlankFunctionSignature()
@@ -567,19 +567,19 @@ ModifierListSyntax getCannedModifiers(const RC<SyntaxArena> &Arena) {
   auto NoArgument = TokenSyntax::missingToken(tok::identifier, "", Arena);
   auto NoRParen = TokenSyntax::missingToken(tok::r_paren, ")", Arena);
   auto PublicDeclModifierDetail = Factory.makeDeclModifierDetail(
-      /*GarbageNodes=*/None, NoLParen, /*GarbageNodes=*/None, NoArgument,
-      /*GarbageNodes=*/None, NoRParen);
+      /*UnexpectedNodes=*/None, NoLParen, /*UnexpectedNodes=*/None, NoArgument,
+      /*UnexpectedNodes=*/None, NoRParen);
   auto Public = Factory.makeDeclModifier(
-      /*GarbageNodes=*/None, PublicID,
-      /*GarbageNodes=*/None, PublicDeclModifierDetail);
+      /*UnexpectedNodes=*/None, PublicID,
+      /*UnexpectedNodes=*/None, PublicDeclModifierDetail);
 
   auto StaticKW = Factory.makeStaticKeyword("", " ");
   auto StaticDeclModifierDetail = Factory.makeDeclModifierDetail(
-      /*GarbageNodes=*/None, NoLParen, /*GarbageNodes=*/None, NoArgument,
-      /*GarbageNodes=*/None, NoRParen);
+      /*UnexpectedNodes=*/None, NoLParen, /*UnexpectedNodes=*/None, NoArgument,
+      /*UnexpectedNodes=*/None, NoRParen);
   auto Static =
-      Factory.makeDeclModifier(/*GarbageNodes=*/None, StaticKW,
-                               /*GarbageNodes=*/None, StaticDeclModifierDetail);
+      Factory.makeDeclModifier(/*UnexpectedNodes=*/None, StaticKW,
+                               /*UnexpectedNodes=*/None, StaticDeclModifierDetail);
 
   return Factory.makeBlankModifierList().appending(Public).appending(Static);
 }
@@ -609,22 +609,22 @@ CodeBlockSyntax getCannedBody(const RC<SyntaxArena> &Arena) {
   SyntaxFactory Factory(Arena);
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "-", Arena);
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
-  auto One = Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
+  auto One = Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, OneDigits);
   auto ReturnKW = Factory.makeReturnKeyword("\n  ", "");
-  auto Return = Factory.makeReturnStmt(/*GarbageNodes=*/None, ReturnKW,
-                                       /*GarbageNodes=*/None, One);
-  auto ReturnItem = Factory.makeCodeBlockItem(/*GarbageNodes=*/None, Return,
-                                              /*GarbageNodes=*/None, None,
-                                              /*GarbageNodes=*/None, None);
+  auto Return = Factory.makeReturnStmt(/*UnexpectedNodes=*/None, ReturnKW,
+                                       /*UnexpectedNodes=*/None, One);
+  auto ReturnItem = Factory.makeCodeBlockItem(/*UnexpectedNodes=*/None, Return,
+                                              /*UnexpectedNodes=*/None, None,
+                                              /*UnexpectedNodes=*/None, None);
 
   auto Stmts = Factory.makeCodeBlockItemList({ReturnItem});
 
   auto LBrace = Factory.makeLeftBraceToken("", "");
   auto RBrace = Factory.makeRightBraceToken("\n", "");
 
-  return Factory.makeCodeBlock(/*GarbageNodes=*/None, LBrace,
-                               /*GarbageNodes=*/None, Stmts,
-                               /*GarbageNodes=*/None, RBrace);
+  return Factory.makeCodeBlock(/*UnexpectedNodes=*/None, LBrace,
+                               /*UnexpectedNodes=*/None, Stmts,
+                               /*UnexpectedNodes=*/None, RBrace);
 }
 
 GenericWhereClauseSyntax getCannedWhereClause(const RC<SyntaxArena> &Arena) {
@@ -634,10 +634,10 @@ GenericWhereClauseSyntax getCannedWhereClause(const RC<SyntaxArena> &Arena) {
   auto EqualEqual = Factory.makeEqualityOperator("", " ");
   auto Int = Factory.makeTypeIdentifier("Int", "", " ");
   auto SameType = Factory.makeSameTypeRequirement(
-      /*GarbageNodes=*/None, T, /*GarbageNodes=*/None, EqualEqual,
-      /*GarbageNodes=*/None, Int);
-  auto Req = Factory.makeGenericRequirement(/*GarbageNodes=*/None, SameType,
-                                            /*GarbageNodes=*/None, None);
+      /*UnexpectedNodes=*/None, T, /*UnexpectedNodes=*/None, EqualEqual,
+      /*UnexpectedNodes=*/None, Int);
+  auto Req = Factory.makeGenericRequirement(/*UnexpectedNodes=*/None, SameType,
+                                            /*UnexpectedNodes=*/None, None);
 
   auto Requirements = Factory.makeBlankGenericRequirementList().appending(Req);
 
@@ -658,10 +658,10 @@ FunctionDeclSyntax getCannedFunctionDecl(const RC<SyntaxArena> &Arena) {
   auto Body = getCannedBody(Arena);
 
   return Factory.makeFunctionDecl(
-      /*GarbageNodes=*/None, NoAttributes, /*GarbageNodes=*/None, Modifiers,
-      /*GarbageNodes=*/None, FuncKW, /*GarbageNodes=*/None, Foo,
-      /*GarbageNodes=*/None, GenericParams, /*GarbageNodes=*/None, Signature,
-      /*GarbageNodes=*/None, GenericWhere, /*GarbageNodes=*/None, Body);
+      /*UnexpectedNodes=*/None, NoAttributes, /*UnexpectedNodes=*/None, Modifiers,
+      /*UnexpectedNodes=*/None, FuncKW, /*UnexpectedNodes=*/None, Foo,
+      /*UnexpectedNodes=*/None, GenericParams, /*UnexpectedNodes=*/None, Signature,
+      /*UnexpectedNodes=*/None, GenericWhere, /*UnexpectedNodes=*/None, Body);
 }
 
 TEST(DeclSyntaxTests, FunctionDeclMakeAPIs) {
@@ -729,7 +729,7 @@ TEST(DeclSyntaxTests, ProtocolMakeAPIs) {
     auto MyCollection = Factory.makeIdentifier("MyCollection", "", "");
     auto ElementName = Factory.makeIdentifier("Element", "", "");
     auto ElementParam = Factory.makePrimaryAssociatedType(
-        /*GarbageNodes=*/None, ElementName, /*GarbageNodes=*/None, None);
+        /*UnexpectedNodes=*/None, ElementName, /*UnexpectedNodes=*/None, None);
     auto LeftAngle = Factory.makeLeftAngleToken("", "");
     auto RightAngle = Factory.makeRightAngleToken("", " ");
     auto PrimaryAssocs = PrimaryAssociatedTypeClauseSyntaxBuilder(Arena)
@@ -745,12 +745,12 @@ TEST(DeclSyntaxTests, ProtocolMakeAPIs) {
                       .useRightBrace(RightBrace)
                       .build();
     Factory
-        .makeProtocolDecl(/*GarbageNodes=*/None, None, /*GarbageNodes=*/None,
-                          None, /*GarbageNodes=*/None, Protocol,
-                          /*GarbageNodes=*/None, MyCollection,
-                          /*GarbageNodes=*/None, PrimaryAssocs,
-                          /*GarbageNodes=*/None, None, /*GarbageNodes=*/None,
-                          None, /*GarbageNodes=*/None, Members)
+        .makeProtocolDecl(/*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None,
+                          None, /*UnexpectedNodes=*/None, Protocol,
+                          /*UnexpectedNodes=*/None, MyCollection,
+                          /*UnexpectedNodes=*/None, PrimaryAssocs,
+                          /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None,
+                          None, /*UnexpectedNodes=*/None, Members)
         .print(OS);
     ASSERT_EQ(OS.str().str(),
               "protocol MyCollection<Element> {}");
