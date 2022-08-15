@@ -501,11 +501,29 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   if (!tempObj)
     return;
 
-  // If the storage corresponds to a source-level var, do not optimize here.
-  // Mem2Reg will transform the lexical alloc_stack into a lexical begin_borrow
-  // which will ensure that the value's lifetime isn't observably shortened.
-  if (tempObj->isLexical())
-    return;
+  // If the temporary storage is lexical, it either came from a source-level var
+  // or was marked lexical because it was passed to a function that has been
+  // inlined.
+  // TODO: [begin_borrow_addr] Once we can mark addresses as being borrowed, we
+  //       won't need to mark alloc_stacks lexical during inlining.  At that
+  //       point, the above comment should change, but the implementation
+  //       remains the same.
+  //
+  // In either case, we can eliminate the temporary if the source of the copy is
+  // lexical and it is live for longer than the temporary.
+  if (tempObj->isLexical()) {
+    // TODO: Determine whether the base of the copy_addr's source is lexical and
+    //       its live range contains the range in which the alloc_stack
+    //       contains the value copied into it via the copy_addr.
+    //
+    // For now, only look for guaranteed arguments.
+    auto storage = AccessStorageWithBase::compute(copyInst->getSrc());
+    if (!storage.base)
+      return;
+    if (auto *arg = dyn_cast<SILFunctionArgument>(storage.base))
+      if (arg->getOwnershipKind() != OwnershipKind::Guaranteed)
+        return;
+  }
 
   bool isOSSA = copyInst->getFunction()->hasOwnership();
   
@@ -645,10 +663,20 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     return std::next(si->getIterator());
   }
 
-  // If the storage corresponds to a source-level var, do not optimize here.
-  // Mem2Reg will transform the lexical alloc_stack into a lexical begin_borrow
-  // which will ensure that the value's lifetime isn't observably shortened.
+  // If the temporary storage is lexical, it either came from a source-level var
+  // or was marked lexical because it was passed to a function that has been
+  // inlined.
+  // TODO: [begin_borrow_addr] Once we can mark addresses as being borrowed, we
+  //       won't need to mark alloc_stacks lexical during inlining.  At that
+  //       point, the above comment should change, but the implementation
+  //       remains the same.
+  //
+  // In either case, we can eliminate the temporary if the source of the store
+  // is lexical and it is live for longer than the temporary.
   if (tempObj->isLexical()) {
+    // TODO: Find the lexical root of the source, if any, and allow optimization
+    //       if its live range contains the range in which the alloc_stack
+    //       contains the value stored into it.
     return std::next(si->getIterator());
   }
 

@@ -15,6 +15,8 @@
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Defer.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILInstruction.h"
@@ -433,17 +435,44 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   auto calleeConv = getCalleeFunction()->getConventions();
   for (auto p : llvm::enumerate(AppliedArgs)) {
     SILValue callArg = p.value();
+    SWIFT_DEFER { entryArgs.push_back(callArg); };
     unsigned idx = p.index();
     if (idx >= calleeConv.getSILArgIndexOfFirstParam()) {
-      // Insert begin/end borrow for guaranteed arguments.
-      if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
-        if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
-          callArg = newValue;
-          borrowedArgs[idx] = true;
+      auto paramInfo = calleeConv.getParamInfoForSILArg(idx);
+      if (callArg->getType().isAddress()) {
+        // If lexical lifetimes are enabled, any alloc_stacks in the caller that
+        // are passed to the callee being inlined (except mutating exclusive
+        // accesses) need to be promoted to be lexical.  Otherwise,
+        // destroy_addrs could be hoisted through the body of the newly inlined
+        // function without regard to the deinit barriers it contains.
+        //
+        // TODO: [begin_borrow_addr] Instead of marking the alloc_stack as a
+        //       whole lexical, just mark the inlined range lexical via
+        //       begin_borrow_addr [lexical]/end_borrow_addr just as is done
+        //       with values.
+        auto &module = Apply.getFunction()->getModule();
+        auto enableLexicalLifetimes =
+            module.getASTContext().SILOpts.supportsLexicalLifetimes(module);
+        if (!enableLexicalLifetimes)
+          continue;
+
+        // Exclusive mutating accesses don't entail a lexical scope.
+        if (paramInfo.getConvention() == ParameterConvention::Indirect_Inout)
+          continue;
+
+        auto storage = AccessStorageWithBase::compute(callArg);
+        if (auto *asi = dyn_cast<AllocStackInst>(storage.base))
+          asi->setIsLexical();
+      } else {
+        // Insert begin/end borrow for guaranteed arguments.
+        if (paramInfo.isGuaranteed()) {
+          if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
+            callArg = newValue;
+            borrowedArgs[idx] = true;
+          }
         }
       }
     }
-    entryArgs.push_back(callArg);
   }
 
   // Create the return block and set ReturnToBB for use in visitTerminator
