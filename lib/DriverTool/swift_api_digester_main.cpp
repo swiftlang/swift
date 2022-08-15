@@ -558,6 +558,11 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
   if (Ctx.getOpts().SkipRemoveDeprecatedCheck &&
       D->isDeprecated())
     return;
+  // Don't complain about removing importation of SwiftOnoneSupport.
+  if (D->getKind() == SDKNodeKind::DeclImport &&
+      D->getName() == "SwiftOnoneSupport") {
+    return;
+  }
   D->emitDiag(SourceLoc(), diag::removed_decl, false);
 }
 
