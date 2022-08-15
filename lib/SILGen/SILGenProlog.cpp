@@ -264,9 +264,9 @@ struct ArgumentInitHelper {
     if (!SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
       return value;
 
-    bool isNoImplicitCopy = false;
-    if (auto *arg = dyn_cast<SILFunctionArgument>(value))
-      isNoImplicitCopy = arg->isNoImplicitCopy();
+    // Look for the following annotations on the function argument:
+    // - @noImplicitCopy
+    auto isNoImplicitCopy = pd->isNoImplicitCopy();
 
     // If we have a no implicit copy argument and the argument is trivial,
     // we need to use copyable to move only to convert it to its move only
