@@ -113,8 +113,6 @@ public:
            node->getKind() <= SILNodeKind::Last_SILArgument;
   }
 
-  bool isNoImplicitCopy() const;
-
   unsigned getIndex() const;
 
   /// Return non-null if \p value is a phi.
@@ -406,12 +404,6 @@ inline SILPhiArgument *SILArgument::isTerminatorResult(SILValue value) {
       return arg;
   }
   return nullptr;
-}
-
-inline bool SILArgument::isNoImplicitCopy() const {
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(this))
-    return fArg->isNoImplicitCopy();
-  return false;
 }
 
 inline bool SILArgument::isTerminatorResult() const {
