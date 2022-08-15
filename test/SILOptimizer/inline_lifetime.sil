@@ -130,6 +130,20 @@ bb0(%instance : $*T):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @caller_allocstack_callee_inguaranteed : $@convention(thin) <T> () -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'caller_allocstack_callee_inguaranteed'
+sil [ossa] @caller_allocstack_callee_inguaranteed : $@convention(thin) <T> () -> () {
+bb0:
+  %addr = alloc_stack $T
+  apply undef<T>(%addr) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %callee_inguaranteed = function_ref @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %retval = apply %callee_inguaranteed<T>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_addr %addr : $*T
+  dealloc_stack %addr : $*T
+  return %retval : $()
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // begin_apply
 ////////////////////////////////////////////////////////////////////////////////
