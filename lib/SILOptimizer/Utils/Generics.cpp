@@ -1553,7 +1553,7 @@ void FunctionSignaturePartialSpecializer::addRequirements(
   for (auto &reqReq : Reqs) {
     LLVM_DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n";
                reqReq.dump(llvm::dbgs()));
-    AllRequirements.push_back(*reqReq.subst(SubsMap));
+    AllRequirements.push_back(reqReq.subst(SubsMap));
   }
 }
 
