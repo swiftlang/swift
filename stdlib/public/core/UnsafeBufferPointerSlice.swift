@@ -410,9 +410,11 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     with `type`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func storeBytes<T>(of value: T, as type: T.Type) {
+  public func storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
     let buffer = Base(rebasing: self)
-    buffer.storeBytes(of: value, toByteOffset: 0, as: T.self)
+    buffer.storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
 }
 
