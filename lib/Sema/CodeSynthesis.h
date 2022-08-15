@@ -70,8 +70,6 @@ Expr *buildSelfReference(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
 /// \param selfAccessorKind The kind of access being performed.
 /// \param isMutable Whether the resulting argument is for a mutable self
 /// argument. Such an argument is passed 'inout'.
-/// \param convertTy The type of the resulting argument. For a reference to
-/// super, this can be a superclass type to upcast to.
 Argument buildSelfArgument(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
                            bool isMutable);
 
