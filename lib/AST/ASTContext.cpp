@@ -5307,10 +5307,9 @@ ASTContext::getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
                         baseGenericSig, derivedParams);
 
   for (auto reqt : baseGenericSig.getRequirements()) {
-    if (auto substReqt = reqt.subst(QueryOverrideSubs(info),
-                                    LookUpConformanceInOverrideSubs(info))) {
-      addedRequirements.push_back(*substReqt);
-    }
+    auto substReqt = reqt.subst(QueryOverrideSubs(info),
+                                LookUpConformanceInOverrideSubs(info));
+    addedRequirements.push_back(substReqt);
   }
 
   auto genericSig = buildGenericSignature(*this, derivedNominalSig,

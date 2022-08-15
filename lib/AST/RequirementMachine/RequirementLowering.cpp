@@ -465,8 +465,7 @@ struct InferRequirementsWalker : public TypeWalker {
       auto decl = typeAlias->getDecl();
       auto subMap = typeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
-        if (auto req = rawReq.subst(subMap))
-          desugarRequirement(*req, SourceLoc(), reqs, errors);
+        desugarRequirement(rawReq.subst(subMap), SourceLoc(), reqs, errors);
       }
 
       return Action::Continue;
@@ -532,8 +531,8 @@ struct InferRequirementsWalker : public TypeWalker {
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
-      if (auto req = rawReq.subst(subMap))
-        desugarRequirement(*req, SourceLoc(), reqs, errors);
+      auto req = rawReq.subst(subMap);
+      desugarRequirement(req, SourceLoc(), reqs, errors);
     }
 
     return Action::Continue;
