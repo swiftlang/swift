@@ -563,4 +563,73 @@ UnsafeMutableRawBufferPointerSliceTests.test(
   })
 }
 
+UnsafeMutableRawBufferPointerSliceTests.test(
+  "slice.of.UnsafeMutableRawBufferPointer.load"
+) {
+  let count = 4
+  let sizeInBytes = count * MemoryLayout<Int>.stride
+  let b = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment
+  )
+  defer {
+    b.deallocate()
+  }
+  b.withMemoryRebound(to: Int.self) {
+    var (i, c) = $0.update(from: 1...count)
+    expectEqual(c, count)
+    expectNil(i.next())
+  }
+  expectEqual(
+    1, b[...].load(as: Int.self)
+  )
+  expectEqual(
+    2, b[...].load(fromByteOffset: MemoryLayout<Int>.stride, as: Int.self)
+  )
+  expectEqual(
+    3, b[MemoryLayout<Int>.stride...].load(
+      fromByteOffset: MemoryLayout<Int>.stride, as: Int.self
+    )
+  )
+}
+
+UnsafeMutableRawBufferPointerSliceTests.test(
+  "slice.of.UnsafeMutableRawBufferPointer.loadUnaligned"
+) {
+  let count = 4
+  let sizeInBytes = count * MemoryLayout<Int>.stride
+  let b = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment
+  )
+  defer {
+    b.deallocate()
+  }
+  b.copyBytes(from: 0..<UInt8(sizeInBytes))
+  let i = b[...].loadUnaligned(fromByteOffset: 3, as: Int.self)
+  expectEqual(3, withUnsafeBytes(of: i, \.first))
+  let i16 = b[7...].loadUnaligned(as: Int16.self)
+  expectEqual(7, withUnsafeBytes(of: i16, \.first))
+  let i32 = b[17...].loadUnaligned(fromByteOffset: 6, as: Int32.self)
+  expectEqual(23, withUnsafeBytes(of: i32, \.first))
+}
+
+UnsafeMutableRawBufferPointerSliceTests.test(
+  "slice.of.UnsafeMutableRawBufferPointer.storeBytes"
+) {
+  let count = 4
+  let sizeInBytes = count * MemoryLayout<Int>.stride
+  let b = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment
+  )
+  defer {
+    b.deallocate()
+  }
+  b.copyBytes(from: repeatElement(0, count: sizeInBytes))
+  expectEqual(b[0], 0)
+  b[...].storeBytes(of: .max, as: UInt8.self)
+  expectEqual(b[0], .max)
+  expectTrue(b[3..<3+MemoryLayout<UInt>.size].allSatisfy({ $0 == 0 }))
+  b[3...].storeBytes(of: .max, toByteOffset: 4, as: UInt.self)
+  expectTrue(b[7..<7+MemoryLayout<UInt>.size].allSatisfy({ $0 == .max }))
+}
+
 runAllTests()
