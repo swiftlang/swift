@@ -1048,7 +1048,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // The unconditional_cast can be skipped, if the result of a cast
       // is not used afterwards.
       if (!ResultNotUsed) {
-        if (!dynamicCast.canUseScalarCheckedCastInstructions())
+        if (!dynamicCast.canSILUseScalarCheckedCastInstructions())
           return nullptr;
 
         CastedValue =
@@ -1080,87 +1080,6 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     NewI = Builder.createBranch(Loc, SuccessBB, CastedValue);
   }
 
-  eraseInstAction(Inst);
-  willSucceedAction();
-  return NewI;
-}
-
-SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
-    CheckedCastValueBranchInst *Inst) {
-  if (auto *I = optimizeCheckedCastValueBranchInst(Inst))
-    Inst = dyn_cast<CheckedCastValueBranchInst>(I);
-
-  if (!Inst)
-    return nullptr;
-
-  SILDynamicCastInst dynamicCast(Inst);
-  auto SourceFormalType = dynamicCast.getSourceFormalType();
-  auto TargetLoweredType = dynamicCast.getTargetLoweredType();
-  auto TargetFormalType = dynamicCast.getTargetFormalType();
-  auto Loc = dynamicCast.getLocation();
-  auto *SuccessBB = dynamicCast.getSuccessBlock();
-  auto *FailureBB = dynamicCast.getFailureBlock();
-  auto Op = dynamicCast.getSource();
-  auto *F = dynamicCast.getFunction();
-
-  // Check if we can statically predict the outcome of the cast.
-  auto Feasibility = dynamicCast.classifyFeasibility(false /*allow wmo opts*/);
-
-  SILBuilderWithScope Builder(Inst, builderContext);
-
-  if (Feasibility == DynamicCastFeasibility::WillFail) {
-    auto *NewI = Builder.createBranch(Loc, FailureBB);
-    eraseInstAction(Inst);
-    willFailAction();
-    return NewI;
-  }
-
-  // Casting will succeed.
-
-  bool ResultNotUsed = SuccessBB->getArgument(0)->use_empty();
-  SILValue CastedValue;
-  if (Op->getType() != TargetLoweredType) {
-    // Apply the bridged cast optimizations.
-    // TODO: Bridged casts cannot be expressed by checked_cast_value_br yet.
-    // Once the support for opaque values has landed, please review this
-    // code.
-    auto *BridgedI = optimizeBridgedCasts(dynamicCast);
-    if (BridgedI) {
-      llvm_unreachable(
-          "Bridged casts cannot be expressed by checked_cast_value_br yet");
-    } else {
-      // If the cast may succeed or fail and can't be turned into a bridging
-      // call, then let it be.
-      if (Feasibility == DynamicCastFeasibility::MaySucceed) {
-        return nullptr;
-      }
-
-      assert(Feasibility == DynamicCastFeasibility::WillSucceed);
-
-      // Replace by unconditional_cast, followed by a branch.
-      // The unconditional_cast can be skipped, if the result of a cast
-      // is not used afterwards.
-
-      if (!dynamicCast.canUseScalarCheckedCastInstructions())
-        return nullptr;
-
-      if (!ResultNotUsed) {
-        CastedValue =
-            emitSuccessfulScalarUnconditionalCast(Builder, Loc, dynamicCast);
-      } else {
-        CastedValue = SILUndef::get(TargetLoweredType, *F);
-      }
-    }
-    if (!CastedValue)
-      CastedValue = Builder.createUnconditionalCheckedCastValue(
-          Loc, Op, SourceFormalType,
-          TargetLoweredType, TargetFormalType);
-  } else {
-    // No need to cast.
-    CastedValue = Op;
-  }
-
-  auto *NewI = Builder.createBranch(Loc, SuccessBB, CastedValue);
   eraseInstAction(Inst);
   willSucceedAction();
   return NewI;
@@ -1224,7 +1143,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
 
       if (MI) {
         if (SuccessBB->getSinglePredecessorBlock() &&
-            canUseScalarCheckedCastInstructions(
+            canSILUseScalarCheckedCastInstructions(
                 Inst->getModule(), MI->getType().getASTType(),
                 Inst->getTargetFormalType())) {
           SILBuilderWithScope B(Inst, builderContext);
@@ -1248,12 +1167,6 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
       }
     }
   }
-  return nullptr;
-}
-
-SILInstruction *CastOptimizer::optimizeCheckedCastValueBranchInst(
-    CheckedCastValueBranchInst *Inst) {
-  // TODO
   return nullptr;
 }
 
@@ -1441,7 +1354,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *Trap = Builder.createBuiltinTrap(Loc);
+    auto *Trap = Builder.createUnconditionalFail(Loc, "failed cast");
     Inst->replaceAllUsesWithUndef();
     eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
@@ -1453,7 +1366,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     deleteInstructionsAfterUnreachable(UnreachableInst, Trap);
 
     willFailAction();
-    return Trap;
+    return nullptr;
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
@@ -1633,7 +1546,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *TrapI = Builder.createBuiltinTrap(Loc);
+    auto *TrapI = Builder.createUnconditionalFail(Loc, "failed cast");
     eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(TrapI->getIterator()));
     auto *UnreachableInst =

@@ -109,11 +109,11 @@ bb0(%0 : $Bar):
 // test.trytowalk (test.Walkable) -> ()
 sil hidden @_TF4test9trytowalkFPS_8Walkable_T_ : $@convention(thin) (@owned Walkable) -> () {
 bb0(%0 : $Walkable):
-  %2 = open_existential_ref %0 : $Walkable to $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable // users: %3, %4
-  %3 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %4
-  %4 = apply %3<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
-  %5 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %6
-  %6 = apply %5<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %2 = open_existential_ref %0 : $Walkable to $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self // users: %3, %4
+  %3 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %4
+  %4 = apply %3<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %5 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %6
+  %6 = apply %5<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
   strong_release %0 : $Walkable                   // id: %8
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
@@ -124,7 +124,7 @@ bb0(%0 : $Walkable):
 // one opened in the entry block.
 
 // CHECK-LABEL: sil @cse_open_existential_in_bbarg : $@convention(thin) (@owned AnyObject) -> ()
-// CHECK: open_existential_ref %0 : $AnyObject to $[[OPENED:@opened\(.*\) AnyObject]]
+// CHECK: open_existential_ref %0 : $AnyObject to $[[OPENED:@opened\(.*, AnyObject\) Self]]
 // CHECK: bb1(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
 // CHECK-NOT: open_existential_ref
 // CHECK: bb3(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
@@ -132,22 +132,22 @@ bb0(%0 : $Walkable):
 // CHECK: return
 sil @cse_open_existential_in_bbarg : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : $AnyObject):
-  %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb1, bb2
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self, #NSProxy.description!getter.foreign, bb1, bb2
 
-bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
-  strong_retain %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>):
+  strong_retain %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>
   %6 = apply %5() : $@callee_owned () -> @owned Optional<NSString>
-  %7 = open_existential_ref %0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  dynamic_method_br %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb3, bb4
+  %7 = open_existential_ref %0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  dynamic_method_br %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self, #NSProxy.description!getter.foreign, bb3, bb4
 
 bb2:
   br bb5
 
-bb3(%9 : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
-  strong_retain %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  %10 = partial_apply %9(%7) : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+bb3(%9 : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>):
+  strong_retain %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  %10 = partial_apply %9(%7) : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>
   %11 = apply %10() : $@callee_owned () -> @owned Optional<NSString>
   br bb5
 

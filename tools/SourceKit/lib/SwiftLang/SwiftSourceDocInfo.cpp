@@ -984,10 +984,11 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
         Invoc.getLangOptions().Target,
         /*PrettyPrint=*/false,
         AccessLevel::Private,
-        /*EmitSynthesizedMembers*/ false,
-        /*PrintMessages*/ false,
-        /*SkipInheritedDocs*/ false,
-        /*IncludeSPISymbols*/ true,
+        /*EmitSynthesizedMembers=*/false,
+        /*PrintMessages=*/false,
+        /*SkipInheritedDocs=*/false,
+        /*IncludeSPISymbols=*/true,
+        /*IncludeClangDocs=*/true
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
@@ -1161,7 +1162,19 @@ static bool passCursorInfoForDecl(
                                   AddSymbolGraph, Lang, Invoc, PreviousSnaps,
                                   Allocator)) {
       // Ignore but make sure to remove the partially-filled symbol
-      llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {});
+      llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
+      Symbols.pop_back();
+    }
+  }
+  for (auto D : Info.ShorthandShadowedDecls) {
+    CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
+    DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
+                   ArrayRef<NominalTypeDecl *>(), Invoc);
+    if (auto Err = fillSymbolInfo(SymbolInfo, DInfo, MainModule, Info.Loc,
+                                  AddSymbolGraph, Lang, Invoc, PreviousSnaps,
+                                  Allocator)) {
+      // Ignore but make sure to remove the partially-filled symbol
+      llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
       Symbols.pop_back();
     }
   }
@@ -2157,17 +2170,22 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 namespace {
 class RelatedIdScanner : public SourceEntityWalker {
   ValueDecl *Dcl;
-  llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges;
+  llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> &Ranges;
+  /// Declarations that are tied to the same name as \c Dcl and should thus also
+  /// be renamed if \c Dcl is renamed. Most notabliy this contains closure
+  /// captures like `[foo]`.
+  llvm::SmallVectorImpl<ValueDecl *> &RelatedDecls;
   SourceManager &SourceMgr;
   unsigned BufferID = -1;
   bool Cancelled = false;
 
 public:
-  explicit RelatedIdScanner(SourceFile &SrcFile, unsigned BufferID,
-                            ValueDecl *D,
-      llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges)
-    : Ranges(Ranges), SourceMgr(SrcFile.getASTContext().SourceMgr),
-      BufferID(BufferID) {
+  explicit RelatedIdScanner(
+      SourceFile &SrcFile, unsigned BufferID, ValueDecl *D,
+      llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> &Ranges,
+      llvm::SmallVectorImpl<ValueDecl *> &RelatedDecls)
+      : Ranges(Ranges), RelatedDecls(RelatedDecls),
+        SourceMgr(SrcFile.getASTContext().SourceMgr), BufferID(BufferID) {
     if (auto *V = dyn_cast<VarDecl>(D)) {
       // Always use the canonical var decl for comparison. This is so we
       // pick up all occurrences of x in case statements like the below:
@@ -2189,6 +2207,40 @@ public:
   }
 
 private:
+  bool walkToExprPre(Expr *E) override {
+    if (Cancelled)
+      return false;
+
+    // Check if there are closure captures like `[foo]` where the caputred
+    // variable should also be renamed
+    if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
+      for (auto ShorthandShadow : getShorthandShadows(CaptureList)) {
+        if (ShorthandShadow.first == Dcl) {
+          RelatedDecls.push_back(ShorthandShadow.second);
+        } else if (ShorthandShadow.second == Dcl) {
+          RelatedDecls.push_back(ShorthandShadow.first);
+        }
+      }
+    }
+    return true;
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    if (Cancelled)
+      return false;
+
+    if (auto CondStmt = dyn_cast<LabeledConditionalStmt>(S)) {
+      for (auto ShorthandShadow : getShorthandShadows(CondStmt)) {
+        if (ShorthandShadow.first == Dcl) {
+          RelatedDecls.push_back(ShorthandShadow.second);
+        } else if (ShorthandShadow.second == Dcl) {
+          RelatedDecls.push_back(ShorthandShadow.first);
+        }
+      }
+    }
+    return true;
+  }
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Cancelled)
       return false;
@@ -2231,7 +2283,7 @@ private:
 
   bool passId(CharSourceRange Range) {
     unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(),BufferID);
-    Ranges.push_back({ Offset, Range.getByteLength() });
+    Ranges.insert({Offset, Range.getByteLength()});
     return !Cancelled;
   }
 };
@@ -2300,21 +2352,54 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         if (VD->isOperator())
           return;
 
-        RelatedIdScanner Scanner(SrcFile, BufferID, VD, Ranges);
+        // Record ranges in a set first so we don't record some ranges twice.
+        // This could happen in capture lists where e.g. `[foo]` is both the
+        // reference of the captured variable and the declaration of the
+        // variable usable in the closure.
+        llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> RangesSet;
 
-        if (auto *Case = getCaseStmtOfCanonicalVar(VD)) {
-          Scanner.walk(Case);
-          while ((Case = Case->getFallthroughDest().getPtrOrNull())) {
-            Scanner.walk(Case);
+        // List of decls whose ranges should be reported as related identifiers.
+        SmallVector<ValueDecl *, 2> Worklist;
+        Worklist.push_back(VD);
+
+        // Decls that we have already visited, so we don't walk circles.
+        SmallPtrSet<ValueDecl *, 2> VisitedDecls;
+        while (!Worklist.empty()) {
+          ValueDecl *Dcl = Worklist.back();
+          Worklist.pop_back();
+          if (!VisitedDecls.insert(Dcl).second) {
+            // We have already visited this decl. Don't visit it again.
+            continue;
           }
-        } else if (DeclContext *LocalDC = VD->getDeclContext()->getLocalContext()) {
-          Scanner.walk(LocalDC);
-        } else {
-          Scanner.walk(SrcFile);
+
+          RelatedIdScanner Scanner(SrcFile, BufferID, Dcl, RangesSet, Worklist);
+
+          if (auto *Case = getCaseStmtOfCanonicalVar(Dcl)) {
+            Scanner.walk(Case);
+            while ((Case = Case->getFallthroughDest().getPtrOrNull())) {
+              Scanner.walk(Case);
+            }
+          } else if (DeclContext *LocalDC =
+                         Dcl->getDeclContext()->getLocalContext()) {
+            Scanner.walk(LocalDC);
+          } else {
+            Scanner.walk(SrcFile);
+          }
         }
+
+        // Sort ranges so we get deterministic output.
+        Ranges.insert(Ranges.end(), RangesSet.begin(), RangesSet.end());
+        llvm::sort(Ranges,
+                   [](const std::pair<unsigned, unsigned> &LHS,
+                      const std::pair<unsigned, unsigned> &RHS) -> bool {
+                     if (LHS.first == RHS.first) {
+                       return LHS.second < RHS.second;
+                     } else {
+                       return LHS.first < RHS.first;
+                     }
+                   });
       };
       Action();
-
       RelatedIdentsInfo Info;
       Info.Ranges = Ranges;
       Receiver(RequestResult<RelatedIdentsInfo>::fromResult(Info));

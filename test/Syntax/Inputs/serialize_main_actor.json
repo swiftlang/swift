@@ -1,15 +1,20 @@
 {
   "kind": "SourceFile",
   "layout": [
+    null,
     {
       "kind": "CodeBlockItemList",
       "layout": [
         {
           "kind": "CodeBlockItem",
           "layout": [
+            null,
             {
               "kind": "StructDecl",
               "layout": [
+                null,
+                null,
+                null,
                 null,
                 null,
                 {
@@ -20,6 +25,7 @@
                   "trailingTrivia": " ",
                   "presence": "Present"
                 },
+                null,
                 {
                   "tokenKind": {
                     "kind": "identifier",
@@ -32,9 +38,14 @@
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
                 {
                   "kind": "MemberDeclBlock",
                   "layout": [
+                    null,
                     {
                       "tokenKind": {
                         "kind": "l_brace"
@@ -43,15 +54,20 @@
                       "trailingTrivia": "",
                       "presence": "Present"
                     },
+                    null,
                     {
                       "kind": "MemberDeclList",
                       "layout": [
                         {
                           "kind": "MemberDeclListItem",
                           "layout": [
+                            null,
                             {
                               "kind": "InitializerDecl",
                               "layout": [
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 {
@@ -64,173 +80,221 @@
                                 },
                                 null,
                                 null,
+                                null,
+                                null,
+                                null,
                                 {
-                                  "kind": "ParameterClause",
+                                  "kind": "FunctionSignature",
                                   "layout": [
+                                    null,
                                     {
-                                      "tokenKind": {
-                                        "kind": "l_paren"
-                                      },
-                                      "leadingTrivia": "",
-                                      "trailingTrivia": "",
-                                      "presence": "Present"
-                                    },
-                                    {
-                                      "kind": "FunctionParameterList",
+                                      "kind": "ParameterClause",
                                       "layout": [
+                                        null,
                                         {
-                                          "kind": "FunctionParameter",
+                                          "tokenKind": {
+                                            "kind": "l_paren"
+                                          },
+                                          "leadingTrivia": "",
+                                          "trailingTrivia": "",
+                                          "presence": "Present"
+                                        },
+                                        null,
+                                        {
+                                          "kind": "FunctionParameterList",
                                           "layout": [
-                                            null,
                                             {
-                                              "tokenKind": {
-                                                "kind": "kw__"
-                                              },
-                                              "leadingTrivia": "",
-                                              "trailingTrivia": " ",
-                                              "presence": "Present"
-                                            },
-                                            {
-                                              "tokenKind": {
-                                                "kind": "identifier",
-                                                "text": "foo"
-                                              },
-                                              "leadingTrivia": "",
-                                              "trailingTrivia": "",
-                                              "presence": "Present"
-                                            },
-                                            {
-                                              "tokenKind": {
-                                                "kind": "colon"
-                                              },
-                                              "leadingTrivia": "",
-                                              "trailingTrivia": " ",
-                                              "presence": "Present"
-                                            },
-                                            {
-                                              "kind": "AttributedType",
+                                              "kind": "FunctionParameter",
                                               "layout": [
                                                 null,
+                                                null,
+                                                null,
                                                 {
-                                                  "kind": "AttributeList",
+                                                  "tokenKind": {
+                                                    "kind": "kw__"
+                                                  },
+                                                  "leadingTrivia": "",
+                                                  "trailingTrivia": " ",
+                                                  "presence": "Present"
+                                                },
+                                                null,
+                                                {
+                                                  "tokenKind": {
+                                                    "kind": "identifier",
+                                                    "text": "foo"
+                                                  },
+                                                  "leadingTrivia": "",
+                                                  "trailingTrivia": "",
+                                                  "presence": "Present"
+                                                },
+                                                null,
+                                                {
+                                                  "tokenKind": {
+                                                    "kind": "colon"
+                                                  },
+                                                  "leadingTrivia": "",
+                                                  "trailingTrivia": " ",
+                                                  "presence": "Present"
+                                                },
+                                                null,
+                                                {
+                                                  "kind": "AttributedType",
                                                   "layout": [
+                                                    null,
+                                                    null,
+                                                    null,
                                                     {
-                                                      "kind": "CustomAttribute",
+                                                      "kind": "AttributeList",
                                                       "layout": [
                                                         {
+                                                          "kind": "CustomAttribute",
+                                                          "layout": [
+                                                            null,
+                                                            {
+                                                              "tokenKind": {
+                                                                "kind": "at_sign"
+                                                              },
+                                                              "leadingTrivia": "",
+                                                              "trailingTrivia": "",
+                                                              "presence": "Present"
+                                                            },
+                                                            null,
+                                                            {
+                                                              "kind": "SimpleTypeIdentifier",
+                                                              "layout": [
+                                                                null,
+                                                                {
+                                                                  "tokenKind": {
+                                                                    "kind": "identifier",
+                                                                    "text": "MainActor"
+                                                                  },
+                                                                  "leadingTrivia": "",
+                                                                  "trailingTrivia": " ",
+                                                                  "presence": "Present"
+                                                                },
+                                                                null,
+                                                                null
+                                                              ],
+                                                              "presence": "Present"
+                                                            },
+                                                            null,
+                                                            null,
+                                                            null,
+                                                            null,
+                                                            null,
+                                                            null
+                                                          ],
+                                                          "presence": "Present"
+                                                        }
+                                                      ],
+                                                      "presence": "Present"
+                                                    },
+                                                    null,
+                                                    {
+                                                      "kind": "FunctionType",
+                                                      "layout": [
+                                                        null,
+                                                        {
                                                           "tokenKind": {
-                                                            "kind": "at_sign"
+                                                            "kind": "l_paren"
                                                           },
                                                           "leadingTrivia": "",
                                                           "trailingTrivia": "",
                                                           "presence": "Present"
                                                         },
+                                                        null,
                                                         {
-                                                          "kind": "SimpleTypeIdentifier",
-                                                          "layout": [
-                                                            {
-                                                              "tokenKind": {
-                                                                "kind": "identifier",
-                                                                "text": "MainActor"
-                                                              },
-                                                              "leadingTrivia": "",
-                                                              "trailingTrivia": " ",
-                                                              "presence": "Present"
-                                                            },
-                                                            null
-                                                          ],
+                                                          "kind": "TupleTypeElementList",
+                                                          "layout": [],
+                                                          "presence": "Present"
+                                                        },
+                                                        null,
+                                                        {
+                                                          "tokenKind": {
+                                                            "kind": "r_paren"
+                                                          },
+                                                          "leadingTrivia": "",
+                                                          "trailingTrivia": " ",
                                                           "presence": "Present"
                                                         },
                                                         null,
                                                         null,
-                                                        null
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        {
+                                                          "tokenKind": {
+                                                            "kind": "arrow"
+                                                          },
+                                                          "leadingTrivia": "",
+                                                          "trailingTrivia": " ",
+                                                          "presence": "Present"
+                                                        },
+                                                        null,
+                                                        {
+                                                          "kind": "SimpleTypeIdentifier",
+                                                          "layout": [
+                                                            null,
+                                                            {
+                                                              "tokenKind": {
+                                                                "kind": "identifier",
+                                                                "text": "Void"
+                                                              },
+                                                              "leadingTrivia": "",
+                                                              "trailingTrivia": "",
+                                                              "presence": "Present"
+                                                            },
+                                                            null,
+                                                            null
+                                                          ],
+                                                          "presence": "Present"
+                                                        }
                                                       ],
                                                       "presence": "Present"
                                                     }
                                                   ],
                                                   "presence": "Present"
                                                 },
-                                                {
-                                                  "kind": "FunctionType",
-                                                  "layout": [
-                                                    {
-                                                      "tokenKind": {
-                                                        "kind": "l_paren"
-                                                      },
-                                                      "leadingTrivia": "",
-                                                      "trailingTrivia": "",
-                                                      "presence": "Present"
-                                                    },
-                                                    {
-                                                      "kind": "TupleTypeElementList",
-                                                      "layout": [],
-                                                      "presence": "Present"
-                                                    },
-                                                    {
-                                                      "tokenKind": {
-                                                        "kind": "r_paren"
-                                                      },
-                                                      "leadingTrivia": "",
-                                                      "trailingTrivia": " ",
-                                                      "presence": "Present"
-                                                    },
-                                                    null,
-                                                    null,
-                                                    {
-                                                      "tokenKind": {
-                                                        "kind": "arrow"
-                                                      },
-                                                      "leadingTrivia": "",
-                                                      "trailingTrivia": " ",
-                                                      "presence": "Present"
-                                                    },
-                                                    {
-                                                      "kind": "SimpleTypeIdentifier",
-                                                      "layout": [
-                                                        {
-                                                          "tokenKind": {
-                                                            "kind": "identifier",
-                                                            "text": "Void"
-                                                          },
-                                                          "leadingTrivia": "",
-                                                          "trailingTrivia": "",
-                                                          "presence": "Present"
-                                                        },
-                                                        null
-                                                      ],
-                                                      "presence": "Present"
-                                                    }
-                                                  ],
-                                                  "presence": "Present"
-                                                }
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null
                                               ],
                                               "presence": "Present"
-                                            },
-                                            null,
-                                            null,
-                                            null
+                                            }
                                           ],
+                                          "presence": "Present"
+                                        },
+                                        null,
+                                        {
+                                          "tokenKind": {
+                                            "kind": "r_paren"
+                                          },
+                                          "leadingTrivia": "",
+                                          "trailingTrivia": " ",
                                           "presence": "Present"
                                         }
                                       ],
                                       "presence": "Present"
                                     },
-                                    {
-                                      "tokenKind": {
-                                        "kind": "r_paren"
-                                      },
-                                      "leadingTrivia": "",
-                                      "trailingTrivia": " ",
-                                      "presence": "Present"
-                                    }
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null
                                   ],
                                   "presence": "Present"
                                 },
                                 null,
                                 null,
+                                null,
                                 {
                                   "kind": "CodeBlock",
                                   "layout": [
+                                    null,
                                     {
                                       "tokenKind": {
                                         "kind": "l_brace"
@@ -239,11 +303,13 @@
                                       "trailingTrivia": "",
                                       "presence": "Present"
                                     },
+                                    null,
                                     {
                                       "kind": "CodeBlockItemList",
                                       "layout": [],
                                       "presence": "Present"
                                     },
+                                    null,
                                     {
                                       "tokenKind": {
                                         "kind": "r_brace"
@@ -258,6 +324,7 @@
                               ],
                               "presence": "Present"
                             },
+                            null,
                             null
                           ],
                           "presence": "Present"
@@ -265,6 +332,7 @@
                       ],
                       "presence": "Present"
                     },
+                    null,
                     {
                       "tokenKind": {
                         "kind": "r_brace"
@@ -280,6 +348,8 @@
               "presence": "Present"
             },
             null,
+            null,
+            null,
             null
           ],
           "presence": "Present"
@@ -287,9 +357,13 @@
         {
           "kind": "CodeBlockItem",
           "layout": [
+            null,
             {
               "kind": "StructDecl",
               "layout": [
+                null,
+                null,
+                null,
                 null,
                 null,
                 {
@@ -300,6 +374,7 @@
                   "trailingTrivia": " ",
                   "presence": "Present"
                 },
+                null,
                 {
                   "tokenKind": {
                     "kind": "identifier",
@@ -312,9 +387,14 @@
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
                 {
                   "kind": "MemberDeclBlock",
                   "layout": [
+                    null,
                     {
                       "tokenKind": {
                         "kind": "l_brace"
@@ -323,15 +403,20 @@
                       "trailingTrivia": "",
                       "presence": "Present"
                     },
+                    null,
                     {
                       "kind": "MemberDeclList",
                       "layout": [
                         {
                           "kind": "MemberDeclListItem",
                           "layout": [
+                            null,
                             {
                               "kind": "VariableDecl",
                               "layout": [
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 {
@@ -342,15 +427,18 @@
                                   "trailingTrivia": " ",
                                   "presence": "Present"
                                 },
+                                null,
                                 {
                                   "kind": "PatternBindingList",
                                   "layout": [
                                     {
                                       "kind": "PatternBinding",
                                       "layout": [
+                                        null,
                                         {
                                           "kind": "IdentifierPattern",
                                           "layout": [
+                                            null,
                                             {
                                               "tokenKind": {
                                                 "kind": "identifier",
@@ -363,9 +451,11 @@
                                           ],
                                           "presence": "Present"
                                         },
+                                        null,
                                         {
                                           "kind": "TypeAnnotation",
                                           "layout": [
+                                            null,
                                             {
                                               "tokenKind": {
                                                 "kind": "colon"
@@ -374,9 +464,11 @@
                                               "trailingTrivia": " ",
                                               "presence": "Present"
                                             },
+                                            null,
                                             {
                                               "kind": "SimpleTypeIdentifier",
                                               "layout": [
+                                                null,
                                                 {
                                                   "tokenKind": {
                                                     "kind": "identifier",
@@ -386,6 +478,7 @@
                                                   "trailingTrivia": " ",
                                                   "presence": "Present"
                                                 },
+                                                null,
                                                 null
                                               ],
                                               "presence": "Present"
@@ -394,9 +487,12 @@
                                           "presence": "Present"
                                         },
                                         null,
+                                        null,
+                                        null,
                                         {
                                           "kind": "CodeBlock",
                                           "layout": [
+                                            null,
                                             {
                                               "tokenKind": {
                                                 "kind": "l_brace"
@@ -405,18 +501,22 @@
                                               "trailingTrivia": "",
                                               "presence": "Present"
                                             },
+                                            null,
                                             {
                                               "kind": "CodeBlockItemList",
                                               "layout": [
                                                 {
                                                   "kind": "CodeBlockItem",
                                                   "layout": [
+                                                    null,
                                                     {
                                                       "kind": "FunctionCallExpr",
                                                       "layout": [
+                                                        null,
                                                         {
                                                           "kind": "IdentifierExpr",
                                                           "layout": [
+                                                            null,
                                                             {
                                                               "tokenKind": {
                                                                 "kind": "identifier",
@@ -426,10 +526,13 @@
                                                               "trailingTrivia": " ",
                                                               "presence": "Present"
                                                             },
+                                                            null,
                                                             null
                                                           ],
                                                           "presence": "Present"
                                                         },
+                                                        null,
+                                                        null,
                                                         null,
                                                         {
                                                           "kind": "TupleExprElementList",
@@ -437,9 +540,12 @@
                                                           "presence": "Present"
                                                         },
                                                         null,
+                                                        null,
+                                                        null,
                                                         {
                                                           "kind": "ClosureExpr",
                                                           "layout": [
+                                                            null,
                                                             {
                                                               "tokenKind": {
                                                                 "kind": "l_brace"
@@ -448,15 +554,18 @@
                                                               "trailingTrivia": " ",
                                                               "presence": "Present"
                                                             },
+                                                            null,
                                                             {
                                                               "kind": "ClosureSignature",
                                                               "layout": [
+                                                                null,
                                                                 {
                                                                   "kind": "AttributeList",
                                                                   "layout": [
                                                                     {
                                                                       "kind": "CustomAttribute",
                                                                       "layout": [
+                                                                        null,
                                                                         {
                                                                           "tokenKind": {
                                                                             "kind": "at_sign"
@@ -465,9 +574,11 @@
                                                                           "trailingTrivia": "",
                                                                           "presence": "Present"
                                                                         },
+                                                                        null,
                                                                         {
                                                                           "kind": "SimpleTypeIdentifier",
                                                                           "layout": [
+                                                                            null,
                                                                             {
                                                                               "tokenKind": {
                                                                                 "kind": "identifier",
@@ -477,10 +588,14 @@
                                                                               "trailingTrivia": " ",
                                                                               "presence": "Present"
                                                                             },
+                                                                            null,
                                                                             null
                                                                           ],
                                                                           "presence": "Present"
                                                                         },
+                                                                        null,
+                                                                        null,
+                                                                        null,
                                                                         null,
                                                                         null,
                                                                         null
@@ -490,6 +605,12 @@
                                                                   ],
                                                                   "presence": "Present"
                                                                 },
+                                                                null,
+                                                                null,
+                                                                null,
+                                                                null,
+                                                                null,
+                                                                null,
                                                                 null,
                                                                 null,
                                                                 null,
@@ -506,18 +627,22 @@
                                                               ],
                                                               "presence": "Present"
                                                             },
+                                                            null,
                                                             {
                                                               "kind": "CodeBlockItemList",
                                                               "layout": [
                                                                 {
                                                                   "kind": "CodeBlockItem",
                                                                   "layout": [
+                                                                    null,
                                                                     {
                                                                       "kind": "FunctionCallExpr",
                                                                       "layout": [
+                                                                        null,
                                                                         {
                                                                           "kind": "IdentifierExpr",
                                                                           "layout": [
+                                                                            null,
                                                                             {
                                                                               "tokenKind": {
                                                                                 "kind": "identifier",
@@ -527,10 +652,12 @@
                                                                               "trailingTrivia": "",
                                                                               "presence": "Present"
                                                                             },
+                                                                            null,
                                                                             null
                                                                           ],
                                                                           "presence": "Present"
                                                                         },
+                                                                        null,
                                                                         {
                                                                           "tokenKind": {
                                                                             "kind": "l_paren"
@@ -539,6 +666,7 @@
                                                                           "trailingTrivia": "",
                                                                           "presence": "Present"
                                                                         },
+                                                                        null,
                                                                         {
                                                                           "kind": "TupleExprElementList",
                                                                           "layout": [
@@ -547,9 +675,14 @@
                                                                               "layout": [
                                                                                 null,
                                                                                 null,
+                                                                                null,
+                                                                                null,
+                                                                                null,
                                                                                 {
                                                                                   "kind": "StringLiteralExpr",
                                                                                   "layout": [
+                                                                                    null,
+                                                                                    null,
                                                                                     null,
                                                                                     {
                                                                                       "tokenKind": {
@@ -559,12 +692,14 @@
                                                                                       "trailingTrivia": "",
                                                                                       "presence": "Present"
                                                                                     },
+                                                                                    null,
                                                                                     {
                                                                                       "kind": "StringLiteralSegments",
                                                                                       "layout": [
                                                                                         {
                                                                                           "kind": "StringSegment",
                                                                                           "layout": [
+                                                                                            null,
                                                                                             {
                                                                                               "tokenKind": {
                                                                                                 "kind": "string_segment",
@@ -580,6 +715,7 @@
                                                                                       ],
                                                                                       "presence": "Present"
                                                                                     },
+                                                                                    null,
                                                                                     {
                                                                                       "tokenKind": {
                                                                                         "kind": "string_quote"
@@ -588,10 +724,12 @@
                                                                                       "trailingTrivia": "",
                                                                                       "presence": "Present"
                                                                                     },
+                                                                                    null,
                                                                                     null
                                                                                   ],
                                                                                   "presence": "Present"
                                                                                 },
+                                                                                null,
                                                                                 null
                                                                               ],
                                                                               "presence": "Present"
@@ -599,6 +737,7 @@
                                                                           ],
                                                                           "presence": "Present"
                                                                         },
+                                                                        null,
                                                                         {
                                                                           "tokenKind": {
                                                                             "kind": "r_paren"
@@ -608,10 +747,14 @@
                                                                           "presence": "Present"
                                                                         },
                                                                         null,
+                                                                        null,
+                                                                        null,
                                                                         null
                                                                       ],
                                                                       "presence": "Present"
                                                                     },
+                                                                    null,
+                                                                    null,
                                                                     null,
                                                                     null
                                                                   ],
@@ -620,6 +763,7 @@
                                                               ],
                                                               "presence": "Present"
                                                             },
+                                                            null,
                                                             {
                                                               "tokenKind": {
                                                                 "kind": "r_brace"
@@ -631,10 +775,13 @@
                                                           ],
                                                           "presence": "Present"
                                                         },
+                                                        null,
                                                         null
                                                       ],
                                                       "presence": "Present"
                                                     },
+                                                    null,
+                                                    null,
                                                     null,
                                                     null
                                                   ],
@@ -643,6 +790,7 @@
                                               ],
                                               "presence": "Present"
                                             },
+                                            null,
                                             {
                                               "tokenKind": {
                                                 "kind": "r_brace"
@@ -654,6 +802,7 @@
                                           ],
                                           "presence": "Present"
                                         },
+                                        null,
                                         null
                                       ],
                                       "presence": "Present"
@@ -664,6 +813,7 @@
                               ],
                               "presence": "Present"
                             },
+                            null,
                             null
                           ],
                           "presence": "Present"
@@ -671,6 +821,7 @@
                       ],
                       "presence": "Present"
                     },
+                    null,
                     {
                       "tokenKind": {
                         "kind": "r_brace"
@@ -686,6 +837,8 @@
               "presence": "Present"
             },
             null,
+            null,
+            null,
             null
           ],
           "presence": "Present"
@@ -693,6 +846,7 @@
       ],
       "presence": "Present"
     },
+    null,
     {
       "tokenKind": {
         "kind": "eof",

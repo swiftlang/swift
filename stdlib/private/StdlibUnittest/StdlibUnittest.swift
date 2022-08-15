@@ -2182,9 +2182,10 @@ func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
   var count = 0
   sysctlbyname("kern.osproductversion", nil, &count, nil, 0)
-  var s = [CChar](repeating: 0, count: count)
-  sysctlbyname("kern.osproductversion", &s, &count, nil, 0)
-  return String(cString: &s)
+  return withUnsafeTemporaryAllocation(of: CChar.self, capacity: count) {
+    sysctlbyname("kern.osproductversion", $0.baseAddress, &count, nil, 0)
+    return String(cString: $0.baseAddress!)
+  }
 }
 #endif
 #endif

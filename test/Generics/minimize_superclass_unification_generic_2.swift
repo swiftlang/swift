@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 class A<T, U, V> {}
 
@@ -59,7 +59,7 @@ protocol Pba {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pac]A1 == String,
-// CHECK-SAME: Self.[Pac]A2 == (Self.[Pac]C1) -> Array<Self.[Pac]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pac]A2 == (Self.[Pac]C1) -> [Self.[Pac]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pac]A3 == Int,
 
 // CHECK-SAME: Self.[Pac]C2 : Sequence,
@@ -82,7 +82,7 @@ protocol Pac {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pca]A1 == String,
-// CHECK-SAME: Self.[Pca]A2 == (Self.[Pca]C1) -> Array<Self.[Pca]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pca]A2 == (Self.[Pca]C1) -> [Self.[Pca]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pca]A3 == Int,
 
 // CHECK-SAME: Self.[Pca]C2 : Sequence,
@@ -106,7 +106,7 @@ protocol Pca {
 
 // CHECK-SAME: Self.[Pbc]B1 == String,
 // CHECK-SAME: Self.[Pbc]B2 == Self.[Pbc]C1,
-// CHECK-SAME: Self.[Pbc]B3 == Array<Self.[Pbc]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pbc]B3 == [Self.[Pbc]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pbc]B4 == Self.[Pbc]C3,
 
 // CHECK-SAME: Self.[Pbc]C2 : Sequence,
@@ -131,7 +131,7 @@ protocol Pbc {
 
 // CHECK-SAME: Self.[Pcb]B1 == String,
 // CHECK-SAME: Self.[Pcb]B2 == Self.[Pcb]C1,
-// CHECK-SAME: Self.[Pcb]B3 == Array<Self.[Pcb]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pcb]B3 == [Self.[Pcb]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pcb]B4 == Self.[Pcb]C3,
 
 // CHECK-SAME: Self.[Pcb]C2 : Sequence,
@@ -160,12 +160,12 @@ protocol Pcb {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pabc]A1 == String,
-// CHECK-SAME: Self.[Pabc]A2 == (Self.[Pabc]B2) -> Array<Self.[Pabc]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pabc]A2 == (Self.[Pabc]B2) -> [Self.[Pabc]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pabc]A3 == Int,
 
 // CHECK-SAME: Self.[Pabc]B1 == String,
 // CHECK-SAME: Self.[Pabc]B2 == Self.[Pabc]C1,
-// CHECK-SAME: Self.[Pabc]B3 == Array<Self.[Pabc]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pabc]B3 == [Self.[Pabc]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pabc]B4 == Self.[Pabc]C3,
 
 // CHECK-SAME: Self.[Pabc]C2 : Sequence,
@@ -193,12 +193,12 @@ protocol Pabc {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pacb]A1 == String,
-// CHECK-SAME: Self.[Pacb]A2 == (Self.[Pacb]B2) -> Array<Self.[Pacb]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pacb]A2 == (Self.[Pacb]B2) -> [Self.[Pacb]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pacb]A3 == Int,
 
 // CHECK-SAME: Self.[Pacb]B1 == String,
 // CHECK-SAME: Self.[Pacb]B2 == Self.[Pacb]C1,
-// CHECK-SAME: Self.[Pacb]B3 == Array<Self.[Pacb]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pacb]B3 == [Self.[Pacb]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pacb]B4 == Self.[Pacb]C3,
 
 // CHECK-SAME: Self.[Pacb]C2 : Sequence,
@@ -226,12 +226,12 @@ protocol Pacb {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pbac]A1 == String,
-// CHECK-SAME: Self.[Pbac]A2 == (Self.[Pbac]B2) -> Array<Self.[Pbac]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pbac]A2 == (Self.[Pbac]B2) -> [Self.[Pbac]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pbac]A3 == Int,
 
 // CHECK-SAME: Self.[Pbac]B1 == String,
 // CHECK-SAME: Self.[Pbac]B2 == Self.[Pbac]C1,
-// CHECK-SAME: Self.[Pbac]B3 == Array<Self.[Pbac]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pbac]B3 == [Self.[Pbac]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pbac]B4 == Self.[Pbac]C3,
 
 // CHECK-SAME: Self.[Pbac]C2 : Sequence,
@@ -259,12 +259,12 @@ protocol Pbac {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pbca]A1 == String,
-// CHECK-SAME: Self.[Pbca]A2 == (Self.[Pbca]B2) -> Array<Self.[Pbca]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pbca]A2 == (Self.[Pbca]B2) -> [Self.[Pbca]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pbca]A3 == Int,
 
 // CHECK-SAME: Self.[Pbca]B1 == String,
 // CHECK-SAME: Self.[Pbca]B2 == Self.[Pbca]C1,
-// CHECK-SAME: Self.[Pbca]B3 == Array<Self.[Pbca]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pbca]B3 == [Self.[Pbca]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pbca]B4 == Self.[Pbca]C3,
 
 // CHECK-SAME: Self.[Pbca]C2 : Sequence,
@@ -292,12 +292,12 @@ protocol Pbca {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pcab]A1 == String,
-// CHECK-SAME: Self.[Pcab]A2 == (Self.[Pcab]B2) -> Array<Self.[Pcab]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pcab]A2 == (Self.[Pcab]B2) -> [Self.[Pcab]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pcab]A3 == Int,
 
 // CHECK-SAME: Self.[Pcab]B1 == String,
 // CHECK-SAME: Self.[Pcab]B2 == Self.[Pcab]C1,
-// CHECK-SAME: Self.[Pcab]B3 == Array<Self.[Pcab]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pcab]B3 == [Self.[Pcab]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pcab]B4 == Self.[Pcab]C3,
 
 // CHECK-SAME: Self.[Pcab]C2 : Sequence,
@@ -325,12 +325,12 @@ protocol Pcab {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pcba]A1 == String,
-// CHECK-SAME: Self.[Pcba]A2 == (Self.[Pcba]B2) -> Array<Self.[Pcba]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pcba]A2 == (Self.[Pcba]B2) -> [Self.[Pcba]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pcba]A3 == Int,
 
 // CHECK-SAME: Self.[Pcba]B1 == String,
 // CHECK-SAME: Self.[Pcba]B2 == Self.[Pcba]C1,
-// CHECK-SAME: Self.[Pcba]B3 == Array<Self.[Pcba]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[Pcba]B3 == [Self.[Pcba]C2.[Sequence]Element],
 // CHECK-SAME: Self.[Pcba]B4 == Self.[Pcba]C3,
 
 // CHECK-SAME: Self.[Pcba]C2 : Sequence,
@@ -438,7 +438,7 @@ protocol PaQc {
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[PcQa]A1 == String,
-// CHECK-SAME: Self.[PcQa]A2 == (Self.[PcQa]T.[Pc]C1) -> Array<Self.[PcQa]T.[Pc]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[PcQa]A2 == (Self.[PcQa]T.[Pc]C1) -> [Self.[PcQa]T.[Pc]C2.[Sequence]Element],
 // CHECK-SAME: Self.[PcQa]A3 == Int,
 
 // CHECK-SAME: Self.[PcQa]T : Pc>
@@ -473,7 +473,7 @@ protocol PbQc {
 
 // CHECK-SAME: Self.[PcQb]B1 == String,
 // CHECK-SAME: Self.[PcQb]B2 == Self.[PcQb]T.[Pc]C1,
-// CHECK-SAME: Self.[PcQb]B3 == Array<Self.[PcQb]T.[Pc]C2.[Sequence]Element>,
+// CHECK-SAME: Self.[PcQb]B3 == [Self.[PcQb]T.[Pc]C2.[Sequence]Element],
 // CHECK-SAME: Self.[PcQb]B4 == Self.[PcQb]T.[Pc]C3,
 
 // CHECK-SAME: Self.[PcQb]T : Pc>

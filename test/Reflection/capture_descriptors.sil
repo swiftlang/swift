@@ -2,7 +2,7 @@
 // REQUIRES: no_asan
 
 // SR-12893
-// XFAIL: openbsd
+// XFAIL: OS=openbsd
 // UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 
 // RUN: %empty-directory(%t)
@@ -305,9 +305,9 @@ bb0(%0 : $*P):
 
 sil [ossa] @existential_caller : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  %payload = open_existential_addr immutable_access %0 : $*P to $*@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P
+  %payload = open_existential_addr immutable_access %0 : $*P to $*@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0", P) Self
   %f = function_ref @existential_callee : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
-  %result = partial_apply [callee_guaranteed] %f<@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P>() : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
+  %result = partial_apply [callee_guaranteed] %f<@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0", P) Self>() : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
   destroy_value %result : $@callee_guaranteed () -> @out P
   destroy_addr %0 : $*P
   %tuple = tuple ()

@@ -49,9 +49,16 @@ EXPR_NODES = [
     # await foo()
     Node('AwaitExpr', kind='Expr',
          children=[
-             Child('AwaitKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AwaitKeyword', kind='ContextualKeywordToken',
                    text_choices=['await']),
+             Child('Expression', kind='Expr'),
+         ]),
+
+    # The move expr
+    Node('MoveExpr', kind='Expr',
+         children=[
+             Child('MoveKeyword', kind='ContextualKeywordToken',
+                   text_choices=['_move']),
              Child('Expression', kind='Expr'),
          ]),
 
@@ -193,12 +200,22 @@ EXPR_NODES = [
     # NOTE: This appears only in SequenceExpr.
     Node('ArrowExpr', kind='Expr',
          children=[
-             Child('AsyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncKeyword', kind='ContextualKeywordToken',
                    text_choices=['async'], is_optional=True),
              Child('ThrowsToken', kind='ThrowsToken',
                    is_optional=True),
              Child('ArrowToken', kind='ArrowToken'),
+         ]),
+
+    # An infix binary expression like x + y.
+    # NOTE: This won't come directly out of the parser. Rather, it is the
+    # result of "folding" a SequenceExpr based on knowing the precedence
+    # relationships amongst the different infix operators.
+    Node('InfixOperatorExpr', kind='Expr',
+         children=[
+             Child('LeftOperand', kind='Expr'),
+             Child('OperatorOperand', kind='Expr'),
+             Child('RightOperand', kind='Expr'),
          ]),
 
     # A floating-point literal
@@ -394,8 +411,7 @@ EXPR_NODES = [
                        Child('SimpleInput', kind='ClosureParamList'),
                        Child('Input', kind='ParameterClause'),
                    ]),
-             Child('AsyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncKeyword', kind='ContextualKeywordToken',
                    text_choices=['async'], is_optional=True),
              Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
@@ -408,8 +424,9 @@ EXPR_NODES = [
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Signature', kind='ClosureSignature', is_optional=True),
              Child('Statements', kind='CodeBlockItemList',
-                   collection_element_name='Statement'),
-             Child('RightBrace', kind='RightBraceToken'),
+                   collection_element_name='Statement', is_indented=True),
+             Child('RightBrace', kind='RightBraceToken',
+                   requires_leading_newline=True),
          ]),
 
     # unresolved-pattern-expr -> pattern
@@ -601,7 +618,7 @@ EXPR_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # postfix '#if' expession
+    # postfix '#if' expression
     Node('PostfixIfConfigExpr', kind='Expr',
          children=[
              Child('Base', kind='Expr', is_optional=True),

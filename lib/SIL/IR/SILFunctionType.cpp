@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "libsil"
+
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
@@ -399,17 +400,39 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
 
         // The GSB used to drop requirements which reference non-existent
         // generic parameters, whereas the RequirementMachine asserts now.
-        // Filter thes requirements out explicitly to preserve the old
+        // Filter these requirements out explicitly to preserve the old
         // behavior.
         if (std::find_if(genericParams.begin(), genericParams.end(),
                          [interfaceTy](CanGenericTypeParamType t) -> bool {
                            return t->isEqual(interfaceTy->getRootGenericParam());
                          }) != genericParams.end()) {
           types.insert(interfaceTy->getCanonicalType());
+
           for (auto *proto : at->getConformsTo()) {
             reqs.push_back(Requirement(RequirementKind::Conformance,
                                        interfaceTy,
                                        proto->getDeclaredInterfaceType()));
+          }
+
+          // The GSB would add conformance requirements if a nested type
+          // requirement involving a resolved DependentMemberType was added;
+          // eg, if you start with <T> and add T.[P]A == Int, it would also
+          // add the conformance requirement T : P.
+          //
+          // This was not an intended behavior on the part of the GSB, and the
+          // logic here is a complete mess, so just simulate the old behavior
+          // here.
+          auto parentTy = interfaceTy;
+          while (parentTy) {
+            if (auto memberTy = parentTy->getAs<DependentMemberType>()) {
+              parentTy = memberTy->getBase();
+              if (auto *assocTy = memberTy->getAssocType()) {
+                reqs.push_back(Requirement(RequirementKind::Conformance,
+                                           parentTy,
+                                           assocTy->getProtocol()->getDeclaredInterfaceType()));
+              }
+            } else
+              parentTy = Type();
           }
         }
       }
@@ -462,7 +485,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -490,7 +513,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -610,7 +633,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -641,7 +664,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -694,7 +717,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
         std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
     auto inoutParam = originalFnTy->getParameters()[paramIndex];
     // The pullback parameter convention depends on whether the original `inout`
-    // paramater is a differentiability parameter.
+    // parameter is a differentiability parameter.
     // - If yes, the pullback parameter convention is `@inout`.
     // - If no, the pullback parameter convention is `@in_guaranteed`.
     auto inoutParamTanType = getAutoDiffTangentTypeForLinearMap(
@@ -778,7 +801,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
   newParameters.reserve(original->getNumParameters());
   for (auto &param : original->getParameters()) {
     newParameters.push_back(
-        param.getWithInterfaceType(param.getInterfaceType()->getCanonicalType(
+        param.getWithInterfaceType(param.getInterfaceType()->getReducedType(
             constrainedInvocationGenSig)));
   }
 
@@ -786,7 +809,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
   newResults.reserve(original->getNumResults());
   for (auto &result : original->getResults()) {
     newResults.push_back(
-        result.getWithInterfaceType(result.getInterfaceType()->getCanonicalType(
+        result.getWithInterfaceType(result.getInterfaceType()->getReducedType(
             constrainedInvocationGenSig)));
   }
   return SILFunctionType::get(
@@ -1301,6 +1324,14 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     return true;
   }
+
+  // Pass C++ const reference types indirectly. Right now there's no way to
+  // express immutable borrowed params, so we have to have this hack.
+  // Eventually, we should just express these correctly: rdar://89647503
+  if (clangTy->isReferenceType() &&
+      clangTy->getPointeeType().isConstQualified())
+    return true;
+
   return false;
 }
 
@@ -1358,16 +1389,13 @@ class DestructureInputs {
   AbstractionPattern TopLevelOrigType = AbstractionPattern::getInvalid();
   SmallVectorImpl<SILParameterInfo> &Inputs;
   unsigned NextOrigParamIndex = 0;
-  Optional<SmallBitVector> NoImplicitCopyIndices;
 
 public:
   DestructureInputs(TypeExpansionContext expansion, TypeConverter &TC,
                     const Conventions &conventions, const ForeignInfo &foreign,
-                    SmallVectorImpl<SILParameterInfo> &inputs,
-                    Optional<SmallBitVector> noImplicitCopyIndices)
+                    SmallVectorImpl<SILParameterInfo> &inputs)
       : expansion(expansion), TC(TC), Convs(conventions), Foreign(foreign),
-        Inputs(inputs),
-        NoImplicitCopyIndices(noImplicitCopyIndices) {}
+        Inputs(inputs) {}
 
   void destructure(AbstractionPattern origType,
                    CanAnyFunctionType::CanParamArrayRef params,
@@ -1405,9 +1433,6 @@ private:
     // Add any foreign parameters that are positioned here.
     maybeAddForeignParameters();
 
-    bool hasNoImplicitCopy =
-        NoImplicitCopyIndices.hasValue() && NoImplicitCopyIndices->any();
-
     // Process all the non-self parameters.
     for (unsigned i = 0; i != numNonSelfParams; ++i) {
       auto ty = params[i].getParameterType();
@@ -1415,8 +1440,7 @@ private:
       auto flags = params[i].getParameterFlags();
 
       visit(flags.getValueOwnership(), /*forSelf=*/false, eltPattern, ty,
-            flags.isNoDerivative(),
-            hasNoImplicitCopy && (*NoImplicitCopyIndices)[i]);
+            flags.isNoDerivative());
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -1427,8 +1451,7 @@ private:
       auto eltPattern = origType.getFunctionParamType(numNonSelfParams);
       auto flags = selfParam.getParameterFlags();
 
-      visit(flags.getValueOwnership(), /*forSelf=*/true, eltPattern, ty, false,
-            false);
+      visit(flags.getValueOwnership(), /*forSelf=*/true, eltPattern, ty, false);
     }
 
     TopLevelOrigType = AbstractionPattern::getInvalid();
@@ -1437,7 +1460,7 @@ private:
 
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
-             bool isNonDifferentiable, bool isNoImplicitCopy) {
+             bool isNonDifferentiable) {
     assert(!isa<InOutType>(substType));
 
     // Tuples get handled specially, in some cases:
@@ -1451,11 +1474,8 @@ private:
         // Expand the tuple.
         for (auto i : indices(substTupleTy.getElementTypes())) {
           auto &elt = substTupleTy->getElement(i);
-          auto ownership = elt.getParameterFlags().getValueOwnership();
-          assert(ownership == ValueOwnership::Default);
-          assert(!elt.isVararg());
-          visit(ownership, forSelf, origType.getTupleElementType(i),
-                CanType(elt.getRawType()), false, false);
+          visit(ValueOwnership::Default, forSelf,
+                origType.getTupleElementType(i), CanType(elt.getType()), false);
         }
         return;
       case ValueOwnership::InOut:
@@ -1481,8 +1501,6 @@ private:
       convention = ParameterConvention::Direct_Unowned;
     } else {
       // If we are no implicit copy, our ownership is always Owned.
-      if (isNoImplicitCopy)
-        ownership = ValueOwnership::Owned;
       convention = Convs.getDirect(ownership, forSelf, origParamIndex, origType,
                                    substTLConv);
       assert(!isIndirectFormalParameter(convention));
@@ -1549,7 +1567,7 @@ private:
       // This is a "self", but it's not a Swift self, we handle it differently.
       visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
             /*forSelf=*/false, ForeignSelf->OrigSelfParam,
-            ForeignSelf->SubstSelfParam.getParameterType(), false, false);
+            ForeignSelf->SubstSelfParam.getParameterType(), false);
     }
     return true;
   }
@@ -1662,7 +1680,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto selfMetatype = MetatypeType::get(dynamicSelfInterfaceType,
                                             MetatypeRepresentation::Thick);
 
-      auto canSelfMetatype = selfMetatype->getCanonicalType(origGenericSig);
+      auto canSelfMetatype = selfMetatype->getReducedType(origGenericSig);
       SILParameterInfo param(canSelfMetatype, convention);
       inputs.push_back(param);
 
@@ -1672,7 +1690,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     if (capture.isOpaqueValue()) {
       OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
       auto canType = opaqueValue->getType()->mapTypeOutOfContext()
-          ->getCanonicalType(origGenericSig);
+          ->getReducedType(origGenericSig);
       auto &loweredTL =
           TC.getTypeLowering(AbstractionPattern(genericSig, canType),
                              canType, expansion);
@@ -1692,7 +1710,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     auto *VD = capture.getDecl();
     auto type = VD->getInterfaceType();
-    auto canType = type->getCanonicalType(origGenericSig);
+    auto canType = type->getReducedType(origGenericSig);
 
     auto &loweredTL =
         TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
@@ -1862,8 +1880,7 @@ static CanSILFunctionType getSILFunctionType(
     SILExtInfoBuilder extInfoBuilder, const Conventions &conventions,
     const ForeignInfo &foreignInfo, Optional<SILDeclRef> origConstant,
     Optional<SILDeclRef> constant, Optional<SubstitutionMap> reqtSubs,
-    ProtocolConformanceRef witnessMethodConformance,
-    Optional<SmallBitVector> noImplicitCopyIndices) {
+    ProtocolConformanceRef witnessMethodConformance) {
   // Find the generic parameters.
   CanGenericSignature genericSig =
     substFnInterfaceType.getOptGenericSignature();
@@ -1903,7 +1920,16 @@ static CanSILFunctionType getSILFunctionType(
   }
 
   // Map 'throws' to the appropriate error convention.
-  if (substFnInterfaceType->getExtInfo().isThrowing() && !foreignInfo.error &&
+  // Give the type an error argument whether the substituted type semantically
+  // `throws` or if the abstraction pattern specifies a Swift function type
+  // that also throws. This prevents the need for a second possibly-thunking
+  // conversion when using a non-throwing function in more abstract throwing
+  // context.
+  bool isThrowing = substFnInterfaceType->getExtInfo().isThrowing();
+  if (auto origFnType = origType.getAs<AnyFunctionType>()) {
+    isThrowing |= origFnType->getExtInfo().isThrowing();
+  }
+  if (isThrowing && !foreignInfo.error &&
       !foreignInfo.async) {
     assert(!origType.isForeign()
            && "using native Swift error convention for foreign type!");
@@ -1936,7 +1962,7 @@ static CanSILFunctionType getSILFunctionType(
       valueType = valueType.subst(*reqtSubs);
     }
 
-    coroutineSubstYieldType = valueType->getCanonicalType(genericSig);
+    coroutineSubstYieldType = valueType->getReducedType(genericSig);
   }
 
   bool shouldBuildSubstFunctionType = [&]{
@@ -2014,8 +2040,7 @@ static CanSILFunctionType getSILFunctionType(
   SmallVector<SILParameterInfo, 8> inputs;
   {
     DestructureInputs destructurer(expansionContext, TC, conventions,
-                                   foreignInfo, inputs,
-                                   noImplicitCopyIndices);
+                                   foreignInfo, inputs);
     destructurer.destructure(origType, substFnInterfaceType.getParams(),
                              extInfoBuilder);
   }
@@ -2039,13 +2064,9 @@ static CanSILFunctionType getSILFunctionType(
     // Lower in the context of the closure. Since the set of captures is a
     // private contract between the closure and its enclosing context, we
     // don't need to keep its capture types opaque.
-    auto expansion = TypeExpansionContext::maximal(
-        constant->getAnyFunctionRef()->getAsDeclContext(), false);
-    // ...unless it's inlinable, in which case it might get inlined into
-    // some place we need to keep opaque types opaque.
-    if (constant->isSerialized())
-      expansion = TypeExpansionContext::minimal();
-    lowerCaptureContextParameters(TC, *constant, genericSig, expansion, inputs);
+    lowerCaptureContextParameters(TC, *constant, genericSig,
+                                  TC.getCaptureTypeExpansionContext(*constant),
+                                  inputs);
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -2077,7 +2098,7 @@ static CanSILFunctionType getSILFunctionType(
                         .withConcurrent(isSendable)
                         .withAsync(isAsync)
                         .build();
-  
+
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
                               results, errorResult,
@@ -2240,7 +2261,7 @@ struct DefaultAllocatorConventions : DefaultConventions {
   }
 };
 
-/// The default conventions for Swift setter acccessors.
+/// The default conventions for Swift setter accessories.
 ///
 /// These take self at +0, but all other parameters at +1. This is because we
 /// assume that setter parameters are likely to be values to be forwarded into
@@ -2302,15 +2323,14 @@ static CanSILFunctionType getNativeSILFunctionType(
     AbstractionPattern origType, CanAnyFunctionType substInterfaceType,
     SILExtInfoBuilder extInfoBuilder, Optional<SILDeclRef> origConstant,
     Optional<SILDeclRef> constant, Optional<SubstitutionMap> reqtSubs,
-    ProtocolConformanceRef witnessMethodConformance,
-    Optional<SmallBitVector> noImplicitCopyIndices) {
+    ProtocolConformanceRef witnessMethodConformance) {
   assert(bool(origConstant) == bool(constant));
   auto getSILFunctionTypeForConventions =
       [&](const Conventions &convs) -> CanSILFunctionType {
     return getSILFunctionType(TC, context, origType, substInterfaceType,
                               extInfoBuilder, convs, ForeignInfo(),
                               origConstant, constant, reqtSubs,
-                              witnessMethodConformance, noImplicitCopyIndices);
+                              witnessMethodConformance);
   };
   switch (extInfoBuilder.getRepresentation()) {
   case SILFunctionType::Representation::Block:
@@ -2374,7 +2394,295 @@ CanSILFunctionType swift::getNativeSILFunctionType(
 
   return ::getNativeSILFunctionType(
       TC, context, origType, substType, silExtInfo.intoBuilder(), origConstant,
-      substConstant, reqtSubs, witnessMethodConformance, None);
+      substConstant, reqtSubs, witnessMethodConformance);
+}
+
+/// Build a generic signature and environment for a re-abstraction thunk.
+///
+/// Most thunks share the generic environment with their original function.
+/// The one exception is if the thunk type involves an open existential,
+/// in which case we "promote" the opened existential to a new generic parameter.
+///
+/// \param SGF - the parent function
+/// \param openedExistential - the opened existential to promote to a generic
+//  parameter, if any
+/// \param inheritGenericSig - whether to inherit the generic signature from the
+/// parent function.
+/// \param genericEnv - the new generic environment
+/// \param contextSubs - map old archetypes to new archetypes
+/// \param interfaceSubs - map interface types to old archetypes
+static CanGenericSignature
+buildThunkSignature(SILFunction *fn,
+                    bool inheritGenericSig,
+                    OpenedArchetypeType *openedExistential,
+                    GenericEnvironment *&genericEnv,
+                    SubstitutionMap &contextSubs,
+                    SubstitutionMap &interfaceSubs,
+                    ArchetypeType *&newArchetype) {
+  auto *mod = fn->getModule().getSwiftModule();
+  auto &ctx = mod->getASTContext();
+
+  // If there's no opened existential, we just inherit the generic environment
+  // from the parent function.
+  if (openedExistential == nullptr) {
+    auto genericSig =
+      fn->getLoweredFunctionType()->getInvocationGenericSignature();
+    genericEnv = fn->getGenericEnvironment();
+    interfaceSubs = fn->getForwardingSubstitutionMap();
+    contextSubs = interfaceSubs;
+    return genericSig;
+  }
+
+  // Add the existing generic signature.
+  int depth = 0;
+  GenericSignature baseGenericSig;
+  if (inheritGenericSig) {
+    if (auto genericSig =
+          fn->getLoweredFunctionType()->getInvocationGenericSignature()) {
+      baseGenericSig = genericSig;
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
+    }
+  }
+
+  // Add a new generic parameter to replace the opened existential.
+  auto *newGenericParam =
+      GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
+
+  assert(openedExistential->isRoot());
+  auto constraint = openedExistential->getExistentialType();
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
+  Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
+                             constraint);
+
+  auto genericSig = buildGenericSignature(ctx, baseGenericSig,
+                                          { newGenericParam },
+                                          { newRequirement });
+  genericEnv = genericSig.getGenericEnvironment();
+
+  newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
+    ->castTo<ArchetypeType>();
+
+  // Calculate substitutions to map the caller's archetypes to the thunk's
+  // archetypes.
+  if (auto calleeGenericSig = fn->getLoweredFunctionType()
+          ->getInvocationGenericSignature()) {
+    contextSubs = SubstitutionMap::get(
+      calleeGenericSig,
+      [&](SubstitutableType *type) -> Type {
+        return genericEnv->mapTypeIntoContext(type);
+      },
+      MakeAbstractConformanceForGenericType());
+  }
+
+  // Calculate substitutions to map interface types to the caller's archetypes.
+  interfaceSubs = SubstitutionMap::get(
+    genericSig,
+    [&](SubstitutableType *type) -> Type {
+      if (type->isEqual(newGenericParam))
+        return openedExistential;
+      return fn->mapTypeIntoContext(type);
+    },
+    MakeAbstractConformanceForGenericType());
+
+  return genericSig.getCanonicalSignature();
+}
+
+/// Build the type of a function transformation thunk.
+CanSILFunctionType swift::buildSILFunctionThunkType(
+    SILFunction *fn,
+    CanSILFunctionType &sourceType,
+    CanSILFunctionType &expectedType,
+    CanType &inputSubstType,
+    CanType &outputSubstType,
+    GenericEnvironment *&genericEnv,
+    SubstitutionMap &interfaceSubs,
+    CanType &dynamicSelfType,
+    bool withoutActuallyEscaping,
+    Optional<DifferentiationThunkKind> differentiationThunkKind) {
+  // We shouldn't be thunking generic types here, and substituted function types
+  // ought to have their substitutions applied before we get here.
+  assert(!expectedType->isPolymorphic() &&
+         !expectedType->getCombinedSubstitutions());
+  assert(!sourceType->isPolymorphic() &&
+         !sourceType->getCombinedSubstitutions());
+
+  // This may inherit @noescape from the expectedType. The @noescape attribute
+  // is only stripped when using this type to materialize a new decl.
+  auto extInfoBuilder = expectedType->getExtInfo().intoBuilder();
+  if (!differentiationThunkKind ||
+      *differentiationThunkKind == DifferentiationThunkKind::Reabstraction ||
+      extInfoBuilder.hasContext()) {
+    // Can't build a reabstraction thunk without context, so we require
+    // ownership semantics on the result type.
+    assert(expectedType->getExtInfo().hasContext());
+
+    extInfoBuilder = extInfoBuilder.withRepresentation(
+          SILFunctionType::Representation::Thin);
+  }
+
+  if (withoutActuallyEscaping)
+    extInfoBuilder = extInfoBuilder.withNoEscape(false);
+
+  // Does the thunk type involve archetypes other than opened existentials?
+  bool hasArchetypes = false;
+  // Does the thunk type involve an open existential type?
+  CanOpenedArchetypeType openedExistential;
+  auto archetypeVisitor = [&](CanType t) {
+    if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
+      if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
+        const auto root = opened.getRoot();
+        assert((openedExistential == CanArchetypeType() ||
+                openedExistential == root) &&
+               "one too many open existentials");
+        openedExistential = root;
+      } else {
+        hasArchetypes = true;
+      }
+    }
+  };
+
+  // Use the generic signature from the context if the thunk involves
+  // generic parameters.
+  CanGenericSignature genericSig;
+  SubstitutionMap contextSubs;
+  ArchetypeType *newArchetype = nullptr;
+
+  if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
+    expectedType.visit(archetypeVisitor);
+    sourceType.visit(archetypeVisitor);
+
+    genericSig = buildThunkSignature(fn,
+                                     hasArchetypes,
+                                     openedExistential,
+                                     genericEnv,
+                                     contextSubs,
+                                     interfaceSubs,
+                                     newArchetype);
+  }
+
+  auto substTypeHelper = [&](SubstitutableType *type) -> Type {
+    // FIXME: Type::subst should not pass in non-root archetypes.
+    // Consider only root archetypes.
+    if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
+      if (!archetype->isRoot())
+        return Type();
+    }
+
+    if (CanType(type) == openedExistential)
+      return newArchetype;
+
+    return Type(type).subst(contextSubs);
+  };
+  auto substConformanceHelper =
+    LookUpConformanceInSubstitutionMap(contextSubs);
+
+  // Utility function to apply contextSubs, and also replace the
+  // opened existential with the new archetype.
+  auto substFormalTypeIntoThunkContext =
+      [&](CanType t) -> CanType {
+    return t.subst(substTypeHelper, substConformanceHelper)
+               ->getCanonicalType();
+  };
+  auto substLoweredTypeIntoThunkContext =
+      [&](CanSILFunctionType t) -> CanSILFunctionType {
+    return SILType::getPrimitiveObjectType(t)
+             .subst(fn->getModule(), substTypeHelper, substConformanceHelper)
+             .castTo<SILFunctionType>();
+  };
+
+  sourceType = substLoweredTypeIntoThunkContext(sourceType);
+  expectedType = substLoweredTypeIntoThunkContext(expectedType);
+
+  bool hasDynamicSelf = false;
+
+  if (inputSubstType) {
+    inputSubstType = substFormalTypeIntoThunkContext(inputSubstType);
+    hasDynamicSelf |= inputSubstType->hasDynamicSelfType();
+  }
+
+  if (outputSubstType) {
+    outputSubstType = substFormalTypeIntoThunkContext(outputSubstType);
+    hasDynamicSelf |= outputSubstType->hasDynamicSelfType();
+  }
+
+  hasDynamicSelf |= sourceType->hasDynamicSelfType();
+  hasDynamicSelf |= expectedType->hasDynamicSelfType();
+
+  // If our parent function was pseudogeneric, this thunk must also be
+  // pseudogeneric, since we have no way to pass generic parameters.
+  if (genericSig)
+    if (fn->getLoweredFunctionType()->isPseudogeneric())
+      extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
+
+  // Add the function type as the parameter.
+  auto contextConvention =
+      fn->getTypeLowering(sourceType).isTrivial()
+          ? ParameterConvention::Direct_Unowned
+          : ParameterConvention::Direct_Guaranteed;
+  SmallVector<SILParameterInfo, 4> params;
+  params.append(expectedType->getParameters().begin(),
+                expectedType->getParameters().end());
+
+  if (!differentiationThunkKind ||
+      *differentiationThunkKind == DifferentiationThunkKind::Reabstraction) {
+    params.push_back({sourceType,
+                      sourceType->getExtInfo().hasContext()
+                        ? contextConvention
+                        : ParameterConvention::Direct_Unowned});
+  }
+
+  // If this thunk involves DynamicSelfType in any way, add a capture for it
+  // in case we need to recover metadata.
+  if (hasDynamicSelf) {
+    dynamicSelfType = fn->getDynamicSelfMetadata()->getType().getASTType();
+    if (!isa<MetatypeType>(dynamicSelfType)) {
+      dynamicSelfType = CanMetatypeType::get(dynamicSelfType,
+                                             MetatypeRepresentation::Thick);
+    }
+    params.push_back({dynamicSelfType, ParameterConvention::Direct_Unowned});
+  }
+
+  auto mapTypeOutOfContext = [&](CanType type) -> CanType {
+    return type->mapTypeOutOfContext()->getCanonicalType();
+  };
+
+  // Map the parameter and expected types out of context to get the interface
+  // type of the thunk.
+  SmallVector<SILParameterInfo, 4> interfaceParams;
+  interfaceParams.reserve(params.size());
+  for (auto &param : params) {
+    auto interfaceParam = param.map(mapTypeOutOfContext);
+    interfaceParams.push_back(interfaceParam);
+  }
+
+  SmallVector<SILYieldInfo, 4> interfaceYields;
+  for (auto &yield : expectedType->getYields()) {
+    auto interfaceYield = yield.map(mapTypeOutOfContext);
+    interfaceYields.push_back(interfaceYield);
+  }
+
+  SmallVector<SILResultInfo, 4> interfaceResults;
+  for (auto &result : expectedType->getResults()) {
+    auto interfaceResult = result.map(mapTypeOutOfContext);
+    interfaceResults.push_back(interfaceResult);
+  }
+
+  Optional<SILResultInfo> interfaceErrorResult;
+  if (expectedType->hasErrorResult()) {
+    auto errorResult = expectedType->getErrorResult();
+    interfaceErrorResult = errorResult.map(mapTypeOutOfContext);;
+  }
+
+  // The type of the thunk function.
+  return SILFunctionType::get(
+      genericSig, extInfoBuilder.build(), expectedType->getCoroutineKind(),
+      ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
+      interfaceResults, interfaceErrorResult,
+      expectedType->getPatternSubstitutions(), SubstitutionMap(),
+      fn->getASTContext());
+
 }
 
 //===----------------------------------------------------------------------===//
@@ -2669,6 +2977,8 @@ public:
       // not apply to functions returning ObjC types.
       } else if (clang::ento::coreFoundation::followsCreateRule(TheDecl)) {
         return ResultConvention::Owned;
+      } else if (tl.getLoweredType().isForeignReferenceType()) {
+        return ResultConvention::Unowned;
       } else {
         return ResultConvention::Autoreleased;
       }
@@ -2753,23 +3063,19 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
     return getSILFunctionType(
         TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
         extInfoBuilder, ObjCMethodConventions(method), foreignInfo, constant,
-        constant, None, ProtocolConformanceRef(), None);
+        constant, None, ProtocolConformanceRef());
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    AbstractionPattern origPattern =
-        method->isOverloadedOperator()
-            ? AbstractionPattern::getCXXOperatorMethod(origType, method,
-                                                       foreignInfo.self)
-            : AbstractionPattern::getCXXMethod(origType, method,
-                                               foreignInfo.self);
+    AbstractionPattern origPattern = AbstractionPattern::getCXXMethod(origType, method,
+                                                                      foreignInfo.self);
     bool isMutating =
         TC.Context.getClangModuleLoader()->isCXXMethodMutating(method);
     auto conventions = CXXMethodConventions(method, isMutating);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
                               substInterfaceType, extInfoBuilder, conventions,
                               foreignInfo, constant, constant, None,
-                              ProtocolConformanceRef(), None);
+                              ProtocolConformanceRef());
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
@@ -2782,7 +3088,7 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
                               substInterfaceType, extInfoBuilder,
                               CFunctionConventions(func), foreignInfo, constant,
-                              constant, None, ProtocolConformanceRef(), None);
+                              constant, None, ProtocolConformanceRef());
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -2810,7 +3116,7 @@ static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
       return getSILFunctionType(
           TC, TypeExpansionContext::minimal(), origType, substType,
           extInfoBuilder, CFunctionTypeConventions(fnType), ForeignInfo(),
-          constant, constant, None, ProtocolConformanceRef(), None);
+          constant, constant, None, ProtocolConformanceRef());
     }
   }
 
@@ -2818,7 +3124,7 @@ static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
   return getSILFunctionType(TC, TypeExpansionContext::minimal(), origType,
                             substType, extInfoBuilder,
                             DefaultBlockConventions(), ForeignInfo(), constant,
-                            constant, None, ProtocolConformanceRef(), None);
+                            constant, None, ProtocolConformanceRef());
 }
 
 /// Try to find a clang method declaration for the given function.
@@ -2986,7 +3292,7 @@ static CanSILFunctionType getSILFunctionTypeForObjCSelectorFamily(
       TC, TypeExpansionContext::minimal(), AbstractionPattern(origType),
       substInterfaceType, extInfoBuilder, ObjCSelectorFamilyConventions(family),
       foreignInfo, constant, constant,
-      /*requirement subs*/ None, ProtocolConformanceRef(), None);
+      /*requirement subs*/ None, ProtocolConformanceRef());
 }
 
 static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
@@ -3056,23 +3362,9 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
       }
     }();
 
-    Optional<SmallBitVector> noImplicitCopyIndices;
-    if (constant.hasDecl()) {
-      auto decl = constant.getDecl();
-      if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
-        noImplicitCopyIndices.emplace(funcDecl->getParameters()->size());
-        for (auto p : llvm::enumerate(*funcDecl->getParameters())) {
-          if (p.value()->isNoImplicitCopy()) {
-            noImplicitCopyIndices->set(p.index());
-          }
-        }
-      }
-    }
-
     return ::getNativeSILFunctionType(
         TC, context, origType, origLoweredInterfaceType, extInfoBuilder,
-        constant, constant, None, witnessMethodConformance,
-        noImplicitCopyIndices);
+        constant, constant, None, witnessMethodConformance);
   }
 
   ForeignInfo foreignInfo;
@@ -3141,19 +3433,11 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     if (!c.hasDecl())
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
-    // TODO: Is this correct for operators?
     if (auto method =
-            dyn_cast_or_null<clang::CXXMethodDecl>(c.getDecl()->getClangDecl())) {
-      // Subscripts and call operators are imported as normal methods.
-      bool staticOperator = method->isOverloadedOperator() &&
-                            method->getOverloadedOperator() != clang::OO_Call &&
-                            method->getOverloadedOperator() != clang::OO_Subscript;
-      return isa<clang::CXXConstructorDecl>(method) ||
-                     method->isStatic() ||
-                     staticOperator
-          ? SILFunctionTypeRepresentation::CFunctionPointer
-          : SILFunctionTypeRepresentation::CXXMethod;
-    }
+            dyn_cast_or_null<clang::CXXMethodDecl>(c.getDecl()->getClangDecl()))
+      return isa<clang::CXXConstructorDecl>(method) || method->isStatic()
+                 ? SILFunctionTypeRepresentation::CFunctionPointer
+                 : SILFunctionTypeRepresentation::CXXMethod;
 
 
     // For example, if we have a function in a namespace:
@@ -3614,7 +3898,7 @@ public:
     //   add the appropriate invocation substitutions.
     //
     // - Otherwise, if there are pattern substitutions, just substitute
-    //   those; the other components are inside the patttern generic
+    //   those; the other components are inside the pattern generic
     //   signature.
     //
     // - Otherwise, substitute the basic components.
@@ -3640,7 +3924,7 @@ public:
 
     auto patternSubs = origType->getPatternSubstitutions();
 
-    // If we have an invocation signatture, we generally shouldn't
+    // If we have an invocation signature, we generally shouldn't
     // substitute into the pattern substitutions and component types.
     if (auto sig = origType->getInvocationGenericSignature()) {
       // Substitute the invocation substitutions if present.
@@ -4090,10 +4374,7 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       assert(numParameterLists == 2);
       if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
-        return method->isOverloadedOperator()
-                   ? AbstractionPattern::getCurriedCXXOperatorMethod(fnType,
-                                                                     bridgedFn)
-                   : AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
+        return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {
         // C function imported as a method.
         return AbstractionPattern::getCurriedCFunctionAsMethod(fnType,
@@ -4179,19 +4460,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
     auto partialFnPattern = bridgingFnPattern.getFunctionResultType();
     for (unsigned i : indices(methodParams)) {
-      // C++ operators that are implemented as non-static member functions get
-      // imported into Swift as static methods that have an additional
-      // parameter for the left-hand-side operand instead of the receiver
-      // object. These are inout parameters and don't get bridged.
-      // TODO: Undo this if we stop using inout.
-      if (auto method = dyn_cast_or_null<clang::CXXMethodDecl>(
-              constant.getDecl()->getClangDecl())) {
-        if (i==0 && method->isOverloadedOperator()) {
-          bridgedParams.push_back(methodParams[0]);
-          continue;
-        }
-      }
-
       auto paramPattern = partialFnPattern.getFunctionParamType(i);
       auto bridgedParam =
           getBridgedParam(rep, paramPattern, methodParams[i], bridging);
@@ -4301,7 +4569,7 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
 
     // Opaque types are compatible with their substitution.
     if (inFunction) {
-      auto opaqueTypesSubsituted = aa;
+      auto opaqueTypesSubstituted = aa;
       auto *dc = inFunction->getDeclContext();
       auto *currentModule = inFunction->getModule().getSwiftModule();
       if (!dc || !dc->isChildContextOf(currentModule))
@@ -4310,15 +4578,15 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
           dc, inFunction->getResilienceExpansion(),
           inFunction->getModule().isWholeModule());
       if (aa.getASTType()->hasOpaqueArchetype())
-        opaqueTypesSubsituted = aa.subst(inFunction->getModule(), replacer,
+        opaqueTypesSubstituted = aa.subst(inFunction->getModule(), replacer,
                                          replacer, CanGenericSignature(), true);
 
-      auto opaqueTypesSubsituted2 = bb;
+      auto opaqueTypesSubstituted2 = bb;
       if (bb.getASTType()->hasOpaqueArchetype())
-        opaqueTypesSubsituted2 =
+        opaqueTypesSubstituted2 =
             bb.subst(inFunction->getModule(), replacer, replacer,
                      CanGenericSignature(), true);
-      if (opaqueTypesSubsituted == opaqueTypesSubsituted2)
+      if (opaqueTypesSubstituted == opaqueTypesSubstituted2)
         continue;
     }
 

@@ -16,7 +16,7 @@ import Swift
 ///
 /// - Returns: May return a negative number to signal a decoding error.
 @available(SwiftStdlib 5.7, *)
-public // SPI _Distributed
+public // SPI Distributed
 func _getParameterCount(mangledMethodName name: String) -> Int32 {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
@@ -27,7 +27,7 @@ func _getParameterCount(mangledMethodName name: String) -> Int32 {
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_func_getParameterCount")
-public // SPI _Distributed
+public // SPI Distributed
 func __getParameterCount(
     _ typeNameStart: UnsafePointer<UInt8>,
     _ typeNameLength: UInt
@@ -39,7 +39,7 @@ func __getParameterCount(
 /// - Returns: the actual number of types written,
 ///            or negative value to signify an error
 @available(SwiftStdlib 5.7, *)
-public // SPI _Distributed
+public // SPI Distributed
 func _getParameterTypeInfo(
   mangledMethodName name: String,
   genericEnv: UnsafeRawPointer?, // GenericEnvironmentDescriptor *
@@ -58,7 +58,7 @@ func _getParameterTypeInfo(
 ///             or a negative value to signal decoding error.
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_func_getParameterTypeInfo")
-public // SPI _Distributed
+public // SPI Distributed
 func __getParameterTypeInfo(
     _ typeNameStart: UnsafePointer<UInt8>, _ typeNameLength: UInt,
     _ genericEnv: UnsafeRawPointer?, // GenericEnvironmentDescriptor *
@@ -67,7 +67,7 @@ func __getParameterTypeInfo(
 ) -> Int32
 
 @available(SwiftStdlib 5.7, *)
-public // SPI _Distributed
+public // SPI Distributed
 func _getReturnTypeInfo(
   mangledMethodName name: String,
   genericEnv: UnsafeRawPointer?, // GenericEnvironmentDescriptor *
@@ -82,7 +82,7 @@ func _getReturnTypeInfo(
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_func_getReturnTypeInfo")
-public // SPI _Distributed
+public // SPI Distributed
 func __getReturnTypeInfo(
     _ typeNameStart: UnsafePointer<UInt8>,
     _ typeNameLength: UInt,
@@ -95,7 +95,7 @@ func __getReturnTypeInfo(
 /// the given distributed target
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_getGenericEnvironment")
-public // SPI _Distributed
+public // SPI Distributed
 func _getGenericEnvironmentOfDistributedTarget(
     _ targetNameStart: UnsafePointer<UInt8>,
     _ targetNameLength: UInt
@@ -103,8 +103,18 @@ func _getGenericEnvironmentOfDistributedTarget(
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_getWitnessTables")
-public // SPI _Distributed
+public // SPI Distributed
 func _getWitnessTablesFor(
   environment: UnsafeRawPointer,
   genericArguments: UnsafeRawPointer
 ) -> (UnsafeRawPointer, Int)
+
+@available(SwiftStdlib 5.7, *)
+@_silgen_name("swift_distributed_makeDistributedTargetAccessorNotFoundError")
+internal // SPI Distributed
+func _makeDistributedTargetAccessorNotFoundError() -> Error {
+  /// We don't include the name of the target in case the input was compromised.
+  return ExecuteDistributedTargetError(
+    message: "Failed to locate distributed function accessor",
+    errorCode: .targetAccessorNotFound)
+}

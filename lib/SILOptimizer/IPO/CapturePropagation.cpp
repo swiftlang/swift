@@ -267,8 +267,8 @@ CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
 SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                                         SILFunction *OrigF) {
   IsSerialized_t Serialized = IsNotSerialized;
-  if (PAI->getFunction()->isSerialized() && OrigF->isSerialized())
-    Serialized = IsSerializable;
+  if (PAI->getFunction()->isSerialized())
+    Serialized = IsSerialized;
 
   std::string Name = getClonedName(PAI, Serialized, OrigF);
 

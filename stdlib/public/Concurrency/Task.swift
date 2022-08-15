@@ -463,6 +463,17 @@ func taskCreateFlags(
 // ==== Task Creation ----------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model.")
+  }
+#else
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
   ///
@@ -507,10 +518,22 @@ extension Task where Failure == Never {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Error {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
   ///
@@ -556,11 +579,23 @@ extension Task where Failure == Error {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 // ==== Detached Tasks ---------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func detached(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
   ///
@@ -602,10 +637,22 @@ extension Task where Failure == Never {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Error {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func detached(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task.
   ///
@@ -650,6 +697,7 @@ extension Task where Failure == Error {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
@@ -833,8 +881,19 @@ internal func _asyncMainDrainQueue() -> Never
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
 
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
-public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+@usableFromInline
+@preconcurrency
+internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
+  fatalError("Unavailable in task-to-thread concurrency model")
+}
+#else
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@preconcurrency
+internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
   Task.detached {
     do {
 #if !os(Windows)
@@ -852,6 +911,7 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
   }
   _asyncMainDrainQueue()
 }
+#endif
 
 // FIXME: both of these ought to take their arguments _owned so that
 //        we can do a move out of the future in the common case where it's
@@ -900,6 +960,67 @@ func _reportUnexpectedExecutor(_ _filenameStart: Builtin.RawPointer,
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrentThreadPriority")
 func _getCurrentThreadPriority() -> Int
+
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.8, *)
+@usableFromInline
+@_unavailableFromAsync(message: "Use _taskRunInline from a sync context to begin an async context.")
+internal func _taskRunInline<T>(_ body: () async -> T) -> T {
+#if compiler(>=5.5) && $BuiltinTaskRunInline
+  return Builtin.taskRunInline(body)
+#else
+  fatalError("Unsupported Swift compiler")
+#endif
+}
+
+@available(SwiftStdlib 5.8, *)
+extension Task where Failure == Never {
+  /// Start an async context within the current sync context and run the
+  /// provided async closure, returning the value it produces.
+  @available(SwiftStdlib 5.8, *)
+  @_spi(_TaskToThreadModel)
+  @_unavailableFromAsync(message: "Use Task.runInline from a sync context to begin an async context.")
+  public static func runInline(_ body: () async -> Success) -> Success {
+    return _taskRunInline(body)
+  }
+}
+
+@available(SwiftStdlib 5.8, *)
+extension Task where Failure == Error {
+  @available(SwiftStdlib 5.8, *)
+  @_alwaysEmitIntoClient
+  @usableFromInline
+  internal static func _runInlineHelper<T>(
+    body: () async -> Result<T, Error>,
+    rescue: (Result<T, Error>) throws -> T
+  ) rethrows -> T {
+    return try rescue(
+      _taskRunInline(body)
+    )
+  }
+
+  /// Start an async context within the current sync context and run the
+  /// provided async closure, returning or throwing the value or error it
+  /// produces.
+  @available(SwiftStdlib 5.8, *)
+  @_spi(_TaskToThreadModel)
+  @_unavailableFromAsync(message: "Use Task.runInline from a sync context to begin an async context.")
+  public static func runInline(_ body: () async throws -> Success) rethrows -> Success {
+    return try _runInlineHelper(
+      body: {
+        do { 
+          let value = try await body() 
+          return Result.success(value)
+        }
+        catch let error {
+          return Result.failure(error)
+        }
+    },
+      rescue: { try $0.get() }
+    )
+  }
+}
+#endif
 
 #if _runtime(_ObjC)
 

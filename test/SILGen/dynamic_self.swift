@@ -1,10 +1,10 @@
-// RUN: %target-swift-emit-silgen -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify
-// RUN: %target-swift-emit-ir -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify
+// RUN: %target-swift-emit-silgen -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
-// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify
-// RUN: %target-swift-emit-ir -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify
+// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 protocol P {
   func f() -> Self
@@ -85,38 +85,38 @@ func testArchetypeDispatch<T: P>(t: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self23testExistentialDispatch{{[_0-9a-zA-Z]*}}F
 func testExistentialDispatch(p: P) {
 // CHECK: bb0([[P:%[0-9]+]] : $*P):
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]]) P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]], P) Self
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
-// CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]]) P
-// CHECK:   apply [[P_F_METHOD]]<@opened([[N]]) P>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]], P) Self, #P.f : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]], P) Self
+// CHECK:   apply [[P_F_METHOD]]<@opened([[N]], P) Self>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   destroy_addr [[P_RESULT]] : $*P
 // CHECK:   dealloc_stack [[P_RESULT]] : $*P
   _ = p.f()
 
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]]) P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]], P) Self
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
-// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]]) P
-// CHECK:   copy_addr [[PCOPY_ADDR]] to [initialization] [[PCOPY_ADDR_1]] : $*@opened([[N]]) P
-// CHECK:   [[P_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.p!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   [[P_RESULT_ADDR2:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]]) P
-// CHECK:   apply [[P_P_GETTER]]<@opened([[N]]) P>([[P_RESULT_ADDR2]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]]) P
+// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]], P) Self
+// CHECK:   copy_addr [[PCOPY_ADDR]] to [initialization] [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
+// CHECK:   [[P_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], P) Self, #P.p!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   [[P_RESULT_ADDR2:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]], P) Self
+// CHECK:   apply [[P_P_GETTER]]<@opened([[N]], P) Self>([[P_RESULT_ADDR2]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
 // CHECK:   destroy_addr [[P_RESULT]] : $*P
-// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]]) P
+// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
 // CHECK:   dealloc_stack [[P_RESULT]] : $*P
   _ = p.p
 
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]]) P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]], P) Self
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
-// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]]) P
-// CHECK:   copy_addr [[PCOPY_ADDR]] to [initialization] [[PCOPY_ADDR_1]] : $*@opened([[N]]) P
-// CHECK:   [[P_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.subscript!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]]) P
-// CHECK:   apply [[P_SUBSCRIPT_GETTER]]<@opened([[N]]) P>([[P_RESULT_ADDR]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]]) P
+// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]], P) Self
+// CHECK:   copy_addr [[PCOPY_ADDR]] to [initialization] [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
+// CHECK:   [[P_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], P) Self, #P.subscript!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]], P) Self
+// CHECK:   apply [[P_SUBSCRIPT_GETTER]]<@opened([[N]], P) Self>([[P_RESULT_ADDR]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
 // CHECK:   destroy_addr [[P_RESULT]] : $*P
-// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]]) P
+// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
 // CHECK:   dealloc_stack [[P_RESULT]] : $*P
   _ = p[]
 }
@@ -124,32 +124,32 @@ func testExistentialDispatch(p: P) {
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self28testExistentialDispatchClass{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed CP) -> ()
 func testExistentialDispatchClass(cp: CP) {
 // CHECK: bb0([[CP:%[0-9]+]] : @guaranteed $CP):
-// CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]]) CP
-// CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]]) CP>([[CP_ADDR]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
+// CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]], CP) Self
+// CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]], CP) Self, #CP.f : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]], CP) Self>([[CP_ADDR]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]], CP) Self : $@opened([[N]], CP) Self, $CP
 // CHECK:   destroy_value [[RESULT_EXISTENTIAL]]
   _ = cp.f()
 
-// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]]) CP
-// CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]]) CP
-// CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]]) CP
-// CHECK: [[CP_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.p!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: [[APPLY_RESULT:%[0-9]+]] = apply [[CP_P_GETTER]]<@opened([[N]]) CP>([[CP_BORROWED]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: end_borrow [[CP_BORROWED]] : $@opened([[N]]) CP
-// CHECK: destroy_value [[CP_ADDR_1]] : $@opened([[N]]) CP
-// CHECK: [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[APPLY_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
+// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]], CP) Self
+// CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]], CP) Self
+// CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]], CP) Self
+// CHECK: [[CP_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], CP) Self, #CP.p!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[APPLY_RESULT:%[0-9]+]] = apply [[CP_P_GETTER]]<@opened([[N]], CP) Self>([[CP_BORROWED]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: end_borrow [[CP_BORROWED]] : $@opened([[N]], CP) Self
+// CHECK: destroy_value [[CP_ADDR_1]] : $@opened([[N]], CP) Self
+// CHECK: [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[APPLY_RESULT]] : $@opened([[N]], CP) Self : $@opened([[N]], CP) Self, $CP
 // CHECK: destroy_value [[RESULT_EXISTENTIAL]] : $CP
   _ = cp.p
 
-// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]]) CP
-// CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]]) CP
-// CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]]) CP
-// CHECK: [[CP_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.subscript!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: [[APPLY_RESULT:%[0-9]+]] = apply [[CP_SUBSCRIPT_GETTER]]<@opened([[N]]) CP>([[CP_BORROWED]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: end_borrow [[CP_BORROWED]] : $@opened([[N]]) CP
-// CHECK: destroy_value [[CP_ADDR_1]] : $@opened([[N]]) CP
-// CHECK: [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[APPLY_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
+// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]], CP) Self
+// CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]], CP) Self
+// CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]], CP) Self
+// CHECK: [[CP_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], CP) Self, #CP.subscript!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[APPLY_RESULT:%[0-9]+]] = apply [[CP_SUBSCRIPT_GETTER]]<@opened([[N]], CP) Self>([[CP_BORROWED]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: end_borrow [[CP_BORROWED]] : $@opened([[N]], CP) Self
+// CHECK: destroy_value [[CP_ADDR_1]] : $@opened([[N]], CP) Self
+// CHECK: [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[APPLY_RESULT]] : $@opened([[N]], CP) Self : $@opened([[N]], CP) Self, $CP
 // CHECK: destroy_value [[RESULT_EXISTENTIAL]] : $CP
   _ = cp[]
 }
@@ -160,7 +160,7 @@ func testExistentialDispatchClass(cp: CP) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self21testAnyObjectDispatch1oyyXl_tF : $@convention(thin) (@guaranteed AnyObject) -> () {
 func testAnyObjectDispatch(o: AnyObject) {
-  // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@opened({{.*}}) AnyObject, #ObjC.method!foreign, bb1, bb2
+  // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@opened({{.*}}, AnyObject) Self, #ObjC.method!foreign, bb1, bb2
 
   // CHECK: bb1([[METHOD:%[0-9]+]] : {{.*}}):
   // CHECK:   [[O_OBJ_COPY:%.*]] = copy_value [[O_OBJ]]
@@ -517,6 +517,17 @@ public class CaptureTwoValuesTest {
 
     // CHECK-LABEL: sil private [ossa] @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZyycfU_ : $@convention(thin) (@guaranteed CaptureTwoValuesTest, @guaranteed CaptureTwoValuesTest) -> () {
   }
+}
+
+
+final class Final {
+  static func useSelf(_ body: (Self) -> ()) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self13testNoErasureyyyAA5FinalCXEF : $@convention(thin) (@noescape @callee_guaranteed (@guaranteed Final) -> ()) -> () {
+func testNoErasure(_ body: (Final) -> ()) {
+  // CHECK: function_ref @$s12dynamic_self5FinalC7useSelfyyyACXDXEFZ : $@convention(method) (@noescape @callee_guaranteed (@guaranteed Final) -> (), @thick Final.Type) -> ()
+  return Final.useSelf(body)
 }
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {

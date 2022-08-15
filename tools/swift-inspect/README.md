@@ -13,7 +13,7 @@ swift-inspect can be built using [swift-package-manager](https://github.com/appl
 In order to build on Windows, some additional parameters must be passed to the build tool to locate the necessary libraries.
 
 ~~~
-swift build -Xcc -I%DEVELOPER_DIR%\Toolchains\unknown-Asserts-development.xctoolchain\usr\include\swift\SwiftRemoteMirror -Xlinker %DEVELOPER_DIR%\Toolchains\unknown-Asserts-development.xctoolchain\usr\lib\swift\windows\x86_64\swiftRemoteMirror.lib
+swift build -Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror -Xlinker %SDKROOT%\usr\lib\swift\windows\x86_64\swiftRemoteMirror.lib
 ~~~
 
 ### Using
@@ -21,6 +21,9 @@ swift build -Xcc -I%DEVELOPER_DIR%\Toolchains\unknown-Asserts-development.xctool
 The following inspection operations are available currently.
 
 ##### All Platforms
+
+dump-arrays &lt;name-or-pid&gt;
+: Print information about array objects in the target
 
 dump-cache-nodes &lt;name-or-pid&gt;
 : Print the metadata cache nodes.
@@ -35,9 +38,6 @@ dump-raw-metadata &lt;name-or-pid&gt; [--backtrace] [--backtrace-long]
 : Print metadata allocations.
 
 ##### Darwin Only
-
-dump-arrays &lt;name-or-pid&gt;
-: Print information about array objects in the target
 
 dump-concurrency &lt;name-or-pid&gt;
 : Print information about tasks, actors, and threads under Concurrency.

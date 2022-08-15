@@ -8,7 +8,7 @@ import Builtin
 
 typealias AnyObject = Builtin.AnyObject
 
-protocol FakeAnyObject : class {}
+protocol FakeAnyObject : AnyObject {}
 
 class C : FakeAnyObject {
   init()
@@ -58,7 +58,8 @@ enum E1 {
 // Tests //
 ///////////
 
-// Make sure that we see all the way through the chain of casts that %9 has an RCIdentity of %0 and that %12 is really the partial apply.
+// Make sure that we see all the way through the chain of casts that %9 has
+// an RCIdentity of %0 and that %12 is really the partial apply.
 // CHECK-LABEL: @test_rcid_preserving_casts@
 // CHECK: RESULT #9: 9 = 0
 // CHECK: RESULT #12: 12 = 11
@@ -71,8 +72,8 @@ bb0(%0 : $Builtin.NativeObject):
   %5 = ref_to_bridge_object %3 : $E, %4 : $Builtin.Word
   %6 = bridge_object_to_ref %5 : $Builtin.BridgeObject to $C
   %7 = init_existential_ref %6 : $C : $C, $FakeAnyObject
-  %8 = open_existential_ref %7 : $FakeAnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233") FakeAnyObject
-  %9 = unchecked_ref_cast %8 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233") FakeAnyObject to $Builtin.NativeObject
+  %8 = open_existential_ref %7 : $FakeAnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233", FakeAnyObject) Self
+  %9 = unchecked_ref_cast %8 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233", FakeAnyObject) Self to $Builtin.NativeObject
   %10 = function_ref @foo : $@convention(thin) (Builtin.Word) -> ()
   %11 = partial_apply %10(%4) : $@convention(thin) (Builtin.Word) -> ()
   %12 = convert_function %11 : $@callee_owned @convention(thick) () -> () to $@callee_owned @convention(thick) () -> ()

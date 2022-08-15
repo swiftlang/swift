@@ -1,4 +1,4 @@
-//===--- PassUtils.swift - Utilities for optimzation passes ---------------===//
+//===--- SubstitutionMap.swift --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,5 +17,9 @@ public struct SubstitutionMap {
 
   public init(_ bridged: BridgedSubstitutionMap) {
     self.bridged = bridged
+  }
+  
+  public init() {
+    self.bridged = SubstitutionMap_getEmpty();
   }
 }

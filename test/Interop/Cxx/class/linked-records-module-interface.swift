@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=LinkedRecords -I %S/Inputs/ -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=LinkedRecords -I %S/Inputs/ -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: enum Space {
 // CHECK:   struct C {
@@ -40,4 +40,15 @@
 // CHECK:   var c: F.__Unnamed_union___Anonymous_field0.__Unnamed_struct_c
 // CHECK:   var m: M
 // CHECK:   var m2: M
+// CHECK: }
+
+// CHECK: struct G {
+// CHECK:   init()
+// CHECK:   init(cc: G.__Unnamed_class_cc)
+// CHECK:   struct __Unnamed_class_cc {
+// CHECK:     init()
+// CHECK:     init(m: M)
+// CHECK:     var m: M
+// CHECK:   }
+// CHECK:   var cc: G.__Unnamed_class_cc
 // CHECK: }

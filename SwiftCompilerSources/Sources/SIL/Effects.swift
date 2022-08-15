@@ -93,7 +93,7 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
   public enum Kind {
     /// The selected argument value does not escape.
     ///
-    /// Synatx examples:
+    /// Syntax examples:
     ///    !%0       // argument 0 does not escape
     ///    !%0.**    // argument 0 and all transitively contained values do not escape
     ///
@@ -101,7 +101,7 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
     
     /// The selected argument value escapes to the specified selection (= first payload).
     ///
-    /// Synatx examples:
+    /// Syntax examples:
     ///    %0.s1 => %r   // field 2 of argument 0 exclusively escapes via return.
     ///    %0.s1 -> %1   // field 2 of argument 0 - and other values - escape to argument 1.
     ///
@@ -185,11 +185,17 @@ public struct FunctionEffects : CustomStringConvertible, CustomReflectable {
       }
   }
 
-  public func canEscape(path: ArgumentEffect.Path) -> Bool {
+  public func canEscape(argumentIndex: Int, path: ArgumentEffect.Path, analyzeAddresses: Bool) -> Bool {
     return !argumentEffects.contains(where: {
-      if case .notEscaping = $0.kind,
-          $0.selectedArg.matches(.argument(0), path) {
-        return true
+      if case .notEscaping = $0.kind, $0.selectedArg.value == .argument(argumentIndex) {
+
+        // Any address of a class property of an object, which is passed to the function, cannot
+        // escape the function. Whereas a value stored in such a property could escape.
+        let p = (analyzeAddresses ? path.popLastClassAndValuesFromTail() : path)
+
+        if p.matches(pattern: $0.selectedArg.pathPattern) {
+          return true
+        }
       }
       return false
     })
@@ -262,7 +268,7 @@ extension StringParser {
       }
       if function.numIndirectResultArguments > 0 {
         if function.numIndirectResultArguments != 1 {
-          try throwError("mutli-value returns not supported yet")
+          try throwError("multi-value returns not supported yet")
         }
         value = .argument(0)
       } else {
@@ -274,7 +280,7 @@ extension StringParser {
       }
       value = .argument(argIdx + function.numIndirectResultArguments)
     } else {
-      try throwError("paramter name or return expected")
+      try throwError("parameter name or return expected")
     }
 
     let valueType: Type

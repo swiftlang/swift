@@ -7,6 +7,12 @@
 
 // REQUIRES: asserts
 
+// arm64e checks that there is a sound Swift stdlib but the test compiles itself
+// as `-module Swift` and so that verification fails. (in some ptrauth
+// verification code)
+
+// UNSUPPORTED: CPU=arm64e
+
 sil_stage canonical
 
 import Builtin

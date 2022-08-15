@@ -1,7 +1,18 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -enable-library-evolution -emit-module-interface-path %t/External.swiftinterface -module-name External -DEXTERNAL
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr -module-interface-preserve-types-as-written -I %t | %FileCheck %s --check-prefix PREFER
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr -I %t | %FileCheck %s --check-prefix DONTPREFER
+
+// -- Generate an interface for the External module.
+// RUN: %target-swift-emit-module-interface(%t/External.swiftinterface) %s -module-name External -DEXTERNAL
+// RUN: %target-swift-typecheck-module-from-interface(%t/External.swiftinterface) -module-name External
+
+// -- Check output with -module-interface-preserve-types-as-written.
+// RUN: %target-swift-emit-module-interface(%t/Preserve.swiftinterface) %s -module-name PreferTypeRepr -module-interface-preserve-types-as-written -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/Preserve.swiftinterface) -module-name PreferTypeRepr -I %t
+// RUN: %FileCheck --check-prefixes=CHECK,PREFER %s < %t/Preserve.swiftinterface
+
+// -- Check output without the flag.
+// RUN: %target-swift-emit-module-interface(%t/DontPreserve.swiftinterface) %s -module-name PreferTypeRepr -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/DontPreserve.swiftinterface) -module-name PreferTypeRepr -I %t
+// RUN: %FileCheck --check-prefixes=CHECK,DONTPREFER %s < %t/DontPreserve.swiftinterface
 
 #if EXTERNAL
 public struct Toy {
@@ -48,9 +59,11 @@ public struct Ex<T: Pet> {
 // CHECK-NEXT: }
 public struct My<T> {}
 
-// CHECK: extension My where T : PreserveTypeRepr.Pet
+// PREFER: extension My where T : PreferTypeRepr.Pet
+// DONTPREFER: extension PreferTypeRepr.My where T : PreferTypeRepr.Pet
 extension My where T: Pet {
-  // CHECK: public func isPushingUpDaisies() -> Swift.String
+  // PREFER: public func isPushingUpDaisies() -> String
+  // DONTPREFER: public func isPushingUpDaisies() -> Swift.String
   public func isPushingUpDaisies() -> String { "" }
 }
 

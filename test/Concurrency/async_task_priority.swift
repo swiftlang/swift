@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/async_task_priority
 // RUN: %target-run %t/async_task_priority
 
+// REQUIRES: VENDOR=apple
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
@@ -10,9 +11,10 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: back_deploy_concurrency
 
 import Darwin
-@_predatesConcurrency import Dispatch
+@preconcurrency import Dispatch
 import StdlibUnittest
 
 func loopUntil(priority: TaskPriority) async {

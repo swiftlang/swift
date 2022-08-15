@@ -115,11 +115,11 @@ func t() {
 func f0(_ a: Any) -> Int { return 1 }
 assert(f0(1) == 1)
 
-
+// TODO(diagnostics): Bad diagnostic - should be `circular reference`
 var selfRef = { selfRef() }
-// expected-note@-1 2{{through reference here}}
-// expected-error@-2 {{circular reference}}
+// expected-error@-1 {{unable to infer closure type in the current context}}
 
+// TODO: should be an error `circular reference` but it's diagnosed via overlapped requests
 var nestedSelfRef = {
   var recursive = { nestedSelfRef() }
   // expected-warning@-1 {{variable 'recursive' was never mutated; consider changing to 'let' constant}}
@@ -140,12 +140,11 @@ func anonymousClosureArgsInClosureWithArgs() {
   var a3 = { (z: Int) in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'z'?}} {{26-28=z}}
   var a4 = { (z: [Int], w: [Int]) in
     f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'z'?}} {{7-9=z}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
-    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}}
   }
   var a5 = { (_: [Int], w: [Int]) in
     f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
     f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
   }
 }
 
@@ -211,7 +210,7 @@ class ExplicitSelfRequiredTest {
     doStuff {method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in }} expected-note{{reference 'self.' explicitly}} {{14-14=self.}}
     doVoidStuff {_ = method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in }} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
     doVoidStuff {() -> () in _ = method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self]}} expected-note{{reference 'self.' explicitly}} {{34-34=self.}}
-    // With an empty capture list, insertion should should be suggested without a comma
+    // With an empty capture list, insertion should be suggested without a comma
     doStuff { [] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{21-21=self.}}
     doStuff { [  ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{23-23=self.}}
     doStuff { [ /* This space intentionally left blank. */ ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{65-65=self.}}
@@ -302,6 +301,8 @@ enum ImplicitSelfAllowedInEnum {
 
 class SomeClass {
   var field : SomeClass?
+  var `class` : SomeClass?
+  var `in`: Int = 0
   func foo() -> Int {}
 }
 
@@ -342,8 +343,30 @@ extension SomeClass {
     doStuff { [weak xyz = self.field] in xyz!.foo() }
 
     // rdar://16889886 - Assert when trying to weak capture a property of self in a lazy closure
-    // FIXME: We should probably offer a fix-it to the field capture error and suppress the 'implicit self' error. https://bugs.swift.org/browse/SR-11634
-    doStuff { [weak self.field] in field!.foo() }   // expected-error {{fields may only be captured by assigning to a specific name}} expected-error {{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}} {{36-36=self.}} expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+    doStuff { [weak self.field] in field!.foo() }
+    // expected-error@-1{{fields may only be captured by assigning to a specific name}}{{21-21=field = }}
+    // expected-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-3{{reference 'self.' explicitly}} {{36-36=self.}}
+    // expected-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+
+    doStuff { [self.field] in field!.foo() }
+    // expected-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=field = }}
+    // expected-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-3{{reference 'self.' explicitly}} {{31-31=self.}}
+    // expected-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+
+    doStuff { [self.field!.foo()] in 32 }
+    //expected-error@-1{{fields may only be captured by assigning to a specific name}}
+
+    doStuff { [self.class] in self.class!.foo() }
+    //expected-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=`class` = }}
+
+    doStuff { [self.`in`] in `in` }
+    //expected-note@-1{{capture 'self' explicitly to enable implicit 'self' in this closure}}
+    //expected-error@-2{{fields may only be captured by assigning to a specific name}}{{16-16=`in` = }}
+    //expected-error@-3{{reference to property 'in' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    //expected-note@-4{{reference 'self.' explicitly}}
+
     // expected-warning @+1 {{variable 'self' was written to, but never read}}
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
 
@@ -403,7 +426,7 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {   // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
+let samples = {
           if (i > 10) { return true }
           else { return false }
         }()
@@ -452,9 +475,9 @@ var f = { (s: Undeclared) -> Int in 0 } // expected-error {{cannot find type 'Un
 
 // <rdar://problem/21375863> Swift compiler crashes when using closure, declared to return illegal type.
 func r21375863() {
-  var width = 0 // expected-warning {{variable 'width' was never mutated}}
-  var height = 0 // expected-warning {{variable 'height' was never mutated}}
-  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{cannot find type 'asdf' in scope}} expected-warning {{variable 'bufs' was never used}}
+  var width = 0
+  var height = 0
+  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{cannot find type 'asdf' in scope}}
     [UInt8](repeating: 0, count: width*height)
   }
 }
@@ -485,8 +508,8 @@ func lvalueCapture<T>(c: GenericClass<T>) {
 }
 
 // Don't expose @lvalue-ness in diagnostics.
-let closure = { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
-  var helper = true
+let closure = {
+  var helper = true // expected-warning {{variable 'helper' was never mutated; consider changing to 'let' constant}}
   return helper
 }
 
@@ -530,7 +553,7 @@ class SR3186 {
   }
 }
 
-// Apply the explicit 'self' rule even if it referrs to a capture, if
+// Apply the explicit 'self' rule even if it refers to a capture, if
 // we're inside a nested closure
 class SR14120 {
   func operation() {}
@@ -709,3 +732,22 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
         }
     }
 }
+
+// https://github.com/apple/swift/issues/59716
+// FIXME: Diagnostic should be tailored for closure result
+["foo"].map { s in
+    if s == "1" { return } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    return s.isEmpty
+}.filter { $0 }
+
+["foo"].map { s in
+    if s == "1" { return } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    if s == "2" { return }
+    if s == "3" { return }
+    return s.isEmpty
+}.filter { $0 }
+
+["foo"].map { s in
+    if s == "1" { return () } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    return s.isEmpty
+}.filter { $0 }

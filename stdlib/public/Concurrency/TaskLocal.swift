@@ -136,7 +136,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// the operation closure.
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () async throws -> R,
-                           file: String = #file, line: UInt = #line) async rethrows -> R {
+                           file: String = #fileID, line: UInt = #line) async rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
@@ -161,7 +161,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// the operation closure.
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
-                           file: String = #file, line: UInt = #line) rethrows -> R {
+                           file: String = #fileID, line: UInt = #line) rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 

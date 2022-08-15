@@ -318,7 +318,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.set.underflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 2, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
 
-  var bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[1..<2])
+  let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[1..<2])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -331,7 +331,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.set.overflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 2, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
 
-  var bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[0..<1])
+  let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[0..<1])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -367,10 +367,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.get.overflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow") {
-  var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
 
-  var bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[1..<3])
+  let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[1..<3])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -380,10 +380,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.set.overflow") {
-  var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
 
-  var bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[0..<2])
+  let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[0..<2])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -394,7 +394,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.set.overflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.narrow") {
-  var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
 
   if _isDebugAssertConfiguration() {
@@ -405,7 +405,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.narrow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.wide") {
-  var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
 
   if _isDebugAssertConfiguration() {
@@ -431,7 +431,7 @@ UnsafeRawBufferPointerTestSuite.test("_copyContents") {
 #if !os(WASI)
 // Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
-  var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
 
   let bytes = buffer[0..<2]
@@ -446,7 +446,7 @@ UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
 #endif
 
 // Use copyBytes without contiguous storage
-UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguouseStorage") {
+UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguousStorage") {
   let ranges: [Range<UInt8>] = [0..<2, 1..<3, 2..<4, 3..<5]
   var array = [UInt8](repeating: 0, count: 2)
   for range in ranges {
@@ -461,7 +461,7 @@ UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguouseStorage") {
 #if !os(WASI)
 // Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("copyBytes.sequence.overflow") {
-  var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
   
   let bytes = buffer[0..<2]
@@ -498,6 +498,48 @@ UnsafeRawBufferPointerTestSuite.test("load.after")
   }
 }
 
+UnsafeRawBufferPointerTestSuite.test("load.aligned") {
+  var data: [UInt8] = [0, 0, 0, 0, .max, .max, .max, .max]
+  data.withUnsafeBytes {
+    let x = $0.load(fromByteOffset: 4, as: UInt32.self)
+    expectEqual(x, .max)
+  }
+  data.withUnsafeMutableBytes {
+    let x = $0.load(fromByteOffset: 0, as: UInt32.self)
+    expectEqual(x, 0)
+  }
+}
+
+UnsafeRawBufferPointerTestSuite.test("load.invalid")
+.skip(.custom({ !_isDebugAssertConfiguration() }, // require debugAssert
+              reason: "This tests a debug precondition.."))
+.code {
+  let data: [UInt8] = [0, 0, 0, .max, .max, .max, .max, 0]
+  let i = data.firstIndex(of: .max)!
+  expectCrashLater()
+  _ = data.withUnsafeBytes {
+    $0.load(fromByteOffset: i, as: UInt32.self)
+  }
+}
+
+UnsafeRawBufferPointerTestSuite.test("load.unaligned")
+.skip(.custom({ // require SwiftStdlib 5.7
+  if #available(SwiftStdlib 5.7, *) { return false } else { return true }
+}, reason: "Requires stdlib from Swift 5.7"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+  var data: [UInt8] = [0, 0, 0, .max, .max, .max, .max, 0]
+  let i = data.firstIndex(of: .max)!
+  data.withUnsafeBytes {
+    let x = $0.loadUnaligned(fromByteOffset: i, as: UInt32.self)
+    expectEqual(x, .max)
+  }
+  data.withUnsafeMutableBytes {
+    let x = $0.loadUnaligned(fromByteOffset: i-1, as: UInt32.self)
+    expectEqual(UInt32(littleEndian: x), 0xffffff00)
+  }
+}
+
 UnsafeRawBufferPointerTestSuite.test("store.before")
 .skip(.custom(
     { !_isDebugAssertConfiguration() },
@@ -519,6 +561,60 @@ UnsafeRawBufferPointerTestSuite.test("store.after")
   withUnsafeMutableBytes(of: &x) {
     $0.storeBytes(of: UInt64(0), as: UInt64.self)
   }
+}
+
+UnsafeRawBufferPointerTestSuite.test("store.unaligned")
+.skip(.custom({
+  if #available(SwiftStdlib 5.7, *) { return false }
+  return true
+}, reason: "Requires Swift 5.7's stdlib"))
+.code {
+  let count = MemoryLayout<UInt>.stride * 2
+  let p1 = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: count,
+    alignment: MemoryLayout<UInt>.alignment
+  )
+  defer { p1.deallocate() }
+  p1.copyBytes(from: repeatElement(UInt8.zero, count: count))
+  let value = UInt.max
+  let offset = 3
+  p1.storeBytes(of: value, toByteOffset: offset, as: UInt.self)
+  expectEqual(p1.load(fromByteOffset: offset-1, as: UInt8.self),
+              0)
+  expectEqual(p1.load(fromByteOffset: offset, as: UInt8.self),
+              .max)
+  let storedLength = MemoryLayout<UInt>.size
+  expectEqual(p1.load(fromByteOffset: offset-1+storedLength, as: UInt8.self),
+              .max)
+  expectEqual(p1.load(fromByteOffset: offset+storedLength, as: UInt8.self),
+              0)
+}
+
+UnsafeRawBufferPointerTestSuite.test("store.invalid")
+.skip(.custom({ !_isDebugAssertConfiguration() }, // require debugAssert
+              reason: "This tests a debug precondition.."))
+.skip(.custom({ // require SwiftStdlib 5.7
+  if #available(SwiftStdlib 5.7, *) { return false } else { return true }
+}, reason: "Requires stdlib from Swift 5.7"))
+.code {
+  let t = "Text that is longer than fits in a small String."
+  let p1 = UnsafeMutableRawPointer.allocate(
+    byteCount: MemoryLayout<String>.size,
+    alignment: MemoryLayout<String>.alignment
+  )
+  defer { p1.deallocate() }
+  expectCrashLater()
+  p1.storeBytes(of: t, as: String.self)
+  expectUnreachable()
+}
+
+UnsafeRawBufferPointerTestSuite.test("store.valid") {
+  let value32 = UInt32.max
+  var value64 = Int64.zero
+  withUnsafeMutableBytes(of: &value64) {
+    $0.storeBytes(of: value32, toByteOffset: MemoryLayout<UInt32>.stride, as: UInt32.self)
+  }
+  expectEqual(value64, 0xffffffff << 32)
 }
 
 UnsafeRawBufferPointerTestSuite.test("copy.bytes.overflow")

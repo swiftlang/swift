@@ -212,6 +212,9 @@ struct FragileFunctionKind {
     return (lhs.kind == rhs.kind &&
             lhs.allowUsableFromInline == rhs.allowUsableFromInline);
   }
+
+  /// Casts to `unsigned` for diagnostic %selects.
+  unsigned getSelector() { return static_cast<unsigned>(kind); }
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -454,6 +457,15 @@ public:
   const Decl *getInnermostDeclarationDeclContext() const {
     return
         const_cast<DeclContext *>(this)->getInnermostDeclarationDeclContext();
+  }
+
+  /// Returns the topmost context that is a declaration, excluding ModuleDecl.
+  ///
+  /// This may return itself.
+  LLVM_READONLY
+  Decl *getTopmostDeclarationDeclContext();
+  const Decl *getTopmostDeclarationDeclContext() const {
+    return const_cast<DeclContext *>(this)->getTopmostDeclarationDeclContext();
   }
 
   /// Returns the innermost context that is an AbstractFunctionDecl whose

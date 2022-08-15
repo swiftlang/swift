@@ -82,7 +82,13 @@ static inline void crash(const char *message) {
   swift_unreachable("Expected compiler to crash.");
 }
 
-// swift::fatalError() halts with a crash log message, 
+// swift::fatalErrorv() halts with a crash log message,
+// but makes no attempt to preserve register state.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+SWIFT_VFORMAT(2)
+extern void fatalErrorv(uint32_t flags, const char *format, va_list args);
+
+// swift::fatalError() halts with a crash log message,
 // but makes no attempt to preserve register state.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 SWIFT_FORMAT(2, 3)
@@ -177,7 +183,7 @@ struct RuntimeErrorDetails {
   const char *currentStackDescription;
 
   // Number of frames in the current stack that should be ignored when reporting
-  // the issue (exluding the reportToDebugger/_swift_runtime_on_report frame).
+  // the issue (excluding the reportToDebugger/_swift_runtime_on_report frame).
   // The remaining top frame should point to user's code where the bug is.
   uintptr_t framesToSkip;
 

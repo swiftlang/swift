@@ -107,7 +107,7 @@ struct LetKeyPaths {
   let double: Double
 }
 
-protocol TestExisential {}
+protocol TestExistential {}
 
 struct KeyPathTypes {
   weak var weakObj: TestClass?
@@ -118,7 +118,7 @@ struct KeyPathTypes {
   var function: (Int) -> (Int)
   var optionalFunction: (Int) -> (Int)?
   var enumField: TestEnum
-  var existential: TestExisential
+  var existential: TestExistential
   var existentialMetatype: Any.Type
   var metatype: Int.Type
 }

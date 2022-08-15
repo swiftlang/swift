@@ -8,8 +8,6 @@
 # REQUIRES: nonexecutable_test
 
 
-from __future__ import print_function
-
 import os
 import subprocess
 import sys
@@ -24,6 +22,10 @@ for module_file in os.listdir(sdk_overlay_dir):
         continue
     # Skip the standard library because it's tested elsewhere.
     if module_name == "Swift":
+        continue
+    # Skip the C++ standard library overlay because it's not yet shipped
+    # in any released SDK.
+    if module_name == "std":
         continue
     # TODO(TF-1229): Fix the "_Differentiation" module.
     if module_name == "_Differentiation":

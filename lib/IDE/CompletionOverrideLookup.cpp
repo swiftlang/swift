@@ -215,7 +215,7 @@ void CompletionOverrideLookup::addMethodOverride(
     DynamicLookupInfo dynamicLookupInfo) {
   CodeCompletionResultBuilder Builder(Sink,
                                       CodeCompletionResultKind::Declaration,
-                                      SemanticContextKind::Super, {});
+                                      SemanticContextKind::Super);
   Builder.setResultTypeNotApplicable();
   Builder.setAssociatedDecl(FD);
   addValueOverride(FD, Reason, dynamicLookupInfo, Builder, hasFuncIntroducer);
@@ -234,7 +234,7 @@ void CompletionOverrideLookup::addVarOverride(
 
   CodeCompletionResultBuilder Builder(Sink,
                                       CodeCompletionResultKind::Declaration,
-                                      SemanticContextKind::Super, {});
+                                      SemanticContextKind::Super);
   Builder.setAssociatedDecl(VD);
   addValueOverride(VD, Reason, dynamicLookupInfo, Builder, hasVarIntroducer);
 }
@@ -244,7 +244,7 @@ void CompletionOverrideLookup::addSubscriptOverride(
     DynamicLookupInfo dynamicLookupInfo) {
   CodeCompletionResultBuilder Builder(Sink,
                                       CodeCompletionResultKind::Declaration,
-                                      SemanticContextKind::Super, {});
+                                      SemanticContextKind::Super);
   Builder.setResultTypeNotApplicable();
   Builder.setAssociatedDecl(SD);
   addValueOverride(SD, Reason, dynamicLookupInfo, Builder, false);
@@ -256,7 +256,7 @@ void CompletionOverrideLookup::addTypeAlias(
     DynamicLookupInfo dynamicLookupInfo) {
   CodeCompletionResultBuilder Builder(Sink,
                                       CodeCompletionResultKind::Declaration,
-                                      SemanticContextKind::Super, {});
+                                      SemanticContextKind::Super);
   Builder.setResultTypeNotApplicable();
   Builder.setAssociatedDecl(ATD);
   if (!hasTypealiasIntroducer && !hasAccessModifier)
@@ -273,7 +273,7 @@ void CompletionOverrideLookup::addConstructor(
     DynamicLookupInfo dynamicLookupInfo) {
   CodeCompletionResultBuilder Builder(Sink,
                                       CodeCompletionResultKind::Declaration,
-                                      SemanticContextKind::Super, {});
+                                      SemanticContextKind::Super);
   Builder.setResultTypeNotApplicable();
   Builder.setAssociatedDecl(CD);
 
@@ -469,7 +469,7 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
     NominalTypeDecl *builder, Type componentType,
     ResultBuilderBuildFunction function) {
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Pattern,
-                                      SemanticContextKind::CurrentNominal, {});
+                                      SemanticContextKind::CurrentNominal);
   Builder.setResultTypeNotApplicable();
 
   if (!hasFuncIntroducer) {

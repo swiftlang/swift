@@ -14,8 +14,6 @@ constructing parsers and more argument types. This module exposes a strict
 super-set of the argparse API and is meant to be used as a drop-in replacement.
 """
 
-from __future__ import absolute_import, unicode_literals
-
 from argparse import (ArgumentDefaultsHelpFormatter, ArgumentError,
                       ArgumentTypeError, FileType, HelpFormatter,
                       Namespace, RawDescriptionHelpFormatter,

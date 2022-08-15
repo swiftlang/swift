@@ -30,3 +30,34 @@ func testActor(obj: MyActor) async {
 // ACTOR-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: receiveNonSendable({#arg: MyNonSendable#})[' async'][#Void#]; name=receiveNonSendable(arg:); diagnostics=warning:actor-isolated 'receiveNonSendable(arg:)' should only be referenced from inside the actor{{$}}
 // ACTOR: End completions
 }
+
+func testClosure(obj: (Int) async -> Void) {
+  obj(#^CLOSURE_CALL^#)
+// CLOSURE_CALL: Begin completions
+// CLOSURE_CALL-DAG: Pattern/CurrModule/Flair[ArgLabels]/NotRecommended: ['(']{#Int#}[')'][' async'][#Void#]; name=; diagnostics=error:async function used in a context that does not support concurrency
+// CLOSURE_CALL: End completions
+}
+
+func test() {
+  struct Foo {
+    var value: String? {
+      get async { nil }
+    }
+  }
+
+  var globalValue: String? {
+    get async { nil }
+  }
+
+  let foo = Foo()
+  foo.#^EXPLICITLY_ASYNC_PROPERTY^#
+// EXPLICITLY_ASYNC_PROPERTY: Begin completions
+// EXPLICITLY_ASYNC_PROPERTY-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: value[#String?#][' async']; name=value; diagnostics=error:async 'value' used in a context that does not support concurrency
+// EXPLICITLY_ASYNC_PROPERTY: End completions
+
+  #^EXPLICIT_GLOBAL_VAR^#
+// EXPLICIT_GLOBAL_VAR: Begin completions
+// EXPLICIT_GLOBAL_VAR-DAG: Decl[LocalVar]/Local/NotRecommended: globalValue[#String?#][' async']; name=globalValue; diagnostics=error:async 'globalValue' used in a context that does not support concurrency
+// EXPLICIT_GLOBAL_VAR: End completions
+
+}

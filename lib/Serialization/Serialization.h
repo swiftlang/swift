@@ -66,7 +66,8 @@ protected:
 
   /// Record the name of a record within a block.
   void emitRecordID(unsigned ID, StringRef name,
-                    SmallVectorImpl<unsigned char> &nameBuffer);
+                    SmallVectorImpl<unsigned char> &nameBuffer,
+                    SmallVectorImpl<unsigned> *wideNameBuffer = nullptr);
 
   void writeToStream(raw_ostream &os);
 
@@ -222,9 +223,9 @@ class Serializer : public SerializerBase {
                        index_block::SUBSTITUTION_MAP_OFFSETS>
   SubstitutionMapsToSerialize;
 
-  ASTBlockRecordKeeper<const NormalProtocolConformance *, NormalConformanceID,
-                       index_block::NORMAL_CONFORMANCE_OFFSETS>
-  NormalConformancesToSerialize;
+  ASTBlockRecordKeeper<ProtocolConformance *, ProtocolConformanceID,
+                       index_block::PROTOCOL_CONFORMANCE_OFFSETS>
+  ConformancesToSerialize;
 
   ASTBlockRecordKeeper<const SILLayout *, SILLayoutID,
                        index_block::SIL_LAYOUT_OFFSETS>
@@ -250,7 +251,7 @@ public:
 
   using DeclMembersData = SmallVector<DeclID, 2>;
   // In-memory representation of what will eventually be an on-disk
-  // hash table of all ValueDecl-members of a paticular DeclBaseName.
+  // hash table of all ValueDecl-members of a particular DeclBaseName.
   using DeclMembersTable = llvm::MapVector<uint32_t, DeclMembersData>;
 
   using DeclMemberNamesData = std::pair<serialization::BitOffset,
@@ -296,11 +297,13 @@ private:
   /// This is for Named Lazy Member Loading.
   DeclMemberNamesTable DeclMemberNames;
 
+  enum {NumDeclTypeAbbrCodes = 512};
+
   /// The abbreviation code for each record in the "decls-and-types" block.
   ///
   /// These are registered up front when entering the block, so they can be
   /// reused.
-  std::array<unsigned, 256> DeclTypeAbbrCodes;
+  std::array<unsigned, NumDeclTypeAbbrCodes> DeclTypeAbbrCodes;
 
   /// The decls that adopt compiler-known protocols.
   SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
@@ -315,14 +318,6 @@ private:
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
   void writeInputBlock(const SerializationOptions &options);
-
-  /// Writes a list of protocol conformances.
-  void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
-                         const std::array<unsigned, 256> &abbrCodes);
-
-  /// Writes a list of protocol conformances.
-  void writeConformances(ArrayRef<ProtocolConformance*> conformances,
-                         const std::array<unsigned, 256> &abbrCodes);
 
   /// Check if a decl is cross-referenced.
   bool isDeclXRef(const Decl *D) const;
@@ -360,6 +355,10 @@ private:
 
   /// Writes a substitution map.
   void writeASTBlockEntity(const SubstitutionMap substitutions);
+
+  /// Writes a protocol conformance.
+  void writeASTBlockEntity(ProtocolConformance *conformance);
+  void writeLocalNormalProtocolConformance(NormalProtocolConformance *);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
@@ -401,7 +400,7 @@ private:
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
 
-  /// Serializes the given dependnecy graph into the incremental information
+  /// Serializes the given dependency graph into the incremental information
   /// section of this swift module.
   void writeIncrementalInfo(
       const fine_grained_dependencies::SourceFileDepGraph *DepGraph);
@@ -489,14 +488,26 @@ public:
   /// The SubstitutionMap will be scheduled for serialization if necessary.
   SubstitutionMapID addSubstitutionMapRef(SubstitutionMap substitutions);
 
-  /// Records the use of the given normal protocol conformance.
+  /// Records the use of the given protocol conformance.
   ///
-  /// The normal protocol conformance will be scheduled for
-  /// serialization if necessary.
+  /// The protocol conformance will be scheduled for serialization
+  /// if necessary.
+  ///
+  /// \param genericEnv When provided, the generic environment that describes
+  /// the archetypes within the substitutions. The replacement types within
+  /// the substitution will be mapped out of the generic environment before
+  /// being written.
   ///
   /// \returns The ID for the given conformance in this module.
-  NormalConformanceID addConformanceRef(
-                        const NormalProtocolConformance *conformance);
+  ProtocolConformanceID addConformanceRef(ProtocolConformance *conformance,
+                                   GenericEnvironment *genericEnv = nullptr);
+  ProtocolConformanceID addConformanceRef(ProtocolConformanceRef conformance,
+                                   GenericEnvironment *genericEnv = nullptr);
+
+  SmallVector<ProtocolConformanceID, 4>
+  addConformanceRefs(ArrayRef<ProtocolConformanceRef> conformances);
+  SmallVector<ProtocolConformanceID, 4>
+  addConformanceRefs(ArrayRef<ProtocolConformance *> conformances);
 
   /// Records the use of the given SILLayout.
   SILLayoutID addSILLayoutRef(const SILLayout *layout);
@@ -507,47 +518,34 @@ public:
   /// may not be exactly the same as the name of the module containing DC;
   /// instead, it will match the containing file's "exported module name".
   ///
+  /// \param ignoreExport When true, register the real module name,
+  /// ignoring exported_as definitions.
   /// \returns The ID for the identifier for the module's name, or one of the
   /// special module codes defined above.
   /// \see FileUnit::getExportedModuleName
-  IdentifierID addContainingModuleRef(const DeclContext *DC);
+  IdentifierID addContainingModuleRef(const DeclContext *DC,
+                                      bool ignoreExport);
 
   /// Records the module \m.
   IdentifierID addModuleRef(const ModuleDecl *m);
 
-  /// Write a normal protocol conformance.
-  void writeASTBlockEntity(const NormalProtocolConformance *conformance);
-
   /// Write a SILLayout.
   void writeASTBlockEntity(const SILLayout *layout);
 
-  /// Writes a protocol conformance.
-  ///
-  /// \param genericEnv When provided, the generic environment that describes
-  /// the archetypes within the substitutions. The replacement types within
-  /// the substitution will be mapped out of the generic environment before
-  /// being written.
-  void writeConformance(ProtocolConformanceRef conformance,
-                        const std::array<unsigned, 256> &abbrCodes,
-                        GenericEnvironment *genericEnv = nullptr);
-
-  /// Writes a protocol conformance.
-  void writeConformance(ProtocolConformance *conformance,
-                        const std::array<unsigned, 256> &abbrCodes,
-                        GenericEnvironment *genericEnv = nullptr);
-
-  /// Writes a set of generic requirements.
-  void writeGenericRequirements(ArrayRef<Requirement> requirements,
-                                const std::array<unsigned, 256> &abbrCodes);
+  /// Adds an encoding of the given list of generic requirements to
+  /// the given list of values.
+  void serializeGenericRequirements(ArrayRef<Requirement> requirements,
+                                    SmallVectorImpl<uint64_t> &scratch);
 
   /// Writes a protocol's requirement signature, consisting of a list of
   /// generic requirements and a list of protocol typealias records.
-  void writeRequirementSignature(const RequirementSignature &requirementSig,
-                                 const std::array<unsigned, 256> &abbrCodes);
+  void writeRequirementSignature(const RequirementSignature &requirementSig);
 
   /// Writes a protocol's associated type table.
-  void writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
-                            const std::array<unsigned, 256> &abbrCodes);
+  void writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
+
+  /// Writes a protocol's primary associated type table.
+  void writePrimaryAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
 
   bool allowCompilerErrors() const;
 };

@@ -38,7 +38,6 @@ bb0(%0 : $Builtin.Int1):
 
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast_addr_fail
 // CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
 // CHECK: unreachable
 // CHECK: }
 sil [ossa] @test_unconditional_checked_cast_addr_fail : $@convention(thin) (@in E, @in D) -> @out D {

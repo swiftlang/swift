@@ -27,7 +27,7 @@ func globalFunc(@Wrapper arg: Int) {
   let _: Wrapper<Int> = _arg
 }
 
-func testGloablFunc(value: Int, projection: Projection<Int>) {
+func testGlobalFunc(value: Int, projection: Projection<Int>) {
   globalFunc(arg: value)
   globalFunc($arg: projection)
 

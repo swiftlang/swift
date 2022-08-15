@@ -64,6 +64,9 @@ private:
   /// \c numSolutions entries.
   Solution *solutions = nullptr;
 
+  /// A source range that was too complex to solve.
+  Optional<SourceRange> TooComplexAt = None;
+
   /// General constructor for the named constructors.
   SolutionResult(Kind kind) : kind(kind) {
     emittedDiagnostic = false;
@@ -95,9 +98,7 @@ public:
 
   /// Produce a "too complex" failure, which was not yet been
   /// diagnosed.
-  static SolutionResult forTooComplex() {
-    return SolutionResult(TooComplex);
-  }
+  static SolutionResult forTooComplex(Optional<SourceRange> affected);
 
   /// Produce a failure that has already been diagnosed.
   static SolutionResult forError() {
@@ -122,6 +123,10 @@ public:
 
   /// Take the set of solutions when there is an ambiguity.
   MutableArrayRef<Solution> takeAmbiguousSolutions() &&;
+
+  /// Retrieve a range of source that has been determined to be too
+  /// complex to solve in a reasonable time.
+  Optional<SourceRange> getTooComplexAt() const { return TooComplexAt; }
 
   /// Whether this solution requires the client to produce a diagnostic.
   bool requiresDiagnostic() const {

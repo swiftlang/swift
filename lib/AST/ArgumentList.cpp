@@ -35,6 +35,19 @@ SourceRange Argument::getSourceRange() const {
   return SourceRange(labelLoc, exprEndLoc);
 }
 
+Argument Argument::implicitInOut(ASTContext &ctx, Expr *expr) {
+  assert(!isa<InOutExpr>(expr) && "Cannot nest InOutExpr");
+
+  // Eventually this will set an 'inout' bit on Argument, but for now,
+  // synthesize in the InOutExpr.
+  Type objectTy;
+  if (auto subTy = expr->getType())
+    objectTy = subTy->castTo<LValueType>()->getObjectType();
+
+  return Argument::unlabeled(
+      new (ctx) InOutExpr(SourceLoc(), expr, objectTy, /*isImplicit*/ true));
+}
+
 bool Argument::isInOut() const {
   return ArgExpr->isSemanticallyInOutExpr();
 }
@@ -260,32 +273,6 @@ Expr *ArgumentList::packIntoImplicitTupleOrParen(
     tuple->setType(TupleType::get(tupleEltTypes, ctx));
 
   return tuple;
-}
-
-Type ArgumentList::composeTupleOrParenType(
-    ASTContext &ctx, llvm::function_ref<Type(Expr *)> getType) const {
-  if (auto *unary = getUnlabeledUnaryExpr()) {
-    auto ty = getType(unary);
-    assert(ty);
-    ParameterTypeFlags flags;
-    if (get(0).isInOut()) {
-      ty = ty->getInOutObjectType();
-      flags = flags.withInOut(true);
-    }
-    return ParenType::get(ctx, ty, flags);
-  }
-  SmallVector<TupleTypeElt, 4> elts;
-  for (auto arg : *this) {
-    auto ty = getType(arg.getExpr());
-    assert(ty);
-    ParameterTypeFlags flags;
-    if (arg.isInOut()) {
-      ty = ty->getInOutObjectType();
-      flags = flags.withInOut(true);
-    }
-    elts.emplace_back(ty, arg.getLabel(), flags);
-  }
-  return TupleType::get(elts, ctx);
 }
 
 bool ArgumentList::matches(ArrayRef<AnyFunctionType::Param> params,

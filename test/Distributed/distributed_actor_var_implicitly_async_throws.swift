@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)
@@ -31,6 +31,24 @@ distributed actor D {
   // OK:
   distributed var dist: String {
     "dist"
+  }
+
+  // FIXME: The following should be accepted.
+  /*
+  distributed var distGet: String {
+    get distributed {
+      "okey"
+    }
+  }
+  */
+
+  distributed var distSetGet: String { // expected-error {{'distributed' computed property 'distSetGet' cannot have setter}}
+    set distributed { // expected-error {{expected '{' to start setter definition}}
+      _ = newValue
+    }
+    get distributed {
+      "okey"
+    }
   }
 
   // expected-error@+1{{'distributed' property 'hello' cannot be 'static'}}

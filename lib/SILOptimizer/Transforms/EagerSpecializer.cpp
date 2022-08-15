@@ -309,8 +309,8 @@ public:
         substConv(ReInfo.getSubstitutedType(), GenericFunc->getModule()),
         Builder(*GenericFunc), Loc(GenericFunc->getLocation()) {
     Builder.setCurrentDebugScope(GenericFunc->getDebugScope());
-    IsClassF = Builder.getModule().findFunction(
-      "_swift_isClassOrObjCExistentialType", SILLinkage::PublicExternal);
+    IsClassF = Builder.getModule().loadFunction(
+      "_swift_isClassOrObjCExistentialType", SILModule::LinkingMode::LinkAll);
     assert(IsClassF);
   }
 
@@ -735,7 +735,7 @@ SILValue EagerDispatch::emitArgumentConversion(
                                            LoadOwnershipQualifier::Take);
     } else {
       Val = Builder.emitLoadBorrowOperation(Loc, CastArg);
-      if (Val.getOwnershipKind() == OwnershipKind::Guaranteed)
+      if (Val->getOwnershipKind() == OwnershipKind::Guaranteed)
         ArgAtIndexNeedsEndBorrow.push_back(CallArgs.size());
     }
     CallArgs.push_back(Val);
@@ -848,11 +848,19 @@ void EagerSpecializerTransform::run() {
       targetFunc = SA->getTargetFunction();
       if (!targetFunc->isDefinition()) {
         auto &module = FuncBuilder.getModule();
-        bool success = module.loadFunction(targetFunc);
+        bool success = module.loadFunction(targetFunc,
+                                           SILModule::LinkingMode::LinkAll);
         assert(success);
-        module.linkFunction(targetFunc);
       }
       onlyCreatePrespecializations = true;
+    } else if (targetFunc->getLinkage() == SILLinkage::Shared) {
+      // We have `shared` linkage if we deserialize a public serialized
+      // function.
+      // That means we are loading it from another module. In this case, we
+      // don't want to create a pre-specialization.
+      SpecializedFuncs.push_back(nullptr);
+      ReInfoVec.emplace_back(ReabstractionInfo());
+      continue;
     }
     ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
                            FuncBuilder.getModule().isWholeModule(), targetFunc,

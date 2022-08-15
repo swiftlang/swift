@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ModuleFileExtension.h"
@@ -197,6 +198,8 @@ public:
       DC = omDecl->getCanonicalDecl();
     } else if (auto fDecl = dyn_cast<clang::FunctionDecl>(dc)) {
       DC = fDecl->getCanonicalDecl();
+    } else if (auto externCDecl = dyn_cast<clang::LinkageSpecDecl>(dc)) {
+      DC = externCDecl->getLexicalDeclContext();
     } else {
       assert(isa<clang::TranslationUnitDecl>(dc) ||
              isa<clang::LinkageSpecDecl>(dc) ||
@@ -276,7 +279,8 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 17; // Lazy Member Loading Index
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 18; // Unsafe C++ method renaming.
+
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.

@@ -14,14 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
-#include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxKind.h"
 
 // Regex parser delivered via Swift modules.
-#include "swift/Parse/ExperimentalRegexBridging.h"
+#include "swift/Parse/RegexParserBridging.h"
 static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
   regexLiteralParsingFn = fn;
@@ -41,22 +41,22 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
 
   // Let the Swift library parse the contents, returning an error, or null if
   // successful.
-  // TODO: We need to be able to pass back a source location to emit the error
-  // at.
-  const char *errorStr = nullptr;
-  unsigned version;
+  unsigned version = 0;
   auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
       RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
           regexText.size()));
-  regexLiteralParsingFn(regexText.str().c_str(), &errorStr, &version,
-                        /*captureStructureOut*/ capturesBuf.data(),
-                        /*captureStructureSize*/ capturesBuf.size());
-  if (errorStr) {
-    diagnose(Tok, diag::regex_literal_parsing_error, errorStr);
-    return makeParserError();
-  }
-
+  bool hadError =
+      regexLiteralParsingFn(regexText.str().c_str(), &version,
+                            /*captureStructureOut*/ capturesBuf.data(),
+                            /*captureStructureSize*/ capturesBuf.size(),
+                            /*diagBaseLoc*/ Tok.getLoc(), Diags);
   auto loc = consumeToken();
+  SourceMgr.recordRegexLiteralStartLoc(loc);
+
+  if (hadError) {
+    return makeParserResult(new (Context) ErrorExpr(loc));
+  }
+  assert(version >= 1);
   return makeParserResult(RegexLiteralExpr::createParsed(
       Context, loc, regexText, version, capturesBuf));
 }

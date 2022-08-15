@@ -1130,13 +1130,6 @@ public:
           Out << elt->getType() << "\n";
           abort();
         }
-        if (!field.getParameterFlags().isNone()) {
-          Out << "TupleExpr has non-empty parameter flags?\n";
-          Out << "sub expr: \n";
-          elt->dump(Out);
-          Out << "\n";
-          abort();
-        }
       });
       verifyCheckedBase(E);
     }
@@ -1467,6 +1460,25 @@ public:
 
       checkTrivialSubtype(srcTy, destTy, "DerivedToBaseExpr");
       verifyCheckedBase(E);
+    }
+
+    bool shouldVerify(ErasureExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      for (auto &elt : expr->getArgumentConversions()) {
+        assert(!OpaqueValues.count(elt.OrigValue));
+        OpaqueValues[elt.OrigValue] = 0;
+      }
+
+      return true;
+    }
+
+    void cleanup(ErasureExpr *expr) {
+      for (auto &elt : expr->getArgumentConversions()) {
+        assert(OpaqueValues.count(elt.OrigValue));
+        OpaqueValues.erase(elt.OrigValue);
+      }
     }
 
     void verifyChecked(ErasureExpr *E) {
@@ -1963,10 +1975,6 @@ public:
         Out << "ParenExpr not of ParenType\n";
         abort();
       }
-      if (!ty->getParameterFlags().isNone()) {
-        Out << "ParenExpr has non-empty parameter flags?\n";
-        abort();
-      }
       verifyCheckedBase(E);
     }
 
@@ -2314,7 +2322,7 @@ public:
 
       if (VD->hasAccess()) {
         if (VD->getFormalAccess() == AccessLevel::Open) {
-          if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
+          if (!isa<ClassDecl>(VD) && !VD->isSyntacticallyOverridable()) {
             Out << "decl cannot be 'open'\n";
             VD->dump(Out);
             abort();
@@ -2697,21 +2705,6 @@ public:
             abort();
           }
 
-          // Check the witness substitutions.
-          const auto &witness = normal->getWitnessUncached(req);
-
-          if (auto *genericEnv = witness.getSyntheticEnvironment())
-            Generics.push_back(genericEnv->getGenericSignature());
-
-          verifyChecked(witness.getRequirementToSyntheticSubs());
-          verifyChecked(witness.getSubstitutions());
-
-          if (auto *genericEnv = witness.getSyntheticEnvironment()) {
-            assert(Generics.back().get<GenericSignature>().getPointer()
-                   == genericEnv->getGenericSignature().getPointer());
-            Generics.pop_back();
-          }
-
           continue;
         }
       }
@@ -2849,6 +2842,11 @@ public:
         verifyConformance(ext, conformance);
       }
 
+      // Make sure extension binding succeeded.
+      if (!ext->hasBeenBound()) {
+        Out << "ExtensionDecl was not bound\n";
+        abort();
+      }
       verifyCheckedBase(ext);
     }
 

@@ -79,7 +79,7 @@ func transpose(v: Float) -> Float
 func transpose(v: Float) -> Float
 
 // NOTE: The "expected ',' separator" diagnostic is not ideal.
-// Ideally, the diagnostic should point out that that `Swift.Float.+(_:_)` is
+// Ideally, the diagnostic should point out that `Swift.Float.+(_:_)` is
 // not a valid declaration name (missing colon after second argument label).
 // expected-error @+2 {{expected ',' separator}}
 // expected-error @+1 {{expected declaration}}
@@ -87,7 +87,7 @@ func transpose(v: Float) -> Float
 func transpose(v: Float) -> Float
 
 // NOTE: The "expected ',' separator" diagnostic is not ideal.
-// Ideally, the diagnostic should point out that that `Swift.Float.+.a` is
+// Ideally, the diagnostic should point out that `Swift.Float.+.a` is
 // not a valid declaration name.
 // expected-error @+2 {{expected ',' separator}}
 // expected-error @+1 {{expected declaration}}

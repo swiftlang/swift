@@ -21,6 +21,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
@@ -42,91 +43,39 @@ using namespace ide;
 // typeCheckContextAt(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 
-void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
-  while (isa<AbstractClosureExpr>(DC))
-    DC = DC->getParent();
-
+void swift::ide::typeCheckContextAt(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                                    SourceLoc Loc) {
   // Make sure the extension has been bound.
-  {
-    // Even if the extension is invalid (e.g. nested in a function or another
-    // type), we want to know the "intended nominal" of the extension so that
-    // we can know the type of 'Self'.
-    SmallVector<ExtensionDecl *, 1> extensions;
-    for (auto typeCtx = DC->getInnermostTypeContext(); typeCtx != nullptr;
-         typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
-      if (auto *ext = dyn_cast<ExtensionDecl>(typeCtx))
-        extensions.push_back(ext);
-    }
-    while (!extensions.empty()) {
-      extensions.back()->computeExtendedNominal();
-      extensions.pop_back();
-    }
-
-    // If the completion happens in the inheritance clause of the extension,
-    // 'DC' is the parent of the extension. We need to iterate the top level
-    // decls to find it. In theory, we don't need the extended nominal in the
-    // inheritance clause, but ASTScope lookup requires that. We don't care
-    // unless 'DC' is not 'SourceFile' because non-toplevel extensions are
-    // 'canNeverBeBound()' anyway.
-    if (auto *SF = dyn_cast<SourceFile>(DC)) {
-      auto &SM = DC->getASTContext().SourceMgr;
-      for (auto *decl : SF->getTopLevelDecls())
-        if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-          if (SM.rangeContainsTokenLoc(ext->getSourceRange(), Loc))
-            ext->computeExtendedNominal();
-    }
+  auto DC = TypeCheckCtx.getDeclContext();
+  // Even if the extension is invalid (e.g. nested in a function or another
+  // type), we want to know the "intended nominal" of the extension so that
+  // we can know the type of 'Self'.
+  SmallVector<ExtensionDecl *, 1> extensions;
+  for (auto typeCtx = DC->getInnermostTypeContext(); typeCtx != nullptr;
+       typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
+    if (auto *ext = dyn_cast<ExtensionDecl>(typeCtx))
+      extensions.push_back(ext);
+  }
+  while (!extensions.empty()) {
+    extensions.back()->computeExtendedNominal();
+    extensions.pop_back();
   }
 
-  // Type-check this context.
-  switch (DC->getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::SerializedLocal:
-  case DeclContextKind::EnumElementDecl:
-  case DeclContextKind::GenericTypeDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::ExtensionDecl:
-    // Nothing to do for these.
-    break;
-
-  case DeclContextKind::Initializer:
-    if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
-      if (auto *PBD = patternInit->getBinding()) {
-        auto i = patternInit->getBindingIndex();
-        PBD->getPattern(i)->forEachVariable(
-            [](VarDecl *VD) { (void)VD->getInterfaceType(); });
-        if (PBD->getInit(i)) {
-          if (!PBD->isInitializerChecked(i))
-            typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/true);
-        }
-      }
-    } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
-        auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
-        (void)Param->getTypeCheckedDefaultExpr();
-      }
-    }
-    break;
-
-  case DeclContextKind::TopLevelCodeDecl:
-    swift::typeCheckASTNodeAtLoc(DC, Loc);
-    break;
-
-  case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = cast<AbstractFunctionDecl>(DC);
+  // If the completion happens in the inheritance clause of the extension,
+  // 'DC' is the parent of the extension. We need to iterate the top level
+  // decls to find it. In theory, we don't need the extended nominal in the
+  // inheritance clause, but ASTScope lookup requires that. We don't care
+  // unless 'DC' is not 'SourceFile' because non-toplevel extensions are
+  // 'canNeverBeBound()' anyway.
+  if (auto *SF = dyn_cast<SourceFile>(DC)) {
     auto &SM = DC->getASTContext().SourceMgr;
-    auto bodyRange = AFD->getBodySourceRange();
-    if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
-      swift::typeCheckASTNodeAtLoc(DC, Loc);
-    } else {
-      assert(bodyRange.isInvalid() && "The body should not be parsed if the "
-                                      "completion happens in the signature");
-    }
-    break;
+    for (auto *decl : SF->getTopLevelDecls())
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+        if (SM.rangeContainsTokenLoc(ext->getSourceRange(), Loc))
+          ext->computeExtendedNominal();
   }
-  }
+
+  swift::typeCheckASTNodeAtLoc(TypeCheckCtx, Loc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -304,7 +253,7 @@ void swift::ide::collectPossibleReturnTypesFromContext(
           const auto type = swift::performTypeResolution(
               CE->getExplicitResultTypeRepr(), DC->getASTContext(),
               /*isSILMode=*/false, /*isSILType=*/false,
-              DC->getGenericEnvironmentOfContext(), /*GenericParams=*/nullptr,
+              DC->getGenericSignatureOfContext(), /*GenericParams=*/nullptr,
               const_cast<DeclContext *>(DC), /*diagnostics=*/false);
 
           if (!type->hasError()) {
@@ -415,6 +364,19 @@ static void collectPossibleCalleesByQualifiedLookup(
   auto baseInstanceTy = baseTy->getMetatypeInstanceType();
   if (!baseInstanceTy->mayHaveMembers())
     return;
+
+  if (name == DeclNameRef::createConstructor()) {
+    // Existential types cannot be instantiated. e.g. 'MyProtocol()'.
+    if (baseInstanceTy->isExistentialType())
+      return;
+
+    // 'AnyObject' is not initializable.
+    if (baseInstanceTy->isAnyObject())
+      return;
+  }
+
+  // Make sure we've resolved implicit members.
+  namelookup::installSemanticMembersIfNeeded(baseInstanceTy, name);
 
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
@@ -1136,7 +1098,7 @@ class ExprContextAnalyzer {
       break;
     }
     case StmtKind::ForEach:
-      if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
+      if (auto SEQ = cast<ForEachStmt>(Parent)->getParsedSequence()) {
         if (containsTarget(SEQ)) {
           recordPossibleType(Context.getSequenceType());
         }

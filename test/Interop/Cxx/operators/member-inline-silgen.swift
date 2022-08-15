@@ -1,17 +1,24 @@
-// RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
 
 import MemberInline
 
 public func sub(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> LoadableIntWrapper { lhs - rhs }
 
 // CHECK: bb0([[SELF:%.*]] : $*LoadableIntWrapper, [[RHS:%.*]] : $LoadableIntWrapper):
-
+// CHECK: [[METATYPE:%.*]] = metatype $@thin LoadableIntWrapper.Type
 // CHECK: [[SELFACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*LoadableIntWrapper
-// CHECK: [[OP:%.*]] = function_ref [[NAME:@(_ZN18LoadableIntWrappermiES_|\?\?GLoadableIntWrapper@@QEAA\?AU0@U0@@Z)]] : $@convention(c) (@inout LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
-// CHECK: apply [[OP]]([[SELFACCESS]], [[RHS]]) : $@convention(c) (@inout LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK: [[OP:%.*]] = function_ref @$sSo18LoadableIntWrapperV1soiyA2Bz_ABtFZ : $@convention(method) (@inout LoadableIntWrapper, LoadableIntWrapper, @thin LoadableIntWrapper.Type) -> LoadableIntWrapper
+// CHECK: apply [[OP]]([[SELFACCESS]], [[RHS]], [[METATYPE]]) : $@convention(method) (@inout LoadableIntWrapper, LoadableIntWrapper, @thin LoadableIntWrapper.Type) -> LoadableIntWrapper
 // CHECK: end_access [[SELFACCESS]] : $*LoadableIntWrapper
 
-// CHECK: sil [clang LoadableIntWrapper."-"] [[NAME]] : $@convention(c) (@inout LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
+public func exclaim(_ wrapper: inout LoadableBoolWrapper) -> LoadableBoolWrapper { !wrapper }
+
+// CHECK: bb0([[SELF:%.*]] : $*LoadableBoolWrapper):
+// CHECK:   [[METATYPE:%.*]] = metatype $@thin LoadableBoolWrapper.Type
+// CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*LoadableBoolWrapper
+// CHECK:   [[OP:%.*]] = function_ref @$sSo19LoadableBoolWrapperV1nopyA2BzFZ : $@convention(method) (@inout LoadableBoolWrapper, @thin LoadableBoolWrapper.Type) -> LoadableBoolWrapper
+// CHECK:   apply [[OP]]([[SELFACCESS]], [[METATYPE]]) : $@convention(method) (@inout LoadableBoolWrapper, @thin LoadableBoolWrapper.Type) -> LoadableBoolWrapper
+// CHECK:   end_access [[SELFACCESS]]
 
 public func call(_ wrapper: inout LoadableIntWrapper, _ arg: Int32) -> Int32 { wrapper(arg) }
 

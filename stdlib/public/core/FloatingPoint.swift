@@ -328,15 +328,19 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// `infinity` is greater than this value.
   static var greatestFiniteMagnitude: Self { get }
 
-  /// The mathematical constant pi.
+  /// The [mathematical constant π][wiki], approximately equal to 3.14159.
+  /// 
+  /// When measuring an angle in radians, π is equivalent to a half-turn.
   ///
-  /// This value should be rounded toward zero to keep user computations with
-  /// angles from inadvertently ending up in the wrong quadrant. A type that
-  /// conforms to the `FloatingPoint` protocol provides the value for `pi` at
-  /// its best possible precision.
+  /// This value is rounded toward zero to keep user computations with angles
+  /// from inadvertently ending up in the wrong quadrant. A type that conforms
+  /// to the `FloatingPoint` protocol provides the value for `pi` at its best
+  /// possible precision.
   ///
   ///     print(Double.pi)
   ///     // Prints "3.14159265358979"
+  ///
+  /// [wiki]: https://en.wikipedia.org/wiki/Pi
   static var pi: Self { get }
 
   // NOTE: Rationale for "ulp" instead of "epsilon":

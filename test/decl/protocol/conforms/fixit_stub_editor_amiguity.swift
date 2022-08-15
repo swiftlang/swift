@@ -9,7 +9,7 @@ struct Notification {}
 
 struct MyApp: AmbiguousFuncProtocol {
 // expected-error@-1 {{type 'MyApp' does not conform to protocol 'AmbiguousFuncProtocol'}}
-// expected-note@-2 {{do you want to add protocol stubs?}} {{38-38=\n    func application(recieved: Ambiguous.Notification) {\n        <#code#>\n    \}\n}}
+// expected-note@-2 {{do you want to add protocol stubs?}} {{38-38=\n    func application(received: Ambiguous.Notification) {\n        <#code#>\n    \}\n}}
 }
 
 extension MyApp: AmbiguousVarProtocol {

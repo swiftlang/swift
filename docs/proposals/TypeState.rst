@@ -132,7 +132,7 @@ typestate, so that we can talk not only about a list of files, but also about a
 list of *open* files".
 
 
-You should be allowed to declare typestate transitions on "self" any any by-ref
+You should be allowed to declare typestate transitions on "self" any by-ref
 arguments/ret values on functions.  In Plaid syntax::
 
   public void open() [ClosedFile>>OpenFile]

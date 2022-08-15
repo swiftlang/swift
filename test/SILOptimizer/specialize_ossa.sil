@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 

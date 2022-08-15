@@ -14,6 +14,7 @@
 #include "../SwiftShims/MetadataSections.h"
 
 #include <cstddef>
+#include <new>
 
 extern "C" const char __dso_handle[];
 
@@ -55,9 +56,9 @@ static void swift_image_constructor() {
   { reinterpret_cast<uintptr_t>(&__start_##name),                              \
     static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
 
-  sections = {
+  ::new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
-      __dso_handle,
+      { __dso_handle },
 
       nullptr,
       nullptr,

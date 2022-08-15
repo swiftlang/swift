@@ -795,7 +795,7 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
         substConv.getSILType(param, builder.getTypeExpansionContext());
     SILValue arg = *paramArgIter;
     if (builder.hasOwnership() && arg->getType().isObject() &&
-        arg.getOwnershipKind() == OwnershipKind::Owned &&
+        arg->getOwnershipKind() == OwnershipKind::Owned &&
         param.isGuaranteed()) {
       SILBuilderWithScope borrowBuilder(applySite.getInstruction(), builder);
       arg = borrowBuilder.createBeginBorrow(loc, arg);
@@ -900,6 +900,8 @@ getWitnessMethodSubstitutions(
     bool isSelfAbstract,
     ClassDecl *classWitness) {
 
+  auto &ctx = mod->getASTContext();
+
   if (witnessThunkSig.isNull())
     return SubstitutionMap();
 
@@ -909,46 +911,100 @@ getWitnessMethodSubstitutions(
   assert(!conformanceRef.isAbstract());
   auto conformance = conformanceRef.getConcrete();
 
+  auto selfType = conformance->getProtocol()->getSelfInterfaceType();
+
   // If `Self` maps to a bound generic type, this gives us the
   // substitutions for the concrete type's generic parameters.
   auto baseSubMap = conformance->getSubstitutions(mod);
 
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootConformance();
-  if (auto witnessSig = rootConformance->getGenericSignature())
-    baseDepth = witnessSig.getGenericParams().back()->getDepth() + 1;
+  if (auto conformingTypeSig = rootConformance->getGenericSignature())
+    baseDepth = conformingTypeSig.getGenericParams().back()->getDepth() + 1;
 
-  // If the witness has a class-constrained 'Self' generic parameter,
-  // we have to build a new substitution map that shifts all generic
-  // parameters down by one.
-  if (classWitness != nullptr) {
-    auto *proto = conformance->getProtocol();
-    auto selfType = proto->getSelfInterfaceType();
+  // witnessThunkSig begins with the optional class 'Self', followed by the
+  // generic parameters of the concrete conforming type, followed by the
+  // generic parameters of the protocol requirement, if any.
+  //
+  // - The 'Self' parameter is replaced with the conforming type.
+  // - The conforming type's generic parameters are replaced by the
+  //   conformance substitutions.
+  // - The protocol requirement's generic parameters are replaced from the
+  //   substitution map at the call site.
+  return SubstitutionMap::get(
+      witnessThunkSig,
+      [&](SubstitutableType *type) {
+        auto *paramType = type->castTo<GenericTypeParamType>();
+        unsigned depth = paramType->getDepth();
 
-    auto selfSubMap = SubstitutionMap::getProtocolSubstitutions(
-        proto, selfType.subst(origSubMap), conformanceRef);
-    if (baseSubMap.empty()) {
-      assert(baseDepth == 0);
-      baseSubMap = selfSubMap;
-    } else {
-      baseSubMap = SubstitutionMap::combineSubstitutionMaps(
-          selfSubMap,
-          baseSubMap,
-          CombineSubstitutionMaps::AtDepth,
-          /*firstDepth=*/1,
-          /*secondDepth=*/0,
-          witnessThunkSig);
-    }
-    baseDepth += 1;
-  }
+        if (classWitness != nullptr) {
+          if (depth == 0) {
+            assert(paramType->getIndex() == 0);
+            return selfType.subst(origSubMap);
+          }
 
-  return SubstitutionMap::combineSubstitutionMaps(
-      baseSubMap,
-      origSubMap,
-      CombineSubstitutionMaps::AtDepth,
-      /*firstDepth=*/baseDepth,
-      /*secondDepth=*/1,
-      witnessThunkSig);
+          --depth;
+        }
+
+        if (depth < baseDepth) {
+          paramType = GenericTypeParamType::get(
+              paramType->isTypeSequence(),
+              depth, paramType->getIndex(), ctx);
+
+          return Type(paramType).subst(baseSubMap);
+        }
+
+        depth = depth - baseDepth + 1;
+
+        paramType = GenericTypeParamType::get(
+            paramType->isTypeSequence(),
+            depth, paramType->getIndex(), ctx);
+        return Type(paramType).subst(origSubMap);
+      },
+      [&](CanType type, Type substType, ProtocolDecl *proto) {
+        auto *paramType = type->getRootGenericParam();
+        unsigned depth = paramType->getDepth();
+
+        if (classWitness != nullptr) {
+          if (depth == 0) {
+            assert(type->isEqual(paramType));
+            assert(paramType->getIndex() == 0);
+            return conformanceRef;
+          }
+
+          --depth;
+        }
+
+        if (depth < baseDepth) {
+          type = CanType(type.transform([&](Type t) -> Type {
+            if (t->isEqual(paramType)) {
+              return GenericTypeParamType::get(
+                  paramType->isTypeSequence(),
+                  depth, paramType->getIndex(), ctx);
+            }
+
+            assert(!t->is<GenericTypeParamType>());
+            return t;
+          }));
+
+          return baseSubMap.lookupConformance(type, proto);
+        }
+
+        depth = depth - baseDepth + 1;
+
+        type = CanType(type.transform([&](Type t) -> Type {
+          if (t->isEqual(paramType)) {
+            return GenericTypeParamType::get(
+                paramType->isTypeSequence(),
+                depth, paramType->getIndex(), ctx);
+          }
+
+          assert(!t->is<GenericTypeParamType>());
+          return t;
+        }));
+
+        return origSubMap.lookupConformance(type, proto);
+      });
 }
 
 SubstitutionMap
@@ -1025,7 +1081,7 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
       if (argBuilder.hasOwnership() &&
           applySite.getKind() != ApplySiteKind::PartialApplyInst &&
           arg->getType().isObject() &&
-          arg.getOwnershipKind() == OwnershipKind::Owned &&
+          arg->getOwnershipKind() == OwnershipKind::Owned &&
           paramInfo.isGuaranteedConvention()) {
         SILBuilderWithScope borrowBuilder(applySite.getInstruction(),
                                           argBuilder);
@@ -1073,7 +1129,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember());
+      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 
   if (!f)
     return false;
@@ -1094,9 +1150,10 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
     return false;
   }
 
-  // FIXME: devirtualizeWitnessMethod below does not support cases with
-  // covariant 'Self' nested inside a collection type,
-  // like '[Self]' or '[* : Self]'.
+  // FIXME: devirtualizeWitnessMethod does not support cases with covariant
+  // 'Self'-rooted type parameters nested inside a collection type, like
+  // '[Self]' or '[* : Self.A]', because it doesn't know how to deal with
+  // associated collection upcasts.
   const Type interfaceTy = wmi->getMember()
                                .getDecl()
                                ->getInterfaceType()
@@ -1107,35 +1164,35 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
   if (!interfaceTy->hasTypeParameter())
     return true;
 
-  class HasSelfNestedInsideCollection final : public TypeWalker {
-    unsigned CollectionDepth;
+  auto *const selfGP = wmi->getLookupProtocol()->getProtocolSelfType();
+  auto isSelfRootedTypeParameter = [selfGP](Type T) -> bool {
+    if (!T->hasTypeParameter())
+      return false;
 
-  public:
-    Action walkToTypePre(Type T) override {
-      if (!T->hasTypeParameter())
-        return Action::SkipChildren;
-
-      if (auto *GP = T->getAs<GenericTypeParamType>()) {
-        // Only 'Self' will have zero depth in the type of a requirement.
-        if (GP->getDepth() == 0 && CollectionDepth)
-          return Action::Stop;
-      }
-
-      if (T->isArray() || T->isDictionary())
-        ++CollectionDepth;
-
-      return Action::Continue;
+    if (T->isTypeParameter()) {
+      return T->getRootGenericParam()->isEqual(selfGP);
     }
 
-    Action walkToTypePost(Type T) override {
-      if (T->isArray() || T->isDictionary())
-        --CollectionDepth;
-
-      return Action::Continue;
-    }
+    return false;
   };
 
-  return !interfaceTy.walk(HasSelfNestedInsideCollection());
+  return !interfaceTy.findIf([&](Type T) -> bool {
+    if (!T->hasTypeParameter())
+      return false;
+
+    if (T->isArray() || T->isDictionary()) {
+      return T.findIf(isSelfRootedTypeParameter);
+    }
+
+    if (auto *FT = T->getAs<FunctionType>()) {
+      for (const auto &Param : FT->getParams()) {
+        if (Param.isVariadic() && T.findIf(isSelfRootedTypeParameter))
+          return true;
+      }
+    }
+
+    return false;
+  });
 }
 
 /// In the cases where we can statically determine the function that
@@ -1153,7 +1210,7 @@ swift::tryDevirtualizeWitnessMethod(ApplySite applySite,
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember());
+      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 
   return devirtualizeWitnessMethod(applySite, f, wmi->getConformance(), ore);
 }

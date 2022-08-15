@@ -191,8 +191,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
 
   auto environment = archetype->getGenericEnvironment();
 
-  // Otherwise, ask the generic signature for the environment for the best
-  // path to the conformance.
+  // Otherwise, ask the generic signature for the best path to the conformance.
   // TODO: this isn't necessarily optimal if the direct conformance isn't
   // concretely available; we really ought to be comparing the full paths
   // to this conformance from concrete sources.
@@ -200,8 +199,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto signature = environment->getGenericSignature().getCanonicalSignature();
   auto archetypeDepType = archetype->getInterfaceType();
 
-  auto astPath = signature->getConformanceAccessPath(archetypeDepType,
-                                                     protocol);
+  auto astPath = signature->getConformancePath(archetypeDepType, protocol);
 
   auto i = astPath.begin(), e = astPath.end();
   assert(i != e && "empty path!");
@@ -437,7 +435,7 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
           auto ty = reqt.TypeParameter.subst(archetype->getSubstitutions())
-                        ->getCanonicalType(opaqueDecl->getGenericSignature());
+                        ->getReducedType(opaqueDecl->getGenericSignature());
           if (reqt.Protocol) {
             auto ref =
                 ProtocolConformanceRef(reqt.Protocol)

@@ -42,29 +42,26 @@ public:
   Requirement(RequirementKind kind, Type first, LayoutConstraint second)
     : RequirementBase(kind, first, second) {}
 
-  /// Whether this requirement is in its canonical form.
+  /// Whether this requirement's types contain ErrorTypes.
+  bool hasError() const;
+
+  /// Whether this requirement is written with canonical types.
   bool isCanonical() const;
 
-  /// Get the canonical form of this requirement.
+  /// Canonicalize the types in this requirement.
   Requirement getCanonical() const;
 
   /// Subst the types involved in this requirement.
   ///
-  /// The \c args arguments are passed through to Type::subst. This doesn't
-  /// touch the superclasses, protocols or layout constraints.
+  /// The \c args arguments are passed through to Type::subst.
   template <typename ...Args>
-  llvm::Optional<Requirement> subst(Args &&...args) const {
+  Requirement subst(Args &&...args) const {
     auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
-    if (newFirst->hasError())
-      return None;
-
     switch (getKind()) {
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType: {
       auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
-      if (newSecond->hasError())
-        return None;
       return Requirement(getKind(), newFirst, newSecond);
     }
     case RequirementKind::Layout:

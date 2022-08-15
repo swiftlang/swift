@@ -302,30 +302,30 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
   }
 }
 
-void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind,
+void SyntaxParsingContext::collectNodesInPlace(SyntaxKind CollectionKind,
                                          SyntaxNodeCreationKind nodeCreateK) {
-  assert(isCollectionKind(ColletionKind));
+  assert(isCollectionKind(CollectionKind));
   assert(isTopOfContextStack());
   if (!Enabled)
     return;
   auto Parts = getParts();
   auto Count = 0;
   for (auto I = Parts.rbegin(), End = Parts.rend(); I != End; ++I) {
-    if (!SyntaxFactory::canServeAsCollectionMemberRaw(ColletionKind, I->getKind()))
+    if (!SyntaxFactory::canServeAsCollectionMemberRaw(CollectionKind, I->getKind()))
       break;
     ++Count;
   }
   if (Count)
-    createNodeInPlace(ColletionKind, Count, nodeCreateK);
+    createNodeInPlace(CollectionKind, Count, nodeCreateK);
 }
 
 static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,
                                            MutableArrayRef<ParsedRawSyntaxNode> Parts) {
   ParsedRawSyntaxRecorder &Recorder = RootData.Recorder;
-  ParsedRawSyntaxNode Layout[2];
+  ParsedRawSyntaxNode Layout[4];
 
   assert(!Parts.empty() && Parts.back().isToken(tok::eof));
-  Layout[1] = std::move(Parts.back());
+  Layout[3] = std::move(Parts.back());
   Parts = Parts.drop_back();
 
 
@@ -333,10 +333,10 @@ static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,
     return node.getKind() == SyntaxKind::CodeBlockItem;
   }) && "all top level element must be 'CodeBlockItem'");
 
-  Layout[0] = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList, Parts);
+  Layout[1] = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList, Parts);
 
   return Recorder.recordRawSyntax(SyntaxKind::SourceFile,
-                                  llvm::makeMutableArrayRef(Layout, 2));
+                                  llvm::makeMutableArrayRef(Layout, 4));
 }
 
 OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {

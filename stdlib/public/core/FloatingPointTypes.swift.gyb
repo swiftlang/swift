@@ -13,7 +13,6 @@
 import SwiftShims
 
 %{
-from __future__ import division
 from SwiftIntTypes import all_integer_types
 from SwiftFloatingPointTypes import all_floating_point_types
 
@@ -23,9 +22,6 @@ from SwiftFloatingPointTypes import all_floating_point_types
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-
-# Number of bits in integer literals.
-builtinIntLiteralBits = 2048
 }%
 
 % for self_type in all_floating_point_types():
@@ -1079,7 +1075,7 @@ extension ${Self} {
       // the original value; if so, the conversion was exact. We need to be
       // careful, however, to make sure that the first conversion does not
       // round to a value that is out of the defined range of the second
-      // converion. E.g. Float(Int.max) rounds to Int.max + 1, and converting
+      // conversion. E.g. Float(Int.max) rounds to Int.max + 1, and converting
       // that back to Int will trap. For Float, Double, and Float80, this is
       // only an issue for the upper bound (because the lower bound of [U]Int
       // is either zero or a power of two, both of which are exactly

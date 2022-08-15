@@ -179,7 +179,8 @@ public:
         layoutSubs.getGenericSignature().getCanonicalSignature();
     auto boxLayout =
         SILLayout::get(SGF.getASTContext(), layoutSig,
-                       SILField(layoutTy->getCanonicalType(layoutSig), true));
+                       SILField(layoutTy->getReducedType(layoutSig), true),
+                       /*captures generics*/ false);
 
     resultBox = SGF.B.createAllocBox(loc,
       SILBoxType::get(SGF.getASTContext(),
@@ -498,6 +499,7 @@ class ForeignAsyncInitializationPlan final : public ResultPlan {
   SILType opaqueResumeType;
   SILValue resumeBuf;
   SILValue continuation;
+  ExecutorBreadcrumb breadcrumb;
   
 public:
   ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc,
@@ -506,9 +508,8 @@ public:
   {
     // Allocate space to receive the resume value when the continuation is
     // resumed.
-    opaqueResumeType =
-        SGF.getLoweredType(AbstractionPattern(calleeTypeInfo.substResultType),
-                           calleeTypeInfo.substResultType);
+    opaqueResumeType = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                          calleeTypeInfo.substResultType);
     resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
   }
   
@@ -575,8 +576,8 @@ public:
     SILFunction *impl =
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
-                impFnTy->mapTypeOutOfContext()->getCanonicalType(sig)),
-            continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
+                impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
+            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
             origFormalType, sig, *calleeTypeInfo.foreign.async,
             calleeTypeInfo.foreign.error);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
@@ -595,6 +596,11 @@ public:
     // know we won't escape it locally so the callee can be responsible for
     // _Block_copy-ing it.
     return ManagedValue::forUnmanaged(block);
+  }
+
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&crumb) override {
+    assert(!breadcrumb.needsEmit() && "overwriting an existing breadcrumb?");
+    breadcrumb = std::move(crumb);
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
@@ -654,7 +660,7 @@ public:
         auto sig = env ? env->getGenericSignature().getCanonicalSignature()
                        : CanGenericSignature();
         auto mappedContinuationTy =
-            continuationBGT->mapTypeOutOfContext()->getCanonicalType(sig);
+            continuationBGT->mapTypeOutOfContext()->getReducedType(sig);
         auto resumeType =
             cast<BoundGenericType>(mappedContinuationTy).getGenericArgs()[0];
         auto continuationTy = continuationBGT->getCanonicalType();
@@ -692,6 +698,7 @@ public:
     // Propagate an error if we have one.
     if (errorBlock) {
       SGF.B.emitBlock(errorBlock);
+      breadcrumb.emit(SGF, loc);
       
       Scope errorScope(SGF, loc);
 
@@ -703,18 +710,17 @@ public:
     }
     
     SGF.B.emitBlock(resumeBlock);
+    breadcrumb.emit(SGF, loc);
     
     // The incoming value is the maximally-abstracted result type of the
     // continuation. Move it out of the resume buffer and reabstract it if
     // necessary.
-    auto resumeResult = SGF.emitLoad(loc, resumeBuf,
-      calleeTypeInfo.origResultType
-         ? *calleeTypeInfo.origResultType
-         : AbstractionPattern(calleeTypeInfo.substResultType),
-                 calleeTypeInfo.substResultType,
-                 SGF.getTypeLowering(calleeTypeInfo.substResultType),
-                 SGFContext(), IsTake);
-    
+    auto resumeResult =
+        SGF.emitLoad(loc, resumeBuf, AbstractionPattern::getOpaque(),
+                     calleeTypeInfo.substResultType,
+                     SGF.getTypeLowering(calleeTypeInfo.substResultType),
+                     SGFContext(), IsTake);
+
     return RValue(SGF, loc, calleeTypeInfo.substResultType, resumeResult);
   }
 };
@@ -752,6 +758,23 @@ public:
 
     auto errorType =
         CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
+
+    // In cases when from swift, we call objc imported methods written like so:
+    //
+    // (1) - (BOOL)submit:(NSError *_Nonnull __autoreleasing *_Nullable)errorOut;
+    //
+    // the clang importer will successfully import the given method as having a
+    // non-null NSError. This doesn't follow the normal convention where we
+    // expect the NSError to be Optional<NSError>. In order to preserve source
+    // compatibility, we want to allow SILGen to handle this behavior. Luckily
+    // in this case, NSError and Optional<NSError> are layout compatible, so we
+    // can just pass in the Optional<NSError> and everything works.
+    if (auto nsErrorTy = SGF.getASTContext().getNSErrorType()->getCanonicalType()) {
+      if (errorType == nsErrorTy) {
+        errorType = errorType.wrapInOptionalType();
+      }
+    }
+
     auto &errorTL = SGF.getTypeLowering(errorType);
 
     // Allocate a temporary.
@@ -772,6 +795,10 @@ public:
                                 ManagedValue::forLValue(errorTemp),
                                 /*TODO: enforcement*/ None,
                                 AbstractionPattern(errorType), errorType);
+  }
+
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&breadcrumb) override {
+    subPlan->deferExecutorBreadcrumb(std::move(breadcrumb));
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,

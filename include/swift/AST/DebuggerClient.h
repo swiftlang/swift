@@ -62,7 +62,7 @@ public:
                                ResultVector &RV) = 0;
 
   /// The following functions allow the debugger to modify the results of a
-  /// qualfied lookup as needed. These methods may add, remove or modify the
+  /// qualified lookup as needed. These methods may add, remove or modify the
   /// entries in `decls`. See the corresponding DeclContext::lookupInXYZ
   /// functions defined in NameLookup.cpp for more context.
   ///

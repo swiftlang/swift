@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # utils/build-tooling-libs - Helper tool for building the SwiftSyntax paresr
 # and SwiftStaticMirror libraries -*- python -*-
 #
@@ -22,8 +22,6 @@
 #
 # This utility also provides capability to gather profile data and build the parser
 # library with PGO optimization enabled.
-
-from __future__ import print_function
 
 import copy
 import multiprocessing
@@ -69,6 +67,7 @@ class Builder(object):
         self.host = host
         self.arch = arch
         self.native_build_dir = native_build_dir
+        self.swiftc_path = args.swiftc_path
 
     def call(self, command, env=None, without_sleeping=False):
         if without_sleeping:
@@ -174,6 +173,7 @@ class Builder(object):
             "-DSWIFT_HOST_VARIANT_SDK=" + host_sdk,
             "-DSWIFT_HOST_VARIANT_ARCH=" + self.arch,
             "-DCMAKE_Swift_COMPILER_TARGET=" + host_triple,
+            "-DCMAKE_Swift_COMPILER=" + self.swiftc_path,
             "-DCMAKE_C_FLAGS=" + llvm_c_flags,
             "-DCMAKE_CXX_FLAGS=" + llvm_c_flags,
         ]
@@ -236,6 +236,7 @@ class Builder(object):
             os.path.join(SWIFT_SOURCE_ROOT, 'swift'),
         ]
         cmake_args += [
+            "-DSWIFT_BUILD_SYNTAXPARSERLIB=TRUE",
             "-DSWIFT_BUILD_ONLY_SYNTAXPARSERLIB=TRUE",
             "-DSWIFT_BUILD_SYNTAXPARSERTEST=TRUE",
         ]
@@ -246,6 +247,7 @@ class Builder(object):
             "-DSWIFT_BUILD_STATIC_STDLIB=FALSE",
             "-DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE",
             "-DSWIFT_BUILD_STATIC_SDK_OVERLAY=FALSE",
+            "-DSWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT=FALSE",
         ]
         cmake_args += [
             "-DLLVM_ENABLE_LIBXML2=FALSE",
@@ -264,6 +266,13 @@ class Builder(object):
             "-DCLANG_INCLUDE_TESTS=FALSE",
             "-DSWIFT_INCLUDE_TESTS=FALSE",
         ]
+        cmake_args += [
+            "-DBOOTSTRAPPING_MODE=HOSTTOOLS",
+            "-DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=" +
+            os.path.join(SWIFT_SOURCE_ROOT,
+                         "swift-experimental-string-processing"),
+        ]
+
         llvm_src_path = os.path.join(SWIFT_SOURCE_ROOT, "llvm") \
             if isSwiftContainedInLLVMProject \
             else os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "llvm")
@@ -392,6 +401,7 @@ Example invocations:
         defaults.DARWIN_INSTALL_PREFIX if isDarwin else defaults.UNIX_INSTALL_PREFIX
     )
     default_ninja = toolchain.ninja
+    default_swiftc = toolchain.swiftc
 
     option("--release", store_true, help="build in release mode")
     option(
@@ -490,6 +500,16 @@ Example invocations:
         store_path,
         default=default_ninja,
         help="the path to ninja (default = %s)" % default_ninja,
+    )
+    option(
+        "--swiftc-path",
+        store_path,
+        default=default_swiftc,
+        help="""
+        Override the swiftc compiler used to build SwiftCompilerSources.
+        This is needed to build the most recent state of main if it uses C++ interop 
+        features that aren't in the host's toolchain yet. (default = %s)
+        """ % default_swiftc
     )
 
     parser = optbuilder.build()

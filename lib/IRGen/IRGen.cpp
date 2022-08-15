@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "irgen"
+#include "../Serialization/ModuleFormat.h"
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/DiagnosticsIRGen.h"
@@ -44,7 +44,6 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
 #include "swift/TBDGen/TBDGen.h"
-#include "../Serialization/ModuleFormat.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/StringSet.h"
@@ -59,12 +58,15 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/ObjectFile.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -79,9 +81,11 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
+#include "llvm/Transforms/Instrumentation/InstrProfiling.h"
 #include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
+#include "llvm/Transforms/Scalar.h"
 
 #include <thread>
 
@@ -92,6 +96,8 @@
 using namespace swift;
 using namespace irgen;
 using namespace llvm;
+
+#define DEBUG_TYPE "irgen"
 
 static cl::opt<bool> DisableObjCARCContract(
     "disable-objc-arc-contract", cl::Hidden,
@@ -144,6 +150,11 @@ static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
 static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
                                    legacy::PassManagerBase &PM) {
   PM.add(createThreadSanitizerLegacyPassPass());
+}
+
+static void addSwiftDbgAddrBlockSplitterPass(const PassManagerBuilder &Builder,
+                                             legacy::PassManagerBase &PM) {
+  PM.add(createSwiftDbgAddrBlockSplitter());
 }
 
 static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
@@ -211,9 +222,26 @@ void setModuleFlags(IRGenModule &IGM) {
   }
 }
 
-void swift::performLLVMOptimizations(const IRGenOptions &Opts,
-                                     llvm::Module *Module,
-                                     llvm::TargetMachine *TargetMachine) {
+static void align(llvm::Module *Module) {
+  // For performance benchmarking: Align the module to the page size by
+  // aligning the first function of the module.
+    unsigned pageSize =
+#if HAVE_UNISTD_H
+      sysconf(_SC_PAGESIZE));
+#else
+      4096; // Use a default value
+#endif
+    for (auto I = Module->begin(), E = Module->end(); I != E; ++I) {
+      if (!I->isDeclaration()) {
+        I->setAlignment(llvm::MaybeAlign(pageSize));
+        break;
+      }
+    }
+}
+static void
+performOptimizationsUsingLegacyPassManger(const IRGenOptions &Opts,
+                                          llvm::Module *Module,
+                                          llvm::TargetMachine *TargetMachine) {
   // Set up a pipeline.
   PassManagerBuilderWrapper PMBuilder(Opts);
 
@@ -284,9 +312,16 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
         if (Builder.OptLevel > 0) {
           const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
           unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
-          PM.add(createSwiftMergeFunctionsPass(schema.isEnabled(), key));
+          PM.add(createLegacySwiftMergeFunctionsPass(schema.isEnabled(), key));
         }
       });
+  }
+
+  if (RunSwiftSpecificLLVMOptzns) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSwiftDbgAddrBlockSplitterPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addSwiftDbgAddrBlockSplitterPass);
   }
 
   // Configure the function passes.
@@ -352,28 +387,213 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract)
+  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
+      !Opts.DisableLLVMOptzns)
     ModulePasses.add(createObjCARCContractPass());
 
   // Do it.
   ModulePasses.run(*Module);
 
   if (AlignModuleToPageSize) {
-    // For performance benchmarking: Align the module to the page size by
-    // aligning the first function of the module.
-    unsigned pageSize =
-#if HAVE_UNISTD_H
-      sysconf(_SC_PAGESIZE));
-#else
-      4096; // Use a default value
-#endif
-    for (auto I = Module->begin(), E = Module->end(); I != E; ++I) {
-      if (!I->isDeclaration()) {
-        I->setAlignment(llvm::MaybeAlign(pageSize));
-        break;
-      }
-    }
+    align(Module);
   }
+}
+
+static void
+performOptimizationsUsingNewPassManger(const IRGenOptions &Opts,
+                                       llvm::Module *Module,
+                                       llvm::TargetMachine *TargetMachine) {
+  Optional<PGOOptions> PGOOpt;
+
+  PipelineTuningOptions PTO;
+
+  bool RunSwiftMergeFunctions = true;
+  // LLVM MergeFunctions and SwiftMergeFunctions don't understand that the
+  // string in the metadata on calls in @llvm.type.checked.load intrinsics is
+  // semantically meaningful, and mis-compile (mis-merge) unrelated functions.
+  if (Opts.VirtualFunctionElimination || Opts.WitnessMethodElimination) {
+    RunSwiftMergeFunctions = false;
+  }
+
+  bool RunSwiftSpecificLLVMOptzns =
+      !Opts.DisableSwiftSpecificLLVMOptzns && !Opts.DisableLLVMOptzns;
+
+  PTO.CallGraphProfile = false;
+
+  llvm::OptimizationLevel level = llvm::OptimizationLevel::O0;
+  if (Opts.shouldOptimize() && !Opts.DisableLLVMOptzns) {
+    // For historical reasons, loop interleaving is set to mirror setting for
+    // loop unrolling.
+    PTO.LoopInterleaving = true;
+    PTO.LoopVectorization = true;
+    PTO.SLPVectorization = true;
+    PTO.MergeFunctions = RunSwiftMergeFunctions;
+    level = llvm::OptimizationLevel::Os;
+  } else {
+    level = llvm::OptimizationLevel::O0;
+  }
+
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+
+  bool DebugPassStructure = false;
+  PassInstrumentationCallbacks PIC;
+  PrintPassOptions PrintPassOpts;
+  PrintPassOpts.Indent = DebugPassStructure;
+  PrintPassOpts.SkipAnalyses = DebugPassStructure;
+  StandardInstrumentations SI(DebugPassStructure, /*VerifyEach*/ false,
+                              PrintPassOpts);
+  SI.registerCallbacks(PIC, &FAM);
+
+  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
+
+  // Register the AA manager first so that our version is the one used.
+  FAM.registerPass([&] {
+    auto AA = PB.buildDefaultAAPipeline();
+    if (RunSwiftSpecificLLVMOptzns)
+      AA.registerFunctionAnalysis<SwiftAA>();
+    return AA;
+  });
+  FAM.registerPass([&] { return SwiftAA(); });
+
+  // Register all the basic analyses with the managers.
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+  ModulePassManager MPM;
+
+  if (RunSwiftSpecificLLVMOptzns) {
+    PB.registerScalarOptimizerLateEPCallback(
+        [](FunctionPassManager &FPM, OptimizationLevel Level) {
+          if (Level != OptimizationLevel::O0)
+            FPM.addPass(SwiftARCOptPass());
+        });
+    PB.registerOptimizerLastEPCallback([](ModulePassManager &MPM,
+                                          OptimizationLevel Level) {
+      if (Level != OptimizationLevel::O0)
+        MPM.addPass(createModuleToFunctionPassAdaptor(SwiftARCContractPass()));
+    });
+  }
+
+  // PassBuilder adds coroutine passes per default.
+  //
+
+  if (Opts.Sanitizers & SanitizerKind::Address) {
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
+                                           OptimizationLevel Level) {
+      auto Recover = bool(Opts.SanitizersWithRecoveryInstrumentation &
+                          SanitizerKind::Address);
+      bool UseAfterScope = false;
+      bool ModuleUseAfterScope = true;
+      bool UseOdrIndicator = Opts.SanitizeAddressUseODRIndicator;
+      llvm::AsanDtorKind DestructorKind = llvm::AsanDtorKind::Global;
+      llvm::AsanDetectStackUseAfterReturnMode UseAfterReturn =
+          llvm::AsanDetectStackUseAfterReturnMode::Runtime;
+      MPM.addPass(
+          RequireAnalysisPass<ASanGlobalsMetadataAnalysis, llvm::Module>());
+      MPM.addPass(ModuleAddressSanitizerPass(false, Recover,
+                                             ModuleUseAfterScope,
+                                             UseOdrIndicator, DestructorKind));
+      MPM.addPass(createModuleToFunctionPassAdaptor(AddressSanitizerPass(
+          {false, Recover, UseAfterScope, UseAfterReturn})));
+    });
+  }
+
+  if (Opts.Sanitizers & SanitizerKind::Thread) {
+    PB.registerOptimizerLastEPCallback(
+        [&](ModulePassManager &MPM, OptimizationLevel Level) {
+          MPM.addPass(ModuleThreadSanitizerPass());
+          MPM.addPass(createModuleToFunctionPassAdaptor(ThreadSanitizerPass()));
+        });
+  }
+
+  if (Opts.SanitizeCoverage.CoverageType !=
+      llvm::SanitizerCoverageOptions::SCK_None) {
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
+                                           OptimizationLevel Level) {
+      std::vector<std::string> allowlistFiles;
+      std::vector<std::string> ignorelistFiles;
+      MPM.addPass(ModuleSanitizerCoveragePass(Opts.SanitizeCoverage,
+                                              allowlistFiles, ignorelistFiles));
+    });
+  }
+  if (RunSwiftSpecificLLVMOptzns && RunSwiftMergeFunctions) {
+    PB.registerOptimizerLastEPCallback(
+        [&](ModulePassManager &MPM, OptimizationLevel Level) {
+          if (Level != OptimizationLevel::O0) {
+            const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
+            unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
+            MPM.addPass(SwiftMergeFunctionsPass(schema.isEnabled(), key));
+          }
+        });
+  }
+  if (RunSwiftSpecificLLVMOptzns) {
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
+                                           OptimizationLevel Level) {
+      MPM.addPass(
+          createModuleToFunctionPassAdaptor(SwiftDbgAddrBlockSplitterPass()));
+    });
+  }
+
+  if (Opts.GenerateProfile) {
+    InstrProfOptions options;
+    options.Atomic = bool(Opts.Sanitizers & SanitizerKind::Thread);
+    PB.registerPipelineStartEPCallback(
+        [options](ModulePassManager &MPM, OptimizationLevel level) {
+          MPM.addPass(InstrProfiling(options, false));
+        });
+  }
+
+  if (!Opts.shouldOptimize() || Opts.DisableLLVMOptzns) {
+    MPM = PB.buildO0DefaultPipeline(level, false);
+  } else {
+    MPM = PB.buildPerModuleDefaultPipeline(level);
+  }
+
+  // Make sure we do ARC contraction under optimization.  We don't
+  // rely on any other LLVM ARC transformations, but we do need ARC
+  // contraction to add the objc_retainAutoreleasedReturnValue
+  // assembly markers and remove clang.arc.used.
+  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
+      !Opts.DisableLLVMOptzns)
+    MPM.addPass(createModuleToFunctionPassAdaptor(ObjCARCContractPass()));
+
+  if (Opts.Verify) {
+    // Run verification before we run the pipeline.
+    ModulePassManager VerifyPM;
+    VerifyPM.addPass(VerifierPass());
+    VerifyPM.run(*Module, MAM);
+    // PB.registerPipelineStartEPCallback(
+    //       [](ModulePassManager &MPM, OptimizationLevel Level) {
+    //         MPM.addPass(VerifierPass());
+    //       });
+
+    // Run verification after we ran the pipeline;
+    MPM.addPass(VerifierPass());
+  }
+
+  if (Opts.PrintInlineTree)
+    MPM.addPass(InlineTreePrinterPass());
+
+  if (!Opts.DisableLLVMOptzns)
+    MPM.run(*Module, MAM);
+
+  if (AlignModuleToPageSize) {
+    align(Module);
+  }
+}
+
+void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+                                     llvm::Module *Module,
+                                     llvm::TargetMachine *TargetMachine) {
+  if (Opts.LegacyPassManager)
+    performOptimizationsUsingLegacyPassManger(Opts, Module, TargetMachine);
+  else
+    performOptimizationsUsingNewPassManger(Opts, Module, TargetMachine);
 }
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
@@ -589,10 +809,29 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
     EmitPasses.add(createPrintModulePass(out));
     break;
   case IRGenOutputKind::LLVMBitcode: {
+    // Emit a module summary by default for Regular LTO except ld64-based ones
+    // (which use the legacy LTO API).
+    bool EmitRegularLTOSummary =
+        targetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
+
+    if (EmitRegularLTOSummary || opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
+      // Rename anon globals to be able to export them in the summary.
+      EmitPasses.add(createNameAnonGlobalPass());
+    }
+
     if (opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
       EmitPasses.add(createWriteThinLTOBitcodePass(out));
     } else {
-      EmitPasses.add(createBitcodeWriterPass(out));
+      if (EmitRegularLTOSummary) {
+        module->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
+        // Assume other sources are compiled with -fsplit-lto-unit (it's enabled
+        // by default when -flto is specified on platforms that support regular
+        // lto summary.)
+        module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
+                              uint32_t(1));
+      }
+      EmitPasses.add(createBitcodeWriterPass(
+          out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
     }
     break;
   }
@@ -747,6 +986,18 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.AsyncContextExtendedFrameEntry = PointerAuthSchema(
       dataKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::SwiftAsyncContextExtendedFrameEntry);
+
+  opts.ExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::ExtendedExistentialTypeShape);
+
+  opts.NonUniqueExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::NonUniqueExtendedExistentialTypeShape);
 }
 
 std::unique_ptr<llvm::TargetMachine>
@@ -1007,7 +1258,6 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
       irEntitiesToEmit.push_back(source->getIRLinkEntity());
       break;
     case SymbolSource::Kind::LinkerDirective:
-    case SymbolSource::Kind::CrossModuleOptimization:
     case SymbolSource::Kind::Unknown:
       llvm_unreachable("Not supported");
     }
@@ -1035,7 +1285,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{
-        desc.Ctx, desc.Conv, desc.SILOpts,
+        desc.Ctx, desc.Conv, desc.SILOpts, nullptr,
         symsToEmit.map([](const auto &x) { return x.silRefsToEmit; })};
     SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
 
@@ -1072,8 +1322,9 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     for (auto *file : filesToEmit) {
       if (auto *nextSF = dyn_cast<SourceFile>(file)) {
         IGM.emitSourceFile(*nextSF);
-      } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(file)) {
-        IGM.emitSynthesizedFileUnit(*nextSFU);
+        if (auto *synthSFU = file->getSynthesizedFile()) {
+          IGM.emitSynthesizedFileUnit(*synthSFU);
+        }
       } else {
         file->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
           IGM.addLinkLibrary(LinkLib);
@@ -1315,11 +1566,15 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(SF);
-      IGM->emitSourceFile(*SF);
-    } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(nextSFU);
-      IGM->emitSynthesizedFileUnit(*nextSFU);
+      {
+        CurrentIGMPtr IGM = irgen.getGenModule(SF);
+        IGM->emitSourceFile(*SF);
+      }
+      
+      if (auto *synthSFU = File->getSynthesizedFile()) {
+        CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
+        IGM->emitSynthesizedFileUnit(*synthSFU);
+      }
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
         irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
@@ -1461,7 +1716,8 @@ GeneratedModule swift::performIRGeneration(
       outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
-      !parallelOutputFilenames.empty()) {
+      !parallelOutputFilenames.empty() &&
+      !Opts.UseSingleModuleLLVMEmission) {
     ::performParallelIRGeneration(desc);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.

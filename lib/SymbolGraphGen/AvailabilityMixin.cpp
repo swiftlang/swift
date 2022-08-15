@@ -31,6 +31,7 @@ StringRef getDomain(const AvailableAttr &AvAttr) {
     case PlatformAgnosticAvailabilityKind::Deprecated:
     case PlatformAgnosticAvailabilityKind::Unavailable:
     case PlatformAgnosticAvailabilityKind::None:
+    case PlatformAgnosticAvailabilityKind::NoAsync:
       break;
   }
 
@@ -133,7 +134,7 @@ Availability::updateFromParent(const Availability &Parent) {
 
   // Allow filling from the parent.
   // For replacement, we will consider a parent's
-  // earlier deprecation to supercede a child's later deprecation.
+  // earlier deprecation to supersede a child's later deprecation.
   if (!Deprecated) {
     Deprecated = Parent.Deprecated;
   } else if (Parent.Deprecated && *Parent.Deprecated < *Deprecated) {

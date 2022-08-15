@@ -11,7 +11,7 @@ struct DoesNotConformToProtocol {
 
 struct DummyStruct {};
 
-struct NonTrivial {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivial {
   ~NonTrivial() {}
   NonTrivial(DummyStruct) {}
   NonTrivial() {}
@@ -26,6 +26,33 @@ struct Trivial {
   void test1() {}
   void test2(int) {}
   char test3(int, unsigned) { return 42; }
+};
+
+struct ReturnsNullableValue {
+  const int *returnPointer() __attribute__((swift_attr("import_unsafe"))) {
+    return nullptr;
+  }
+};
+
+struct ReturnsNonNullValue {
+  const int *returnPointer() __attribute__((returns_nonnull))
+  __attribute__((swift_attr("import_unsafe"))) {
+    return (int *)this;
+  }
+};
+
+struct HasOperatorExclaim {
+  int value;
+
+  HasOperatorExclaim operator!() const { return {-value}; }
+};
+
+struct HasOperatorEqualEqual {
+  int value;
+  
+  bool operator==(const HasOperatorEqualEqual &other) const {
+    return value == other.value;
+  }
 };
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_PROTOCOL_CONFORMANCE_H

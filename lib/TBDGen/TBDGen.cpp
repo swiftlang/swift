@@ -77,7 +77,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
     return;
 
 #ifndef NDEBUG
-  if (kind == SymbolKind::GlobalSymbol && !source.isFromCrossModuleOptimization()) {
+  if (kind == SymbolKind::GlobalSymbol) {
     if (!DuplicateSymbolChecker.insert(name).second) {
       llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
       assert(false && "TBDGen symbol appears twice");
@@ -269,7 +269,7 @@ getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
   return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
 }
 
-/// Find the most relevant introducing version of the decl stack we have visted
+/// Find the most relevant introducing version of the decl stack we have visited
 /// so far.
 static Optional<llvm::VersionTuple>
 getInnermostIntroVersion(ArrayRef<Decl*> DeclStack, PlatformKind Platform) {
@@ -479,6 +479,10 @@ void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
   for (auto conformance : IDC->getLocalConformances(
                             ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
+    if (Opts.PublicSymbolsOnly &&
+        getDeclLinkage(protocol) != FormalLinkage::PublicUnique)
+      continue;
+
     auto needsWTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
     if (!needsWTable)
@@ -559,7 +563,7 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
 
   // Differential functions are emitted only when forward-mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
-      !ctx.LangOpts.EnableExperimentalForwardModeDifferentiation)
+      !ctx.LangOpts.hasFeature(Feature::ForwardModeDifferentiation))
     return;
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
       config.parameterIndices,
@@ -718,9 +722,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  if (AFD->isDistributed()) {
-    addSymbol(SILDeclRef(AFD).asDistributed());
-    addAsyncFunctionPointerSymbol(SILDeclRef(AFD).asDistributed());
+  if (auto distributedThunk = AFD->getDistributedThunk()) {
+    auto thunk = SILDeclRef(distributedThunk).asDistributed();
+    addSymbol(thunk);
+    addAsyncFunctionPointerSymbol(thunk);
   }
 
   // Add derivative function symbols.
@@ -746,6 +751,15 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   if (AFD->hasAsync()) {
     addAsyncFunctionPointerSymbol(SILDeclRef(AFD));
   }
+
+  // Skip non objc compatible methods or non-public methods.
+  if (isa<DestructorDecl>(AFD) || !AFD->isObjC() ||
+      AFD->getFormalAccess() != AccessLevel::Public)
+    return;
+  if (auto *CD = dyn_cast<ClassDecl>(AFD->getDeclContext()))
+    recorder.addObjCMethod(CD, SILDeclRef(AFD));
+  else if (auto *ED = dyn_cast<ExtensionDecl>(AFD->getDeclContext()))
+    recorder.addObjCMethod(ED, SILDeclRef(AFD));
 }
 
 void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
@@ -846,6 +860,11 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   }
 
   visitAbstractStorageDecl(VD);
+}
+
+void TBDGenVisitor::visitSubscriptDecl(SubscriptDecl *SD) {
+  visitDefaultArguments(SD, SD->getIndices());
+  visitAbstractStorageDecl(SD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -950,30 +969,9 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       }
 
       TBD.addMethodDescriptor(method);
-
-      if (auto methodOrCtorOrDtor = method.getDecl()) {
-        // Skip non objc compatible methods or non-public methods.
-        if (!methodOrCtorOrDtor->isObjC() ||
-            methodOrCtorOrDtor->getFormalAccess() != AccessLevel::Public)
-          return;
-
-        // only handle FuncDecl here. Initializers are handled in
-        // visitConstructorDecl.
-        if (isa<FuncDecl>(methodOrCtorOrDtor))
-          recorder.addObjCMethod(CD, method);
-      }
     }
 
-    void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {
-      if (auto methodOrCtorOrDtor = derivedRef.getDecl()) {
-        if (!methodOrCtorOrDtor->isObjC() ||
-            methodOrCtorOrDtor->getFormalAccess() != AccessLevel::Public)
-          return;
-
-        if (isa<FuncDecl>(methodOrCtorOrDtor))
-          recorder.addObjCMethod(CD, derivedRef);
-      }
-    }
+    void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
 
     void addPlaceholder(MissingMemberDecl *) {}
 
@@ -994,10 +992,6 @@ void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
     if (CD->hasAsync()) {
       addAsyncFunctionPointerSymbol(
           SILDeclRef(CD, SILDeclRef::Kind::Initializer));
-    }
-    if (auto parentClass = CD->getParent()->getSelfClassDecl()) {
-      if (parentClass->isObjC() || CD->isObjC())
-        recorder.addObjCMethod(parentClass, SILDeclRef(CD));
     }
   }
 
@@ -1196,13 +1190,7 @@ void TBDGenVisitor::visitFile(FileUnit *file) {
 void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   // Add any autolinking force_load symbols.
   addFirstFileSymbols();
-
-  if (desc.getPublicCMOSymbols()) {
-    for (const std::string &sym : *desc.getPublicCMOSymbols()) {
-      addSymbol(sym, SymbolSource::forCrossModuleOptimization());
-    }
-  }
-
+  
   if (auto *singleFile = desc.getSingleFile()) {
     assert(SwiftModule == singleFile->getParentModule() &&
            "mismatched file and module");
@@ -1234,6 +1222,10 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   llvm::for_each(Modules, [&](ModuleDecl *M) {
     for (auto *file : M->getFiles()) {
       visitFile(file);
+
+      // Visit synthesized file, if it exists.
+      if (auto *synthesizedFile = file->getSynthesizedFile())
+        visitFile(synthesizedFile);
     }
   });
 }
@@ -1346,9 +1338,9 @@ std::vector<std::string> swift::getPublicSymbols(TBDGenDescriptor desc) {
   return llvm::cantFail(evaluator(PublicSymbolsRequest{desc}));
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                const TBDGenOptions &opts, TBDSymbolSetPtr publicCMOSymbols) {
+                         const TBDGenOptions &opts) {
   auto &evaluator = M->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forModule(M, opts, publicCMOSymbols);
+  auto desc = TBDGenDescriptor::forModule(M, opts);
   auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
                  "YAML writing should be error-free");
@@ -1393,8 +1385,11 @@ public:
     addOrGetObjCInterface(decl);
   }
 
-  void addObjCMethod(const ClassDecl *cls,
-                     SILDeclRef method) override {
+  void addObjCCategory(const ExtensionDecl *decl) override {
+    addOrGetObjCCategory(decl);
+  }
+
+  void addObjCMethod(const GenericContext *ctx, SILDeclRef method) override {
     SmallString<128> buffer;
     StringRef name = getSelectorName(method, buffer);
     apigen::APIAvailability availability;
@@ -1409,12 +1404,23 @@ public:
         access = apigen::APIAccess::Private;
     }
 
-    auto *clsRecord = addOrGetObjCInterface(cls);
-    api.addObjCMethod(clsRecord, name, moduleLoc, access, isInstanceMethod,
-                      false, availability);
+    apigen::ObjCContainerRecord *record = nullptr;
+    if (auto *cls = dyn_cast<ClassDecl>(ctx))
+      record = addOrGetObjCInterface(cls);
+    else if (auto *ext = dyn_cast<ExtensionDecl>(ctx))
+      record = addOrGetObjCCategory(ext);
+
+    if (record)
+      api.addObjCMethod(record, name, moduleLoc, access, isInstanceMethod,
+                        false, availability);
   }
 
 private:
+  /// Follow the naming schema that IRGen uses for Categories (see
+  /// ClassDataBuilder).
+  using CategoryNameKey = std::pair<const ClassDecl *, const ModuleDecl *>;
+  llvm::DenseMap<CategoryNameKey, unsigned> CategoryCounts;
+
   apigen::APIAvailability getAvailability(const Decl *decl) {
     bool unavailable = false;
     std::string introduced, obsoleted;
@@ -1471,11 +1477,46 @@ private:
     return cls;
   }
 
+  void buildCategoryName(const ExtensionDecl *ext, const ClassDecl *cls,
+                         SmallVectorImpl<char> &s) {
+    llvm::raw_svector_ostream os(s);
+    ModuleDecl *module = ext->getParentModule();
+    os << module->getName();
+    unsigned categoryCount = CategoryCounts[{cls, module}]++;
+    if (categoryCount > 0)
+      os << categoryCount;
+  }
+
+  apigen::ObjCCategoryRecord *addOrGetObjCCategory(const ExtensionDecl *decl) {
+    auto entry = categoryMap.find(decl);
+    if (entry != categoryMap.end())
+      return entry->second;
+
+    SmallString<128> interfaceBuffer;
+    SmallString<128> nameBuffer;
+    ClassDecl *cls = decl->getSelfClassDecl();
+    auto interface = cls->getObjCRuntimeName(interfaceBuffer);
+    buildCategoryName(decl, cls, nameBuffer);
+    apigen::APIAvailability availability = getAvailability(decl);
+    apigen::APIAccess access =
+        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+    apigen::APILinkage linkage =
+        decl->getMaxAccessLevel() == AccessLevel::Public
+            ? apigen::APILinkage::Exported
+            : apigen::APILinkage::Internal;
+    auto category = api.addObjCCategory(nameBuffer, linkage, moduleLoc, access,
+                                        availability, interface);
+    categoryMap.try_emplace(decl, category);
+    return category;
+  }
+
   apigen::API &api;
   ModuleDecl *module;
   apigen::APILoc moduleLoc;
 
   llvm::DenseMap<const ClassDecl*, apigen::ObjCInterfaceRecord*> classMap;
+  llvm::DenseMap<const ExtensionDecl *, apigen::ObjCCategoryRecord *>
+      categoryMap;
 };
 
 apigen::API APIGenRequest::evaluate(Evaluator &evaluator,
@@ -1491,10 +1532,10 @@ apigen::API APIGenRequest::evaluate(Evaluator &evaluator,
 }
 
 void swift::writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os,
-                             bool PrettyPrint, TBDSymbolSetPtr publicCMOSymbols) {
+                             bool PrettyPrint) {
   TBDGenOptions opts;
   auto &evaluator = M->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forModule(M, opts, publicCMOSymbols);
+  auto desc = TBDGenDescriptor::forModule(M, opts);
   auto api = llvm::cantFail(evaluator(APIGenRequest{desc}));
   api.writeAPIJSONFile(os, PrettyPrint);
 }

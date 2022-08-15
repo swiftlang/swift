@@ -48,8 +48,8 @@ namespace swift {
   class Evaluator;
   class FileUnit;
   class GeneratedModule;
-  class GenericEnvironment;
   class GenericParamList;
+  class GenericSignature;
   class IRGenOptions;
   class LangOptions;
   class SILOptions;
@@ -157,6 +157,10 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
+  /// Load derivative configurations from @derivative attributes (including
+  /// those defined in non-primary sources).
+  void loadDerivativeConfigurations(SourceFile &SF);
+
   /// Resolve the given \c TypeRepr to an interface type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
@@ -165,13 +169,13 @@ namespace swift {
   /// \returns A well-formed type on success, or an \c ErrorType.
   Type performTypeResolution(TypeRepr *TyR, ASTContext &Ctx, bool isSILMode,
                              bool isSILType,
-                             GenericEnvironment *GenericEnv,
+                             GenericSignature GenericSig,
                              GenericParamList *GenericParams,
                              DeclContext *DC, bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
-                                             DeclContext *DC);
+  GenericSignature handleSILGenericParams(GenericParamList *genericParams,
+                                          DeclContext *DC);
 
   /// Turn the given module into SIL IR.
   ///
@@ -179,12 +183,14 @@ namespace swift {
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performASTLowering(ModuleDecl *M, Lowering::TypeConverter &TC,
-                     const SILOptions &options);
+                     const SILOptions &options,
+                     const IRGenOptions *irgenOptions = nullptr);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
   performASTLowering(FileUnit &SF, Lowering::TypeConverter &TC,
-                     const SILOptions &options);
+                     const SILOptions &options,
+                     const IRGenOptions *irgenOptions = nullptr);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -257,6 +263,11 @@ namespace swift {
                    ASTContext &Ctx,
                    llvm::Module *Module,
                    StringRef OutputFilename);
+
+  bool writeEmptyOutputFilesFor(
+    const ASTContext &Context,
+    std::vector<std::string> &ParallelOutputFilenames,
+    const IRGenOptions &IRGenOpts);
 
   /// Run the LLVM passes. In multi-threaded compilation this will be done for
   /// multiple LLVM modules in parallel.

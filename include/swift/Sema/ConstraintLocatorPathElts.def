@@ -54,6 +54,9 @@ SIMPLE_LOCATOR_PATH_ELT(AutoclosureResult)
 /// The result of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 
+/// FIXME: Misleading name: this locator is used only for single-expression
+/// closure returns.
+///
 /// The type of a closure body.
 CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
 
@@ -69,8 +72,11 @@ CUSTOM_LOCATOR_PATH_ELT(ContextualType)
 /// A result of an expression involving dynamic lookup.
 SIMPLE_LOCATOR_PATH_ELT(DynamicLookupResult)
 
-/// The superclass of a protocol existential type.
-SIMPLE_LOCATOR_PATH_ELT(ExistentialSuperclassType)
+/// The superclass of a protocol composition type.
+SIMPLE_LOCATOR_PATH_ELT(ProtocolCompositionSuperclassType)
+
+/// The constraint of an existential type.
+SIMPLE_LOCATOR_PATH_ELT(ExistentialConstraintType)
 
 /// The argument type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionArgument)
@@ -229,8 +235,19 @@ CUSTOM_LOCATOR_PATH_ELT(ImplicitConversion)
 /// An implicit call to a 'dynamicMember' subscript for a dynamic member lookup.
 SIMPLE_LOCATOR_PATH_ELT(ImplicitDynamicMemberSubscript)
 
-/// The element of the closure body e.g. statement, declaration, or expression.
-CUSTOM_LOCATOR_PATH_ELT(ClosureBodyElement)
+/// The element of the closure/function body e.g. statement, pattern,
+/// declaration, or expression.
+CUSTOM_LOCATOR_PATH_ELT(SyntacticElement)
+
+/// The element of the pattern binding declaration.
+CUSTOM_LOCATOR_PATH_ELT(PatternBindingElement)
+
+/// A declaration introduced by a pattern: name (i.e. `x`) or `_`
+ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
+  /// The variable declared by a named pattern.
+  CUSTOM_LOCATOR_PATH_ELT(NamedPatternDecl)
+  /// The anonymous variable declared by a `_` pattern.
+  CUSTOM_LOCATOR_PATH_ELT(AnyPatternDecl)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

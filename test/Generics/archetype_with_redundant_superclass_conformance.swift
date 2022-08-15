@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
+// RUN: %target-swift-frontend -emit-ir %s
 
 protocol P {
   associatedtype T : Q

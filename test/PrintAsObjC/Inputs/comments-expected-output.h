@@ -32,6 +32,14 @@ SWIFT_CLASS("_TtC8comments10ATXHeaders")
 @end
 
 
+SWIFT_CLASS("_TtC8comments10Attributes")
+@interface Attributes
+/// Here is an attribute:
+/// Attribute text
+- (void)f0;
+@end
+
+
 SWIFT_CLASS("_TtC8comments13AutomaticLink")
 @interface AutomaticLink
 /// And now for a URL.
@@ -182,6 +190,16 @@ SWIFT_CLASS("_TtC8comments13EmptyComments")
 - (void)f3;
 /// Aaa.
 - (void)f4;
+@end
+
+
+SWIFT_CLASS("_TtC8comments9Footnotes")
+@interface Footnotes
+/// Has some footnotes.
+/// Footnotes aren’t handled by swiftMarkup yet[^footnote], but they may in the future.
+/// [^footnote]: Footnotes aren’t parsed by default in swift-cmark, and swiftMarkup doesn’t
+/// enable the feature.
+- (void)f0;
 @end
 
 
@@ -424,6 +442,9 @@ SWIFT_CLASS("_TtC8comments13UnorderedList")
 - (void)f0;
 @end
 
+#endif
+#if defined(__cplusplus)
+#endif
 #if __has_attribute(external_source_symbol)
 # pragma clang attribute pop
 #endif

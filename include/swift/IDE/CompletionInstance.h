@@ -46,7 +46,7 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 /// The result returned via the callback from the perform*Operation methods.
 struct CompletionInstanceResult {
   /// The compiler instance that is prepared for the second pass.
-  CompilerInstance &CI;
+  std::shared_ptr<CompilerInstance> CI;
   /// Whether an AST was reused.
   bool DidReuseAST;
   /// Whether the CompletionInstance found a code completion token in the source
@@ -87,14 +87,14 @@ class CompletionInstance {
 
   std::mutex mtx;
 
-  std::unique_ptr<CompilerInstance> CachedCI;
+  std::shared_ptr<CompilerInstance> CachedCI;
   llvm::hash_code CachedArgHash;
   llvm::sys::TimePoint<> DependencyCheckedTimestamp;
   llvm::StringMap<llvm::hash_code> InMemoryDependencyHash;
   unsigned CachedReuseCount = 0;
   std::atomic<bool> CachedCIShouldBeInvalidated;
 
-  void cacheCompilerInstance(std::unique_ptr<CompilerInstance> CI,
+  void cacheCompilerInstance(std::shared_ptr<CompilerInstance> CI,
                              llvm::hash_code ArgsHash);
 
   bool shouldCheckDependencies() const;
@@ -109,6 +109,7 @@ class CompletionInstance {
   bool performCachedOperationIfPossible(
       llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      const SearchPathOptions &SearchPathOpts,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,

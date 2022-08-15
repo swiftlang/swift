@@ -8,6 +8,7 @@ using namespace llvm;
 
 class CompilerVersionTest : public ::testing::Test {};
 class VersionTest : public ::testing::Test{};
+class CompilerVersionUnpackingTest : public ::testing::Test {};
 
 Optional<version::Version> CV(const char *VersionString) {
   return version::Version::parseCompilerVersionString(VersionString,
@@ -51,4 +52,32 @@ TEST_F(VersionTest, VersionComparison) {
   EXPECT_TRUE(V("1.").hasValue());
   EXPECT_FALSE(V(".1").hasValue());
 
+}
+
+TEST_F(CompilerVersionUnpackingTest, VersionComparison) {
+  EXPECT_EQ(CV("700").getValue(), V("0.700").getValue());
+  EXPECT_EQ(CV("700.*").getValue(), V("0.700").getValue());
+  EXPECT_EQ(CV("700.*.1").getValue(), V("0.700.1").getValue());
+  EXPECT_EQ(CV("700.*.23").getValue(), V("0.700.23").getValue());
+  EXPECT_EQ(CV("700.*.1.1").getValue(), V("0.700.1.1").getValue());
+
+  EXPECT_EQ(CV("1300").getValue(), V("1.300").getValue());
+  EXPECT_EQ(CV("1300.*").getValue(), V("1.300").getValue());
+  EXPECT_EQ(CV("1300.*.1").getValue(), V("1.300.1").getValue());
+  EXPECT_EQ(CV("1300.*.23").getValue(), V("1.300.23").getValue());
+  EXPECT_EQ(CV("1300.*.1.1").getValue(), V("1.300.1.1").getValue());
+
+  EXPECT_EQ(CV("5007").getValue(), V("5.7").getValue());
+  EXPECT_EQ(CV("5007.*").getValue(), V("5.7").getValue());
+  EXPECT_EQ(CV("5007.*.1").getValue(), V("5.7.1").getValue());
+  EXPECT_EQ(CV("5007.*.23").getValue(), V("5.7.23").getValue());
+  EXPECT_EQ(CV("5007.*.1.1").getValue(), V("5.7.1.1").getValue());
+
+  // Since this test was added during 5.7, we expect all of these comparisons to
+  // be GE, either because we are comparing to the empty version or because we
+  // are comparing to a version >= 5.7.0.0.0.
+  auto currentVersion = version::Version::getCurrentCompilerVersion();
+  EXPECT_GE(CV("700"), currentVersion);
+  EXPECT_GE(CV("1300"), currentVersion);
+  EXPECT_GE(CV("5007"), currentVersion);
 }

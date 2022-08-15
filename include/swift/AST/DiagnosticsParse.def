@@ -140,7 +140,13 @@ ERROR(lex_invalid_escape_delimiter,none,
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
 
-ERROR(lex_unterminated_regex,none,
+ERROR(lex_regex_literal_invalid_starting_char,none,
+      "regex literal may not start with %0; add backslash to escape",
+      (StringRef))
+ERROR(lex_regex_literal_invalid_ending_char,none,
+      "regex literal may not end with %0; use extended literal instead",
+      (StringRef))
+ERROR(lex_regex_literal_unterminated,none,
       "unterminated regex literal", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
@@ -213,8 +219,6 @@ ERROR(number_cant_start_decl_name,none,
       (StringRef))
 ERROR(expected_identifier_after_case_comma, PointsToFirstBadToken,
       "expected identifier after comma in enum 'case' declaration", ())
-ERROR(decl_redefinition,none,
-      "definition conflicts with previous value", ())
 ERROR(let_cannot_be_computed_property,none,
       "'let' declarations cannot be computed properties", ())
 ERROR(let_cannot_be_observing_property,none,
@@ -378,9 +382,6 @@ ERROR(expected_rbrace_actor,none,
       "expected '}' in actor", ())
 
 // Protocol
-ERROR(generic_arguments_protocol,PointsToFirstBadToken,
-      "protocols do not allow generic parameters; use associated types instead",
-      ())
 ERROR(expected_lbrace_protocol,PointsToFirstBadToken,
       "expected '{' in protocol type", ())
 ERROR(expected_rbrace_protocol,none,
@@ -421,10 +422,12 @@ ERROR(expected_lparen_initializer,PointsToFirstBadToken,
       "expected '(' for initializer parameters", ())
 ERROR(initializer_has_name,PointsToFirstBadToken,
       "initializers cannot have a name", ())
+ERROR(initializer_result_type,PointsToFirstBadToken,
+      "initializers cannot have a result type", ())
 
 // Destructor
 ERROR(destructor_decl_outside_class,none,
-      "deinitializers may only be declared within a class", ())
+      "deinitializers may only be declared within a class or actor", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
@@ -657,6 +660,10 @@ ERROR(sil_markmustcheck_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
 ERROR(sil_markmustcheck_requires_attribute,none,
       "mark_must_check requires an attribute like 'noImplicitCopy'", ())
+ERROR(sil_moveonlytocopyable_invalid_attribute,none,
+      "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
+ERROR(sil_moveonlytocopyable_requires_attribute,none,
+      "moveonlywrapper_to_copyable requires either a [guaranteed] or [owned] attribute", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -679,6 +686,8 @@ ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
 ERROR(sil_dynamically_replaced_func_not_found,none,
       "dynamically replaced function not found %0", (Identifier))
+ERROR(sil_adhoc_requirement_witness_func_not_found,none,
+      "ad-hoc requirement witness function not found %0", (Identifier))
 ERROR(sil_specialize_target_func_not_found,none,
       "_specialize target function not found %0", (Identifier))
 ERROR(sil_availability_expected_version,none,
@@ -728,7 +737,7 @@ ERROR(sil_witness_protocol_conformance_not_found,none,
 ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
       "expected '%0' in differentiability witness", (StringRef))
 ERROR(sil_diff_witness_unknown_kind,PointsToFirstBadToken,
-      "unknonwn differentiability kind '%0'; expected 'forward', 'reverse', "
+      "unknown differentiability kind '%0'; expected 'forward', 'reverse', "
       "'normal', or 'linear'", (StringRef))
 ERROR(sil_diff_witness_serialized_declaration,none,
       "differentiability witness declaration should not be serialized", ())
@@ -804,6 +813,8 @@ ERROR(expected_dynamic_func_attr,none,
 ERROR(async_after_throws,none,
       "%select{'async'|'reasync'}0 must precede %select{'throws'|'rethrows'}1",
       (bool, bool))
+ERROR(await_in_function_type,none,
+      "expected async specifier; did you mean 'async'?", ())
 ERROR(duplicate_effects_specifier,none,
       "'%0' has already been specified", (StringRef))
 
@@ -1057,7 +1068,7 @@ ERROR(expected_expr_throw,PointsToFirstBadToken,
 ERROR(expected_await_not_async,none,
       "found 'async' in expression; did you mean 'await'?", ())
 
-// Yield Statment
+// Yield Statement
 ERROR(expected_expr_yield,PointsToFirstBadToken,
       "expected expression in 'yield' statement", ())
 ERROR(unexpected_label_yield,none,
@@ -1084,12 +1095,14 @@ ERROR(conditional_var_initializer_required,none,
 ERROR(wrong_condition_case_location,none,
       "pattern matching binding is spelled with 'case %0', not '%0 case'",
       (StringRef))
+ERROR(conditional_var_valid_identifiers_only,none,
+      "unwrap condition requires a valid identifier", ())
 
 // If Statement
 ERROR(expected_condition_if,PointsToFirstBadToken,
       "expected expression, var, or let in 'if' condition", ())
 ERROR(missing_condition_after_if,none,
-      "missing condition in an 'if' statement", ())
+      "missing condition in 'if' statement", ())
 ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_or_if_after_else,PointsToFirstBadToken,
@@ -1105,7 +1118,7 @@ NOTE(suggest_removing_else,none,
 ERROR(expected_condition_guard,PointsToFirstBadToken,
       "expected expression, var, let or case in 'guard' condition", ())
 ERROR(missing_condition_after_guard,none,
-      "missing condition in an 'guard' statement", ())
+      "missing condition in 'guard' statement", ())
 ERROR(expected_else_after_guard,PointsToFirstBadToken,
       "expected 'else' after 'guard' condition", ())
 ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
@@ -1115,7 +1128,7 @@ ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
 ERROR(expected_condition_while,PointsToFirstBadToken,
       "expected expression, var, or let in 'while' condition", ())
 ERROR(missing_condition_after_while,none,
-      "missing condition in a 'while' statement", ())
+      "missing condition in 'while' statement", ())
 ERROR(expected_lbrace_after_while,PointsToFirstBadToken,
       "expected '{' after 'while' condition", ())
 
@@ -1349,6 +1362,11 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// String interpolation isnt closed by a )
+// ie: `let west = "ye \("`
+ERROR(string_interpolation_unclosed, none,
+      "cannot find ')' to match opening '(' in string interpolation", ())
+
 // Interpolations with parameter labels or multiple values
 WARNING(string_interpolation_list_changing,none,
       "interpolating multiple values will not form a tuple in Swift 5", ())
@@ -1495,9 +1513,8 @@ ERROR(attr_unsupported_on_target, none,
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
-ERROR(attr_availability_unavailable_deprecated,none,
-      "'%0' attribute cannot be both unconditionally 'unavailable' and "
-      "'deprecated'", (StringRef))
+ERROR(attr_availability_multiple_kinds ,none,
+      "'%0' attribute cannot be both '%1' and '%2'", (StringRef, StringRef, StringRef))
 
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
@@ -1559,17 +1576,8 @@ ERROR(attr_availability_duplicate,none,
       (StringRef, StringRef))
 
 // originallyDefinedIn
-// FIXME(backDeploy): Refactor to share with back deployment attr
 ERROR(originally_defined_in_missing_rparen,none,
       "expected ')' in @_originallyDefinedIn argument list", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-ERROR(originally_defined_in_unrecognized_platform,none,
-      "unrecognized platform name in @_originallyDefinedIn argument list", ())
-
-// FIXME: This is unused and can be removed
-ERROR(originally_defined_in_unrecognized_property,none,
-      "unrecognized property in @_originallyDefinedIn argument list", ())
 
 ERROR(originally_defined_in_need_original_module_name,none,
       "expected 'module: \"original\"' in the first argument to "
@@ -1578,28 +1586,11 @@ ERROR(originally_defined_in_need_original_module_name,none,
 ERROR(originally_defined_in_need_nonempty_module_name,none,
       "original module name cannot be empty in @_originallyDefinedIn", ())
 
-// FIXME(backDeploy): Refactor to share with back deployment attr
-ERROR(originally_defined_in_need_platform_version,none,
-     "expected at least one platform version in @_originallyDefinedIn", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_major_minor_only,none,
-        "@_originallyDefinedIn only uses major and minor version number", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_missing_platform_name,none,
-        "* as platform name has no effect", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_swift_version, none,
-        "Swift language version checks has no effect "
-        "in @_originallyDefinedIn", ())
-
-WARNING(originally_defined_in_package_description, none,
-        "PackageDescription version checks has no effect "
-        "in @_originallyDefinedIn", ())
-
 // backDeploy
+ERROR(attr_back_deploy_expected_before_label,none,
+      "expected 'before:' in '@_backDeploy' attribute", ())
+ERROR(attr_back_deploy_expected_colon_after_before,none,
+      "expected ':' after 'before' in '@_backDeploy' attribute", ())
 ERROR(attr_back_deploy_missing_rparen,none,
       "expected ')' in '@_backDeploy' argument list", ())
 
@@ -1797,8 +1788,14 @@ ERROR(redundant_class_requirement,none,
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
 ERROR(where_inside_brackets,none,
-        "'where' clause next to generic parameters is obsolete, "
-        "must be written following the declaration's type", ())
+      "'where' clause next to generic parameters is obsolete, "
+      "must be written following the declaration's type", ())
+
+
+ERROR(expected_rangle_primary_associated_type_list,PointsToFirstBadToken,
+      "expected '>' to complete primary associated type list", ())
+ERROR(expected_primary_associated_type_name,PointsToFirstBadToken,
+      "expected an identifier to name primary associated type", ())
 
 //------------------------------------------------------------------------------
 // MARK: Conditional compilation parsing diagnostics
@@ -1833,7 +1830,10 @@ ERROR(version_component_not_number,none,
 ERROR(compiler_version_too_many_components,none,
       "compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,NoUsage,
-      "the second version component is not used for comparison", ())
+      "the second version component is not used for comparison in legacy "
+      "compiler versions%select{|; are you trying to encode a new Swift "
+      "compiler version for compatibility with legacy compilers?}0",
+      (bool))
 ERROR(empty_version_component,none,
       "found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,
@@ -1851,11 +1851,20 @@ WARNING(likely_simulator_platform_condition,none,
       "use 'targetEnvironment(simulator)' instead",
       ())
 
-ERROR(canimport_two_parameters, none, "canImport can take only two parameters", ())
-
-ERROR(canimport_label, none, "2nd parameter of canImport should be labeled as _version or _underlyingVersion", ())
-
-ERROR(canimport_version, none, "cannot parse module version: %0", (StringRef))
+ERROR(canimport_two_parameters,none,
+      "canImport can take only two parameters", ())
+ERROR(canimport_label,none,
+      "2nd parameter of canImport should be labeled as "
+      "_version or _underlyingVersion", ())
+ERROR(canimport_invalid_version,none,
+      "cannot parse module version '%0'",
+      (StringRef))
+ERROR(canimport_empty_version,none,
+      "%0 argument cannot be empty",
+      (StringRef))
+WARNING(canimport_version_too_many_components,none,
+        "trailing components of version '%0' are ignored",
+        (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Availability query parsing diagnostics
@@ -1907,11 +1916,6 @@ ERROR(availability_query_repeated_platform, none,
 ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
-      (StringRef, bool))
-
-ERROR(attr_requires_distributed, none,
-      "'%0' %select{attribute|modifier}1 is only valid when experimental "
-      "distributed support is enabled",
       (StringRef, bool))
 
 //------------------------------------------------------------------------------

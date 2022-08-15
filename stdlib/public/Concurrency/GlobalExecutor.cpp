@@ -25,7 +25,7 @@
 /// threads from growing without limit.
 /// 
 /// Second, executors may own dedicated threads, or they may schedule
-/// work onto some some underlying executor.  Dedicated threads can
+/// work onto some underlying executor.  Dedicated threads can
 /// improve the responsiveness of a subsystem *locally*, but they impose
 /// substantial costs which can drive down performance *globally*
 /// if not used carefully.  When an executor relies on running work

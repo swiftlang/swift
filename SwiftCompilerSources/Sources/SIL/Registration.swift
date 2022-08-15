@@ -14,7 +14,7 @@ import Basic
 import SILBridging
 
 private func register<T: AnyObject>(_ cl: T.Type) {
-  String(describing: cl).withBridgedStringRef { nameStr in
+  String(describing: cl)._withStringRef { nameStr in
     let metatype = unsafeBitCast(cl, to: SwiftMetatype.self)
     registerBridgedClass(nameStr, metatype)
   }
@@ -39,6 +39,8 @@ public func registerSILClasses() {
   register(BlockArgument.self)
 
   register(StoreInst.self)
+  register(StoreWeakInst.self)
+  register(StoreUnownedInst.self)
   register(CopyAddrInst.self)
   register(EndAccessInst.self)
   register(EndBorrowInst.self)
@@ -56,7 +58,10 @@ public func registerSILClasses() {
   register(ReleaseValueInst.self)
   register(DestroyValueInst.self)
   register(DestroyAddrInst.self)
+  register(InjectEnumAddrInst.self)
   register(LoadInst.self)
+  register(LoadWeakInst.self)
+  register(LoadUnownedInst.self)
   register(LoadBorrowInst.self)
   register(BuiltinInst.self)
   register(UpcastInst.self)
@@ -81,6 +86,7 @@ public func registerSILClasses() {
   register(GlobalAddrInst.self)
   register(GlobalValueInst.self)
   register(IntegerLiteralInst.self)
+  register(StringLiteralInst.self)
   register(TupleInst.self)
   register(TupleExtractInst.self)
   register(TupleElementAddrInst.self)
@@ -89,19 +95,23 @@ public func registerSILClasses() {
   register(StructElementAddrInst.self)
   register(EnumInst.self)
   register(UncheckedEnumDataInst.self)
+  register(InitEnumDataAddrInst.self)
+  register(UncheckedTakeEnumDataAddrInst.self)
   register(RefElementAddrInst.self)
   register(RefTailAddrInst.self)
   register(UnconditionalCheckedCastInst.self)
-  register(UnconditionalCheckedCastValueInst.self)
   register(ConvertFunctionInst.self)
   register(ThinToThickFunctionInst.self)
   register(ObjCExistentialMetatypeToObjectInst.self)
   register(ObjCMetatypeToObjectInst.self)
   register(ValueToBridgeObjectInst.self)
   register(MarkDependenceInst.self)
+  register(RefToBridgeObjectInst.self)
   register(BridgeObjectToRefInst.self)
+  register(BridgeObjectToWordInst.self)
   register(BeginAccessInst.self)
   register(BeginBorrowInst.self)
+  register(ProjectBoxInst.self)
   register(CopyValueInst.self)
   register(EndCOWMutationInst.self)
   register(ClassifyBridgeObjectInst.self)
@@ -140,5 +150,4 @@ public func registerSILClasses() {
   register(AwaitAsyncContinuationInst.self)
   register(CheckedCastBranchInst.self)
   register(CheckedCastAddrBranchInst.self)
-  register(CheckedCastValueBranchInst.self)
 }

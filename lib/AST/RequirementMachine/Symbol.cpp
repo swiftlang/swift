@@ -78,6 +78,7 @@ struct Symbol::Storage final
   Storage(Symbol::Kind kind, CanType type, ArrayRef<Term> substitutions) {
     assert(kind == Symbol::Kind::Superclass ||
            kind == Symbol::Kind::ConcreteType);
+    assert(!type->hasUnboundGenericType());
     assert(!type->hasTypeVariable());
     assert(type->hasTypeParameter() != substitutions.empty());
 
@@ -596,7 +597,8 @@ Symbol Symbol::withConcreteSubstitutions(
     break;
   }
 
-  llvm_unreachable("Bad symbol kind");
+  llvm::errs() << "Bad symbol kind: " << *this << "\n";
+  abort();
 }
 
 /// For a superclass or concrete type symbol
@@ -656,6 +658,8 @@ void Symbol::dump(llvm::raw_ostream &out) const {
 
   PrintOptions opts;
   opts.AlternativeTypeNames = &substitutionNames;
+  opts.OpaqueReturnTypePrinting =
+      PrintOptions::OpaqueReturnTypePrintingMode::StableReference;
 
   switch (getKind()) {
   case Kind::Name:
@@ -671,9 +675,15 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     return;
   }
 
-  case Kind::GenericParam:
-    out << Type(getGenericParam());
+  case Kind::GenericParam: {
+    auto *gp = getGenericParam();
+    if (gp->isTypeSequence()) {
+      out << "(" << Type(gp) << "…)";
+    } else {
+      out << Type(gp);
+    }
     return;
+  }
 
   case Kind::Layout:
     out << "[layout: ";

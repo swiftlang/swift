@@ -103,7 +103,8 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 5; // Store FilterName in cache
+static constexpr uint32_t onDiskCompletionCacheVersion =
+    10; // Store if decl has an async alternative
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -151,12 +152,14 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
   const char *chunks = resultEnd;
   auto chunkSize = read32le(chunks);
   const char *strings = chunks + chunkSize;
-  auto stringCount = read32le(strings);
-  assert(strings + stringCount == end && "incorrect file size");
-  (void)stringCount; // so it is not seen as "unused" in release builds.
-  llvm::DenseMap<uint32_t, NullTerminatedStringRef> knownStrings;
+  auto stringsSize = read32le(strings);
+  const char *types = strings + stringsSize;
+  auto typesSize = read32le(types);
+  assert(types + typesSize == end && "incorrect file size");
+  (void)typesSize; // so it is not seen as "unused" in release builds.
 
   // STRINGS
+  llvm::DenseMap<uint32_t, NullTerminatedStringRef> knownStrings;
   auto getString = [&](uint32_t index) -> NullTerminatedStringRef {
     if (index == ~0u)
       return "";
@@ -170,6 +173,32 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto str = NullTerminatedStringRef(StringRef(p, size), *V.Allocator);
     knownStrings[index] = str;
     return str;
+  };
+
+  // TYPES
+  llvm::DenseMap<uint32_t, const USRBasedType *> knownTypes;
+  std::function<const USRBasedType *(uint32_t)> getType =
+      [&](uint32_t index) -> const USRBasedType * {
+    auto found = knownTypes.find(index);
+    if (found != knownTypes.end()) {
+      return found->second;
+    }
+    const char *p = types + index;
+    auto usrLength = read32le(p);
+    auto usr = StringRef(p, usrLength);
+    p += usrLength;
+    auto supertypesCount = read32le(p);
+    std::vector<const USRBasedType *> supertypes;
+    supertypes.reserve(supertypesCount);
+    for (unsigned i = 0; i < supertypesCount; i++) {
+      auto supertypeIndex = read32le(p);
+      supertypes.push_back(getType(supertypeIndex));
+    }
+    auto customAttributeKinds = OptionSet<CustomAttributeKind, uint8_t>(*p++);
+    const USRBasedType *res = USRBasedType::fromUSR(
+        usr, supertypes, customAttributeKinds, V.USRTypeArena);
+    knownTypes[index] = res;
+    return res;
   };
 
   // CHUNKS
@@ -206,11 +235,14 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto diagSeverity =
         static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
+    auto isAsync = static_cast<bool>(*cursor++);
+    auto hasAsyncAlternative = static_cast<bool>(*cursor++);
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
     auto filterNameIndex = read32le(cursor);
+    auto nameForDiagnosticsIndex = read32le(cursor);
 
     auto assocUSRCount = read32le(cursor);
     SmallVector<NullTerminatedStringRef, 4> assocUSRs;
@@ -218,18 +250,27 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       assocUSRs.push_back(getString(read32le(cursor)));
     }
 
+    auto resultTypesCount = read32le(cursor);
+    SmallVector<const USRBasedType *, 1> resultTypes;
+    resultTypes.reserve(resultTypesCount);
+    for (size_t i = 0; i < resultTypesCount; i++) {
+      resultTypes.push_back(getType(read32le(cursor)));
+    }
+
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
     auto filterName = getString(filterNameIndex);
+    auto nameForDiagnostics = getString(nameForDiagnosticsIndex);
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
-            kind, associatedKind, opKind, isSystem, string, moduleName,
-            briefDocComment, makeArrayRef(assocUSRs).copy(*V.Allocator),
-            CodeCompletionResultType::unknown(), notRecommended, diagSeverity,
-            diagMessage, filterName);
+            kind, associatedKind, opKind, isSystem, isAsync,
+            hasAsyncAlternative, string, moduleName, briefDocComment,
+            makeArrayRef(assocUSRs).copy(*V.Allocator),
+            CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
+            diagMessage, filterName, nameForDiagnostics);
 
     V.Results.push_back(result);
   }
@@ -302,6 +343,9 @@ static void writeCachedModule(llvm::raw_ostream &out,
   std::string strings_;
   llvm::raw_string_ostream strings(strings_);
   llvm::StringMap<uint32_t> knownStrings;
+  std::string types_;
+  llvm::raw_string_ostream types(types_);
+  llvm::DenseMap<const USRBasedType *, uint32_t> knownTypes;
 
   auto addString = [&strings, &knownStrings](StringRef str) {
     if (str.empty())
@@ -315,6 +359,39 @@ static void writeCachedModule(llvm::raw_ostream &out,
     LE.write(static_cast<uint32_t>(str.size()));
     strings << str;
     knownStrings[str] = size;
+    return static_cast<uint32_t>(size);
+  };
+
+  std::function<uint32_t(const USRBasedType *)> addType =
+      [&types, &knownTypes, &addType](const USRBasedType *type) -> uint32_t {
+    auto found = knownTypes.find(type);
+    if (found != knownTypes.end()) {
+      return found->second;
+    }
+    std::vector<uint32_t> supertypeIndicies;
+    // IMPORTANT: To compute the supertype indicies, we might need to add
+    // entries to the type table by calling addType recursively. Thus, we must
+    // perform this calculation before writing any bytes of this type to the
+    // types table.
+    auto supertypes = type->getSupertypes();
+    supertypeIndicies.reserve(supertypes.size());
+    for (auto supertype : supertypes) {
+      supertypeIndicies.push_back(addType(supertype));
+    }
+
+    auto size = types.tell();
+    endian::Writer LE(types, little);
+    StringRef USR = type->getUSR();
+    LE.write(static_cast<uint32_t>(USR.size()));
+    types << USR;
+    LE.write(static_cast<uint32_t>(supertypeIndicies.size()));
+    for (auto supertypeIndex : supertypeIndicies) {
+      LE.write(static_cast<uint32_t>(supertypeIndex));
+    }
+    OptionSet<CustomAttributeKind, uint8_t> customAttributeKinds =
+        type->getCustomAttributeKinds();
+    LE.write(static_cast<uint8_t>(customAttributeKinds.toRaw()));
+    knownTypes[type] = size;
     return static_cast<uint32_t>(size);
   };
 
@@ -349,16 +426,26 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
       LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
+      LE.write(static_cast<uint8_t>(R->isAsync()));
+      LE.write(static_cast<uint8_t>(R->hasAsyncAlternative()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
       LE.write(addString(R->getDiagnosticMessage())); // index into strings
       LE.write(addString(R->getFilterName())); // index into strings
+      LE.write(addString(R->getNameForDiagnostics())); // index into strings
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {
         LE.write(addString(R->getAssociatedUSRs()[i]));
+      }
+
+      auto resultTypes =
+          R->getResultType().getUSRBasedResultTypes(V.USRTypeArena);
+      LE.write(static_cast<uint32_t>(resultTypes.size()));
+      for (auto resultType : resultTypes) {
+        LE.write(addType(resultType)); // index into types
       }
     }
   }
@@ -372,6 +459,10 @@ static void writeCachedModule(llvm::raw_ostream &out,
   // STRINGS
   LE.write(static_cast<uint32_t>(strings.tell()));
   out << strings.str();
+
+  // TYPES
+  LE.write(static_cast<uint32_t>(types.tell()));
+  out << types.str();
 }
 
 /// Get the name for the cached code completion results for a given key \p K in

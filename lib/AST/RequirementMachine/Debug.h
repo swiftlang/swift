@@ -51,17 +51,33 @@ enum class DebugFlags : unsigned {
   /// Print debug output from the minimal conformances algorithm.
   MinimalConformances = (1<<9),
 
+  /// Print more detailed debug output from the minimal conformances algorithm.
+  MinimalConformancesDetail = (1<<10),
+
   /// Print debug output from the protocol dependency graph.
-  ProtocolDependencies = (1<<10),
+  ProtocolDependencies = (1<<11),
 
   /// Print debug output from generic signature minimization.
-  Minimization = (1<<11),
+  Minimization = (1<<12),
 
   /// Print redundant rules and their replacement paths.
-  RedundantRules = (1<<12),
+  RedundantRules = (1<<13),
 
   /// Print more detail about redundant rules.
-  RedundantRulesDetail = (1<<13)
+  RedundantRulesDetail = (1<<14),
+
+  /// Print debug output from the concrete contraction pre-processing pass.
+  ConcreteContraction = (1<<15),
+
+  /// Print debug output from propagating explicit requirement
+  /// IDs from redundant rules.
+  PropagateRequirementIDs = (1<<16),
+
+  /// Print a trace of requirement machines constructed and how long each took.
+  Timers = (1<<17),
+
+  /// Print conflicting rules.
+  ConflictingRules = (1<<18),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

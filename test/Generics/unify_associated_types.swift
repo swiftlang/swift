@@ -20,7 +20,7 @@ protocol P2a {
 
 struct MergeTest<G : P1a & P2a> {}
 
-// CHECK-LABEL: Adding generic signature <τ_0_0 where τ_0_0 : P1a, τ_0_0 : P2a> {
+// CHECK-LABEL: Requirement machine for fresh signature < G >
 // CHECK-LABEL: Rewrite system: {
 // CHECK: - τ_0_0.[P2a:T] => τ_0_0.[P1a:T]
 // CHECK: - τ_0_0.[P1a:T].[P2] => τ_0_0.[P1a:T]
@@ -30,5 +30,3 @@ struct MergeTest<G : P1a & P2a> {}
 // CHECK:   τ_0_0 => { conforms_to: [P1a P2a] }
 // CHECK:   τ_0_0.[P1a:T] => { conforms_to: [P1 P2] }
 // CHECK: }
-// CHECK: }
-

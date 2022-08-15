@@ -19,13 +19,16 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -64,14 +67,10 @@ bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
   if (closure->isSeparatelyTypeChecked())
     return false;
 
-  auto &opts = D->getASTContext().TypeCheckerOpts;
-
-  // If multi-statement inference is enabled, let's not walk
-  // into declarations contained in a multi-statement closure
-  // because they'd be handled via `typeCheckDecl` that runs
+  // Let's not walk into declarations contained in a multi-statement
+  // closure because they'd be handled via `typeCheckDecl` that runs
   // syntactic diagnostics.
-  if (opts.EnableMultiStatementClosureInference &&
-      !closure->hasSingleExpressionBody()) {
+  if (!closure->hasSingleExpressionBody()) {
     // Since pattern bindings get their types through solution application,
     // `typeCheckDecl` doesn't touch initializers (because they are already
     // fully type-checked), so pattern bindings have to be allowed to be
@@ -101,6 +100,7 @@ bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
 ///   - KeyPath expressions cannot refer to effectful properties / subscripts
+///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
@@ -321,11 +321,17 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
         checkCheckedCastExpr(cast);
       }
-      
+
+      // Diagnose move expression uses where the sub expression is not a declref
+      // expr.
+      if (auto *moveExpr = dyn_cast<MoveExpr>(E)) {
+        checkMoveExpr(moveExpr);
+      }
+
       return { true, E };
     }
 
-    /// Visit each component of the keypath and emit a diganostic if they
+    /// Visit each component of the keypath and emit a diagnostic if they
     /// refer to a member that has effects.
     void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
       for (const auto &component : keyPath->getComponents()) {
@@ -354,10 +360,24 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       auto layout = castType->getExistentialLayout();
       for (auto proto : layout.getProtocols()) {
-        if (proto->getDecl()->isMarkerProtocol()) {
+        if (proto->isMarkerProtocol()) {
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
-                             proto->getDecl()->getName());
+                             proto->getName());
         }
+      }
+    }
+
+    void checkMoveExpr(MoveExpr *moveExpr) {
+      // Make sure the MoveOnly feature is set. If not, error.
+      if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
+        auto error =
+          diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
+        Ctx.Diags.diagnose(moveExpr->getLoc(), error);
+      }
+
+      if (!isa<DeclRefExpr>(moveExpr->getSubExpr())) {
+        Ctx.Diags.diagnose(moveExpr->getLoc(),
+                           diag::move_expression_not_passed_lvalue);
       }
     }
 
@@ -532,7 +552,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // `*SpelledAsFile` cases and various other File-related cases.
       //
       // The way we're going to do this is a bit magical. We will arrange the
-      // cases in MagicIdentifierLiteralExpr::Kind so that that they sort in
+      // cases in MagicIdentifierLiteralExpr::Kind so that they sort in
       // this order:
       //
       //     #fileID < Swift 6 #file < #filePath < Swift 5 #file < others
@@ -1691,7 +1711,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       //   1. There is an existing capture list which already has some
       //      entries. We need to insert 'self' into the capture list along
       //      with a separating comma.
-      //   2. There is an existing capture list, but it is empty (jusr '[]').
+      //   2. There is an existing capture list, but it is empty (just '[]').
       //      We can just insert 'self'.
       //   3. Arguments or types are already specified in the signature,
       //      but there is no existing capture list. We will need to insert
@@ -1794,7 +1814,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       }
 
       if (hasExplicitAnyObject)
-        members.push_back(typeDecl->getASTContext().getAnyObjectType());
+        members.push_back(typeDecl->getASTContext().getAnyObjectConstraint());
 
       auto type = ProtocolCompositionType::get(typeDecl->getASTContext(),
                                                members, hasExplicitAnyObject);
@@ -2096,7 +2116,7 @@ static void diagnoseUnownedImmediateDeallocationImpl(ASTContext &ctx,
   if (varDecl->getDeclContext()->isTypeContext())
     storageKind = SK_Property;
 
-  // TODO: The DiagnoseLifetimeIssuesPass prints a similiar warning in this
+  // TODO: The DiagnoseLifetimeIssuesPass prints a similar warning in this
   // situation. We should only print one warning.
 
   ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
@@ -2331,7 +2351,7 @@ static bool fixItOverrideDeclarationTypesImpl(
 }
 }
 
-bool swift::computeFixitsForOverridenDeclaration(
+bool swift::computeFixitsForOverriddenDeclaration(
     ValueDecl *decl, const ValueDecl *base,
     llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag) {
   SmallVector<std::tuple<NoteKind_t, SourceRange, std::string>, 4> Notes;
@@ -2603,33 +2623,40 @@ public:
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
-  using Candidate = std::pair<Expr *, SubstitutionMap>;
+  using Candidate = std::tuple<Expr *, SubstitutionMap, /*isUnique=*/bool>;
+  using AvailabilityContext = IfStmt *;
 
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
   BraceStmt *Body;
-  SmallVector<Candidate, 4> Candidates;
-  SmallPtrSet<const void *, 4> KnownCandidates;
+
+  /// A set of all candidates with unique signatures.
+  SmallPtrSet<const void *, 4> UniqueSignatures;
+
+  /// Represents a current availability context. `nullptr` means that
+  /// there are no restrictions.
+  AvailabilityContext CurrentAvailability = nullptr;
+
+  /// All of the candidates together with their availability.
+  ///
+  /// If a candidate is found in non-`if #available` context or
+  /// `if #available` has other dynamic conditions, it covers 'all'
+  /// versions and the context is set to `nullptr`.
+  SmallVector<std::pair<AvailabilityContext, Candidate>, 4> Candidates;
 
   bool HasInvalidReturn = false;
 
 public:
   OpaqueUnderlyingTypeChecker(AbstractFunctionDecl *Implementation,
-                              OpaqueTypeDecl *OpaqueDecl,
-                              BraceStmt *Body)
-    : Ctx(Implementation->getASTContext()),
-      Implementation(Implementation),
-      OpaqueDecl(OpaqueDecl),
-      Body(Body)
-  {
-    
-  }
-  
+                              OpaqueTypeDecl *OpaqueDecl, BraceStmt *Body)
+      : Ctx(Implementation->getASTContext()), Implementation(Implementation),
+        OpaqueDecl(OpaqueDecl), Body(Body) {}
+
   void check() {
     Body->walk(*this);
 
-    // If given function has any invalid returns in the body
+    // If given function has any invalid `return`s in the body
     // let's not try to validate the types, since it wouldn't
     // be accurate.
     if (HasInvalidReturn)
@@ -2639,95 +2666,290 @@ public:
     // we have nothing to infer the underlying type from.
     if (Candidates.empty()) {
       Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
+
+      // We try to find if the last element of the `Body` multi element
+      // `BraceStmt` is an expression that produces a value that satisfies all
+      // the opaque type requirements and if that is the case, it means we can
+      // suggest a fix-it note to add an explicit `return`.
+      if (Body->getNumElements() > 1) {
+        auto element = Body->getLastElement();
+        // Let's see if the last statement would make for a valid return value.
+        if (auto expr = element.dyn_cast<Expr *>()) {
+          bool conforms = llvm::all_of(OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements(),
+                                       [&expr, this](auto requirement) {
+            if (requirement.getKind() == RequirementKind::Conformance) {
+              auto conformance =
+                  TypeChecker::conformsToProtocol(expr->getType()->getRValueType(),
+                                                  requirement.getProtocolDecl(),
+                                                  Implementation->getModuleContext(),
+                                                  /*allowMissing=*/ false);
+              return !conformance.isInvalid();
+            }
+            // If we encounter any requirements other than `Conformance`, we do
+            // not attempt to type check the expression.
+            return false;
+          });
+
+          // If all requirements are fulfilled, we offer to insert `return` to
+          // fix the issue.
+          if (conforms) {
+            Ctx.Diags
+                .diagnose(expr->getStartLoc(),
+                          diag::opaque_type_missing_return_last_expr_note)
+                .fixItInsert(expr->getStartLoc(), "return ");
+          }
+        }
+      }
+
+      return;
+    }
+
+    if (Candidates.size() == 1) {
+      finalizeUnique(Candidates.front().second);
       return;
     }
 
     // Check whether all of the underlying type candidates match up.
     // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
-    SubstitutionMap underlyingSubs = Candidates.front().second;
-    if (Candidates.size() > 1) {
-      unsigned mismatchIndex = OpaqueDecl->getOpaqueGenericParams().size();
-      for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
-        unsigned index = genericParam->getIndex();
-        Type underlyingType = Candidates[0].second.getReplacementTypes()[index];
-        bool found = false;
-        for (const auto &candidate : Candidates) {
-          Type otherType = candidate.second.getReplacementTypes()[index];
-          if (!underlyingType->isEqual(otherType)) {
-            mismatchIndex = index;
-            found = true;
-            break;
-          }
-        }
 
-        if (found)
-          break;
-      }
-      assert(mismatchIndex < OpaqueDecl->getOpaqueGenericParams().size());
-
-      if (auto genericParam =
-              OpaqueDecl->getExplicitGenericParam(mismatchIndex)) {
-        Implementation->diagnose(
-            diag::opaque_type_mismatched_underlying_type_candidates_named,
-            genericParam->getName())
-          .highlight(genericParam->getLoc());
-      } else {
-        TypeRepr *opaqueRepr =
-            OpaqueDecl->getOpaqueReturnTypeReprs()[mismatchIndex];
-        Implementation->diagnose(
-            diag::opaque_type_mismatched_underlying_type_candidates,
-            opaqueRepr)
-          .highlight(opaqueRepr->getSourceRange());
-      }
-
-      for (auto candidate : Candidates) {
-        Ctx.Diags.diagnose(
-           candidate.first->getLoc(),
-           diag::opaque_type_underlying_type_candidate_here,
-           candidate.second.getReplacementTypes()[mismatchIndex]);
-      }
+    // There is a single unique signature, which means that all returns
+    // matched.
+    if (llvm::count_if(Candidates, [](const auto &entry) {
+          const auto &candidate = entry.second;
+          return std::get<2>(candidate); // isUnique field.
+        }) == 1) {
+      finalizeUnique(Candidates.front().second);
       return;
     }
-    
+
+    SmallVector<Candidate, 4> universallyUniqueCandidates;
+
+    for (const auto &entry : Candidates) {
+      AvailabilityContext availability = entry.first;
+      const auto &candidate = entry.second;
+
+      // Unique candidate without availability context.
+      if (!availability && std::get<2>(candidate))
+        universallyUniqueCandidates.push_back(candidate);
+    }
+
+    // TODO(diagnostics): Need a tailored diagnostic for this case.
+    if (universallyUniqueCandidates.empty()) {
+      Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
+      return;
+    }
+
+    // If there is a single universally available unique candidate
+    // the underlying type would have to be determined at runtime
+    // based on the results of availability checks.
+    if (universallyUniqueCandidates.size() == 1) {
+      finalizeOpaque(universallyUniqueCandidates.front());
+      return;
+    }
+
+    // A list of all mismatches discovered across all candidates.
+    // If there are any mismatches in availability contexts, they
+    // are not diagnosed but propagated to the declaration.
+    Optional<std::pair<unsigned, GenericTypeParamType *>> mismatch;
+
+    auto opaqueParams = OpaqueDecl->getOpaqueGenericParams();
+    SubstitutionMap underlyingSubs = std::get<1>(Candidates.front().second);
+
+    for (auto index : indices(opaqueParams)) {
+      auto *genericParam = opaqueParams[index];
+
+      Type underlyingType = Type(genericParam).subst(underlyingSubs);
+      bool found = false;
+      for (const auto &candidate : universallyUniqueCandidates) {
+        Type otherType = Type(genericParam).subst(std::get<1>(candidate));
+
+        if (!underlyingType->isEqual(otherType)) {
+          mismatch.emplace(index, genericParam);
+          found = true;
+          break;
+        }
+      }
+
+      if (found)
+        break;
+    }
+
+    assert(mismatch.hasValue());
+
+    if (auto genericParam =
+            OpaqueDecl->getExplicitGenericParam(mismatch->first)) {
+      Implementation
+          ->diagnose(
+              diag::opaque_type_mismatched_underlying_type_candidates_named,
+              genericParam->getName())
+          .highlight(genericParam->getLoc());
+    } else {
+      TypeRepr *opaqueRepr =
+          OpaqueDecl->getOpaqueReturnTypeReprs()[mismatch->first];
+      Implementation
+          ->diagnose(diag::opaque_type_mismatched_underlying_type_candidates,
+                     opaqueRepr)
+          .highlight(opaqueRepr->getSourceRange());
+    }
+
+    for (const auto &candidate : universallyUniqueCandidates) {
+      Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
+                         diag::opaque_type_underlying_type_candidate_here,
+                         Type(mismatch->second).subst(std::get<1>(candidate)));
+    }
+  }
+
+  bool isSelfReferencing(const Candidate &candidate) {
+    auto substitutions = std::get<1>(candidate);
+
     // The underlying type can't be defined recursively
     // in terms of the opaque type itself.
     auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
         OpaqueDecl->getDeclaredInterfaceType());
     for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
-      auto underlyingType = Type(genericParam).subst(underlyingSubs);
-      auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
-        return t->isEqual(opaqueTypeInContext);
-      });
+      auto underlyingType = Type(genericParam).subst(substitutions);
+      auto isSelfReferencing = underlyingType.findIf(
+          [&](Type t) -> bool { return t->isEqual(opaqueTypeInContext); });
 
       if (isSelfReferencing) {
-        unsigned index = genericParam->getIndex();
-        Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
+        Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
                            diag::opaque_type_self_referential_underlying_type,
-                           underlyingSubs.getReplacementTypes()[index]);
-        return;
+                           underlyingType);
+        return true;
       }
     }
 
+    return false;
+  }
+
+  // A single unique underlying substitution.
+  void finalizeUnique(const Candidate &candidate) {
     // If we have one successful candidate, then save it as the underlying
     // substitutions of the opaque decl.
-    OpaqueDecl->setUnderlyingTypeSubstitutions(
-        underlyingSubs.mapReplacementTypesOutOfContext());
+    OpaqueDecl->setUniqueUnderlyingTypeSubstitutions(
+        std::get<1>(candidate).mapReplacementTypesOutOfContext());
   }
-  
+
+  // There is no clear winner here since there are candidates within
+  // limited availability contexts.
+  void finalizeOpaque(const Candidate &universallyAvailable) {
+    using AvailabilityCondition = OpaqueTypeDecl::AvailabilityCondition;
+
+    SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *, 4>
+        conditionalSubstitutions;
+
+    for (const auto &entry : Candidates) {
+      auto availabilityContext = entry.first;
+      const auto &candidate = entry.second;
+
+      if (!availabilityContext)
+        continue;
+
+      SmallVector<AvailabilityCondition, 4> conditions;
+
+      llvm::transform(availabilityContext->getCond(),
+                      std::back_inserter(conditions),
+                      [&](const StmtConditionElement &elt) {
+                        auto condition = elt.getAvailability();
+                        return std::make_pair(condition->getAvailableRange(),
+                                              condition->isUnavailability());
+                      });
+
+      conditionalSubstitutions.push_back(
+          OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+              Ctx, conditions,
+              std::get<1>(candidate).mapReplacementTypesOutOfContext()));
+    }
+
+    // Add universally available choice as the last one.
+    conditionalSubstitutions.push_back(
+        OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+            Ctx, {{VersionRange::empty(), /*unavailable=*/false}},
+            std::get<1>(universallyAvailable)
+                .mapReplacementTypesOutOfContext()));
+
+    OpaqueDecl->setConditionallyAvailableSubstitutions(
+        conditionalSubstitutions);
+  }
+
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
-      auto key =
-          underlyingToOpaque->substitutions.getCanonical().getOpaqueValue();
-      if (KnownCandidates.insert(key).second) {
-        Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
-                                            underlyingToOpaque->substitutions));
+      auto subMap = underlyingToOpaque->substitutions;
+
+      auto key = subMap.getCanonical().getOpaqueValue();
+      auto isUnique = UniqueSignatures.insert(key).second;
+
+      auto candidate =
+          std::make_tuple(underlyingToOpaque->getSubExpr(), subMap, isUnique);
+
+      if (isSelfReferencing(candidate)) {
+        HasInvalidReturn = true;
+        return {false, nullptr};
       }
+
+      if (subMap.hasDynamicSelf()) {
+        Ctx.Diags.diagnose(E->getLoc(),
+                           diag::opaque_type_cannot_contain_dynamic_self);
+        HasInvalidReturn = true;
+        return {false, nullptr};
+      }
+
+      Candidates.push_back({CurrentAvailability, candidate});
       return {false, E};
     }
+
     return {true, E};
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (auto *If = dyn_cast<IfStmt>(S)) {
+      if (Parent.getAsStmt() != Body) {
+        // If this is not a top-level `if`, let's drop
+        // contextual information that has been set previously.
+        CurrentAvailability = nullptr;
+        return {true, S};
+      }
+
+      // If this is `if #(un)available` statement with no other dynamic
+      // conditions, let's check if it returns opaque type directly.
+      if (llvm::all_of(If->getCond(), [&](const auto &condition) {
+            return condition.getKind() == StmtConditionElement::CK_Availability;
+          })) {
+        // Check return statement directly with availability context set.
+        if (auto *Then = dyn_cast<BraceStmt>(If->getThenStmt())) {
+          llvm::SaveAndRestore<ParentTy> parent(Parent, Then);
+
+          for (auto element : Then->getElements()) {
+            auto *Return = getAsStmt<ReturnStmt>(element);
+
+            // If this is not a direct return statement, walk into it
+            // without setting contextual availability because we want
+            // to find all `return`s.
+            if (!(Return && Return->hasResult())) {
+              element.walk(*this);
+              continue;
+            }
+
+            // Note that we are about to walk into a return statement
+            // that is located in a `if #available` without any other
+            // conditions.
+            llvm::SaveAndRestore<AvailabilityContext> context(
+                CurrentAvailability, If);
+
+            Return->getResult()->walk(*this);
+          }
+        }
+
+        // Walk the else branch directly as well.
+        if (auto *Else = If->getElseStmt()) {
+          llvm::SaveAndRestore<ParentTy> parent(Parent, If);
+          Else->walk(*this);
+        }
+
+        return {false, S};
+      }
+    }
+
     if (auto *RS = dyn_cast<ReturnStmt>(S)) {
       if (RS->hasResult()) {
         auto resultTy = RS->getResult()->getType();
@@ -2740,7 +2962,7 @@ public:
 
     return {true, S};
   }
-  
+
   // Don't descend into nested decls.
   bool walkToDeclPre(Decl *D) override {
     return false;
@@ -3382,11 +3604,12 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
 }
 
 // Perform MiscDiagnostics on Switch Statements.
-static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
+static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt,
+                        DeclContext *DC) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
-    TypeChecker::checkExistentialTypes(ctx, cs);
+    TypeChecker::checkExistentialTypes(ctx, cs, DC);
 
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
@@ -3550,6 +3773,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       case ExprKind::Array:
       case ExprKind::Dictionary:
       case ExprKind::InterpolatedStringLiteral:
+      case ExprKind::Closure:
         // If a trailing closure appears as a child of one of these types of
         // expression, don't diagnose it as there is no ambiguity.
         return {E->isImplicit(), E};
@@ -3592,7 +3816,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   } else if (auto SS = dyn_cast<SwitchStmt>(S)) {
     checkStmtConditionTrailingClosure(ctx, SS->getSubjectExpr());
   } else if (auto FES = dyn_cast<ForEachStmt>(S)) {
-    checkStmtConditionTrailingClosure(ctx, FES->getSequence());
+    checkStmtConditionTrailingClosure(ctx, FES->getParsedSequence());
     checkStmtConditionTrailingClosure(ctx, FES->getWhere());
   } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
     for (auto CS : DCS->getCatches())
@@ -4742,30 +4966,42 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return {false, E};
 
-      if (auto *declRefExpr = dyn_cast<DeclRefExpr>(E)) {
-        if (declRefExpr->getDecl()->getBaseName() == Ctx.Id_self &&
-            declRefExpr->getType()->is<AnyFunctionType>()) {
-          if (auto typeContext = DC->getInnermostTypeContext()) {
-            // self() is not easily confusable
-            if (!isa<CallExpr>(Parent.getAsExpr())) {
-              auto baseType = typeContext->getDeclaredInterfaceType();
-              if (!baseType->getEnumOrBoundGenericEnum()) {
-                auto baseTypeString = baseType.getString();
+      auto *DRE = dyn_cast<DeclRefExpr>(E);
+      // If this is not an explicit 'self' reference, let's keep searching.
+      if (!DRE || DRE->isImplicit())
+        return {true, E};
 
-                Ctx.Diags.diagnose(E->getLoc(), diag::self_refers_to_method,
-                    baseTypeString);
+      // If this not 'self' or it's not a function reference, it's unrelated.
+      if (!(DRE->getDecl()->getBaseName() == Ctx.Id_self &&
+            DRE->getType()->is<AnyFunctionType>()))
+        return {true, E};
 
-                Ctx.Diags
-                  .diagnose(E->getLoc(),
-                      diag::fix_unqualified_access_member_named_self,
-                      baseTypeString)
-                  .fixItInsert(E->getLoc(), diag::insert_type_qualification,
-                      baseType);
-              }
-            }
-          }
-        }
+      auto typeContext = DC->getInnermostTypeContext();
+      // Use of 'self' in enums is not confusable.
+      if (!typeContext || typeContext->getSelfEnumDecl())
+        return {true, E};
+
+      // self(...) is not easily confusable.
+      if (auto *parentExpr = Parent.getAsExpr()) {
+        if (isa<CallExpr>(parentExpr))
+          return {true, E};
+
+        // Explicit call to a static method 'self' of some type is not
+        // confusable.
+        if (isa<DotSyntaxCallExpr>(parentExpr) && !parentExpr->isImplicit())
+          return {true, E};
       }
+
+      auto baseType = typeContext->getDeclaredInterfaceType();
+      auto baseTypeString = baseType.getString();
+
+      Ctx.Diags.diagnose(E->getLoc(), diag::self_refers_to_method,
+                         baseTypeString);
+
+      Ctx.Diags
+          .diagnose(E->getLoc(), diag::fix_unqualified_access_member_named_self,
+                    baseTypeString)
+          .fixItInsert(E->getLoc(), diag::insert_type_qualification, baseType);
 
       return {true, E};
     }
@@ -4844,7 +5080,7 @@ void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt,
-                                            bool disableExprAvailabiltyChecking) {
+                                            bool disableExprAvailabilityChecking) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -4856,7 +5092,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseComparisonWithNaN(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
-  if (!ctx.LangOpts.DisableAvailabilityChecking && !disableExprAvailabiltyChecking)
+  if (!ctx.LangOpts.DisableAvailabilityChecking && !disableExprAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
@@ -4867,10 +5103,10 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
   auto &ctx = DC->getASTContext();
 
-  TypeChecker::checkExistentialTypes(ctx, const_cast<Stmt *>(S));
-    
+  TypeChecker::checkExistentialTypes(ctx, const_cast<Stmt *>(S), DC);
+
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(ctx, switchStmt);
+    checkSwitch(ctx, switchStmt, DC);
 
   checkStmtConditionTrailingClosure(ctx, S);
   
@@ -5186,22 +5422,10 @@ bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
   if (!forEach->getAwaitLoc().isValid())
     return false;
 
-  auto &ctx = dc->getASTContext();
-
-  auto sequenceProto = TypeChecker::getProtocol(
-      ctx, forEach->getForLoc(), KnownProtocolKind::AsyncSequence);
-
-  if (!sequenceProto)
-    return false;
-
-  // fetch the sequence out of the statement
-  // else wise the value is potentially unresolved
-  auto Ty = forEach->getSequence()->getType();
-  auto module = dc->getParentModule();
-  auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
-
+  auto conformanceRef = forEach->getSequenceConformance();
   if (conformanceRef.hasEffect(EffectKind::Throws) &&
       forEach->getTryLoc().isInvalid()) {
+    auto &ctx = dc->getASTContext();
     ctx.Diags
         .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
         .fixItInsert(forEach->getAwaitLoc(), "try");

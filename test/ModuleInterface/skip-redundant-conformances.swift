@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -module-name Foo -emit-module-interface-path %t/Foo.swiftinterface %s
-// RUN: %target-swift-frontend -compile-module-from-interface %t/Foo.swiftinterface -o %t/Foo.swiftmodule
+// RUN: %target-swift-emit-module-interface(%t/Foo.swiftinterface) %s -module-name Foo
+// RUN: %target-swift-typecheck-module-from-interface(%t/Foo.swiftinterface) -module-name Foo
 
 public protocol ProtocolA : class {}
 public protocol ProtocolB: ProtocolA {}

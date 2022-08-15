@@ -20,5 +20,5 @@ func test_context_builtins() {
 // CHECK-LABEL: define{{.*}}@test_context_builtins()
 // CHECK: entry:
 // CHECK:   [[CTX:%.*]] = call swiftcc %swift.refcounted* @swift_autoDiffCreateLinearMapContext({{i[0-9]+}} {{.*}})
-// CEHCK:   call swiftcc i8* @swift_autoDiffProjectTopLevelSubcontext(%swift.refcounted* [[CTX]])
+// CHECK:   call swiftcc i8* @swift_autoDiffProjectTopLevelSubcontext(%swift.refcounted* [[CTX]])
 // CHECK:   [[BUF:%.*]] = call swiftcc i8* @swift_autoDiffAllocateSubcontext(%swift.refcounted* [[CTX]], {{i[0-9]+}} {{.*}})

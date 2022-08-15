@@ -195,8 +195,6 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   if (GenericParams == nullptr || GenericParams->getWhereLoc().isInvalid())
     return;
 
-
-
   auto WhereRangeInsideBrackets = GenericParams->getWhereClauseSourceRange();
 
   // Move everything immediately following the last generic parameter
@@ -300,10 +298,11 @@ ParserStatus Parser::parseGenericWhereClause(
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
       SourceLoc ColonLoc = consumeToken();
-      BodyContext->setCreateSyntax(SyntaxKind::ConformanceRequirement);
       if (Tok.is(tok::identifier) &&
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
+        BodyContext->setCreateSyntax(SyntaxKind::LayoutRequirement);
+
         // Parse a layout constraint.
         Identifier LayoutName;
         auto LayoutLoc = consumeIdentifier(LayoutName,
@@ -325,6 +324,7 @@ ParserStatus Parser::parseGenericWhereClause(
               LayoutConstraintLoc(Layout, LayoutLoc)));
         }
       } else {
+        BodyContext->setCreateSyntax(SyntaxKind::ConformanceRequirement);
         // Parse the protocol or composition.
         ParserResult<TypeRepr> Protocol = parseType();
         Status |= Protocol;
@@ -352,9 +352,23 @@ ParserStatus Parser::parseGenericWhereClause(
         SecondType = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
 
       // Add the requirement
-      Requirements.push_back(RequirementRepr::getSameType(FirstType.get(),
-                                                      EqualLoc,
-                                                      SecondType.get()));
+      if (FirstType.hasCodeCompletion()) {
+        // If the first type has a code completion token, don't record a same
+        // type constraint because otherwise if we have
+        //   K.#^COMPLETE^# == Foo
+        // we parse this as
+        //   K == Foo
+        // and thus simplify K to Foo. But we didn't want to state that K is Foo
+        // but that K has a member of type Foo.
+        // FIXME: The proper way to fix this would be to represent the code
+        // completion token in the TypeRepr.
+        Requirements.push_back(RequirementRepr::getTypeConstraint(
+            FirstType.get(), EqualLoc,
+            new (Context) ErrorTypeRepr(SecondType.get()->getLoc())));
+      } else {
+        Requirements.push_back(RequirementRepr::getSameType(
+            FirstType.get(), EqualLoc, SecondType.get()));
+      }
     } else if (FirstType.hasCodeCompletion()) {
       // Recover by adding dummy constraint.
       Requirements.push_back(RequirementRepr::getTypeConstraint(

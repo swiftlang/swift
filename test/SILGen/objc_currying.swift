@@ -101,8 +101,8 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer?
 // CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
-// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.pod!foreign, [[HAS_METHOD:bb[0-9]+]]
-// CHECK:   [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
+// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}, AnyObject) Self, #CurryTest.pod!foreign, [[HAS_METHOD:bb[0-9]+]]
+// CHECK:   [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Int, @opened({{.*}}, AnyObject) Self) -> Int):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   partial_apply [callee_guaranteed] [[METHOD]]([[OPENED_ANY_COPY_2]])
 // CHECK: } // end sil function '$s13objc_currying19curry_pod_AnyObjectyS2icyXlF'
@@ -115,8 +115,8 @@ func curry_pod_AnyObject(_ x: AnyObject) -> (Int) -> Int {
 // CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
-// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.normalOwnership!foreign, [[HAS_METHOD:bb[0-9]+]]
-// CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Optional<CurryTest>, @opened({{.*}}) AnyObject) -> @autoreleased Optional<CurryTest>):
+// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}, AnyObject) Self, #CurryTest.normalOwnership!foreign, [[HAS_METHOD:bb[0-9]+]]
+// CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Optional<CurryTest>, @opened({{.*}}, AnyObject) Self) -> @autoreleased Optional<CurryTest>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[METHOD]]([[OPENED_ANY_COPY_2]])
 // CHECK:   [[THUNK:%.*]] = function_ref @$sSo9CurryTestCSgACIegyo_A2CIeggo_TR
@@ -132,9 +132,9 @@ func curry_normalOwnership_AnyObject(_ x: AnyObject) -> (CurryTest?) -> CurryTes
 // CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
-// CHECK:   dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}) AnyObject, #CurryTest.weirdOwnership!foreign, [[HAS_METHOD:bb[0-9]+]]
+// CHECK:   dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}, AnyObject) Self, #CurryTest.weirdOwnership!foreign, [[HAS_METHOD:bb[0-9]+]]
 //
-// CHECK: bb1([[METHOD:%.*]] : $@convention(objc_method) (@owned Optional<CurryTest>, @owned @opened({{.*}}) AnyObject) -> @owned Optional<CurryTest>):
+// CHECK: bb1([[METHOD:%.*]] : $@convention(objc_method) (@owned Optional<CurryTest>, @owned @opened({{.*}}, AnyObject) Self) -> @owned Optional<CurryTest>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   partial_apply [callee_guaranteed] [[METHOD]]([[OPENED_ANY_COPY_2]])
 // CHECK: } // end sil function '$s13objc_currying30curry_weirdOwnership_AnyObjectySo9CurryTestCSgAEcyXlF'
@@ -147,7 +147,7 @@ func curry_weirdOwnership_AnyObject(_ x: AnyObject) -> (CurryTest?) -> CurryTest
 // CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
-// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.bridged!foreign, [[HAS_METHOD:bb[0-9]+]]
+// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}, AnyObject) Self, #CurryTest.bridged!foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK: } // end sil function '$s13objc_currying23curry_bridged_AnyObjectySSSgACcyXlF'
 func curry_bridged_AnyObject(_ x: AnyObject) -> (String?) -> String? {
   return x.bridged!
@@ -159,8 +159,8 @@ func curry_bridged_AnyObject(_ x: AnyObject) -> (String?) -> String? {
 // CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
-// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.returnsSelf!foreign, [[HAS_METHOD:bb[0-9]+]]
-// CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased Optional<AnyObject>):
+// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}, AnyObject) Self, #CurryTest.returnsSelf!foreign, [[HAS_METHOD:bb[0-9]+]]
+// CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}, AnyObject) Self) -> @autoreleased Optional<AnyObject>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[METHOD]]([[OPENED_ANY_COPY_2]])
 // CHECK: } // end sil function '$s13objc_currying27curry_returnsSelf_AnyObjectyyXlSgycyXlF'
@@ -172,8 +172,8 @@ func curry_returnsSelf_AnyObject(_ x: AnyObject) -> () -> AnyObject? {
 // CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
-// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.returnsInnerPointer!foreign, [[HAS_METHOD:bb[0-9]+]]
-// CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @unowned_inner_pointer Optional<UnsafeMutableRawPointer>):
+// CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}, AnyObject) Self, #CurryTest.returnsInnerPointer!foreign, [[HAS_METHOD:bb[0-9]+]]
+// CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}, AnyObject) Self) -> @unowned_inner_pointer Optional<UnsafeMutableRawPointer>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[METHOD]]([[OPENED_ANY_COPY_2]])
 // CHECK: } // end sil function '$s13objc_currying35curry_returnsInnerPointer_AnyObjectySvSgycyXlF'
@@ -191,8 +191,8 @@ func curry_initializer() -> (Int) -> Gizmo? {
   return Gizmo.init(bellsOn:)
 }
 
-// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo> {
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo> {
 
 // CHECK-LABEL: sil private [ossa] @$s13objc_currying17curry_initializerSo5GizmoCSgSicyFAESicfu_ : $@convention(thin) (Int) -> @owned Optional<Gizmo> {
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfcTO : $@convention(method) (Int, @owned Gizmo) -> @owned Optional<Gizmo> {
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfcTO : $@convention(method) (Int, @owned Gizmo) -> @owned Optional<Gizmo> {

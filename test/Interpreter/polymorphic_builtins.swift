@@ -7,20 +7,20 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(mysimd)) -enable-library-evolution %S/../Inputs/polymorphic_builtins.swift -emit-module -emit-module-path %t/mysimd.swiftmodule -module-name mysimd -parse-stdlib -D DEBUG -Onone -Xfrontend -requirement-machine-protocol-signatures=on
+// RUN: %target-build-swift-dylib(%t/%target-library-name(mysimd)) -enable-library-evolution %S/../Inputs/polymorphic_builtins.swift -emit-module -emit-module-path %t/mysimd.swiftmodule -module-name mysimd -parse-stdlib -D DEBUG -Onone
 // RUN: %target-codesign %t/%target-library-name(mysimd)
 
-// RUN: %target-build-swift %s -L %t -I %t -lmysimd -parse-stdlib -Xfrontend -disable-access-control -Xfrontend -sil-verify-all %target-rpath(%t) -o %t/a.out -D DEBUG -Onone -Xfrontend -requirement-machine-protocol-signatures=on
+// RUN: %target-build-swift %s -L %t -I %t -lmysimd -parse-stdlib -Xfrontend -disable-access-control -Xfrontend -sil-verify-all %target-rpath(%t) -o %t/a.out -D DEBUG -Onone
 // RUN: %target-codesign %t/a.out
 
 // RUN: %target-run %t/a.out %t/%target-library-name(mysimd)
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(mysimd)) -enable-library-evolution %S/../Inputs/polymorphic_builtins.swift -emit-module -emit-module-path %t/mysimd.swiftmodule -module-name mysimd -parse-stdlib -O -Xfrontend -requirement-machine-protocol-signatures=on
+// RUN: %target-build-swift-dylib(%t/%target-library-name(mysimd)) -enable-library-evolution %S/../Inputs/polymorphic_builtins.swift -emit-module -emit-module-path %t/mysimd.swiftmodule -module-name mysimd -parse-stdlib -O
 // RUN: %target-codesign %t/%target-library-name(mysimd)
 
-// RUN: %target-build-swift %s -L %t -I %t -lmysimd -parse-stdlib -Xfrontend -disable-access-control -Xfrontend -sil-verify-all %target-rpath(%t) -o %t/a.out -O -Xfrontend -requirement-machine-protocol-signatures=on
+// RUN: %target-build-swift %s -L %t -I %t -lmysimd -parse-stdlib -Xfrontend -disable-access-control -Xfrontend -sil-verify-all %target-rpath(%t) -o %t/a.out -O
 // RUN: %target-codesign %t/a.out
 
 // RUN: %target-run %t/a.out %t/%target-library-name(mysimd)

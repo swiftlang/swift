@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+import ArgumentParser
+import SwiftRemoteMirror
 
 internal struct DumpArrays: ParsableCommand {
   static let configuration = CommandConfiguration(
@@ -20,21 +21,26 @@ internal struct DumpArrays: ParsableCommand {
   var options: UniversalOptions
 
   func run() throws {
-    try inspect(process: options.nameOrPid) { process in
+    try inspect(options: options) { process in
       print("Address", "Size", "Count", "Is Class", separator: "\t")
       process.iterateHeap { (allocation, size) in
-        let metadata: swift_reflectioN_ptr_t =
+        let metadata: UInt =
             swift_reflection_metadataForObject(process.context, UInt(allocation))
         if metadata == 0 { return }
-        guard process.context.isContiguousArray(metadata: metadata) else { return }
 
-        let isClass = process.context.isArrayOfClass(metdata)
+        guard process.context.isContiguousArray(swift_reflection_ptr_t(metadata)) else {
+          return
+        }
+
+        let ReadBytes: RemoteProcess.ReadBytesFunction =
+            type(of: process).ReadBytes
+        let this = process.toOpaqueRef()
+
+        let isClass = process.context.isArrayOfClass(swift_reflection_ptr_t(metadata))
         let count = process.context.arrayCount(swift_reflection_ptr_t(allocation),
-                                               process.ReadBytes)
+                                               { ReadBytes(this, $0, UInt64($1), nil) })
         print("\(hex: swift_reflection_ptr_t(allocation))\t\(size)\t\(count.map(String.init) ?? "<unknown>")\t\(isClass)")
       }
     }
   }
 }
-
-#endif

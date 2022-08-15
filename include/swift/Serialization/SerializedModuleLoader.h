@@ -24,7 +24,7 @@ namespace file_types {
   enum ID : uint8_t;
 }
 
-/// Spceifies how to load modules when both a module interface and serialized
+/// Specifies how to load modules when both a module interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.
 enum class ModuleLoadingMode {
   PreferInterface,
@@ -36,7 +36,7 @@ enum class ModuleLoadingMode {
 /// Helper type used to pass and compute the sets of related filenames used by
 /// \c SerializedModuleLoader subclasses.
 struct SerializedModuleBaseName {
-  /// The base filename, wtihout any extension.
+  /// The base filename, without any extension.
   SmallString<256> baseName;
 
   /// Creates a \c SerializedModuleBaseName.
@@ -190,7 +190,7 @@ public:
                               unsigned previousGeneration) override;
 
   virtual void loadObjCMethods(
-                 ClassDecl *classDecl,
+                 NominalTypeDecl *typeDecl,
                  ObjCSelector selector,
                  bool isInstanceMethod,
                  unsigned previousGeneration,

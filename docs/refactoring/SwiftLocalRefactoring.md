@@ -300,7 +300,7 @@ with (2). It passes if the two are identical, otherwise the test fails.
 3  }
 4  // RUN: rm -rf %t.result && mkdir -p %t.result
 5  // RUN: %refactor -localize-string -source-filename %s -pos=2:14 > %t.result/localized.swift
-6  // RUN: diff -u %S/Iutputs/localized.swift.expected %t.result/localized.swift
+6  // RUN: diff -u %S/Outputs/localized.swift.expected %t.result/localized.swift
 ~~~
 
 ~~~swift
@@ -334,7 +334,7 @@ following figure illustrates.
 ## Potential Local Refactoring Ideas
 This post just touches on some of the things that are now possible to implement in the new refactoring engine.
 If you are excited about extending the refactoring engine to implement additional transformations,
-Swift's [issue database](https://bugs.swift.org) contains [several ideas of refactoring transformations](https://bugs.swift.org/issues/?jql=labels%3DStarterProposal%20AND%20labels%3DRefactoring%20AND%20resolution%3DUnresolved) awaiting implementations.
+Swift's issue database contains [several ideas of refactoring transformations](https://github.com/apple/swift/issues?q=is%3Aissue+is%3Aopen+label%3ARefactoring) awaiting implementations.
 
 For further help with implementing refactoring transformations, please feel free to ask questions on the [Swift forums](https://forums.swift.org/c/development/compiler/9).
 

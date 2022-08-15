@@ -14,7 +14,14 @@ struct GS<Base> {
   var _value: Builtin.Int64
 }
 
-class Klass {}
+class Klass {
+  @_hasStorage var i: Int
+  init()
+}
+
+class OtherClass {
+  var klass: Klass
+}
 
 struct Two {
   var a: Klass
@@ -50,6 +57,7 @@ bb0(%0 : $*Klass, %1 : $*Klass):
 
 sil @throwing_function : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error)
 sil @use_gsbase_builtinnativeobject : $@convention(thin) (@guaranteed GS<Builtin.NativeObject>) -> ()
+sil [readonly] @readonly_throwing_func : $@convention(thin) (@in_guaranteed Int) -> @error Error
 
 sil_global @globalString : $String
 
@@ -638,9 +646,9 @@ bb1:
   %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
-  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
-  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %2 : $*Optional<P>
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
@@ -672,9 +680,9 @@ bb1:
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
   destroy_addr %2 : $*Optional<P>
-  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P
-  %14 = witness_method $@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
+  %14 = witness_method $@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
   dealloc_stack %2 : $*Optional<P>
@@ -705,10 +713,10 @@ bb1:
   %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
-  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
   destroy_addr %2 : $*Optional<P>
-  %14 = witness_method $@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %14 = witness_method $@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
   dealloc_stack %2 : $*Optional<P>
@@ -975,6 +983,32 @@ bb0(%0 : $*Klass, %1 : @owned $Klass):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Just check that we don't crash here.
+// Currently this pattern is not optimized, but we might in future.
+sil [ossa] @dont_extend_access_scope_over_term_inst : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = ref_element_addr %0 : $Klass, #Klass.i
+  %2 = begin_access [read] [dynamic] %1 : $*Int
+  %3 = alloc_stack $Int
+  copy_addr %2 to [initialization] %3 : $*Int
+  end_access %2 : $*Int
+  %6 = function_ref @readonly_throwing_func : $@convention(thin) (@in_guaranteed Int) -> @error Error
+  try_apply %6(%3) : $@convention(thin) (@in_guaranteed Int) -> @error Error, normal bb1, error bb2
+bb1(%8 : $()):
+  destroy_addr %3 : $*Int
+  dealloc_stack %3 : $*Int
+  br bb3
+bb2(%12 : @owned $Error):
+  destroy_addr %3 : $*Int
+  dealloc_stack %3 : $*Int
+  destroy_value %12 : $Error
+  br bb3
+bb3:
+  %17 = tuple ()
+  return %17 : $()
+}
+
 
 /////////////////
 // Store Tests //
@@ -1293,6 +1327,55 @@ bb0(%0 : @owned $GS<Builtin.NativeObject>):
   return %v : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_optimize_store_of_enum
+// CHECK:         alloc_stack
+// CHECK:       } // end sil function 'dont_optimize_store_of_enum'
+sil [ossa] @dont_optimize_store_of_enum : $@convention(method) <Element> (@guaranteed Optional<Klass>) -> () {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  %1 = copy_value %0 : $Optional<Klass>
+  %32 = alloc_stack $Optional<Klass>
+  store %1 to [init] %32 : $*Optional<Klass>
+  switch_enum %0 : $Optional<Klass>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb5
+
+bb5:
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb6(%50 : @guaranteed $Klass):
+  %53 = load [take] %32 : $*Optional<Klass>
+  destroy_value %53 : $Optional<Klass>
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @store_of_enum_must_be_in_same_block
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'store_of_enum_must_be_in_same_block'
+sil [ossa] @store_of_enum_must_be_in_same_block : $@convention(method) <Element> (@guaranteed Optional<Klass>) -> () {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  %32 = alloc_stack $Optional<Klass>
+  switch_enum %0 : $Optional<Klass>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb5
+
+bb5:
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb6(%50 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Optional<Klass>
+  store %1 to [init] %32 : $*Optional<Klass>
+  %53 = load [take] %32 : $*Optional<Klass>
+  destroy_value %53 : $Optional<Klass>
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
 ////////////////////////////////////////
 // Unchecked Take Enum Data Addr Inst //
 ////////////////////////////////////////
@@ -1465,3 +1548,35 @@ bb1(%6 : @guaranteed $Klass):
   return %res : $()
 }
 
+// Lexical alloc_stacks can still be eliminated if their sources are guaranteed
+// function arguments (because those are lexical and have a live range that
+// contains the live range of the value stored into the alloc stack).
+// CHECK-LABEL: sil [ossa] @copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg : {{.*}} {
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg'
+sil [ossa] @copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg : $@convention(thin) (@guaranteed OtherClass) -> () {
+entry(%instance : @guaranteed $OtherClass):
+  %field_ptr = ref_element_addr %instance : $OtherClass, #OtherClass.klass
+  %addr = alloc_stack [lexical] $Klass
+  copy_addr %field_ptr to [initialization] %addr : $*Klass
+  destroy_addr %addr : $*Klass
+  dealloc_stack %addr : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Lexical alloc_stacks can't be eliminated even if their source is a function
+// argument if that function argument is inout.
+// CHECK-LABEL: sil [ossa] @copy_addr__lexical_alloc_stack_temporary__inout_function_arg : {{.*}} {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'copy_addr__lexical_alloc_stack_temporary__inout_function_arg'
+sil [ossa] @copy_addr__lexical_alloc_stack_temporary__inout_function_arg : $@convention(thin) (@inout NonTrivialStruct) -> () {
+entry(%instance : $*NonTrivialStruct):
+  %field_ptr = struct_element_addr %instance : $*NonTrivialStruct, #NonTrivialStruct.val
+  %addr = alloc_stack [lexical] $Klass
+  copy_addr %field_ptr to [initialization] %addr : $*Klass
+  destroy_addr %addr : $*Klass
+  dealloc_stack %addr : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}

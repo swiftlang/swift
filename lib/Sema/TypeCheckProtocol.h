@@ -100,6 +100,35 @@ CheckTypeWitnessResult checkTypeWitness(Type type,
                                         const NormalProtocolConformance *Conf,
                                         SubstOptions options = None);
 
+/// A type witness inferred without the aid of a specific potential
+/// value witness.
+class AbstractTypeWitness {
+  AssociatedTypeDecl *AssocType;
+  Type TheType;
+
+  /// The defaulted associated type that was used to infer this type witness.
+  /// Need not necessarily match \c AssocType, but their names must.
+  AssociatedTypeDecl *DefaultedAssocType;
+
+public:
+  AbstractTypeWitness(AssociatedTypeDecl *AssocType, Type TheType,
+                      AssociatedTypeDecl *DefaultedAssocType = nullptr)
+      : AssocType(AssocType), TheType(TheType),
+        DefaultedAssocType(DefaultedAssocType) {
+    assert(AssocType && TheType);
+    assert(!DefaultedAssocType ||
+           (AssocType->getName() == DefaultedAssocType->getName()));
+  }
+
+  AssociatedTypeDecl *getAssocType() const { return AssocType; }
+
+  Type getType() const { return TheType; }
+
+  AssociatedTypeDecl *getDefaultedAssocType() const {
+    return DefaultedAssocType;
+  }
+};
+
 /// The set of associated types that have been inferred by matching
 /// the given value witness to its corresponding requirement.
 struct InferredAssociatedTypesByWitness {
@@ -159,6 +188,10 @@ enum class MatchKind : uint8_t {
 
   /// The witness has fewer effects than the requirement, which is okay.
   FewerEffects,
+
+  /// The witness is @Sendable and the requirement is not. Okay in certain
+  /// language modes.
+  RequiresNonSendable,
 
   /// There is a difference in optionality.
   OptionalityConflict,
@@ -445,6 +478,7 @@ struct RequirementMatch {
     switch(Kind) {
     case MatchKind::ExactMatch:
     case MatchKind::FewerEffects:
+    case MatchKind::RequiresNonSendable:
       return true;
 
     case MatchKind::OptionalityConflict:
@@ -481,6 +515,7 @@ struct RequirementMatch {
     switch(Kind) {
     case MatchKind::ExactMatch:
     case MatchKind::FewerEffects:
+    case MatchKind::RequiresNonSendable:
     case MatchKind::OptionalityConflict:
     case MatchKind::RenamedMatch:
       return true;
@@ -516,6 +551,7 @@ struct RequirementMatch {
     switch(Kind) {
     case MatchKind::ExactMatch:
     case MatchKind::FewerEffects:
+    case MatchKind::RequiresNonSendable:
     case MatchKind::RenamedMatch:
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
@@ -716,9 +752,6 @@ private:
   /// Whether we've already complained about problems with this conformance.
   bool AlreadyComplained = false;
 
-  /// Whether we checked the requirement signature already.
-  bool CheckedRequirementSignature = false;
-
   /// Mapping from Objective-C methods to the set of requirements within this
   /// protocol that have the same selector and instance/class designation.
   llvm::SmallDenseMap<ObjCMethodKey, TinyPtrVector<AbstractFunctionDecl *>, 4>
@@ -755,8 +788,11 @@ private:
 
   /// Check that the witness and requirement have compatible actor contexts.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  bool checkActorIsolation(ValueDecl *requirement, ValueDecl *witness);
+  /// \returns the isolation that needs to be enforced to invoke the witness
+  /// from the requirement, used when entering an actor-isolated synchronous
+  /// witness from an asynchronous requirement.
+  Optional<ActorIsolation>
+  checkActorIsolation(ValueDecl *requirement, ValueDecl *witness);
 
   /// Record a type witness.
   ///
@@ -790,6 +826,10 @@ private:
   /// Attempt to resolve a type witness via member name lookup.
   ResolveWitnessResult resolveTypeWitnessViaLookup(
                          AssociatedTypeDecl *assocType);
+
+  /// Check whether all of the protocol's generic requirements are satisfied by
+  /// the chosen type witnesses.
+  void ensureRequirementsAreSatisfied();
 
   /// Diagnose or defer a diagnostic, as appropriate.
   ///
@@ -849,10 +889,6 @@ public:
   /// directly as possible.
   void resolveSingleTypeWitness(AssociatedTypeDecl *assocType);
 
-  /// Check all of the protocols requirements are actually satisfied by a
-  /// the chosen type witnesses.
-  void ensureRequirementsAreSatisfied();
-
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.
   void checkConformance(MissingWitnessDiagnosisKind Kind);
@@ -873,7 +909,7 @@ public:
                     llvm::function_ref<bool(AbstractFunctionDecl *)>predicate);
 };
 
-/// A system for recording and probing the intergrity of a type witness solution
+/// A system for recording and probing the integrity of a type witness solution
 /// for a set of unresolved associated type declarations.
 ///
 /// Right now can reason only about abstract type witnesses, i.e., same-type
@@ -919,7 +955,7 @@ class TypeWitnessSystem final {
   struct TypeWitnessCandidate final {
     /// The defaulted associated type declaration correlating with this
     /// candidate, if present.
-    const AssociatedTypeDecl *DefaultedAssocType;
+    AssociatedTypeDecl *DefaultedAssocType;
 
     /// The equivalence class of this candidate.
     EquivalenceClass *EquivClass;
@@ -947,7 +983,7 @@ public:
 
   /// Get the defaulted associated type relating to the resolved type witness
   /// for the associated type with the given name, if present.
-  const AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
+  AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
 
   /// Record a type witness for the given associated type name.
   ///
@@ -961,8 +997,7 @@ public:
   /// defines the given default type.
   ///
   /// \note This need not lead to the resolution of a type witness.
-  void addDefaultTypeWitness(Type type,
-                             const AssociatedTypeDecl *defaultedAssocType);
+  void addDefaultTypeWitness(Type type, AssociatedTypeDecl *defaultedAssocType);
 
   /// Record the given same-type requirement, if regarded of interest to
   /// the system.
@@ -1079,15 +1114,23 @@ private:
     ConformanceChecker &checker,
     const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
 
+  /// Compute a "fixed" type witness for an associated type, e.g.,
+  /// if the refined protocol requires it to be equivalent to some other type.
+  Type computeFixedTypeWitness(AssociatedTypeDecl *assocType);
+
   /// Compute the default type witness from an associated type default,
   /// if there is one.
-  Optional<std::pair<AssociatedTypeDecl *, Type>>
+  Optional<AbstractTypeWitness>
   computeDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
 
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
   std::pair<Type, TypeDecl *>
   computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
+
+  /// Compute a type witness without using a specific potential witness.
+  Optional<AbstractTypeWitness>
+  computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Collect abstract type witnesses and feed them to the given system.
   void collectAbstractTypeWitnesses(
@@ -1165,6 +1208,20 @@ private:
                 ConformanceChecker &checker,
                 SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
 
+  /// We may need to determine a type witness, regardless of the existence of a
+  /// default value for it, e.g. when a 'distributed actor' is looking up its
+  /// 'ID', the default defined in an extension for 'Identifiable' would be
+  /// located using the lookup resolve. This would not be correct, since the
+  /// type actually must be based on the associated 'ActorSystem'.
+  ///
+  /// TODO(distributed): perhaps there is a better way to avoid this mixup?
+  ///   Note though that this issue seems to only manifest in "real" builds
+  ///   involving multiple files/modules, and not in tests within the Swift
+  ///   project itself.
+  bool canAttemptEagerTypeWitnessDerivation(
+      ConformanceChecker &checker,
+      AssociatedTypeDecl *assocType);
+
 public:
   /// Describes a mapping from associated type declarations to their
   /// type witnesses (as interface types).
@@ -1197,7 +1254,7 @@ RequirementMatch matchWitness(
 
 RequirementMatch
 matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
-             ProtocolDecl *proto, ProtocolConformance *conformance,
+             ProtocolDecl *proto, RootProtocolConformance *conformance,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness);
 
 /// If the given type is a direct reference to an associated type of

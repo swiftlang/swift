@@ -19,7 +19,7 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
-void KeyPathTypeCheckCompletionCallback::sawSolution(
+void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
   // Determine the code completion.
   size_t ComponentIndex = 0;
@@ -73,8 +73,7 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
   Results.push_back({BaseType, /*OnRoot=*/(ComponentIndex == 0)});
 }
 
-void swift::ide::deliverKeyPathResults(
-    ArrayRef<KeyPathTypeCheckCompletionCallback::Result> Results,
+void KeyPathTypeCheckCompletionCallback::deliverResults(
     DeclContext *DC, SourceLoc DotLoc,
     ide::CodeCompletionContext &CompletionCtx,
     CodeCompletionConsumer &Consumer) {

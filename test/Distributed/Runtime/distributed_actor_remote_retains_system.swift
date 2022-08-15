@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,7 +8,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import _Distributed
+import Distributed
 
 distributed actor SomeSpecificDistributedActor {
   deinit {
@@ -38,6 +38,7 @@ final class FakeActorSystem: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocation
   typealias InvocationEncoder = FakeInvocation
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   deinit {
     print("deinit \(self)")
@@ -101,7 +102,7 @@ class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvoc
   typealias SerializationRequirement = Codable
 
   func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   func recordErrorType<E: Error>(_ type: E.Type) throws {}
   func doneRecording() throws {}
@@ -112,6 +113,22 @@ class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvoc
   func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument{ fatalError() }
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
+}
+
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
 }
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -130,8 +147,6 @@ func test_remote() async {
   print("remote.id = \(remote.id)") // CHECK: remote.id = ActorAddress(address: "sact://127.0.0.1/example#1234")
   print("remote.system = \(remote.actorSystem)") // CHECK: remote.system = main.FakeActorSystem
 
-  // only once we exit the function and the remote is released, the system has no more references
-  // CHECK-DAG: deinit ActorAddress(address: "sact://127.0.0.1/example#1234")
   // system must deinit after the last actor using it does deinit
   // CHECK-DAG: deinit main.FakeActorSystem
 }

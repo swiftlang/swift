@@ -498,6 +498,45 @@ ${SelfName}TestSuite.test("withMemoryReboundSE0333") {
   }
 }
 
+${SelfName}TestSuite.test("withMemoryReboundSE0333.capacity1") {
+  let mutablePtr = UnsafeMutablePointer<(Int,Bool,Int64)>.allocate(capacity: 1)
+  let i = Int.random(in: 0 ... .max)
+  mutablePtr.initialize(to: (i, i.isMultiple(of: 2), Int64(0xff & i)))
+  defer { mutablePtr.deallocate() }
+  let ptr = ${SelfName}<(Int, Bool, Int64)>(mutablePtr)
+  // test rebinding to a shorter type with the same alignment
+  ptr.withMemoryRebound(to: (Int, Bool).self, capacity: 1) {
+    // Make sure the closure argument is a ${SelfName}
+    let ptrT: ${SelfName}<(Int, Bool)> = $0
+    // and that the element is (Int, Bool).
+    let mutablePtrT = UnsafeMutablePointer(mutating: ptrT)
+    expectType((Int, Bool).self, &mutablePtrT.pointee)
+    expectEqual($0.pointee.0, i)
+    expectEqual($0.pointee.1, i.isMultiple(of: 2))
+  }
+}
+
+${SelfName}TestSuite.test("pointer(to:)") {
+  struct Example {
+    var a = false
+    var b = 0
+    var c: String { "\(a),\(b)" }
+  }
+  let allocated = UnsafeMutablePointer<Example>.allocate(capacity: 1)
+  allocated.pointee = Example()
+  defer { allocated.deallocate() }
+  let p = ${SelfName}(allocated)
+  expectEqual(p.pointer(to: \.a)!.pointee, false)
+  expectEqual(p.pointer(to: \.b)!.pointee, 0)
+  expectNil(p.pointer(to: \.c))
+% if SelfName == 'UnsafeMutablePointer':
+  p.pointer(to: \.a)!.pointee = true
+  p.pointer(to: \.b)!.pointee += 1
+  expectEqual(p.pointer(to: \.a as KeyPath)!.pointee, true)
+  expectEqual(p.pointer(to: \.b as KeyPath)!.pointee, 1)
+% end
+}
+
 % end
 
 runAllTests()

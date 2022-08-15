@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/protocol_typealias_other.swift -emit-module-path %t/protocol_typealias_other.swiftmodule -module-name protocol_typealias_other -requirement-machine-protocol-signatures=on
-// RUN: %target-swift-frontend -typecheck %s -I %t -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module %S/Inputs/protocol_typealias_other.swift -emit-module-path %t/protocol_typealias_other.swiftmodule -module-name protocol_typealias_other
+// RUN: %target-swift-frontend -typecheck %s -I %t -debug-generic-signatures 2>&1 | %FileCheck %s
 
 import protocol_typealias_other
 

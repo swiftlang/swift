@@ -165,7 +165,7 @@ public:
         derivative->getLoweredFunctionType()->getSubstGenericSignature();
     auto *linMapStruct = getLinearMapStruct(origBB);
     auto linMapStructType =
-        linMapStruct->getDeclaredInterfaceType()->getCanonicalType(
+        linMapStruct->getDeclaredInterfaceType()->getReducedType(
             derivativeGenSig);
     Lowering::AbstractionPattern pattern(derivativeGenSig, linMapStructType);
     return typeConverter.getLoweredType(pattern, linMapStructType,

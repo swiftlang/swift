@@ -38,7 +38,6 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -104,6 +103,7 @@ class AnyFunctionType;
 class ASTContext;
 class FileUnit;
 class FuncDecl;
+class IRGenOptions;
 class KeyPathPattern;
 class ModuleDecl;
 class SILUndef;
@@ -167,10 +167,10 @@ public:
       llvm::DenseMap<const SILBasicBlock *, std::string>;
 
   enum class LinkingMode : uint8_t {
-    /// Link functions with non-public linkage. Used by the mandatory pipeline.
+    /// Link functions with shared linkage. Used by the mandatory pipeline.
     LinkNormal,
 
-    /// Link all functions. Used by the performance pipeine.
+    /// Link all functions. Used by the performance pipeline.
     LinkAll
   };
 
@@ -274,7 +274,7 @@ private:
   /// Declarations which are externally visible.
   ///
   /// These are method declarations which are referenced from inlinable
-  /// functions due to cross-module-optimzation. Those declarations don't have
+  /// functions due to cross-module-optimization. Those declarations don't have
   /// any attributes or linkage which mark them as externally visible by
   /// default.
   /// Currently this table is not serialized.
@@ -304,8 +304,17 @@ private:
   /// This is the set of undef values we've created, for uniquing purposes.
   llvm::DenseMap<SILType, SILUndef *> UndefValues;
 
+  llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
+  llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
+
   /// The stage of processing this module is at.
   SILStage Stage;
+
+  /// True if SIL conventions force address-only to be passed by address.
+  ///
+  /// Used for bootstrapping the AddressLowering pass. This should eventually
+  /// be inferred from the SIL stage to be true only when Stage == Lowered.
+  bool loweredAddresses;
 
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
@@ -328,7 +337,7 @@ private:
   /// A mapping from root opened archetypes to the instructions which define
   /// them.
   ///
-  /// The value is either a SingleValueInstrution or a PlaceholderValue, in case
+  /// The value is either a SingleValueInstruction or a PlaceholderValue, in case
   /// an opened archetype definition is looked up during parsing or
   /// deserializing SIL, where opened archetypes can be forward referenced.
   ///
@@ -345,9 +354,21 @@ private:
   /// The options passed into this SILModule.
   const SILOptions &Options;
 
+  /// IRGen options to be used by target specific SIL optimization passes.
+  ///
+  /// Not null, if the module is created by the compiler itself (and not
+  /// e.g. by lldb).
+  const IRGenOptions *irgenOptions;
+
+  /// The number of functions created in this module, which will be the index of
+  /// the next function.
+  unsigned nextFunctionIndex = 0;
+
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
   bool serialized;
+
+  bool parsedAsSerializedSIL;
 
   /// Set if we have registered a deserialization notification handler for
   /// lowering ownership in non transparent functions.
@@ -368,17 +389,14 @@ private:
 #endif
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
-            Lowering::TypeConverter &TC, const SILOptions &Options);
+            Lowering::TypeConverter &TC, const SILOptions &Options,
+            const IRGenOptions *irgenOptions = nullptr);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
 
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
-  
-  /// Symbols (e.g. function names) which are made public by the
-  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
-  TBDSymbolSetPtr publicCMOSymbols;
 
 public:
   ~SILModule();
@@ -419,7 +437,7 @@ public:
   /// e.g. an open_existential_addr.
   ///
   /// In case the opened archetype is not defined yet (e.g. during parsing or
-  /// deserilization), a PlaceholderValue is returned. This should not be the
+  /// deserialization), a PlaceholderValue is returned. This should not be the
   /// case outside of parsing or deserialization.
   SILValue getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
                                      SILFunction *inFunction);
@@ -441,11 +459,30 @@ public:
   /// This should only be the case during parsing or deserialization.
   bool hasUnresolvedOpenedArchetypeDefinitions();
 
+  /// Get a unique index for a struct or class field in layout order.
+  ///
+  /// Precondition: \p decl must be a non-resilient struct or class.
+  ///
+  /// Precondition: \p field must be a stored property declared in \p decl,
+  ///               not in a superclass.
+  ///
+  /// Postcondition: The returned index is unique across all properties in the
+  ///                object, including properties declared in a superclass.
+  unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
+
+  unsigned getCaseIndex(EnumElementDecl *enumElement);
+
   /// Called by SILBuilder whenever a new instruction is created and inserted.
   void notifyAddedInstruction(SILInstruction *inst);
 
   /// Called after an instruction is moved from one function to another.
   void notifyMovedInstruction(SILInstruction *inst, SILFunction *fromFunction);
+
+  unsigned getNewFunctionIndex() { return nextFunctionIndex++; }
+
+  // This may be larger that the number of live functions in the 'functions'
+  // linked list because it includes the indices of zombie functions.
+  unsigned getNumFunctionIndices() const { return nextFunctionIndex; }
 
   /// Set a serialization action.
   void setSerializeSILAction(ActionCallback SerializeSILAction);
@@ -454,6 +491,12 @@ public:
   /// Set a flag indicating that this module is serialized already.
   void setSerialized() { serialized = true; }
   bool isSerialized() const { return serialized; }
+
+  void setParsedAsSerializedSIL() {
+    serialized = true;
+    parsedAsSerializedSIL = true;
+  }
+  bool isParsedAsSerializedSIL() const { return parsedAsSerializedSIL; }
 
   void setBasicBlockName(const SILBasicBlock *block, StringRef name) {
 #ifndef NDEBUG
@@ -502,7 +545,8 @@ public:
   /// single-file mode, and a ModuleDecl in whole-module mode.
   static std::unique_ptr<SILModule>
   createEmptyModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
-                    Lowering::TypeConverter &TC, const SILOptions &Options);
+                    Lowering::TypeConverter &TC, const SILOptions &Options,
+                    const IRGenOptions *irgenOptions = nullptr);
 
   /// Get the Swift module associated with this SIL module.
   ModuleDecl *getSwiftModule() const { return TheSwiftModule; }
@@ -535,12 +579,12 @@ public:
   bool isOptimizedOnoneSupportModule() const;
 
   const SILOptions &getOptions() const { return Options; }
-
-  /// Return the symbols (e.g. function names) which are made public by the
-  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
-  TBDSymbolSetPtr getPublicCMOSymbols() { return publicCMOSymbols; }
-
-  void addPublicCMOSymbol(StringRef symbol);
+  const IRGenOptions *getIRGenOptionsOrNull() const {
+    // We don't want to serialize target specific SIL.
+    assert(isSerialized() &&
+           "Target specific options must not be used before serialization");
+    return irgenOptions;
+  }
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
@@ -660,7 +704,7 @@ public:
 
   // This is currently limited to VarDecl because the visibility of global
   // variables and class properties is straightforward, while the visibility of
-  // class methods (ValueDecls) depends on the subclass scope. "Visiblity" has
+  // class methods (ValueDecls) depends on the subclass scope. "Visibility" has
   // a different meaning when vtable layout is at stake.
   bool isVisibleExternally(const VarDecl *decl) {
     return isPossiblyUsedExternally(getDeclSILLinkage(decl), isWholeModule());
@@ -688,9 +732,20 @@ public:
   /// \return null if this module has no such function
   SILFunction *lookUpFunction(SILDeclRef fnRef);
 
-  /// Attempt to deserialize the SILFunction. Returns true if deserialization
-  /// succeeded, false otherwise.
-  bool loadFunction(SILFunction *F);
+  /// Attempt to deserialize function \p F and all functions which are referenced
+  /// from \p F (according to the \p LinkMode).
+  ///
+  /// Returns true if deserialization succeeded, false otherwise.
+  bool loadFunction(SILFunction *F, LinkingMode LinkMode);
+
+  /// Attempt to deserialize a function with \p name and all functions which are
+  /// referenced from that function (according to the \p LinkMode).
+  ///
+  /// If \p linkage is provided, the deserialized function is required to have
+  /// that linkage. Returns null, if this is not the case.
+  SILFunction *loadFunction(StringRef name,
+                            LinkingMode LinkMode,
+                            Optional<SILLinkage> linkage = None);
 
   /// Update the linkage of the SILFunction with the linkage of the serialized
   /// function.
@@ -699,19 +754,10 @@ public:
   /// AST, e.g. cross-module-optimization can change the SIL linkages.
   void updateFunctionLinkage(SILFunction *F);
 
-  /// Attempt to link the SILFunction. Returns true if linking succeeded, false
-  /// otherwise.
+  /// Attempt to deserialize function \p F and all required referenced functions.
   ///
-  /// \return false if the linking failed.
-  bool linkFunction(SILFunction *F,
-                    LinkingMode LinkMode = LinkingMode::LinkNormal);
-
-  /// Check if a given function exists in any of the modules with a
-  /// required linkage, i.e. it can be linked by linkFunction.
-  ///
-  /// \return null if this module has no such function. Otherwise
-  /// the declaration of a function.
-  SILFunction *findFunction(StringRef Name, SILLinkage Linkage);
+  /// Returns true if linking succeeded, false otherwise.
+  bool linkFunction(SILFunction *F, LinkingMode LinkMode);
 
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
@@ -725,15 +771,15 @@ public:
   ///        table.
   /// \arg deserializeLazily If we cannot find the witness table should we
   ///                        attempt to lazily deserialize it.
-  SILWitnessTable *
-  lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily=true);
-  SILWitnessTable *
-  lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
+  SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C);
 
   /// Attempt to lookup \p Member in the witness table for \p C.
+  ///
+  /// Also, deserialize all referenced functions according to the \p linkgingMode.
   std::pair<SILFunction *, SILWitnessTable *>
   lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
-                               SILDeclRef Requirement);
+                               SILDeclRef Requirement,
+                               SILModule::LinkingMode linkingMode);
 
   /// Look up the SILDefaultWitnessTable representing the default witnesses
   /// of a resilient protocol, if any.
@@ -785,6 +831,11 @@ public:
     assert(s >= Stage && "regressing stage?!");
     Stage = s;
   }
+
+  /// True if SIL conventions force address-only to be passed by address.
+  bool useLoweredAddresses() const { return loweredAddresses; }
+
+  void setLoweredAddresses(bool val) { loweredAddresses = val; }
 
   llvm::IndexedInstrProfReader *getPGOReader() const { return PGOReader.get(); }
 
@@ -904,7 +955,7 @@ public:
   /// See scheduledForDeletion for details.
   void scheduleForDeletion(SILInstruction *I);
 
-  /// Deletes all scheuled instructions for real.
+  /// Deletes all scheduled instructions for real.
   /// See scheduledForDeletion for details.
   void flushDeletedInsts();
 
@@ -952,15 +1003,13 @@ inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
     // entirely.
     return LexicalLifetimes != LexicalLifetimesOption::Off;
   case SILStage::Canonical:
+  case SILStage::Lowered:
     // In Canonical SIL, lexical markers are used to ensure that object
     // lifetimes do not get observably shortened from the end of a lexical
     // scope.  That behavior only occurs when lexical lifetimes is (fully)
     // enabled.  (When only diagnostic markers are enabled, the markers are
     // stripped as part of lowering from raw to canonical SIL.)
     return LexicalLifetimes == LexicalLifetimesOption::On;
-  case SILStage::Lowered:
-    // We do not support OSSA in Lowered SIL, so this is always false.
-    return false;
   }
 }
 

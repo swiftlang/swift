@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Implements a pass for simplifying substitutions in concrete type symbols.
-// Substitutions can be simplifed in one of two ways; either a substitution
+// Substitutions can be simplified in one of two ways; either a substitution
 // term can be replaced by a more canonical term, or it can be replaced by a
 // concrete type.
 //
@@ -259,8 +259,15 @@ void RewriteSystem::processTypeDifference(const TypeDifference &difference,
   // the same rewrite loop in concretelySimplifyLeftHandSideSubstitutions().
   auto &lhsRule = getRule(lhsRuleID);
   if (lhsRule.getRHS() == difference.BaseTerm &&
-      !lhsRule.isSubstitutionSimplified())
+      !lhsRule.isSubstitutionSimplified()) {
+    if (lhsRule.isFrozen()) {
+      llvm::errs() << "Frozen rule should already be subst-simplified: "
+                   << lhsRule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
     lhsRule.markSubstitutionSimplified();
+  }
 }
 
 /// Simplify terms appearing in the substitutions of the last symbol of \p term,
@@ -378,7 +385,7 @@ RewriteSystem::simplifySubstitutions(Term baseTerm, Symbol symbol,
 /// is built, and a final simplification pass is performed with \p map set to
 /// the new property map.
 void RewriteSystem::simplifyLeftHandSideSubstitutions(const PropertyMap *map) {
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isSubstitutionSimplified())
       continue;

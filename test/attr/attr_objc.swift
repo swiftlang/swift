@@ -273,13 +273,13 @@ enum subject_enum: Int {
   // Fake for access notes: @objc(subject_enumElement3) // bad-access-note-move@+2{{subject_enum.subject_enumElement4}}
   @objc(subject_enumElement3) // bad-access-note-move{{subject_enum.subject_enumElement3}} expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-31=}}
   case subject_enumElement3, subject_enumElement4
-  // Becuase of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
+  // Because of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
   // expected-remark@-2 * {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}} expected-note@-2 *{{attribute 'objc' was added by access note for fancy tests}}
 
   // Fake for access notes: @objc // bad-access-note-move@+2{{subject_enum.subject_enumElement6}}
   @objc // bad-access-note-move{{subject_enum.subject_enumElement5}} expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement5, subject_enumElement6
-  // Becuase of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
+  // Because of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
   // expected-remark@-2 * {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} expected-note@-2 *{{attribute 'objc' was added by access note for fancy tests}}
 
   @nonobjc // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
@@ -364,9 +364,11 @@ protocol subject_containerObjCProtocol1 {
 @objc // access-note-move{{subject_containerObjCProtocol2}}
 protocol subject_containerObjCProtocol2 {
   init(a: Int)
+  // expected-note@-1 {{'init' previously declared here}}
 
   @objc // FIXME: Access notes can't distinguish between init(a:) overloads
   init(a: Double)
+  // expected-warning@-1 {{initializer 'init(a:)' with Objective-C selector 'initWithA:' conflicts with previous declaration with the same Objective-C selector; this is an error in Swift 6}}
 
   func func1() -> Int
   @objc // access-note-move{{subject_containerObjCProtocol2.func1_()}}
@@ -946,14 +948,14 @@ class infer_instanceVar1 {
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
   // Fake for access notes: @objc // access-note-move@-3{{infer_instanceVar1.instanceVar2_}}
 
-  var intstanceVar4: Int {
-  // CHECK: @objc var intstanceVar4: Int {
+  var instanceVar4: Int {
+  // CHECK: @objc var instanceVar4: Int {
     get {}
     // CHECK-NEXT: @objc get {}
   }
 
-  var intstanceVar5: Int {
-  // CHECK: @objc var intstanceVar5: Int {
+  var instanceVar5: Int {
+  // CHECK: @objc var instanceVar5: Int {
     get {}
     // CHECK-NEXT: @objc get {}
     set {}
@@ -1736,9 +1738,9 @@ protocol infer_instanceVar4 {
 class infer_instanceVar5 {
 // CHECK-LABEL: {{^}}class infer_instanceVar5 {
 
-  @objc // access-note-move{{infer_instanceVar5.intstanceVar1}}
-  var intstanceVar1: Int {
-  // CHECK: @objc var intstanceVar1: Int
+  @objc // access-note-move{{infer_instanceVar5.instanceVar1}}
+  var instanceVar1: Int {
+  // CHECK: @objc var instanceVar1: Int
     get {}
     // CHECK: @objc get {}
     set {}
@@ -2570,7 +2572,7 @@ class NeverReturningMethod {
   func doesNotReturn() -> Never {}
 }
 
-// SR-5025
+// https://github.com/apple/swift/issues/47601
 class User: NSObject {
 }
 
@@ -2638,20 +2640,30 @@ private extension MyObjCClass {
   private func notExposedToObjC() {}
 }
 
-// SR-9035
+// https://github.com/apple/swift/issues/51538
 
-class SR_9035_C {}
+class issue51538_C {}
 
-@objc // access-note-move{{SR_9035_P}}
-protocol SR_9035_P {
+@objc // access-note-move{{issue51538_P}}
+protocol issue51538_P {
   func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
-  func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
+  func throwingMethod2() throws -> Unmanaged<issue51538_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 }
 
-// SR-12801: Make sure we reject an @objc generic subscript.
-class SR12801 {
-  @objc // bad-access-note-move{{SR12801.subscript(_:)}}
+// https://github.com/apple/swift/issues/55246
+// Make sure we reject an @objc generic subscript.
+class issue55246 {
+  @objc // bad-access-note-move{{issue55246.subscript(_:)}}
   subscript<T>(foo : [T]) -> Int { return 0 }
   // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
+}
+
+// @_backDeploy
+
+public class BackDeployClass {
+  @available(macOS 11.0, *)
+  @_backDeploy(before: macOS 12.0)
+  @objc // expected-error {{'@objc' cannot be applied to a back deployed instance method}}
+  final public func objcMethod() {}
 }

@@ -725,9 +725,9 @@ static unsigned findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
     IRGenFunction &IGF, CanSILFunctionType substType,
     CanSILFunctionType outType) {
   auto substParameters = substType->getParameters();
-  auto outParamters = outType->getParameters();
+  auto outParameters = outType->getParameters();
   unsigned firstNonEmpty = -1U;
-  for (unsigned paramIdx = outParamters.size() ; paramIdx != substParameters.size(); ++paramIdx) {
+  for (unsigned paramIdx = outParameters.size() ; paramIdx != substParameters.size(); ++paramIdx) {
     bool isEmpty =
         isABIIgnoredParameterWithoutStorage(IGF.IGM, IGF, substType, paramIdx);
     assert((isEmpty || firstNonEmpty == -1U) && "Expect at most one partially "
@@ -2366,8 +2366,7 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   auto *dispatchFnTy =
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
   llvm::SmallString<40> name;
-  llvm::raw_svector_ostream(name)
-      << "__swift_suspend_dispatch_" << argTypes.size();
+  llvm::raw_svector_ostream(name) << CurFn->getName() << ".0";
   llvm::Function *dispatch =
       llvm::Function::Create(dispatchFnTy, llvm::Function::InternalLinkage,
                              llvm::StringRef(name), &IGM.Module);
@@ -2376,7 +2375,7 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   IRGenFunction dispatchIGF(IGM, dispatch);
   // Don't emit debug info if we are generating a function for the prologue.
   if (IGM.DebugInfo && Builder.getCurrentDebugLocation())
-    IGM.DebugInfo->emitArtificialFunction(dispatchIGF, dispatch);
+    IGM.DebugInfo->emitOutlinedFunction(dispatchIGF, dispatch, CurFn->getName());
   auto &Builder = dispatchIGF.Builder;
   auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
   llvm::Value *fnPtrArg = &*(it++);
@@ -2435,7 +2434,9 @@ llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
 }
 
 llvm::Function *IRGenFunction::createAsyncSuspendFn() {
-  StringRef name = "__swift_suspend_point";
+  llvm::SmallString<40> nameBuffer;
+  llvm::raw_svector_ostream(nameBuffer) << CurFn->getName() << ".1";
+  StringRef name(nameBuffer);
   if (llvm::GlobalValue *F = IGM.Module.getNamedValue(name))
     return cast<llvm::Function>(F);
 
@@ -2456,7 +2457,8 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   suspendFn->setDoesNotThrow();
   IRGenFunction suspendIGF(IGM, suspendFn);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
+    IGM.DebugInfo->emitOutlinedFunction(suspendIGF, suspendFn,
+                                        CurFn->getName());
   auto &Builder = suspendIGF.Builder;
 
   llvm::Value *resumeFunction = suspendFn->getArg(0);

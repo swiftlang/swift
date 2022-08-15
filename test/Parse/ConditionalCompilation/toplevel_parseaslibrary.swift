@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -D FOO
 
-// '-parse-as-library' doesn't allow exprssions nor statements in #if blocks.
+// '-parse-as-library' doesn't allow expressions nor statements in #if blocks.
 
 func foo() {}
 

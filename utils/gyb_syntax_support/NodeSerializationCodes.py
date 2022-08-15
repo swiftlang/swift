@@ -1,4 +1,4 @@
-from .Node import error
+from .Utils import error
 
 
 SYNTAX_NODE_SERIALIZATION_CODES = {
@@ -98,7 +98,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'CodeBlock': 93,
     'DeclNameArgument': 94,
     'DeclNameArguments': 95,
-    # removed: 'FunctionCallArgument': 96,
+    'ActorDecl': 96,
     'TupleExprElement': 97,
     'ArrayElement': 98,
     'DictionaryElement': 99,
@@ -166,7 +166,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AvailabilityVersionRestriction': 161,
     'VersionTuple': 162,
     'CodeBlockItemList': 163,
-    # removed: 'FunctionCallArgumentList': 164,
+    'LayoutRequirement': 164,
     'TupleExprElementList': 165,
     'ArrayElementList': 166,
     'DictionaryElementList': 167,
@@ -232,7 +232,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'NamedAttributeStringArgument': 227,
     'DeclName': 228,
     'PoundAssertStmt': 229,
-    'SomeType': 230,
+    'ConstrainedSugarType': 230,
     'CustomAttribute': 231,
     'GenericRequirement': 232,
     'DifferentiableAttributeArguments': 233,
@@ -240,7 +240,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiabilityParams': 235,
     'DifferentiabilityParamList': 236,
     'DifferentiabilityParam': 237,
-    # removed: 'DifferentiableAttributeFuncSpecifier': 238,
+    'DeclModifierDetail': 238,
     'FunctionDeclName': 239,
     'PoundFilePathExpr': 240,
     'DerivativeRegistrationAttributeArguments': 241,
@@ -255,6 +255,22 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'UnavailabilityCondition': 251,
     'AvailabilityEntry' : 252,
     'RegexLiteralExpr': 253,
+    'PrimaryAssociatedTypeList' : 254,
+    'PrimaryAssociatedType' : 255,
+    'PrimaryAssociatedTypeClause' : 256,
+    'BackDeployAttributeSpecList' : 257,
+    'BackDeployVersionList' : 258,
+    'BackDeployVersionArgument' : 259,
+    'Missing': 260,
+    'MissingDecl': 261,
+    'MissingExpr': 262,
+    'MissingStmt': 263,
+    'MissingType': 264,
+    'MissingPattern': 265,
+    'GarbageNodes' : 266,
+    'LabeledStmt': 267,
+    'InfixOperatorExpr': 268,
+    'MoveExpr': 269,
 }
 
 

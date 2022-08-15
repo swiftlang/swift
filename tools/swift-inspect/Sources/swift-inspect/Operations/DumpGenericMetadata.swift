@@ -34,7 +34,7 @@ internal struct DumpGenericMetadata: ParsableCommand {
   var backtraceOptions: BacktraceOptions
 
   func run() throws {
-    try inspect(process: options.nameOrPid) { process in
+    try inspect(options: options) { process in
       let allocations: [swift_metadata_allocation_t] =
           try process.context.allocations.sorted()
 

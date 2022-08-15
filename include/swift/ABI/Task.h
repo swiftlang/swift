@@ -563,7 +563,7 @@ public:
   /// \c Executing, then \c waitingTask has been added to the
   /// wait queue and will be scheduled when the future completes. Otherwise,
   /// the future has completed and can be queried.
-  /// The waiting task's async context will be intialized with the parameters if
+  /// The waiting task's async context will be initialized with the parameters if
   /// the current's task state is executing.
   FutureFragment::Status waitFuture(AsyncTask *waitingTask,
                                     AsyncContext *waitingTaskContext,
@@ -631,19 +631,9 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_resume
     ResumeParent;
 
-  /// Flags describing this context.
-  ///
-  /// Note that this field is only 32 bits; any alignment padding
-  /// following this on 64-bit platforms can be freely used by the
-  /// function.  If the function is a yielding function, that padding
-  /// is of course interrupted by the YieldToParent field.
-  AsyncContextFlags Flags;
-
-  AsyncContext(AsyncContextFlags flags,
-               TaskContinuationFunction *resumeParent,
+  AsyncContext(TaskContinuationFunction *resumeParent,
                AsyncContext *parent)
-    : Parent(parent), ResumeParent(resumeParent),
-      Flags(flags) {}
+    : Parent(parent), ResumeParent(resumeParent) {}
 
   AsyncContext(const AsyncContext &) = delete;
   AsyncContext &operator=(const AsyncContext &) = delete;
@@ -667,36 +657,58 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_yield
     YieldToParent;
 
-  YieldingAsyncContext(AsyncContextFlags flags,
-                       TaskContinuationFunction *resumeParent,
+  YieldingAsyncContext(TaskContinuationFunction *resumeParent,
                        TaskContinuationFunction *yieldToParent,
                        AsyncContext *parent)
-    : AsyncContext(flags, resumeParent, parent),
+    : AsyncContext(resumeParent, parent),
       YieldToParent(yieldToParent) {}
-
-  static bool classof(const AsyncContext *context) {
-    return context->Flags.getKind() == AsyncContextKind::Yielding;
-  }
 };
 
 /// An async context that can be resumed as a continuation.
 class ContinuationAsyncContext : public AsyncContext {
 public:
+  class FlagsType : public FlagSet<size_t> {
+  public:
+    enum {
+      CanThrow = 0,
+      IsExecutorSwitchForced = 1,
+    };
+
+    explicit FlagsType(size_t bits) : FlagSet(bits) {}
+    constexpr FlagsType() {}
+
+    /// Whether this is a throwing continuation.
+    FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow,
+                                  canThrow,
+                                  setCanThrow)
+
+    /// See AsyncContinuationFlags::isExecutorSwitchForced().
+    FLAGSET_DEFINE_FLAG_ACCESSORS(IsExecutorSwitchForced,
+                                  isExecutorSwitchForced,
+                                  setIsExecutorSwitchForced)
+  };
+
+  /// Flags for the continuation.  Not public ABI.
+  FlagsType Flags;
+
   /// An atomic object used to ensure that a continuation is not
   /// scheduled immediately during a resume if it hasn't yet been
-  /// awaited by the function which set it up.
+  /// awaited by the function which set it up.  Not public ABI.
   std::atomic<ContinuationStatus> AwaitSynchronization;
 
   /// The error result value of the continuation.
   /// This should be null-initialized when setting up the continuation.
   /// Throwing resumers must overwrite this with a non-null value.
+  /// Public ABI.
   SwiftError *ErrorResult;
 
   /// A pointer to the normal result value of the continuation.
   /// Normal resumers must initialize this before resuming.
+  /// Public ABI.
   OpaqueValue *NormalResult;
 
   /// The executor that should be resumed to.
+  /// Public ABI.
   ExecutorRef ResumeToExecutor;
 
   void setErrorResult(SwiftError *error) {
@@ -704,11 +716,7 @@ public:
   }
 
   bool isExecutorSwitchForced() const {
-    return Flags.continuation_isExecutorSwitchForced();
-  }
-
-  static bool classof(const AsyncContext *context) {
-    return context->Flags.getKind() == AsyncContextKind::Continuation;
+    return Flags.isExecutorSwitchForced();
   }
 };
 

@@ -13,6 +13,7 @@ target_link_libraries(swiftFrontendTool INTERFACE
   clangBasic)
 target_link_libraries(swiftFrontendTool PRIVATE
     swiftClangImporter
+    swiftConstExtract
     swiftDemangling
     swiftDependencyScan
     swiftFrontend
@@ -26,6 +27,7 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftSIL
     swiftSILGen
     swiftSILOptimizer
-    swiftTBDGen)
+    swiftTBDGen
+    swiftThreading)
 
 set_swift_llvm_is_available(swiftFrontendTool)

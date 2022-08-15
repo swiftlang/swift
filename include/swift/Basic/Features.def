@@ -48,7 +48,18 @@
   LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
 #endif
 
-LANGUAGE_FEATURE(StaticAssert, 0, "#assert", langOpts.EnableExperimentalStaticAssert)
+#ifndef UPCOMING_FEATURE
+#  define UPCOMING_FEATURE(FeatureName, SENumber, Version)   \
+     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName, \
+                      langOpts.hasFeature(#FeatureName))
+#endif
+
+#ifndef EXPERIMENTAL_FEATURE
+#  define EXPERIMENTAL_FEATURE(FeatureName)  \
+     LANGUAGE_FEATURE(FeatureName, 0, #FeatureName, \
+                      langOpts.hasFeature(#FeatureName))
+#endif
+
 LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
 LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties", true)
 LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
@@ -71,9 +82,47 @@ LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building 
 LANGUAGE_FEATURE(BuiltinMove, 0, "Builtin.move()", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
+LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
 LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 
+UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
+UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
+UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
+UPCOMING_FEATURE(ExistentialAny, 335, 6)
+
+EXPERIMENTAL_FEATURE(StaticAssert)
+EXPERIMENTAL_FEATURE(VariadicGenerics)
+EXPERIMENTAL_FEATURE(NamedOpaqueTypes)
+EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures)
+EXPERIMENTAL_FEATURE(MoveOnly)
+EXPERIMENTAL_FEATURE(OneWayClosureParameters)
+EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
+EXPERIMENTAL_FEATURE(ResultBuilderASTTransform)
+
+/// Whether to enable experimental differentiable programming features:
+/// `@differentiable` declaration attribute, etc.
+EXPERIMENTAL_FEATURE(DifferentiableProgramming)
+
+/// Whether to enable forward mode differentiation.
+EXPERIMENTAL_FEATURE(ForwardModeDifferentiation)
+
+/// Whether to enable experimental `AdditiveArithmetic` derived
+/// conformances.
+EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances)
+
+/// Whether Objective-C completion handler parameters are imported as
+/// @Sendable.
+EXPERIMENTAL_FEATURE(SendableCompletionHandlers)
+
+/// Enables opaque type erasure without also enabling implict dynamic
+EXPERIMENTAL_FEATURE(OpaqueTypeErasure)
+
+#undef EXPERIMENTAL_FEATURE
+#undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE

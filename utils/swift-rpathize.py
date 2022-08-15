@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # On Darwin, dynamic libraries have an install name.  At link time, the
 # linker can work with a dylib anywhere in the filesystem, but it will
@@ -54,8 +54,18 @@ def main(arguments):
 
 
 def rpathize(filename):
-    dylibsOutput = subprocess.check_output(
-        ['xcrun', 'dyldinfo', '-dylibs', filename])
+    dylibsOutput = None
+
+    try:
+        # `dyldinfo` has been replaced with `dyld_info`, so we try it first
+        # before falling back to `dyldinfo`
+        dylibsOutput = subprocess.check_output(
+            ['xcrun', 'dyld_info', '-dependents', filename],
+            universal_newlines=True)
+    except subprocess.CalledProcessError:
+        dylibsOutput = subprocess.check_output(
+            ['xcrun', 'dyldinfo', '-dylibs', filename],
+            universal_newlines=True)
 
     # The output from dyldinfo -dylibs is a line of header followed by one
     # install name per line, indented with spaces.
@@ -64,8 +74,7 @@ def rpathize(filename):
 
     # Build a command to invoke install_name_tool.
     command = ['install_name_tool']
-    for binaryline in dylibsOutput.splitlines():
-        line = binaryline.decode("utf-8", "strict")
+    for line in dylibsOutput.splitlines():
         match = dylib_regex.match(line)
         if match:
             command.append('-change')

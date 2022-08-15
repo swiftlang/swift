@@ -32,35 +32,35 @@ func genericNoOptional<T>(_: T) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
 func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.p!getter
   let _ = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.p!getter
   let _: P = p.p
   // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcAaC_pcfu_ : $@convention(thin) (@in_guaranteed P) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
   let _: (P) -> () = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.p!getter
   let _: P? = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.p!getter
   let _: Any = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.p!getter
   let _: Any? = p.p
 
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxlF
   genericOverload(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxSglF
   genericOverload(p.q)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(p.q)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(p.q)
 
@@ -409,4 +409,34 @@ struct UnsafePointerStruct {
 func useUnsafePointerStruct<U>(_ ptr: UnsafePointer<U>) {
   // CHECK: function_ref @$s7ranking19UnsafePointerStructVyACSPyxGclufC : $@convention(method) <τ_0_0> (UnsafePointer<τ_0_0>, @thin UnsafePointerStruct.Type) -> UnsafePointerStruct
   let _: UnsafePointerStruct = UnsafePointerStruct(ptr)
+}
+
+/// Archetype vs. non-archetype (expect placeholder)
+
+protocol SignalProtocol {
+  associatedtype Element
+  associatedtype Error: Swift.Error
+}
+
+struct Signal<Element, Error: Swift.Error>: SignalProtocol {
+  init<S: Sequence>(sequence: S) where S.Iterator.Element == Element {
+  }
+}
+
+extension SignalProtocol where Element: SignalProtocol, Element.Error == Error {
+  typealias InnerElement = Element.Element
+
+  func flatten() -> Signal<InnerElement, Error> {
+    fatalError()
+  }
+}
+
+extension SignalProtocol where Element: SignalProtocol, Error == Never {
+  func flatten() -> Signal<Element.Element, Element.Error> {
+    fatalError()
+  }
+}
+
+func no_ambiguity_error_vs_never<Element, Error>(_ signals: [Signal<Element, Error>]) -> Signal<Element, Error> {
+  return Signal(sequence: signals).flatten() // Ok
 }

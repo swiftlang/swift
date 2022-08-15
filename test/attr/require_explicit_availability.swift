@@ -7,6 +7,11 @@ public struct S { // expected-warning {{public declarations should have an avail
   public func method() { }
 }
 
+@available(macOS, unavailable)
+public struct UnavailableStruct {
+  public func okMethod() { }
+}
+
 public func foo() { bar() } // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
 
 @usableFromInline
@@ -41,9 +46,24 @@ public func +(lhs: S, rhs: S) -> S { } // expected-warning {{public declarations
 
 public enum E { } // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
 
+@available(macOS, unavailable)
+public enum UnavailableEnum {
+  case caseOk
+}
+
 public class C { } // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
 
+@available(macOS, unavailable)
+public class UnavailableClass {
+  public func okMethod() { }
+}
+
 public protocol P { } // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
+
+@available(macOS, unavailable)
+public protocol UnavailableProto {
+  func requirementOk()
+}
 
 private protocol PrivateProto { }
 
@@ -56,10 +76,18 @@ extension S {
   public func okWhenTheExtensionHasAttribute() { }
 }
 
+@available(macOS, unavailable)
+extension S {
+  public func okWhenTheExtensionIsUnavailable() { }
+}
+
 extension S {
   internal func dontWarnWithoutPublicMembers() { }
   private func dontWarnWithoutPublicMembers1() { }
 }
+
+// An empty extension should be ok.
+extension S { }
 
 extension S : P { // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
 }
@@ -96,6 +124,9 @@ public var publicVar = S() // expected-warning {{public declarations should have
 @available(macOS 10.10, *)
 public var publicVarOk = S()
 
+@available(macOS, unavailable)
+public var unavailablePublicVarOk = S()
+
 public var (a, b) = (S(), S()) // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
 
 @available(macOS 10.10, *)
@@ -109,6 +140,11 @@ public var implicitGet: S { // expected-warning {{public declarations should hav
 
 @available(macOS 10.10, *)
 public var implicitGetOk: S {
+  return S()
+}
+
+@available(macOS, unavailable)
+public var unavailableImplicitGetOk: S {
   return S()
 }
 

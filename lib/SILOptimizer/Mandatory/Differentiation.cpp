@@ -171,7 +171,6 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
     if (isa<BranchInst>(term) || isa<CondBranchInst>(term) ||
         isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term) ||
         isa<CheckedCastBranchInst>(term) ||
-        isa<CheckedCastValueBranchInst>(term) ||
         isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
       continue;
     // If terminator is an unsupported branching terminator, emit an error.
@@ -321,7 +320,7 @@ static void copyParameterArgumentsForApply(
     // Objects are to be retained.
     if (arg->getType().isObject()) {
       auto newArg = arg;
-      if (newArg.getOwnershipKind() != OwnershipKind::None)
+      if (newArg->getOwnershipKind() != OwnershipKind::None)
         newArg = copyBuilder.emitCopyValueOperation(loc, arg);
       collectNewArg(newArg);
       continue;
@@ -497,7 +496,7 @@ emitDerivativeFunctionReference(
           builder.emitBeginBorrowOperation(original.getLoc(), original);
       SILValue derivativeFn = builder.createDifferentiableFunctionExtract(
           borrowedDiffFunc.getLoc(), kind, borrowedDiffFunc);
-      if (derivativeFn.getOwnershipKind() != OwnershipKind::None)
+      if (derivativeFn->getOwnershipKind() != OwnershipKind::None)
         derivativeFn =
             builder.emitCopyValueOperation(original.getLoc(), derivativeFn);
       builder.emitEndBorrowOperation(original.getLoc(), borrowedDiffFunc);
@@ -899,7 +898,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // - Functions with no return.
     // - Functions with unsupported control flow.
     if (context.getASTContext()
-            .LangOpts.EnableExperimentalForwardModeDifferentiation &&
+            .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
         (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
          diagnoseUnsupportedControlFlow(
              context, witness->getOriginalFunction(), invoker)))
@@ -915,7 +914,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // generation because generated JVP may not match semantics of custom VJP.
     // Instead, create an empty JVP.
     if (context.getASTContext()
-            .LangOpts.EnableExperimentalForwardModeDifferentiation &&
+            .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
         !witness->getVJP()) {
       // JVP and differential generation do not currently support functions with
       // multiple basic blocks.
@@ -1206,7 +1205,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     builder.createDeallocStack(loc, buf);
 
   // If our original copy does not have none ownership, copy it.
-  if (origFnOperand.getOwnershipKind() != OwnershipKind::None)
+  if (origFnOperand->getOwnershipKind() != OwnershipKind::None)
     origFnOperand = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *newDiffFn = context.createDifferentiableFunction(
       builder, loc, parameterIndices, resultIndices, origFnOperand,
@@ -1222,7 +1221,7 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   // with an undef transpose function operand. Eventually, a legitimate
   // transpose function operand should be created and used.
   auto origFnOperand = lfi->getOriginalFunction();
-  if (origFnOperand.getOwnershipKind() != OwnershipKind::None)
+  if (origFnOperand->getOwnershipKind() != OwnershipKind::None)
     origFnOperand = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *parameterIndices = lfi->getParameterIndices();
   auto originalType = origFnOperand->getType().castTo<SILFunctionType>();

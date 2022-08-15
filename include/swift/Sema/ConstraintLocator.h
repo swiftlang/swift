@@ -85,6 +85,9 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type
 
+  CTP_ExprPattern,      ///< `~=` operator application associated with expression
+                        /// pattern.
+
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
@@ -187,6 +190,11 @@ public:
 
     bool isClosureResult() const {
       return getKind() == PathElementKind::ClosureResult;
+    }
+
+    void dump(raw_ostream &out) const LLVM_ATTRIBUTE_USED;
+    SWIFT_DEBUG_DUMP {
+      dump(llvm::errs());
     }
   };
 
@@ -1009,11 +1017,11 @@ public:
   }
 };
 
-class LocatorPathElt::ClosureBodyElement final
+class LocatorPathElt::SyntacticElement final
     : public StoredPointerElement<void> {
 public:
-  ClosureBodyElement(ASTNode element)
-      : StoredPointerElement(PathElementKind::ClosureBodyElement,
+  SyntacticElement(ASTNode element)
+      : StoredPointerElement(PathElementKind::SyntacticElement,
                              element.getOpaqueValue()) {
     assert(element);
   }
@@ -1051,7 +1059,53 @@ public:
   }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == PathElementKind::ClosureBodyElement;
+    return elt->getKind() == PathElementKind::SyntacticElement;
+  }
+};
+
+class LocatorPathElt::PatternBindingElement final
+    : public StoredIntegerElement<1> {
+public:
+  PatternBindingElement(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::PatternBindingElement, index) {}
+
+  unsigned getIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PatternBindingElement;
+  }
+};
+
+class LocatorPathElt::PatternDecl : public StoredIntegerElement<1> {
+public:
+  PatternDecl(ConstraintLocator::PathElementKind kind)
+      : StoredIntegerElement(kind, /*placeholder=*/0) {
+    assert(classof(this) && "classof needs updating");
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::NamedPatternDecl ||
+           elt->getKind() == ConstraintLocator::AnyPatternDecl;
+  }
+};
+
+class LocatorPathElt::NamedPatternDecl final
+    : public LocatorPathElt::PatternDecl {
+public:
+  NamedPatternDecl() : PatternDecl(ConstraintLocator::NamedPatternDecl) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::NamedPatternDecl;
+  }
+};
+
+class LocatorPathElt::AnyPatternDecl final
+    : public LocatorPathElt::PatternDecl {
+public:
+  AnyPatternDecl() : PatternDecl(ConstraintLocator::AnyPatternDecl) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::AnyPatternDecl;
   }
 };
 
@@ -1240,6 +1294,12 @@ public:
 
     return None;
   }
+
+  /// Produce a debugging dump of this locator.
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
+
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
 } // end namespace constraints

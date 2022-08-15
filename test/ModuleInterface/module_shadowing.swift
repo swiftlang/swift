@@ -2,8 +2,10 @@
 
 // Build modules imported by this file.
 // RUN: %empty-directory(%t/lib)
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/lib/ShadowyHorror.swiftinterface %S/Inputs/ShadowyHorror.swift -enable-library-evolution -module-name ShadowyHorror -swift-version 5
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -emit-module-interface-path %t/lib/TestModule.swiftinterface %S/Inputs/TestModule.swift -enable-library-evolution -module-name TestModule -swift-version 5
+// RUN: %target-swift-emit-module-interface(%t/lib/ShadowyHorror.swiftinterface) %S/Inputs/ShadowyHorror.swift -parse-stdlib -module-cache-path %t/mcp -module-name ShadowyHorror
+// RUN: %target-swift-typecheck-module-from-interface(%t/lib/ShadowyHorror.swiftinterface) -module-name ShadowyHorror
+// RUN: %target-swift-emit-module-interface(%t/lib/TestModule.swiftinterface) %S/Inputs/TestModule.swift -parse-stdlib -module-name TestModule
+// RUN: %target-swift-typecheck-module-from-interface(%t/lib/TestModule.swiftinterface) -module-name TestModule
 
 // Build this file as a module and check that it emits the expected warnings.
 // RUN: %empty-directory(%t/subtest-1)

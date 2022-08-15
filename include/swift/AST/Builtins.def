@@ -557,12 +557,6 @@ BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
 /// Triggers a runtime failure if the condition is true.
 BUILTIN_MISC_OPERATION(CondFailMessage, "condfail_message", "", Special)
 
-/// Sizeof has type T.Type -> Int
-BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
-
-/// Strideof has type T.Type -> Int
-BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
-
 /// IsPOD has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
 
@@ -579,9 +573,6 @@ BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 
 /// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
-
-/// Alignof has type T.Type -> Int
-BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
 ///
@@ -699,7 +690,7 @@ BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 /// zeroInitializer has type <T> () -> T
 BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
-/// once has type (Builtin.RawPointer, () -> ())
+/// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 /// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
 BUILTIN_MISC_OPERATION(OnceWithContext, "onceWithContext", "", Special)
@@ -851,6 +842,15 @@ BUILTIN_MISC_OPERATION(AssumeAlignment, "assumeAlignment", "n", Special)
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
+/// Sizeof has type T.Type -> Int
+BUILTIN_MISC_OPERATION_WITH_SILGEN(Sizeof, "sizeof", "n", Special)
+
+/// Strideof has type T.Type -> Int
+BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
+
+/// Alignof has type T.Type -> Int
+BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
+
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
 // Retrieve the ExecutorRef on which the current asynchronous
@@ -893,6 +893,16 @@ BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 /// Returns an AsyncLet* that must be passed to endAsyncLetLifetime for
 /// destruction.
 BUILTIN_MISC_OPERATION(StartAsyncLetWithLocalBuffer, "startAsyncLetWithLocalBuffer", "", Special)
+
+/// taskRunInline()<T>: (
+///     () async -> T
+/// ) -> T
+///
+/// Create an async context inline in the current synchronous context and run
+/// the specified closure.
+///
+/// This is only supported under the task-to-thread concurrency model.
+BUILTIN_MISC_OPERATION(TaskRunInline, "taskRunInline", "", Special)
 
 /// endAsyncLet(): (Builtin.RawPointer) -> Void
 ///

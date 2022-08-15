@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
 //
@@ -8,20 +8,30 @@ import AmbiguousMethods
 
 var CxxAmbiguousMethodTestSuite = TestSuite("CxxAmbiguousMethods")
 
-CxxAmbiguousMethodTestSuite.test("numberOfMutableMethodsCalled: () -> Int") {
+// It's important to check that both calling the const version first
+// and the mutable version first pass. This helps confirm that the lookup
+// table is being properly seeded.
+CxxAmbiguousMethodTestSuite.test("[Const First] numberOfMutableMethodsCalled: () -> Int") {
   var instance = HasAmbiguousMethods()
 
   // Sanity check. Make sure we start at 0
+  // and that calling numberOfMutableMethodsCalled doesn't change
+  // the count
   expectEqual(0, instance.numberOfMutableMethodsCalled())
-
-  // Make sure calling numberOfMutableMethodsCalled above didn't
-  // change the count
   expectEqual(0, instance.numberOfMutableMethodsCalled())
 
   // Check that mutable version _does_ change the mutable call count
+  expectEqual(0, instance.numberOfMutableMethodsCalled())
   expectEqual(1, instance.numberOfMutableMethodsCalledMutating())
+}
 
+CxxAmbiguousMethodTestSuite.test("[Mutable First] numberOfMutableMethodsCalled: () -> Int") {
+  var instance = HasAmbiguousMethods()
+
+  // Call mutable first
+  expectEqual(1, instance.numberOfMutableMethodsCalledMutating())
   expectEqual(1, instance.numberOfMutableMethodsCalled())
+
 }
 
 CxxAmbiguousMethodTestSuite.test("Basic Increment: (Int) -> Int") {

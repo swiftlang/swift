@@ -231,8 +231,11 @@ Callee IRGenThunk::lookupMethod() {
   if (selfTy.is<MetatypeType>()) {
     metadata = selfValue;
   } else {
+    auto &Types = IGF.IGM.getSILModule().Types;
+    auto *env = Types.getConstantGenericEnvironment(declRef);
+    auto sig = env ? env->getGenericSignature() : GenericSignature();
     metadata = emitHeapMetadataRefForHeapObject(IGF, selfValue, selfTy,
-                                                /*suppress cast*/ true);
+                                                sig, /*suppress cast*/ true);
   }
 
   // Find the method we're interested in.
@@ -520,7 +523,7 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
     }
       
     void noteResilientSuperclass() {}
-    void noteStartOfImmediateMembers(ClassDecl *clas) {}
+    void noteStartOfImmediateMembers(ClassDecl *clazz) {}
   };
   
   LookUpNonoverriddenMethods(IGF, classDecl, method).layout();

@@ -239,19 +239,22 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
                                           unsigned maxRuleLength) {
   assert(Initialized);
   assert(!Minimized);
+  assert(!Frozen);
 
-  // Complete might already be set, if we're re-running completion after
+  // 'Complete' might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
   Complete = 1;
 
-  bool again = false;
+  unsigned ruleCount;
 
   std::vector<CriticalPair> resolvedCriticalPairs;
   std::vector<RewriteLoop> resolvedLoops;
 
   do {
-    // For every rule, looking for other rules that overlap with this rule.
-    for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
+    ruleCount = Rules.size();
+
+    // For every rule, look for other rules that overlap with this rule.
+    for (unsigned i = FirstLocalRule, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
       if (lhs.isLHSSimplified() ||
           lhs.isRHSSimplified() ||
@@ -335,22 +338,21 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
       }
     }
 
+    assert(ruleCount == Rules.size());
+
     simplifyLeftHandSides();
 
-    again = false;
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
-      if (Rules.size() > maxRuleCount)
+      if (getLocalRules().size() > maxRuleCount)
         return std::make_pair(CompletionResult::MaxRuleCount, Rules.size() - 1);
 
       if (!addRule(pair.LHS, pair.RHS, &pair.Path))
         continue;
 
       // Check if the new rule is too long.
-      if (Rules.back().getDepth() > maxRuleLength)
+      if (Rules.back().getDepth() > maxRuleLength + getLongestInitialRule())
         return std::make_pair(CompletionResult::MaxRuleLength, Rules.size() - 1);
-
-      again = true;
     }
 
     for (const auto &loop : resolvedLoops) {
@@ -362,7 +364,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
 
     simplifyRightHandSides();
     simplifyLeftHandSideSubstitutions(/*map=*/nullptr);
-  } while (again);
+  } while (Rules.size() > ruleCount);
 
   return std::make_pair(CompletionResult::Success, 0);
 }

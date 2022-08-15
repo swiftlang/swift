@@ -16,6 +16,7 @@
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -132,30 +133,6 @@ public:
     : RequestResponsePrinterBase(OS, Indent, PrintAsJSON) { }
 };
 } // end anonymous namespace
-
-void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
-  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
-    unsigned char c = Str[i];
-
-    switch (c) {
-    case '\\':
-      OS << '\\' << '\\';
-      break;
-    case '\t':
-      OS << '\\' << 't';
-      break;
-    case '\n':
-      OS << '\\' << 'n';
-      break;
-    case '"':
-      OS << '\\' << '"';
-      break;
-    default:
-      OS << c;
-      break;
-    }
-  }
-}
 
 static void printError(sourcekitd_response_t Err, raw_ostream &OS) {
   OS << "error response (";

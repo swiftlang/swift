@@ -1,7 +1,18 @@
 open class Base {
-    var x = 1
+   var x = 1
+}
+internal struct TypeContainer {
+
+  enum SomeEnum:String {
+    case FirstCase = "first"
+    case SecondCase = "second"
+  }
 }
 
 internal class SubClass : Base {
-    var y = 2
+    var y : TypeContainer.SomeEnum
+
+    override init() {
+        y = .FirstCase
+    }
 }

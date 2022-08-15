@@ -42,25 +42,24 @@ extension Unicode.Scalar {
 }
 
 extension UnsafeBufferPointer where Element == UInt8 {
-  internal func hasNormalizationBoundary(before index: Int) -> Bool {
-    if index == 0 || index == count {
+  internal func hasNormalizationBoundary(before offset: Int) -> Bool {
+    if offset == 0 || offset == count {
       return true
     }
-    _internalInvariant(!UTF8.isContinuation(self[_unchecked: index]))
+    _internalInvariant(!UTF8.isContinuation(self[_unchecked: offset]))
 
     // Sub-300 latiny fast-path
-    if self[_unchecked: index] < 0xCC { return true }
+    if self[_unchecked: offset] < 0xCC { return true }
 
-    let cu = _decodeScalar(self, startingAt: index).0
+    let cu = _decodeScalar(self, startingAt: offset).0
     return cu._isNFCStarter
   }
 
-  internal func isOnUnicodeScalarBoundary(_ index: Int) -> Bool {
-    guard index < count else {
-      _internalInvariant(index == count)
+  internal func isOnUnicodeScalarBoundary(_ offset: Int) -> Bool {
+    guard offset < count else {
+      _internalInvariant(offset == count)
       return true
     }
-    return !UTF8.isContinuation(self[index])
+    return !UTF8.isContinuation(self[offset])
   }
-  
 }

@@ -148,7 +148,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>(
+public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -161,7 +161,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{21-21=-> <#Result#> }} {{educational-notes=complex-closure-inference}}
+  _ = myMap(0..<10, { x in // expected-error {{'myMap' is unavailable: call the 'map()' method on the sequence}}
     ()
     return x
   })
@@ -248,7 +248,7 @@ String().asdf  // expected-error {{value of type 'String' has no member 'asdf'}}
 // <rdar://problem/21553065> Spurious diagnostic: '_' can only appear in a pattern or on the left side of an assignment
 protocol r21553065Protocol {}
 class r21553065Class<T : AnyObject> {} // expected-note{{requirement specified as 'T' : 'AnyObject'}}
-_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' requires that 'r21553065Protocol' be a class type}}
+_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' requires that 'any r21553065Protocol' be a class type}}
 
 // Type variables not getting erased with nested closures
 struct Toe {
@@ -453,7 +453,7 @@ func testTypeSugar(_ a : Int) {
 
 // <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
 func r21974772(_ y : Int) {
-  let x = &(1.0 + y) // expected-error {{use of extraneous '&'}}
+  let x = &(1.0 + y) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }
 
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
@@ -462,7 +462,7 @@ protocol r22020088P {}
 func r22020088Foo<T>(_ t: T) {}
 
 func r22020088bar(_ p: r22020088P?) {
-  r22020088Foo(p.fdafs) // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
+  r22020088Foo(p.fdafs) // expected-error {{value of type '(any r22020088P)?' has no member 'fdafs'}}
 }
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
@@ -573,7 +573,16 @@ func r22263468(_ a : String?) {
   // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
   // re-think the way errors in tuple elements are detected because it's currently impossible to detect
   // exactly what went wrong here and aggregate fixes for different elements at the same time.
-  _ = MyTuple(42, a) // expected-error {{tuple type '(_const Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
+  _ = MyTuple(42, a) // expected-error {{tuple type '(Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
+}
+
+func testTupleConstructionInOutArg() {
+  typealias II = (Int, Int)
+
+  var i = 0
+  _ = (Int, Int)(&i, 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  _ = II(&i, 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  _ = II(&i, &i) // expected-error 2{{'&' may only be used to pass an argument to inout parameter}}
 }
 
 // rdar://71829040 - "ambiguous without more context" error for tuple type mismatch.
@@ -1089,7 +1098,7 @@ class ListExpr_28456467 : AST_28456467, Expr_28456467 {
 
   override var hasStateDef: Bool {
     return elems.first(where: { $0.hasStateDef }) != nil
-    // expected-error@-1 {{value of type 'Expr_28456467' has no member 'hasStateDef'}}
+    // expected-error@-1 {{value of type 'any Expr_28456467' has no member 'hasStateDef'}}
   }
 }
 
@@ -1137,7 +1146,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-1 {{could not infer type for placeholder}}
   // expected-error@-2 {{type placeholder not allowed here}}
 }
 
@@ -1303,9 +1312,14 @@ func f11(_ n: Int) {}
 func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
 f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
 
-let f12: (Int) -> Void = { _ in } // expected-note {{candidate '(Int) -> Void' requires 1 argument, but 2 were provided}}
-func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' : 'P2')}}
-f12(3, f4)// expected-error {{no exact matches in call to global function 'f12'}}
+let f12: (Int) -> Void = { _ in }
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{where 'T' = 'Int'}}
+f12(3, f4)// expected-error {{global function 'f12' requires that 'Int' conform to 'P2'}}
+
+// SR-15293: Bad diagnostic for var + func overload with mismatched call
+func f13(x: Int, y: Int) {}
+var f13: Any = 0
+f13(0, x: 0) // expected-error {{incorrect argument labels in call (have '_:x:', expected 'x:y:')}}
 
 // SR-12242
 struct SR_12242_R<Value> {}

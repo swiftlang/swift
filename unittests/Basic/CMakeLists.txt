@@ -44,6 +44,11 @@ add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 target_link_libraries(SwiftBasicTests
   PRIVATE
   swiftBasic
+  swiftThreading
   clangBasic
   LLVMTestingSupport
   )
+
+if(SWIFT_HOST_VARIANT STREQUAL windows)
+  target_link_libraries(SwiftBasicTests PRIVATE Synchronization)
+endif()

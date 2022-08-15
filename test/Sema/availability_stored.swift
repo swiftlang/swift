@@ -3,15 +3,23 @@
 // Code should type check with a new enough deployment target:
 // RUN: %target-swift-frontend -typecheck %s -target %target-cpu-apple-macos50
 
+// Code should also type check when the library client deployment target is
+// lowered via -target-min-inlining-version.
+// RUN: %target-swift-frontend -typecheck %s -target %target-cpu-apple-macos50 -enable-library-evolution -target-min-inlining-version min
+
 // REQUIRES: OS=macosx
 
 @available(macOS 50, *)
-struct NewStruct {}
+public struct NewStruct {}
 
 @available(macOS 50, *)
 @propertyWrapper
-struct NewPropertyWrapper<Value> {
-  var wrappedValue: Value
+public struct NewPropertyWrapper<Value> {
+  public var wrappedValue: Value
+
+  public init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
 }
 
 @available(macOS 50, *)
@@ -59,6 +67,21 @@ struct BadReferenceStruct2 {
   lazy var z: Int = 42
 }
 
+@available(macOS 40, *)
+public struct PublicStruct {
+  // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  public var x: NewStruct
+
+  // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  @NewPropertyWrapper public var y: Int
+
+  // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  public lazy var z: Int = 42
+}
+
 // The same behavior should hold for enum elements with payloads.
 @available(macOS 50, *)
 enum GoodReferenceEnum {
@@ -80,6 +103,13 @@ enum BadReferenceEnum1 {
 
 @available(macOS 40, *)
 enum BadReferenceEnum2 {
+  // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  case x(NewStruct)
+}
+
+@available(macOS 40, *)
+public enum PublicReferenceEnum {
   // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   case x(NewStruct)

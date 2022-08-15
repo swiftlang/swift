@@ -44,7 +44,7 @@ add_swift_target_library(swiftSwiftOnoneSupport
 if(WINDOWS IN_LIST SWIFT_SDKS)
   # When building in Debug mode, the standard library provides the symbols that
   # we need and as such SwiftOnoneSupport does not need to provide any exported
-  # interfaces.  This results in the import library beinging elided.  However,
+  # interfaces.  This results in the import library being elided.  However,
   # we explicitly link against the SwiftOnoneSupport library when building
   # programs in Debug mode, and need the import library to be generated even if
   # nothing is exported.  Because we will still generate the DLL, create an

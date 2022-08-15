@@ -51,7 +51,7 @@ using ContextHashField = IdentifierIDField;
 /// A bit that indicates whether or not a module is a framework
 using IsFrameworkField = BCFixed<1>;
 
-/// Arrays of various identifiers, distinguised for readability
+/// Arrays of various identifiers, distinguished for readability
 using IdentifierIDArryField = llvm::BCArray<IdentifierIDField>;
 
 /// Identifiers used to refer to the above arrays
@@ -102,7 +102,7 @@ using IdentifierNodeLayout = BCRecordLayout<IDENTIFIER_NODE, BCBlob>;
 //
 // These arrays are also referenced by their sequence number,
 // starting from 1, similar to identifiers above. Value 0 indicates an
-// empty array. This record is used because individiual array fields must
+// empty array. This record is used because individual array fields must
 // appear as the last field of whatever record they belong to, and several of
 // the below record layouts contain multiple arrays.
 using IdentifierArrayLayout =

@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 using namespace swift;
@@ -675,8 +676,8 @@ static Words::iterator matchTypeNameFromBackWithSpecialCases(
 
       if (shortenedNameWord != newShortenedNameWord) {
         unsigned targetSize = newShortenedNameWord.size();
-        auto newIter = llvm::make_reverse_iterator(WordIterator(name,
-                                                                targetSize));
+        auto newIter = std::make_reverse_iterator(WordIterator(name,
+                                                               targetSize));
 #ifndef NDEBUG
         while (nameWordRevIter.base().getPosition() > targetSize)
           ++nameWordRevIter;
@@ -1391,4 +1392,28 @@ Optional<StringRef> swift::stripWithCompletionHandlerSuffix(StringRef name) {
   }
 
   return None;
+}
+
+void swift::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
+  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
+    unsigned char c = Str[i];
+
+    switch (c) {
+      case '\\':
+        OS << '\\' << '\\';
+        break;
+      case '\t':
+        OS << '\\' << 't';
+        break;
+      case '\n':
+        OS << '\\' << 'n';
+        break;
+      case '"':
+        OS << '\\' << '"';
+        break;
+      default:
+        OS << c;
+        break;
+    }
+  }
 }

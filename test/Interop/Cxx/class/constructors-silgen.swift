@@ -39,7 +39,7 @@ public func singleMemberTypeNoArgInit() {
   let i = IntWrapper()
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo10IntWrapperV1xABs5Int32V_tcfC : $@convention(method) (Int32, @thin IntWrapper.Type) -> IntWrapper
+// CHECK-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo10IntWrapperV1xABs5Int32V_tcfC : $@convention(method) (Int32, @thin IntWrapper.Type) -> IntWrapper
 // CHECK: bb0([[I:%[0-9]+]] : $Int32, %{{[0-9]+}} : $@thin IntWrapper.Type):
 // CHECK-NEXT: [[S:%.*]] = struct $IntWrapper ([[I]] : $Int32)
 // CHECK-NEXT: return [[S]]
@@ -48,7 +48,7 @@ public func singleMemberTypeValueInit() {
   let i = IntWrapper(x: 42)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo25DefaultConstructorDeletedV1aABSpys5Int32VG_tcfC : $@convention(method) (UnsafeMutablePointer<Int32>, @thin DefaultConstructorDeleted.Type) -> DefaultConstructorDeleted
+// CHECK-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo25DefaultConstructorDeletedV1aABSpys5Int32VG_tcfC : $@convention(method) (UnsafeMutablePointer<Int32>, @thin DefaultConstructorDeleted.Type) -> DefaultConstructorDeleted
 // CHECK: bb0([[A:%.*]] : $UnsafeMutablePointer<Int32>
 // CHECK-NEXT: [[OUT:%.*]] = struct $DefaultConstructorDeleted ([[A]] : $UnsafeMutablePointer<Int32>)
 // CHECK-NEXT: return [[OUT]] : $DefaultConstructorDeleted

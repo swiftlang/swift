@@ -21,6 +21,7 @@
 #include "llvm/IR/InlineAsm.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/GlobalDecl.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 
@@ -281,7 +282,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
 
 /// Get or create an Objective-C selector reference.  Always returns
 /// an i8**.  The design is that the compiler will emit a load of this
-/// pointer, and the linker will ensure that that pointer is unique.
+/// pointer, and the linker will ensure that pointer is unique.
 llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   // Check whether a reference for this selector already exists.
   auto &entry = ObjCSelectorRefs[selector];
@@ -944,7 +945,6 @@ static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref,
   SILFn = IGM.getSILModule().lookUpFunction(ref);
   assert(SILFn && "no IR function for swift-as-objc thunk");
   auto fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
-  ApplyIRLinkage(IRLinkage::Internal).to(fn);
   // Don't add the unnamed_addr attribute: in some places Foundation is
   // comparing ObjC method pointers. Therefore LLVM's function merging pass must
   // not create aliases for identical functions, but create thunks.
@@ -1279,7 +1279,10 @@ irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
 ObjCMethodDescriptor
 irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                      VarDecl *property) {
-  assert(property->isSettable(property->getDeclContext()) &&
+  // Optional properties support mutation on the Objective-C side, but not the
+  // Swift side.
+  assert((property->getAttrs().hasAttribute<OptionalAttr>() ||
+          property->isSettable(property->getDeclContext())) &&
          "not a settable property?!");
 
   Selector setterSel(property, Selector::ForSetter);
@@ -1320,7 +1323,11 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
 ObjCMethodDescriptor
 irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                      SubscriptDecl *subscript) {
-  assert(subscript->supportsMutation() && "not a settable subscript?!");
+  // Optional subscripts support mutation on the Objective-C side, but not the
+  // Swift side.
+  assert((subscript->getAttrs().hasAttribute<OptionalAttr>() ||
+          subscript->supportsMutation()) &&
+         "not a settable subscript?!");
 
   Selector setterSel(subscript, Selector::ForSetter);
   ObjCMethodDescriptor descriptor{};
@@ -1512,5 +1519,21 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
     fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
   }
   auto call = Builder.CreateCall(fn, value);
+  call->setDoesNotThrow();
+}
+
+void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
+    ValueDecl *fn, llvm::Value *value) {
+  assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
+
+  auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
+  auto llvmFn = IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition);
+
+  auto argType =
+      cast<llvm::FunctionType>(llvmFn->getType()->getPointerElementType())
+          ->getParamType(0);
+  value = Builder.CreateBitCast(value, argType);
+
+  auto call = Builder.CreateCall(llvmFn, value);
   call->setDoesNotThrow();
 }

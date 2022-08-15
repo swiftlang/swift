@@ -114,6 +114,13 @@ void swift::copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks) {
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   defUseWorklist.initialize(currentDef);
   while (SILValue value = defUseWorklist.pop()) {
+    SILPhiArgument *arg;
+    if ((arg = dyn_cast<SILPhiArgument>(value)) && arg->isPhi()) {
+      visitAdjacentReborrowsOfPhi(arg, [&](SILPhiArgument *reborrow) {
+        defUseWorklist.insert(reborrow);
+        return true;
+      });
+    }
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
 
@@ -168,8 +175,33 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::EndBorrow:
+        // Guaranteed values are considered uses of the value when the value is
+        // an owned phi and the guaranteed values are adjacent reborrow phis or
+        // reborrow of such.
+        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        break;
       case OperandOwnership::Reborrow:
-        llvm_unreachable("operand kind cannot take an owned value");
+        BranchInst *branch;
+        if (!(branch = dyn_cast<BranchInst>(user))) {
+          // Non-phi reborrows (tuples, etc) never end the lifetime of the owned
+          // value.
+          liveness.updateForUse(user, /*lifetimeEnding*/ false);
+          defUseWorklist.insert(cast<SingleValueInstruction>(user));
+          break;
+        }
+        if (is_contained(user->getOperandValues(), currentDef)) {
+          // An adjacent phi consumes the value being reborrowed.  Although this
+          // use doesn't end the lifetime, this user does.
+          liveness.updateForUse(user, /*lifetimeEnding*/ true);
+          break;
+        }
+        // No adjacent phi consumes the value.  This use is not lifetime ending.
+        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        // This branch reborrows a guaranteed phi whose lifetime is dependent on
+        // currentDef.  Uses of the reborrowing phi extend liveness.
+        auto *reborrow = branch->getArgForOperand(use);
+        defUseWorklist.insert(reborrow);
+        break;
       }
     }
   }
@@ -590,7 +622,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroys() {
 /// copies and destroys for deletion. Insert new copies for interior uses that
 /// require ownership of the used operand.
 void CanonicalizeOSSALifetime::rewriteCopies() {
-  assert(currentDef.getOwnershipKind() == OwnershipKind::Owned);
+  assert(currentDef->getOwnershipKind() == OwnershipKind::Owned);
 
   SmallSetVector<SILInstruction *, 8> instsToDelete;
   defUseWorklist.clear();
@@ -770,7 +802,7 @@ static bool shouldCanonicalizeWithPoison(SILValue def) {
 
 /// Canonicalize a single extended owned lifetime.
 bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
-  if (def.getOwnershipKind() != OwnershipKind::Owned)
+  if (def->getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
   if (def->isLexical())

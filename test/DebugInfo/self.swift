@@ -1,6 +1,4 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
-// The type of self in the allocator is inout only when building against an asserts stdlib.
-// XFAIL: no_asserts
 
 public struct stuffStruct {
     var a: Int64 = 6

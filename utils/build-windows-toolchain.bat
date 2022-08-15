@@ -40,18 +40,36 @@ set TEMP=%BuildRoot%\tmp
 set TMP=%BuildRoot%\tmp
 set TMPDIR=%BuildRoot%\tmp
 
+set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
+
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
 
 md "%BuildRoot%\Library"
 
-:: TODO(compnerd) build ICU from source
-curl.exe -sOL "https://github.com/unicode-org/icu/releases/download/release-67-1/icu4c-67_1-Win64-MSVC2017.zip" || (exit /b)
-"%SystemDrive%\Program Files\Git\usr\bin\unzip.exe" -o icu4c-67_1-Win64-MSVC2017.zip -d %BuildRoot%\Library\icu-67.1
-md %BuildRoot%\Library\icu-67.1\usr\bin
-copy %BuildRoot%\Library\icu-67.1\bin64\icudt67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
-copy %BuildRoot%\Library\icu-67.1\bin64\icuin67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
-copy %BuildRoot%\Library\icu-67.1\bin64\icuuc67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
+:: Build ICU
+copy %SourceRoot%\swift-installer-scripts\shared\ICU\CMakeLists.txt %SourceRoot%\icu\icu4c\ || (exit /b)
+cmake ^
+  -B %BuildRoot%\icu ^
+
+  -D BUILD_SHARED_LIBS=NO ^
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=cl ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=cl ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\icu-69.1\usr ^
+
+  -D BUILD_TOOLS=YES ^
+
+  -G Ninja ^
+  -S %SourceRoot%\icu\icu4c || (exit /b)
+cmake --build "%BuildRoot%\icu" || (exit /b)
+cmake --build "%BuildRoot%\icu" --target install || (exit /b)
 
 :: FIXME(compnerd) is there a way to build the sources without downloading the amalgamation?
 curl.exe -sOL "https://sqlite.org/2021/sqlite-amalgamation-3360000.zip" || (exit /b)
@@ -163,8 +181,8 @@ cmake --build "%BuildRoot%\curl" --target install || (exit /b)
 :: Prepare system modules
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\ucrt.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" || (exit /b)
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\winsdk.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\visualc.modulemap" "%VCToolsInstallDir%\include\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\visualc.apinotes" "%VCToolsInstallDir%\include\visualc.apinotes" || (exit /b)
+copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.modulemap" "%VCToolsInstallDir%\include\module.modulemap" || (exit /b)
+copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.apinotes" "%VCToolsInstallDir%\include\vcruntime.apinotes" || (exit /b)
 
 :: Build Toolchain
 cmake ^
@@ -280,9 +298,10 @@ cmake ^
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
   -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
-  -D ICU_ROOT=%BuildRoot%\Library\icu-67.1 ^
-  -D ICU_UC_LIBRARY=%BuildRoot%\Library\icu-67.1\lib64\icuuc67.lib ^
-  -D ICU_I18N_LIBRARY=%BuildRoot%\Library\icu-67.1\lib64\icuin67.lib ^
+  -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
+  -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
+  -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
+  -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
   -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
   -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
   -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
@@ -623,166 +642,25 @@ python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'D
 :: TODO(compnerd) match the XCTest installation name
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development' } }), encoding='utf-8'))" > %PlatformRoot%\Info.plist
 
-:: Package toolchain.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\toolchain\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
-  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
-  -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi
-
-:: Package sdk.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\CustomActions\SwiftInstaller\SwiftInstaller.vcxproj -t:restore
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\sdk\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
-  -p:PLATFORM_ROOT=%PlatformRoot%\ ^
-  -p:SDK_ROOT=%SDKInstallRoot%\ ^
-  -p:SWIFT_SOURCE_DIR=%SourceRoot%\swift\ ^
-  -p:PlatformToolset=v142
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
-
-:: Package runtime.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\runtime\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
-  -p:SDK_ROOT=%SDKInstallRoot%\
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\runtime\runtime.msi
-
-:: Package icu.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\icu.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\icu\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\icu\ ^
-  -p:ProductVersion=67.1 ^
-  -p:ProductVersionMajor=67 ^
-  -p:ICU_ROOT=%BuildRoot%
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\icu\icu.msi
-
-:: Package devtools.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\devtools\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\devtools\ ^
-  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\devtools\devtools.msi
-
-:: Collate MSIs
-move %PackageRoot%\toolchain\toolchain.msi %PackageRoot% || (exit /b)
-move %PackageRoot%\sdk\sdk.msi %PackageRoot% || (exit /b)
-move %PackageRoot%\runtime\runtime.msi %PackageRoot% || (exit /b)
-move %PackageRoot%\icu\icu.msi %PackageRoot% || (exit /b)
-move %PackageRoot%\devtools\devtools.msi %PackageRoot% || (exit /b)
-
-:: Build Installer
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\installer\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\installer\ ^
-  -p:MSI_LOCATION=%PackageRoot%\
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\installer\installer.exe
-
-:: Stage Artifacts
-md %BuildRoot%\artifacts
-:: FIXME(compnerd) should we provide SDKs as standalone artifact?
-move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
-:: Redistributable libraries for developers
-move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
-move %PackageRoot%\icu.msi %BuildRoot%\artifacts || (exit /b)
-:: Installer
-move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
+IF NOT "%SKIP_PACKAGING%"=="1" call :PackageToolchain
 
 :: TODO(compnerd) test LLVM
 
-:: Test Swift
-:: TODO(compnerd) make lit adjust the path properly
-path %BuildRoot%\3;%BuildRoot%\1\bin;%BuildRoot%\Library\icu-67.1\usr\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
-cmake --build %BuildRoot%\1 --target check-swift || (exit /b)
+SET SKIP_TEST=0
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==swift SET SKIP_TEST=1)
+IF "%SKIP_TEST%"=="0" call :TestSwift
 
-:: Test dispatch
-cmake --build %BuildRoot%\3 --target ExperimentalTest || (exit /b)
+SET SKIP_TEST=0
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==dispatch SET SKIP_TEST=1)
+IF "%SKIP_TEST%"=="0" call :TestDispatch
 
-:: NOTE(compnerd) update the path *before* the build because the tests are
-:: executed to shard the test suite.
-path %BuildRoot%\5;%BuildRoot%\4\bin;%PATH%
+SET SKIP_TEST=0
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==foundation SET SKIP_TEST=1)
+IF "%SKIP_TEST%"=="0" call :TestFoundation
 
-:: Rebuild Foundation (w/ testing)
-cmake ^
-  -B %BuildRoot%\4 ^
-
-  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
-  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
-
-  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
-  -D ICU_ROOT=%BuildRoot%\Library\icu-67.1 ^
-  -D ICU_UC_LIBRARY=%BuildRoot%\Library\icu-67.1\lib64\icuuc67.lib ^
-  -D ICU_I18N_LIBRARY=%BuildRoot%\Library\icu-67.1\lib64\icuin67.lib ^
-  -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
-  -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
-  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
-  -D ZLIB_LIBRARY=%BuildRoot%\Library\zlib-1.2.11\usr\lib\zlibstatic.lib ^
-  -D ZLIB_INCLUDE_DIR=%BuildRoot%\Library\zlib-1.2.11\usr\include ^
-  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
-  -D XCTest_DIR=%BuildRoot%\5\cmake\modules ^
-
-  -D ENABLE_TESTING=YES ^
-
-  -G Ninja ^
-  -S %SourceRoot%\swift-corelibs-foundation || (exit /b)
-cmake --build %BuildRoot%\4 || (exit /b)
-
-:: Test Foundation
-set CTEST_OUTPUT_ON_FAILURE=1
-cmake --build %BuildRoot%\4 --target test || (exit /b)
-
-:: Rebuild XCTest (w/ testing)
-cmake ^
-  -B %BuildRoot%\5 ^
-
-  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
-  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_INSTALL_PREFIX=%PlatformRoot%\Developer\Library\XCTest-development\usr ^
-
-  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
-  -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
-
-  -D ENABLE_TESTING=YES ^
-  -D XCTEST_PATH_TO_LIBDISPATCH_BUILD=%BuildRoot%\3 ^
-  -D XCTEST_PATH_TO_LIBDISPATCH_SOURCE=%SourceRoot%\swift-corelibs-libdispatch ^
-  -D XCTEST_PATH_TO_FOUNDATION_BUILD=%BuildRoot%\4 ^
-
-  -G Ninja ^
-  -S %SourceRoot%\swift-corelibs-xctest || (exit /b)
-cmake --build %BuildRoot%\5 || (exit /b)
-
-:: Test XCTest
-cmake --build %BuildRoot%\5 --target check-xctest || (exit /b)
+SET SKIP_TEST=0
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==xctest SET SKIP_TEST=1)
+IF "%SKIP_TEST%"=="0" call :TestXCTest
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
@@ -829,8 +707,192 @@ rd /s /q zlib libxml2 sqlite icu curl
 git clone --quiet --no-tags --depth 1 --branch v1.2.11 https://github.com/madler/zlib
 git clone --quiet --no-tags --depth 1 --branch v2.9.12 https://github.com/gnome/libxml2
 git clone --quiet --no-tags --depth 1 --branch version-3.36.0 https://github.com/sqlite/sqlite
-git clone --quiet --no-tags --depth 1 --branch maint/maint-67 https://github.com/unicode-org/icu
+git clone --quiet --no-tags --depth 1 --branch maint/maint-69 https://github.com/unicode-org/icu
 git clone --quiet --no-tags --depth 1 --branch curl-7_77_0 https://github.com/curl/curl
+
+goto :eof
+endlocal
+
+:TestSwift
+setlocal enableextensions enabledelayedexpansion
+
+:: Test Swift
+:: TODO(compnerd) make lit adjust the path properly
+path %BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
+cmake --build %BuildRoot%\1 --target check-swift || (exit /b)
+
+goto :eof
+endlocal
+
+:TestDispatch
+setlocal enableextensions enabledelayedexpansion
+
+:: Test dispatch
+cmake --build %BuildRoot%\3 --target ExperimentalTest || (exit /b)
+
+goto :eof
+endlocal
+
+:TestFoundation
+setlocal enableextensions enabledelayedexpansion
+
+:: NOTE(compnerd) update the path *before* the build because the tests are
+:: executed to shard the test suite.
+path %BuildRoot%\5;%BuildRoot%\4\bin;%BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
+
+:: Rebuild Foundation (w/ testing)
+cmake ^
+  -B %BuildRoot%\4 ^
+
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
+
+  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
+  -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
+  -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
+  -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
+  -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
+  -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
+  -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
+  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
+  -D ZLIB_LIBRARY=%BuildRoot%\Library\zlib-1.2.11\usr\lib\zlibstatic.lib ^
+  -D ZLIB_INCLUDE_DIR=%BuildRoot%\Library\zlib-1.2.11\usr\include ^
+  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
+  -D XCTest_DIR=%BuildRoot%\5\cmake\modules ^
+
+  -D ENABLE_TESTING=YES ^
+
+  -G Ninja ^
+  -S %SourceRoot%\swift-corelibs-foundation || (exit /b)
+cmake --build %BuildRoot%\4 || (exit /b)
+
+:: Test Foundation
+set CTEST_OUTPUT_ON_FAILURE=1
+cmake --build %BuildRoot%\4 --target test || (exit /b)
+
+goto :eof
+endlocal
+
+:TestXCTest
+setlocal enableextensions enabledelayedexpansion
+
+:: NOTE(compnerd) update the path *before* the build because the tests are
+:: executed to shard the test suite.
+path %BuildRoot%\5;%BuildRoot%\4\bin;%BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
+
+:: Rebuild XCTest (w/ testing)
+cmake ^
+  -B %BuildRoot%\5 ^
+
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%PlatformRoot%\Developer\Library\XCTest-development\usr ^
+
+  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
+  -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
+
+  -D ENABLE_TESTING=YES ^
+  -D XCTEST_PATH_TO_LIBDISPATCH_BUILD=%BuildRoot%\3 ^
+  -D XCTEST_PATH_TO_LIBDISPATCH_SOURCE=%SourceRoot%\swift-corelibs-libdispatch ^
+  -D XCTEST_PATH_TO_FOUNDATION_BUILD=%BuildRoot%\4 ^
+
+  -G Ninja ^
+  -S %SourceRoot%\swift-corelibs-xctest || (exit /b)
+cmake --build %BuildRoot%\5 || (exit /b)
+
+:: Test XCTest
+cmake --build %BuildRoot%\5 --target check-xctest || (exit /b)
+
+goto :eof
+endlocal
+
+:PackageToolchain
+setlocal enableextensions enabledelayedexpansion
+
+:: Package toolchain.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\toolchain\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
+  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
+  -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi
+
+:: Package sdk.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\CustomActions\SwiftInstaller\SwiftInstaller.vcxproj -t:restore
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\sdk\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
+  -p:PLATFORM_ROOT=%PlatformRoot%\ ^
+  -p:SDK_ROOT=%SDKInstallRoot%\ ^
+  -p:SWIFT_SOURCE_DIR=%SourceRoot%\swift\ ^
+  -p:PlatformToolset=v142
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
+
+:: Package runtime.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\runtime\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
+  -p:SDK_ROOT=%SDKInstallRoot%\
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\runtime\runtime.msi
+
+:: Package devtools.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\devtools\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\devtools\ ^
+  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\devtools\devtools.msi
+
+:: Collate MSIs
+move %PackageRoot%\toolchain\toolchain.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\sdk\sdk.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\runtime\runtime.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\devtools\devtools.msi %PackageRoot% || (exit /b)
+
+:: Build Installer
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\installer\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\installer\ ^
+  -p:MSI_LOCATION=%PackageRoot%\
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\installer\installer.exe
+
+:: Stage Artifacts
+md %BuildRoot%\artifacts
+
+:: Redistributable libraries for developers
+move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
+:: Toolchain
+move %PackageRoot%\toolchain.msi %BuildRoot%\artifacts || (exit /b)
+:: SDK
+move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
+:: Installer
+move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
 
 goto :eof
 endlocal

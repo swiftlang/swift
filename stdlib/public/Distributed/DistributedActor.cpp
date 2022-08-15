@@ -33,7 +33,7 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
 }
 
 SWIFT_CC(swift)
-SWIFT_EXPORT_FROM(swift_Distributed)
+SWIFT_EXPORT_FROM(swiftDistributed)
 void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
                                               size_t targetNameLength) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
@@ -65,7 +65,7 @@ using TargetExecutorSignature =
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
-SWIFT_EXPORT_FROM(swift_Distributed)
+SWIFT_EXPORT_FROM(swiftDistributed)
 TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 
 /// Accessor takes:
@@ -96,7 +96,7 @@ static DistributedAccessorSignature::ContinuationType
     swift_distributed_execute_target_resume;
 
 SWIFT_CC(swiftasync)
-static void ::swift_distributed_execute_target_resume(
+static void swift_distributed_execute_target_resume(
     SWIFT_ASYNC_CONTEXT AsyncContext *context,
     SWIFT_CONTEXT SwiftError *error) {
   auto parentCtx = context->Parent;
@@ -109,8 +109,12 @@ static void ::swift_distributed_execute_target_resume(
   return resumeInParent(parentCtx, error);
 }
 
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError(
+    const char *targetNameStart, size_t targetNameLength);
+
 SWIFT_CC(swiftasync)
-void ::swift_distributed_execute_target(
+void swift_distributed_execute_target(
     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
@@ -124,8 +128,12 @@ void ::swift_distributed_execute_target(
     void **decoderWitnessTable) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
-    assert(false && "no distributed accessor");
-    return; // FIXME(distributed): return -1 here so the lib can fail the call
+    SwiftError *error =
+        swift_distributed_makeDistributedTargetAccessorNotFoundError(targetNameStart, targetNameLength);
+    auto resumeInParent =
+        reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
+            callerContext->ResumeParent);
+    return resumeInParent(callerContext, error);
   }
 
   auto *asyncFnPtr = reinterpret_cast<

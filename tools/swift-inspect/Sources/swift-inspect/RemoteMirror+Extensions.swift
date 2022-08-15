@@ -65,7 +65,7 @@ extension SwiftReflectionContextRef {
   }
 
   internal func name(type: swift_reflection_ptr_t) -> String? {
-    let typeref: UInt64 = swift_reflection_typeRefForMetadata(self, UInt(type))
+    let typeref = swift_reflection_typeRefForMetadata(self, UInt(type))
     if typeref == 0 { return nil }
 
     guard let name = swift_reflection_copyDemangledNameForTypeRef(self, typeref) else {
@@ -97,7 +97,7 @@ extension SwiftReflectionContextRef {
   internal func isArrayOfClass(_ array: swift_reflection_ptr_t) -> Bool {
     guard isContiguousArray(array) else { return false }
 
-    let typeref: UInt64 = swift_reflection_typeRefForMetadata(self, UInt(array))
+    let typeref = swift_reflection_typeRefForMetadata(self, UInt(array))
     if typeref == 0 { return false }
 
     let count = swift_reflection_genericArgumentCountOfTypeRef(typeref)

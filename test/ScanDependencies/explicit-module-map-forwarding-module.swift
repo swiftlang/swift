@@ -10,7 +10,7 @@
 // Step 2: build .swiftmodule from .swiftinterface and give the adjacent .swiftmodule as a candidate compiled module.
 // RUN: %target-swift-frontend -compile-module-from-interface %t/inputs/Foo.swiftinterface -o %t/inputs/Foo-from-interface.swiftmodule -module-name Foo -candidate-module-file %t/inputs/Foo.swiftmodule
 
-// Step 3: the new .swiftmodule should be a fowarding module.
+// Step 3: the new .swiftmodule should be a forwarding module.
 // RUN: %{python} %S/../ModuleInterface/ModuleCache/Inputs/check-is-forwarding-module.py %t/inputs/Foo-from-interface.swiftmodule
 
 // Step 4: using the forwarding module in explicit module map should be OK.
@@ -37,7 +37,12 @@
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}," >> %/t/inputs/map.json
 // RUN: echo "{" >> %/t/inputs/map.json
-// RUN: echo "\"moduleName\": \"_Distributed\"," >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"_StringProcessing\"," >> %/t/inputs/map.json
+// RUN: echo "\"modulePath\": \"%/string_processing_module\"," >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
+// RUN: echo "}," >> %/t/inputs/map.json
+// RUN: echo "{" >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"Distributed\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%/distributed_module\"," >> %/t/inputs/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json

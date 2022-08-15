@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # line-directive.py - Transform line numbers in error messages -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -10,8 +10,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ----------------------------------------------------------------------------
-from __future__ import print_function
-
 import bisect
 import io
 import os
@@ -62,10 +60,7 @@ line_pattern = re.compile(
 
 def _make_line_map(target_filename, stream=None):
     """
-    >>> try:
-    ...     from StringIO import StringIO # py2
-    ... except ImportError:
-    ...     from io import StringIO # py3
+    >>> from io import StringIO
     >>> _make_line_map('box',
     ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
     ... line 2
@@ -695,7 +690,8 @@ def run():
             command_args,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
-            universal_newlines=True
+            universal_newlines=True,
+            encoding='UTF-8'
         )
 
         sources = '(?P<file>' + '|'.join(re.escape(s) for s in sources) + ')'

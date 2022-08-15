@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/STLExtras.h"
-#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/Basic/GraphNodeWorklist.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
@@ -29,7 +30,7 @@ SILArgument::SILArgument(ValueKind subClassKind,
                          const ValueDecl *inputDecl)
     : ValueBase(subClassKind, type),
       parentBlock(inputParentBlock), decl(inputDecl) {
-  Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
+  sharedUInt8().SILArgument.valueOwnershipKind = uint8_t(ownershipKind);
   inputParentBlock->insertArgument(inputParentBlock->args_end(), this);
 }
 
@@ -226,6 +227,31 @@ bool SILPhiArgument::getIncomingPhiValues(
   return true;
 }
 
+bool SILPhiArgument::visitTransitiveIncomingPhiOperands(
+    function_ref<bool(SILPhiArgument *, Operand *)> visitor) {
+  if (!isPhi())
+    return false;
+
+  GraphNodeWorklist<SILPhiArgument *, 4> worklist;
+  worklist.initialize(this);
+
+  while (auto *argument = worklist.pop()) {
+    SmallVector<Operand *> operands;
+    argument->getIncomingPhiOperands(operands);
+
+    for (auto *operand : operands) {
+      SILPhiArgument *forwarded;
+      if ((forwarded = dyn_cast<SILPhiArgument>(operand->get())) &&
+          forwarded->isPhi()) {
+        worklist.insert(forwarded);
+      }
+      if (!visitor(argument, operand))
+        return false;
+    }
+  }
+  return true;
+}
+
 static SILValue
 getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
                                   const SILBasicBlock *predBlock,
@@ -253,8 +279,6 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
         ->getArgForDestBB(parentBlock, argIndex);
   case TermKind::CheckedCastBranchInst:
     return cast<const CheckedCastBranchInst>(predTermInst)->getOperand();
-  case TermKind::CheckedCastValueBranchInst:
-    return cast<const CheckedCastValueBranchInst>(predTermInst)->getOperand();
   case TermKind::SwitchEnumInst:
     return cast<const SwitchEnumInst>(predTermInst)->getOperand();
   }

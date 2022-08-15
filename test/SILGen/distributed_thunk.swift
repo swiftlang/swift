@@ -1,15 +1,15 @@
-// RUN:  %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --dump-input=fail
+// RUN: %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 distributed actor DA {
-  typealias ActorSystem = FakeActorSystem
+  typealias ActorSystem = LocalTestingDistributedActorSystem
 }
 
 extension DA {
-  // CHECK-LABEL: sil hidden [thunk] [distributed] [ossa] @$s17distributed_thunk2DAC1fyyFTE : $@convention(method) @async (@guaranteed DA) -> @error Error
+  // CHECK-LABEL: sil hidden [thunk] [distributed] [ref_adhoc_requirement_witness "$s11Distributed29LocalTestingInvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"] [ossa] @$s17distributed_thunk2DAC1fyyYaKFTE : $@convention(method) @async (@guaranteed DA) -> @error Error {
   // CHECK: function_ref @swift_distributed_actor_is_remote
 
   // Call the actor function
@@ -18,106 +18,44 @@ extension DA {
   distributed func f() { }
 }
 
-// ==== ----------------------------------------------------------------------------------------------------------------
-// ==== Fake Address -----------------------------------------------------------
-
-public struct ActorAddress: Hashable, Sendable, Codable {
-  public let address: String
-  public init(parse address : String) {
-    self.address = address
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    self.address = try container.decode(String.self)
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(self.address)
-  }
+protocol ServerProto {
+  func doSomething() async throws
 }
 
-// ==== Fake Transport ---------------------------------------------------------
-
-public struct FakeActorSystem: DistributedActorSystem {
-  public typealias ActorID = ActorAddress
-  public typealias InvocationDecoder = FakeInvocationDecoder
-  public typealias InvocationEncoder = FakeInvocationEncoder
-  public typealias SerializationRequirement = Codable
-
-  init() {
-    print("Initialized new FakeActorSystem")
-  }
-
-  public func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor,
-      Act.ID == ActorID  {
-    nil
-  }
-
-  public func assignID<Act>(_ actorType: Act.Type) -> ActorID
-      where Act: DistributedActor,
-      Act.ID == ActorID {
-    ActorAddress(parse: "xxx")
-  }
-
-  public func actorReady<Act>(_ actor: Act)
-      where Act: DistributedActor,
-      Act.ID == ActorID {
-  }
-
-  public func resignID(_ id: ActorID) {
-  }
-
-  public func makeInvocationEncoder() -> InvocationEncoder {
-    .init()
-  }
-
-  public func remoteCall<Act, Err, Res>(
-    on actor: Act,
-    target: RemoteCallTarget,
-    invocation invocationEncoder: inout InvocationEncoder,
-    throwing: Err.Type,
-    returning: Res.Type
-  ) async throws -> Res
-    where Act: DistributedActor,
-          Act.ID == ActorID,
-          Err: Error,
-          Res: SerializationRequirement {
-    fatalError("not implemented")
-  }
-
-  public func remoteCallVoid<Act, Err>(
-    on actor: Act,
-    target: RemoteCallTarget,
-    invocation invocationEncoder: inout InvocationEncoder,
-    throwing: Err.Type
-  ) async throws
-    where Act: DistributedActor,
-          Act.ID == ActorID,
-          Err: Error {
-    fatalError("not implemented")
-  }
+extension DA: ServerProto {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk2DACAA11ServerProtoA2aDP11doSomethingyyYaKFTW : $@convention(witness_method: ServerProto) @async (@in_guaranteed DA) -> @error Error
+  // TODO: we do hop here actually; ...-NOT: hop_to_executor
+  // CHECK: function_ref @$s17distributed_thunk2DAC11doSomethingyyYaKFTE
+  // CHECK: return
+  distributed func doSomething() { }
 }
 
-// === Sending / encoding -------------------------------------------------
-public struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
-  public typealias SerializationRequirement = Codable
+distributed actor DA2: ServerProto {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
 
-  public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
-  public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
-  public mutating func doneRecording() throws {}
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA2CAA11ServerProtoA2aDP11doSomethingyyYaKFTW : $@convention(witness_method: ServerProto) @async (@in_guaranteed DA2) -> @error Error
+  // CHECK-NOT: hop_to_executor
+  // CHECK-NOT: return
+  // CHECK: function_ref @$s17distributed_thunk3DA2C11doSomethingyyYaKFTE
+  distributed func doSomething() async { }
 }
 
-// === Receiving / decoding -------------------------------------------------
-public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
-  public typealias SerializationRequirement = Codable
+distributed actor DA3: ServerProto {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
 
-  public func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  public func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
-  public func decodeReturnType() throws -> Any.Type? { nil }
-  public func decodeErrorType() throws -> Any.Type? { nil }
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA3CAA11ServerProtoA2aDP11doSomethingyyYaKFTW
+  // CHECK-NOT: hop_to_executor
+  // CHECK-NOT: return
+  // CHECK: function_ref @$s17distributed_thunk3DA3C11doSomethingyyYaKFTE
+  distributed func doSomething() async throws { }
+}
+
+distributed actor DA4: ServerProto {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA4CAA11ServerProtoA2aDP11doSomethingyyYaKFTW
+  // TODO: we do hop here actually; ...-NOT: hop_to_executor
+  // CHECK-NOT: return
+  // CHECK: function_ref @$s17distributed_thunk3DA4C11doSomethingyyYaKFTE
+  distributed func doSomething() throws { }
 }

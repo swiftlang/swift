@@ -480,7 +480,7 @@ static bool isInterestingTypealias(Type type) {
   else
     return false;
 
-  if (aliasDecl->getUnderlyingType()->isVoid())
+  if (type->isVoid())
     return false;
 
   // The 'Swift.AnyObject' typealias is not 'interesting'.
@@ -504,7 +504,7 @@ static bool isInterestingTypealias(Type type) {
   return true;
 }
 
-/// Walks the type recursivelly desugaring  types to display, but skipping
+/// Walks the type recursively desugaring  types to display, but skipping
 /// `GenericTypeParamType` because we would lose association with its original
 /// declaration and end up presenting the parameter in τ_0_0 format on
 /// diagnostic.
@@ -670,10 +670,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Type type;
     bool needsQualification = false;
 
-    // TODO: We should use PrintOptions::printForDiagnostic here, or we should
-    // rename that method.
-    PrintOptions printOptions{};
-
+    // Compute the appropriate print options for this argument.
+    auto printOptions = PrintOptions::forDiagnosticArguments();
     if (Arg.getKind() == DiagnosticArgumentKind::Type) {
       type = Arg.getAsType()->getWithoutParens();
       if (type.isNull()) {
@@ -739,7 +737,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
         llvm::SmallString<256> AkaText;
         llvm::raw_svector_ostream OutAka(AkaText);
 
-        OutAka << getAkaTypeForDisplay(type);
+        getAkaTypeForDisplay(type)->print(OutAka, printOptions);
         Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
                             typeName.c_str(), AkaText.c_str());
       } else {
@@ -1042,24 +1040,40 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
 
 void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
+  handleDiagnostic(std::move(*ActiveDiagnostic));
+  ActiveDiagnostic.reset();
+}
+
+void DiagnosticEngine::handleDiagnostic(Diagnostic &&diag) {
   if (TransactionCount == 0) {
-    emitDiagnostic(*ActiveDiagnostic);
+    emitDiagnostic(diag);
     WrappedDiagnostics.clear();
     WrappedDiagnosticArgs.clear();
   } else {
-    onTentativeDiagnosticFlush(*ActiveDiagnostic);
-    TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
+    onTentativeDiagnosticFlush(diag);
+    TentativeDiagnostics.emplace_back(std::move(diag));
   }
-  ActiveDiagnostic.reset();
+}
+
+void DiagnosticEngine::clearTentativeDiagnostics() {
+  TentativeDiagnostics.clear();
+  WrappedDiagnostics.clear();
+  WrappedDiagnosticArgs.clear();
 }
 
 void DiagnosticEngine::emitTentativeDiagnostics() {
   for (auto &diag : TentativeDiagnostics) {
     emitDiagnostic(diag);
   }
-  TentativeDiagnostics.clear();
-  WrappedDiagnostics.clear();
-  WrappedDiagnosticArgs.clear();
+  clearTentativeDiagnostics();
+}
+
+void DiagnosticEngine::forwardTentativeDiagnosticsTo(
+    DiagnosticEngine &targetEngine) {
+  for (auto &diag : TentativeDiagnostics) {
+    targetEngine.handleDiagnostic(std::move(diag));
+  }
+  clearTentativeDiagnostics();
 }
 
 /// Returns the access level of the least accessible PrettyPrintedDeclarations

@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SILGEN_EXECUTORBREADCRUMB_H
+#define SWIFT_SILGEN_EXECUTORBREADCRUMB_H
+
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -37,7 +40,14 @@ public:
   // Emits the hop back sequence, if any, necessary to get back to
   // the executor represented by this breadcrumb.
   void emit(SILGenFunction &SGF, SILLocation loc);
+
+#ifndef NDEBUG
+  // FOR ASSERTS ONLY: returns true if calling `emit` will emit a hop-back.
+  bool needsEmit() const { return mustReturnToExecutor; }
+#endif
 };
 
 } // namespace Lowering
 } // namespace swift
+
+#endif

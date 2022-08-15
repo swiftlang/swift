@@ -10,7 +10,7 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\documentclass[headsepline,bibliography=totoc]{scrreport}
+\documentclass[headsepline,bibliography=totoc]{scrreprt}
 
 \usepackage{imakeidx}
 
@@ -218,7 +218,7 @@ func minimum<S>(of elements: S) -> S.Iterator.Element
 \end{Verbatim}
 A particularly powerful kind of generic requirement---and perhaps the entire reason the requirement machine exists---is the same-type requirement.
 
-Supppose you're working with $\genericparam{S}$, a generic parameter ranging over $\proto{Sequence}$. Writing $\genericparam{S}.\namesym{Iterator}.\namesym{Element}$ everywhere will get awkward fast. As I mentioned, the real version of $\proto{Sequence}$ in the standard library is slightly more complex. Indeed, it defines an $\namesym{Element}$ associated type in the protocol itself, so that the user can write $\genericparam{S}.\namesym{Element}$. Simply adding the associated type definition is not enough, because now $\genericparam{S}.\namesym{Element}$ and $\genericparam{S}.\namesym{Iterator}.\namesym{Element}$ are \emph{different} type parameters and cannot be used interchangeably.
+Suppose you're working with $\genericparam{S}$, a generic parameter ranging over $\proto{Sequence}$. Writing $\genericparam{S}.\namesym{Iterator}.\namesym{Element}$ everywhere will get awkward fast. As I mentioned, the real version of $\proto{Sequence}$ in the standard library is slightly more complex. Indeed, it defines an $\namesym{Element}$ associated type in the protocol itself, so that the user can write $\genericparam{S}.\namesym{Element}$. Simply adding the associated type definition is not enough, because now $\genericparam{S}.\namesym{Element}$ and $\genericparam{S}.\namesym{Iterator}.\namesym{Element}$ are \emph{different} type parameters and cannot be used interchangeably.
 
 \index{same-type requirement}
 To express this restriction that concrete types conforming to $\proto{Sequence}$ must provide an iterator type compatible with the element type, a \texttt{where} clause in the protocol can state a same-type requirement:
@@ -261,7 +261,7 @@ But in this case, you may as well just peel off the $\namesym{Array}\langle\bull
 \[\genericparam{T}.\namesym{Element} == \namesym{Int}.\]
 
 \index{power set}
-One more small language feature is worth mentioning. You might want to define a function that constructs the the set of all subsets of a set, i.e., the power set. The $\namesym{Set}\langle\bullet\rangle$ type constructor requires that its argument conforms to $\proto{Hashable}$:
+One more small language feature is worth mentioning. You might want to define a function that constructs the set of all subsets of a set, i.e., the power set. The $\namesym{Set}\langle\bullet\rangle$ type constructor requires that its argument conforms to $\proto{Hashable}$:
 \begin{Verbatim}
 struct Set<Element : Hashable> {...}
 \end{Verbatim}
@@ -574,7 +574,7 @@ The simplest of all queries are the binary predicates, which respond with a true
 \begin{example}
 \index{protocol inheritance}
 \index{conformance requirement}
-Recall from Listing \ref{hashableequatable} there is an inheritance relationship from $\proto{Hashable}$ and $\proto{Equatable}$, and take the generic signature
+Recall from Listing \ref{hashableequatable} there is an inheritance relationship from $\proto{Hashable}$ and $\proto{Equatable}$, and consider the generic signature
 \[\gensig{\genericparam{T}}{\genericparam{T}\colon\proto{Hashable}}.\]
 Since protocol inheritance is expressed as a conformance requirement on $\genericparam{Self}$, both of these queries will return true:
 \begin{itemize}
@@ -791,11 +791,11 @@ Finally, I can describe the remaining set of generic signature queries.
 \item [\texttt{getCanonicalTypeInContext()}] computes the canonical type of an arbitrary type.
 \end{description}
 
-The \texttt{getCanonicalTypeInContext()} query is more general than the other two, which only exist for performance reasons.
+The \texttt{getCanonicalTypeInContext()} query is the most general and can subsume the others. The other two have specialized implementations for performance reasons.
 
 \chapter{Monoids}\label{monoids}
 
-Over the next two chapters, I'm going to take a rather circuitous route through the field of abstract algebra.\footnote{Unfortunately, you won't see a definition of the mathematical concept of a ``field.'' It's not useful here.} It's possible to define finitely-presented monoids without talking about quotients of free monoids. For that matter, rewrite systems can be introduced without using the word ``monoid'' at all. But the various definitions you'll see along the way will come in handy later, and you can always skim this section and come back to it if needed.
+Over the next two chapters, I'm going to take a rather circuitous route through the field of abstract algebra. It's possible to define finitely-presented monoids without talking about quotients of free monoids. For that matter, rewrite systems can be introduced without using the word ``monoid'' at all. But the various definitions you'll see along the way will come in handy later, and you can always skim this section and come back to it if needed.
 
 \index{monoid}
 \index{binary operation}
@@ -1390,7 +1390,7 @@ Finally, I can formalize the notion of ``reducing'' terms by making them ``small
 \begin{definition}[Reduction relation]\label{transinvdef} If $A^*$ is equipped with a reduction order $<$, then a relation $\rightarrow$ is a \emph{reduction relation} with respect to $<$ if $x\rightarrow y$ implies that $y<x$. Another equivalent definition is that a reduction relation $\rightarrow$ is a \emph{sub-relation} of $>$, the inverse relation of $<$. 
 \end{definition}
 \index{rewrite system}
-As you saw in the previous example, a reduction relation for a finitely-presented monoid can be constructed by orienting the equations from the presentation with respect to some reduction order, a process which converts the equations into rewrite rules. Such a set of rewrite rules is called a \emph{rewrite system}. There is a simple algorithm for for reducing a term into an irreducible form:
+As you saw in the previous example, a reduction relation for a finitely-presented monoid can be constructed by orienting the equations from the presentation with respect to some reduction order, a process which converts the equations into rewrite rules. Such a set of rewrite rules is called a \emph{rewrite system}. There is a simple algorithm for reducing a term into an irreducible form:
 \begin{algorithm}[Reducing a term]\label{reducingaterm} Let $t$ be a term in some rewrite system $R$.
 \begin{enumerate}
 \item Initialize the boolean flag to false.
@@ -1420,8 +1420,8 @@ d&\Rightarrow b\tag{3}
 \end{align}
 Let's use these rules to reduce the string $adc$. The only reduction you can apply initially is Rule 3, which turns $a\underline{d}c$ into $a\underline{b}c$. At this point though, you have two choices on how to proceed: Rule 1 or Rule 2:
 \begin{enumerate}
-\item Applying Rule 1 turns $\underline{ab}c$ into $\underline{a}c$, which cannot be reduced any further.
-\item Applying Rule 2 turns $a\underline{bc}$ into $a\underline{b}$, which can be reduced via an application of Rule 1, leaving you with $\underline{a}$, which is irreducible.
+\item Applying Rule 1 turns $\underline{ab}c$ into $\underline{a}c$, which is irreducible (that is, it cannot be reduced any further).
+\item Applying Rule 2 turns $a\underline{bc}$ into $a\underline{b}$, which can be reduced via an application of Rule 1, leaving you with $\underline{a}$, which is also irreducible.
 \end{enumerate}
 This is a problem. Algorithm \ref{reducingaterm} can only solve the word problem if every term has a unique irreducible form, and yet, the term $adc$ can be reduced to two distinct and irreducible terms $ac$ and $a$ by applying rules in a different order.
 
@@ -2026,88 +2026,9 @@ To get some of the subsequent listings and diagrams to fit, I abbreviated the pr
 \item $\protosym{OptionSet}$ becomes $\protosym{O}$.
 \end{itemize}
 
-\section{Some Proofs}
-Now, I'm going to prove some results about the requirement machine with name and protocol symbols.
-
-\index{domain of a term}
-\begin{definition}\label{domain1} The \emph{domain map} is a partial function that maps a term $T$ to a set of protocol names. If the first symbol in the term is a protocol symbol $\protosym{P}$, then $\domain(T)=\{\proto{P}\}$. Otherwise, the domain map is not defined. If $\domain(T)$ is defined, then the term $T$ is \emph{valid}.
-
-For now, the domain of a term always contains exactly one protocol, if the mapping is defined at all. Later on, you will see that in the full requirement machine, certain kinds of valid terms can have an empty domain, or a domain of multiple protocols.
-\end{definition}
-\begin{lemma}\label{domainoflowered} For any type parameter $T$ of a protocol $\proto{P}$, $\domain(\Lambda_{\proto{P}}(T))=\{\proto{P}\}$. In particular, this means the type lowering map $\Lambda_{\proto{P}}$ always outputs valid terms.
-\end{lemma}
-\begin{proof}
-This follows from Definition~\ref{liftingloweringmaps}, where the term constructed by $\Lambda_{\proto{P}}$ always begins with the protocol symbol $\protosym{P}$.
-\end{proof}
-The notion of validity can be extended to rewrite rules.
-\index{domain of a term}
-\begin{definition}\label{validrule}
-A rewrite rule $T\Rightarrow U$ is \emph{valid} if the terms $T$ and $U$ are both valid, and $\domain(T)=\domain(U)$.
-\end{definition}
-
-The next proof shows equivalent terms always have the same domain. Intuitively, this makes sense, since terms are always ``relative'' to the protocol in which they appear, and it would not make sense for a type parameter in one protocol to be equivalent to a type parameter in another protocol.
-\begin{lemma} If ${T}{\downarrow}={U}{\downarrow}$ and $\domain(T)$ is defined, then $\domain(U)=\domain(T)$.
-\end{lemma}
-\begin{proof}\index{derivation path}\index{monoid congruence}
-Since ${T}{\downarrow}={U}{\downarrow}$, $T$ and $U$ are equivalent under the monoid congruence generated by the initial set of rewrite rules, and there exists a derivation path transforming $T$ to $U$ using these rules. Say this derivation path has length $n$, and let $(s_i\Rightarrow t_i, k_i)$ be the $i$th component. For each $i$, one of $s_i\Rightarrow t_i$ or $t_i\Rightarrow s_i$ is an initial rewrite rule produced by the requirement lowering map $\Lambda_{\proto{Q}_i}$ for some $\proto{Q}_i$. Let $x_i$ be the $i$th intermediate term in the derivation path, where $x_0=T$ and $x_n=U$.
-
-Let $\domain(T)=\{\proto{P}\}$. Induction on the length of the derivation path will show that $\domain(U)=\{\proto{P}\}$.
+The toy requirement machine with name and protocol symbols is somewhat limited in what it can do:
 \begin{enumerate}
-\item The base case is where $i=0$. Here, the derivation path is empty, so $T=U$ and $\domain(U)=\{\proto{P}\}$.
-
-\item Now, assume that all derivation paths of length $i-1$ are domain-preserving. This means that $\domain(x_{i-1})=\{\proto{P}\}$. There are two cases to consider.
-\begin{enumerate}
-\item The first case is there the $i$th component of the derivation path has $k_i>0$, leaving the first symbol of the intermediate term untouched. In this case, $\domain(x_i)=\domain(x_{i-1})$.
-\item The second case is where $k_i=0$, meaning that the derivation path component replaces a prefix $s_i$ with $t_i$. Since $s_i$ is a prefix of $x_{i-1}$, $\domain(s_i)=\{\proto{P}\}$ by the induction hypothesis. By Definition~\ref{reqlowering1} and Lemma~\ref{domainoflowered}, it is also the case that $\domain(t_i)=\{\proto{P}\}$. Therefore, $\domain(x_i)=\{\proto{P}\}$.
-\end{enumerate}
-\item Since the final term $x_n$ is equal to $U$, it follows that $\domain(U)=\{\proto{P}\}$.
-\end{enumerate}
-\end{proof}
-The above lemma has a couple of interesting consequences.
-\begin{lemma} If a term is valid, then its canonical form ${T}{\downarrow}$ is also valid. Furthermore, the identity element $\varepsilon$ is not the canonical form of any valid term.
-\end{lemma}
-\begin{proof} If some term $T$ is a valid term, then $\domain(T)$ is defined, and since ${T}{\downarrow}$ is equivalent to $T$, $\domain({T}{\downarrow})=\domain(T)$. Therefore ${T}{\downarrow}$ is a valid term.
-
-For the second part, assume that $T$ is a valid term, and ${T}{\downarrow}=\varepsilon$. Since $|\varepsilon|=0$, $\domain(\varepsilon)$ is not defined, and $\domain(T)$ must not be defined either. This contradicts the assumption that $T$ is a valid term. Therefore, ${T}{\downarrow}\neq\varepsilon$.
-\end{proof}
-
-The next results concern the structure of rules derived from conformance requirements.
-\begin{definition} A \emph{type-like} term is one where the first symbol is a protocol symbol, and all subsequent symbols, if there are any, are name symbols.
-\end{definition}
-\begin{lemma} Rewrite rules produced by the requirement lowering map $\Lambda_{\proto{P}}$ take on one of the following two forms:
-\begin{enumerate}
-\item $T.\protosym{Q}\Rightarrow T$ where $T$ is a type-like term and $\proto{Q}$ is some protocol.
-\item $T\Rightarrow U$ where $T$ and $U$ are type-like terms.
-\end{enumerate}
-\end{lemma}
-\begin{proof} This follows from Definition~\ref{reqlowering1}.
-\end{proof}
-
-\begin{lemma}\label{propliketerm1} Suppose that $T$ and $U$ are type-like symbols with domain $\{\proto{P}\}$, and the canonical form of $T.\protosym{Q}$ is $U$. Then the canonical form of $T$ is also $U$.
-\end{lemma}
-\begin{proof}
-TODO.
-\end{proof}
-
-The notion of canonical types defined in Section~\ref{canonicaltypes} corresponds to canonical terms in this rewrite system.
-\begin{lemma} If $T$ is a canonical type parameter in the protocol $\proto{P}$, then $\Lambda_{\proto{P}}(T)$ is a canonical term.
-\end{lemma}
-\begin{proof}
-TODO.
-\end{proof}
-
-Putting all this together, you can prove the following.
-\begin{theorem}\label{finiterqm} Let $\proto{P}$ be a protocol defining an infinite set of unique canonical type parameters $\{T_i\}$ where each $T_i$ conforms to some protocol $\proto{Q}$. Then the rewrite system constructed from this protocol is not convergent.
-\end{theorem}
-\begin{proof}
-For any type parameter $T_i$, the term $\Lambda_{\proto{P}}(T_i)$ is canonical, since $T_i$ is canonical. Together with the fact that $T_i$ conforms to $\proto{Q}$, Lemma~\ref{propliketerm1} shows that the term $\Lambda_{\proto{P}}(T_i).\protosym{Q}$ reduces to $\Lambda_{\proto{P}}(T_i)$. Since no proper suffix of a valid type-like term is valid, this means for each $T_i$, the confluent completion of the rewrite system must contain a valid rewrite rule of the form $\Lambda_{\proto{P}}(T_i).\protosym{Q}\Rightarrow \Lambda_{\proto{P}}(T_i)$. Each of these rules is distinct and there are infinitely many of them, therefore the rewrite system is not convergent.
-\end{proof}
-
-Indeed, the toy requirement machine with name and protocol symbols is somewhat limited in what it can do:
-\begin{enumerate}
-\item Perhaps the most serious issue is shown in Theorem~\ref{finiterqm}: this rewrite system cannot cope with recursive conformance requirements. In fact, it is no more expressive than the ancient \texttt{ArchetypeBuilder}, described in Algorithm~\ref{archetypebuilder}.
-
-\item Even the \emph{statement} of Theorem~\ref{finiterqm} is awkward. There is no way to talk about what it means for a type parameter to actually ``exist,'' so the theorem must be phrased in terms of there being an infinite number of conformance requirements, when really it should talk about there being infinitely many unique type parameters.
+\item As you will see in the next chapter, the most serious issue is that this rewrite system cannot cope with recursive conformance requirements. This makes it no more expressive than the ancient \texttt{ArchetypeBuilder}, described in Algorithm~\ref{archetypebuilder}.
 
 \item Reducing terms to canonical form lets you determine if two type parameters are equivalent, but it's insufficient for \texttt{getCanonicalTypeInContext()}.
 
@@ -2120,11 +2041,11 @@ The issue is that this association between associated types and protocols is ``e
 \item Layout, superclass and concrete type requirements are not supported.
 \end{enumerate}
 
-The first three problems are closely intertwined and the full solution is the subject of the next chapter. 
+The first two problems are closely intertwined and the full solution is the subject of the next chapter. 
 
-Problem 3 has a straightforward solution, described in Section \ref{genericparamsym}; it requires adding more symbols to the alphabet.
+Problem 2 has a straightforward solution, described in Section \ref{genericparamsym}; it requires adding more symbols to the alphabet.
 
-Problem 4 is really not a shortcoming of the rewrite system itself, but rather something that requires building some machinery on top; that is the topic of Chapter \ref{propertymap}.
+Problem 3 is really not a shortcoming of the rewrite system itself, but rather something that requires building some machinery on top; that is the topic of Chapter \ref{propertymap}.
 
 \chapter{Associated Types}\label{associatedtypes}
 
@@ -2137,7 +2058,7 @@ protocol View {
 \end{Verbatim}
 \end{listing}
 
-To motivate the introduction of the next concept, consider the SwiftUI $\proto{View}$ protocol shown in Listing~\ref{viewproto}. The protocol's requirement signature contains a recursive conformance requirement, $\genericparam{Self}.\namesym{Body}\colon \proto{View}$. By Theorem~\ref{finiterqm}, the rewrite system constructed in the requirement machine with name and protocol symbols is not convergent.
+To motivate the introduction of the next concept, consider the SwiftUI $\proto{View}$ protocol shown in Listing~\ref{viewproto}. The protocol's requirement signature contains a recursive conformance requirement, $\genericparam{Self}.\namesym{Body}\colon \proto{View}$. It turns out the rewrite system constructed in the requirement machine with name and protocol symbols is not convergent!
 
 First, let's take a closer look at where exactly things go wrong. The initial rewrite system consists of a single rule:
 \[\protosym{View}.\namesym{Body}.\protosym{View}\Rightarrow\protosym{View}.\namesym{Body}\]
@@ -2208,7 +2129,7 @@ t&\leftrightarrow ab\\
 u&\leftrightarrow a\\
 v&\leftrightarrow b
 \end{align*}
-This means that adding a new \emph{generator} to $M$ made the presentation convergent. What does this generator represent in the world of Swift? Well, $u\in M'$ is $a\in M$, which is $\protosym{View}$ in Swift; and $v\in M'$ is $b\in M$, which is $\namesym{Body}$. Therefore $t\in M'$ is $ab\in M$, which is $\protosym{View}.\namesym{Body}$. You may guess that $t$ could be a new kind of symbol, perhaps representing a ``bound'' associated type inside a specific protcol.
+This means that adding a new \emph{generator} to $M$ made the presentation convergent. What does this generator represent in the world of Swift? Well, $u\in M'$ is $a\in M$, which is $\protosym{View}$ in Swift; and $v\in M'$ is $b\in M$, which is $\namesym{Body}$. Therefore $t\in M'$ is $ab\in M$, which is $\protosym{View}.\namesym{Body}$. You may guess that $t$ could be a new kind of symbol, perhaps representing a ``bound'' associated type inside a specific protocol.
 
 \index{associated type symbol}
  The crux of the issue is that name symbols like $\namesym{Body}$ don't carry any information, and little can be said about them unless they're prefixed with some other term that is known to conform to a protocol. Thus, you cannot simply add a rewrite rule to say that $\namesym{Body}$ conforms to $\protosym{View}$:
@@ -2340,39 +2261,6 @@ One interesting phenomenon is when terms containing name symbols reduce to assoc
 &\rightarrow\assocsym{View}{Body}.\assocsym{View}{Body}.\namesym{Body}\tag{Rule 4}\\
 &\rightarrow\assocsym{View}{Body}.\assocsym{View}{Body}.\assocsym{View}{Body}\tag{Rule 4}
 \end{align}
-
-\index{domain of a term}
-Some terms no longer start with a protocol symbol, so an amended definition of the domain map is needed.
-\begin{definition} If the first symbol of a term $T$ is an associated type symbol $\assocsym{P}{A}$, then $\domain(T):=\{\proto{P}\}$.
-\end{definition}
-As before, the rewrite system is domain-preserving. Indeed, the only added rules are the associated type introduction rules, $\proto{P}.\namesym{A}\Rightarrow\assocsym{P}{A}$. These rules are domain-preserving by the above definition.
-
-Previously, I mentioned that the earlier formulation of the requirement machine with name and protocol symbols could not express the fact that a type parameter actually exists. Now, associated type symbols offer a solution. If a fully-reduced term contains name symbols, it means that the type parameter represented by this term does not exist:
-\[\protosym{View}.\namesym{Body}.\namesym{Goat}\rightarrow\assocsym{View}{Body}.\namesym{Goat}.\]
-The converse is not true however. A term that only contains associated type symbols might still not be a ``real'' type parameter. For example, the $\proto{View}$ protocol's $\namesym{Body}$ associated type does not conform to $\proto{Sequence}$, so the following term does not represent an actual type parameter, even though it looks legitimate:
-\[\assocsym{View}{Body}.\assocsym{Sequence}{Element}\]
-
-This new validity condition can be expressed using the tools I've already introduced. The domain of $\assocsym{Sequence}{Element}$ is $\{\proto{Sequence}\}$, but $\assocsym{View}{Body}$ does not conform to $\proto{Sequence}$, because $\assocsym{View}{Body}.\protosym{Sequence}$ does not reduce to $\assocsym{View}{Body}$. This can be generalized.
-\begin{definition} A term $T=T_1.\ldots.T_n$ is \emph{conformance-valid} if at every position, the prefix conforms to each protocol in the domain of the corresponding suffix.
-
-More specifically, for every $1\leq i<n$, let $U=T_1.\ldots.T_i$ and $V=T_{i+1}.\ldots.T_n$, so that $T=UV$. Note that both $U$ and $V$ are non-empty. Then $T$ is conformance-valid if $V$ is valid, and $U.\protosym{P}$ and $U$ reduce to the same canonical form for all $\proto{P}\in\domain(V)$.
-\end{definition}
-Conformance validity has some useful properties.
-\begin{lemma} If the terms produced by applying the type lowering map $\Lambda_{\proto{P}}$ to the initial generic requirements all reduce to conformance-valid terms, then the rewrite system preserves conformance validity.
-\end{lemma}
-\begin{proof} TODO.
-\end{proof}
-
-\begin{lemma} If $T$ is conformance-valid, then so is its canonical form ${T}{\downarrow}$.
-\end{lemma}
-\begin{proof} TODO.
-\end{proof}
-
-\iffalse
-This solves the quandry presented at the beginning of this chapter, where the earlier formulation of the rewrite system that lacked associated type symbols had no apparent way of implementing the \texttt{getCanonicalTypeInContext()} generic signature query.
-
-Now that a term containing name symbols reduces to a canonical term with associated type symbols, it appears that mapping terms back to fully resolved type parameters is now a possibility. Unfortunately, the reality is a little bit more complicated. The inherited associated type construction I will introduce in the next section once again breaks the correspondence between terms and canonical types; this will be repaired in Section \ref{implqueries}.
-\fi
 
 \section{Inherited Associated Types}\label{inheritedassoctypes}
 \index{recursive conformance requirement}
@@ -2575,6 +2463,7 @@ In this section, I've been implicitly using a lexicographic order on protocol na
 \end{center}
 \end{figure}
 
+\iffalse
 \section{Merged Associated Types}\label{mergedassoctypes}
 
 The previous section showed an example of what can be called ``vertical composition,'' where the $\proto{BidirectionalCollection}$ protocol imposed an additional protocol conformance requirement on the $\namesym{Indices}$ associated type it inherits from $\proto{Collection}$. The recursive conformance on the $\namesym{Indices}$ associated type caused some trouble, which was resolved with the introduction of inherited associated type symbols.
@@ -2677,195 +2566,8 @@ What happened here is that the rewrite system wants to normalize a mix of $\asso
 Unfortunately, this cannot be expressed with a convergent rewrite system over the existing alphabet. Recall the two other examples of this phenomenon shown in this chapter:
 \begin{enumerate}
 \item Introducing associated type symbols made recursive protocol conformance requirements convergent.
-\item Introducing inherited associated type symbols made vertical composition of recursive protocol conformance requirements convergent.
+\item Introducing inherited associated type symbols made recursive protocol conformance requirements on inherited associated types convergent.
 \end{enumerate}
-Similarly, the solution here is to introduce a new kind of symbol, the merged associated type symbol, which will make horizontal composition of recursive conformance requirements convergent.
-
-\index{merged associated type symbol}
-\begin{definition}[Merged associated type symbol]
-If $P:=\{\proto{P}_1,\ldots,\proto{P}_n\}$ is an ordered list of protocols and $\namesym{A}$ is an associated type present in each $\proto{P}_i\in P$, the \emph{merged associated type symbol} $[\proto{P}_1\cap\ldots\cap\proto{P}_n\colon\namesym{T}]$ represents the horizontal composition of the associated type symbols $[\proto{P}_i\colon\namesym{A}]$ for all $\proto{P}_i\in P$.
-
-Note that no protocol $\proto{P}_i$ must inherit from any other protocol $\proto{P}_j$ in the list. If $\proto{P}_i$ inherits from $\proto{P}_j$, then $\proto{P}_j$ can be deleted from the list. Taken to the limit, this reduces to the inherited associated type case from the previous section.
-\end{definition}
-
-In the reduction order, merged associated type symbols must precede plain associated type symbols, or other merged associated type symbols with fewer protocols. That is, the following identities must hold:
-\begin{align*}
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}]&<\assocsym{P1}{A}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}]&<\assocsym{P2}{A}
-\end{align*}
-The full definition of the reduction order that you will see described in Definition~\ref{symbolorder} takes this into account.
-
-Whereas plain associated type symbols and inherited associated type symbols come into existence when the initial set of rewrite rules are built for a protocol, merged associated type symbols are introduced by the completion procedure itself. This is done via a heuristic which attempts to detect when they would be beneficial.
-
-\begin{definition}[Merged associated type candidate] If $\{\proto{P}_i\}_{1\leq i\leq m}$ and $\{\proto{Q}_i\}_{1\leq i\leq n}$ are two lists of protocols, $\namesym{A}$ is the name of an associated type, and $T$ is some term, then a rewrite rule of the form
-\[T.[\proto{P}_1\cap\ldots\cap\proto{P}_m\colon\namesym{A}] \Rightarrow T.[\proto{Q}_1\cap\ldots\cap\proto{Q}_n\colon\namesym{A}]\]
-is a \emph{merged associated type candidate}.
-\end{definition}
-
-Merged associated type candidates are identified when new rules are added by the completion procedure. Note that the candidate rule itself might already contain merged associated type symbols. The merging procedure can run multiple times, building up wider and wider merged associated type symbols. Initially, the first merge candidate necessarily only involves plain associated type symbols containing one protocol each.
-
-In the running example of this section, Rule~12 described above is a merged associated type candidate:
-\begin{align}
-\assocsym{P3}{T}.\assocsym{P2}{A}\Rightarrow\assocsym{P3}{T}.\assocsym{P1}{A}\tag{12}
-\end{align}
-The requirement machine uses a modified form of the Knuth-Bendix completion procedure described in Algorithm~\ref{knuthbendix}. When a merged associated type candidate is detected, the completion procedure stops, and the candidate rule is processed via an algorithm, which possibly adds new rewrite rules.
-
-\begin{algorithm}[Processing a merged associated type candidate]
-This algorithm takes a rewrite system $S$, and a merged associated type candidate rule of the form
-\[T.[\proto{P}_1\cap\ldots\cap\proto{P}_m\colon\namesym{A}] \Rightarrow T.[\proto{Q}_1\cap\ldots\cap\proto{Q}_n\colon\namesym{A}],\]
-where $\{\proto{P}_i\}_{1\leq i\leq m}$ and $\{\proto{Q}_i\}_{1\leq i\leq n}$ are two lists of protocols, and $\namesym{A}$ is the name of an associated type.
-
-The algorithm adds zero or more new rewrite rules to $S$ to resolve the merged associated type candidate, at which point the completion procedure can continue checking for overlaps and resolving critical pairs.
-\begin{enumerate}
-\item First, merge the two lists of protocols $\{\proto{P}_i\}_{1\leq i\leq m}$ and $\{\proto{Q}_i\}_{1\leq i\leq n}$, deleting any protocols that are inherited by other protocols in the list. Let $\{\proto{R}_i\}_{0\leq i\leq k}$ be the merged list of protocols.
-
-If the list $\{\proto{R}_i\}_{0\leq i\leq k}$ is exactly equal to $\{\proto{Q}_i\}_{1\leq i\leq n}$, return immediately, since no new rules would get added to $S$ below. One example of this is if the merge candidate is a rule $T.\assocsym{P}{A}\Rightarrow T.\assocsym{Q}{A}$, and $\proto{P}$ inherits from $\proto{Q}$.
-\item Construct the merged associated type symbol $[\proto{R}_1\cap\ldots\cap\proto{R}_k\colon\namesym{A}]$ and add it to the rewrite system's alphabet.
-
-\item Next, add a rewrite rule to $S$:
-\begin{align*}
-T.[\proto{Q}_1\cap\ldots\cap\proto{Q}_n\colon\namesym{A}] &\Rightarrow T.[\proto{R}_1\cap\ldots\cap\proto{R}_k\colon\namesym{A}]
-\end{align*}
-
-\item Finally, lift conformance requirements on $[\proto{P}_1\cap\ldots\cap\proto{P}_m\colon\namesym{A}]$ and $[\proto{Q}_1\cap\ldots\cap\proto{Q}_n\colon\namesym{A}]$. For each rewrite rule $R$ in $S$,
-\begin{enumerate}
-\item If $R$ is of the following form, where $\proto{P'}$ is some protocol,
-\[[\proto{P}_1\cap\ldots\cap\proto{P}_m\colon\namesym{A}].\protosym{P'}\Rightarrow [\proto{P}_1\cap\ldots\cap\proto{P}_m\colon\namesym{A}],\]
-then add a new rewrite rule to $S$:
-\[[\proto{R}_1\cap\ldots\cap\proto{R}_k\colon\namesym{A}].\protosym{P'}\Rightarrow [\proto{R}_1\cap\ldots\cap\proto{R}_k\colon\namesym{A}]\]
-\item If $R$ is of the following form, where $\proto{P'}$ is some protocol,
-\[[\proto{Q}_1\cap\ldots\cap\proto{Q}_n\colon\namesym{A}].\protosym{P'}\Rightarrow [\proto{Q}_1\cap\ldots\cap\proto{Q}_n\colon\namesym{A}]\]
-then add a new rewrite rule to $S$:
-\[[\proto{R}_1\cap\ldots\cap\proto{R}_k\colon\namesym{A}].\protosym{P'}\Rightarrow [\proto{R}_1\cap\ldots\cap\proto{R}_k\colon\namesym{A}]\]
-\end{enumerate}
-
-\end{enumerate}
-\end{algorithm}
-
-Returning to the example, consider how the completion procedure now proceeds once equipped with the above algorithm. Let's rewind back to Rule~12 and discard the Rules~13--16, since they were added after the train went off the rails.
-
-Indeed, once Rule~12 is introduced, it can be processed by the merged associated type candidate algorithm, which adds four new rewrite rules:
-\begin{enumerate}
-\item Step~1 adds the merged associated type symbol $[\proto{P1}\cap\proto{P2}\colon\namesym{A}]$ to the rewrite system.
-
-\item Next, Step~2 adds the rule:
-\begin{align}
-\assocsym{P3}{T}.\assocsym{P1}{A}&\Rightarrow\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{13}
-\end{align}
-
-\item Finally, Step~3 lifts the conformance requirements on $\assocsym{P1}{A}$ and $\assocsym{P2}{A}$ to the merged associated type symbol $[\proto{P1}\cap\proto{P2}\colon\namesym{A}]$:
-\begin{align*}
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\protosym{P1}&\Rightarrow [\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{14}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\protosym{P2}&\Rightarrow [\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{15}
-\end{align*}
-
-\end{enumerate}
-The new rules added by the merged associated type algorithm have some overlaps with a couple of existing rules. In particular, Rule~14 and Rule~15 overlap with Rule~1 and Rule~3 respectively. Resolving these critical pairs introduces two new rewrite rules:
-\begin{align}
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\namesym{A}&\Rightarrow[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P1}{A}\tag{16}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\namesym{A}&\Rightarrow[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P2}{A}\tag{17}
-\end{align}
-Now, the newly-added Rule~16 and Rule~17 overlap with each other, since they have equal left hand sides. Resolving this critical pair introduces a new rewrite rule:
-\begin{align}
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P2}{A}\Rightarrow [\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P1}{A}\tag{18}
-\end{align}
-The above rule is actually another merged associated type candidate, so the merged associated type candidate algorithm will run again.
-\begin{enumerate}
-\item Step~1 computes the merged associated type symbol $[\proto{P1}\cap\proto{P2}\colon\namesym{A}]$, which has already been added to the rewrite system when Rule~12 was processed by this algorithm.
-\item Step~2 adds the rule:
-\begin{align}
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P1}{A}&\Rightarrow [\proto{P1}\cap\proto{P2}\colon\namesym{A}].[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{19}
-\end{align}
-\item Step~3 looks for conformance requirements on $\assocsym{P1}{A}$ and $\assocsym{P2}{A}$, which have already been lifted to $[\proto{P1}\cap\proto{P2}\colon\namesym{A}]$ when Rule~12 was processed by this algorithm.
-\end{enumerate}
-
-The merged associated type candidate algorithm has now run twice, introducing some new rewrite rules involving the merged associated type symbol $[\proto{P1}\cap\proto{P2}\colon\namesym{A}]$. It is now time to revisit some of the critical pairs which caused trouble before. Recall that Rule~12 overlapped with Rule~4 on the term $\assocsym{P3}{T}.\assocsym{P2}{A}.\protosym{P2}$. Reducing this term with both rules yields a pair of terms as before:
-\begin{align*}
-t_0&=\assocsym{P3}{T}.\assocsym{P1}{A}.\protosym{P2}\\
-t_1&=\assocsym{P3}{T}.\assocsym{P2}{A}
-\end{align*}
-With the newly-added rewrite rules, the first term $t_0$ now reduces as follows:
-\begin{align}
-t_0=&\assocsym{P3}{T}.\assocsym{P1}{A}.\protosym{P2}\nonumber\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\protosym{P2}\tag{Rule 13}\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{Rule 15}
-\end{align}
-The second term $t_1$ serendipitously reduces to the same term:
-\begin{align}
-t_1=&\assocsym{P3}{T}.\assocsym{P2}{A}\nonumber\\
-t_1=&\assocsym{P3}{T}.\assocsym{P1}{A}\tag{Rule 12}\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{Rule 13}
-\end{align}
-This critical pair is now trivial, and can be discarded.
-
-Rule~12 also overlapped with Rule~9 on the term $\assocsym{P3}{T}.\assocsym{P2}{A}.\namesym{A}$. Again, reducing this term with both rules yields a pair of terms as before:
-\begin{align*}
-t_0&=\assocsym{P3}{T}.\assocsym{P1}{A}.\namesym{A}\\
-t_1&=\assocsym{P3}{T}.\assocsym{P2}{A}.\assocsym{P2}{A}
-\end{align*}
-This time though, the first term $t_0$ reduces as follows:
-\begin{align}
-t_0=&\assocsym{P3}{T}.\assocsym{P1}{A}.\namesym{A}\nonumber\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\namesym{A}\tag{Rule 13}\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P1}{A}\tag{Rule 16}\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}].[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{Rule 19}
-\end{align}
-The second term $t_1$ miraculously reduces to the same term:
-\begin{align}
-t_1=&\assocsym{P3}{T}.\assocsym{P2}{A}.\assocsym{P2}{A}\nonumber\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P2}{A}\tag{Rule 13}\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P1}{A}\tag{Rule 18}\\
-\rightarrow&\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}].[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{Rule 19}
-\end{align}
-Yet again, the critical pair is trivial and can be discarded.
-
-In fact, all remaining overlaps have been resolved, and we have a confluent rewrite system. Listing~\ref{mergedlisting} shows the full list of rewrite rules. Note that the final post-processing cleanup pass deletes Rule~10, Rule~12, Rule~17 and Rule~19 because their left hand sides can be reduced by other rules. Furthermore, the right hand sides of Rule~11 and Rule~18 are simplified by applying other rules.
-\begin{listing}\caption{Confluent rewrite system for merged associated type example}\label{mergedlisting}
-\begin{align}
-\protosym{P1}.\namesym{A}&\Rightarrow\assocsym{P1}{A}\tag{1}\\
-\assocsym{P1}{A}.\protosym{P1}&\Rightarrow\assocsym{P1}{A}\tag{2}\\
-\protosym{P2}.\namesym{A}&\Rightarrow\assocsym{P2}{A}\tag{3}\\
-\assocsym{P2}{A}.\protosym{P2}&\Rightarrow\assocsym{P2}{A}\tag{4}\\
-\protosym{P3}.\namesym{T}&\Rightarrow\assocsym{P3}{T}\tag{5}\\
-\assocsym{P3}{T}.\protosym{P1}&\Rightarrow\assocsym{P3}{T}\tag{6}\\
-\assocsym{P3}{T}.\protosym{P2}&\Rightarrow\assocsym{P3}{T}\tag{7}\\
-\assocsym{P1}{A}.\namesym{A}&\Rightarrow\assocsym{P1}{A}.\assocsym{P1}{A}\tag{8}\\
-\assocsym{P2}{A}.\namesym{A}&\Rightarrow\assocsym{P2}{A}.\assocsym{P2}{A}\tag{9}\\
-\assocsym{P3}{T}.\namesym{A}&\Rightarrow\assocsym{P3}{T}.\assocsym{P1}{A}\tag{\textbf{Deleted}}\\
-\assocsym{P3}{T}.\namesym{A}&\Rightarrow\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{11}\\
-\assocsym{P3}{T}.\assocsym{P2}{A}&\Rightarrow\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{12}\\
-\assocsym{P3}{T}.\assocsym{P1}{A}&\Rightarrow\assocsym{P3}{T}.[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{13}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\protosym{P1}&\Rightarrow [\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{14}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\protosym{P2}&\Rightarrow [\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{15}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\namesym{A}&\Rightarrow[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P1}{A}\tag{\textbf{Deleted}}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\namesym{A}&\Rightarrow[\proto{P1}\cap\proto{P2}\colon\namesym{A}].[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{17}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P2}{A}&\Rightarrow [\proto{P1}\cap\proto{P2}\colon\namesym{A}].[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{18}\\
-[\proto{P1}\cap\proto{P2}\colon\namesym{A}].\assocsym{P1}{A}&\Rightarrow [\proto{P1}\cap\proto{P2}\colon\namesym{A}].[\proto{P1}\cap\proto{P2}\colon\namesym{A}]\tag{19}
-\end{align}
-\end{listing}
-
-\iffalse
-For example, $\proto{MutableCollection}$ is another protocol inheriting from $\proto{Collection}$ which imposes additional requirements on $\proto{Collection}$'s associated types. Listing~\ref{bidirectionalandmutable} shows a protocol with an associated type $\namesym{A}$ that conforms to \emph{both} $\proto{BidirectionalCollection}$ and $\proto{MutableCollection}$. The type parameter $\genericparam{Self}.\namesym{A}.\namesym{SubSequence}$ (and $\genericparam{Self}.\namesym{A}.\namesym{SubSequence}.\namesym{SubSequence}$, and so on) will conform to both $\proto{BidirectionalCollection}$ and $\proto{MutableCollection}$.
-\begin{listing}\caption{Example of horizontal composition}\label{bidirectionalandmutable}
-\begin{Verbatim}
-protocol BidirectionalCollection : Collection
-  where SubSequence : BidirectionalCollection,
-        Indices : BidirectionalCollection {
-  ...
-}
-
-protocol MutableCollection : Collection
-  where SubSequence : MutableCollection {
-  ...
-}
-
-protocol P {
-  // A.SubSequence is both a BidirectionalCollection, and a
-  // MutableCollection.
-  associatedtype A : BidirectionalCollection, MutableCollection
-}
-\end{Verbatim}
-\end{listing}
 \fi
 
 \chapter{The Requirement Machine}\label{requirementmachine}
@@ -2881,8 +2583,7 @@ The requirement machine operates on the below alphabet:
 \index{protocol symbol}
 \item \textbf{Protocol symbols}: $\protosym{P}$ where $\proto{P}$ is a Swift protocol.
 \index{associated type symbol}
-\index{merged associated type symbol}
-\item \textbf{Associated type symbols}: $[\proto{P}_0\cap\ldots\cap\proto{P}_n\colon\namesym{T}]$ where the $\proto{P}_i$ are protocols and $\namesym{T}$ is an associated type name. Each protocol must define or inherit an associated type named $\namesym{T}$. The list of protocols always contains at least one protocol, so $n\geq 1$. If $n > 1$, the associated type symbol is called a merged associated type symbol. These were discussed in detail in Section~\ref{mergedassoctypes}.
+\item \textbf{Associated type symbols}: $\assocsym{P}{T}$ where $\proto{P}$ is a protocol and $\namesym{T}$ is an associated type name. The protocol must directly define or inherit an associated type named $\namesym{T}$
 \index{name symbol}
 \item \textbf{Name symbols}: $\namesym{T}$ for any valid Swift identifier.
 \index{generic parameter symbol}
@@ -2966,20 +2667,15 @@ If $\alpha$ and $\beta$ have the same kind, then they are compared as follows:
 \begin{itemize}
 \item \textbf{Protocol symbols:} Let $\alpha=\protosym{P}$ and $\beta=\protosym{Q}$. Then $\alpha<\beta$ if $\proto{P}<\proto{Q}$ in the reduction protocol order from Definition \ref{protocolorder}.
 \item \textbf{Associated type symbols:} Let
-$
-\alpha=[\proto{P}_0\cap\ldots\cap\proto{P}_m:\namesym{T}]$, $
-\beta=[\proto{Q}_0\cap\ldots\cap\proto{Q}_n:\namesym{T}]$.
+$\alpha=\assocsym{P}{T}$, $\beta=\assocsym{Q}{U}$.
 \begin{itemize}
-\item If the identifier $T$ precedes $U$ in lexicographic order, then $\alpha < \beta$.
-\item If $T=U$, and $m>n$, then $\alpha < \beta$.
-\item If $T=U$, $m=n$, and there is some $j$ such that for all $i<j$, $\proto{P}_i=\proto{Q}_i$ and $\proto{P}_j<\proto{Q}_j$, then $\alpha<\beta$.
+\item If the identifier $\namesym{T}$ precedes $\namesym{U}$ in lexicographic order, then $\alpha < \beta$.
+\item If $\namesym{T}=\namesym{U}$ and $\proto{P}<\proto{Q}$ in the reduction protocol order, then $\alpha < \beta$.
 \end{itemize}
 \item \textbf{Name symbols} $\alpha<\beta$ if the identifier of $\alpha$ precedes the identifier of $\beta$ lexicographically.
 \item \textbf{Generic parameter symbols} Let $\alpha=\genericsym{d}{i}$, $\beta=\genericsym{d'}{i'}$. Then $\alpha < \beta$ if either $d<d'$, or if $d=d'$ and $i<i'$.
 \end{itemize}
 \end{definition}
-The ordering of merged associated type symbols is subtle. A symbol with more protocols precedes one with fewer, so for example
-$[\proto{P}\cap\proto{Q}:\namesym{A}]<\assocsym{P}{A}$. This order remains well-founded, because only a set of protocol symbols exist, which imposes an upper bound on the size of a merged associated type symbol.
 
 \index{shortlex order}
 \begin{definition}[Reduction order on terms]
@@ -3025,7 +2721,7 @@ Finally, I will generalize the requirement lowering map from Definition~\ref{req
 \index{generic requirement}
 \index{requirement signature}
 \begin{algorithm}[Protocol requirement lowering]\label{lowerreqinproto}
-The map $\Lambda_{\proto{P}}\colon\namesym{Requirement}\rightarrow\namesym{Rule}^+$ takes a generic requirement and produces one or more rewrite rules (that's what the ``$+$'' in $\namesym{Rule}^+$ means). In practice, the only kind of requirement that produces more than one rule is a superclass requirement, which introduces an additional implied $\namesym{AnyObject}$ layout requirement. The requirement lowering map builds on top of the type lowering map $\Lambda_{\proto{P}}\colon \namesym{Type} \rightarrow \namesym {Term}$.
+The map $\Lambda_{\proto{P}}\colon\namesym{Requirement}\rightarrow\namesym{Rule}$ takes a generic requirement and produces a rewrite rule. The requirement lowering map builds on top of the type lowering map $\Lambda_{\proto{P}}\colon \namesym{Type} \rightarrow \namesym {Term}$.
 
 Each kind of generic requirement is handled as follows.
 \begin{itemize}
@@ -3036,10 +2732,8 @@ Each kind of generic requirement is handled as follows.
 \item \textbf{Layout requirements} $\namesym{T}\colon\namesym{L}$ lower to a rule eliminating a layout symbol from the end of the type term for $\namesym{T}$:
 \[\Lambda_{\proto{P}}(\namesym{T}).\layoutsym{L} \Rightarrow \Lambda_{\proto{P}}(\namesym{T})\]
 \index{superclass requirement}
-\item \textbf{Superclass requirements} $\namesym{T}\colon\namesym{C}$ lower to \emph{two} rules, the first one eliminating a superclass symbol from the end of the type term for $\namesym{T}$:
-\[\Lambda_{\proto{P}}(\namesym{T}).\supersym{\namesym{C}} \Rightarrow \Lambda_{\proto{P}}(\namesym{T}),\]
-and the second one eliminating an $\namesym{AnyObject}$ layout symbol:
-\[\Lambda_{\proto{P}}(\namesym{T}).\layoutsym{\namesym{AnyObject}} \Rightarrow \Lambda_{\proto{P}}(\namesym{T}).\]
+\item \textbf{Superclass requirements} $\namesym{T}\colon\namesym{C}$ lower to a rule eliminating a superclass symbol from the end of the type term for $\namesym{T}$:
+\[\Lambda_{\proto{P}}(\namesym{T}).\supersym{\namesym{C}} \Rightarrow \Lambda_{\proto{P}}(\namesym{T})\]
 \index{concrete type requirement}
 \item \textbf{Concrete type requirements} $\namesym{T}==\namesym{C}$ (where the right-hand side is a concrete type) lower to a rule eliminating a concrete type symbol from the end of the type term for $\namesym{T}$:
 \[\Lambda_{\proto{P}}(\namesym{T}).\concretesym{\namesym{C}}\Rightarrow\Lambda_{\proto{P}}(\namesym{T})\]
@@ -3049,11 +2743,14 @@ and the second one eliminating an $\namesym{AnyObject}$ layout symbol:
 \item \textbf{Same-type requirements} $\namesym{T}==\namesym{U}$ (where the right-hand side is a type parameter) lower to an equivalence of terms. I'm going to assume that $\Lambda_{\proto{P}}(\namesym{T}) > \Lambda_{\proto{P}}(\namesym{U})$ in the shortlex order on terms (if not, flip the terms around):
 \[\Lambda_{\proto{P}}(\namesym{T}) \Rightarrow \Lambda_{\proto{P}}(\namesym{U})\]
 \end{itemize}
+
+% FIXME: Link to property map section here and mention implied AnyObject rule.
+
 \end{algorithm}
 
 \section{Generic Parameters}\label{genericparamsym}
 \index{generic parameter symbol}
-So far, I've only shown you how to build rewrite rules from requirements in the requirement signature of some protocol $\proto{P}$. When lowering a type parameter, the protocol $\genericparam{Self}$ type lowers to the protocol symbol $\protosym{P}$. Once such a rewrite system is built, queries can be performed against the protocol generic signature $\gensig{\genericparam{Self}}{\genericparam{Self}\colon\proto{P}}$. When lowering parameters and requirements in an arbitary generic signature, generic parameter types instead become generic parameter symbols.
+So far, I've only shown you how to build rewrite rules from requirements in the requirement signature of some protocol $\proto{P}$. When lowering a type parameter, the protocol $\genericparam{Self}$ type lowers to the protocol symbol $\protosym{P}$. Once such a rewrite system is built, queries can be performed against the protocol generic signature $\gensig{\genericparam{Self}}{\genericparam{Self}\colon\proto{P}}$. When lowering parameters and requirements in an arbitrary generic signature, generic parameter types instead become generic parameter symbols.
 
 Generic parameter symbols should only ever appear as the initial symbol in a term. While the rewrite system would have no trouble with terms where generic parameter symbols appear elsewhere in the abstract, they don't actually make sense semantically, since they do not correspond to valid Swift type parameter types.
 
@@ -3226,17 +2923,7 @@ One thing to note is that the reduction order on symbols (Definition \ref{symbol
 \index{critical pair}
 The next issue is rather subtle. An adjustment needs to be made to the Knuth-Bendix completion procedure to correctly handle overlaps between rules involving concrete type and superclass symbols. In the below, I will only talk about concrete type symbols, but as usual, superclass symbols are identical, just replace $\concretesym{\cdots}$ with $\supersym{\cdots}$.
 
-First, let's extend the notion of validity of rules to add a new precondition that a concrete type rule must satisfy in order to be valid. This will be important in the implementation of generic signature queries, described in the next chapter.
-\begin{definition}\label{concretevalid}
-\index{domain of a term}
-A concrete type rule $\namesym{T}.\concretesym{\namesym{C};\,\sigma_0,\ldots,\sigma_n}\Rightarrow\namesym{T}$ is \emph{valid} if
-\begin{enumerate}
-\item the rule is valid in the sense of Definition~\ref{validrule}, and additionally,
-\item for each $\sigma_i$, $\domain(\sigma_i)=\domain(\namesym{T})$.
-\end{enumerate}
-\end{definition}
-
-Recall Definition~\ref{overlappingrules}, and suppose the two overlapping rules are $x\Rightarrow y$ and $x'\Rightarrow y'$, where the overlap is of the second kind, that is, $x$ has a suffix equal to a prefix of $x'$. Furthermore, assume $x'$ ends with a concrete type symbol. Borrowing the notation from this definition, this means that
+Suppose the two overlapping rules are $x\Rightarrow y$ and $x'\Rightarrow y'$, where the overlap is of the second kind, that is, $x$ has a suffix equal to a prefix of $x'$. Furthermore, assume $x'$ ends with a concrete type symbol. Borrowing the notation from this definition, this means that
 \begin{align*}
 x&=uv\\
 x'&=vw.\concretesym{\namesym{T};\;\sigma_0,\ldots,\sigma_n}
@@ -3248,7 +2935,7 @@ Reducing $t$ with $x\Rightarrow y$ and $x'\Rightarrow y'$ gives the critical pai
 t_0&=yw.\concretesym{\namesym{T};\;\sigma_0,\ldots,\sigma_n}\\
 t_1&=uy'
 \end{align*}
-Unfortunately, this violates the new notion of validity in Definition~\ref{concretevalid}. The trick is that when forming the overlapped term $t$, you need to prepend $u$ to each substitution term $\sigma_i$. So the adjusted overlapped term $t$ is
+As the next example shows, this is not what you want. Instead, completion prepends $u$ to each substitution term $\sigma_i$. So the adjusted overlapped term $t$ is
 \[t=uvw.\concretesym{\namesym{T};\;u\sigma_0,\ldots,u\sigma_n}.\]
 Reducing the adjusted term $t$ with $x\Rightarrow y$ and $x'\Rightarrow y'$ gives the correct critical pair:
 \begin{align*}
@@ -3310,7 +2997,7 @@ Intuitively, the completion process began with the fact that
 \[\assocsym{P}{U}==\namesym{G}\langle\assocsym{P}{V}\rangle,\]
 and derived that\
 \[\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}==\namesym{G}\langle\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}\rangle.\]
-Adjusting the concrete type symbol by prepending the prefix $\genericsym{0}{0}.\assocsym{S}{E}$ to the substitution $\sigma_0$ appearing in the left-hand side of Rule 7 ``re-rooted'' the concrete type, giving the correct result shown above and preserving validity as per Definition~\ref{concretevalid}. Without the adjustment, we would instead have derived the fact
+Adjusting the concrete type symbol by prepending the prefix $\genericsym{0}{0}.\assocsym{S}{E}$ to the substitution $\sigma_0$ appearing in the left-hand side of Rule 7 ``re-rooted'' the concrete type, giving the correct result shown above. Without the adjustment, we would instead have derived the fact
 \[\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}==\namesym{G}\langle\assocsym{P}{T}\rangle,\]
 which does not make sense.
 \end{example}
@@ -3542,9 +3229,9 @@ This final rule was added by the completion procedure to resolve the overlap of 
 \end{enumerate}
 When constructing the property map, sorting the rules by the length of their left hand sides guarantees that Rule~6 and Rule~7 are processed before Rule~10 and Rule~14. This is important because the subject type of Rule~6 and Rule~7 ($\assocsym{P}{B}$), is a suffix of the subject type of Rule~10 and Rule~14 ($\genericsym{0}{0}.\assocsym{P}{B}$), which means that the property map entries for both Rule~10 and Rule~14 inherit the superclass and layout requirements from Rule~6 and Rule~7. Furthermore, the substitution $\sigma_0:=\assocsym{P}{A}$ in the superclass requirement is adjusted by prepending the prefix $\genericsym{0}{0}$.
 
-The property map constructed by Algorithm~\ref{propmapconsalgo} from the above rules is shown in Table~\ref{propmapexample2table}.
+The property map constructed by Algorithm~\ref{propmapconsalgo} from the above rules is shown in Table~\ref{propmapexample3table}.
 In the next section, you will see how this example property map can solve generic signature queries.
-\begin{table}\caption{Property map constructed from Example~\ref{propmapexample3}}\label{propmapexample2table}
+\begin{table}\caption{Property map constructed from Example~\ref{propmapexample3}}\label{propmapexample3table}
 \begin{center}
 \begin{tabular}{|l|l|}
 \hline
@@ -3674,7 +3361,7 @@ Now, the time has finally come to describe the implementation of the four proper
 \item[\texttt{getRequiredProtocols()}] The list of protocol requirements satisfied by a type parameter $T$ is recorded in the form of protocol symbols in the property map. This list is transformed into a minimal canonical list of protocols using Definition~\ref{minimalproto}.
 \index{layout constraints}
 \index{join of layout constraints}
-\item[\texttt{getLayoutContraint()}] A type parameter $T$ might be subject to multiple layout constraints, in which case the property map entry will store a list of layout constraints $L_1,\ldots,L_n$. This query needs to compute their join, which is the largest layout constraint that simultaneously satisfies all of them:
+\item[\texttt{getLayoutConstraint()}] A type parameter $T$ might be subject to multiple layout constraints, in which case the property map entry will store a list of layout constraints $L_1,\ldots,L_n$. This query needs to compute their join, which is the largest layout constraint that simultaneously satisfies all of them:
 \[L_1\wedge\cdots\wedge L_n.\]
 Some layout constraints are disjoint on concrete types, meaning their join is the uninhabited ``bottom'' layout constraint, which precedes all other layout constraints in the partial order. In this case, the original generic signature is said to have conflicting requirements. While such a signature does not violate the requirement machine's invariants, it cannot be satisfied by any valid set of concrete substitutions. Detecting and diagnosing conflicting requirements is discussed later.
 

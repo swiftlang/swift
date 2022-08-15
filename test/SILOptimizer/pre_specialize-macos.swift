@@ -26,5 +26,5 @@ public func usePrespecializedEntryPoints() {
   publicPrespecialized2(SomeOtherData())
 }
 
-// OPT: sil [available 10.50] [noinline] @$s22pre_specialized_module21publicPrespecialized2yyxlFAA8SomeDataV_Ts5 : $@convention(thin) (SomeData) -> ()
-// OPT: sil [available 10.50] [noinline] @$s22pre_specialized_module21publicPrespecialized2yyxlF0a1_B8_module213SomeOtherDataV_Ts5 : $@convention(thin) (SomeOtherData) -> ()
+// OPT: sil [available 10.50] [noinline] {{.*}}@$s22pre_specialized_module21publicPrespecialized2yyxlFAA8SomeDataV_Ts5 : $@convention(thin) (SomeData) -> ()
+// OPT: sil [available 10.50] [noinline] {{.*}}@$s22pre_specialized_module21publicPrespecialized2yyxlF0a1_B8_module213SomeOtherDataV_Ts5 : $@convention(thin) (SomeOtherData) -> ()

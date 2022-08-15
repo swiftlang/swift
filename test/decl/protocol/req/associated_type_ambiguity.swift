@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on -requirement-machine-protocol-signatures=on
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P1 {
   typealias T = Int
@@ -9,20 +9,24 @@ protocol P2 {
   associatedtype T
 }
 
+// Note: the warnings should probably be emitted.
+
 // CHECK: ExtensionDecl line={{.*}} base=P1
-// CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2>
-extension P1 where Self : P2, T == Int {
+// CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2, Self.[P2]T == Int>
+extension P1 where Self : P2, T == Int { // expected-warning {{redundant same-type constraint 'Self.T' == 'Int'}}
   func takeT11(_: T) {}
   func takeT12(_: Self.T) {}
 }
 
 // CHECK: ExtensionDecl line={{.*}} base=P1
-// CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2>
-extension P1 where Self : P2, Self.T == Int {
+// CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2, Self.[P2]T == Int>
+extension P1 where Self : P2, Self.T == Int { // expected-warning {{redundant same-type constraint 'Self.T' == 'Int'}}
   func takeT21(_: T) {}
   func takeT22(_: Self.T) {}
 }
 
+// CHECK: ExtensionDecl line={{.*}} base=P1
+// CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2, Self.[P2]T == Int>
 extension P1 where Self : P2 {
   func takeT31(_: T) {}
   func takeT32(_: Self.T) {}

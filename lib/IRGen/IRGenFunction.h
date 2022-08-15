@@ -266,6 +266,10 @@ public:
   llvm::Value *emitLoadOfRelativePointer(Address addr, bool isFar,
                                          llvm::PointerType *expectedType,
                                          const llvm::Twine &name = "");
+  llvm::Value *
+  emitLoadOfCompactFunctionPointer(Address addr, bool isFar,
+                                   llvm::PointerType *expectedType,
+                                   const llvm::Twine &name = "");
 
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *alignMask,
@@ -504,6 +508,9 @@ public:
 
   llvm::Value *emitBlockCopyCall(llvm::Value *value);
   void emitBlockRelease(llvm::Value *value);
+
+  void emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn,
+                                                 llvm::Value *value);
 
   // Routines for an unknown reference-counting style (meaning,
   // dynamically something compatible with either the ObjC or Swift styles).

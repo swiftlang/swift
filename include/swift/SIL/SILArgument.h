@@ -68,6 +68,7 @@ class SILArgument : public ValueBase {
 
   SILBasicBlock *parentBlock;
   const ValueDecl *decl;
+  USE_SHARED_UINT8;
 
 protected:
   SILArgument(ValueKind subClassKind, SILBasicBlock *inputParentBlock,
@@ -81,7 +82,7 @@ protected:
                        const ValueDecl *inputDecl = nullptr)
       : ValueBase(subClassKind, type),
         parentBlock(nullptr), decl(inputDecl) {
-    Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
+    sharedUInt8().SILArgument.valueOwnershipKind = uint8_t(ownershipKind);
   }
 
 public:
@@ -89,11 +90,11 @@ public:
   void operator delete(void *, size_t) = delete;
 
   ValueOwnershipKind getOwnershipKind() const {
-    return static_cast<ValueOwnershipKind>(Bits.SILArgument.VOKind);
+    return ValueOwnershipKind(sharedUInt8().SILArgument.valueOwnershipKind);
   }
 
   void setOwnershipKind(ValueOwnershipKind newKind) {
-    Bits.SILArgument.VOKind = static_cast<unsigned>(newKind);
+    sharedUInt8().SILArgument.valueOwnershipKind = uint8_t(newKind);
   }
 
   SILBasicBlock *getParent() const { return parentBlock; }
@@ -272,6 +273,13 @@ public:
   ///
   /// If visitor returns false, iteration is stopped and we return false.
   bool visitIncomingPhiOperands(function_ref<bool(Operand *)> visitor) const;
+
+  /// Visit incoming phi operands and the argument into which they are incoming;
+  /// if an operand's value is itself a phi, visit that phi's operands.
+  ///
+  /// Returns false when called on a non-phi and when the visitor returns false.
+  bool visitTransitiveIncomingPhiOperands(
+      function_ref<bool(SILPhiArgument *, Operand *)> visitor);
 
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are

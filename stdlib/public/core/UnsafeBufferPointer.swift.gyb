@@ -296,7 +296,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
     // NOTE: We allow the subtraction to silently overflow in release builds
-    // to eliminate a superflous check when `start` and `end` are both valid
+    // to eliminate a superfluous check when `start` and `end` are both valid
     // indices. (The operation can only overflow if `start` is negative, which
     // implies it's an invalid index.) `Collection` does not specify what
     // `distance` should return when given an invalid index pair.
@@ -730,9 +730,9 @@ extension Unsafe${Mutable}BufferPointer {
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
 % if Mutable:
-  @_silgen_name("$_swift_se0333_UnsafeMutableBufferPointer_withMemoryRebound")
+  @_silgen_name("_swift_se0333_UnsafeMutableBufferPointer_withMemoryRebound")
 % else:
-  @_silgen_name("$_swift_se0333_UnsafeBufferPointer_withMemoryRebound")
+  @_silgen_name("_swift_se0333_UnsafeBufferPointer_withMemoryRebound")
 % end
   public func withMemoryRebound<T, Result>(
     to type: T.Type,
@@ -763,8 +763,9 @@ extension Unsafe${Mutable}BufferPointer {
   }
 
   // This unavailable implementation uses the expected mangled name
-  // of `withMemoryRebound`, and provides an entry point for any
-  // binary compiled against the stlib binary for Swift 5.6 and older.
+  // of `withMemoryRebound<T, Result>(to:_:)`, and provides
+  // an entry point for any binary linked against the stdlib binary
+  // for Swift 5.6 and older.
   @available(*, unavailable)
 % if Mutable:
   @_silgen_name("$sSr17withMemoryRebound2to_qd_0_qd__m_qd_0_Sryqd__GKXEtKr0_lF")

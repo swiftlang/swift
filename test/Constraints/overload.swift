@@ -257,3 +257,30 @@ func rdar79672230() {
   var t: MyType = MyType()
   test(&t) // expected-error {{no exact matches in call to local function 'test'}}
 }
+
+// rdar://97396399 - crash in swift::DiagnosticEngine::formatDiagnosticText
+func rdar97396399() {
+  // Has to be overloaded to make sure that contextual type is not recorded during constraint generation
+  func test(_: () -> Void) {}
+  func test(_: (Int) -> Void) {}
+
+  // Multiple different overloads, none of which conform to Sequence
+  func fn(_: Int) -> Int {}
+  // expected-note@-1 {{found candidate with type '(Int) -> Int'}}
+  // expected-note@-2 {{result type 'Int' of 'fn' does not conform to 'Sequence'}}
+  func fn(_: Int) -> Double {}
+  // expected-note@-1 {{found candidate with type '(Int) -> Double'}}
+  // expected-note@-2 {{result type 'Double' of 'fn' does not conform to 'Sequence'}}
+
+  test {
+    for x in fn { // expected-error {{no 'fn' overloads produce result type that conforms to 'Sequence'}}
+      print(x)
+    }
+  }
+
+  test {
+    for x in fn(42) { // expected-error {{no 'fn' overloads produce result type that conforms to 'Sequence'}}
+      print(x)
+    }
+  }
+}

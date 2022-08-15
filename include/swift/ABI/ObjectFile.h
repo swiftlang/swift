@@ -29,7 +29,7 @@ public:
     return {};
   }
   /// Get the name of the segment in the symbol rich binary that may contain
-  /// Swift meteadata.
+  /// Swift metadata.
   virtual llvm::Optional<llvm::StringRef> getSymbolRichSegmentName() {
     return {};
   }

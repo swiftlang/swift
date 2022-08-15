@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _Distributed
+import Distributed
 
 // ==== Fake Address -----------------------------------------------------------
 
@@ -87,7 +87,7 @@ public struct MissingRemoteCallVoidActorSystem: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
 //  func remoteCallVoid<Act, Err>(
@@ -99,7 +99,7 @@ public struct MissingRemoteCallVoidActorSystem: DistributedActorSystem {
 //    where Act: DistributedActor,
 //          Act.ID == ActorID,
 //          Err: Error {
-//    throw ExecuteDistributedTargetError(message: "Not implemented.")
+//    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
 //  }
 }
 
@@ -177,7 +177,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
       }
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
+        target: target,
         invocationDecoder: invocation.makeDecoder(),
         handler: resultHandler
       )
@@ -224,7 +224,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
       }
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
+        target: target,
         invocationDecoder: invocation.makeDecoder(),
         handler: resultHandler
       )
@@ -257,8 +257,8 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
     genericSubs.append(type)
   }
 
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
-    print(" > encode argument: \(argument)")
+  public mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {
+    print(" > encode argument name:\(argument.effectiveLabel), argument: \(argument.value)")
     arguments.append(argument)
   }
   public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
@@ -349,7 +349,7 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
   }
 
   // FIXME(distributed): can we return void here?
-  public func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print(" << onReturn: \(value)")
     storeReturn(value)
   }

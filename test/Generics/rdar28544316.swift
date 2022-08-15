@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -debug-generic-signatures 2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
 class PropertyDataSource<O: PropertyHosting> {

@@ -65,6 +65,13 @@ void ValueBase::replaceAllUsesWithUndef() {
   }
 }
 
+void ValueBase::replaceAllTypeDependentUsesWith(ValueBase *RHS) {
+  SmallVector<Operand *, 4> typeUses(getTypeDependentUses());
+  for (Operand *use : typeUses) {
+    use->set(RHS);
+  }
+}
+
 SILInstruction *ValueBase::getDefiningInstruction() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
     return inst;
@@ -179,9 +186,13 @@ StringRef OwnershipKind::asString() const {
 
 ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention)
-    : value(OwnershipKind::Any) {
-  auto &M = F.getModule();
+    : ValueOwnershipKind(F, Type, Convention,
+                         SILModuleConventions(F.getModule())) {}
 
+ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
+                                       SILArgumentConvention Convention,
+                                       SILModuleConventions moduleConventions)
+    : value(OwnershipKind::Any) {
   // Trivial types can be passed using a variety of conventions. They always
   // have trivial ownership.
   if (Type.isTrivial(F)) {
@@ -192,14 +203,12 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Indirect_In_Constant:
-    value = SILModuleConventions(M).useLoweredAddresses()
-                ? OwnershipKind::None
-                : OwnershipKind::Owned;
+    value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
+                                                    : OwnershipKind::Owned;
     break;
   case SILArgumentConvention::Indirect_In_Guaranteed:
-    value = SILModuleConventions(M).useLoweredAddresses()
-                ? OwnershipKind::None
-                : OwnershipKind::Guaranteed;
+    value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
+                                                    : OwnershipKind::Guaranteed;
     break;
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
@@ -334,7 +343,7 @@ bool Operand::canAcceptKind(ValueOwnershipKind kind,
 }
 
 bool Operand::satisfiesConstraints(SILModuleConventions *silConv) const {
-  return canAcceptKind(get().getOwnershipKind(), silConv);
+  return canAcceptKind(get()->getOwnershipKind(), silConv);
 }
 
 bool Operand::isLifetimeEnding() const {
@@ -352,14 +361,14 @@ bool Operand::isLifetimeEnding() const {
   // isLifetimeEnding() as false even if the constraint itself has a constraint
   // that says a value is LifetimeEnding. If we have a value that has a
   // non-OwnershipKind::None ownership then we just return true as expected.
-  return get().getOwnershipKind() != OwnershipKind::None;
+  return get()->getOwnershipKind() != OwnershipKind::None;
 }
 
 bool Operand::isConsuming() const {
   if (!getOwnershipConstraint().isConsuming())
     return false;
 
-  return get().getOwnershipKind() != OwnershipKind::None;
+  return get()->getOwnershipKind() != OwnershipKind::None;
 }
 
 void Operand::dump() const { print(llvm::dbgs()); }

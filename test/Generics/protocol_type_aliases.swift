@@ -1,9 +1,5 @@
-// FIXME: Once the Requirement Machine can emit diagnostics, run this test with
-// it enabled unconditionally.
-
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=off
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on > %t.dump 2>&1
-// RUN: %FileCheck %s < %t.dump
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures > %t.dump 2>&1
 
 
 func sameType<T>(_: T.Type, _: T.Type) {}
@@ -38,21 +34,20 @@ func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
 // CHECK-LABEL: .concreteRequirementOnConcreteNestedTypeAlias@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.[Q2]C == τ_0_0.[Q2]B.[P2]A>
 func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> == T.B.X {}
-// expected-warning@-1 {{neither type in same-type constraint ('S<T.C>' or 'T.B.X' (aka 'S<T.B.A>')) refers to a generic parameter or associated type}}
 
 
 // Incompatible concrete typealias types are flagged as such
 protocol P3 {
     typealias T = Int
 }
-protocol Q3: P3 { // expected-error{{generic signature requires types 'Int'}}
+protocol Q3: P3 { // expected-error{{no type for 'Self.T' can satisfy both 'Self.T == Int' and 'Self.T == Float'}}
     typealias T = Float
 }
 
 protocol P3_1 {
     typealias T = Float
 }
-protocol Q3_1: P3, P3_1 {} // expected-error{{generic signature requires types 'Float'}}
+protocol Q3_1: P3, P3_1 {} // expected-error{{no type for 'Self.T' can satisfy both 'Self.T == Float' and 'Self.T == Int'}}
 
 
 // Subprotocols can force associated types in their parents to be concrete, and
@@ -63,8 +58,11 @@ protocol Q3_1: P3, P3_1 {} // expected-error{{generic signature requires types '
 protocol Q4: P {
     typealias A = Int // expected-warning{{typealias overriding associated type 'A' from protocol 'P'}}
 }
+
+// FIXME(rqm-diagnostics): Bogus warning
+
 protocol Q5: P {
-    typealias X = Int
+    typealias X = Int // expected-warning{{redundant same-type constraint 'Self.X' == 'Int'}}
 }
 
 // fully generic functions that manipulate the archetypes in a P
@@ -107,7 +105,7 @@ protocol P7 {
 }
 
 // CHECK-LABEL: .P7a@
-// CHECK: Requirement signature: <Self where Self : P7>
+// CHECK: Requirement signature: <Self where Self : P7, Self.[P7a]A == Int>
 protocol P7a : P7 {
   associatedtype A   // expected-warning{{associated type 'A' is redundant with type 'A' declared in inherited protocol 'P7'}}
 }

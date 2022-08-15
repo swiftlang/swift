@@ -269,6 +269,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
+  if(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER)
+    list(APPEND result "-D" "SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER")
+  endif()
+
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY")
   endif()
@@ -300,6 +304,10 @@ function(_add_target_variant_swift_compile_flags
   if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
     list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
   endif()
+  
+  if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+    list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_VECTOR_TYPES")
+  endif()
 
   if(SWIFT_STDLIB_HAS_COMMANDLINE)
     list(APPEND result "-D" "SWIFT_STDLIB_HAS_COMMANDLINE")
@@ -314,9 +322,16 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-Xcc" "-DSWIFT_STDLIB_HAS_ENVIRON")
   endif()
 
-  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-    list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
+  if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
   endif()
+
+  if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
+  endif()
+
+  string(TOUPPER "${SWIFT_SDK_${sdk}_THREADING_PACKAGE}" _threading_package)
+  list(APPEND result "-D" "SWIFT_THREADING_${_threading_package}")
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
@@ -465,17 +480,13 @@ function(_compile_swift_files
     endif()
   endif()
 
-  # The standard library and overlays are built with -requirement-machine-protocol-signatures=verify.
-  if(SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-requirement-machine-protocol-signatures=verify")
-  endif()
-
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
   if(SWIFTFILE_IS_STDLIB AND SWIFT_STDLIB_STABLE_ABI)
     list(APPEND swift_flags "-enable-library-evolution")
+    list(APPEND swift_flags "-Xfrontend" "-library-level"  "-Xfrontend" "api")
   endif()
 
-  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  if("${SWIFT_SDK_${SWIFTFILE_SDK}_THREADING_PACKAGE}" STREQUAL "none")
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
@@ -491,6 +502,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-reflection-metadata-for-debugger-only")
   else()
     list(APPEND swift_flags "-D" "SWIFT_ENABLE_REFLECTION")
+  endif()
+
+  if(NOT "${SWIFT_STDLIB_TRAP_FUNCTION}" STREQUAL "")
+    list(APPEND swift_flags "-Xfrontend" "-trap-function" "-Xfrontend" "${SWIFT_STDLIB_TRAP_FUNCTION}")
   endif()
 
   # FIXME: Cleaner way to do this?

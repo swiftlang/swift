@@ -96,14 +96,14 @@ protected:
     PrintingDiagnosticConsumer printingConsumer;
     DiagnosticEngine diags(sourceMgr);
     diags.addConsumer(printingConsumer);
-    TypeCheckerOptions typeckOpts;
+    TypeCheckerOptions typecheckOpts;
     LangOptions langOpts;
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
     ClangImporterOptions clangImpOpts;
     symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
     SILOptions silOpts;
-    auto ctx = ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
+    auto ctx = ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
                                clangImpOpts, symbolGraphOpts, sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
@@ -149,7 +149,7 @@ protected:
 
     auto bufData = (*bufOrErr)->getBuffer();
     auto validationInfo = serialization::validateSerializedAST(
-        bufData, silOpts.EnableOSSAModules);
+        bufData, silOpts.EnableOSSAModules, /*requiredSDK*/StringRef());
     ASSERT_EQ(serialization::Status::Valid, validationInfo.status);
     ASSERT_EQ(bufData, moduleBuffer->getBuffer());
   }

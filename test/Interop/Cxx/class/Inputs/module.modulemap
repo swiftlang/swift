@@ -87,3 +87,27 @@ module InvalidNestedStruct {
   header "invalid-nested-struct.h"
   requires cplusplus
 }
+
+module ClassProtocolNameClash {
+  header "class-protocol-name-clash.h"
+  requires cplusplus
+}
+
+module DictionaryOfNSStrings {
+  header "dictionary-of-nsstrings.h"
+  requires cplusplus
+}
+
+module ForwardDeclaredCxxRecord {
+  header "forward-declared-cxx-record.h"
+  requires cplusplus
+}
+
+module ReturnsLargeClass {
+  header "returns-large-class.h"
+}
+
+module ForwardDeclaredInNamespace {
+  header "forward-declared-in-namespace.h"
+  requires cplusplus
+}

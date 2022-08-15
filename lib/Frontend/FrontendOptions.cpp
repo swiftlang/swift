@@ -234,8 +234,7 @@ void FrontendOptions::forAllOutputPaths(
   const std::string *outputs[] = {
       &outs.ModuleOutputPath,          &outs.ModuleDocOutputPath,
       &outs.ModuleInterfaceOutputPath, &outs.PrivateModuleInterfaceOutputPath,
-      &outs.ObjCHeaderOutputPath,      &outs.CxxHeaderOutputPath,
-      &outs.ModuleSourceInfoOutputPath};
+      &outs.ClangHeaderOutputPath,     &outs.ModuleSourceInfoOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
@@ -582,6 +581,48 @@ bool FrontendOptions::canActionEmitABIDescriptor(ActionType action) {
   if (action == ActionType::CompileModuleFromInterface)
     return true;
   return false;
+}
+bool FrontendOptions::canActionEmitConstValues(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::PrintASTDecl:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::PrintVersion:
+  case ActionType::PrintFeature:
+    return false;
+  case ActionType::Typecheck:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
+    return true;
+  }
+  llvm_unreachable("unhandled action");
 }
 bool FrontendOptions::canActionEmitModule(ActionType action) {
   switch (action) {

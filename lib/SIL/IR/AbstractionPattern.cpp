@@ -50,7 +50,7 @@ TypeConverter::getAbstractionPattern(AbstractStorageDecl *decl,
 AbstractionPattern
 TypeConverter::getAbstractionPattern(SubscriptDecl *decl, bool isNonObjC) {
   auto sig = decl->getGenericSignatureOfContext().getCanonicalSignature();
-  auto type = sig.getCanonicalTypeInContext(decl->getElementInterfaceType());
+  auto type = sig.getReducedType(decl->getElementInterfaceType());
   return AbstractionPattern(sig, type);
 }
 
@@ -79,7 +79,7 @@ TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
   auto sig = var->getDeclContext()
                  ->getGenericSignatureOfContext()
                  .getCanonicalSignature();
-  auto swiftType = sig.getCanonicalTypeInContext(var->getInterfaceType());
+  auto swiftType = sig.getReducedType(var->getInterfaceType());
 
   if (isNonObjC)
     return AbstractionPattern(sig, swiftType);
@@ -111,7 +111,7 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   auto sig = decl->getParentEnum()
                  ->getGenericSignatureOfContext()
                  .getCanonicalSignature();
-  auto type = sig.getCanonicalTypeInContext(decl->getArgumentInterfaceType());
+  auto type = sig.getReducedType(decl->getArgumentInterfaceType());
 
   return AbstractionPattern(sig, type);
 }
@@ -171,12 +171,6 @@ AbstractionPattern::getCurriedCXXMethod(CanType origType,
   return getCurriedCXXMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
-AbstractionPattern AbstractionPattern::getCurriedCXXOperatorMethod(
-    CanType origType, const AbstractFunctionDecl *function) {
-  auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedCXXOperatorMethod(origType, clangMethod, function->getImportAsMemberStatus());
-}
-
 AbstractionPattern
 AbstractionPattern::getOptional(AbstractionPattern object) {
   switch (object.getKind()) {
@@ -192,9 +186,6 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::ObjCCompletionHandlerArgumentsType:
@@ -295,9 +286,6 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     return false;
@@ -371,9 +359,6 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("function types are not tuples");
@@ -413,6 +398,74 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   }
     
   }
+  llvm_unreachable("bad kind");
+}
+
+AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    llvm_unreachable("function types can not be move only");
+  case Kind::ClangType:
+    llvm_unreachable("clang types can not be move only yet");
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("not handled yet");
+  case Kind::Discard:
+    llvm_unreachable("operation not needed on discarded abstractions yet");
+  case Kind::Opaque:
+  case Kind::Tuple:
+  case Kind::Type:
+    if (auto mvi = dyn_cast<SILMoveOnlyWrappedType>(getType())) {
+      return AbstractionPattern(getGenericSignature(), mvi->getInnerType());
+    }
+    return *this;
+  }
+
+  llvm_unreachable("bad kind");
+}
+
+AbstractionPattern AbstractionPattern::addingMoveOnlyWrapper() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    llvm_unreachable("function types can not be move only");
+  case Kind::ClangType:
+    llvm_unreachable("clang types can not be move only yet");
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("not handled yet");
+  case Kind::Discard:
+    llvm_unreachable("operation not needed on discarded abstractions yet");
+  case Kind::Opaque:
+  case Kind::Tuple:
+  case Kind::Type:
+    if (isa<SILMoveOnlyWrappedType>(getType()))
+      return *this;
+    return AbstractionPattern(getGenericSignature(),
+                              SILMoveOnlyWrappedType::get(getType()));
+  }
+
   llvm_unreachable("bad kind");
 }
 
@@ -500,8 +553,6 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   }
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
                               getCXXMethod()->getReturnType().getTypePtr());
@@ -521,10 +572,6 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     return getPartialCurriedCXXMethod(getGenericSignatureForFunctionComponent(),
                                       getResultType(getType()), getCXXMethod(),
                                       getImportAsMemberStatus());
-  case Kind::CurriedCXXOperatorMethodType:
-    return getPartialCurriedCXXOperatorMethod(
-        getGenericSignatureForFunctionComponent(), getResultType(getType()),
-        getCXXMethod(), getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType: {
     // If this is a foreign async function, the result type comes from the
@@ -644,12 +691,9 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::CurriedObjCMethodType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::CurriedCXXMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
   case Kind::ObjCCompletionHandlerArgumentsType:
     swift_unreachable("not appropriate for this kind");
   }
@@ -701,16 +745,6 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     assert(params.size() == 1);
     return getCXXMethodSelfPattern(params[0].getParameterType());
-  }
-  case Kind::CurriedCXXOperatorMethodType: {
-    auto params = cast<AnyFunctionType>(getType()).getParams();
-    assert(params.size() == 1);
-
-    // The formal metatype parameter to a C++ member operator function imported
-    // as a static method is dropped on the floor. Leave it untransformed.
-    return AbstractionPattern::getDiscard(
-        getGenericSignatureForFunctionComponent(),
-        params[0].getParameterType());
   }
   case Kind::CFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType: {
@@ -765,35 +799,6 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               paramType,
                               getClangFunctionParameterType(methodType, index));
-  }
-  case Kind::CXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType: {
-    auto params = cast<AnyFunctionType>(getType()).getParams();
-    auto paramType = params[index].getParameterType();
-
-    // See importer::isImportedAsStatic
-    bool isStatic = getImportAsMemberStatus().isStatic();
-    if (isStatic) {
-      // The first parameter holds the left-hand-side operand, which gets passed
-      // to the C++ function as the this pointer.
-      if (index == 0)
-        return getCXXMethodSelfPattern(paramType);
-    } else {
-      // The last parameter is 'self'.
-      if (getKind() == Kind::CXXOperatorMethodType &&
-          index == params.size() - 1)
-        return getCXXMethodSelfPattern(params.back().getParameterType());
-    }
-
-    // A parameter of type () does not correspond to a Clang parameter.
-    if (paramType->isVoid())
-      return AbstractionPattern(paramType);
-    
-    // Otherwise, we're talking about the formal parameter clause.
-    auto methodType = getCXXMethod()->getType().getTypePtr();
-    return AbstractionPattern(
-        getGenericSignatureForFunctionComponent(), paramType,
-        getClangFunctionParameterType(methodType, index - (isStatic ? 1 : 0)));
   }
   case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
@@ -876,9 +881,6 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -921,9 +923,6 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -939,6 +938,55 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
     // This is not reflected in clang types.
     return AbstractionPattern(getGenericSignature(),
                               getType().getReferenceStorageReferent(),
+                              getClangType());
+  }
+  llvm_unreachable("bad kind");
+}
+
+static CanType getExistentialConstraintType(CanType type) {
+  assert(type.isExistentialType());
+  if (auto *ET = type->getAs<ExistentialType>()) {
+    return CanType(ET->getConstraintType());
+  }
+  return type;
+}
+
+AbstractionPattern AbstractionPattern::getExistentialConstraintType() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::ObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::Tuple:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("pattern for function or tuple cannot be for optional");
+
+  case Kind::Opaque:
+    return *this;
+
+  case Kind::Type:
+    if (isTypeParameterOrOpaqueArchetype())
+      return AbstractionPattern::getOpaque();
+    return AbstractionPattern(getGenericSignature(),
+                              ::getExistentialConstraintType(getType()));
+
+  case Kind::Discard:
+    return AbstractionPattern::getDiscard(
+        getGenericSignature(), ::getExistentialConstraintType(getType()));
+
+  case Kind::ClangType:
+    // This is not reflected in clang types.
+    return AbstractionPattern(getGenericSignature(),
+                              ::getExistentialConstraintType(getType()),
                               getClangType());
   }
   llvm_unreachable("bad kind");
@@ -1027,16 +1075,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
-    out << (getKind() == Kind::CXXOperatorMethodType
-              ? "AP::CXXOperatorMethodType(" :
-            getKind() == Kind::CurriedCXXOperatorMethodType
-              ? "AP::CurriedCXXOperatorMethodType(" :
-            getKind() == Kind::PartialCurriedCXXOperatorMethodType
-              ? "AP::PartialCurriedCXXOperatorMethodType(" :
-            getKind() == Kind::CXXMethodType
+    out << (getKind() == Kind::CXXMethodType
               ? "AP::CXXMethodType(" :
             getKind() == Kind::CurriedCXXMethodType
               ? "AP::CurriedCXXMethodType("
@@ -1187,15 +1226,12 @@ const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard:
     auto memberTy = getType()->getTypeOfMember(member->getModuleContext(),
                                       member, origMemberInterfaceType)
-                             ->getCanonicalType(getGenericSignature());
+                             ->getReducedType(getGenericSignature());
       
     return AbstractionPattern(getGenericSignature(), memberTy);
   }
@@ -1217,7 +1253,7 @@ AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
     assert(derivativeFnTy);
     return AbstractionPattern(
         getGenericSignature(),
-        derivativeFnTy->getCanonicalType(getGenericSignature()));
+        derivativeFnTy->getReducedType(getGenericSignature()));
   }
   case Kind::Opaque:
     return getOpaqueDerivativeFunction();
@@ -1248,9 +1284,6 @@ AbstractionPattern::getResultConvention(TypeConverter &TC) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
     // Function types are always passed directly
     return Direct;
       
@@ -1292,9 +1325,6 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
     // Function types are always passed directly
     return Direct;
       
@@ -1366,11 +1396,8 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
       && OtherData == other.OtherData;
       
   case Kind::CXXMethodType:
-  case Kind::CXXOperatorMethodType:
   case Kind::CurriedCXXMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
     return OrigType == other.OrigType
       && GenericSig == other.GenericSig
       && CXXMethod == other.CXXMethod
@@ -1464,9 +1491,10 @@ public:
     if (auto gp = handleTypeParameterInAbstractionPattern(pattern, t))
       return gp;
     
-    assert(!pattern.getType()->hasTypeParameter()
+    assert(pattern.getType()->isExistentialType() ||
+           (!pattern.getType()->hasTypeParameter()
            && !pattern.getType()->hasArchetype()
-           && !pattern.getType()->hasOpaqueArchetype());
+           && !pattern.getType()->hasOpaqueArchetype()));
     return pattern.getType();
   }
   
@@ -1704,6 +1732,44 @@ public:
     llvm_unreachable("Unimplemented!");
   }
 
+  CanType visitExistentialType(ExistentialType *exist,
+                               AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, exist))
+      return gp;
+
+    // Avoid walking into the constraint type if we can help it.
+    if (!exist->hasTypeParameter() && !exist->hasArchetype() &&
+        !exist->hasOpaqueArchetype()) {
+      return CanType(exist);
+    }
+
+    return CanExistentialType::get(visit(
+        exist->getConstraintType(), pattern.getExistentialConstraintType()));
+  }
+
+  CanType visitParameterizedProtocolType(ParameterizedProtocolType *ppt,
+                                         AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, ppt))
+      return gp;
+
+    // Recurse into the arguments of the parameterized protocol.
+    SmallVector<Type, 4> substArgs;
+    auto origPPT = pattern.getAs<ParameterizedProtocolType>();
+    if (!origPPT)
+      return CanType(ppt);
+    
+    for (unsigned i = 0; i < ppt->getArgs().size(); ++i) {
+      auto argTy = ppt->getArgs()[i];
+      auto origArgTy = AbstractionPattern(pattern.getGenericSignatureOrNull(),
+                                          origPPT.getArgs()[i]);
+      auto substEltTy = visit(argTy, origArgTy);
+      substArgs.push_back(substEltTy);
+    }
+
+    return CanType(ParameterizedProtocolType::get(
+        TC.Context, ppt->getBaseType(), substArgs));
+  }
+
   CanType visitTupleType(TupleType *tuple, AbstractionPattern pattern) {
     if (auto gp = handleTypeParameterInAbstractionPattern(pattern, tuple))
       return gp;
@@ -1712,10 +1778,8 @@ public:
     SmallVector<TupleTypeElt, 4> tupleElts;
     for (unsigned i = 0; i < tuple->getNumElements(); ++i) {
       auto elt = tuple->getElement(i);
-      auto substEltTy = visit(elt.getType(),
-                              pattern.getTupleElementType(i));
-      tupleElts.push_back(
-            TupleTypeElt(substEltTy, elt.getName(), elt.getParameterFlags()));
+      auto substEltTy = visit(elt.getType(), pattern.getTupleElementType(i));
+      tupleElts.emplace_back(substEltTy, elt.getName());
     }
     
     return CanType(TupleType::get(tupleElts, TC.Context));
@@ -1812,15 +1876,16 @@ const {
       if (conformingReplacementType->isTypeParameter())
         return ProtocolConformanceRef(conformedProtocol);
     
-      return TC.M.lookupConformance(conformingReplacementType, conformedProtocol);
+      return TC.M.lookupConformance(conformingReplacementType, conformedProtocol,
+                                    /*allowMissing*/ true);
     });
 
   auto yieldType = visitor.substYieldType;
   if (yieldType)
-    yieldType = yieldType->getCanonicalType(substSig);
+    yieldType = yieldType->getReducedType(substSig);
   
   return std::make_tuple(
-          AbstractionPattern(substSig, substTy->getCanonicalType(substSig)),
+          AbstractionPattern(substSig, substTy->getReducedType(substSig)),
           subMap,
           yieldType
             ? AbstractionPattern(substSig, yieldType)

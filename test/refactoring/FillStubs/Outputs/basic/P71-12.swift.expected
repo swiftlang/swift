@@ -71,10 +71,6 @@ extension C13 : P1 {
 extension C13 : P2 {
     typealias T2 = <#type#>
 
-    func foo1() {
-        <#code#>
-    }
-
   typealias T1 = Int
   func foo1() {}
 }

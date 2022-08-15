@@ -1,0 +1,22 @@
+// RUN: %target-swift-emit-ir %s -O | %FileCheck %s
+
+// https://github.com/apple/swift/issues/43069
+
+sil_stage canonical
+
+import Swift
+
+sil @rec : $@convention(thin) (Int) -> Int {
+bb0(%arg : $Int):
+  %ref = function_ref @rec : $@convention(thin) (Int) -> Int
+  %res = apply %ref(%arg) : $@convention(thin) (Int) -> Int
+  return %res : $Int
+}
+
+// CHECK: define{{.*}} swiftcc [[T:i[0-9]+]] @rec([[T]] %0) #0 {
+// CHECK-NEXT: entry:
+// CHECK-NEXT: br label %tailrecurse
+// CHECK-EMPTY:
+// CHECK-NEXT: tailrecurse:
+// CHECK-NEXT: br label %tailrecurse
+// CHECK-NEXT: }

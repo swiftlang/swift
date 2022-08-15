@@ -270,6 +270,22 @@ private:
            llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>) const;
 };
 
+/// Request the nominal types that occur as the right-hand side of "Self: Foo"
+/// constraints in the generic signature of a protocol extension.
+class SelfBoundsFromGenericSignatureRequest
+    : public SimpleRequest<SelfBoundsFromGenericSignatureRequest,
+                           SelfBounds(const ExtensionDecl *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  SelfBounds evaluate(Evaluator &evaluator, const ExtensionDecl *extDecl) const;
+};
+
 /// Request all type aliases and nominal types that appear in the "where"
 /// clause of an extension.
 class TypeDeclsFromWhereClauseRequest :
@@ -787,6 +803,62 @@ private:
 
 public:
   // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether this is a decl that supports being called through the
+/// implementation of a \c callAsFunction method.
+class IsCallAsFunctionNominalRequest
+    : public SimpleRequest<IsCallAsFunctionNominalRequest,
+                           bool(NominalTypeDecl *, DeclContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                DeclContext *dc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Computes whether the specified decl or a super-class/super-protocol has the
+/// @dynamicMemberLookup attribute on it.
+class HasDynamicMemberLookupAttributeRequest
+    : public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
+                           bool(NominalTypeDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Computes whether the specified decl or a super-class/super-protocol has the
+/// @dynamicCallable attribute on it.
+class HasDynamicCallableAttributeRequest
+    : public SimpleRequest<HasDynamicCallableAttributeRequest,
+                           bool(NominalTypeDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
   bool isCached() const { return true; }
 };
 

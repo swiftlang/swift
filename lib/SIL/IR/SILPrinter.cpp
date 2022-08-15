@@ -23,8 +23,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/CFG.h"
@@ -32,6 +32,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILVTable.h"
@@ -461,9 +462,12 @@ static void printSILTypeColorAndSigil(raw_ostream &OS, SILType t) {
 
 void SILType::print(raw_ostream &OS, const PrintOptions &PO) const {
   printSILTypeColorAndSigil(OS, *this);
-  
+
   // Print other types as their Swift representation.
-  getASTType().print(OS, PO);
+  //
+  // NOTE: We always print the Raw AST type so we don't look through
+  // move-onlyness.
+  getRawASTType().print(OS, PO);
 }
 
 void SILType::dump() const {
@@ -529,8 +533,6 @@ static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
 }
 
 namespace {
-  
-class SILPrinter;
 
 // 1. Accumulate opcode-specific comments in this stream.
 // 2. Start emitting comments: lineComments.start()
@@ -595,6 +597,10 @@ protected:
   }
 };
 
+} // namespace
+
+namespace swift {
+
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILInstructionVisitor<SILPrinter> {
@@ -647,7 +653,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   
   SILPrinter &operator<<(SILType t) {
     printSILTypeColorAndSigil(PrintState.OS, t);
-    t.getASTType().print(PrintState.OS, PrintState.ASTOptions);
+    t.getRawASTType().print(PrintState.OS, PrintState.ASTOptions);
     return *this;
   }
   
@@ -669,7 +675,7 @@ public:
     return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
-    return {Ctx.getID(V), V ? V->getType() : SILType(), V.getOwnershipKind()};
+    return {Ctx.getID(V), V ? V->getType() : SILType(), V->getOwnershipKind()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILFunctionArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
@@ -888,6 +894,7 @@ public:
     llvm::SmallVector<SILValue, 8> values;
     llvm::copy(inst->getResults(), std::back_inserter(values));
     printUserList(values, inst);
+    printBranchTargets(inst);
   }
 
   void printUserList(ArrayRef<SILValue> values, SILNodePointer node) {
@@ -929,6 +936,31 @@ public:
     llvm::interleave(
         UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
         [&] { *this << ", "; });
+  }
+
+  void printBranchTargets(const SILInstruction *inst) {
+    if (auto condBr = dyn_cast<CondBranchInst>(inst)) {
+      if (condBr->getTrueBB()->getDebugName().hasValue()) {
+        *this << ", true->" << condBr->getTrueBB()->getDebugName().getValue();
+      }
+      if (condBr->getFalseBB()->getDebugName().hasValue()) {
+        *this << ", false->" << condBr->getFalseBB()->getDebugName().getValue();
+      }
+    } else if (auto br = dyn_cast<BranchInst>(inst)) {
+      if (br->getDestBB()->getDebugName().hasValue()) {
+        *this << ", dest->" << br->getDestBB()->getDebugName().getValue();
+      }
+    } else if (auto termInst = dyn_cast<TermInst>(inst)) {
+      // Otherwise, we just print the successors in order without pretty printing
+      for (unsigned i = 0, numSuccessors = termInst->getSuccessors().size();
+           i != numSuccessors; ++i) {
+        auto &successor = termInst->getSuccessors()[i];
+        if (successor.getBB()->getDebugName().hasValue()) {
+          *this << ", #" << i
+                << "->" << successor.getBB()->getDebugName().getValue();
+        }
+      }
+    }
   }
 
   void printConformances(ArrayRef<ProtocolConformanceRef> conformances) {
@@ -1355,6 +1387,10 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
+    
+    if (ABI->emitReflectionMetadata()) {
+      *this << "[reflection] ";
+    }
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo(),
                   &ABI->getModule().getASTContext().SourceMgr);
@@ -1608,7 +1644,7 @@ public:
     if (!op)
       return;
 
-    if (inst->getForwardingOwnershipKind() != op.getOwnershipKind()) {
+    if (inst->getForwardingOwnershipKind() != op->getOwnershipKind()) {
       *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
     }
   }
@@ -1713,6 +1749,15 @@ public:
     *this << getIDAndType(CI->getDest());
   }
 
+  void visitExplicitCopyAddrInst(ExplicitCopyAddrInst *CI) {
+    if (CI->isTakeOfSrc())
+      *this << "[take] ";
+    *this << Ctx.getID(CI->getSrc()) << " to ";
+    if (CI->isInitializationOfDest())
+      *this << "[initialization] ";
+    *this << getIDAndType(CI->getDest());
+  }
+
   void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *CI) {
     *this << Ctx.getID(CI->getSrc()) << " to ";
     *this << getIDAndType(CI->getDest());
@@ -1747,23 +1792,10 @@ public:
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
 
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
-    *this << CI->getSourceFormalType() << " in "
-          << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
-          << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
-          << Ctx.getID(CI->getFailureBB());
-  }
-
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
-  }
-
-  void visitUnconditionalCheckedCastValueInst(
-      UnconditionalCheckedCastValueInst *CI) {
-    *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getOperand())
-          << " to " << CI->getTargetFormalType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
@@ -1789,7 +1821,7 @@ public:
   void visitUncheckedOwnershipConversionInst(
       UncheckedOwnershipConversionInst *UOCI) {
     *this << getIDAndType(UOCI->getOperand()) << ", "
-          << "@" << UOCI->getOperand().getOwnershipKind() << " to "
+          << "@" << UOCI->getOperand()->getOwnershipKind() << " to "
           << "@" << UOCI->getConversionOwnershipKind();
   }
 
@@ -1803,12 +1835,6 @@ public:
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
-  }
-  void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
-  void visitPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUpcastInst(UpcastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
@@ -1919,6 +1945,35 @@ public:
     case CheckKind::NoImplicitCopy:
       *this << "[no_implicit_copy] ";
       break;
+    case CheckKind::NoCopy:
+      *this << "[no_copy] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitCopyableToMoveOnlyWrapperValueInst(
+      CopyableToMoveOnlyWrapperValueInst *I) {
+    switch (I->getInitialKind()) {
+    case CopyableToMoveOnlyWrapperValueInst::Owned:
+      *this << "[owned] ";
+      break;
+    case CopyableToMoveOnlyWrapperValueInst::Guaranteed:
+      *this << "[guaranteed] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *I) {
+    switch (I->getInitialKind()) {
+    case MoveOnlyWrapperToCopyableValueInst::Owned:
+      *this << "[owned] ";
+      break;
+    case MoveOnlyWrapperToCopyableValueInst::Guaranteed:
+      *this << "[guaranteed] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }
@@ -1970,7 +2025,7 @@ public:
     // elements.
     bool SimpleType = true;
     for (auto &Elt : TI->getType().castTo<TupleType>()->getElements()) {
-      if (Elt.hasName() || Elt.isVararg()) {
+      if (Elt.hasName()) {
         SimpleType = false;
         break;
       }
@@ -2752,7 +2807,8 @@ public:
     }
   }
 };
-} // end anonymous namespace
+
+} // namespace swift
 
 static void printBlockID(raw_ostream &OS, SILBasicBlock *bb) {
   SILPrintContext Ctx(OS);
@@ -2787,6 +2843,10 @@ void SingleValueInstruction::dump() const {
 void SILInstruction::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
   SILPrinter(Ctx).print(this);
+}
+
+void NonSingleValueInstruction::dump() const {
+  SILNode::dump();
 }
 
 /// Pretty-print the SILBasicBlock to errs.
@@ -2838,7 +2898,6 @@ static StringRef getLinkageString(SILLinkage linkage) {
   case SILLinkage::Private: return "private ";
   case SILLinkage::PublicExternal: return "public_external ";
   case SILLinkage::HiddenExternal: return "hidden_external ";
-  case SILLinkage::SharedExternal: return "shared_external ";
   }
   llvm_unreachable("bad linkage");
 }
@@ -2894,7 +2953,6 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   switch (isSerialized()) {
   case IsNotSerialized: break;
-  case IsSerializable: OS << "[serializable] "; break;
   case IsSerialized: OS << "[serialized] "; break;
   }
 
@@ -3001,6 +3059,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";
     OS << replacedFun->getName();
+    OS << "\"] ";
+  }
+
+  if (auto *usedFunc = getReferencedAdHocRequirementWitnessFunction()) {
+    OS << "[ref_adhoc_requirement_witness \"";
+    OS << usedFunc->getName();
     OS << "\"] ";
   }
 

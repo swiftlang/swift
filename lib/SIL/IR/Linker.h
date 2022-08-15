@@ -20,7 +20,57 @@
 
 namespace swift {
 
-/// Visitor that knows how to link in dependencies of SILInstructions.
+/// Visits the call graph and makes sure that all required functions (according
+/// to the linking `Mode`) are de-serialized and the `isSerialized` flag is set
+/// correctly.
+///
+/// If the Mode is LinkNormal, just de-serialize the bare minimum of what's
+/// required for a non-optimized compilation. That are all referenced shared
+/// functions, because shared functions must have a body.
+///
+/// If the Mode is LinkAll, de-serialize the maximum amount of functions - for
+/// optimized compilation.
+///
+/// Also make sure that shared functions which are referenced from "IsSerialized"
+/// functions also have the "IsSerialized" flag set.
+/// Usually this already is enforced by SILGen and all passes which create new
+/// functions.
+/// Only in case a de-serialized function references a shared function which
+/// already exists in the module as "IsNotSerialized", it's required to explicitly
+/// set the "IsSerialized" flag.
+///
+/// Example:
+///
+/// Before de-serialization:
+/// \code
+///   sil @foo {
+///     function_ref @publicFuncInOtherModule
+///     function_ref @specializedFunction
+///   }
+///   sil shared @specializedFunction { // IsNotSerialized
+///     function_ref @otherSpecializedFunction
+///   }
+///   sil shared @otherSpecializedFunction { // IsNotSerialized
+///   }
+/// \endcode
+///
+/// After de-serialization:
+/// \code
+///   sil @foo {
+///     function_ref @publicFuncInOtherModule
+///     function_ref @specializedFunction
+///   }
+///   sil public_external [serialized] @publicFuncInOtherModule {
+///     function_ref @specializedFunction
+///   }
+///   // Need to be changed to "IsSerialized"
+///   sil shared [serialized] @specializedFunction {
+///     function_ref @otherSpecializedFunction
+///   }
+///   sil shared [serialized] @otherSpecializedFunction {
+///   }
+/// \endcode
+///
 class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
   using LinkingMode = SILModule::LinkingMode;
 
@@ -47,6 +97,10 @@ public:
   /// Returns true if any deserialization was performed.
   bool processFunction(SILFunction *F);
 
+  /// Process the witnesstable of \p conformanceRef.
+  /// Returns true if any deserialization was performed.
+  bool processConformance(ProtocolConformanceRef conformanceRef);
+
   /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
   /// transitively references.
   ///
@@ -63,11 +117,10 @@ public:
   void visitFunctionRefInst(FunctionRefInst *FRI);
   void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI);
   void visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI);
-  void visitProtocolConformance(ProtocolConformanceRef C,
-                                const Optional<SILDeclRef> &Member);
+  void visitProtocolConformance(ProtocolConformanceRef C);
   void visitApplySubstitutions(SubstitutionMap subs);
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
-    visitProtocolConformance(WMI->getConformance(), WMI->getMember());
+    visitProtocolConformance(WMI->getConformance());
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI);
@@ -78,11 +131,14 @@ public:
 private:
   /// Cause a function to be deserialized, and visit all other functions
   /// referenced from this function according to the linking mode.
-  void addFunctionToWorklist(SILFunction *F);
+  void deserializeAndPushToWorklist(SILFunction *F);
 
   /// Consider a function for deserialization if the current linking mode
   /// requires it.
-  void maybeAddFunctionToWorklist(SILFunction *F);
+  ///
+  /// If `setToSerializable` is true than all shared functions which are referenced
+  /// from `F` are set to
+  void maybeAddFunctionToWorklist(SILFunction *F, bool setToSerializable);
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.

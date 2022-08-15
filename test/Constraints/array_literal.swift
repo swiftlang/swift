@@ -145,10 +145,13 @@ func defaultToAny(i: Int, s: String) {
   let _: [Any] = [1, "a", 3.5]
   let _: [Any] = [1, "a", [3.5, 3.7, 3.9]]
   let _: [Any] = [1, "a", [3.5, "b", 3]]
+  let _: [Any] = [1, [2, [3]]]
   
   let _: [Any?] = [1, "a", nil, 3.5]
   let _: [Any?] = [1, "a", nil, [3.5, 3.7, 3.9]]
   let _: [Any?] = [1, "a", nil, [3.5, "b", nil]]
+  let _: [Any?] = [1, [2, [3]]]
+  let _: [Any?] = [1, nil, [2, nil, [3]]]
 
   let a6 = [B(), C()]
   let _: Int = a6 // expected-error{{value of type '[A]'}}
@@ -219,10 +222,10 @@ func joinWithNil<T>(s: String, a: Any, t: T, m: T.Type, p: Proto1 & Proto2, arr:
   let _: Int = a16 // expected-error{{value of type '[T.Type?]'}}
   
   let a17 = [p, nil]
-  let _: Int = a17 // expected-error{{value of type '[(Proto1 & Proto2)?]'}}
+  let _: Int = a17 // expected-error{{value of type '[(any Proto1 & Proto2)?]'}}
   
   let a18 = [nil, p]
-  let _: Int = a18 // expected-error{{value of type '[(Proto1 & Proto2)?]'}}
+  let _: Int = a18 // expected-error{{value of type '[(any Proto1 & Proto2)?]'}}
   
   let a19 = [arr, nil]
   let _: Int = a19 // expected-error{{value of type '[[Int]?]'}}

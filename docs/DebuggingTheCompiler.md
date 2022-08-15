@@ -206,17 +206,12 @@ Conformances:
     (integer_literal_expr type='Int2048' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)))
 ```
 
-When using the integrated swift-repl, one can dump the same output for each
+When using swift LLDB REPL, one can dump the same output for each
 expression as one evaluates the expression by enabling constraints debugging by
-typing `:constraints debug on`:
+passing the flag `-Xfrontend -debug-constraints`:
 
-    $ swift -frontend -repl -enable-objc-interop -module-name REPL
-    ***  You are running Swift's integrated REPL,  ***
-    ***  intended for compiler and stdlib          ***
-    ***  development and testing purposes only.    ***
-    ***  The full REPL is built as part of LLDB.   ***
-    ***  Type ':help' for assistance.              ***
-    (swift) :constraints debug on
+    $ swift repl -Xfrontend -debug-constraints
+    1> let foo = 1
 
 ## Debugging on SIL Level
 
@@ -604,7 +599,7 @@ find MyProject/Sources -name '*.swift' -type f > input-files.txt
 # In some cases, projects may use multiple files with the same
 # name but in different directories (for different schemes),
 # which can be a problem. Having a file list makes working around
-# this convenient as you can manually manually edit out the files
+# this convenient as you can manually edit out the files
 # that are not of interest at this stage.
 
 mkdir Output

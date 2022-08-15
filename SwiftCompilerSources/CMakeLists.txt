@@ -16,7 +16,7 @@
 #
 function(add_swift_compiler_module module)
   cmake_parse_arguments(ALSM
-                        ""
+                        "ADD_TO_SYNTAXPARSE"
                         ""
                         "DEPENDS;SOURCES"
                         ${ARGN})
@@ -35,6 +35,7 @@ function(add_swift_compiler_module module)
 
   set_property(TARGET ${target_name} PROPERTY module_name ${module})
   set_property(TARGET ${target_name} PROPERTY module_depends ${ALSM_DEPENDS})
+  set_property(TARGET ${target_name} PROPERTY add_to_syntaxparse ${ALSM_ADD_TO_SYNTAXPARSE})
 
   get_property(modules GLOBAL PROPERTY swift_compiler_modules)
   set_property(GLOBAL PROPERTY swift_compiler_modules ${modules} ${module})
@@ -74,13 +75,20 @@ function(add_swift_compiler_modules_library name)
 
   set(swift_compile_options
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "-Xfrontend" "-enable-cxx-interop"
+      "-Xfrontend" "-enable-experimental-cxx-interop"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+  if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
+  endif()
 
   if(CMAKE_BUILD_TYPE STREQUAL Debug)
     list(APPEND swift_compile_options "-g")
   else()
     list(APPEND swift_compile_options "-O" "-cross-module-optimization")
+  endif()
+
+  if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+    list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
 
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
@@ -89,13 +97,26 @@ function(add_swift_compiler_modules_library name)
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    set(sdk_option "-sdk" "${sdk_path}")
     if(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
       # Let the cross-compiled compile don't pick up the compiled stdlib by providing
       # an (almost) empty resource dir.
       # The compiler will instead pick up the stdlib from the SDK.
       get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
       set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
+    endif()
+    if(NOT EXISTS "${sdk_path}/usr/include/c++")
+      # Darwin SDKs in Xcode 12 or older do not include libc++, which prevents clang from finding libc++ when invoked
+      # from ClangImporter. This results in build errors. To workaround this, let's explicitly pass the path to libc++
+      # to clang.
+      message(WARNING "Building with an outdated Darwin SDK: libc++ missing from the ${SWIFT_HOST_VARIANT_SDK} SDK. Will use libc++ from the toolchain.")
+      get_filename_component(absolute_libcxx_path "${CMAKE_C_COMPILER}/../../include/c++/v1" REALPATH)
+      if (EXISTS "${absolute_libcxx_path}")
+        set(sdk_option ${sdk_option} "-Xcc" "-isystem" "-Xcc" "${absolute_libcxx_path}")
+      else()
+        message(ERROR "libc++ not found in the toolchain.")
+      endif()
     endif()
   elseif(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE")
     set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
@@ -107,6 +128,8 @@ function(add_swift_compiler_modules_library name)
 
   set(all_obj_files)
   set(all_module_targets)
+  set(syntaxparse_obj_files)
+  set(syntaxparse_module_targets)
   get_property(modules GLOBAL PROPERTY "swift_compiler_modules")
   foreach(module ${modules})
 
@@ -114,6 +137,7 @@ function(add_swift_compiler_modules_library name)
     get_target_property(module ${module_target} "module_name")
     get_target_property(sources ${module_target} SOURCES)
     get_target_property(dependencies ${module_target} "module_depends")
+    get_target_property(add_to_syntaxparse ${module_target} "add_to_syntaxparse")
     set(deps, "")
     if (dependencies)
       foreach(dep_module ${dependencies})
@@ -133,11 +157,15 @@ function(add_swift_compiler_modules_library name)
     set_property(TARGET ${module_target} PROPERTY "module_file" "${module_file}")
 
     set(all_obj_files ${all_obj_files} ${module_obj_file})
+    if (add_to_syntaxparse)
+      set(syntaxparse_obj_files ${syntaxparse_obj_files} ${module_obj_file})
+    endif()
 
     # Compile the module into an object file
     add_custom_command_target(dep_target OUTPUT ${module_obj_file}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
+        importedHeaderDependencies
       COMMAND ${ALS_SWIFT_EXEC} "-c" "-o" ${module_obj_file}
               ${sdk_option}
               "-target" ${target}
@@ -145,32 +173,45 @@ function(add_swift_compiler_modules_library name)
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
               "-wmo" ${swift_compile_options}
+              # LLVM modules and headers.
+              "-Xcc" "-I" "-Xcc" "${LLVM_MAIN_INCLUDE_DIR}"
+              # Generated LLVM headers.
+              "-Xcc" "-I" "-Xcc" "${LLVM_INCLUDE_DIR}"
               # Bridging modules and headers.
               "-Xcc" "-I" "-Xcc" "${SWIFT_SOURCE_DIR}/include"
               # Generated C headers.
-              "-Xcc" "-I" "-Xcc" "${CMAKE_BINARY_DIR}/include"
+              "-Xcc" "-I" "-Xcc" "${CMAKE_CURRENT_BINARY_DIR}/../include"
               # Generated swift modules.
               "-I" "${build_dir}"
       COMMENT "Building swift module ${module}")
 
     set("${module}_dep_target" ${dep_target})
     set(all_module_targets ${all_module_targets} ${dep_target})
+    if (add_to_syntaxparse)
+      set(syntaxparse_module_targets ${syntaxparse_module_targets} ${dep_target})
+    endif()
   endforeach()
 
   # Create a static library containing all module object files.
+  if (XCODE)
+    # Xcode does not compile libraries that contain only object files.
+    # Therefore, it fails to create the static library. As a workaround,
+    # we add an empty source file force_lib.c to the target.
+    set(all_obj_files force_lib.c ${all_obj_files})
+  endif()
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
 
-  # Xcode does not compile libraries that contain only object files.
-  # Therefore, it fails to create the static library. As a workaround,
-  # we add a dummy script phase to the target.
   if (XCODE)
-    add_custom_command(TARGET ${name} POST_BUILD 
-      COMMAND ""
-      COMMENT "Dummy script phase to force building this target")
+    set(syntaxparse_obj_files force_lib.c ${syntaxparse_obj_files})
   endif()
+  add_library("${name}_SwiftSyntax" STATIC ${syntaxparse_obj_files})
+  add_dependencies("${name}_SwiftSyntax" ${syntaxparse_module_targets})
+  set_target_properties("${name}_SwiftSyntax" PROPERTIES LINKER_LANGUAGE CXX)
+  set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS "${name}_SwiftSyntax")
+
 endfunction()
 
 
@@ -180,18 +221,60 @@ add_swift_host_library(swiftCompilerStub OBJECT stubs.cpp)
 if (NOT BOOTSTRAPPING_MODE)
 
   add_library(swiftCompilerModules ALIAS swiftCompilerStub)
+  add_library(swiftCompilerModules_SwiftSyntax ALIAS swiftCompilerStub)
 
 else()
-  # Note: "Swift" is not added intentinally here, because it would break
+  # Note: "Swift" is not added intentionally here, because it would break
   # the bootstrapping build in case no swift toolchain is installed on the host.
   project(SwiftInTheCompiler LANGUAGES C CXX)
 
   add_subdirectory(Sources)
 
+  # TODO: generate this dynamically through the modulemap; this cannot use `sed`
+  # as that is not available on all paltforms (e.g. Windows).
+  #
+  # step 1: generate a dummy source file, which just includes all headers
+  # defined in include/swift/module.modulemap
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+       "
+#include \"Basic/BridgedSwiftObject.h\"
+#include \"Basic/BasicBridging.h\"
+#include \"Basic/SourceLoc.h\"
+
+#include \"AST/ASTBridging.h\"
+#include \"AST/DiagnosticEngine.h\"
+#include \"AST/DiagnosticConsumer.h\"
+
+#include \"SIL/SILBridging.h\"
+
+#include \"SILOptimizer/OptimizerBridging.h\"
+
+#include \"Parse/RegexParserBridging.h\"
+")
+
+  # step 2: build a library containing that source file. This library depends on all the included header files.
+  #         The swift modules can now depend on that target.
+  #         Note that this library is unused, i.e. not linked to anything.   
+  add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
+  target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
+
   if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
     if (NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
       message(FATAL_ERROR "Need a swift toolchain building swift compiler sources")
+    endif()
+
+    if(${BOOTSTRAPPING_MODE} STREQUAL "HOSTTOOLS")
+      if(NOT SWIFT_EXEC_FOR_SWIFT_MODULES STREQUAL CMAKE_Swift_COMPILER)
+        message(FATAL_ERROR "The Swift compiler (${CMAKE_Swift_COMPILER}) differs from the Swift compiler in SWIFT_NATIVE_SWIFT_TOOLS_PATH (${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc).")
+      endif()
+
+      set(min_supported_swift_version 5.8)
+      if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
+        message(FATAL_ERROR
+            "Outdated Swift compiler: building with host tools requires Swift ${min_supported_swift_version} or newer. "
+            "Please update your Swift toolchain or switch BOOTSTRAPPING_MODE to BOOTSTRAPPING(-WITH-HOSTLIBS)? or OFF.")
+      endif()
     endif()
 
     add_swift_compiler_modules_library(swiftCompilerModules
@@ -212,8 +295,12 @@ else()
         list(APPEND b0_deps swiftDarwin-bootstrapping0)
         list(APPEND b1_deps swiftDarwin-bootstrapping1)
       endif()
+      if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_LIBSTDCXX_PLATFORMS)
+        list(APPEND b0_deps copy-libstdcxx-modulemap-bootstrapping0 copy-libstdcxx-header-bootstrapping0)
+        list(APPEND b1_deps copy-libstdcxx-modulemap-bootstrapping1 copy-libstdcxx-header-bootstrapping1)
+      endif()
     endif()
-    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
       set(platform ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
       set(compatibility_libs
           "swiftCompatibility50-${platform}"
@@ -250,4 +337,3 @@ else()
   endif()
 
 endif()
-

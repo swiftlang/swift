@@ -54,7 +54,7 @@ struct SwiftReflectionContext {
     auto Reader = std::make_shared<CMemoryReader>(impl);
     nativeContext = new NativeReflectionContext(Reader);
   }
-  
+
   ~SwiftReflectionContext() {
     freeTemporaryAllocation();
     delete nativeContext;
@@ -76,7 +76,7 @@ struct SwiftReflectionContext {
   // call to allocateTemporaryObject, or until the context is destroyed. Does
   // NOT free any existing objects created with allocateTemporaryObject or
   // allocateSubsequentTemporaryObject. Use to allocate additional objects after
-  // a call to allocateTemporaryObject when muliple objects are needed
+  // a call to allocateTemporaryObject when multiple objects are needed
   // simultaneously.
   template <typename T>
   T *allocateSubsequentTemporaryObject() {
@@ -203,9 +203,9 @@ ReflectionSection<Iterator> sectionFromInfo(const swift_reflection_info_t &Info,
   auto RemoteSectionStart = (uint64_t)(uintptr_t)Section.section.Begin
     - Info.LocalStartAddress
     + Info.RemoteStartAddress;
-  
+
   auto Start = RemoteRef<void>(RemoteSectionStart, Section.section.Begin);
-  
+
   return ReflectionSection<Iterator>(Start,
              (uintptr_t)Section.section.End - (uintptr_t)Section.section.Begin);
 }
@@ -225,7 +225,7 @@ void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
   auto Context = ContextRef->nativeContext;
-  
+
   // The `offset` fields must be zero.
   if (Info.field.offset != 0
       || Info.associated_types.offset != 0
@@ -238,15 +238,16 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
   }
 
   ReflectionInfo ContextInfo{
-    sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
-    sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
-    sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
-    sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
-    sectionFromInfo<const void *>(Info, Info.type_references),
-    sectionFromInfo<const void *>(Info, Info.reflection_strings),
-    ReflectionSection<const void *>(nullptr, 0),
-    ReflectionSection<MultiPayloadEnumDescriptorIterator>(0, 0)};
-  
+      sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
+      sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
+      sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
+      sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
+      sectionFromInfo<const void *>(Info, Info.type_references),
+      sectionFromInfo<const void *>(Info, Info.reflection_strings),
+      ReflectionSection<const void *>(nullptr, 0),
+      ReflectionSection<MultiPayloadEnumDescriptorIterator>(0, 0),
+      {}};
+
   Context->addReflectionInfo(ContextInfo);
 }
 
@@ -264,10 +265,11 @@ void swift_reflection_addReflectionMappingInfo(
       reflectionSectionFromLocalAndRemote<CaptureDescriptorIterator>(
           Info.capture),
       reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
-      reflectionSectionFromLocalAndRemote<const void *>(Info.reflection_strings),
+      reflectionSectionFromLocalAndRemote<const void *>(
+          Info.reflection_strings),
       ReflectionSection<const void *>(nullptr, 0),
-      MultiPayloadEnumSection(0, 0)
-  };
+      MultiPayloadEnumSection(0, 0),
+      {}};
 
   Context->addReflectionInfo(ContextInfo);
 }
@@ -821,10 +823,23 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
 swift_async_task_slab_return_t
 swift_reflection_asyncTaskSlabPointer(SwiftReflectionContextRef ContextRef,
                                       swift_reflection_ptr_t AsyncTaskPtr) {
-  auto Info = swift_reflection_asyncTaskInfo(ContextRef, AsyncTaskPtr);
+  auto Context = ContextRef->nativeContext;
+
+  // We only care about the AllocatorSlabPtr field. Disable child task and async
+  // backtrace iteration to save wasted work.
+  unsigned ChildTaskLimit = 0;
+  unsigned AsyncBacktraceLimit = 0;
+
+  llvm::Optional<std::string> Error;
+  NativeReflectionContext::AsyncTaskInfo TaskInfo;
+  std::tie(Error, TaskInfo) =
+      Context->asyncTaskInfo(AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
+
   swift_async_task_slab_return_t Result = {};
-  Result.Error = Info.Error;
-  Result.SlabPtr = Info.AllocatorSlabPtr;
+  if (Error) {
+    Result.Error = returnableCString(ContextRef, Error);
+  }
+  Result.SlabPtr = TaskInfo.AllocatorSlabPtr;
   return Result;
 }
 
@@ -866,18 +881,42 @@ swift_async_task_info_t
 swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
                                swift_reflection_ptr_t AsyncTaskPtr) {
   auto Context = ContextRef->nativeContext;
+
+  // Limit the child task and async backtrace iteration to semi-reasonable
+  // numbers to avoid doing excessive work on bad data.
+  unsigned ChildTaskLimit = 1000000;
+  unsigned AsyncBacktraceLimit = 1000;
+
   llvm::Optional<std::string> Error;
   NativeReflectionContext::AsyncTaskInfo TaskInfo;
-  std::tie(Error, TaskInfo) = Context->asyncTaskInfo(AsyncTaskPtr);
+  std::tie(Error, TaskInfo) =
+      Context->asyncTaskInfo(AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
 
   swift_async_task_info_t Result = {};
   if (Error) {
     Result.Error = returnableCString(ContextRef, Error);
     return Result;
   }
-  Result.JobFlags = TaskInfo.JobFlags;
-  Result.TaskStatusFlags = TaskInfo.TaskStatusFlags;
+
+  Result.Kind = TaskInfo.Kind;
+  Result.EnqueuePriority = TaskInfo.EnqueuePriority;
+  Result.IsChildTask = TaskInfo.IsChildTask;
+  Result.IsFuture = TaskInfo.IsFuture;
+  Result.IsGroupChildTask = TaskInfo.IsGroupChildTask;
+  Result.IsAsyncLetTask = TaskInfo.IsAsyncLetTask;
+
+  Result.MaxPriority = TaskInfo.MaxPriority;
+  Result.IsCancelled = TaskInfo.IsCancelled;
+  Result.IsStatusRecordLocked = TaskInfo.IsStatusRecordLocked;
+  Result.IsEscalated = TaskInfo.IsEscalated;
+  Result.HasIsRunning = TaskInfo.HasIsRunning;
+  Result.IsRunning = TaskInfo.IsRunning;
+  Result.IsEnqueued = TaskInfo.IsEnqueued;
   Result.Id = TaskInfo.Id;
+
+  Result.HasThreadPort = TaskInfo.HasThreadPort;
+  Result.ThreadPort = TaskInfo.ThreadPort;
+
   Result.RunJob = TaskInfo.RunJob;
   Result.AllocatorSlabPtr = TaskInfo.AllocatorSlabPtr;
 
@@ -905,13 +944,19 @@ swift_reflection_actorInfo(SwiftReflectionContextRef ContextRef,
                            swift_reflection_ptr_t ActorPtr) {
   auto Context = ContextRef->nativeContext;
   llvm::Optional<std::string> Error;
-  NativeReflectionContext::ActorInfo TaskInfo;
-  std::tie(Error, TaskInfo) = Context->actorInfo(ActorPtr);
+  NativeReflectionContext::ActorInfo ActorInfo;
+  std::tie(Error, ActorInfo) = Context->actorInfo(ActorPtr);
 
   swift_actor_info_t Result = {};
   Result.Error = returnableCString(ContextRef, Error);
-  Result.Flags = TaskInfo.Flags;
-  Result.FirstJob = TaskInfo.FirstJob;
+  Result.State = ActorInfo.State;
+  Result.IsDistributedRemote = ActorInfo.IsDistributedRemote;
+  Result.IsPriorityEscalated = ActorInfo.IsPriorityEscalated;
+  Result.MaxPriority = ActorInfo.MaxPriority;
+  Result.FirstJob = ActorInfo.FirstJob;
+
+  Result.HasThreadPort = ActorInfo.HasThreadPort;
+  Result.ThreadPort = ActorInfo.ThreadPort;
 
   return Result;
 }

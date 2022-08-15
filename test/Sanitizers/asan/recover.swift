@@ -1,6 +1,6 @@
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
 // Check with recovery instrumentation and the runtime option to continue execution.
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -emit-ir -o %t.asan_recover.ll
@@ -52,7 +52,7 @@ func foo(_ rawptr:UnsafeMutablePointer<UInt8>) {
 // test this because there's no undefined behavior happening. Hopefully this
 // means that the program behaviour after ASan catches an issue should be
 // consistent. If we did something different like two use-after-free issues the
-// behaviour could be very unpredicatable resulting in a flakey test.
+// behaviour could be very unpredictable resulting in a flakey test.
 var x = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
 x.initialize(repeating: 0, count: size)
 __asan_poison_memory_region(UnsafeMutableRawPointer(x), size)

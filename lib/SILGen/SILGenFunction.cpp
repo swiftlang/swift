@@ -28,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -270,9 +271,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         capturedArgs.push_back(emitUndef(getLoweredType(type)));
         break;
       case CaptureKind::Immutable:
-      case CaptureKind::StorageAddress:
-        capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
+      case CaptureKind::StorageAddress: {
+        auto ty = getLoweredType(type);
+        if (SGM.M.useLoweredAddresses())
+          ty = ty.getAddressType();
+        capturedArgs.push_back(emitUndef(ty));
         break;
+      }
       case CaptureKind::Box: {
         auto boxTy = SGM.Types.getContextBoxTypeForCapture(
             vd,
@@ -290,13 +295,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
     auto getAddressValue = [&](SILValue entryValue) -> SILValue {
-      if (SGM.Types
-              .getTypeLowering(
-                  valueType,
-                  TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-                      expansion.getResilienceExpansion()))
-              .isAddressOnly() &&
-          !entryValue->getType().isAddress()) {
+      if (SGM.M.useLoweredAddresses()
+          && SGM.Types
+                 .getTypeLowering(
+                     valueType,
+                     TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                         expansion.getResilienceExpansion()))
+                 .isAddressOnly()
+          && !entryValue->getType().isAddress()) {
 
         auto addr = emitTemporaryAllocation(vd, entryValue->getType());
         auto val = B.emitCopyValueOperation(vd, entryValue);
@@ -314,18 +320,29 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // let declarations.
       auto &tl = getTypeLowering(valueType);
       SILValue Val = Entry.value;
+      bool eliminateMoveOnlyWrapper =
+          Val->getType().isMoveOnlyWrapped() &&
+          !vd->getInterfaceType()->is<SILMoveOnlyWrappedType>();
 
       if (!Val->getType().isAddress()) {
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
         if (canGuarantee && !vd->getInterfaceType()->is<ReferenceStorageType>()) {
           auto guaranteed = ManagedValue::forUnmanaged(Val).borrow(*this, loc);
+          if (eliminateMoveOnlyWrapper)
+            guaranteed = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                loc, guaranteed);
           capturedArgs.push_back(guaranteed);
           break;
         }
-      
-        // Just retain a by-val let.
+
+        // Just copy a by-val let.
         Val = B.emitCopyValueOperation(loc, Val);
+        // If we need to unwrap a moveonlywrapped value, do so now but in an
+        // owned way to ensure that the partial apply is viewed as a semantic
+        // use of the value.
+        if (eliminateMoveOnlyWrapper)
+          Val = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, Val);
       } else {
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
@@ -343,13 +360,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     }
     case CaptureKind::Immutable: {
       if (canGuarantee) {
-        auto entryValue = getAddressValue(Entry.value);
         // No-escaping stored declarations are captured as the
         // address of the value.
-        assert(entryValue->getType().isAddress() && "no address for captured var!");
-        capturedArgs.push_back(ManagedValue::forLValue(entryValue));
+        auto entryValue = getAddressValue(Entry.value);
+        capturedArgs.push_back(ManagedValue::forBorrowedRValue(entryValue));
       }
-      else {
+      else if (!silConv.useLoweredAddresses()) {
+        capturedArgs.push_back(
+          B.createCopyValue(loc, ManagedValue::forUnmanaged(Entry.value)));
+      } else {
         auto entryValue = getAddressValue(Entry.value);
         // We cannot pass a valid SILDebugVariable while creating the temp here
         // See rdar://60425582
@@ -434,7 +453,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  SubstitutionMap subs,
                                  bool alreadyConverted) {
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
-
+  SGM.Types.setCaptureTypeExpansionContext(constant, SGM.M);
+  
   auto constantInfo = getConstantInfo(getTypeExpansionContext(), constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);
   SILType functionTy = functionRef->getType();

@@ -78,8 +78,6 @@ void TypeDifference::dump(llvm::raw_ostream &out) const {
 }
 
 void TypeDifference::verify(RewriteContext &ctx) const {
-#ifndef NDEBUG
-
 #define VERIFY(expr, str) \
   if (!(expr)) { \
     llvm::errs() << "TypeDifference::verify(): " << str << "\n"; \
@@ -113,7 +111,6 @@ void TypeDifference::verify(RewriteContext &ctx) const {
   }
 
 #undef VERIFY
-#endif
 }
 
 namespace {
@@ -213,8 +210,6 @@ namespace {
     }
 
     void verify() const {
-#ifndef NDEBUG
-
 #define VERIFY(expr, str) \
   if (!(expr)) { \
     llvm::errs() << "ConcreteTypeMatcher::verify(): " << str << "\n"; \
@@ -258,7 +253,6 @@ namespace {
       }
 
 #undef VERIFY
-#endif
     }
 
     void dump(llvm::raw_ostream &out) const {
@@ -460,7 +454,6 @@ RewriteSystem::computeTypeDifference(Term baseTerm, Symbol lhs, Symbol rhs,
 
   bool isConflict = (matcher.ConcreteConflicts.size() > 0);
 
-#ifndef NDEBUG
   if (!isConflict) {
     // The meet operation should be commutative.
     if (lhsMeetRhs.RHS != rhsMeetLhs.RHS) {
@@ -523,7 +516,6 @@ RewriteSystem::computeTypeDifference(Term baseTerm, Symbol lhs, Symbol rhs,
       }
     }
   }
-#endif
 
   if (lhs != lhsMeetRhs.RHS)
     lhsDifferenceID = recordTypeDifference(lhsMeetRhs);

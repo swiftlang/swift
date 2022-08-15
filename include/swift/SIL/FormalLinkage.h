@@ -15,6 +15,7 @@
 
 namespace swift {
 
+class CanGenericSignature;
 class CanType;
 class RootProtocolConformance;
 class ValueDecl;
@@ -44,6 +45,8 @@ enum class FormalLinkage {
 
 FormalLinkage getDeclLinkage(const ValueDecl *decl);
 FormalLinkage getTypeLinkage(CanType formalType);
+FormalLinkage getTypeLinkage_correct(CanType formalType);
+FormalLinkage getGenericSignatureLinkage(CanGenericSignature signature);
 SILLinkage getSILLinkage(FormalLinkage linkage,
                          ForDefinition_t forDefinition);
 SILLinkage

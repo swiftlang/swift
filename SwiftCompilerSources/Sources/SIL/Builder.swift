@@ -15,11 +15,28 @@ import SILBridging
 
 /// A utility to create new instructions at a given insertion point.
 public struct Builder {
-  let insertionPoint: Instruction
+
+  public enum InsertionPoint {
+    case before(Instruction)
+    case atEndOf(BasicBlock)
+  }
+
+  let insertAt: InsertionPoint
   let location: Location
   private let passContext: BridgedPassContext
 
-  private var bridgedInsPoint: BridgedInstruction { insertionPoint.bridged }
+  private var bridged: BridgedBuilder {
+    switch insertAt {
+    case .before(let inst):
+      return BridgedBuilder(insertBefore: inst.bridged.optional,
+                            insertAtEnd: OptionalBridgedBasicBlock.none,
+                            loc: location.bridged)
+    case .atEndOf(let block):
+      return BridgedBuilder(insertBefore: OptionalBridgedInstruction.none,
+                            insertAtEnd: block.bridged.optional,
+                            loc: location.bridged)
+    }
+  }
 
   private func notifyInstructionsChanged() {
     PassContext_notifyChanges(passContext, instructionsChanged)
@@ -33,9 +50,9 @@ public struct Builder {
     PassContext_notifyChanges(passContext, branchesChanged)
   }
 
-  public init(insertionPoint: Instruction, location: Location,
+  public init(insertAt: InsertionPoint, location: Location,
               passContext: BridgedPassContext) {
-    self.insertionPoint = insertionPoint
+    self.insertAt = insertAt
     self.location = location;
     self.passContext = passContext
   }
@@ -44,10 +61,9 @@ public struct Builder {
       operandType: Type, resultType: Type, arguments: [Value]) -> BuiltinInst {
     notifyInstructionsChanged()
     return arguments.withBridgedValues { valuesRef in
-      return name.withBridgedStringRef { nameStr in
+      return name._withStringRef { nameStr in
         let bi = SILBuilder_createBuiltinBinaryFunction(
-          bridgedInsPoint, location.bridgedLocation, nameStr,
-          operandType.bridged, resultType.bridged, valuesRef)
+          bridged, nameStr, operandType.bridged, resultType.bridged, valuesRef)
         return bi.getAs(BuiltinInst.self)
       }
     }
@@ -55,46 +71,52 @@ public struct Builder {
 
   public func createCondFail(condition: Value, message: String) -> CondFailInst {
     notifyInstructionsChanged()
-    return message.withBridgedStringRef { messageStr in
-      let cf = SILBuilder_createCondFail(
-        bridgedInsPoint, location.bridgedLocation, condition.bridged, messageStr)
+    return message._withStringRef { messageStr in
+      let cf = SILBuilder_createCondFail(bridged, condition.bridged, messageStr)
       return cf.getAs(CondFailInst.self)
     }
   }
 
   public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
     notifyInstructionsChanged()
-    let literal = SILBuilder_createIntegerLiteral(
-      bridgedInsPoint, location.bridgedLocation, type.bridged, value)
+    let literal = SILBuilder_createIntegerLiteral(bridged, type.bridged, value)
     return literal.getAs(IntegerLiteralInst.self)
   }
   
   public func createDeallocStackRef(_ operand: Value) -> DeallocStackRefInst {
     notifyInstructionsChanged()
-    let dr = SILBuilder_createDeallocStackRef(bridgedInsPoint, location.bridgedLocation, operand.bridged)
+    let dr = SILBuilder_createDeallocStackRef(bridged, operand.bridged)
     return dr.getAs(DeallocStackRefInst.self)
   }
 
   public func createUncheckedRefCast(object: Value, type: Type) -> UncheckedRefCastInst {
     notifyInstructionsChanged()
-    let object = SILBuilder_createUncheckedRefCast(
-      bridgedInsPoint, location.bridgedLocation, object.bridged, type.bridged)
+    let object = SILBuilder_createUncheckedRefCast(bridged, object.bridged, type.bridged)
     return object.getAs(UncheckedRefCastInst.self)
   }
 
   @discardableResult
   public func createSetDeallocating(operand: Value, isAtomic: Bool) -> SetDeallocatingInst {
     notifyInstructionsChanged()
-    let setDeallocating = SILBuilder_createSetDeallocating(
-      bridgedInsPoint, location.bridgedLocation, operand.bridged, isAtomic)
+    let setDeallocating = SILBuilder_createSetDeallocating(bridged, operand.bridged, isAtomic)
     return setDeallocating.getAs(SetDeallocatingInst.self)
   }
 
   public func createFunctionRef(_ function: Function) -> FunctionRefInst {
     notifyInstructionsChanged()
-    let functionRef = SILBuilder_createFunctionRef(
-      bridgedInsPoint, location.bridgedLocation, function.bridged)
+    let functionRef = SILBuilder_createFunctionRef(bridged, function.bridged)
     return functionRef.getAs(FunctionRefInst.self)
+  }
+
+  public func createCopyValue(operand: Value) -> CopyValueInst {
+    notifyInstructionsChanged()
+    return SILBuilder_createCopyValue(bridged, operand.bridged).getAs(CopyValueInst.self)
+  }
+
+  @discardableResult
+  public func createDestroyValue(operand: Value) -> DestroyValueInst {
+    notifyInstructionsChanged()
+    return SILBuilder_createDestroyValue(bridged, operand.bridged).getAs(DestroyValueInst.self)
   }
 
   @discardableResult
@@ -107,11 +129,38 @@ public struct Builder {
     notifyCallsChanged()
 
     let apply = arguments.withBridgedValues { valuesRef in
-      SILBuilder_createApply(
-        bridgedInsPoint, location.bridgedLocation, function.bridged,
-        substitutionMap.bridged, valuesRef
-      )
+      SILBuilder_createApply(bridged, function.bridged, substitutionMap.bridged, valuesRef)
     }
     return apply.getAs(ApplyInst.self)
+  }
+  
+  public func createUncheckedEnumData(enum enumVal: Value,
+                                      caseIndex: Int,
+                                      resultType: Type) -> UncheckedEnumDataInst {
+    notifyInstructionsChanged()
+    let ued = SILBuilder_createUncheckedEnumData(bridged, enumVal.bridged, caseIndex, resultType.bridged)
+    return ued.getAs(UncheckedEnumDataInst.self)
+  }
+  @discardableResult
+  public func createSwitchEnum(enum enumVal: Value,
+                               cases: [(Int, BasicBlock)],
+                               defaultBlock: BasicBlock? = nil) -> SwitchEnumInst {
+    notifyInstructionsChanged()
+    notifyBranchesChanged()
+    let se = cases.withUnsafeBufferPointer { caseBuffer in
+      SILBuilder_createSwitchEnumInst(
+        bridged, enumVal.bridged, defaultBlock.bridged, caseBuffer.baseAddress, caseBuffer.count)
+    }
+    return se.getAs(SwitchEnumInst.self)
+  }
+  
+  @discardableResult
+  public func createBranch(to destBlock: BasicBlock, arguments: [Value] = []) -> BranchInst {
+    notifyInstructionsChanged()
+    notifyBranchesChanged()
+    return arguments.withBridgedValues { valuesRef in
+      let bi = SILBuilder_createBranch(bridged, destBlock.bridged, valuesRef)
+      return bi.getAs(BranchInst.self)
+    }
   }
 }

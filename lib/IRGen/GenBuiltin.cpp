@@ -283,6 +283,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::TaskRunInline) {
+    auto result = args.claimNext();
+    auto closure = args.claimNext();
+    auto closureContext = args.claimNext();
+
+    emitTaskRunInline(IGF, substitutions, result, closure, closureContext);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
     // Claim metadata pointer.
     (void)args.claimAll();
@@ -1336,7 +1345,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
   if (Builtin.ID == BuiltinValueKind::AssumeAlignment) {
-    // A no-op pointer cast that passes on its first value. Common occurences of
+    // A no-op pointer cast that passes on its first value. Common occurrences of
     // this builtin should already be removed with the alignment guarantee moved
     // to the subsequent load or store.
     //

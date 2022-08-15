@@ -19,10 +19,11 @@
 #ifndef SWIFT_IRGEN_GENERICREQUIREMENT_H
 #define SWIFT_IRGEN_GENERICREQUIREMENT_H
 
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
 class Value;
@@ -41,12 +42,6 @@ class Address;
 class IRGenFunction;
 class IRGenModule;
 
-/// An abstract generic requirement.
-struct GenericRequirement {
-  CanType TypeParameter;
-  ProtocolDecl *Protocol;
-};
-
 using RequirementCallback =
   llvm::function_ref<void(GenericRequirement requirement)>;
 
@@ -60,7 +55,6 @@ void enumerateGenericSignatureRequirements(CanGenericSignature signature,
 llvm::Value *
 emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                         CanGenericSignature signature,
-                                        ModuleDecl &module,
                                         GenericRequirement requirement,
                                         SubstitutionMap subs);
 
@@ -99,11 +93,12 @@ void bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
 /// root conformances of the context established by the type, again minus
 /// anything fulfillable from its parent type metadata).
 class GenericTypeRequirements {
-  NominalTypeDecl *TheDecl;
   llvm::SmallVector<GenericRequirement, 4> Requirements;
+  CanGenericSignature Generics;
 
 public:
   GenericTypeRequirements(IRGenModule &IGM, NominalTypeDecl *decl);
+  GenericTypeRequirements(IRGenModule &IGM, GenericSignature sig);
 
   /// Return the layout chunks.
   ArrayRef<GenericRequirement> getRequirements() const {
@@ -151,26 +146,5 @@ public:
 
 } // end namespace irgen
 } // end namespace swift
-
-namespace llvm {
-  template <> struct DenseMapInfo<swift::irgen::GenericRequirement> {
-    using GenericRequirement = swift::irgen::GenericRequirement;
-    using CanTypeInfo = llvm::DenseMapInfo<swift::CanType>;
-    static GenericRequirement getEmptyKey() {
-      return { CanTypeInfo::getEmptyKey(), nullptr };
-    }
-    static GenericRequirement getTombstoneKey() {
-      return { CanTypeInfo::getTombstoneKey(), nullptr };
-    }
-    static llvm::hash_code getHashValue(GenericRequirement req) {
-      return hash_combine(CanTypeInfo::getHashValue(req.TypeParameter),
-                          hash_value(req.Protocol));
-    }
-    static bool isEqual(GenericRequirement lhs, GenericRequirement rhs) {
-      return (lhs.TypeParameter == rhs.TypeParameter &&
-              lhs.Protocol == rhs.Protocol);
-    }
-  };
-}
 
 #endif

@@ -2,14 +2,19 @@
 #define TEST_INTEROP_CXX_FOREIGN_REFERENCE_INPUTS_SINGLETON_H
 
 #include <stdlib.h>
+#if defined(_WIN32)
+inline void *operator new(size_t, void *p) { return p; }
+#else
+#include <new>
+#endif
 
 #include "visibility.h"
 
-inline void *operator new(size_t, void *p) { return p; }
-
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-struct __attribute__((swift_attr("import_as_ref"))) DeletedDtor {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) DeletedDtor {
   int value = 42;
 
   DeletedDtor() = default;
@@ -27,7 +32,9 @@ struct __attribute__((swift_attr("import_as_ref"))) DeletedDtor {
 
 void mutateIt(DeletedDtor &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_as_ref"))) PrivateDtor {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) PrivateDtor {
   int value = 42;
 
   PrivateDtor() = default;
@@ -47,7 +54,9 @@ private:
 
 void mutateIt(PrivateDtor &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_as_ref"))) DeletedSpecialMembers {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) DeletedSpecialMembers {
   int value = 42;
 
   DeletedSpecialMembers() = default;
@@ -65,7 +74,9 @@ struct __attribute__((swift_attr("import_as_ref"))) DeletedSpecialMembers {
 
 void mutateIt(DeletedSpecialMembers &x) { x.value = 32; }
 
-struct __attribute__((swift_attr("import_as_ref"))) PrivateSpecialMembers {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) PrivateSpecialMembers {
   int value = 42;
 
   PrivateSpecialMembers() = default;

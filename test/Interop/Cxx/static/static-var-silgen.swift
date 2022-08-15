@@ -1,15 +1,11 @@
-// RUN: %target-swift-emit-sil -I %S/Inputs -enable-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
 import StaticVar
 
 func initStaticVars() -> CInt {
   return staticVar + staticVarInit + staticVarInlineInit + staticConst + staticConstInit
-    + staticConstInlineInit + staticConstexpr + staticNonTrivial.val + staticConstNonTrivial.val
-    + staticConstexprNonTrivial.val
+    + staticConstInlineInit + staticNonTrivial.val + staticConstNonTrivial.val
 }
-
-// Constexpr globals should be inlined and removed.
-// CHECK-NOT: sil_global public_external [let] @staticConstexpr : $Int32
 
 // CHECK: // clang name: staticVar
 // CHECK: sil_global public_external @staticVar : $Int32
@@ -27,8 +23,6 @@ func initStaticVars() -> CInt {
 // CHECK: sil_global public_external @staticNonTrivial : $NonTrivial
 // CHECK: // clang name: staticConstNonTrivial
 // CHECK: sil_global public_external [let] @staticConstNonTrivial : $NonTrivial
-// CHECK: // clang name: staticConstexprNonTrivial
-// CHECK: sil_global public_external [let] @staticConstexprNonTrivial : $NonTrivial
 
 func readStaticVar() -> CInt {
   return staticVar

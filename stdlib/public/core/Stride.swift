@@ -96,7 +96,7 @@
 ///   `Stride` type's implementations. If a type conforming to `Strideable` is
 ///   its own `Stride` type, it must provide concrete implementations of the
 ///   two operators to avoid infinite recursion.
-public protocol Strideable: Comparable {
+public protocol Strideable<Stride>: Comparable {
   /// A type that represents the distance between two values.
   associatedtype Stride: SignedNumeric, Comparable
 

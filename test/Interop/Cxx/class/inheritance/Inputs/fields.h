@@ -1,6 +1,3 @@
-template <class From, class To>
-To __swift_interopStaticCast(From from) { return from; }
-
 struct HasThreeFields {
   int a = 1;
   int b = 2;
@@ -21,7 +18,7 @@ struct DerivedFromAll : HasOneField, DerivedWithOneField {
 
 // Non trivial types:
 
-struct NonTrivial {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivial {
   NonTrivial() {}
   ~NonTrivial() {}
 };
@@ -36,13 +33,24 @@ struct NonTrivialDerivedWithOneField : NonTrivialHasThreeFields {
   int d = 4;
 };
 
-struct NonTrivialHasOneField {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivialHasOneField {
   NonTrivialHasOneField() {}
   ~NonTrivialHasOneField() {}
 
   int e = 5;
 };
 
-struct NonTrivialDerivedFromAll : NonTrivialHasOneField, NonTrivialDerivedWithOneField {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivialDerivedFromAll
+    : NonTrivialHasOneField,
+      NonTrivialDerivedWithOneField {
   int f = 6;
 };
+
+// Templates:
+
+template<class T>
+struct ClassTemplate {
+  T value;
+};
+
+struct DerivedFromClassTemplate : ClassTemplate<int> {};

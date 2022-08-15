@@ -27,20 +27,12 @@
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Thread.h"
 #include <atomic>
+#include <new>
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
-
-#if HAVE_PTHREAD_H
-#include <pthread.h>
-#endif
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRA_LEAN
-#define NOMINMAX
-#include <Windows.h>
-#endif
 
 namespace swift {
 
@@ -49,24 +41,8 @@ namespace swift {
 #if 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
   fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
-          (unsigned long)_swift_get_thread_id(),                               \
-          __FILE__, __LINE__, __FUNCTION__,                                    \
-          __VA_ARGS__)
-
-#if defined(_WIN32)
-using ThreadID = decltype(GetCurrentThreadId());
-#else
-using ThreadID = decltype(pthread_self());
-#endif
-
-inline ThreadID _swift_get_thread_id() {
-#if defined(_WIN32)
-  return GetCurrentThreadId();
-#else
-  return pthread_self();
-#endif
-}
-
+          (unsigned long)Thread::current()::platformThreadId(), __FILE__,      \
+          __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
 #endif
@@ -113,7 +89,7 @@ void _swift_tsan_release(void *addr);
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
 
-#if !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
 inline SerialExecutorWitnessTable *
 _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
   extern SerialExecutorWitnessTable wtable
@@ -145,9 +121,16 @@ namespace {
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
+  // The ABI reserves three words of storage for these contexts, which
+  // we currently use as follows.  These fields are not accessed by
+  // generated code; they're purely internal to the runtime, and only
+  // when the calling task actually suspends.
+  //
+  // (If you think three words is an odd choice, one of them used to be
+  // the context flags.)
   SwiftError *errorResult;
-
   OpaqueValue *successResultPointer;
+  void *_reserved;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
     fillWithSuccess(future->getStoragePtr(), future->getResultType(),
@@ -203,7 +186,7 @@ public:
 ///
 /// 32 bit systems with SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=1
 ///
-///          Flags               Exeuction Lock           Unused           TaskStatusRecord *
+///          Flags               Execution Lock           Unused           TaskStatusRecord *
 /// |----------------------|----------------------|----------------------|-------------------|
 ///          32 bits                32 bits                32 bits              32 bits
 ///
@@ -280,12 +263,22 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// actor. This bit is cleared when a starts running on a thread, suspends
     /// or is completed.
     IsEnqueued = 0x1000,
+
+#ifndef NDEBUG
+    /// Task has been completed.  This is purely used to enable an assertion
+    /// that the task is completed when we destroy it.
+    IsComplete = 0x2000,
+#endif
   };
 
+  // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
+  // ActiveTaskStatusWithoutEscalation in
+  // include/swift/Reflection/RuntimeInternals.h. Any changes to the layout here
+  // must also be made there.
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
   dispatch_lock_t ExecutionLock;
-  uint32_t Unused;
+  LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #elif SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_8_BYTES
   uint32_t Flags;
   dispatch_lock_t ExecutionLock;
@@ -293,7 +286,7 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
   uint32_t Flags;
 #else /* !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_8_BYTES */
   uint32_t Flags;
-  uint32_t Unused;
+  LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #endif
   TaskStatusRecord *Record;
 
@@ -393,6 +386,20 @@ public:
 #endif
   }
 
+#ifndef NDEBUG
+  bool isComplete() const {
+    return Flags & IsComplete;
+  }
+
+  ActiveTaskStatus withComplete() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | IsComplete, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | IsComplete);
+#endif
+  }
+#endif
+
   /// Is there a lock on the linked list of status records?
   bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
   ActiveTaskStatus withLockingRecord(TaskStatusRecord *lockRecord) const {
@@ -480,7 +487,9 @@ public:
   }
 
   void traceStatusChanged(AsyncTask *task) {
-    concurrency::trace::task_status_changed(task, Flags);
+    concurrency::trace::task_status_changed(
+        task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
+        isStoredPriorityEscalated(), isRunning(), isEnqueued());
   }
 };
 
@@ -512,7 +521,7 @@ struct AsyncTask::PrivateStorage {
 
   /// Storage for the ActiveTaskStatus. See doc for ActiveTaskStatus for size
   /// and alignment requirements.
-  alignas(2 * sizeof(void *)) char StatusStorage[sizeof(ActiveTaskStatus)];
+  alignas(ActiveTaskStatus) char StatusStorage[sizeof(ActiveTaskStatus)];
 
   /// The allocator for the task stack.
   /// Currently 2 words + 8 bytes.
@@ -564,6 +573,9 @@ struct AsyncTask::PrivateStorage {
       auto newStatus = oldStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
       newStatus = newStatus.withoutEnqueued();
+#ifndef NDEBUG
+      newStatus = newStatus.withComplete();
+#endif
 
       // This can fail since the task can still get concurrently cancelled or
       // escalated.
@@ -612,11 +624,11 @@ AsyncTask::OpaquePrivateStorage::get() const {
   return reinterpret_cast<const PrivateStorage &>(*this);
 }
 inline void AsyncTask::OpaquePrivateStorage::initialize(JobPriority basePri) {
-  new (this) PrivateStorage(basePri);
+  ::new (this) PrivateStorage(basePri);
 }
 inline void AsyncTask::OpaquePrivateStorage::initializeWithSlab(
     JobPriority basePri, void *slab, size_t slabCapacity) {
-  new (this) PrivateStorage(basePri, slab, slabCapacity);
+  ::new (this) PrivateStorage(basePri, slab, slabCapacity);
 }
 inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
   get().complete(task);
@@ -650,6 +662,7 @@ retry:;
   while (true) {
     // We can get here from being suspended or being enqueued
     assert(!oldStatus.isRunning());
+    assert(!oldStatus.isComplete());
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     // Task's priority is greater than the thread's - do a self escalation
@@ -687,7 +700,7 @@ retry:;
 /// task. Otherwise, if we reset the voucher and priority escalation too early, the
 /// thread may be preempted immediately before we can finish the enqueue of the
 /// high priority task to the next location. We will then have a priority inversion
-/// of waiting for a low priority thread to enqueue a high priorty task.
+/// of waiting for a low priority thread to enqueue a high priority task.
 ///
 /// In order to do this correctly, we need enqueue-ing of a task to the next
 /// executor, to have a "hand-over-hand locking" type of behaviour - until the
@@ -740,7 +753,10 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
 
   // Set up task for enqueue to next location by setting the Job priority field
   Flags.setPriority(newStatus.getStoredPriority());
-  concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
+  concurrency::trace::task_flags_changed(
+      this, static_cast<uint8_t>(Flags.getPriority()), Flags.task_isChildTask(),
+      Flags.task_isFuture(), Flags.task_isGroupChildTask(),
+      Flags.task_isAsyncLetTask());
 
   swift_task_enqueue(this, newExecutor);
 }

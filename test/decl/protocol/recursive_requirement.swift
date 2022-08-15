@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 // -----
 
@@ -6,8 +6,8 @@ protocol Foo {
   associatedtype Bar : Foo
 }
 
-struct Oroborous : Foo {
-  typealias Bar = Oroborous
+struct Ouroboros : Foo {
+  typealias Bar = Ouroboros
 }
 
 // -----
@@ -53,7 +53,7 @@ protocol P3 {
 protocol P4 : P3 {}
 
 protocol DeclaredP : P3, // expected-warning{{redundant conformance constraint 'Self' : 'P3'}}
-P4 {} // expected-note{{conformance constraint 'Self' : 'P3' implied here}}
+P4 {}
 
 struct Y3 : DeclaredP {
 }
@@ -76,7 +76,7 @@ protocol Gamma {
   associatedtype Delta: Alpha
 }
 
-struct Epsilon<T: Alpha, // expected-note{{conformance constraint 'U' : 'Gamma' implied here}}
+struct Epsilon<T: Alpha,
                U: Gamma> // expected-warning{{redundant conformance constraint 'U' : 'Gamma'}}
   where T.Beta == U,
         U.Delta == T {}
@@ -91,7 +91,7 @@ protocol AsExistentialB {
 }
 
 protocol AsExistentialAssocTypeA {
-  var delegate : AsExistentialAssocTypeB? { get } // expected-warning {{protocol 'AsExistentialAssocTypeB' as a type must be explicitly marked as 'any'}}
+  var delegate : AsExistentialAssocTypeB? { get } // expected-error {{use of protocol 'AsExistentialAssocTypeB' as a type must be written 'any AsExistentialAssocTypeB'}}
 }
 protocol AsExistentialAssocTypeB {
   func aMethod(_ object : AsExistentialAssocTypeA)
@@ -103,7 +103,7 @@ protocol AsExistentialAssocTypeAgainA {
   associatedtype Bar
 }
 protocol AsExistentialAssocTypeAgainB {
-  func aMethod(_ object : AsExistentialAssocTypeAgainA) // expected-warning {{protocol 'AsExistentialAssocTypeAgainA' as a type must be explicitly marked as 'any'}}
+  func aMethod(_ object : AsExistentialAssocTypeAgainA) // expected-error {{use of protocol 'AsExistentialAssocTypeAgainA' as a type must be written 'any AsExistentialAssocTypeAgainA'}}
 }
 
 // SR-547

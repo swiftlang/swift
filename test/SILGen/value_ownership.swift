@@ -72,8 +72,8 @@ func useConsumingGetterGeneric<T : OwnershipProto>(_ t: T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s15value_ownership29useConsumingGetterExistentialyyAA14OwnershipProto_pF : $@convention(thin) (@in_guaranteed OwnershipProto) -> () {
 func useConsumingGetterExistential(_ e: OwnershipProto) {
-// CHECK:      [[FN:%.*]] = witness_method $@opened("{{.*}}") OwnershipProto, #OwnershipProto.explicitPropertyGet!getter : <Self where Self : OwnershipProto> (__owned Self) -> () -> String, %2 : $*@opened("{{.*}}") OwnershipProto : $@convention(witness_method: OwnershipProto) <τ_0_0 where τ_0_0 : OwnershipProto> (@in τ_0_0) -> @owned String
-// CHECK-NEXT: apply [[FN]]<@opened("{{.*}}") OwnershipProto>({{%.*}}) : $@convention(witness_method: OwnershipProto) <τ_0_0 where τ_0_0 : OwnershipProto> (@in τ_0_0) -> @owned String
+// CHECK:      [[FN:%.*]] = witness_method $@opened("{{.*}}", OwnershipProto) Self, #OwnershipProto.explicitPropertyGet!getter : <Self where Self : OwnershipProto> (__owned Self) -> () -> String, %2 : $*@opened("{{.*}}", OwnershipProto) Self : $@convention(witness_method: OwnershipProto) <τ_0_0 where τ_0_0 : OwnershipProto> (@in τ_0_0) -> @owned String
+// CHECK-NEXT: apply [[FN]]<@opened("{{.*}}", OwnershipProto) Self>({{%.*}}) : $@convention(witness_method: OwnershipProto) <τ_0_0 where τ_0_0 : OwnershipProto> (@in τ_0_0) -> @owned String
 
   blackHole(e.explicitPropertyGet)
 }

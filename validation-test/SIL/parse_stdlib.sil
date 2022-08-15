@@ -3,4 +3,3 @@
 // RUN: %target-sil-opt -enable-sil-verify-all=true %t.sil > /dev/null
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
-// REQUIRES: rdar81658645

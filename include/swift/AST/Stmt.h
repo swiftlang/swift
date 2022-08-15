@@ -159,6 +159,12 @@ public:
                            SourceLoc rbloc,
                            Optional<bool> implicit = None);
 
+  static BraceStmt *createImplicit(ASTContext &ctx,
+                                   ArrayRef<ASTNode> elements) {
+    return create(ctx, /*lbloc=*/SourceLoc(), elements, /*rbloc=*/SourceLoc(),
+                  /*implicit=*/true);
+  }
+
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
 
@@ -552,6 +558,9 @@ public:
                   labelInfo),
       DoLoc(doLoc), Body(body) {}
 
+  static DoStmt *createImplicit(ASTContext &C, LabeledStmtInfo labelInfo,
+                                ArrayRef<ASTNode> body);
+
   SourceLoc getDoLoc() const { return DoLoc; }
   
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
@@ -743,8 +752,8 @@ class ForEachStmt : public LabeledStmt {
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  VarDecl *iteratorVar = nullptr;
-  Expr *iteratorVarRef = nullptr;
+  PatternBindingDecl *iteratorVar = nullptr;
+  Expr *nextCall = nullptr;
   OpaqueValueExpr *elementExpr = nullptr;
   Expr *convertElementExpr = nullptr;
 
@@ -759,11 +768,11 @@ public:
     setPattern(Pat);
   }
 
-  void setIteratorVar(VarDecl *var) { iteratorVar = var; }
-  VarDecl *getIteratorVar() const { return iteratorVar; }
+  void setIteratorVar(PatternBindingDecl *var) { iteratorVar = var; }
+  PatternBindingDecl *getIteratorVar() const { return iteratorVar; }
 
-  void setIteratorVarRef(Expr *var) { iteratorVarRef = var; }
-  Expr *getIteratorVarRef() const { return iteratorVarRef; }
+  void setNextCall(Expr *next) { nextCall = next; }
+  Expr *getNextCall() const { return nextCall; }
 
   void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
   OpaqueValueExpr *getElementExpr() const { return elementExpr; }
@@ -802,8 +811,12 @@ public:
   /// by this foreach loop, as it was written in the source code and
   /// subsequently type-checked. To determine the semantic behavior of this
   /// expression to extract a range, use \c getRangeInit().
-  Expr *getSequence() const { return Sequence; }
-  void setSequence(Expr *S) { Sequence = S; }
+  Expr *getParsedSequence() const { return Sequence; }
+  void setParsedSequence(Expr *S) { Sequence = S; }
+
+  /// Type-checked version of the sequence or nullptr if this statement
+  /// yet to be type-checked.
+  Expr *getTypeCheckedSequence() const;
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
@@ -997,6 +1010,11 @@ public:
 
   unsigned getNumCaseLabelItems() const { return Bits.CaseStmt.NumPatterns; }
 
+  FallthroughStmt *getFallthroughStmt() const {
+    return hasFallthroughDest() ? *getTrailingObjects<FallthroughStmt *>()
+                                : nullptr;
+  }
+
   NullablePtr<CaseStmt> getFallthroughDest() const {
     return const_cast<CaseStmt &>(*this).getFallthroughDest();
   }
@@ -1025,6 +1043,8 @@ public:
     return getLoc();
   }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
+
+  SourceLoc getItemTerminatorLoc() const { return ItemTerminatorLoc; }
 
   SourceRange getLabelItemsRange() const {
     switch (ParentKind) {

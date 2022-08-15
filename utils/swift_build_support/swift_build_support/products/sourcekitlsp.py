@@ -37,6 +37,10 @@ class SourceKitLSP(product.Product):
     def is_before_build_script_impl_product(cls):
         return False
 
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        return True
+
     def should_build(self, host_target):
         return True
 
@@ -50,14 +54,14 @@ class SourceKitLSP(product.Product):
     def test(self, host_target):
         indexstoredb.run_build_script_helper(
             'test', host_target, self, self.args,
-            self.args.test_sourcekitlsp_sanitize_all)
+            self.args.test_sourcekitlsp_sanitize_all, clean=False)
 
     def should_install(self, host_target):
         return self.args.install_sourcekitlsp
 
     def install(self, host_target):
         indexstoredb.run_build_script_helper(
-            'install', host_target, self, self.args)
+            'install', host_target, self, self.args, clean=False)
 
     @classmethod
     def get_dependencies(cls):

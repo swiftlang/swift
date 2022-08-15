@@ -33,6 +33,7 @@ namespace llvm {
 namespace swift {
 
 class GenericEnvironment;
+class GenericParamList;
 class SubstitutableType;
 typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
 
@@ -199,17 +200,15 @@ public:
   /// written in terms of the generic signature of 'baseDecl'.
   static SubstitutionMap
   getOverrideSubstitutions(const ValueDecl *baseDecl,
-                           const ValueDecl *derivedDecl,
-                           Optional<SubstitutionMap> derivedSubs);
+                           const ValueDecl *derivedDecl);
 
   /// Variant of the above for when we have the generic signatures but not
   /// the decls for 'derived' and 'base'.
   static SubstitutionMap
-  getOverrideSubstitutions(const ClassDecl *baseClass,
-                           const ClassDecl *derivedClass,
+  getOverrideSubstitutions(const NominalTypeDecl *baseNominal,
+                           const NominalTypeDecl *derivedNominal,
                            GenericSignature baseSig,
-                           GenericSignature derivedSig,
-                           Optional<SubstitutionMap> derivedSubs);
+                           const GenericParamList *derivedParams);
 
   /// Combine two substitution maps as follows.
   ///
@@ -313,6 +312,39 @@ public:
                                     ProtocolDecl *conformedProtocol) const;
 };
 
+struct OverrideSubsInfo {
+  ASTContext &Ctx;
+  unsigned BaseDepth;
+  unsigned OrigDepth;
+  SubstitutionMap BaseSubMap;
+  const GenericParamList *DerivedParams;
+
+  OverrideSubsInfo(const NominalTypeDecl *baseNominal,
+                   const NominalTypeDecl *derivedNominal,
+                   GenericSignature baseSig,
+                   const GenericParamList *derivedParams);
+};
+
+struct QueryOverrideSubs {
+  OverrideSubsInfo info;
+
+  explicit QueryOverrideSubs(const OverrideSubsInfo &info)
+    : info(info) {}
+
+  Type operator()(SubstitutableType *type) const;
+};
+
+struct LookUpConformanceInOverrideSubs {
+  OverrideSubsInfo info;
+
+  explicit LookUpConformanceInOverrideSubs(const OverrideSubsInfo &info)
+    : info(info) {}
+
+  ProtocolConformanceRef operator()(CanType type,
+                                    Type substType,
+                                    ProtocolDecl *proto) const;
+};
+
 } // end namespace swift
 
 namespace llvm {
@@ -325,7 +357,7 @@ namespace llvm {
       return swift::SubstitutionMap::getFromOpaqueValue(ptr);
     }
 
-    /// Note: Assuming storage is at leaste 4-byte aligned.
+    /// Note: Assuming storage is at least 4-byte aligned.
     enum { NumLowBitsAvailable = 2 };
   };
 

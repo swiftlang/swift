@@ -58,10 +58,8 @@ public func testMutableArray() {
   // CHECK: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $__ContiguousArrayStorageBase
   // CHECK: [[FN:%.+]] = function_ref @takesMutableRawPointer
-  // CHECK: strong_retain {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: {{^bb[0-9]+:}}
-  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: dealloc_stack {{%.+}} : $*Array<Int>
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
@@ -76,10 +74,8 @@ public func testMutableArrayToOptional() {
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $__ContiguousArrayStorageBase
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeMutableRawPointer>, #Optional.some!enumelt, [[DEP_POINTER]]
   // CHECK: [[FN:%.+]] = function_ref @takesOptMutableRawPointer
-  // CHECK: strong_retain {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: {{^bb[0-9]+:}}
-  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: dealloc_stack {{%.+}} : $*Array<Int>
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()

@@ -94,6 +94,99 @@ UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
   expectEqual(6, p1.load(fromByteOffset: 2 * MemoryLayout<Int>.stride, as: Int.self))
 }
 
+UnsafeMutableRawPointerExtraTestSuite.test("load.unaligned")
+.skip(.custom({
+  if #available(SwiftStdlib 5.7, *) { return false }
+  return true
+}, reason: "Requires Swift 5.7's stdlib"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+  var data: [UInt8] = [0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0x0]
+  var result: UInt32
+  result = data.withUnsafeBytes {
+    $0.loadUnaligned(fromByteOffset: 3, as: UInt32.self)
+  }
+  expectEqual(result, 0xffff_ffff)
+  result = data.withUnsafeMutableBytes {
+    $0[0] = 0
+    return $0.loadUnaligned(fromByteOffset: 1, as: UInt32.self)
+  }
+  expectEqual(result, 0xffff_0000)
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("load.invalid")
+.skip(.custom({ !_isDebugAssertConfiguration() },
+              reason: "This tests a debug precondition.."))
+.code {
+  let data: [UInt8] = [0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0x0]
+  expectCrashLater()
+  _ = data.withUnsafeBytes {
+    $0.load(fromByteOffset: 3, as: UInt32.self)
+  }
+  expectUnreachable()
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("load.invalid.mutable")
+.skip(.custom({ !_isDebugAssertConfiguration() },
+              reason: "This tests a debug precondition.."))
+.code {
+  var data: [UInt8] = [0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0x0]
+  expectCrashLater()
+  _ = data.withUnsafeMutableBytes {
+    $0.load(fromByteOffset: 1, as: UInt32.self)
+  }
+  expectUnreachable()
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
+.skip(.custom({
+  if #available(SwiftStdlib 5.7, *) { return false }
+  return true
+}, reason: "Requires Swift 5.7's stdlib"))
+.code {
+  let count = MemoryLayout<UInt>.stride * 2
+  let p1 = UnsafeMutableRawPointer.allocate(
+    byteCount: count,
+    alignment: MemoryLayout<UInt>.alignment
+  )
+  defer { p1.deallocate() }
+  Array(repeating: UInt8.zero, count: count).withUnsafeBufferPointer {
+    p1.copyBytes(from: UnsafeRawPointer($0.baseAddress!), count: $0.count)
+  }
+  let value = UInt.max
+  let offset = 3
+  p1.storeBytes(of: value, toByteOffset: offset, as: UInt.self)
+  expectEqual(p1.load(fromByteOffset: offset-1, as: UInt8.self),
+              0)
+  expectEqual(p1.load(fromByteOffset: offset, as: UInt8.self),
+              .max)
+  let storedLength = MemoryLayout<UInt>.size
+  expectEqual(p1.load(fromByteOffset: offset-1+storedLength, as: UInt8.self),
+              .max)
+  expectEqual(p1.load(fromByteOffset: offset+storedLength, as: UInt8.self),
+              0)
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
+.skip(.custom({ !_isDebugAssertConfiguration() },
+              reason: "This tests a debug precondition.."))
+.skip(.custom({
+  if #available(SwiftStdlib 5.7, *) { return false }
+  return true
+}, reason: "Requires Swift 5.7's stdlib"))
+.code {
+  Missile.missilesLaunched = 0
+  let m = Missile(0)
+  let p1 = UnsafeMutableRawPointer.allocate(
+    byteCount: MemoryLayout<Missile>.size,
+    alignment: MemoryLayout<Missile>.alignment
+  )
+  defer { p1.deallocate() }
+  expectCrashLater()
+  p1.storeBytes(of: m, as: Missile.self)
+  expectUnreachable()
+}
+
 UnsafeMutableRawPointerExtraTestSuite.test("copyMemory") {
   let sizeInBytes = 4 * MemoryLayout<Int>.stride
   let rawPtr = UnsafeMutableRawPointer.allocate(
@@ -250,6 +343,45 @@ UnsafeMutableRawPointerExtraTestSuite.test("withMemoryRebound") {
     let mutablePtrT = UnsafeMutablePointer(mutating: ptrT)
     expectType(UInt.self, &mutablePtrT.pointee)
   }
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("realignment-functions") {
+  var m = UnsafeMutableRawPointer(bitPattern: 1)!
+  expectEqual(m.alignedUp(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(m.alignedUp(for: Int32.self), .init(bitPattern: 4)!)
+  expectEqual(m.alignedUp(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(m.alignedUp(toMultipleOf: 16), .init(bitPattern: 16)!)
+
+  m = .init(bitPattern: 13)!
+  expectEqual(m.alignedDown(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(m.alignedDown(for: Int32.self), .init(bitPattern: 12)!)
+  expectEqual(m.alignedDown(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(m.alignedDown(toMultipleOf: 4), .init(bitPattern: 12)!)
+
+  var p = UnsafeRawPointer(bitPattern: 1)!
+  expectEqual(p.alignedUp(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(p.alignedUp(for: Int32.self), .init(bitPattern: 4)!)
+  expectEqual(p.alignedUp(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(p.alignedUp(toMultipleOf: 16), .init(bitPattern: 16)!)
+
+  p = .init(bitPattern: 13)!
+  expectEqual(p.alignedDown(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(p.alignedDown(for: Int32.self), .init(bitPattern: 12)!)
+  expectEqual(p.alignedDown(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(p.alignedDown(toMultipleOf: 4), .init(bitPattern: 12)!)
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("pointer-comparisons") {
+  let a = UnsafeMutableRawPointer(bitPattern: 0x8000)!
+  let b = UnsafeRawPointer(bitPattern: 0x9000)!
+
+  expectTrue(a.assumingMemoryBound(to: Int.self) == UnsafeRawPointer(a))
+  expectTrue(b.assumingMemoryBound(to: UInt.self) >= b)
+  expectTrue(a <= a.assumingMemoryBound(to: Double.self))
+
+  expectTrue(a.assumingMemoryBound(to: Int.self) != b)
+  expectTrue(b.assumingMemoryBound(to: UInt.self) > UnsafeMutableRawPointer(a))
+  expectTrue(a < b.assumingMemoryBound(to: Double.self))
 }
 
 runAllTests()

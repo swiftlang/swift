@@ -14,6 +14,7 @@
 #include "../SwiftShims/MetadataSections.h"
 
 #include <cstdint>
+#include <new>
 
 extern "C" const char __ImageBase[];
 
@@ -64,9 +65,9 @@ static void swift_image_constructor() {
   { reinterpret_cast<uintptr_t>(&__start_##name) + sizeof(__start_##name),     \
     reinterpret_cast<uintptr_t>(&__stop_##name) - reinterpret_cast<uintptr_t>(&__start_##name) - sizeof(__start_##name) }
 
-  sections = {
+  ::new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
-      __ImageBase,
+      { __ImageBase },
 
       nullptr,
       nullptr,

@@ -91,7 +91,7 @@ class C {
     super.init()
   }
 
-  func implictMember() {
+  func implicitMember() {
     _ = .foo
     _ = .foo(x: 12)
     _ = .foo() { 12 }
@@ -148,7 +148,6 @@ typealias J = inout @autoclosure () -> Int
 typealias K = (@invalidAttr Int, inout Int, __shared Int, __owned Int) -> ()
 
 @objc private typealias T<a,b> = Int
-@objc private typealias T<a,b>
 
 class Foo {
   let bar: Int

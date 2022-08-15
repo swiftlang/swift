@@ -48,7 +48,7 @@
 // existing rewrite rules with the overlap term U.V.W in the middle. If we then
 // add a third rewrite step for the new rule inverted, (U.Y => X.W), we get a
 // loop that begins and ends at X.W. This loop encodes that the new rule
-// (X.W => U.Y) is redundant because it can be expresed in terms of other rules.
+// (X.W => U.Y) is redundant because it can be expressed in terms of other rules.
 //
 // The homotopy reduction algorithm in HomotopyReduction.cpp uses rewrite loops
 // to find a minimal set of rewrite rules, which are then used to construct a
@@ -170,6 +170,225 @@ void RewritePath::invert() {
     step.invert();
 }
 
+/// Given a rewrite rule which appears exactly once in a loop
+/// without context, return a new definition for this rewrite rule.
+/// The new definition is the path obtained by deleting the
+/// rewrite rule from the loop.
+RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
+  // A cycle is a path from the basepoint to the basepoint.
+  // Somewhere in this path, an application of \p ruleID
+  // appears in an empty context.
+
+  // First, we split the cycle into two paths:
+  //
+  // (1) A path from the basepoint to the rule's
+  // left hand side,
+  RewritePath basepointToLhs;
+  // (2) And a path from the rule's right hand side
+  // to the basepoint.
+  RewritePath rhsToBasepoint;
+
+  // Because the rule only appears once, we know that basepointToLhs
+  // and rhsToBasepoint do not involve the rule itself.
+
+  // If the rule is inverted, we have to invert the whole thing
+  // again at the end.
+  bool ruleWasInverted = false;
+
+  bool sawRule = false;
+
+  for (auto step : Steps) {
+    switch (step.Kind) {
+    case RewriteStep::Rule: {
+      if (step.getRuleID() != ruleID)
+        break;
+
+      assert(!sawRule && "Rule appears more than once?");
+      assert(!step.isInContext() && "Rule appears in context?");
+
+      ruleWasInverted = step.Inverse;
+      sawRule = true;
+      continue;
+    }
+    case RewriteStep::PrefixSubstitutions:
+    case RewriteStep::Shift:
+    case RewriteStep::Decompose:
+    case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
+      break;
+    }
+
+    if (sawRule)
+      rhsToBasepoint.add(step);
+    else
+      basepointToLhs.add(step);
+  }
+
+  // Build a path from the rule's lhs to the rule's rhs via the
+  // basepoint.
+  RewritePath result = rhsToBasepoint;
+  result.append(basepointToLhs);
+
+  // We want a path from the lhs to the rhs, so invert it unless
+  // the rewrite step was also inverted.
+  if (!ruleWasInverted)
+    result.invert();
+
+  return result;
+}
+
+/// Replace every rewrite step involving the given rewrite rule with
+/// either the replacement path (or its inverse, if the step was
+/// inverted).
+///
+/// The replacement path is re-contextualized at each occurrence of a
+/// rewrite step involving the given rule.
+///
+/// Returns true if any rewrite steps were replaced; false means the
+/// rule did not appear in this path.
+bool RewritePath::replaceRulesWithPaths(
+    llvm::function_ref<const RewritePath *(unsigned)> fn) {
+  bool foundAny = false;
+
+  for (const auto &step : Steps) {
+    if (step.Kind == RewriteStep::Rule &&
+        fn(step.getRuleID()) != nullptr) {
+      foundAny = true;
+      break;
+    }
+  }
+
+  if (!foundAny)
+    return false;
+
+  SmallVector<RewriteStep, 4> newSteps;
+
+  for (const auto &step : Steps) {
+    switch (step.Kind) {
+    case RewriteStep::Rule: {
+      auto *replacementPath = fn(step.getRuleID());
+      if (replacementPath == nullptr) {
+        newSteps.push_back(step);
+        break;
+      }
+
+      // Ok, we found a rewrite step referencing a redundant rule.
+      // Replace this step with the provided path. If this rewrite step has
+      // context, the path's own steps must be re-contextualized.
+
+      // Keep track of rewrite step pairs which push and pop the stack. Any
+      // rewrite steps enclosed with a push/pop are not re-contextualized.
+      unsigned pushCount = 0;
+
+      auto recontextualizeStep = [&](RewriteStep newStep) {
+        bool inverse = newStep.Inverse ^ step.Inverse;
+
+        if (newStep.pushesTermsOnStack() && inverse) {
+          assert(pushCount > 0);
+          --pushCount;
+        }
+
+        if (pushCount == 0) {
+          newStep.StartOffset += step.StartOffset;
+          newStep.EndOffset += step.EndOffset;
+        }
+
+        newStep.Inverse = inverse;
+        newSteps.push_back(newStep);
+
+        if (newStep.pushesTermsOnStack() && !inverse) {
+          ++pushCount;
+        }
+      };
+
+      // If this rewrite step is inverted, invert the entire path.
+      if (step.Inverse) {
+        for (auto newStep : llvm::reverse(*replacementPath))
+          recontextualizeStep(newStep);
+      } else {
+        for (auto newStep : *replacementPath)
+          recontextualizeStep(newStep);
+      }
+
+      // Rewrite steps which push and pop the stack must come in balanced pairs.
+      assert(pushCount == 0);
+
+      break;
+    }
+    case RewriteStep::PrefixSubstitutions:
+    case RewriteStep::Shift:
+    case RewriteStep::Decompose:
+    case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
+      newSteps.push_back(step);
+      break;
+    }
+  }
+
+  std::swap(newSteps, Steps);
+  return true;
+}
+
+bool RewritePath::replaceRuleWithPath(unsigned ruleID,
+                                      const RewritePath &path) {
+  return replaceRulesWithPaths(
+      [&](unsigned otherRuleID) -> const RewritePath * {
+        if (ruleID == otherRuleID)
+          return &path;
+
+        return nullptr;
+      });
+}
+
+SmallVector<unsigned, 1>
+RewritePath::findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
+                                                  const RewriteSystem &system) const {
+  // Rules appearing in empty context (possibly more than once).
+  llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
+  // The number of times each rule appears (with or without context).
+  llvm::SmallDenseMap<unsigned, unsigned, 2> ruleFrequency;
+
+  RewritePathEvaluator evaluator(term);
+  for (auto step : Steps) {
+    switch (step.Kind) {
+    case RewriteStep::Rule: {
+      if (!step.isInContext() && !evaluator.isInContext())
+        rulesInEmptyContext.insert(step.getRuleID());
+
+      ++ruleFrequency[step.getRuleID()];
+      break;
+    }
+
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::Decompose:
+    case RewriteStep::PrefixSubstitutions:
+    case RewriteStep::Shift:
+    case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
+    case RewriteStep::RightConcreteProjection:
+      break;
+    }
+
+    evaluator.apply(step, system);
+  }
+
+  // Collect all rules that we saw exactly once in empty context.
+  SmallVector<unsigned, 1> rulesOnceInEmptyContext;
+  for (auto rule : rulesInEmptyContext) {
+    auto found = ruleFrequency.find(rule);
+    assert(found != ruleFrequency.end());
+
+    if (found->second == 1)
+      rulesOnceInEmptyContext.push_back(rule);
+  }
+
+  return rulesOnceInEmptyContext;
+}
+
 /// Dumps a series of rewrite steps applied to \p term.
 void RewritePath::dump(llvm::raw_ostream &out,
                        MutableTerm term,
@@ -203,7 +422,6 @@ void RewritePath::dumpLong(llvm::raw_ostream &out,
 }
 
 void RewriteLoop::verify(const RewriteSystem &system) const {
-#ifndef NDEBUG
   RewritePathEvaluator evaluator(Basepoint);
 
   for (const auto &step : Path) {
@@ -222,7 +440,93 @@ void RewriteLoop::verify(const RewriteSystem &system) const {
     evaluator.dump(llvm::errs());
     abort();
   }
-#endif
+}
+
+/// Recompute various cached values if needed.
+void RewriteLoop::recompute(const RewriteSystem &system) {
+  if (!Dirty)
+    return;
+  Dirty = 0;
+
+  Useful = 0;
+  ProjectionCount = 0;
+  DecomposeCount = 0;
+  HasConcreteTypeAliasRule = 0;
+
+  RewritePathEvaluator evaluator(Basepoint);
+  for (auto step : Path) {
+    switch (step.Kind) {
+    case RewriteStep::Rule: {
+      Useful |= (!step.isInContext() && !evaluator.isInContext());
+
+      const auto &rule = system.getRule(step.getRuleID());
+      if (rule.isDerivedFromConcreteProtocolTypeAliasRule())
+        HasConcreteTypeAliasRule = 1;
+
+      break;
+    }
+
+    case RewriteStep::LeftConcreteProjection:
+      ++ProjectionCount;
+      break;
+
+    case RewriteStep::Decompose:
+      ++DecomposeCount;
+      break;
+
+    case RewriteStep::PrefixSubstitutions:
+    case RewriteStep::Shift:
+    case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
+    case RewriteStep::RightConcreteProjection:
+      break;
+    }
+
+    evaluator.apply(step, system);
+  }
+
+  RulesInEmptyContext =
+      Path.findRulesAppearingOnceInEmptyContext(Basepoint, system);
+}
+
+/// A rewrite rule is redundant if it appears exactly once in a loop
+/// without context.
+ArrayRef<unsigned>
+RewriteLoop::findRulesAppearingOnceInEmptyContext(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return RulesInEmptyContext;
+}
+
+/// The number of LeftConcreteProjection steps, used by the elimination order to
+/// prioritize loops that are not concrete unification projections.
+unsigned RewriteLoop::getProjectionCount(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return ProjectionCount;
+}
+
+/// The number of Decompose steps, used by the elimination order to prioritize
+/// loops that are not concrete simplifications.
+unsigned RewriteLoop::getDecomposeCount(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return DecomposeCount;
+}
+
+/// Returns true if the loop contains at least one concrete protocol typealias rule.
+/// See Rule::isDerivedFromConcreteProtocolTypeAliasRule().
+bool RewriteLoop::hasConcreteTypeAliasRule(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return HasConcreteTypeAliasRule;
+}
+
+/// Returns true if the loop contains any rules in empty context.
+bool RewriteLoop::isUseful(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return Useful;
 }
 
 void RewriteLoop::dump(llvm::raw_ostream &out,

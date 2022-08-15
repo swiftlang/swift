@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
@@ -12,15 +13,16 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 distributed actor Greeter {
   distributed func generic<V: Codable>(_ value: V) -> String {
+    _ = V.self
     return "\(value)"
   }
 
@@ -31,18 +33,24 @@ distributed actor Greeter {
 
 }
 
+distributed actor GenericGreeter<Greeting: Sendable & Codable> {
+  distributed func echo(greeting: Greeting) -> Greeting {
+    greeting
+  }
+}
+
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = Greeter(system: system)
+  let local = Greeter(actorSystem: system)
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   let r1 = try await ref.generic("Caplin")
   // CHECK: > encode generic sub: Swift.String
-  // CHECK: > encode argument: Caplin
+  // CHECK: > encode argument name:_, value: Caplin
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording
-  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC7genericySSxSeRzSERzlFTE"), invocation:FakeInvocationEncoder(genericSubs: [Swift.String], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.generic(_:), invocation:FakeInvocationEncoder(genericSubs: [Swift.String], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
   print("reply: \(r1)")
   // CHECK: reply: Caplin
 
@@ -53,14 +61,26 @@ func test() async throws {
   )
   // CHECK: > encode generic sub: Swift.String
   // CHECK: > encode generic sub: Swift.Int
-  // CHECK: > encode argument: 2.0
-  // CHECK: > encode argument: Caplin
-  // CHECK: > encode argument: [1, 2, 3]
+  // CHECK: > encode argument name:strict, value: 2.0
+  // CHECK: > encode argument name:_, value: Caplin
+  // CHECK: > encode argument name:_, value: [1, 2, 3]
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording
-  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC8generic26strict__SSSd_xSayq_GtSeRzSERzSeR_SER_r0_lFTE"), invocation:FakeInvocationEncoder(genericSubs: [Swift.String, Swift.Int], arguments: [2.0, "Caplin", [1, 2, 3]], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.generic2(strict:_:_:), invocation:FakeInvocationEncoder(genericSubs: [Swift.String, Swift.Int], arguments: [2.0, "Caplin", [1, 2, 3]], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
   print("reply: \(r2)")
   // CHECK: reply: Caplin
+
+  let gen = GenericGreeter<String>(actorSystem: system)
+  let r3 = try await gen.echo(greeting: "Hello generics!")
+  print("reply: \(r3)")
+  // CHECK: reply: Hello generics!
+
+  let genRef = try GenericGreeter<String>.resolve(id: gen.id, using: system)
+  let r32 = try await genRef.echo(greeting: "Hello generics!")
+  // CHECK: > encode generic sub: Swift.String
+  // CHECK: > encode return type: Swift.String
+  print("reply: \(r32)")
+  // CHECK: reply: Hello generics!
 }
 
 @main struct Main {

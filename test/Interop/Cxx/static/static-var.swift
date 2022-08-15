@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clangxx -c %S/Inputs/static-var.cpp -I %S/Inputs -o %t/static-var.o
-// RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/static-var.o -Xfrontend -enable-cxx-interop
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/static-var.o -Xfrontend -enable-experimental-cxx-interop
 // RUN: %target-codesign %t/statics
 // RUN: %target-run %t/statics
 //
@@ -47,10 +47,6 @@ StaticVarTestSuite.test("static-const-int-init") {
   expectEqual(128, staticConstInit)
 }
 
-StaticVarTestSuite.test("static-constexpr-int") {
-  expectEqual(32, staticConstexpr)
-}
-
 StaticVarTestSuite.test("static-non-trivial") {
   expectEqual(1024, staticNonTrivial.val)
 }
@@ -73,10 +69,6 @@ StaticVarTestSuite.test("static-non-trivial-write-from-swift") {
 
 StaticVarTestSuite.test("static-const-non-trivial") {
   expectEqual(2048, staticConstNonTrivial.val)
-}
-
-StaticVarTestSuite.test("static-constexpr-non-trivial") {
-  expectEqual(8192, staticConstexprNonTrivial.val)
 }
 
 runAllTests()

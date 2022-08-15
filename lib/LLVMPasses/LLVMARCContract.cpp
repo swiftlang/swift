@@ -64,7 +64,7 @@ class SwiftARCContractImpl {
   bool Changed;
 
   /// Swift RC Identity.
-  SwiftRCIdentity *RC;
+  SwiftRCIdentity RC;
 
   /// The function that we are processing.
   Function &F;
@@ -72,8 +72,7 @@ class SwiftARCContractImpl {
   /// The entry point builder that is used to construct ARC entry points.
   ARCEntryPointBuilder B;
 public:
-  SwiftARCContractImpl(Function &InF, SwiftRCIdentity *InRC)
-    : Changed(false), RC(InRC), F(InF), B(F) {}
+  SwiftARCContractImpl(Function &InF) : Changed(false), F(InF), B(F) {}
 
   // The top level run routine of the pass.
   bool run();
@@ -109,7 +108,7 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
           break;
         }
       }
-      B.createRetainN(RC->getSwiftRCIdentityRoot(O), RetainList.size(), RI);
+      B.createRetainN(RC.getSwiftRCIdentityRoot(O), RetainList.size(), RI);
 
       // Replace all uses of the retain instructions with our new retainN and
       // then delete them.
@@ -135,7 +134,7 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
           break;
         }
       }
-      B.createReleaseN(RC->getSwiftRCIdentityRoot(O), ReleaseList.size(), RI);
+      B.createReleaseN(RC.getSwiftRCIdentityRoot(O), ReleaseList.size(), RI);
 
       // Remove all old release instructions.
       for (auto *Inst : ReleaseList) {
@@ -159,7 +158,7 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
           break;
         }
       }
-      B.createUnknownObjectRetainN(RC->getSwiftRCIdentityRoot(O),
+      B.createUnknownObjectRetainN(RC.getSwiftRCIdentityRoot(O),
                                    UnknownObjectRetainList.size(), RI);
 
       // Replace all uses of the retain instructions with our new retainN and
@@ -187,7 +186,7 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
           break;
         }
       }
-      B.createUnknownObjectReleaseN(RC->getSwiftRCIdentityRoot(O),
+      B.createUnknownObjectReleaseN(RC.getSwiftRCIdentityRoot(O),
                                     UnknownObjectReleaseList.size(), RI);
 
       // Remove all old release instructions.
@@ -214,7 +213,7 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
         }
       }
       // Bridge retain may modify the input reference before forwarding it.
-      auto *I = B.createBridgeRetainN(RC->getSwiftRCIdentityRoot(O),
+      auto *I = B.createBridgeRetainN(RC.getSwiftRCIdentityRoot(O),
                                       BridgeRetainList.size(), RI);
 
       // Remove all old retain instructions.
@@ -246,8 +245,8 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
           break;
         }
       }
-      B.createBridgeReleaseN(RC->getSwiftRCIdentityRoot(O),
-                              BridgeReleaseList.size(), RI);
+      B.createBridgeReleaseN(RC.getSwiftRCIdentityRoot(O),
+                             BridgeReleaseList.size(), RI);
 
       // Remove all old release instructions.
       for (auto *Inst : BridgeReleaseList) {
@@ -290,7 +289,7 @@ bool SwiftARCContractImpl::run() {
         continue;
       case RT_Retain: {
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
+        auto *ArgVal = RC.getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.RetainList.push_back(CI);
@@ -298,7 +297,7 @@ bool SwiftARCContractImpl::run() {
       }
       case RT_UnknownObjectRetain: {
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
+        auto *ArgVal = RC.getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.UnknownObjectRetainList.push_back(CI);
@@ -307,7 +306,7 @@ bool SwiftARCContractImpl::run() {
       case RT_Release: {
         // Stash any releases that we see.
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
+        auto *ArgVal = RC.getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.ReleaseList.push_back(CI);
@@ -316,7 +315,7 @@ bool SwiftARCContractImpl::run() {
       case RT_UnknownObjectRelease: {
         // Stash any releases that we see.
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
+        auto *ArgVal = RC.getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.UnknownObjectReleaseList.push_back(CI);
@@ -324,7 +323,7 @@ bool SwiftARCContractImpl::run() {
       }
       case RT_BridgeRetain: {
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
+        auto *ArgVal = RC.getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.BridgeRetainList.push_back(CI);
@@ -332,7 +331,7 @@ bool SwiftARCContractImpl::run() {
       }
       case RT_BridgeRelease: {
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
+        auto *ArgVal = RC.getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.BridgeReleaseList.push_back(CI);
@@ -382,15 +381,12 @@ bool SwiftARCContractImpl::run() {
 }
 
 bool SwiftARCContract::runOnFunction(Function &F) {
-  RC = &getAnalysis<SwiftRCIdentity>();
-  return SwiftARCContractImpl(F, RC).run();
+  return SwiftARCContractImpl(F).run();
 }
 
 char SwiftARCContract::ID = 0;
-INITIALIZE_PASS_BEGIN(SwiftARCContract,
-                      "swift-arc-contract", "Swift ARC contraction",
-                      false, false)
-INITIALIZE_PASS_DEPENDENCY(SwiftRCIdentity)
+INITIALIZE_PASS_BEGIN(SwiftARCContract, "swift-arc-contract",
+                      "Swift ARC contraction", false, false)
 INITIALIZE_PASS_END(SwiftARCContract,
                     "swift-arc-contract", "Swift ARC contraction",
                     false, false)
@@ -401,6 +397,17 @@ llvm::FunctionPass *swift::createSwiftARCContractPass() {
 }
 
 void SwiftARCContract::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
-  AU.addRequired<SwiftRCIdentity>();
   AU.setPreservesCFG();
+}
+
+llvm::PreservedAnalyses
+SwiftARCContractPass::run(llvm::Function &F,
+                          llvm::FunctionAnalysisManager &AM) {
+  bool changed = SwiftARCContractImpl(F).run();
+  if (!changed)
+    return PreservedAnalyses::all();
+
+  PreservedAnalyses PA;
+  PA.preserveSet<CFGAnalyses>();
+  return PA;
 }

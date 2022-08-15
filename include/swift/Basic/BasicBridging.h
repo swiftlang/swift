@@ -14,21 +14,13 @@
 #define SWIFT_BASIC_BASICBRIDGING_H
 
 #include "swift/Basic/BridgedSwiftObject.h"
+#include "swift/Basic/SourceLoc.h"
 #include <stddef.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 typedef intptr_t SwiftInt;
 typedef uintptr_t SwiftUInt;
-
-typedef struct {
-  const unsigned char * _Nullable data;
-  size_t length;
-} BridgedStringRef;
 
 typedef struct {
   const void * _Nullable data;
@@ -39,14 +31,8 @@ typedef struct {
   void * _Nonnull streamAddr;
 } BridgedOStream;
 
-void OStream_write(BridgedOStream os, BridgedStringRef str);
-
-void freeBridgedStringRef(BridgedStringRef str);
+void OStream_write(BridgedOStream os, llvm::StringRef str);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif

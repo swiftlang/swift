@@ -225,7 +225,7 @@ static bool convertExtractsToDestructures(CanonicalDefWorklist &copiedDefs,
   SmallVector<StructExtractInst *, 4> extracts;
   auto pushExtract = [&extracts](CopyValueInst *copy) {
     if (auto *extract = dyn_cast<StructExtractInst>(copy->getOperand())) {
-      if (SILValue(extract).getOwnershipKind() == OwnershipKind::Guaranteed) {
+      if (SILValue(extract)->getOwnershipKind() == OwnershipKind::Guaranteed) {
         extracts.push_back(extract);
       }
     }
@@ -375,7 +375,7 @@ namespace {
 class CopyPropagation : public SILFunctionTransform {
   /// True if debug_value instructions should be pruned.
   bool pruneDebug;
-  /// True of all values should be canonicalized.
+  /// True if all values should be canonicalized.
   bool canonicalizeAll;
   /// If true, then borrow scopes will be canonicalized, allowing copies of
   /// guaranteed values to be optimized. Does *not* shrink the borrow scope.
@@ -464,7 +464,7 @@ void CopyPropagation::run() {
       // If borrowed value is not owned, neither CanonicalizeOSSALifetime nor
       // LexicalDestroyFolding will do anything with it.  Just bail out now.
       auto borrowee = bbi->getOperand();
-      if (borrowee.getOwnershipKind() != OwnershipKind::Owned)
+      if (borrowee->getOwnershipKind() != OwnershipKind::Owned)
         break;
 
       auto canonicalized = canonicalizer.canonicalizeValueLifetime(borrowee);
@@ -559,6 +559,9 @@ void CopyPropagation::run() {
   while (!defWorklist.ownedValues.empty()) {
     SILValue def = defWorklist.ownedValues.pop_back_val();
     canonicalizer.canonicalizeValueLifetime(def);
+    // Copies of borrowed values may be dead.
+    if (auto *inst = def->getDefiningInstruction())
+      deleter.trackIfDead(inst);
   }
   // Recursively cleanup dead defs after removing uses.
   deleter.cleanupDeadInstructions();
@@ -585,7 +588,7 @@ SILTransform *swift::createMandatoryCopyPropagation() {
 }
 
 SILTransform *swift::createCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ false,
+  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ EnableRewriteBorrows,
                              /*poisonRefs*/ false);
 }

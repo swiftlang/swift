@@ -37,7 +37,7 @@ entry(%0 : $*T, %1 : $Int):
 
 protocol P {}
 
-// CHECK-LABEL: sil @$s22generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
+// CHECK-LABEL: sil {{.*}}@$s22generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
 // CHECK:       bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $Builtin.Int32):
 // CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    return [[ARG1]] : $Builtin.Int32
@@ -51,7 +51,7 @@ entry(%0 : $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   return %v : $Int
 }
 
-// CHECK-LABEL: sil @call_generic_promotable_box_from_different_generic
+// CHECK-LABEL: sil {{.*}}@call_generic_promotable_box_from_different_generic
 // CHECK:       bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*U, [[ARG2:%.*]] : $Builtin.Int32):
 // CHECK-NEXT:    destroy_addr [[ARG1]] : $*U
 // CHECK-NEXT:    destroy_addr [[ARG0]] : $*T
@@ -82,7 +82,7 @@ struct R<T> {
 // Check that the capture promotion took place and the function now
 // take argument of a type E<(R<T>) -> Builtin.Int32>, which used
 // to be a slot inside a box.
-// CHECK-LABEL: sil @$s23generic_promotable_box2Tf2nni_n : $@convention(thin) <T> (@in R<T>, @in Builtin.Int32, @owned E<(R<T>) -> Builtin.Int32>) -> () 
+// CHECK-LABEL: sil {{.*}}@$s23generic_promotable_box2Tf2nni_n : $@convention(thin) <T> (@in R<T>, @in Builtin.Int32, @owned E<(R<T>) -> Builtin.Int32>) -> () 
 // CHECK:       bb0([[ARG0:%.*]] : $*R<T>, [[ARG1:%.*]] : $*Builtin.Int32, [[ARG2:%.*]] : $E<(R<T>) -> Builtin.Int32>):
 // CHECK-NOT:     project_box
 // CHECK:         switch_enum [[ARG2]] : $E<(R<T>) -> Builtin.Int32>
@@ -112,7 +112,7 @@ exit:
 
 // Check that alloc_box was eliminated and a specialized version of the
 // closure is invoked.
-// CHECK-LABEL: sil @call_generic_promotable_box_from_different_generic2
+// CHECK-LABEL: sil {{.*}}@call_generic_promotable_box_from_different_generic2
 // CHECK:       bb0([[ARG0:%.*]] : $*R<T>, [[ARG1:%.*]] : $*E<(R<U>) -> Builtin.Int32>, [[ARG2:%.*]] : $*Builtin.Int32):
 // CHECK:         %3 = load [[ARG1]] : $*E<(R<U>) -> Builtin.Int32>
 // CHECK:         [[F:%.*]] = function_ref @$s23generic_promotable_box2Tf2nni_n : $@convention(thin) <τ_0_0> (@in R<τ_0_0>, @in Builtin.Int32, @owned E<(R<τ_0_0>) -> Builtin.Int32>) -> ()

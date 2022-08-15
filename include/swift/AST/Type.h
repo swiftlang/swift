@@ -282,13 +282,11 @@ public:
   /// Transform the given type by recursively applying the user-provided
   /// function to each node.
   ///
-  /// If the function returns \c None, the transform operation will
-  ///
   /// \param fn A function object which accepts a type pointer and returns a
   /// transformed type, a null type (which will propagate out the null type),
   /// or None (to indicate that the transform operation should recursively
   /// transform the children). The function object should use \c dyn_cast rather
-  /// than \c getAs when the transform is intended to preserve sugar
+  /// than \c getAs when the transform is intended to preserve sugar.
   ///
   /// \returns the result of transforming the type.
   Type transformRec(llvm::function_ref<Optional<Type>(TypeBase *)> fn) const;
@@ -419,6 +417,7 @@ class CanType : public Type {
   static bool isObjCExistentialTypeImpl(CanType type);
   static bool isTypeErasedGenericClassTypeImpl(CanType type);
   static CanType getOptionalObjectTypeImpl(CanType type);
+  static CanType wrapInOptionalTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -523,6 +522,13 @@ public:
 
   bool isForeignReferenceType(); // in Types.h
 
+  /// Return this type wrapped into an Optional type. E.x.: 'T' ->
+  /// 'Optional<T>'.
+  CanType wrapInOptionalType() const {
+    return wrapInOptionalTypeImpl(*this);
+  }
+
+  /// If this is a type Optional<T>, return T. Otherwise return CanType().
   CanType getOptionalObjectType() const {
     return getOptionalObjectTypeImpl(*this);
   }

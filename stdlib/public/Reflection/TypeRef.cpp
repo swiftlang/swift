@@ -237,6 +237,15 @@ public:
     stream << ")";
   }
 
+  void
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    printHeader("constrained_existential_type");
+    printRec(CET->getBase());
+    for (auto req : CET->getRequirements())
+      visitTypeRefRequirement(req);
+    stream << ")";
+  }
+
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     printHeader("metatype");
     if (M->wasAbstract())
@@ -302,6 +311,27 @@ public:
     stream << ")";
   }
 
+  void visitTypeRefRequirement(const TypeRefRequirement &req) {
+    printHeader("requirement ");
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+      printRec(req.getFirstType());
+      stream << " : ";
+      printRec(req.getSecondType());
+      break;
+    case RequirementKind::SameType:
+      printRec(req.getFirstType());
+      stream << " == ";
+      printRec(req.getSecondType());
+      break;
+    case RequirementKind::Layout:
+      stream << "layout requirement";
+      break;
+    }
+    stream << ")";
+  }
+
   void visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     printHeader("sil_box_with_layout\n");
     Indent += 2;
@@ -324,24 +354,7 @@ public:
     }
     Indent -= 2;
     for (auto &req : SB->getRequirements()) {
-      printHeader("requirement ");
-      switch (req.getKind()) {
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass:
-        printRec(req.getFirstType());
-        stream << " : ";
-        printRec(req.getSecondType());
-        break;
-      case RequirementKind::SameType:
-        printRec(req.getFirstType());
-        stream << " == ";
-        printRec(req.getSecondType());
-        break;
-      case RequirementKind::Layout:
-        stream << "layout requirement";
-        break;
-      }
-      stream << ")";
+      visitTypeRefRequirement(req);
     }
     stream << ")";
     stream << ")";
@@ -419,6 +432,11 @@ struct TypeRefIsConcrete
       if (!visit(Superclass))
         return false;
     return true;
+  }
+
+  bool
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return visit(CET->getBase());
   }
 
   bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -565,8 +583,35 @@ public:
     genericNode->addChild(unspecializedType, Dem);
     genericNode->addChild(genericArgsList, Dem);
 
-    if (auto parent = BG->getParent())
-      assert(false && "not implemented");
+    auto parent = BG->getParent();
+    if (!parent)
+      return genericNode;
+
+    auto parentNode = visit(parent);
+    if (!parentNode || !parentNode->hasChildren() ||
+        parentNode->getKind() != Node::Kind::Type ||
+        !unspecializedType->hasChildren())
+      return genericNode;
+
+    // Peel off the "Type" node.
+    parentNode = parentNode->getFirstChild();
+
+    auto nominalNode = unspecializedType->getFirstChild();
+
+    if (nominalNode->getNumChildren() != 2)
+      return genericNode;
+
+    // Save identifier for reinsertion later, we have to remove it
+    // so we can insert the parent node as the first child.
+    auto identifierNode = nominalNode->getLastChild();
+
+    // Remove all children.
+    nominalNode->removeChildAt(1);
+    nominalNode->removeChildAt(0);
+
+    // Add the parent we just visited back in, followed by the identifier.
+    nominalNode->addChild(parentNode, Dem);
+    nominalNode->addChild(identifierNode, Dem);
 
     return genericNode;
   }
@@ -762,6 +807,18 @@ public:
     return node;
   }
 
+  Demangle::NodePointer
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    auto node = Dem.createNode(Node::Kind::ConstrainedExistential);
+    node->addChild(visit(CET->getBase()), Dem);
+    auto constraintList =
+        Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
+    for (auto req : CET->getRequirements())
+      constraintList->addChild(visitTypeRefRequirement(req), Dem);
+    node->addChild(constraintList, Dem);
+    return node;
+  }
+
   Demangle::NodePointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     auto node = Dem.createNode(Node::Kind::Metatype);
     // FIXME: This is lossy. @objc_metatype is also abstract.
@@ -833,6 +890,37 @@ public:
     return node;
   }
 
+  Demangle::NodePointer visitTypeRefRequirement(const TypeRefRequirement &req) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType: {
+      Node::Kind kind;
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+        kind = Node::Kind::DependentGenericConformanceRequirement;
+        break;
+      case RequirementKind::Superclass:
+        // A DependentGenericSuperclasseRequirement kind seems to be missing.
+        kind = Node::Kind::DependentGenericConformanceRequirement;
+        break;
+      case RequirementKind::SameType:
+        kind = Node::Kind::DependentGenericSameTypeRequirement;
+        break;
+      default:
+        llvm_unreachable("Unhandled requirement kind");
+      }
+      auto r = Dem.createNode(kind);
+      r->addChild(visit(req.getFirstType()), Dem);
+      r->addChild(visit(req.getSecondType()), Dem);
+      return r;
+    }
+    case RequirementKind::Layout:
+      // Not implemented.
+      return nullptr;
+    }
+  }
+
   Demangle::NodePointer
   visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     auto node = Dem.createNode(Node::Kind::SILBoxTypeWithLayout);
@@ -863,35 +951,10 @@ public:
         ++index;
       }
     for (auto &req : SB->getRequirements()) {
-      switch (req.getKind()) {
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass:
-      case RequirementKind::SameType: {
-        Node::Kind kind;
-        switch (req.getKind()) {
-        case RequirementKind::Conformance:
-          kind = Node::Kind::DependentGenericConformanceRequirement;
-          break;
-        case RequirementKind::Superclass:
-          // A DependentGenericSuperclasseRequirement kind seems to be missing.
-          kind = Node::Kind::DependentGenericConformanceRequirement;
-          break;
-        case RequirementKind::SameType:
-          kind = Node::Kind::DependentGenericSameTypeRequirement;
-          break;
-        default:
-          llvm_unreachable("unreachable");
-        }
-        auto r = Dem.createNode(kind);
-        r->addChild(visit(req.getFirstType()), Dem);
-        r->addChild(visit(req.getSecondType()), Dem);
-        signature->addChild(r, Dem);
-        break;
-      }
-      case RequirementKind::Layout:
-        // Not implemented.
-        break;
-      }
+      auto *r = visitTypeRefRequirement(req);
+      if (!r)
+        continue;
+      signature->addChild(r, Dem);
     }
     node->addChild(signature, Dem);
     auto list = Dem.createNode(Node::Kind::TypeList);
@@ -1036,8 +1099,12 @@ public:
     std::vector<const TypeRef *> GenericParams;
     for (auto Param : BG->getGenericParams())
       GenericParams.push_back(visit(Param));
+    auto parent = BG->getParent();
+    if (parent) {
+      parent = ThickenMetatype(Builder).visit(parent);
+    }
     return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
-                                       GenericParams);
+                                       GenericParams, parent);
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
@@ -1070,6 +1137,12 @@ public:
   const TypeRef *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     return PC;
+  }
+
+  const TypeRef *
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
+                                                 CET->getRequirements());
   }
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -1217,6 +1290,42 @@ public:
     // Existential metatypes do not contain type parameters.
     assert(EM->getInstanceType()->isConcrete());
     return EM;
+  }
+
+  llvm::Optional<TypeRefRequirement>
+  visitTypeRefRequirement(const TypeRefRequirement &req) {
+    auto newFirst = visit(req.getFirstType());
+    if (!newFirst)
+      return None;
+
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType: {
+      auto newSecond = visit(req.getFirstType());
+      if (!newSecond)
+        return None;
+      return TypeRefRequirement(req.getKind(), newFirst, newSecond);
+    }
+    case RequirementKind::Layout:
+      return TypeRefRequirement(req.getKind(), newFirst,
+                                req.getLayoutConstraint());
+    }
+
+    llvm_unreachable("Unhandled RequirementKind in switch.");
+  }
+
+  const TypeRef *
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    std::vector<TypeRefRequirement> constraints;
+    for (auto Req : CET->getRequirements()) {
+      auto substReq = visitTypeRefRequirement(Req);
+      if (!substReq)
+        continue;
+      constraints.emplace_back(*substReq);
+    }
+    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
+                                                 constraints);
   }
 
   const TypeRef *

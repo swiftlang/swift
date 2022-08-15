@@ -231,7 +231,7 @@ readYAML(llvm::yaml::IO &io, T &Seq, T &unknownIDs, bool, Context &Ctx) {
       io.beginMapping();
 
       // If the current diagnostic ID is available in YAML and in `.def`, add it
-      // to the diagnostics array. Otherwise, re-parse the current diagnnostic
+      // to the diagnostics array. Otherwise, re-parse the current diagnostic
       // id as a string and store it in `unknownIDs` array.
       if (auto id = LocalizationInput::readID(io)) {
         // YAML file isn't guaranteed to have diagnostics in order of their

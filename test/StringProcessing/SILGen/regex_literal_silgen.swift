@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-string-processing %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-bare-slash-regex -disable-availability-checking %s | %FileCheck %s
 // REQUIRES: swift_in_compiler
 
-var s = '/abc/'
-// CHECK: [[REGEX_STR_LITERAL:%[0-9]+]] = string_literal utf8 "'/abc/'"
+var s = #/abc/#
+// CHECK: [[REGEX_STR_LITERAL:%[0-9]+]] = string_literal utf8 "#/abc/#"
 // CHECK: [[STRING_INIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 // CHECK: [[REGEX_STR:%[0-9]+]] = apply [[STRING_INIT]]([[REGEX_STR_LITERAL]]
 

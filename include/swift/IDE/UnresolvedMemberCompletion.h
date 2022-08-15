@@ -15,7 +15,7 @@
 
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
 namespace ide {
@@ -25,45 +25,32 @@ namespace ide {
 /// formed during expression type-checking.
 class UnresolvedMemberTypeCheckCompletionCallback
     : public TypeCheckCompletionCallback {
-public:
-  struct ExprResult {
+  struct Result {
     Type ExpectedTy;
     bool IsImplicitSingleExpressionReturn;
+
+    /// Whether the surrounding context is async and thus calling async
+    /// functions is supported.
+    bool IsInAsyncContext;
   };
 
-private:
   CodeCompletionExpr *CompletionExpr;
-  SmallVector<ExprResult, 4> ExprResults;
-  SmallVector<Type, 1> EnumPatternTypes;
-  bool GotCallback = false;
+  DeclContext *DC;
+
+  SmallVector<Result, 4> ExprResults;
+  SmallVector<Result, 1> EnumPatternTypes;
+
+  void sawSolutionImpl(const constraints::Solution &solution) override;
 
 public:
   UnresolvedMemberTypeCheckCompletionCallback(
-      CodeCompletionExpr *CompletionExpr)
-      : CompletionExpr(CompletionExpr) {}
+      CodeCompletionExpr *CompletionExpr, DeclContext *DC)
+      : CompletionExpr(CompletionExpr), DC(DC) {}
 
-  ArrayRef<ExprResult> getExprResults() const { return ExprResults; }
-
-  /// If we are completing in a pattern matching position, the types of all
-  /// enums for whose cases are valid as an \c EnumElementPattern.
-  ArrayRef<Type> getEnumPatternTypes() const { return EnumPatternTypes; }
-
-  /// True if at least one solution was passed via the \c sawSolution
-  /// callback.
-  bool gotCallback() const { return GotCallback; }
-
-  /// Typecheck the code completion expression in its outermost expression
-  /// context, calling \c sawSolution for each solution formed.
-  void fallbackTypeCheck(DeclContext *DC);
-
-  void sawSolution(const constraints::Solution &solution) override;
+  void deliverResults(DeclContext *DC, SourceLoc DotLoc,
+                      ide::CodeCompletionContext &CompletionCtx,
+                      CodeCompletionConsumer &Consumer);
 };
-
-void deliverUnresolvedMemberResults(
-    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::ExprResult> Results,
-    ArrayRef<Type> EnumPatternTypes, DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer);
 
 } // end namespace ide
 } // end namespace swift

@@ -11,30 +11,59 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import BasicBridging
+import std
+
+//===----------------------------------------------------------------------===//
+//                              StringRef
+//===----------------------------------------------------------------------===//
+
+public struct StringRef : CustomStringConvertible, CustomReflectable {
+  let _bridged: llvm.StringRef
+
+  public init(bridged: llvm.StringRef) { self._bridged = bridged }
+
+  public var string: String { _bridged.string }
+  public var description: String { string }
+  public var customMirror: Mirror { Mirror(self, children: []) }
+  
+  public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(
+      start: lhs._bridged.__bytes_beginUnsafe(),
+      count: Int(lhs._bridged.__bytes_endUnsafe() - lhs._bridged.__bytes_beginUnsafe()))
+    return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
+      if lhsBuffer.count != rhsBuffer.count { return false }
+      return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
+    }
+  }
+  
+  public static func !=(lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
+}
 
 //===----------------------------------------------------------------------===//
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 
-extension BridgedStringRef {
+extension llvm.StringRef {
   public var string: String {
-    let buffer = UnsafeBufferPointer<UInt8>(start: data, count: Int(length))
-    return String(decoding: buffer, as: UTF8.self)
-  }
-
-  public func takeString() -> String {
-    let str = string
-    freeBridgedStringRef(self)
-    return str
+    String(_cxxString: self.str())
   }
 }
 
 extension String {
-  public func withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
+  /// Underscored to avoid name collision with Swift LLVM Bindings.
+  /// To be replaced with a bindings call once bindings are a dependency.
+  public func _withStringRef<T>(_ c: (llvm.StringRef) -> T) -> T {
     var str = self
     return str.withUTF8 { buffer in
-      return c(BridgedStringRef(data: buffer.baseAddress, length: buffer.count))
+      return c(llvm.StringRef(buffer.baseAddress, buffer.count))
     }
+  }
+
+  /// Underscored to avoid name collision with the std overlay.
+  /// To be replaced with an overlay call once the CI uses SDKs built with Swift 5.8.
+  public init(_cxxString s: std.string) {
+    self.init(cString: s.__c_strUnsafe())
+    withExtendedLifetime(s) {}
   }
 }
 

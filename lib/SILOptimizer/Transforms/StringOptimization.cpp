@@ -693,7 +693,7 @@ ApplyInst *StringOptimization::createStringInit(StringRef str,
       return nullptr;
     
     auto Mangled = SILDeclRef(makeUTF8Decl, SILDeclRef::Kind::Allocator).mangle();
-    makeUTF8Func = module.findFunction(Mangled, SILLinkage::PublicExternal);
+    makeUTF8Func = module.loadFunction(Mangled, SILModule::LinkingMode::LinkAll);
     if (!makeUTF8Func)
       return nullptr;
   }

@@ -4,6 +4,7 @@
 #pragma clang assume_nonnull begin
 
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
+#define UI_ACTOR __attribute__((swift_attr("@UIActor")))
 
 #ifdef __SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS
   #define SENDABLE __attribute__((__swift_attr__("@Sendable")))
@@ -247,12 +248,83 @@ typedef NS_ERROR_ENUM(unsigned, NonSendableErrorCode, NonSendableErrorDomain) {
 } NONSENDABLE;
 // expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-sendable because Swift errors are always sendable}}
 
+UI_ACTOR
+@interface PictureFrame : NSObject
+- (instancetype)initWithSize:(NSInteger)frame NS_DESIGNATED_INITIALIZER;
+- (void)rotate;
+@end
+
+@interface NotIsolatedPictureFrame : NSObject
+- (instancetype)initWithSize:(NSInteger)frame NS_DESIGNATED_INITIALIZER;
+- (void)rotate;
+@end
+
 typedef NSString *SendableStringEnum NS_STRING_ENUM;
 typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
 
 typedef NSString *SendableStringStruct NS_EXTENSIBLE_STRING_ENUM;
 typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE;
 
+SENDABLE
+typedef struct {
+  void *ptr;
+} SendableStructWithNonSendable;
+
 ASSUME_NONSENDABLE_END
+
+typedef id ObjectTypedef;
+typedef void(^BlockTypedef)(id);
+
+@interface NXSender : NSObject
+
+- (id)sendAny:(SENDABLE id)obj SENDABLE;
+- (nullable id)sendOptionalAny:(nullable SENDABLE id)obj SENDABLE;
+- (SendableClass *)sendSendable:(SENDABLE SendableClass *)sendable SENDABLE;
+- (NonSendableClass *)sendSendableSubclasses:(SENDABLE NonSendableClass *)sendableSubclass SENDABLE;
+- (id <LabellyProtocol>)sendProto:(SENDABLE id <LabellyProtocol>)obj SENDABLE;
+- (id <LabellyProtocol, ObjCClub>)sendProtos:(SENDABLE id <LabellyProtocol, ObjCClub>)obj SENDABLE;
+- (NSArray<id> *)sendAnyArray:(SENDABLE NSArray<id> *)array SENDABLE;
+- (GenericObject<SendableClass *> *)sendGeneric:(SENDABLE GenericObject<SendableClass *> *)generic SENDABLE;
+- (void *)sendPtr:(SENDABLE void *)val SENDABLE;    // bad
+- (NSArray<NSString *> *)sendStringArray:(SENDABLE NSArray<NSString *> *)obj SENDABLE;    // bad
+- (ObjectTypedef)sendAnyTypedef:(SENDABLE ObjectTypedef)obj SENDABLE;
+- (NSArray<ObjectTypedef> *)sendAnyTypedefs:(SENDABLE NSArray<ObjectTypedef> *)objs SENDABLE;
+- (BlockTypedef)sendBlockTypedef:(SENDABLE BlockTypedef)block SENDABLE;
+- (NSArray<BlockTypedef> *)sendBlockTypedefs:(SENDABLE NSArray<BlockTypedef> *)blocks SENDABLE;
+- (NSArray *)sendUnbound:(SENDABLE NSArray *)array SENDABLE;
+
+@property (strong) SENDABLE id sendableProp;
+
+@end
+
+SENDABLE id NXSendFunc(SENDABLE id arg);
+SENDABLE id NXSendGlobal;
+
+struct StructWithSendableContents {
+  __unsafe_unretained SENDABLE id sendableField;
+  union {
+    __unsafe_unretained SENDABLE id sendableIndirectField;
+  };
+};
+
+SENDABLE id StructWithSendableContentsGetSendableComputed(struct StructWithSendableContents contents)
+  __attribute__((swift_name("getter:StructWithSendableContents.sendableComputed(self:)")));
+
+@interface CostcoManager : NSObject
++ (instancetype)sharedManager;
+- (void)isCustomerEnrolledInExecutiveProgram:(NSObject *)customer completion:(void(^)(BOOL enrolled))completion;
+@end
+
+@interface Person : NSObject
++ (void)getAsCustomer:(void(^_Nonnull)(NSObject *device))completion;
+@end
+
+
+// rdar://97646309
+UI_ACTOR
+@protocol CoffeeDelegate <NSObject>
+@optional
+- (void)icedMochaService:(NSObject *)mochaService generateMochaWithCompletion:(void (^)(NSObject *_Nullable ingredient1, NSObject *ingredient2, NSObject *ingredient3))completionHandler;
+@end
 
 #pragma clang assume_nonnull end

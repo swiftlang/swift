@@ -1,7 +1,8 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
 //
 // REQUIRES: executable_test
-// REQUIRES: foreign-reference-type-metadata-support
+// REQUIRES: rdar95738946
+// XFAIL: OS=windows-msvc
 
 import StdlibUnittest
 import WitnessTable

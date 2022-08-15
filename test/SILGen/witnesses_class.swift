@@ -39,7 +39,7 @@ func gen<T: Fooable>(_ foo: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s15witnesses_class2exyyAA7Fooable_pF
 // CHECK: bb0([[SELF:%[0-0]+]] : @guaranteed $Fooable):
 // CHECK:         [[SELF_PROJ:%.*]] = open_existential_ref [[SELF]]
-// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Fooable]],
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened\(.*, Fooable\) Self]],
 // CHECK-NOT:     copy_value [[SELF_PROJ]] : $
 // CHECK:         apply [[METHOD]]<[[OPENED]]>([[SELF_PROJ]])
 // CHECK-NOT:     destroy_value [[SELF]]
@@ -98,7 +98,7 @@ class UsesDefaults<X : Barable> : HasDefaults {}
 
 // Invariant Self, since type signature contains an associated type:
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15witnesses_class12UsesDefaultsCyxGAA03HasD0A2aEP23hasDefaultGenericTakesTyy1TQz_qd__tAA7FooableRd__lFTW : $@convention(witness_method: HasDefaults) <τ_0_0 where τ_0_0 : Barable><τ_1_0 where τ_1_0 : Fooable> (@in_guaranteed UsesDefaults<τ_0_0>, @guaranteed τ_1_0, @in_guaranteed UsesDefaults<τ_0_0>) -> ()
+// // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15witnesses_class12UsesDefaultsCyxGAA03HasD0A2aEP23hasDefaultGenericTakesTyy1TQz_qd__tAA7FooableRd__lFTW : $@convention(witness_method: HasDefaults) <τ_0_0 where τ_0_0 : Barable><τ_1_0 where τ_1_0 : Fooable> (@in_guaranteed UsesDefaults<τ_0_0>, @guaranteed τ_1_0, @in_guaranteed UsesDefaults<τ_0_0>) -> ()
 // CHECK: [[FN:%.*]] = function_ref @$s15witnesses_class11HasDefaultsPAAE23hasDefaultGenericTakesTyy1TQz_qd__tAA7FooableRd__lF : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaults><τ_1_0 where τ_1_0 : Fooable> (@in_guaranteed τ_0_0.T, @guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
 // CHECK: apply [[FN]]<UsesDefaults<τ_0_0>, τ_1_0>(
 // CHECK: return

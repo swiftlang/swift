@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -parse-as-library -emit-sil -verify %s
+// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
 
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
@@ -16,6 +16,7 @@ func takeSendable(_ s: SendableType) {}
 
 class NonSendableType {
   var x: Int = 0
+  func f() {}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -304,7 +305,7 @@ actor Convenient {
         self.x = val
     }
 
-    convenience init(bigVal: Int) {
+    init(bigVal: Int) {
         if bigVal < 0 {
             self.init(val: 0)
             say(msg: "hello from actor!")
@@ -315,21 +316,21 @@ actor Convenient {
         Task { await self.mutateIsolatedState() }
     }
 
-    convenience init!(biggerVal1 biggerVal: Int) {
+    init!(biggerVal1 biggerVal: Int) {
         guard biggerVal < 1234567 else { return nil }
         self.init(bigVal: biggerVal)
         say(msg: "hello?")
     }
 
     @MainActor
-    convenience init?(biggerVal2 biggerVal: Int) async {
+    init?(biggerVal2 biggerVal: Int) async {
         guard biggerVal < 1234567 else { return nil }
         self.init(bigVal: biggerVal)
         say(msg: "hello?")
         await mutateIsolatedState()
     }
 
-    convenience init() async {
+    init() async {
         self.init(val: 10)
         self.x += 1
         mutateIsolatedState()
@@ -350,7 +351,7 @@ actor Convenient {
         Task { self }
     }
 
-    convenience init(throwyConvenient val: Int) throws {
+    init(throwyConvenient val: Int) throws {
         try self.init(throwyDesignated: val)
         say(msg: "hello?")
         Task { self }
@@ -386,13 +387,13 @@ actor MyActor {
 
     func helloWorld() {}
 
-    convenience init(ci1 c: Bool) {
+    init(ci1 c: Bool) {
         self.init(i1: c)
         Task { self }
         callMethod(self)
     }
 
-    convenience init(ci2 c: Bool) async {
+    init(ci2 c: Bool) async {
       self.init(i1: c)
       self.x = 1
       callMethod(self)
@@ -514,7 +515,7 @@ struct CardboardBox<T> {
 
 
 @available(SwiftStdlib 5.1, *)
-var globalVar: EscapeArtist?
+var globalVar: EscapeArtist? // expected-note 2 {{var declared here}}
 
 @available(SwiftStdlib 5.1, *)
 actor EscapeArtist {
@@ -523,7 +524,11 @@ actor EscapeArtist {
     init(attempt1: Bool) {
         self.x = 0
 
-        globalVar = self    // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
+        // expected-note@+2 {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
+        // expected-warning@+1 {{reference to var 'globalVar' is not concurrency-safe because it involves shared mutable state}}
+        globalVar = self
+
+        // expected-warning@+1 {{reference to var 'globalVar' is not concurrency-safe because it involves shared mutable state}}
         Task { await globalVar!.isolatedMethod() }
 
         if self.x == 0 {  // expected-warning {{cannot access property 'x' here in non-isolated initializer; this is an error in Swift 6}}
@@ -584,7 +589,7 @@ actor EscapeArtist {
 actor Ahmad {
   nonisolated func f() {}
   var prop: Int = 0
-  var computedProp: Int { 10 }
+  var computedProp: Int { 10 } // expected-note {{property declared here}}
 
   init(v1: Void) {
     Task.detached { self.f() } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
@@ -598,8 +603,20 @@ actor Ahmad {
     prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
   }
 
+  nonisolated init(v3: Void) async {
+    prop = 10
+    f()       // expected-note {{after calling instance method 'f()', only non-isolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
+  @MainActor init(v4: Void) async {
+    prop = 10
+    f()       // expected-note {{after calling instance method 'f()', only non-isolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
   deinit {
-    // expected-warning@+2 {{actor-isolated property 'computedProp' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
+    // expected-warning@+2 {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context; this is an error in Swift 6}}
     // expected-note@+1 {{after accessing property 'computedProp', only non-isolated properties of 'self' can be accessed from a deinit}}
     let x = computedProp
 
@@ -641,12 +658,12 @@ actor Rain {
 actor DeinitExceptionForSwift5 {
   var x: Int = 0
 
-  func cleanup() {
+  func cleanup() { // expected-note {{calls to instance method 'cleanup()' from outside of its actor context are implicitly asynchronous}}
     x = 0
   }
 
   deinit {
-    // expected-warning@+2 {{actor-isolated instance method 'cleanup()' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
+    // expected-warning@+2 {{actor-isolated instance method 'cleanup()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
     // expected-note@+1 {{after calling instance method 'cleanup()', only non-isolated properties of 'self' can be accessed from a deinit}}
     cleanup()
 
@@ -686,5 +703,26 @@ actor OhBrother {
     _ = blah(self) // expected-note {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
 
     whatever = 2 // expected-warning {{cannot access property 'whatever' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor class AwesomeUIView {}
+
+@available(SwiftStdlib 5.1, *)
+class CheckDeinitFromClass: AwesomeUIView {
+  var ns: NonSendableType?
+  deinit {
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor CheckDeinitFromActor {
+  var ns: NonSendableType?
+  deinit {
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
   }
 }

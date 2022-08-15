@@ -281,7 +281,7 @@ getTypeRefByFunction(IRGenModule &IGM,
       S.setPacked(true);
       S.add(llvm::ConstantInt::get(IGM.Int8Ty, 255));
       S.add(llvm::ConstantInt::get(IGM.Int8Ty, 9));
-      S.addRelativeAddress(accessor);
+      S.addCompactFunctionReference(accessor);
 
       // And a null terminator!
       S.addInt(IGM.Int8Ty, 0);
@@ -310,7 +310,12 @@ getTypeRefImpl(IRGenModule &IGM,
                CanType type,
                CanGenericSignature sig,
                MangledTypeRefRole role) {
+  bool useFlatUnique = false;
   switch (role) {
+  case MangledTypeRefRole::FlatUnique:
+    useFlatUnique = true;
+    break;
+
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
     // Note that we're using all of the nominal types referenced by this type,
@@ -335,7 +340,9 @@ getTypeRefImpl(IRGenModule &IGM,
   }
 
   IRGenMangler Mangler;
-  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, sig, type);
+  auto SymbolicName =
+    useFlatUnique ? Mangler.mangleTypeForFlatUniqueTypeRef(sig, type)
+                  : Mangler.mangleTypeForReflection(IGM, sig, type);
   return {IGM.getAddrOfStringForTypeRef(SymbolicName, role),
           SymbolicName.runtimeSizeInBytes()};
 }
@@ -350,7 +357,7 @@ IRGenModule::getTypeRef(CanType type, CanGenericSignature sig,
 std::pair<llvm::Constant *, unsigned>
 IRGenModule::getTypeRef(Type type, GenericSignature genericSig,
                         MangledTypeRefRole role) {
-  return getTypeRef(type->getCanonicalType(genericSig),
+  return getTypeRef(type->getReducedType(genericSig),
                     genericSig.getCanonicalSignature(), role);
 }
 
@@ -438,7 +445,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
         S.setPacked(true);
         S.add(llvm::ConstantInt::get(Int8Ty, 255));
         S.add(llvm::ConstantInt::get(Int8Ty, 9));
-        S.addRelativeAddress(accessorThunk);
+        S.addCompactFunctionReference(accessorThunk);
 
         // And a null terminator!
         S.addInt(Int8Ty, 0);
@@ -482,7 +489,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   S.setPacked(true);
   S.add(llvm::ConstantInt::get(Int8Ty, 255));
   S.add(llvm::ConstantInt::get(Int8Ty, kind));
-  S.addRelativeAddress(accessor);
+  S.addCompactFunctionReference(accessor);
 
   // And a null terminator!
   S.addInt(Int8Ty, 0);
@@ -547,7 +554,7 @@ protected:
   void addTypeRef(Type type, GenericSignature genericSig,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
-    addTypeRef(type->getCanonicalType(genericSig),
+    addTypeRef(type->getReducedType(genericSig),
                genericSig.getCanonicalSignature(), role);
   }
 
@@ -563,8 +570,6 @@ protected:
                   CanGenericSignature sig,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
-    assert(!type->isForeignReferenceType());
-
     B.addRelativeAddress(IGM.getTypeRef(type, sig, role).first);
     addBuiltinTypeRefs(type);
   }
@@ -717,21 +722,21 @@ private:
     if (!type) {
       B.addInt32(0);
     } else {
-      if (type->isForeignReferenceType()) {
-        type->getASTContext().Diags.diagnose(
-            type->lookThroughAllOptionalTypes()
-                ->getClassOrBoundGenericClass()
-                ->getLoc(),
-            diag::foreign_reference_types_unsupported.ID, {});
-        exit(1);
-      }
-
       auto genericSig = NTD->getGenericSignature();
 
-      // The standard library's Mirror demangles metadata from field
-      // descriptors, so use MangledTypeRefRole::Metadata to ensure
-      // runtime metadata is available.
-      addTypeRef(type, genericSig, MangledTypeRefRole::Metadata);
+      // Special case, UFOs are opaque pointers for now.
+      if (type->isForeignReferenceType()) {
+        auto opaqueType = type->getASTContext().getOpaquePointerType();
+        // The standard library's Mirror demangles metadata from field
+        // descriptors, so use MangledTypeRefRole::Metadata to ensure
+        // runtime metadata is available.
+        addTypeRef(opaqueType, genericSig, MangledTypeRefRole::Metadata);
+      } else {
+        // The standard library's Mirror demangles metadata from field
+        // descriptors, so use MangledTypeRefRole::Metadata to ensure
+        // runtime metadata is available.
+        addTypeRef(type, genericSig, MangledTypeRefRole::Metadata);
+      }
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {

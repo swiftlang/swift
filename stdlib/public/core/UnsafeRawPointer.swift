@@ -235,31 +235,31 @@ public struct UnsafeRawPointer: _Pointer {
     _rawValue = unwrapped._rawValue
   }
 
-  /// Creates a new raw pointer from the given typed pointer.		
-  ///		
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`		
-  /// instance. This initializer creates a new pointer to the same address as		
-  /// `other` and performs no allocation or copying.		
-  ///		
-  /// - Parameter other: The typed pointer to convert.		
-  @_transparent		
+  /// Creates a new raw pointer from the given typed pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert.
+  @_transparent
   public init<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
-   _rawValue = other._rawValue		
-  }		
+    _rawValue = other._rawValue
+  }
 
-  /// Creates a new raw pointer from the given typed pointer.		
-  ///		
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`		
-  /// instance. This initializer creates a new pointer to the same address as		
-  /// `other` and performs no allocation or copying.		
-  ///		
-  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the		
-  ///   result is `nil`.		
-  @_transparent		
+  /// Creates a new raw pointer from the given typed pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
+  @_transparent
   public init?<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
-   guard let unwrapped = other else { return nil }		
-   _rawValue = unwrapped._rawValue		
-  }		
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
+  }
 
   /// Deallocates the previously allocated memory block referenced by this pointer.
   ///
@@ -424,16 +424,57 @@ public struct UnsafeRawPointer: _Pointer {
     let rawPointer = (self + offset)._rawValue
 
 #if compiler(>=5.5) && $BuiltinAssumeAlignment
-    // TODO: to support misaligned raw loads, simply remove this assumption.
     let alignedPointer =
       Builtin.assumeAlignment(rawPointer,
                               MemoryLayout<T>.alignment._builtinWordValue)
     return Builtin.loadRaw(alignedPointer)
 #else
-  return Builtin.loadRaw(rawPointer)
+    return Builtin.loadRaw(rawPointer)
 #endif
   }
 
+  /// Returns a new instance of the given type, constructed from the raw memory
+  /// at the specified offset.
+  ///
+  /// This function only supports loading trivial types,
+  /// and will trap if this precondition is not met.
+  /// A trivial type does not contain any reference-counted property
+  /// within its in-memory representation.
+  /// The memory at this pointer plus `offset` must be laid out
+  /// identically to the in-memory representation of `T`.
+  ///
+  /// - Note: A trivial type can be copied with just a bit-for-bit copy without
+  ///   any indirection or reference-counting operations. Generally, native
+  ///   Swift types that do not contain strong or weak references or other
+  ///   forms of indirection are trivial, as are imported C structs and enums.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset from this pointer, in bytes. `offset` must be
+  ///     nonnegative. The default is zero.
+  ///   - type: The type of the instance to create.
+  /// - Returns: A new instance of type `T`, read from the raw bytes at
+  ///   `offset`. The returned instance isn't associated
+  ///   with the value in the range of memory referenced by this pointer.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _debugPrecondition(_isPOD(T.self))
+    return withUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+      let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        temporary._rawValue,
+        (self + offset)._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+      return temporary.pointee
+    }
+    //FIXME: reimplement with `loadRaw` when supported in SIL (rdar://96956089)
+    // e.g. Builtin.loadRaw((self + offset)._rawValue)
+  }
 }
 
 extension UnsafeRawPointer: Strideable {
@@ -441,6 +482,82 @@ extension UnsafeRawPointer: Strideable {
   @_transparent
   public func advanced(by n: Int) -> UnsafeRawPointer {
     return UnsafeRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
+  }
+}
+
+extension UnsafeRawPointer {
+  /// Obtain the next pointer properly aligned to store a value of type `T`.
+  ///
+  /// If `self` is properly aligned for accessing `T`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - type: the type to be stored at the returned address.
+  /// - Returns: a pointer properly aligned to store a value of type `T`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedUp<T>(for type: T.Type) -> Self {
+    let mask = UInt(Builtin.alignof(T.self)) &- 1
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the preceding pointer properly aligned to store a value of type `T`.
+  ///
+  /// If `self` is properly aligned for accessing `T`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - type: the type to be stored at the returned address.
+  /// - Returns: a pointer properly aligned to store a value of type `T`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedDown<T>(for type: T.Type) -> Self {
+    let mask = UInt(Builtin.alignof(T.self)) &- 1
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the next pointer whose bit pattern is a multiple of `alignment`.
+  ///
+  /// If the bit pattern of `self` is a multiple of `alignment`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - alignment: the alignment of the returned pointer, in bytes.
+  ///     `alignment` must be a whole power of 2.
+  /// - Returns: a pointer aligned to `alignment`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedUp(toMultipleOf alignment: Int) -> Self {
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the preceding pointer whose bit pattern is a multiple of `alignment`.
+  ///
+  /// If the bit pattern of `self` is a multiple of `alignment`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - alignment: the alignment of the returned pointer, in bytes.
+  ///     `alignment` must be a whole power of 2.
+  /// - Returns: a pointer aligned to `alignment`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedDown(toMultipleOf alignment: Int) -> Self {
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 }
 
@@ -1044,7 +1161,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
     let rawPointer = (self + offset)._rawValue
 
 #if compiler(>=5.5) && $BuiltinAssumeAlignment
-    // TODO: to support misaligned raw loads, simply remove this assumption.
     let alignedPointer =
       Builtin.assumeAlignment(rawPointer,
                               MemoryLayout<T>.alignment._builtinWordValue)
@@ -1054,11 +1170,53 @@ public struct UnsafeMutableRawPointer: _Pointer {
 #endif
   }
 
+  /// Returns a new instance of the given type, constructed from the raw memory
+  /// at the specified offset.
+  ///
+  /// This function only supports loading trivial types,
+  /// and will trap if this precondition is not met.
+  /// A trivial type does not contain any reference-counted property
+  /// within its in-memory representation.
+  /// The memory at this pointer plus `offset` must be laid out
+  /// identically to the in-memory representation of `T`.
+  ///
+  /// - Note: A trivial type can be copied with just a bit-for-bit copy without
+  ///   any indirection or reference-counting operations. Generally, native
+  ///   Swift types that do not contain strong or weak references or other
+  ///   forms of indirection are trivial, as are imported C structs and enums.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset from this pointer, in bytes. `offset` must be
+  ///     nonnegative. The default is zero.
+  ///   - type: The type of the instance to create.
+  /// - Returns: A new instance of type `T`, read from the raw bytes at
+  ///   `offset`. The returned instance isn't associated
+  ///   with the value in the range of memory referenced by this pointer.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _debugPrecondition(_isPOD(T.self))
+    return withUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+      let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        temporary._rawValue,
+        (self + offset)._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+      return temporary.pointee
+    }
+    //FIXME: reimplement with `loadRaw` when supported in SIL (rdar://96956089)
+    // e.g. Builtin.loadRaw((self + offset)._rawValue)
+  }
+
   /// Stores the given value's bytes into raw memory at the specified offset.
   ///
-  /// The type `T` to be stored must be a trivial type. The memory at this
-  /// pointer plus `offset` must be properly aligned for accessing `T`. The
-  /// memory must also be uninitialized, initialized to `T`, or initialized to
+  /// The type `T` to be stored must be a trivial type. The memory
+  /// must also be uninitialized, initialized to `T`, or initialized to
   /// another trivial type that is layout compatible with `T`.
   ///
   /// After calling `storeBytes(of:toByteOffset:as:)`, the memory is
@@ -1072,14 +1230,14 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   Swift types that do not contain strong or weak references or other
   ///   forms of indirection are trivial, as are imported C structs and enums.
   ///
-  /// If you need to store a copy of a nontrivial value into memory, or to
-  /// store a value into memory that contains a nontrivial value, you cannot
-  /// use the `storeBytes(of:toByteOffset:as:)` method. Instead, you must know
-  /// the type of value previously in memory and initialize or assign the
-  /// memory. For example, to replace a value stored in a raw pointer `p`,
+  /// If you need to store into memory a copy of a value of a type that isn't
+  /// trivial, you cannot use the `storeBytes(of:toByteOffset:as:)` method.
+  /// Instead, you must know either initialize the memory or,
+  /// if you know the memory was already bound to `type`, assign to the memory.
+  /// For example, to replace a value stored in a raw pointer `p`,
   /// where `U` is the current type and `T` is the new type, use a typed
   /// pointer to access and deinitialize the current value before initializing
-  /// the memory with a new value.
+  /// the memory with a new value:
   ///
   ///     let typedPointer = p.bindMemory(to: U.self, capacity: 1)
   ///     typedPointer.deinitialize(count: 1)
@@ -1091,7 +1249,41 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
   @inlinable
+  @_alwaysEmitIntoClient
+  // This custom silgen name is chosen to not interfere with the old ABI
+  @_silgen_name("_swift_se0349_UnsafeMutableRawPointer_storeBytes")
   public func storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+    _debugPrecondition(_isPOD(T.self))
+
+    withUnsafePointer(to: value) { source in
+      // FIXME: to be replaced by _memcpy when conversions are implemented.
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        (self + offset)._rawValue,
+        source._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+    }
+  }
+
+  // This unavailable implementation uses the expected mangled name
+  // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
+  // any binary compiled against the stdlib binary for Swift 5.6 and older.
+  @available(*, unavailable)
+  @_silgen_name("$sSv10storeBytes2of12toByteOffset2asyx_SixmtlF")
+  @usableFromInline func _legacy_se0349_storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+    _legacy_se0349_storeBytes_internal(
+      of: value, toByteOffset: offset, as: T.self
+    )
+  }
+
+  // This is the implementation of `storeBytes` from SwiftStdlib 5.6
+  @_alwaysEmitIntoClient
+  internal func _legacy_se0349_storeBytes_internal<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
     _debugPrecondition(0 == (UInt(bitPattern: self + offset)
@@ -1107,7 +1299,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
         /*volatile:*/ false._value)
     }
   }
-  
+
   /// Copies the specified number of bytes from the given raw pointer's memory
   /// into this pointer's memory.
   ///
@@ -1142,6 +1334,82 @@ extension UnsafeMutableRawPointer: Strideable {
   @_transparent
   public func advanced(by n: Int) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
+  }
+}
+
+extension UnsafeMutableRawPointer {
+  /// Obtain the next pointer properly aligned to store a value of type `T`.
+  ///
+  /// If `self` is properly aligned for accessing `T`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - type: the type to be stored at the returned address.
+  /// - Returns: a pointer properly aligned to store a value of type `T`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedUp<T>(for type: T.Type) -> Self {
+    let mask = UInt(Builtin.alignof(T.self)) &- 1
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the preceding pointer properly aligned to store a value of type `T`.
+  ///
+  /// If `self` is properly aligned for accessing `T`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - type: the type to be stored at the returned address.
+  /// - Returns: a pointer properly aligned to store a value of type `T`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedDown<T>(for type: T.Type) -> Self {
+    let mask = UInt(Builtin.alignof(T.self)) &- 1
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the next pointer whose bit pattern is a multiple of `alignment`.
+  ///
+  /// If the bit pattern of `self` is a multiple of `alignment`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - alignment: the alignment of the returned pointer, in bytes.
+  ///     `alignment` must be a whole power of 2.
+  /// - Returns: a pointer aligned to `alignment`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedUp(toMultipleOf alignment: Int) -> Self {
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the preceding pointer whose bit pattern is a multiple of `alignment`.
+  ///
+  /// If the bit pattern of `self` is a multiple of `alignment`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - alignment: the alignment of the returned pointer, in bytes.
+  ///     `alignment` must be a whole power of 2.
+  /// - Returns: a pointer aligned to `alignment`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedDown(toMultipleOf alignment: Int) -> Self {
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 }
 

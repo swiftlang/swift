@@ -44,6 +44,7 @@ class DeadEndBlocks;
 class ValueBaseUseIterator;
 class ConsumingUseIterator;
 class NonConsumingUseIterator;
+class TypeDependentUseIterator;
 class NonTypeDependentUseIterator;
 class SILValue;
 class SILModuleConventions;
@@ -254,6 +255,9 @@ struct ValueOwnershipKind {
   explicit ValueOwnershipKind(unsigned newValue) : value(innerty(newValue)) {}
   ValueOwnershipKind(const SILFunction &f, SILType type,
                      SILArgumentConvention convention);
+  ValueOwnershipKind(const SILFunction &f, SILType type,
+                     SILArgumentConvention convention,
+                     SILModuleConventions moduleConventions);
 
   /// Parse Value into a ValueOwnershipKind.
   ///
@@ -308,7 +312,7 @@ struct ValueOwnershipKind {
   OperandOwnership getForwardingOperandOwnership(bool allowUnowned) const;
 
   /// Returns true if \p Other can be merged successfully with this, implying
-  /// that the two ownership kinds are "compatibile".
+  /// that the two ownership kinds are "compatible".
   ///
   /// The reason why we do not compare directy is to allow for
   /// OwnershipKind::None to merge into other forms of ValueOwnershipKind.
@@ -316,7 +320,7 @@ struct ValueOwnershipKind {
     return bool(merge(other));
   }
 
-  /// Returns isCompatibleWith(other.getOwnershipKind()).
+  /// Returns isCompatibleWith(other->getOwnershipKind()).
   ///
   /// Definition is inline after SILValue is defined to work around circular
   /// dependencies.
@@ -376,6 +380,8 @@ public:
   /// same type as the result of this instruction.
   void replaceAllUsesWithUndef();
 
+  void replaceAllTypeDependentUsesWith(ValueBase *RHS);
+
   /// Is this value a direct result of the given instruction?
   bool isResultOf(SILInstruction *I) const;
 
@@ -390,6 +396,8 @@ public:
   using consuming_use_range = iterator_range<consuming_use_iterator>;
   using non_consuming_use_iterator = NonConsumingUseIterator;
   using non_consuming_use_range = iterator_range<non_consuming_use_iterator>;
+  using typedependent_use_iterator = TypeDependentUseIterator;
+  using typedependent_use_range = iterator_range<typedependent_use_iterator>;
   using non_typedependent_use_iterator = NonTypeDependentUseIterator;
   using non_typedependent_use_range =
       iterator_range<non_typedependent_use_iterator>;
@@ -402,6 +410,9 @@ public:
 
   inline non_consuming_use_iterator non_consuming_use_begin() const;
   inline non_consuming_use_iterator non_consuming_use_end() const;
+
+  inline typedependent_use_iterator typedependent_use_begin() const;
+  inline typedependent_use_iterator typedependent_use_end() const;
 
   inline non_typedependent_use_iterator non_typedependent_use_begin() const;
   inline non_typedependent_use_iterator non_typedependent_use_end() const;
@@ -429,6 +440,10 @@ public:
 
   /// Returns a range of all non consuming uses
   inline non_consuming_use_range getNonConsumingUses() const;
+
+  /// Returns a range of uses that are classified as a type dependent
+  /// operand of the user.
+  inline typedependent_use_range getTypeDependentUses() const;
 
   /// Returns a range of uses that are not classified as a type dependent
   /// operand of the user.
@@ -543,6 +558,19 @@ public:
 
   bool isLexical() const;
 
+  /// Unsafely eliminate moveonly from this value's type. Returns true if the
+  /// value's underlying type was move only and thus was changed. Returns false
+  /// otherwise.
+  ///
+  /// NOTE: Please do not use this directly! It is only meant to be used by the
+  /// optimizer pass: SILMoveOnlyWrappedTypeEliminator.
+  bool unsafelyEliminateMoveOnlyWrapper() {
+    if (!Type.isMoveOnlyWrapped())
+      return false;
+    Type = Type.removingMoveOnlyWrapper();
+    return true;
+  }
+
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
            node->getKind() <= SILNodeKind::Last_ValueBase;
@@ -640,9 +668,10 @@ public:
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ///
   /// FIXME: remove this redundant API from SILValue.
-  ValueOwnershipKind getOwnershipKind() const {
-    return Value->getOwnershipKind();
-  }
+  LLVM_ATTRIBUTE_DEPRECATED(
+      ValueOwnershipKind getOwnershipKind()
+          const { return Value->getOwnershipKind(); },
+      "Please use ValueBase::getOwnershipKind()");
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
@@ -654,7 +683,7 @@ public:
 inline SILNodePointer::SILNodePointer(SILValue value) : node(value) { }
 
 inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
-  return isCompatibleWith(other.getOwnershipKind());
+  return isCompatibleWith(other->getOwnershipKind());
 }
 
 /// Constraints on the ownership of an operand value.
@@ -1104,6 +1133,7 @@ private:
   friend class ValueBaseUseIterator;
   friend class ConsumingUseIterator;
   friend class NonConsumingUseIterator;
+  friend class TypeDependentUseIterator;
   friend class NonTypeDependentUseIterator;
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
@@ -1231,6 +1261,39 @@ ValueBase::non_consuming_use_end() const {
   return ValueBase::non_consuming_use_iterator(nullptr);
 }
 
+class TypeDependentUseIterator : public ValueBaseUseIterator {
+public:
+  explicit TypeDependentUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
+  TypeDependentUseIterator &operator++() {
+    assert(Cur && "incrementing past end()!");
+    while ((Cur = Cur->NextUse)) {
+      if (Cur->isTypeDependent())
+        break;
+    }
+    return *this;
+  }
+
+  TypeDependentUseIterator operator++(int unused) {
+    TypeDependentUseIterator copy = *this;
+    ++*this;
+    return copy;
+  }
+};
+
+inline ValueBase::typedependent_use_iterator
+ValueBase::typedependent_use_begin() const {
+  auto cur = FirstUse;
+  while (cur && !cur->isTypeDependent()) {
+    cur = cur->NextUse;
+  }
+  return ValueBase::typedependent_use_iterator(cur);
+}
+
+inline ValueBase::typedependent_use_iterator
+ValueBase::typedependent_use_end() const {
+  return ValueBase::typedependent_use_iterator(nullptr);
+}
+
 class NonTypeDependentUseIterator : public ValueBaseUseIterator {
 public:
   explicit NonTypeDependentUseIterator(Operand *cur)
@@ -1309,6 +1372,11 @@ inline ValueBase::consuming_use_range ValueBase::getConsumingUses() const {
 inline ValueBase::non_consuming_use_range
 ValueBase::getNonConsumingUses() const {
   return {non_consuming_use_begin(), non_consuming_use_end()};
+}
+
+inline ValueBase::typedependent_use_range
+ValueBase::getTypeDependentUses() const {
+  return {typedependent_use_begin(), typedependent_use_end()};
 }
 
 inline ValueBase::non_typedependent_use_range

@@ -13,13 +13,15 @@
 #define DEBUG_TYPE "sil-combine"
 
 #include "SILCombiner.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
@@ -1223,7 +1225,7 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *cvi) {
   // transformations around function types that result in given a copy_value a
   // thin_to_thick_function argument). In such a case, just RAUW with the
   // copy_value's operand since it is a no-op.
-  if (cvi->getOperand().getOwnershipKind() == OwnershipKind::None) {
+  if (cvi->getOperand()->getOwnershipKind() == OwnershipKind::None) {
     replaceInstUsesWith(*cvi, cvi->getOperand());
     return eraseInstFromFunction(*cvi);
   }
@@ -1239,7 +1241,7 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *dvi) {
   //
   // As an example, consider transformations around function types that result
   // in a thin_to_thick_function being passed to a destroy_value.
-  if (dvi->getOperand().getOwnershipKind() == OwnershipKind::None) {
+  if (dvi->getOperand()->getOwnershipKind() == OwnershipKind::None) {
     eraseInstFromFunction(*dvi);
     return nullptr;
   }
@@ -1525,7 +1527,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   }
   InitEnumDataAddrInst *DataAddrInst = nullptr;
   InjectEnumAddrInst *EnumAddrIns = nullptr;
-  llvm::SmallPtrSet<SILInstruction *, 32> WriteSet;
+  InstructionSetWithSize WriteSet(IEAI->getFunction());
   for (auto UsersIt : ASO->getUses()) {
     SILInstruction *CurrUser = UsersIt->getUser();
     if (CurrUser->isDeallocatingStack()) {
@@ -1591,7 +1593,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           // don't care about what comes before init enum in the basic block
           break;
         }
-        if (WriteSet.count(Ins) != 0) {
+        if (WriteSet.contains(Ins) != 0) {
           return nullptr;
         }
       }
@@ -2033,7 +2035,7 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     //    lifetime of that argument.
     SILValue selectEnumOperand = SEI->getEnumOperand();
     SILValue switchEnumOperand = selectEnumOperand;
-    if (selectEnumOperand.getOwnershipKind() != OwnershipKind::None) {
+    if (selectEnumOperand->getOwnershipKind() != OwnershipKind::None) {
       switchEnumOperand =
           makeCopiedValueAvailable(selectEnumOperand, Builder.getInsertionBB());
     }
@@ -2148,6 +2150,43 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
   return nullptr;
 }
 
+static Optional<SILType>
+shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
+                                                   CanType storageMetaTy) {
+  auto metaTy = dyn_cast<MetatypeType>(storageMetaTy);
+  if (!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thick)
+    return None;
+
+  auto storageTy = metaTy.getInstanceType()->getCanonicalType();
+  if (!storageTy->is_ContiguousArrayStorage())
+    return None;
+
+  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  if (!boundGenericTy)
+    return None;
+
+  // On SwiftStdlib 5.7 we can replace the call.
+  auto &ctxt = storageMetaTy->getASTContext();
+  auto deployment = AvailabilityContext::forDeploymentTarget(ctxt);
+  if (!deployment.isContainedIn(ctxt.getSwift57Availability()))
+    return None;
+
+  auto genericArgs = boundGenericTy->getGenericArgs();
+  if (genericArgs.size() != 1)
+    return None;
+
+  auto ty = genericArgs[0]->getCanonicalType();
+  if (!ty->getClassOrBoundGenericClass() && !ty->isObjCExistentialType())
+    return None;
+
+  auto anyObjectTy = ctxt.getAnyObjectType();
+  auto arrayStorageTy =
+      BoundGenericClassType::get(ctxt.get_ContiguousArrayStorageDecl(), nullptr,
+                                 {anyObjectTy})
+          ->getCanonicalType();
+  return F.getTypeLowering(arrayStorageTy).getLoweredType();
+}
+
 SILInstruction *
 SILCombiner::
 visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
@@ -2209,6 +2248,31 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
                                        ARDI->getTailAllocatedTypes(),
                                        getCounts(ARDI));
     }
+  } else if (auto *AI = dyn_cast<ApplyInst>(MDVal)) {
+    SILFunction *SF = AI->getReferencedFunctionOrNull();
+    if (!SF)
+      return nullptr;
+
+    if (!SF->hasSemanticsAttr(semantics::ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE))
+      return nullptr;
+
+    auto use = AI->getSingleUse();
+    if (!use || use->getUser() != ARDI)
+      return nullptr;
+
+    auto storageTy = AI->getType().getASTType();
+    // getContiguousArrayStorageType<SomeClass> =>
+    //   ContiguousArrayStorage<AnyObject>
+    auto instanceTy = shouldReplaceCallByContiguousArrayStorageAnyObject(
+        *AI->getFunction(), storageTy);
+    if (!instanceTy)
+      return nullptr;
+    NewInst = Builder.createAllocRef(
+        ARDI->getLoc(), *instanceTy, ARDI->isObjC(), false,
+        ARDI->getTailAllocatedTypes(), getCounts(ARDI));
+    NewInst = Builder.createUncheckedRefCast(ARDI->getLoc(), NewInst,
+                                             ARDI->getType());
+    return NewInst;
   }
   if (NewInst && NewInst->getType() != ARDI->getType()) {
     // In case the argument was an upcast of the metatype, we have to upcast the
@@ -2284,7 +2348,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   {
     SILType baseType = base->getType();
     if (baseType.isObject()) {
-      if ((hasOwnership() && base.getOwnershipKind() == OwnershipKind::None) ||
+      if ((hasOwnership() && base->getOwnershipKind() == OwnershipKind::None) ||
           baseType.isTrivial(*mdi->getFunction())) {
         SILValue value = mdi->getValue();
         replaceInstUsesWith(*mdi, value);

@@ -1,0 +1,21 @@
+enum EnumWithUnderlyingValue: String {
+    case north, south, east, west
+}
+
+
+
+func foo(test: EnumWithUnderlyingValue) {
+  switch test {
+case .north:
+print("north")
+case .south:
+print("south")
+case .east:
+print("east")
+default:
+break
+}
+}
+
+
+

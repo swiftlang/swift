@@ -215,6 +215,13 @@ static std::string getRuntimeLibPath() {
   return path.str().str();
 }
 
+static std::string getSwiftExecutablePath() {
+  llvm::SmallString<128> path;
+  getToolchainPrefixPath(path);
+  llvm::sys::path::append(path, "bin", "swift-frontend");
+  return path.str().str();
+}
+
 static std::string getDiagnosticDocumentationPath() {
   llvm::SmallString<128> path;
   getToolchainPrefixPath(path);
@@ -362,8 +369,9 @@ int main(int argc, const char *argv[]) {
       ^const char *(sourcekitd_uid_t uid) {
         return xpcUIdentFromSKDUID(uid).c_str();
       });
-  sourcekitd::initializeService(
-      getRuntimeLibPath(), getDiagnosticDocumentationPath(), postNotification);
+  sourcekitd::initializeService(getSwiftExecutablePath(), getRuntimeLibPath(),
+                                getDiagnosticDocumentationPath(),
+                                postNotification);
 
   // Increase the file descriptor limit.
   // FIXME: Portability ?

@@ -75,6 +75,36 @@ func `escapedName`(`x`: Int) {}
 escapedName(`x`: 2)
 escapedName(`x`:)
 
+func closureCapture() {
+  let test = 0
+
+  let outerClosure = { [test] in
+    let innerClosure = { [test] in
+      print(test)
+    }
+  }
+}
+
+func closureCaptureWithExplicitName() {
+  let test = 0
+
+  let closure = { [test = test] in
+    print(test)
+  }
+}
+
+func shorthandIfLet(test: Int?) {
+  if let test {
+    print(test)
+  }
+}
+
+func ifLet(test: Int?) {
+  if let test = test {
+    print(test)
+  }
+}
+
 // RUN: %sourcekitd-test -req=related-idents -pos=6:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: START RANGES
 // CHECK1-NEXT: 1:7 - 2
@@ -165,3 +195,51 @@ escapedName(`x`:)
 // CHECK11-NEXT: 75:1 - 11
 // CHECK11-NEXT: 76:1 - 11
 
+
+// RUN: %sourcekitd-test -req=related-idents -pos=79:7 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK12 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=81:25 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK12 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=82:27 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK12 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=83:13 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK12 %s
+// CHECK12:      START RANGES
+// CHECK12-NEXT: 79:7 - 4
+// CHECK12-NEXT: 81:25 - 4
+// CHECK12-NEXT: 82:27 - 4
+// CHECK12-NEXT: 83:13 - 4
+// CHECK12-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=89:7 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK13 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=91:27 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK13 %s
+// CHECK13:      START RANGES
+// CHECK13-NEXT: 89:7 - 4
+// CHECK13-NEXT: 91:27 - 4
+// CHECK13-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=91:20 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK14 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=92:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK14 %s
+// CHECK14:      START RANGES
+// CHECK14-NEXT: 91:20 - 4
+// CHECK14-NEXT: 92:11 - 4
+// CHECK14-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=96:21 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK15 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=97:10 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK15 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=98:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK15 %s
+// CHECK15:      START RANGES
+// CHECK15-NEXT: 96:21 - 4
+// CHECK15-NEXT: 97:10 - 4
+// CHECK15-NEXT: 98:11 - 4
+// CHECK15-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=102:12 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK16 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=103:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK16 %s
+// CHECK16:      START RANGES
+// CHECK16-NEXT: 102:12 - 4
+// CHECK16-NEXT: 103:17 - 4
+// CHECK16-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=103:10 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK17 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=104:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK17 %s
+// CHECK17:      START RANGES
+// CHECK17-NEXT: 103:10 - 4
+// CHECK17-NEXT: 104:11 - 4
+// CHECK17-NEXT: END RANGES

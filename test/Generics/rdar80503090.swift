@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -disable-requirement-machine-concrete-contraction 2>&1 | %FileCheck %s
 
 protocol P {
   associatedtype T where T == Self
@@ -19,9 +20,10 @@ extension P where T : Q {
 }
 
 class C : P {}
+// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self.T' is exactly equal to 'Self'; this is an error in Swift 6}}
 
 extension P where T : C {
-  // CHECK-LABEL: Generic signature: <Self where Self == C>
+  // CHECK-LABEL: Generic signature: <Self where Self : C>
   func test() {
     missing()
   }

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -disable-availability-checking -enable-implicit-dynamic -enable-private-imports %S/Inputs/opaque_return_type_parameter.swift -module-name Repo -emit-module -emit-module-path %t/Repo.swiftmodule -requirement-machine-abstract-signatures=verify
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -swift-version 5 -primary-file %s -emit-ir -requirement-machine-abstract-signatures=verify | %FileCheck %s
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -swift-version 5 -primary-file %s -c -o %t/tmp.o -requirement-machine-abstract-signatures=verify
+// RUN: %target-swift-frontend -disable-availability-checking -enable-implicit-dynamic -enable-private-imports %S/Inputs/opaque_return_type_parameter.swift -module-name Repo -emit-module -emit-module-path %t/Repo.swiftmodule
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -swift-version 5 -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -swift-version 5 -primary-file %s -c -o %t/tmp.o
 @_private(sourceFile: "opaque_return_type_parameter.swift") import Repo
 
 // Make sure we are not emitting a replacement for the opaque result type used as parameter (Assoc).

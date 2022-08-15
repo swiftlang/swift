@@ -129,7 +129,7 @@ protocol NoKeywordProtocol {
 
 func testInvalidKeywordCall(x: NoKeyword, y: NoKeywordProtocol & AnyObject) {
   x(a: 1, b: 2) // expected-error {{@dynamicCallable type 'NoKeyword' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{educational-notes=dynamic-callable-requirements}}
-  y(a: 1, b: 2) // expected-error {{@dynamicCallable type 'NoKeywordProtocol & AnyObject' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{educational-notes=dynamic-callable-requirements}}
+  y(a: 1, b: 2) // expected-error {{@dynamicCallable type 'any NoKeywordProtocol & AnyObject' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{educational-notes=dynamic-callable-requirements}}
 }
 
 // expected-error @+1 {{'@dynamicCallable' attribute cannot be applied to this declaration}}
@@ -442,21 +442,21 @@ func testArchetypeType5<T, C : CallableGeneric5<T>>(a: C) -> Double {
   return a(1, 2, 3) + a(x1: 1, 2, x3: 3)
 }
 
-// SR-9239 Default argument in initializer
+// https://github.com/apple/swift/issues/51727
+// Default argument in initializer
 
 @dynamicCallable
-struct A {
+struct S_51727 {
   init(_ x: Int = 0) {}
   func dynamicallyCall(withArguments args: [Int]) {}
 }
-
-func test9239() {
-  A()() // ok
+do {
+  S_51727()() // ok
 }
 
-// SR-10313
+// https://github.com/apple/swift/issues/52713
 //
-// Modified version of the code snippet in the SR to not crash.
+// Modified version of the code snippet in the issue report to not crash.
 
 struct MissingKeyError: Error {}
 
@@ -471,53 +471,83 @@ class DictionaryBox {
     return value
   }
 }
-
-func test10313() {
+do {
   let box = DictionaryBox()
   box.dictionary["bool"] = false
   let _: Bool = try! box("bool") // ok
 }
 
-// SR-10753
+// https://github.com/apple/swift/issues/53143
 
 @dynamicCallable
-struct B {
+struct S_53143 {
 	public func dynamicallyCall(withArguments arguments: [String]) {}
 }
+do {
+  S_53143()("hello") // ok
+  S_53143()("\(1)") // ok
+}
 
-B()("hello") // ok
-B()("\(1)") // ok
+// https://github.com/apple/swift/issues/54456
 
-// SR-12019
 @dynamicCallable 
-struct SR12019_S {
+struct S_54456 {
   func dynamicallyCall<T: StringProtocol>(withArguments: [T]) { // expected-note {{where 'T' = 'Int'}}
     print("hi")	
   }
 }
 
 @dynamicCallable
-protocol SR12019 {
+protocol P_54456 {
   func dynamicallyCall<T: StringProtocol>(withArguments: [T])  // expected-note 2{{where 'T' = 'Int'}}
 }
 
-class SR12019Class: SR12019 {
+class C_54456: P_54456 {
   func dynamicallyCall<T: StringProtocol>(withArguments: [T]) {} // expected-note {{where 'T' = 'Int'}}
 }
 
-class SR12019SubClass: SR12019Class {}
+class SubC_54456: C_54456 {}
 
-let sr12019s = SR12019_S()
-sr12019s(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+do {
+  let s = S_54456()
+  s(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
 
-// Protocol composition
-let sr12019: SR12019&AnyObject = SR12019Class()
-sr12019(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+  // Protocol composition
+  let pc: P_54456 & AnyObject = C_54456()
+  pc(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
 
-// Protocol
-let sr12019c: SR12019 = SR12019Class()
-sr12019c(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+  // Protocol
+  let p: P_54456 = C_54456()
+  p(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
 
-// Subclass
-let sr12019sub = SR12019SubClass()
-sr12019sub(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+  // Subclass
+  let sub = SubC_54456()
+  sub(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+}
+
+protocol P {}
+extension P {
+  func dynamicallyCall(withArguments: [Int]) {}
+}
+
+@dynamicCallable
+protocol Q {}
+extension Q {
+  func dynamicallyCall(withArguments: [String]) {}
+}
+
+@dynamicCallable
+protocol R {}
+extension R {
+  func dynamicallyCall(withArguments: [Int]) {}
+}
+
+func testProtocolComposition(_ x: P & Q, _ y: Q & R) {
+  // Only Q is marked @dynamicCallable, so P's dynamicallyCall is not available.
+  x(0, 1) // expected-error 2{{cannot convert value of type 'Int' to expected argument type 'String'}}
+  x("a", "b")
+
+  // Fine, both Q and R are @dynamicCallable
+  y(0, 1)
+  y("a", "b")
+}

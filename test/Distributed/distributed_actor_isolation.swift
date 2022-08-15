@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 // TODO(distributed): rdar://82419661 remove -verify-ignore-unknown here, no warnings should be emitted for our
 //  generated code but right now a few are, because of Sendability checks -- need to track it down more.
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)
@@ -42,10 +42,27 @@ distributed actor DistributedActor_1 {
   distributed let letProperty: String = "" // expected-error{{property 'letProperty' cannot be 'distributed', only computed properties can}}
   distributed var varProperty: String = "" // expected-error{{property 'varProperty' cannot be 'distributed', only computed properties can}}
 
+  distributed var computed: String {
+    "computed"
+  }
+
+  distributed var computedNotCodable: NotCodableValue { // expected-error{{result type 'NotCodableValue' of distributed property 'computedNotCodable' does not conform to serialization requirement 'Codable'}}
+    .init()
+  }
+
+  distributed var getSet: String { // expected-error{{'distributed' computed property 'getSet' cannot have setter}}
+    get {
+      "computed"
+    }
+    set {
+      _ = newValue
+    }
+  }
+
   distributed static func distributedStatic() {} // expected-error{{'distributed' method cannot be 'static'}}
   distributed class func distributedClass() {}
   // expected-error@-1{{class methods are only allowed within classes; use 'static' to declare a static method}}
-  // expected-error@-2{{'distributed' method cannot be 'static'}} // TODO(distributed): should call out 'class' instead?
+  // expected-error@-2{{'distributed' method cannot be 'static'}}
 
   func hello() {} // expected-note{{distributed actor-isolated instance method 'hello()' declared here}}
   func helloAsync() async {} // expected-note{{distributed actor-isolated instance method 'helloAsync()' declared here}}
@@ -187,14 +204,56 @@ func test_params(
 distributed actor DijonMustard {
   nonisolated init(system: FakeActorSystem) {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
 
-  convenience init(conv: FakeActorSystem) {
+  convenience init(conv: FakeActorSystem) { // expected-warning {{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{3-15=}}
     self.init(system: conv)
     self.f() // expected-error {{actor-isolated instance method 'f()' can not be referenced from a non-isolated context}}
   }
 
   func f() {} // expected-note {{distributed actor-isolated instance method 'f()' declared here}}
 
-  nonisolated convenience init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+  nonisolated init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
     self.init(system: conv2)
+  }
+}
+
+// ==== Larger example with protocols and extensions ---------------------------
+
+
+protocol Greeting: DistributedActor {
+  distributed func greeting() -> String
+  distributed func greetingAsyncThrows() async throws -> String
+}
+
+extension Greeting {
+  func greetLocal(name: String) async throws { // expected-note{{distributed actor-isolated instance method 'greetLocal(name:)' declared here}}
+    try await print("\(greetingAsyncThrows()), \(name)!") // requirement is async throws, things work
+  }
+
+  func greetLocal2(name: String) {
+    print("\(greeting()), \(name)!")
+  }
+}
+
+extension Greeting where SerializationRequirement == Codable {
+  // okay, uses Codable to transfer arguments.
+  distributed func greetDistributed(name: String) async throws {
+  // okay, we're on the actor
+  try await greetLocal(name: name)
+}
+
+  distributed func greetDistributed2(name: String) async throws {
+  // okay, we're on the actor
+  greetLocal2(name: name)
+}
+
+  func greetDistributedNon(name: String) async throws {
+    // okay, we're on the actor
+    greetLocal2(name: name)
+  }
+}
+
+extension Greeting where SerializationRequirement == Codable {
+  nonisolated func greetAliceALot() async throws {
+    try await greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   }
 }

@@ -11,18 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 extension String.Index {
-  private init?<S: StringProtocol>(
-    _ idx: String.Index, _genericWithin target: S
-  ) {
-    guard target._wholeGuts.isOnGraphemeClusterBoundary(idx),
-          idx >= target.startIndex && idx <= target.endIndex
-    else {
-      return nil
-    }
-
-    self = idx
-  }
-
   /// Creates an index in the given string that corresponds exactly to the
   /// specified position.
   ///
@@ -62,7 +50,15 @@ extension String.Index {
   ///     of `target`.
   ///   - target: The string referenced by the resulting index.
   public init?(_ sourcePosition: String.Index, within target: String) {
-    self.init(sourcePosition, _genericWithin: target)
+    // As a special exception, we allow `sourcePosition` to be an UTF-16 index
+    // when `self` is a UTF-8 string (or vice versa), to preserve compatibility
+    // with (broken) code that keeps using indices from a bridged string after
+    // converting the string to a native representation. Such indices are
+    // invalid, but returning nil here can break code that appeared to work fine
+    // for ASCII strings in Swift releases prior to 5.7.
+    let i = target._guts.ensureMatchingEncoding(sourcePosition)
+    guard target._isValidIndex(i) else { return nil }
+    self = i._characterAligned
   }
 
   /// Creates an index in the given string that corresponds exactly to the
@@ -107,7 +103,23 @@ extension String.Index {
   public init?<S: StringProtocol>(
     _ sourcePosition: String.Index, within target: S
   ) {
-    self.init(sourcePosition, _genericWithin: target)
+    if let str = target as? String {
+      self.init(sourcePosition, within: str)
+      return
+    }
+    if let str = target as? Substring {
+      // As a special exception, we allow `sourcePosition` to be an UTF-16 index
+      // when `self` is a UTF-8 string (or vice versa), to preserve
+      // compatibility with (broken) code that keeps using indices from a
+      // bridged string after converting the string to a native representation.
+      // Such indices are invalid, but returning nil here can break code that
+      // appeared to work fine for ASCII strings in Swift releases prior to 5.7.
+      let i = str._wholeGuts.ensureMatchingEncoding(sourcePosition)
+      guard str._isValidIndex(i) else { return nil }
+      self = i
+      return
+    }
+    self.init(sourcePosition, within: String(target))
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to

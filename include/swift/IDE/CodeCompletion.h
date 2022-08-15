@@ -61,9 +61,9 @@ ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
 
 bool isDynamicLookup(Type T);
 
-void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
-                        CompletionKind Kind, DeclContext *DC,
-                        CodeCompletionResultSink *Sink);
+void postProcessCompletionResults(
+    MutableArrayRef<CodeCompletionResult *> results, CompletionKind Kind,
+    const DeclContext *DC, CodeCompletionResultSink *Sink);
 
 void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                               CompletionLookup &Lookup, DeclContext *DC,
@@ -83,6 +83,10 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
                                            ArrayRef<std::string> accessPath,
                                            bool needLeadingDot,
                                            const SourceFile *SF);
+
+void addExprKeywords(CodeCompletionResultSink &Sink, DeclContext *DC);
+
+void addSuperKeyword(CodeCompletionResultSink &Sink, DeclContext *DC);
 
 } // end namespace ide
 } // end namespace swift

@@ -134,7 +134,7 @@ OptionSetTests.test("Contains.EmptySet") {
   expectFalse(s.contains(.saturday))
 }
 
-// Test formItersection()
+// Test formIntersection()
 
 OptionSetTests.test("FormIntersection.SingleOption") {
   do {

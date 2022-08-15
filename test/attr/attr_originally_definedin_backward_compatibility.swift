@@ -17,13 +17,14 @@
 // RUN: mkdir -p %t/SDK/Frameworks/HighLevel.framework/Modules/HighLevel.swiftmodule
 // RUN: %target-build-swift-dylib(%t/SDK/Frameworks/HighLevel.framework/HighLevel) -module-name HighLevel -emit-module \
 // RUN:		-emit-module-path %t/SDK/Frameworks/HighLevel.framework/Modules/HighLevel.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     %S/Inputs/SymbolMove/HighLevelOriginal.swift -Xlinker -install_name -Xlinker @rpath/HighLevel.framework/HighLevel -enable-library-evolution
+// RUN:     %S/Inputs/SymbolMove/HighlevelOriginal.swift -Xlinker -install_name -Xlinker @rpath/HighLevel.framework/HighLevel -enable-library-evolution
 
 // --- Build an executable using the original high level framework
 // RUN: %target-build-swift -emit-executable %s -g -o %t/HighlevelRunner -F %t/SDK/Frameworks/ -framework HighLevel \
 // RUN: 	%target-rpath(@executable_path/SDK/Frameworks)
 
 // --- Run the executable
+// RUN: %target-codesign %t/SDK/Frameworks/HighLevel.framework/HighLevel
 // RUN: %target-codesign %t/HighlevelRunner
 // RUN: %target-run %t/HighlevelRunner %t/SDK/Frameworks/HighLevel.framework/HighLevel | %FileCheck %s -check-prefix=BEFORE_MOVE
 
@@ -41,6 +42,8 @@
 // RUN:     %S/Inputs/SymbolMove/HighLevel.swift -F %t/SDK/Frameworks -Xlinker -reexport_framework -Xlinker LowLevel -enable-library-evolution
 
 // --- Run the executable
+// RUN: %target-codesign %t/SDK/Frameworks/HighLevel.framework/HighLevel
+// RUN: %target-codesign %t/SDK/Frameworks/LowLevel.framework/LowLevel
 // RUN: %target-codesign %t/HighlevelRunner
 // RUN: %target-run %t/HighlevelRunner %t/SDK/Frameworks/HighLevel.framework/HighLevel %t/SDK/Frameworks/LowLevel.framework/LowLevel | %FileCheck %s -check-prefix=AFTER_MOVE
 

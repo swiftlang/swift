@@ -65,8 +65,8 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
   if (type.isExistentialType()) {
     auto layout = type->getExistentialLayout();
     for (auto proto : layout.getProtocols()) {
-      if (proto->getDecl() == errorProtocol ||
-          proto->getDecl()->inheritsFrom(errorProtocol)) {
+      if (proto == errorProtocol ||
+          proto->inheritsFrom(errorProtocol)) {
         return true;
       }
     }
@@ -732,7 +732,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = OpenedArchetypeType::get(nativeType);
+    auto openedType = OpenedArchetypeType::get(nativeType,
+                                               SGF.F.getGenericSignature());
 
     FormalEvaluationScope scope(SGF);
 
@@ -1817,7 +1818,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       
       auto directResults = substConv.getDirectSILResults();
       auto hasMultipleDirectResults
-        = std::next(directResults.begin()) != directResults.end();
+        = !directResults.empty() &&
+          std::next(directResults.begin()) != directResults.end();
       
       for (unsigned paramI : indices(completionTy->getParameters())) {
         if (errorParamIndex && paramI == *errorParamIndex) {

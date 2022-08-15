@@ -78,8 +78,9 @@ public:
         SGF.SGM.Types.getLoweredType(t, TypeExpansionContext::minimal());
     argType = argType.getCategoryType(argTypeConv.getCategory());
 
-    if (isInOut
-        || orig.getParameterConvention(SGF.SGM.Types) == AbstractionPattern::Indirect)
+    if (isInOut || (orig.getParameterConvention(SGF.SGM.Types) ==
+                        AbstractionPattern::Indirect &&
+                    SGF.SGM.M.useLoweredAddresses()))
       argType = argType.getCategoryType(SILValueCategory::Address);
 
     // Pop the next parameter info.
@@ -108,7 +109,8 @@ public:
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
-    if (argType.isLoadable(SGF.F)) {
+    bool argIsLoadable = argType.isLoadable(SGF.F);
+    if (argIsLoadable) {
       if (argType.isAddress()) {
         if (mv.isPlusOne(SGF))
           mv = SGF.B.createLoadTake(loc, mv);
@@ -116,18 +118,18 @@ public:
           mv = SGF.B.createLoadBorrow(loc, mv);
         argType = argType.getObjectType();
       }
-    } else {
-      if (isNoImplicitCopy) {
-        // We do not support no implicit copy address only types. Emit an error.
-        auto diag = diag::noimplicitcopy_used_on_generic_or_existential;
-        diagnose(SGF.getASTContext(), mv.getValue().getLoc().getSourceLoc(),
-                 diag);
-      }
     }
 
     if (argType.getASTType() != paramType.getASTType()) {
       // Reabstract the value if necessary.
       mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
+    }
+
+    if (isNoImplicitCopy && !argIsLoadable) {
+      // We do not support no implicit copy address only types. Emit an error.
+      auto diag = diag::noimplicitcopy_used_on_generic_or_existential;
+      diagnose(SGF.getASTContext(), mv.getValue().getLoc().getSourceLoc(),
+               diag);
     }
 
     // If the value is a (possibly optional) ObjC block passed into the entry
@@ -254,6 +256,87 @@ struct ArgumentInitHelper {
     return argEmitter.visit(canTy, origTy);
   }
 
+  SILValue updateArgumentValueForBinding(ManagedValue argrv, SILLocation loc,
+                                         ParamDecl *pd, SILValue value,
+                                         const SILDebugVariable &varinfo) {
+    // If we do not need to support lexical lifetimes, just return value as the
+    // updated value.
+    if (!SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
+      return value;
+
+    bool isNoImplicitCopy = false;
+    if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+      isNoImplicitCopy = arg->isNoImplicitCopy();
+
+    // If we have a no implicit copy argument and the argument is trivial,
+    // we need to use copyable to move only to convert it to its move only
+    // form.
+    if (!isNoImplicitCopy) {
+      if (!value->getType().isMoveOnly()) {
+        if (value->getOwnershipKind() == OwnershipKind::Owned) {
+          value =
+              SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+          SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+        }
+        return value;
+      }
+
+      // At this point, we have a move only type.
+      if (value->getOwnershipKind() == OwnershipKind::Owned) {
+        value = SGF.B.createMoveValue(loc, argrv.forward(SGF),
+                                      /*isLexical*/ true);
+        value = SGF.B.createMarkMustCheckInst(
+            loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+        SGF.emitManagedRValueWithCleanup(value);
+        return value;
+      }
+
+      assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
+      value = SGF.B.createCopyValue(loc, value);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getType().isTrivial(SGF.F)) {
+      value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, value);
+      value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
+
+      // If our argument was owned, we use no implicit copy. Otherwise, we
+      // use no copy.
+      auto kind = MarkMustCheckInst::CheckKind::NoCopy;
+      if (pd->isOwned())
+        kind = MarkMustCheckInst::CheckKind::NoImplicitCopy;
+      value = SGF.B.createMarkMustCheckInst(loc, value, kind);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      value = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc, value);
+      value = SGF.B.createCopyValue(loc, value);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getOwnershipKind() == OwnershipKind::Owned) {
+      // If we have an owned value, forward it into the mark_must_check to
+      // avoid an extra destroy_value.
+      value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
+          loc, argrv.forward(SGF));
+      value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    return value;
+  }
+
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
   void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, ParamDecl *pd) {
@@ -274,22 +357,7 @@ struct ArgumentInitHelper {
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
-      if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
-              SGF.getModule()) &&
-          value->getOwnershipKind() == OwnershipKind::Owned) {
-        bool isNoImplicitCopy = false;
-        if (auto *arg = dyn_cast<SILFunctionArgument>(value))
-          isNoImplicitCopy = arg->isNoImplicitCopy();
-        value =
-            SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-        SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
-        if (isNoImplicitCopy) {
-          value = SGF.B.emitCopyValueOperation(loc, value);
-          value = SGF.B.createMarkMustCheckInst(
-              loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
-          SGF.enterDestroyCleanup(value);
-        }
-      }
+      value = updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
       if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
@@ -316,7 +384,7 @@ struct ArgumentInitHelper {
     assert(type->isMaterializable());
 
     ++ArgNo;
-    if (PD->hasName()) {
+    if (PD->hasName() || PD->isIsolated()) {
       makeArgumentIntoBinding(type, &*f.begin(), PD);
       return;
     }
@@ -390,7 +458,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   // Local function to get the captured variable type within the capturing
   // context.
   auto getVarTypeInCaptureContext = [&]() -> Type {
-    auto interfaceType = VD->getInterfaceType()->getCanonicalType(
+    auto interfaceType = VD->getInterfaceType()->getReducedType(
         origGenericSig);
     return SGF.F.mapTypeIntoContext(interfaceType);
   };
@@ -456,11 +524,22 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   case CaptureKind::StorageAddress: {
     // Non-escaping stored decls are captured as the address of the value.
     auto type = getVarTypeInCaptureContext();
-    SILType ty = SGF.getLoweredType(type).getAddressType();
-    SILValue addr = SGF.F.begin()->createFunctionArgument(ty, VD);
-    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
+    SILType ty = SGF.getLoweredType(type);
+    auto argConv = SGF.F.getConventions().getSILArgumentConvention(
+        SGF.F.begin()->getNumArguments());
+    bool isInOut = (argConv == SILArgumentConvention::Indirect_Inout ||
+                    argConv == SILArgumentConvention::Indirect_InoutAliasable);
+    if (isInOut || SGF.SGM.M.useLoweredAddresses()) {
+      ty = ty.getAddressType();
+    }
+    SILValue arg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(arg);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
-    SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
+    if (ty.isAddress()) {
+      SGF.B.createDebugValueAddr(Loc, arg, DbgVar);
+    } else {
+      SGF.B.createDebugValue(Loc, arg, DbgVar);
+    }
     break;
   }
   }
@@ -510,19 +589,6 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
 
     emitCaptureArguments(*this, DC->getGenericSignatureOfContext(),
                          capture, ++ArgNo);
-  }
-
-  // Emit an unreachable instruction if a parameter type is
-  // uninhabited
-  if (paramList) {
-    for (auto *param : *paramList) {
-      if (param->getType()->isStructurallyUninhabited()) {
-        SILLocation unreachableLoc(param);
-        unreachableLoc.markAsPrologue();
-        B.createUnreachable(unreachableLoc);
-        break;
-      }
-    }
   }
 
   // Whether the given declaration context is nested within an actor's
@@ -663,8 +729,9 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
     if (F.isAsync()) {
       // For an async function, hop to the executor.
       B.createHopToExecutor(
-                    RegularLocation::getAutoGeneratedLocation(F.getLocation()),
-                    ExpectedExecutor, /*mandatory*/ false);
+          RegularLocation::getDebugOnlyLocation(F.getLocation(), getModule()),
+          ExpectedExecutor,
+          /*mandatory*/ false);
     } else {
       // For a synchronous function, check that we're on the same executor.
       // Note: if we "know" that the code is completely Sendable-safe, this
@@ -672,6 +739,21 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       emitPreconditionCheckExpectedExecutor(
                     RegularLocation::getAutoGeneratedLocation(F.getLocation()),
                     ExpectedExecutor);
+    }
+  }
+
+  // IMPORTANT: This block should be the last one in `emitProlog`, 
+  // since it terminates BB and no instructions should be insterted after it.
+  // Emit an unreachable instruction if a parameter type is
+  // uninhabited
+  if (paramList) {
+    for (auto *param : *paramList) {
+      if (param->getType()->isStructurallyUninhabited()) {
+        SILLocation unreachableLoc(param);
+        unreachableLoc.markAsPrologue();
+        B.createUnreachable(unreachableLoc);
+        break;
+      }
     }
   }
 }
@@ -721,7 +803,8 @@ SILValue SILGenFunction::emitGenericExecutor(SILLocation loc) {
 void SILGenFunction::emitPrologGlobalActorHop(SILLocation loc,
                                               Type globalActor) {
   ExpectedExecutor = emitLoadGlobalActorExecutor(globalActor);
-  B.createHopToExecutor(loc, ExpectedExecutor, /*mandatory*/ false);
+  B.createHopToExecutor(RegularLocation::getDebugOnlyLocation(loc, getModule()),
+                        ExpectedExecutor, /*mandatory*/ false);
 }
 
 SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
@@ -782,7 +865,8 @@ ExecutorBreadcrumb SILGenFunction::emitHopToTargetExecutor(
     SILLocation loc, SILValue executor) {
   // Record that we need to hop back to the current executor.
   auto breadcrumb = ExecutorBreadcrumb(true);
-  B.createHopToExecutor(loc.asAutoGenerated(), executor, /*mandatory*/ false);
+  B.createHopToExecutor(RegularLocation::getDebugOnlyLocation(loc, getModule()),
+                        executor, /*mandatory*/ false);
   return breadcrumb;
 }
 
@@ -823,7 +907,8 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
       "Builtin.hopToActor must be in an actor-independent function");
   }
   SILValue executor = emitLoadActorExecutor(loc, actor);
-  B.createHopToExecutor(loc.asAutoGenerated(), executor, /*mandatory*/ true);
+  B.createHopToExecutor(RegularLocation::getDebugOnlyLocation(loc, getModule()),
+                        executor, /*mandatory*/ true);
 }
 
 void SILGenFunction::emitPreconditionCheckExpectedExecutor(
@@ -862,8 +947,9 @@ void ExecutorBreadcrumb::emit(SILGenFunction &SGF, SILLocation loc) {
   if (mustReturnToExecutor) {
     assert(SGF.ExpectedExecutor || SGF.unsafelyInheritsExecutor());
     if (auto executor = SGF.ExpectedExecutor)
-      SGF.B.createHopToExecutor(loc.asAutoGenerated(), executor,
-                                /*mandatory*/ false);
+      SGF.B.createHopToExecutor(
+          RegularLocation::getDebugOnlyLocation(loc, SGF.getModule()), executor,
+          /*mandatory*/ false);
   }
 }
 
@@ -928,7 +1014,7 @@ uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
                                  Optional<AbstractionPattern> origClosureType) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
-  resultType = resultType->getCanonicalType(genericSig);
+  resultType = resultType->getReducedType(genericSig);
 
   AbstractionPattern origResultType = origClosureType
     ? origClosureType->getFunctionResultType()

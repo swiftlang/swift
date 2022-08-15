@@ -118,11 +118,11 @@ case iPadHair<S>.HairForceOne:
   ()
 case iPadHair<E>.HairForceOne:
   ()
-case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'HairType'}}
+case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'any HairType'}}
   ()
-case Watch.Edition: // expected-warning {{cast from 'HairType' to unrelated type 'Watch' always fails}}
+case Watch.Edition: // expected-warning {{cast from 'any HairType' to unrelated type 'Watch' always fails}}
   ()
-case .HairForceOne: // expected-error{{type 'HairType' has no member 'HairForceOne'}}
+case .HairForceOne: // expected-error{{type 'any HairType' has no member 'HairForceOne'}}
   ()
 default:
   break
@@ -230,14 +230,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
+  let _ = a.map {
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
+  let _ = a.map {
     switch $0 {
     case .A:
       return 1
@@ -486,6 +486,7 @@ func rdar63510989() {
   }
 
   func test(e: E) {
+    if case .single(_) = e {} // Ok
     if case .single(_ as Value) = e {} // Ok
     if case .single(let v as Value) = e {} // Ok
     // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
@@ -519,4 +520,17 @@ func rdar64157451() {
 func rdar80797176 () {
   for x: Int in [1, 2] where x.bitWidth == 32 { // Ok
   }
+}
+
+// https://github.com/apple/swift/issues/60029
+for (key, values) in oldName { // expected-error{{cannot find 'oldName' in scope}}
+  for (idx, value) in values.enumerated() {
+    print(key, idx, value)
+  }
+}
+
+// https://github.com/apple/swift/issues/60503
+func f60503() {
+  let (key, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
+  let (_, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
 }

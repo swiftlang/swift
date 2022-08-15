@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-final public class BasicBlock : ListNode, CustomStringConvertible, HasName {
+final public class BasicBlock : ListNode, CustomStringConvertible, HasShortDescription {
   public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
   public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }
 
@@ -25,8 +25,10 @@ final public class BasicBlock : ListNode, CustomStringConvertible, HasName {
   public var function: Function { SILBasicBlock_getFunction(bridged).function }
 
   public var description: String {
-    SILBasicBlock_debugDescription(bridged).takeString()
+    let stdString = SILBasicBlock_debugDescription(bridged)
+    return String(_cxxString: stdString)
   }
+  public var shortDescription: String { name }
 
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
 
@@ -120,9 +122,21 @@ public struct PredecessorList : CollectionLikeSequence, IteratorProtocol {
 // Bridging utilities
 
 extension BridgedBasicBlock {
-  var block: BasicBlock { obj.getAs(BasicBlock.self) }
+  public var block: BasicBlock { obj.getAs(BasicBlock.self) }
+  public var optional: OptionalBridgedBasicBlock {
+    OptionalBridgedBasicBlock(obj: self.obj)
+  }
 }
 
 extension OptionalBridgedBasicBlock {
-  var block: BasicBlock? { obj.getAs(BasicBlock.self) }
+  public var block: BasicBlock? { obj.getAs(BasicBlock.self) }
+  public static var none: OptionalBridgedBasicBlock {
+    OptionalBridgedBasicBlock(obj: nil)
+  }
+}
+
+extension Optional where Wrapped == BasicBlock {
+  public var bridged: OptionalBridgedBasicBlock {
+    OptionalBridgedBasicBlock(obj: self?.bridged.obj)
+  }
 }

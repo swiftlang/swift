@@ -78,5 +78,58 @@ BinaryScanningTool::collectConformances(const std::vector<std::string> &protocol
   }
 }
 
+AssociatedTypeCollectionResult
+BinaryScanningTool::collectAssociatedTypes(const std::string &mangledTypeName) {
+  switch (PointerSize) {
+    case 4:
+      // FIXME: This could/should be configurable.
+#if SWIFT_OBJC_INTEROP
+      return Context->Builder.collectAssociatedTypes<WithObjCInterop, 4>(mangledTypeName);
+#else
+      return Context->Builder.collectAssociatedTypes<NoObjCInterop, 4>(mangledTypeName);
+#endif
+    case 8:
+#if SWIFT_OBJC_INTEROP
+      return Context->Builder.collectAssociatedTypes<WithObjCInterop, 8>(mangledTypeName);
+#else
+      return Context->Builder.collectAssociatedTypes<NoObjCInterop, 8>(mangledTypeName);
+#endif
+    default:
+      fputs("unsupported word size in object file\n", stderr);
+      abort();
+  }
+}
+
+AssociatedTypeCollectionResult
+BinaryScanningTool::collectAllAssociatedTypes() {
+  switch (PointerSize) {
+    case 4:
+      // FIXME: This could/should be configurable.
+#if SWIFT_OBJC_INTEROP
+      return Context->Builder.collectAssociatedTypes<WithObjCInterop, 4>(llvm::Optional<std::string>());
+#else
+      return Context->Builder.collectAssociatedTypes<NoObjCInterop, 4>(llvm::Optional<std::string>());
+#endif
+    case 8:
+#if SWIFT_OBJC_INTEROP
+      return Context->Builder.collectAssociatedTypes<WithObjCInterop, 8>(llvm::Optional<std::string>());
+#else
+      return Context->Builder.collectAssociatedTypes<NoObjCInterop, 8>(llvm::Optional<std::string>());
+#endif
+    default:
+      fputs("unsupported word size in object file\n", stderr);
+      abort();
+  }
+}
+
+FieldTypeCollectionResult
+BinaryScanningTool::collectFieldTypes(const std::string &mangledTypeName) {
+  return Context->Builder.collectFieldTypes(mangledTypeName);
+}
+
+FieldTypeCollectionResult
+BinaryScanningTool::collectAllFieldTypes() {
+  return Context->Builder.collectFieldTypes(llvm::Optional<std::string>());
+}
 } // end namespace static_mirror
 } // end namespace swift

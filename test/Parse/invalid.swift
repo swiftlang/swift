@@ -25,7 +25,10 @@ func runAction() {} // expected-note {{'runAction' declared here}}
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{cannot find 'SKAction' in scope; did you mean 'runAction'?}} {{13-21=runAction}} expected-error {{expected ',' separator}} {{32-32=,}}
+  // expected-error@+3 {{argument passed to call that takes no arguments}}
+  // expected-error@+2 {{cannot find 'SKAction' in scope; did you mean 'runAction'?}} {{13-21=runAction}}
+  // expected-error@+1 {{expected ',' separator}} {{32-32=,}}
+  runAction(SKAction.sequence()
     
     skview!
     // expected-error @-1 {{cannot find 'skview' in scope}}
@@ -67,7 +70,7 @@ func d(_ b: String -> <T>() -> T) {} // expected-error {{expected type for funct
 
 
 // <rdar://problem/22143680> QoI: terrible diagnostic when trying to form a generic protocol
-protocol Animal<Food> {  // expected-error {{protocols do not allow generic parameters; use associated types instead}}
+protocol Animal<Food> {  // expected-error {{an associated type named 'Food' must be declared in the protocol 'Animal' or a protocol it inherits}}
   func feed(_ food: Food) // expected-error {{cannot find type 'Food' in scope}}
 }
 

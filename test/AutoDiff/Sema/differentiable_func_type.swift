@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 import _Differentiation
 
@@ -188,8 +188,6 @@ extension Vector: Differentiable where T: Differentiable {
 // expected-note@+1 2 {{found this candidate}}
 func inferredConformancesGeneric<T, U>(_: @differentiable(reverse) (Vector<T>) -> Vector<U>) {}
 
-// expected-error @+4 {{generic signature requires types 'Vector<T>' and 'Vector<T>.TangentVector' to be the same}}
-// expected-error @+3 {{generic signature requires types 'Vector<U>' and 'Vector<U>.TangentVector' to be the same}}
 // expected-error @+2 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(_linear)'}}
 // expected-error @+1 {{result type 'Vector<U>' does not conform to 'Differentiable' and satisfy 'Vector<U> == Vector<U>.TangentVector', but the enclosing function type is '@differentiable(_linear)'}}
 func inferredConformancesGenericLinear<T, U>(_: @differentiable(_linear) (Vector<T>) -> Vector<U>) {}
@@ -209,8 +207,6 @@ func diff(x: Vector<Float>) -> Vector<Float> {}
 inferredConformancesGeneric(diff) // okay!
 
 func inferredConformancesGenericResult<T, U>() -> @differentiable(reverse) (Vector<T>) -> Vector<U> {}
-// expected-error @+4 {{generic signature requires types 'Vector<T>' and 'Vector<T>.TangentVector' to be the same}}
-// expected-error @+3 {{generic signature requires types 'Vector<U>' and 'Vector<U>.TangentVector' to be the same}}
 // expected-error @+2 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(_linear)'}}
 // expected-error @+1 {{result type 'Vector<U>' does not conform to 'Differentiable' and satisfy 'Vector<U> == Vector<U>.TangentVector', but the enclosing function type is '@differentiable(_linear)'}}
 func inferredConformancesGenericResultLinear<T, U>() -> @differentiable(_linear) (Vector<T>) -> Vector<U> {}

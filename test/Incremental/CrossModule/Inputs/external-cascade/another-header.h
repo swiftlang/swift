@@ -1,1 +1,0 @@
-int ASymbolFromAnotherHeader = 43;

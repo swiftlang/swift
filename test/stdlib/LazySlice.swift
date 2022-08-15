@@ -6,7 +6,7 @@ import StdlibUnittest
 
 var tests = TestSuite("LazySlice")
 
-tests.test("CommuteLazyness") {
+tests.test("CommuteLaziness") {
   let a = [1,2,3].lazy
   let b = a[...]
   var c = b.filter { $0 == 0 }

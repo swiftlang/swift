@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module-path %t/foo.swiftmodule -Xfrontend -debug-generic-signatures -Xfrontend -requirement-machine-protocol-signatures=on %s 2>&1 | %FileCheck %s
+// RUN: %target-build-swift -emit-module-path %t/foo.swiftmodule -Xfrontend -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
 public protocol P { }
 public struct X<T: P> {

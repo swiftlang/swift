@@ -16,23 +16,29 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 
-#include "swift/ABI/TaskGroup.h"
-#include "swift/ABI/Task.h"
-#include "swift/ABI/Metadata.h"
-#include "swift/ABI/HeapObject.h"
-#include "TaskPrivate.h"
+#include "Debug.h"
 #include "TaskGroupPrivate.h"
+#include "TaskPrivate.h"
+#include "bitset"
+#include "queue" // TODO: remove and replace with usage of our mpsc queue
+#include "string"
+#include "swift/ABI/HeapObject.h"
+#include "swift/ABI/Metadata.h"
+#include "swift/ABI/Task.h"
+#include "swift/ABI/TaskGroup.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
-#include "Debug.h"
-#include "bitset"
-#include "string"
-#include "queue" // TODO: remove and replace with usage of our mpsc queue
+#include "swift/Threading/Mutex.h"
 #include <atomic>
+#include <new>
+
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+#include <mutex>
+#endif
+
 #include <assert.h>
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
@@ -278,8 +284,7 @@ public:
   };
 
 private:
-
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
   // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
   mutable std::mutex mutex_;
 
@@ -469,7 +474,7 @@ SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
   SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
 
-  TaskGroupImpl *impl = new (group) TaskGroupImpl(T);
+  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 

@@ -116,7 +116,7 @@ public:
   virtual void setup() {}
 
   /// Try to move solver forward by simplifying constraints if possible.
-  /// Such simplication might lead to either producing a solution, or
+  /// Such simplification might lead to either producing a solution, or
   /// creating a set of "follow-up" more granular steps to execute.
   ///
   /// \param prevFailed Indicate whether previous step
@@ -229,7 +229,7 @@ protected:
 
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
     auto &log = llvm::errs();
-    return indent ? log.indent(CS.solverState->depth * 2) : log;
+    return indent ? log.indent(CS.solverState->getCurrentIndent()) : log;
   }
 };
 
@@ -504,6 +504,11 @@ protected:
 
 public:
   StepResult take(bool prevFailed) override {
+    // Before attempting the next choice, let's check whether the constraint
+    // system is too complex already.
+    if (CS.isTooComplex(Solutions))
+      return done(/*isSuccess=*/false);
+
     while (auto choice = Producer()) {
       if (shouldSkip(*choice))
         continue;
@@ -514,7 +519,7 @@ public:
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "(attempting ";
-        choice->print(log, &CS.getASTContext().SourceMgr);
+        choice->print(log, &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent() + 2);
         log << '\n';
       }
 
@@ -697,10 +702,11 @@ private:
     // non-generic score indicates that there were no forced
     // unwrappings of optional(s), no unavailable overload
     // choices present in the solution, no fixes required,
-    // and there are no non-trivial function conversions.
+    // and there are no non-trivial user or function conversions.
     auto &score = BestNonGenericScore->Data;
     return (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-            score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0);
+            score[SK_Fix] == 0 && score[SK_UserConversion] == 0 &&
+            score[SK_FunctionConversion] == 0);
   }
 
   /// Attempt to apply given disjunction choice to constraint system.
@@ -776,6 +782,9 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   class SolverSnapshot {
     ConstraintSystem &CS;
 
+    /// The conjunction this snapshot belongs to.
+    Constraint *Conjunction;
+
     Optional<llvm::SaveAndRestore<DeclContext *>> DC = None;
 
     llvm::SetVector<TypeVariableType *> TypeVars;
@@ -789,8 +798,9 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   public:
     SolverSnapshot(ConstraintSystem &cs, Constraint *conjunction)
-        : CS(cs), TypeVars(std::move(cs.TypeVariables)) {
-      auto *locator = conjunction->getLocator();
+        : CS(cs), Conjunction(conjunction),
+          TypeVars(std::move(cs.TypeVariables)) {
+      auto *locator = Conjunction->getLocator();
       // If this conjunction represents a closure, we need to
       // switch declaration context over to it.
       if (locator->directlyAt<ClosureExpr>()) {
@@ -815,7 +825,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
       IsolationScope = std::make_unique<Scope>(CS);
 
       // Apply solution inferred for the conjunction.
-      CS.applySolution(solution);
+      applySolution(solution);
 
       // Add constraints to the graph after solution
       // has been applied to make sure that all type
@@ -849,6 +859,36 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
       auto &CG = CS.getConstraintGraph();
       for (auto &constraint : CS.InactiveConstraints)
         CG.addConstraint(&constraint);
+    }
+
+    void applySolution(const Solution &solution) {
+      CS.applySolution(solution);
+
+      if (!CS.shouldAttemptFixes())
+        return;
+
+      // If inference succeeded, we are done.
+      auto score = solution.getFixedScore();
+      if (score.Data[SK_Fix] == 0)
+        return;
+
+      // If this conjunction represents a closure and inference
+      // has failed, let's bind all of unresolved type variables
+      // in its interface type to holes to avoid extraneous
+      // fixes produced by outer context.
+
+      auto locator = Conjunction->getLocator();
+      if (locator->directlyAt<ClosureExpr>()) {
+        auto closureTy =
+            CS.getClosureType(castToExpr<ClosureExpr>(locator->getAnchor()));
+
+        CS.simplifyType(closureTy).visit([&](Type componentTy) {
+          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+            CS.assignFixedType(
+                typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
+          }
+        });
+      }
     }
   };
 
@@ -923,14 +963,20 @@ public:
 
     // Restore best score only if conjunction fails because
     // successful outcome should keep a score set by `restoreOuterState`.
-    if (HadFailure)
-      restoreOriginalScores();
+    if (HadFailure) {
+      auto solutionScore = Score();
+      restoreBestScore();
+      restoreCurrentScore(solutionScore);
+    }
 
     if (OuterTimeRemaining) {
       auto anchor = OuterTimeRemaining->first;
       auto remainingTime = OuterTimeRemaining->second;
       CS.Timer.emplace(anchor, CS, remainingTime);
     }
+    
+    if (CS.isDebugMode())
+      getDebugLogger() << ")\n";
   }
 
   StepResult resume(bool prevFailed) override;
@@ -976,16 +1022,19 @@ protected:
 
 private:
   /// Restore best and current scores as they were before conjunction.
-  void restoreOriginalScores() const {
-    CS.solverState->BestScore = BestScore;
+  void restoreCurrentScore(const Score &solutionScore) const {
     CS.CurrentScore = CurrentScore;
+    CS.increaseScore(SK_Fix, solutionScore.Data[SK_Fix]);
+    CS.increaseScore(SK_Hole, solutionScore.Data[SK_Hole]);
   }
+
+  void restoreBestScore() const { CS.solverState->BestScore = BestScore; }
 
   // Restore constraint system state before conjunction.
   //
   // Note that this doesn't include conjunction constraint
   // itself because we don't want to re-solve it.
-  void restoreOuterState() const;
+  void restoreOuterState(const Score &solutionScore) const;
 };
 
 } // end namespace constraints

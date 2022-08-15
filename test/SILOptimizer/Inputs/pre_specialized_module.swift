@@ -18,6 +18,7 @@ public func publicPrespecialized2<T>(_ t: T) { }
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where T == Double)
 @_alwaysEmitIntoClient
+@inline(never)
 internal func internalEmitIntoClientPrespecialized<T>(_ t: T) {
 }
 

@@ -12,7 +12,7 @@
 //
 // REQUIRES: asserts
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 import Swift

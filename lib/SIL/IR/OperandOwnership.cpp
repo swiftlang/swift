@@ -39,7 +39,7 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
-  // Allow module conventions to be overriden while lowering between canonical
+  // Allow module conventions to be overridden while lowering between canonical
   // and lowered SIL stages.
   SILModuleConventions silConv;
 
@@ -59,7 +59,7 @@ public:
   SILValue getValue() const { return op.get(); }
 
   ValueOwnershipKind getOwnershipKind() const {
-    return op.get().getOwnershipKind();
+    return op.get()->getOwnershipKind();
   }
 
   unsigned getOperandIndex() const { return op.getOperandNumber(); }
@@ -147,6 +147,7 @@ OPERAND_OWNERSHIP(TrivialUse, CheckedCastAddrBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondFail)
 OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
+OPERAND_OWNERSHIP(TrivialUse, ExplicitCopyAddr)
 OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
@@ -171,7 +172,6 @@ OPERAND_OWNERSHIP(TrivialUse, ObjCToThickMetatype)
 OPERAND_OWNERSHIP(TrivialUse, OpenExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, OpenExistentialMetatype)
 OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
-OPERAND_OWNERSHIP(TrivialUse, PointerToThinFunction)
 OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
@@ -180,7 +180,6 @@ OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
 OPERAND_OWNERSHIP(TrivialUse, TailAddr)
 OPERAND_OWNERSHIP(TrivialUse, ThickToObjCMetatype)
-OPERAND_OWNERSHIP(TrivialUse, ThinFunctionToPointer)
 OPERAND_OWNERSHIP(TrivialUse, ThinToThickFunction)
 OPERAND_OWNERSHIP(TrivialUse, TupleElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
@@ -260,8 +259,6 @@ OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
 OPERAND_OWNERSHIP(DestroyingConsume, MoveValue)
 
 // Instructions that move an owned value.
-OPERAND_OWNERSHIP(ForwardingConsume, CheckedCastValueBranch)
-OPERAND_OWNERSHIP(ForwardingConsume, UnconditionalCheckedCastValue)
 OPERAND_OWNERSHIP(ForwardingConsume, InitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, DeinitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, MarkUninitialized)
@@ -275,7 +272,7 @@ OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
 OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
 OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
 
-// Instructions that propagate a value value within a borrow scope.
+// Instructions that propagate a value within a borrow scope.
 OPERAND_OWNERSHIP(ForwardingBorrow, TupleExtract)
 OPERAND_OWNERSHIP(ForwardingBorrow, StructExtract)
 OPERAND_OWNERSHIP(ForwardingBorrow, DifferentiableFunctionExtract)
@@ -332,6 +329,8 @@ FORWARDING_OWNERSHIP(InitExistentialRef)
 FORWARDING_OWNERSHIP(DifferentiableFunction)
 FORWARDING_OWNERSHIP(LinearFunction)
 FORWARDING_OWNERSHIP(MarkMustCheck)
+FORWARDING_OWNERSHIP(MoveOnlyWrapperToCopyableValue)
+FORWARDING_OWNERSHIP(CopyableToMoveOnlyWrapperValue)
 #undef FORWARDING_OWNERSHIP
 
 // Arbitrary value casts are forwarding instructions that are also allowed to
@@ -434,7 +433,7 @@ OperandOwnershipClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   return OperandOwnership::TrivialUse;
 }
 
-// Get the OperandOwnership for instaneous apply, yield, and return uses.
+// Get the OperandOwnership for instantaneous apply, yield, and return uses.
 // This does not apply to uses that begin an explicit borrow scope in the
 // caller, such as begin_apply.
 static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
@@ -866,6 +865,8 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
 
   return OperandOwnership::TrivialUse;
 }
+
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRunInline)
 
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)

@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/InferViaDefaults.swiftmodule -enable-experimental-type-inference-from-defaults -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift
-// RUN: %target-swift-frontend -enable-experimental-type-inference-from-defaults -module-name main -typecheck -verify -I %t %s %S/Inputs/type_inference_via_defaults_other_module.swift
+// RUN: %target-build-swift -parse-as-library -emit-library -emit-module-path %t/InferViaDefaults.swiftmodule -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift -o %t/%target-library-name(InferViaDefaults)
+// RUN: %target-swift-frontend -typecheck -verify -lInferViaDefaults -module-name main -I %t -L %t %s
+
+import InferViaDefaults
 
 func testInferFromResult<T>(_: T = 42) -> T { fatalError() } // Ok
 
@@ -136,8 +138,8 @@ func main() {
   testMultiple(a: 0.0, b: "a")  // Ok
 
   // From a different module
-  with_defaults() // Ok
-  with_defaults("") // Ok
+  InferViaDefaults.with_defaults() // Ok
+  InferViaDefaults.with_defaults("") // Ok
 
   _ = S()[] // Ok
   _ = S()[B()] // Ok
@@ -166,4 +168,68 @@ func main() {
   takesCircle(.init()) // Ok
   takesRectangle(.init())
   // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
+}
+
+func test_magic_defaults() {
+  func with_magic(_: Int = #function) {} // expected-error {{default argument value of type 'String' cannot be converted to type 'Int'}}
+  func generic_with_magic<T>(_: T = #line) -> T {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'T'}}
+
+  let _ = with_magic()
+  let _: String = generic_with_magic()
+}
+
+// SR-16069
+func test_allow_same_type_between_dependent_types() {
+  struct Default : P {
+    typealias X = Int
+  }
+
+  struct Other : P {
+    typealias X = Int
+  }
+
+  struct S<T: P> {
+    func test<U: P>(_: U = Default()) where U.X == T.X { // expected-note {{where 'T.X' = 'String', 'U.X' = 'Default.X' (aka 'Int')}}
+    }
+  }
+
+  func test_ok<T: P>(s: S<T>) where T.X == Int {
+    s.test() // Ok: U == Default
+  }
+
+  func test_bad<T: P>(s: S<T>) where T.X == String {
+    s.test() // expected-error {{instance method 'test' requires the types 'String' and 'Default.X' (aka 'Int') be equivalent}}
+  }
+}
+
+// Crash when default type is requested before inherited constructor is type-checked
+
+protocol StorageType {
+  var identifier: String { get }
+}
+
+class Storage {
+}
+
+extension Storage {
+  struct Test {
+    static let test = CustomStorage<String>("") // triggers default type request
+  }
+}
+
+class BaseStorage<T> : Storage, StorageType {
+  enum StorageType {
+  case standard
+  }
+
+  let identifier: String
+  let type: StorageType
+
+  init(_ id: String, type: StorageType = .standard) {
+    self.identifier = id
+    self.type = type
+  }
+}
+
+final class CustomStorage<T>: BaseStorage<T> { // Ok - no crash typechecking inherited init
 }

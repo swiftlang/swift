@@ -62,6 +62,14 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
+void swift::simple_display(llvm::raw_ostream &out, ASTNode node) {
+  if (node) {
+    node.dump(out);
+  } else {
+    out << "null";
+  }
+}
+
 void swift::simple_display(llvm::raw_ostream &out, Type type) {
   if (type)
     type.print(out);
@@ -298,6 +306,29 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// isMoveOnly computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsMoveOnlyRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isMoveOnlyComputed)
+    return decl->LazySemanticInfo.isMoveOnly;
+
+  return None;
+}
+
+void IsMoveOnlyRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.isMoveOnlyComputed = true;
+  decl->LazySemanticInfo.isMoveOnly = value;
+
+  // Add an attribute for printing
+  if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+    decl->getAttrs().add(new (decl->getASTContext())
+                             MoveOnlyAttr(/*Implicit=*/true));
+}
+
+//----------------------------------------------------------------------------//
 // isDynamic computation.
 //----------------------------------------------------------------------------//
 
@@ -340,28 +371,26 @@ void RequirementSignatureRequest::cacheResult(RequirementSignature value) const 
 // Requirement computation.
 //----------------------------------------------------------------------------//
 
-WhereClauseOwner::WhereClauseOwner(GenericContext *genCtx): dc(genCtx) {
-  if (const auto whereClause = genCtx->getTrailingWhereClause())
-    source = whereClause;
-  else
-    source = genCtx->getGenericParams();
-}
+WhereClauseOwner::WhereClauseOwner(GenericContext *genCtx)
+    : dc(genCtx),
+      source(genCtx->getTrailingWhereClause()) {}
 
 WhereClauseOwner::WhereClauseOwner(AssociatedTypeDecl *atd)
     : dc(atd->getInnermostDeclContext()),
       source(atd->getTrailingWhereClause()) {}
 
 SourceLoc WhereClauseOwner::getLoc() const {
-  if (auto where = source.dyn_cast<TrailingWhereClause *>())
+  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
+    return genericParams->getWhereLoc();
+  } else if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
+    return attr->getLocation();
+  } else if (auto attr = source.dyn_cast<DifferentiableAttr *>()) {
+    return attr->getLocation();
+  } else if (auto where = source.dyn_cast<TrailingWhereClause *>()) {
     return where->getWhereLoc();
+  }
 
-  if (auto attr = source.dyn_cast<SpecializeAttr *>())
-    return attr->getLocation();
-
-  if (auto attr = source.dyn_cast<DifferentiableAttr *>())
-    return attr->getLocation();
-
-  return source.get<GenericParamList *>()->getWhereLoc();
+  return SourceLoc();
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -797,14 +826,6 @@ void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
   // into this request.  See rdar://55263708
 }
 
-void InferredGenericSignatureRequestRQM::noteCycleStep(DiagnosticEngine &d) const {
-  // For now, the GSB does a better job of describing the exact structure of
-  // the cycle.
-  //
-  // FIXME: We should consider merging the circularity handling the GSB does
-  // into this request.  See rdar://55263708
-}
-
 //----------------------------------------------------------------------------//
 // UnderlyingTypeRequest computation.
 //----------------------------------------------------------------------------//
@@ -1216,10 +1237,7 @@ Optional<Type> DefaultArgumentTypeRequest::getCachedResult() const {
   if (!defaultInfo)
     return None;
 
-  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
-    return None;
-
-  return defaultInfo->ExprType;
+  return defaultInfo->ExprType ? defaultInfo->ExprType : Optional<Type>();
 }
 
 void DefaultArgumentTypeRequest::cacheResult(Type type) const {
@@ -1456,6 +1474,12 @@ void swift::simple_display(llvm::raw_ostream &out,
     out << ")";
   }
 
+  if (import.options.contains(ImportFlags::Preconcurrency))
+    out << " preconcurrency";
+
+  if (import.options.contains(ImportFlags::WeakLinked))
+    out << " weak-linked";
+
   out << " ]";
 }
 
@@ -1551,7 +1575,8 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   case GlobalActor:
   case GlobalActorUnsafe:
     return forGlobalActor(
-        getGlobalActor().subst(subs), kind == GlobalActorUnsafe);
+        getGlobalActor().subst(subs), kind == GlobalActorUnsafe)
+              .withPreconcurrency(preconcurrency());
   }
   llvm_unreachable("unhandled actor isolation kind!");
 }
@@ -1560,7 +1585,11 @@ void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
   switch (state) {
     case ActorIsolation::ActorInstance:
-      out << "actor-isolated to instance of " << state.getActor()->getName();
+      out << "actor-isolated to instance of ";
+      if (state.isDistributedActor()) {
+        out << "distributed ";
+      }
+      out << "actor " << state.getActor()->getName();
       break;
 
     case ActorIsolation::Independent:

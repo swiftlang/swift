@@ -1,5 +1,5 @@
 from .Classification import classification_by_name
-from .Node import error  # noqa: I201
+from .Utils import error  # noqa: I201
 from .kinds import lowercase_first_word  # noqa: I201
 
 
@@ -37,11 +37,13 @@ class Keyword(Token):
     """
 
     def __init__(self, name, text, serialization_code,
-                 classification='Keyword'):
+                 classification='Keyword',
+                 requires_leading_space=False, requires_trailing_space=True):
         Token.__init__(self, name, 'kw_' + text, serialization_code,
                        unprefixed_kind=text, text=text,
                        classification=classification, is_keyword=True,
-                       requires_trailing_space=True)
+                       requires_leading_space=requires_leading_space,
+                       requires_trailing_space=requires_trailing_space)
 
     def macro_name(self):
         return "KEYWORD"
@@ -171,7 +173,8 @@ SYNTAX_TOKENS = [
     StmtKeyword('Defer', 'defer', serialization_code=23),
     StmtKeyword('If', 'if', serialization_code=24),
     StmtKeyword('Guard', 'guard', serialization_code=25),
-    StmtKeyword('Do', 'do', serialization_code=26),
+    StmtKeyword('Do', 'do', requires_trailing_space=False,
+                serialization_code=26),
     StmtKeyword('Repeat', 'repeat', serialization_code=27),
     StmtKeyword('Else', 'else', serialization_code=28),
     StmtKeyword('For', 'for', serialization_code=29),
@@ -184,21 +187,29 @@ SYNTAX_TOKENS = [
     StmtKeyword('Switch', 'switch', serialization_code=36),
     StmtKeyword('Case', 'case', serialization_code=37),
     StmtKeyword('Default', 'default', serialization_code=38),
-    StmtKeyword('Where', 'where', serialization_code=39),
-    StmtKeyword('Catch', 'catch', serialization_code=40),
+    StmtKeyword('Where', 'where', requires_leading_space=True,
+                serialization_code=39),
+    StmtKeyword('Catch', 'catch', requires_leading_space=True,
+                requires_trailing_space=False, serialization_code=40),
     StmtKeyword('Throw', 'throw', serialization_code=50),
 
     # Expression keywords
     ExprKeyword('As', 'as', serialization_code=41),
     ExprKeyword('Any', 'Any', serialization_code=42),
-    ExprKeyword('False', 'false', serialization_code=43),
+    ExprKeyword('False', 'false', requires_trailing_space=False,
+                serialization_code=43),
     ExprKeyword('Is', 'is', serialization_code=44),
-    ExprKeyword('Nil', 'nil', serialization_code=45),
+    ExprKeyword('Nil', 'nil', requires_trailing_space=False,
+                serialization_code=45),
     ExprKeyword('Rethrows', 'rethrows', serialization_code=46),
-    ExprKeyword('Super', 'super', serialization_code=47),
-    ExprKeyword('Self', 'self', serialization_code=48),
-    ExprKeyword('CapitalSelf', 'Self', serialization_code=49),
-    ExprKeyword('True', 'true', serialization_code=51),
+    ExprKeyword('Super', 'super', requires_trailing_space=False,
+                serialization_code=47),
+    ExprKeyword('Self', 'self', requires_trailing_space=False,
+                serialization_code=48),
+    ExprKeyword('CapitalSelf', 'Self', requires_trailing_space=False,
+                serialization_code=49),
+    ExprKeyword('True', 'true', requires_trailing_space=False,
+                serialization_code=51),
     ExprKeyword('Try', 'try', serialization_code=52),
     ExprKeyword('Throws', 'throws', serialization_code=53),
 
@@ -214,7 +225,8 @@ SYNTAX_TOKENS = [
     # Punctuators
     Punctuator('LeftParen', 'l_paren', text='(', serialization_code=88),
     Punctuator('RightParen', 'r_paren', text=')', serialization_code=89),
-    Punctuator('LeftBrace', 'l_brace', text='{', serialization_code=90),
+    Punctuator('LeftBrace', 'l_brace', text='{', requires_leading_space=True,
+               serialization_code=90),
     Punctuator('RightBrace', 'r_brace', text='}', serialization_code=91),
     Punctuator('LeftSquareBracket', 'l_square', text='[',
                serialization_code=92),
@@ -243,9 +255,8 @@ SYNTAX_TOKENS = [
     Punctuator('PrefixAmpersand', 'amp_prefix', text='&',
                requires_leading_space=True, requires_trailing_space=True, 
                serialization_code=96),
-    Punctuator('Arrow', 'arrow', text='->', requires_trailing_space=True,
-               serialization_code=78),
-
+    Punctuator('Arrow', 'arrow', text='->', requires_leading_space=True,
+               requires_trailing_space=True, serialization_code=78),
 
     Punctuator('Backtick', 'backtick', text='`', serialization_code=79),
 

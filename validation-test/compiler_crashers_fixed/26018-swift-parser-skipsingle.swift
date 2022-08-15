@@ -6,6 +6,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
+
+// https://github.com/apple/swift/issues/43187
+// RUN: %target-swift-ide-test -structure -source-filename=%s
+
 for
 {({{{class
 case,

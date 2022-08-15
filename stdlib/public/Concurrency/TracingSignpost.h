@@ -52,8 +52,11 @@
 #define SWIFT_LOG_ACTOR_STATE_CHANGED_NAME "actor_state_changed"
 #define SWIFT_LOG_ACTOR_JOB_QUEUE_NAME "actor_job_queue"
 #define SWIFT_LOG_TASK_LIFETIME_NAME "task_lifetime"
+#define SWIFT_LOG_TASK_FLAGS_CHANGED_NAME "task_flags_changed"
 #define SWIFT_LOG_TASK_STATUS_CHANGED_NAME "task_status_changed"
 #define SWIFT_LOG_TASK_WAIT_NAME "task_wait"
+#define SWIFT_LOG_TASK_CONTINUATION "task_continuation"
+#define SWIFT_LOG_TASK_CONTINUATION_AWAIT "task_continuation_await"
 #define SWIFT_LOG_JOB_ENQUEUE_GLOBAL_NAME "job_enqueue_global"
 #define SWIFT_LOG_JOB_ENQUEUE_GLOBAL_WITH_DELAY_NAME                           \
   "job_enqueue_global_with_delay"
@@ -66,7 +69,7 @@ namespace trace {
 
 extern os_log_t ActorLog;
 extern os_log_t TaskLog;
-extern OnceToken_t LogsToken;
+extern swift::once_t LogsToken;
 
 void setupLogs(void *unused);
 
@@ -77,7 +80,7 @@ void setupLogs(void *unused);
   do {                                                                         \
     if (!SWIFT_RUNTIME_WEAK_CHECK(os_signpost_enabled))                        \
       return __VA_ARGS__;                                                      \
-    SWIFT_ONCE_F(LogsToken, setupLogs, nullptr);                               \
+    swift::once(LogsToken, setupLogs, nullptr);                                \
   } while (0)
 
 // Every function does ENSURE_LOGS() before making any os_signpost calls, so
@@ -137,13 +140,17 @@ inline void actor_dequeue(HeapObject *actor, Job *job) {
 }
 
 inline void actor_state_changed(HeapObject *actor, Job *firstJob,
-                                bool needsPreprocessing, uintptr_t flags) {
+                                bool needsPreprocessing, uint8_t state,
+                                bool isDistributedRemote,
+                                bool isPriorityEscalated, uint8_t maxPriority) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
   os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_STATE_CHANGED_NAME,
                          "actor=%p needsPreprocessing=%d "
-                         "flags=0x%" PRIxPTR,
-                         actor, needsPreprocessing, flags);
+                         "state=%u isDistributedRemote=%{bool}d "
+                         "isPriorityEscalated=%{bool}d, maxPriority=%u",
+                         actor, needsPreprocessing, state, isDistributedRemote,
+                         isPriorityEscalated, maxPriority);
 }
 
 inline void actor_note_job_queue(HeapObject *actor, Job *first,
@@ -170,16 +177,21 @@ inline void actor_note_job_queue(HeapObject *actor, Job *first,
 // Task trace calls.
 
 inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
-                        AsyncLet *asyncLet) {
+                        AsyncLet *asyncLet, uint8_t jobPriority,
+                        bool isChildTask, bool isFuture, bool isGroupChildTask,
+                        bool isAsyncLetTask) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   auto parentID = parent ? parent->getTaskId() : 0;
   os_signpost_interval_begin(
       TaskLog, id, SWIFT_LOG_TASK_LIFETIME_NAME,
-      "task=%" PRIx64 " resumefn=%p flags=0x%" PRIx32
-      " parent=%" PRIx64 " group=%p asyncLet=%p",
-      task->getTaskId(), task->getResumeFunctionForLogging(),
-      task->Flags.getOpaqueValue(), parentID, group, asyncLet);
+      "task=%" PRIx64
+      " resumefn=%p jobPriority=%u isChildTask=%{bool}d, isFuture=%{bool}d "
+      "isGroupChildTask=%{bool}d isAsyncLetTask=%{bool}d parent=%" PRIx64
+      " group=%p asyncLet=%p",
+      task->getTaskId(), task->getResumeFunctionForLogging(), jobPriority,
+      isChildTask, isFuture, isGroupChildTask, isAsyncLetTask, parentID, group,
+      asyncLet);
 }
 
 inline void task_destroy(AsyncTask *task) {
@@ -189,30 +201,71 @@ inline void task_destroy(AsyncTask *task) {
                            "task=%" PRIx64 "", task->getTaskId());
 }
 
-inline void task_status_changed(AsyncTask *task, uintptr_t flags) {
+inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
+                                bool isCancelled, bool isEscalated,
+                                bool isRunning, bool isEnqueued) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
-  os_signpost_event_emit(TaskLog, id, SWIFT_LOG_TASK_STATUS_CHANGED_NAME,
-                         "task=%" PRIx64 " resumefn=%p flags=0x%" PRIxPTR,
-                         task->getTaskId(), task->getResumeFunctionForLogging(),
-                         flags);
+  os_signpost_event_emit(
+      TaskLog, id, SWIFT_LOG_TASK_STATUS_CHANGED_NAME,
+      "task=%" PRIx64 " resumefn=%p "
+      "maxPriority=%u, isCancelled=%{bool}d "
+      "isEscalated=%{bool}d, isRunning=%{bool}d, isEnqueued=%{bool}d",
+      task->getTaskId(), task->getResumeFunctionForLogging(), maxPriority,
+      isCancelled, isEscalated, isRunning, isEnqueued);
 }
 
-inline void task_flags_changed(AsyncTask *task, uint32_t flags) {
+inline void task_flags_changed(AsyncTask *task, uint8_t jobPriority,
+                               bool isChildTask, bool isFuture,
+                               bool isGroupChildTask, bool isAsyncLetTask) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
-  os_signpost_event_emit(TaskLog, id, SWIFT_LOG_TASK_STATUS_CHANGED_NAME,
-                         "task=%" PRIx64 " flags=0x%" PRIx32, task->getTaskId(),
-                         flags);
+  os_signpost_event_emit(
+      TaskLog, id, SWIFT_LOG_TASK_FLAGS_CHANGED_NAME,
+      "task=%" PRIx64 " jobPriority=%u isChildTask=%{bool}d, isFuture=%{bool}d "
+                      "isGroupChildTask=%{bool}d isAsyncLetTask=%{bool}d",
+      task->getTaskId(), jobPriority, isChildTask, isFuture, isGroupChildTask,
+      isAsyncLetTask);
 }
 
 inline void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   auto waitingID = waitingOn ? waitingOn->getTaskId() : 0;
-  os_signpost_event_emit(TaskLog, id, SWIFT_LOG_TASK_WAIT_NAME,
-                         "task=%" PRIx64 " waitingOnTask=%" PRIx64 " status=0x%" PRIxPTR,
-                         task->getTaskId(), waitingID, status);
+  os_signpost_interval_begin(TaskLog, id, SWIFT_LOG_TASK_WAIT_NAME,
+                             "task=%" PRIx64 " waitingOnTask=%" PRIx64
+                             " status=0x%" PRIxPTR,
+                             task->getTaskId(), waitingID, status);
+}
+
+inline void task_resume(AsyncTask *task) {
+  auto id = os_signpost_id_make_with_pointer(TaskLog, task);
+  os_signpost_interval_end(TaskLog, id, SWIFT_LOG_TASK_WAIT_NAME,
+                           "task=%" PRIx64, task->getTaskId());
+}
+
+inline void task_continuation_init(AsyncTask *task,
+                                   ContinuationAsyncContext *context) {
+  ENSURE_LOGS();
+  auto id = os_signpost_id_make_with_pointer(TaskLog, context);
+  os_signpost_interval_begin(TaskLog, id, SWIFT_LOG_TASK_CONTINUATION,
+                             "task=%" PRIx64 " context=%p", task->getTaskId(),
+                             context);
+}
+
+inline void task_continuation_await(ContinuationAsyncContext *context) {
+  ENSURE_LOGS();
+  auto id = os_signpost_id_make_with_pointer(TaskLog, context);
+  os_signpost_event_emit(TaskLog, id, SWIFT_LOG_TASK_CONTINUATION_AWAIT,
+                         "context=%p", context);
+}
+
+inline void task_continuation_resume(ContinuationAsyncContext *context,
+                                     bool error) {
+  ENSURE_LOGS();
+  auto id = os_signpost_id_make_with_pointer(TaskLog, context);
+  os_signpost_interval_end(TaskLog, id, SWIFT_LOG_TASK_CONTINUATION,
+                           "context=%p error=%{bool}d", context, error);
 }
 
 inline void job_enqueue_global(Job *job) {
@@ -244,30 +297,27 @@ inline void job_enqueue_main_executor(Job *job) {
   }
 }
 
-inline uint64_t job_run_begin(Job *job, ExecutorRef *executor) {
+inline job_run_info job_run_begin(Job *job) {
+  auto invalidInfo = []{
+    return job_run_info{ 0, OS_SIGNPOST_ID_INVALID };
+  };
+
   if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-    ENSURE_LOGS(0);
-    auto id = os_signpost_id_generate(TaskLog);
-    os_signpost_interval_begin(
-        TaskLog, id, SWIFT_LOG_JOB_RUN_NAME,
-        "task=%" PRIx64
-        " executorIdentity=%p executorImplementation=0x%" PRIxPTR,
-        task->getTaskId(), executor->getIdentity(),
-        executor->getRawImplementation());
-    return id;
+    ENSURE_LOGS(invalidInfo());
+    auto handle = os_signpost_id_generate(TaskLog);
+    auto taskId = task->getTaskId();
+    os_signpost_interval_begin(TaskLog, handle, SWIFT_LOG_JOB_RUN_NAME,
+                               "task=%" PRIx64, taskId);
+    return { taskId, handle };
   }
-  return 0;
+  return invalidInfo();
 }
 
-inline void job_run_end(Job *job, ExecutorRef *executor, uint64_t beginHandle) {
-  if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
+inline void job_run_end(job_run_info info) {
+  if (info.handle != OS_SIGNPOST_ID_INVALID) {
     ENSURE_LOGS();
-    os_signpost_interval_end(
-        TaskLog, beginHandle, SWIFT_LOG_JOB_RUN_NAME,
-        "task=%" PRIx64
-        " executorIdentity=%p executorImplementation=0x%" PRIxPTR,
-        task->getTaskId(), executor->getIdentity(),
-        executor->getRawImplementation());
+    os_signpost_interval_end(TaskLog, info.handle, SWIFT_LOG_JOB_RUN_NAME,
+                             "task=%" PRIx64, info.taskId);
   }
 }
 

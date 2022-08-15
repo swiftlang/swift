@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -compute-effects -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -196,28 +198,51 @@ bb5:
   return %a1 : $Int32
 }
 
-// CHECK-LABEL: sil @dont_promote_use_outside_loop
+// CHECK-LABEL: sil @dont_promote_with_crictical_exit_edge
 // CHECK: alloc_ref $XX
 // CHECK-NOT: dealloc_ref
-// CHECK: return
-sil @dont_promote_use_outside_loop : $@convention(thin) () -> Int32 {
+// CHECK: } // end sil function 'dont_promote_with_crictical_exit_edge'
+sil @dont_promote_with_crictical_exit_edge : $@convention(thin) () -> () {
 bb0:
   br bb1
 
 bb1:
   %o1 = alloc_ref $XX
-  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
-  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
   cond_br undef, bb1, bb2
 
 bb2:
-  %l1 = ref_element_addr %n1 : $XX, #XX.x
-  %l2 = load %l1 : $*Int32
-  strong_release %n1 : $XX
-  return %l2 : $Int32
+  strong_release %o1 : $XX
+  %r = tuple ()
+  return %r : $()
 }
 
-// CHECK-LABEL: sil @dont_promote_use_of_container_outside_loop
+// CHECK-LABEL: sil @promote_with_non_crictial_exit_edge
+// CHECK: bb1:
+// CHECK:   alloc_ref [stack] $XX
+// CHECK: bb2:
+// CHECK:   dealloc_stack_ref
+// CHECK: bb3:
+// CHECK:   strong_release
+// CHECK:   dealloc_stack_ref
+// CHECK: } // end sil function 'promote_with_non_crictial_exit_edge'
+sil @promote_with_non_crictial_exit_edge : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %o1 = alloc_ref $XX
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  strong_release %o1 : $XX
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_promote_use_of_container_outside_loop1
 // CHECK: bb0:
 // CHECK:   [[Y:%[0-9]+]] = alloc_ref [stack] $YY
 // CHECK: bb1:
@@ -226,8 +251,8 @@ bb2:
 // CHECK: bb2:
 // CHECK:   apply
 // CHECK:   dealloc_stack_ref [[Y]] : $YY
-// CHECK:   return
-sil @dont_promote_use_of_container_outside_loop : $@convention(thin) () -> () {
+// CHECK: } // end sil function 'dont_promote_use_of_container_outside_loop1'
+sil @dont_promote_use_of_container_outside_loop1 : $@convention(thin) () -> () {
 bb0:
   %y = alloc_ref $YY
   br bb1
@@ -245,11 +270,80 @@ bb2:
   return %t : $()
 }
 
-// CHECK-LABEL: sil @dont_promote_use_before_alloc
+// CHECK-LABEL: sil @dont_promote_use_of_container_outside_loop2
+// CHECK:   alloc_ref [stack] $YY
+// CHECK:   alloc_ref $XX
+// CHECK: } // end sil function 'dont_promote_use_of_container_outside_loop2'
+sil @dont_promote_use_of_container_outside_loop2 : $@convention(thin) () -> () {
+bb0:
+  %y = alloc_ref $YY
+  br bb1
+
+bb1:
+  %x = alloc_ref $XX
+  %rea = ref_element_addr %y : $YY, #YY.xx
+  store %x to %rea : $*XX
+  cond_br undef, bb1, bb2
+
+bb2:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @dont_promote_use_of_container_outside_loop3
+// CHECK:   alloc_ref [stack] $YY
+// CHECK:   alloc_ref $XX
+// CHECK: } // end sil function 'dont_promote_use_of_container_outside_loop3'
+sil @dont_promote_use_of_container_outside_loop3 : $@convention(thin) () -> () {
+bb0:
+  %y = alloc_ref $YY
+  br bb1
+
+bb1:
+  %x = alloc_ref $XX
+  %rea = ref_element_addr %y : $YY, #YY.xx
+  store %x to %rea : $*XX
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @dont_promote_use_of_container_outside_loop4
+// CHECK:   alloc_ref [stack] $YY
+// CHECK:   alloc_ref $XX
+// CHECK: } // end sil function 'dont_promote_use_of_container_outside_loop4'
+sil @dont_promote_use_of_container_outside_loop4 : $@convention(thin) () -> () {
+bb0:
+  %y = alloc_ref $YY
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  %x = alloc_ref $XX
+  %rea = ref_element_addr %y : $YY, #YY.xx
+  store %x to %rea : $*XX
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb1
+
+bb4:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil {{.*}}@dont_promote_use_before_alloc1
 // CHECK: alloc_ref $XX
 // CHECK-NOT: dealloc_ref
-// CHECK: return
-sil @dont_promote_use_before_alloc : $@convention(thin) (@guaranteed XX) -> Int32 {
+// CHECK: } // end sil function 'dont_promote_use_before_alloc1'
+sil @dont_promote_use_before_alloc1 : $@convention(thin) (@guaranteed XX) -> Int32 {
 bb0(%0 : $XX):
   br bb1(%0 : $XX)
 
@@ -263,6 +357,191 @@ bb1(%a1 : $XX):
 bb2:
   return %l2 : $Int32
 }
+
+// CHECK-LABEL: sil {{.*}}@dont_promote_use_before_alloc2
+// CHECK: alloc_ref $XX
+// CHECK: } // end sil function 'dont_promote_use_before_alloc2'
+sil @dont_promote_use_before_alloc2 : $@convention(thin) (@guaranteed XX) -> () {
+bb0(%0 : $XX):
+  br bb1(%0 : $XX)
+
+bb1(%a1 : $XX):
+  strong_release %a1 : $XX
+  %o1 = alloc_ref $XX
+  cond_br undef, bb2(%o1 : $XX), bb3
+
+bb2(%a2 : $XX):
+  br bb1(%a2 : $XX)
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+
+// CHECK-LABEL: sil {{.*}}@dont_promote_use_before_alloc3
+// CHECK: alloc_ref $XX
+// CHECK: } // end sil function 'dont_promote_use_before_alloc3'
+sil @dont_promote_use_before_alloc3 : $@convention(thin) (@guaranteed XX) -> () {
+bb0(%0 : $XX):
+  br bb1(%0 : $XX)
+
+bb1(%a0 : $XX):
+  br bb2(%a0 : $XX)
+
+bb2(%a1 : $XX):
+  strong_release %a1 : $XX
+  %o1 = alloc_ref $XX
+  cond_br undef, bb3(%o1 : $XX), bb4
+
+bb3(%a2 : $XX):
+  br bb1(%a2 : $XX)
+
+bb4:
+  %t = tuple ()
+  return %t : $()
+}
+
+
+// CHECK-LABEL: sil @dont_promote_use_before_alloc4
+// CHECK: alloc_ref $XX
+// CHECK: } // end sil function 'dont_promote_use_before_alloc4'
+sil @dont_promote_use_before_alloc4 : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $XX
+  br bb1
+
+bb1:
+  %l = load %s : $*XX
+  strong_release %l : $XX
+  %o1 = alloc_ref $XX
+  store %o1 to %s : $*XX
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %s : $*XX
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @promote_with_container_in_loop
+// CHECK: bb1:
+// CHECK:   alloc_ref [stack] $YY
+// CHECK: bb2:
+// CHECK:   alloc_ref [stack] $XX
+// CHECK:   dealloc_stack_ref %{{[0-9]+}} : $XX
+// CHECK:   dealloc_stack_ref %{{[0-9]+}} : $YY
+// CHECK: bb3:
+// CHECK: } // end sil function 'promote_with_container_in_loop'
+sil @promote_with_container_in_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %y = alloc_ref $YY
+  br bb2
+
+bb2:
+  %x = alloc_ref $XX
+  %rea = ref_element_addr %y : $YY, #YY.xx
+  store %x to %rea : $*XX
+  cond_br undef, bb1, bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+
+// CHECK-LABEL: sil {{.*}}@dont_promote_not_dominated_use
+// CHECK: alloc_ref $XX
+// CHECK: } // end sil function 'dont_promote_not_dominated_use'
+sil @dont_promote_not_dominated_use : $@convention(thin) (@guaranteed XX) -> () {
+bb0(%0 : $XX):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $XX)
+
+bb2:
+  %o1 = alloc_ref $XX
+  br bb3(%o1 : $XX)
+
+bb3(%a1 : $XX):
+  strong_release %a1 : $XX
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @promote_with_not_post_dominating_container
+// CHECK: bb0:
+// CHECK:   alloc_ref [stack] $YY
+// CHECK: bb1:
+// CHECK:   apply
+// CHECK:   dealloc_stack_ref %{{[0-9]+}} : $YY
+// CHECK: bb2:
+// CHECK:   alloc_ref [stack] $XX
+// CHECK:   store
+// CHECK:   dealloc_stack_ref %{{[0-9]+}} : $XX
+// CHECK:   dealloc_stack_ref %{{[0-9]+}} : $YY
+// CHECK: bb3:
+// CHECK: } // end sil function 'promote_with_not_post_dominating_container'
+sil @promote_with_not_post_dominating_container : $@convention(thin) () -> () {
+bb0:
+  %y = alloc_ref $YY
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f1 = function_ref @take_y : $@convention(thin) (@owned YY) -> ()
+  %a = apply %f1(%y) : $@convention(thin) (@owned YY) -> ()
+  br bb3
+
+bb2:
+  %x = alloc_ref $XX
+  %rea = ref_element_addr %y : $YY, #YY.xx
+  store %x to %rea : $*XX
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @dont_promote_no_outermost_dominating_block
+// CHECK: alloc_ref $YY
+// CHECK: alloc_ref $YY
+// CHECK: alloc_ref $XX
+// CHECK: } // end sil function 'dont_promote_no_outermost_dominating_block'
+sil @dont_promote_no_outermost_dominating_block : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+bb1:
+  %y1 = alloc_ref $YY
+  br bb3(%y1 : $YY)
+bb2:
+  %y2 = alloc_ref $YY
+  br bb3(%y2 : $YY)
+
+bb3(%ya : $YY):
+  br bb4
+
+bb4:
+  %x = alloc_ref $XX
+  %rea = ref_element_addr %ya : $YY, #YY.xx
+  store %x to %rea : $*XX
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb4
+
+bb6:
+  %t = tuple ()
+  return %t : $()
+}
+
 
 // CHECK-LABEL: sil @promote_with_use_in_loop
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
@@ -568,8 +847,8 @@ bb0(%0 : $Int):
   return %11 : $Array<Int>
 }
 
-sil [_semantics "array.uninitialized"] @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
-sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+sil [escapes %0.v** => %r.0] [_semantics "array.uninitialized"] @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+sil [escapes !%2.v**] [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
 
 sil @take_array : $@convention(thin) (@owned Array<Int>) -> () {
 bb0(%0 : $Array<Int>):
@@ -831,16 +1110,13 @@ bb0(%0 : $XX):
   return %1 : $XX
 }
 
-// FIXME: Stack promotion currently fails whenever the last use is a
-// terminator. This is a ridiculous limitation.
-//
 // CHECK-LABEL: sil @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error Error) {
-// CHECK:        alloc_ref $XX
+// CHECK:        alloc_ref [stack] $XX
 // CHECK:        try_apply
 // CHECK:      bb1(%{{.*}} : $XX):
-// CHECK-NEXT:   return
+// CHECK-NEXT:   dealloc_stack_ref
 // CHECK:      bb2(%{{.*}}: $Error):
-// CHECK-NEXT:   throw
+// CHECK-NEXT:   dealloc_stack_ref
 // CHECK-LABEL: } // end sil function 'testUsedByTryApply'
 sil @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error Error) {
 bb0:
@@ -859,7 +1135,7 @@ final class UnownedLink {
   @_hasStorage unowned var link: @sil_unowned UnownedLink
 }
 
-// CHECK-LABEL: sil @dont_promote_escaping_through_unowned
+// CHECK-LABEL: sil {{.*}}@dont_promote_escaping_through_unowned
 // CHECK:         alloc_ref $UnownedLink
 // CHECK-NOT:     dealloc_ref
 // CHECK-LABEL: } // end sil function 'dont_promote_escaping_through_unowned'

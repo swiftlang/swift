@@ -8,7 +8,7 @@ protocol ClassProtocol: AnyObject { func method() }
 
 class C: ClassProtocol { func method() {} }
 
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> ()
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] {{.*}}@test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> ()
 sil @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> () {
 // CHECK-NEXT: //
 // CHECK-NEXT: bb0(%0 : $*ClassProtocol):
@@ -33,14 +33,14 @@ bb0(%0 : $*ClassProtocol):
 sil @test_indirect_class_protocol_guaranteed : $@convention(thin) (@in_guaranteed ClassProtocol) -> () {
 bb0(%0 : $*ClassProtocol):
   %1 = load %0 : $*ClassProtocol
-  %2 = open_existential_ref %1 : $ClassProtocol to $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol
-  %f = witness_method $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol, #ClassProtocol.method : <Self: ClassProtocol> (Self) -> () -> (), %2 : $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
-  apply %f<@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol>(%2) : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
+  %2 = open_existential_ref %1 : $ClassProtocol to $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF", ClassProtocol) Self
+  %f = witness_method $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF", ClassProtocol) Self, #ClassProtocol.method : <Self: ClassProtocol> (Self) -> () -> (), %2 : $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF", ClassProtocol) Self : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
+  apply %f<@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF", ClassProtocol) Self>(%2) : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
   return undef : $()
 }
 
 // Check that a specialization of test_indirect_class_protocol is created.
-// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5 : $@convention(thin) (@owned C) -> ()
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] {{.*}}@$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5 : $@convention(thin) (@owned C) -> ()
 // CHECK-NEXT: //
 // CHECK-NEXT: bb0(%0 : $C):
 // CHECK-NEXT: strong_release %0

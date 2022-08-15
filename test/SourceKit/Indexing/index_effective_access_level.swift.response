@@ -440,7 +440,6 @@
                   key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValuexvs",
                   key.line: 56,
                   key.column: 14,
-                  key.receiver_usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
                   key.is_implicit: 1
                 }
               ]

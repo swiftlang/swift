@@ -461,9 +461,9 @@ bb0(%out : $*Int, %i : $Int, %e : $Error):
   %eload = load %pebAccess : $*SomeError
   end_access %pebAccess : $*SomeError
 
-  %oeb = open_existential_box %e : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  %oebAccess = begin_access [read] [dynamic] %oeb : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  end_access %oebAccess : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  %oeb = open_existential_box %e : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  %oebAccess = begin_access [read] [dynamic] %oeb : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  end_access %oebAccess : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
 
   %v = tuple ()
   return %v : $()
@@ -722,4 +722,26 @@ bb3(%7 : $Builtin.RawPointer):
   %10 = load %9 : $*Int64
   end_access %9 : $*Int64
   return %10 : $Int64
+}
+
+// Test storage for SIL global variable declations.
+
+sil_global hidden @testGlobal : $Builtin.Int64
+
+sil hidden [global_init] @testAddressor : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %4 = global_addr @testGlobal : $*Builtin.Int64
+  %5 = address_to_pointer %4 : $*Builtin.Int64 to $Builtin.RawPointer
+  return %5 : $Builtin.RawPointer
+}
+
+sil hidden [transparent] @testGetter : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %2 = function_ref @testAddressor : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Int64
+  %5 = begin_access [read] [dynamic] %4 : $*Builtin.Int64
+  %6 = load %5 : $*Builtin.Int64
+  end_access %5 : $*Builtin.Int64
+  return %6 : $Builtin.Int64
 }

@@ -237,24 +237,26 @@ bool hasNonTrivialNonDebugTransitiveUsers(
 /// operators to access functionality from the underlying instruction when
 /// needed.
 struct DebugVarCarryingInst {
-  enum class Kind {
+  enum class Kind : uint8_t {
     Invalid = 0,
     DebugValue,
     AllocStack,
     AllocBox,
   };
 
-  Kind kind;
   SILInstruction *inst;
+  Kind kind;
+  uintptr_t spareBits : (sizeof(uintptr_t) - sizeof(Kind)) * 8;
 
-  DebugVarCarryingInst() : kind(Kind::Invalid), inst(nullptr) {}
+  DebugVarCarryingInst() : inst(nullptr), kind(Kind::Invalid), spareBits(0) {}
   DebugVarCarryingInst(DebugValueInst *dvi)
-      : kind(Kind::DebugValue), inst(dvi) {}
+      : inst(dvi), kind(Kind::DebugValue), spareBits(0) {}
   DebugVarCarryingInst(AllocStackInst *asi)
-      : kind(Kind::AllocStack), inst(asi) {}
-  DebugVarCarryingInst(AllocBoxInst *abi) : kind(Kind::AllocBox), inst(abi) {}
+      : inst(asi), kind(Kind::AllocStack), spareBits(0) {}
+  DebugVarCarryingInst(AllocBoxInst *abi)
+      : inst(abi), kind(Kind::AllocBox), spareBits(0) {}
   DebugVarCarryingInst(SILInstruction *newInst)
-      : kind(Kind::Invalid), inst(nullptr) {
+      : inst(nullptr), kind(Kind::Invalid), spareBits(0) {
     switch (newInst->getKind()) {
     default:
       return;
@@ -279,6 +281,15 @@ struct DebugVarCarryingInst {
   /// Enable one to access the methods of the wrapped instruction using
   /// '->'. This keeps the wrapper light weight.
   SILInstruction *operator->() const { return inst; }
+
+  bool operator==(const DebugVarCarryingInst &other) const {
+    return kind == other.kind && inst == other.inst &&
+           spareBits == other.spareBits;
+  }
+
+  bool operator!=(const DebugVarCarryingInst &other) const {
+    return !(*this == other);
+  }
 
   /// Add support for this struct in `if` statement.
   explicit operator bool() const { return bool(kind); }
@@ -336,6 +347,40 @@ struct DebugVarCarryingInst {
     case Kind::AllocStack:
       cast<AllocStackInst>(inst)->markAsMoved();
       break;
+    case Kind::AllocBox:
+      llvm_unreachable("Not implemented");
+    }
+  }
+
+  /// Returns true if this DebugVarCarryingInst was moved.
+  bool getWasMoved() const {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(inst)->getWasMoved();
+    case Kind::AllocStack:
+      return cast<AllocStackInst>(inst)->getWasMoved();
+    case Kind::AllocBox:
+      // We do not support moving alloc box today, so we always return false.
+      return false;
+    }
+  }
+
+  /// If we are attempting to create a "debug_value" clone of this debug var
+  /// carrying inst, return the appropriate SILValue to use as the operand of
+  /// that debug value.
+  ///
+  /// For a debug_value, we just return the actual operand, otherwise we return
+  /// the pointer address.
+  SILValue getOperandForDebugValueClone() const {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(inst)->getOperand();
+    case Kind::AllocStack:
+      return cast<AllocStackInst>(inst);
     case Kind::AllocBox:
       llvm_unreachable("Not implemented");
     }

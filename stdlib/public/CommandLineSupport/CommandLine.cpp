@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <algorithm>
 #include <cassert>
 #include <climits>
 #include <cstdarg>
@@ -22,12 +23,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
-#include <vector>
 
 #include "swift/Runtime/Debug.h"
 
 #include "../SwiftShims/GlobalObjects.h"
 #include "../SwiftShims/RuntimeStubs.h"
+#include "../SwiftShims/Visibility.h"
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -46,118 +47,210 @@ void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
   _swift_stdlib_ProcessOverrideUnsafeArgc = argc;
 }
 
+namespace swift {
+  /// A platform-specific implementation of @c _swift_stdlib_getUnsafeArgvArgc.
+  /// 
+  /// This function should return @c argc and @c argv cheaply (ideally in
+  /// constant time and without needing to allocate.) If it cannot do so,
+  /// it should return @c nullptr, at which point the caller can call
+  /// @c enumerateUnsafeArgv() in order to reconstruct @c argv locally.
+  /// 
+  /// The result of this function is @em not owned by the caller and should
+  /// persist for the lifetime of the process.
+  static char **getUnsafeArgvArgc(int *outArgLen);
+
+  /// A platform-specific function that enumerates the contents of @c argv
+  /// one argument at a time.
+  /// 
+  /// @a body is a function that takes two arguments:
+  /// 
+  /// - The first argument is the value of @c argc if it can be readily
+  ///   computed, or @c -1 otherwise.
+  /// - The second argument is the element of @c argv being enumerated. The
+  ///   caller makes a copy of this string. The implementation should not
+  ///   enumerate the trailing @c nullptr required by the C standard.
+  /// 
+  /// Callers should call @c getUnsafeArgvArgc() before calling this function
+  /// in case a fast path is available. If that function is implemented on this
+  /// platform, then this function does not need to be implemented.
+  template <typename F>
+  static void enumerateUnsafeArgv(const F& body);
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+  assert(outArgLen != nullptr);
+
+  // Check the override before doing any platform-specific work.
+  if (SWIFT_UNLIKELY(_swift_stdlib_ProcessOverrideUnsafeArgv)) {
+    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
+    return _swift_stdlib_ProcessOverrideUnsafeArgv;
+  }
+
+  // Try the platform-specific fast path that avoids heap (re)allocation. Not
+  // all platforms implement this function.
+  if (auto argv = swift::getUnsafeArgvArgc(outArgLen)) {
+    return argv;
+  }
+
+  // Take a slower path wherein we construct the argv array one element at a
+  // time. If the enumeration function can provide us with a hint for argc, we
+  // can avoid calling realloc() more than once.
+  int maxArgc = 0;
+  int argc = 0;
+  char **argv = nullptr;
+  swift::enumerateUnsafeArgv([&] (int maxArgcHint, const char *arg) {
+    if (argc >= maxArgc) {
+      if (maxArgcHint > maxArgc) {
+        // The platform was able to cheaply get argc, so use the
+        // provided value.
+        maxArgc = maxArgcHint;
+      } else {
+        // The platform could not tell us argc, so grow the argument array by
+        // small amounts. We assume here that the command line doesn't usually
+        // have many arguments, so a small/linear growth factor should be safe.
+        //
+        // If we ask for space for 15 arguments on the first allocation, then
+        // when we call realloc (asking for additional space for the trailing
+        // nullptr), we'll avoid wasting memory due to malloc()'s granularity.
+        maxArgc = (maxArgc == 0) ? 15 : (maxArgc + 16);
+      }
+
+      // Reallocate (or initially allocate) the argv buffer. Overallocate by
+      // one element to allow for a trailing nullptr.
+      // 
+      // NOTE: It is intentional that we do not simply use std::vector here.
+      // STL collections may call operator new() which can be overridden by 
+      // client code and that client code could call back into Swift.
+      size_t argvSize = sizeof(char *) * (maxArgc + 1);
+      argv = reinterpret_cast<char **>(realloc(argv, argvSize));
+      if (!argv) {
+        swift::fatalError(0,
+          "Fatal error: Could not allocate space for %d commandline "
+          " arguments: %d\n",
+          argc, errno);
+      }
+    }
+
+    argv[argc] = strdup(arg);
+    argc += 1;
+  });
+
+  if (argv) {
+    // Ensure the arguments array has a trailing nullptr, per the C standard.
+    argv[argc] = nullptr;
+
+  } else {
+    // We didn't get any arguments and never ended up allocating an array.
+    // Return an empty array (save for the trailing nullptr) instead.
+    static char *emptyArgv[] = { nullptr };
+    argc = 0;
+    argv = emptyArgv;
+  }
+
+  *outArgLen = argc;
+  return argv;
+}
+
 #if defined(__APPLE__)
 // NOTE: forward declare this rather than including crt_externs.h as not all
 // SDKs provide it
 extern "C" char ***_NSGetArgv(void);
 extern "C" int *_NSGetArgc(void);
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
-  assert(outArgLen != nullptr);
-
-  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
-    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
-    return _swift_stdlib_ProcessOverrideUnsafeArgv;
-  }
-
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
   *outArgLen = *_NSGetArgc();
   return *_NSGetArgv();
 }
+
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) { }
 #elif defined(__linux__) || defined(__CYGWIN__)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
-  assert(outArgLen != nullptr);
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
+  return nullptr;
+}
 
-  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
-    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
-    return _swift_stdlib_ProcessOverrideUnsafeArgv;
-  }
-
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) {
   FILE *cmdline = fopen("/proc/self/cmdline", "rb");
   if (!cmdline) {
-    swift::fatalError(
-        0, "Fatal error: Unable to open interface to '/proc/self/cmdline'.\n");
+    swift::fatalError(0,
+      "Fatal error: Unable to open interface to '/proc/self/cmdline': %d.\n",
+      errno);
   }
+
   char *arg = nullptr;
   size_t size = 0;
-  std::vector<char *> argvec;
-  while (getdelim(&arg, &size, 0, cmdline) != -1) {
-    argvec.push_back(strdup(arg));
+  while (getdelim(&arg, &size, '\0', cmdline) != -1) {
+    body(-1, arg);
   }
   if (arg) {
     free(arg);
   }
-  fclose(cmdline);
-  *outArgLen = argvec.size();
-  auto outBuf = static_cast<char **>(calloc(argvec.size() + 1, sizeof(char *)));
-  std::copy(argvec.begin(), argvec.end(), outBuf);
-  outBuf[argvec.size()] = nullptr;
 
-  return outBuf;
+  fclose(cmdline);
 }
 #elif defined(_WIN32)
 #include <stdlib.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
-  assert(outArgLen != nullptr);
+namespace swift {
+  /// Convert an argument, represented by a wide string, to UTF-8.
+  ///
+  /// @param str The string to convert.
+  /// 
+  /// @returns The string, converted to UTF-8. The caller is responsible for
+  ///   freeing this string when done with it.
+  /// 
+  /// If @a str cannot be converted to UTF-8, a fatal error occurs.
+  static char *copyUTF8FromWide(wchar_t *str) {
+    char *result = nullptr;
 
-  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
-    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
-    return _swift_stdlib_ProcessOverrideUnsafeArgv;
+    int resultLength = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, str,
+      -1, nullptr, 0, nullptr, nullptr);
+    if (resultLength <= 0) {
+      swift::fatalError(0,
+        "Fatal error: Could not get length of commandline "
+        "argument '%ls': %lu\n",
+        str, GetLastError());
+    }
+
+    result = reinterpret_cast<char *>(malloc(resultLength));
+    if (!result) {
+      swift::fatalError(0,
+        "Fatal error: Could not allocate space for commandline "
+        "argument '%ls': %d\n",
+        str, errno);
+    }
+
+    resultLength = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, str, -1,
+      result, resultLength, nullptr, nullptr);
+    if (resultLength <= 0) {
+      swift::fatalError(0,
+        "Fatal error: Conversion to UTF-8 failed for "
+        "commandline argument '%ls': %lu\n",
+        str, GetLastError());
+    }
+
+    return result;
   }
+}
 
-  *outArgLen = 0;
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
+  return nullptr;
+}
 
-  LPWSTR *szArgList;
-  int nArgs;
-  szArgList = CommandLineToArgvW(GetCommandLineW(), &nArgs);
-  if (szArgList == nullptr)
-    return nullptr;
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) {
+  int argc = 0;
+  if (LPWSTR *wargv = CommandLineToArgvW(GetCommandLineW(), &argc)) {
+    std::for_each(wargv, wargv + argc, [=] (wchar_t *warg) {
+      auto arg = copyUTF8FromWide(warg);
+      body(argc, arg);
+      free(arg);
+    });
 
-  std::vector<char *> argv;
-  for (int i = 0; i < nArgs; ++i) {
-    int szBufferSize =
-        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, szArgList[i], -1,
-                            nullptr, 0, nullptr, nullptr);
-    if (szBufferSize == 0) {
-      swift::fatalError(0,
-                        "Fatal error: Could not retrieve commandline "
-                        "arguments: %u\n",
-                        GetLastError());
-      return nullptr;
-    }
-
-    char *buffer = static_cast<char *>(
-        calloc(static_cast<size_t>(szBufferSize), sizeof(char)));
-    if (buffer == nullptr) {
-      swift::fatalError(0,
-                        "Fatal error: Could not allocate space for commandline"
-                        "arguments");
-      return nullptr;
-    }
-
-    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, szArgList[i], -1,
-                             buffer, szBufferSize, nullptr, nullptr)) {
-      swift::fatalError(0,
-                        "Fatal error: Conversion to UTF-8 failed for "
-                        "commandline arguments");
-      return nullptr;
-    }
-
-    argv.push_back(buffer);
+    LocalFree(wargv);
   }
-
-  LocalFree(szArgList);
-
-  char **args = static_cast<char **>(calloc(argv.size() + 1, sizeof(char *)));
-  std::copy(argv.begin(), argv.end(), args);
-  args[argv.size()] = nullptr;
-
-  assert(argv.size() < INT_MAX && "overflow");
-  *outArgLen = static_cast<int>(argv.size());
-  return args;
 }
 #elif defined(__FreeBSD__)
 #include <errno.h>
@@ -166,15 +259,12 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #include <sys/types.h>
 #include <unistd.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
-  assert(outArgLen != nullptr);
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
+  return nullptr;
+}
 
-  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
-    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
-    return _swift_stdlib_ProcessOverrideUnsafeArgv;
-  }
-
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) {
   char *argPtr = nullptr; // or use ARG_MAX? 8192 is used in LLDB though..
   int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_ARGS, getpid()};
   size_t argPtrSize = 0;
@@ -200,32 +290,17 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   char *curPtr = argPtr;
   char *endPtr = argPtr + argPtrSize;
 
-  std::vector<char *> argvec;
-  for (; curPtr < endPtr; curPtr += strlen(curPtr) + 1)
-    argvec.push_back(strdup(curPtr));
-  *outArgLen = argvec.size();
-  auto outBuf = static_cast<char **>(calloc(argvec.size() + 1, sizeof(char *)));
-  std::copy(argvec.begin(), argvec.end(), outBuf);
-  outBuf[argvec.size()] = nullptr;
-
+  for (; curPtr < endPtr; curPtr += strlen(curPtr) + 1) {
+    body(-1, curPtr);
+  }
   free(argPtr);
-
-  return outBuf;
 }
 #elif defined(__wasi__)
 #include <stdlib.h>
 #include <wasi/api.h>
 #include <wasi/libc.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
-  assert(outArgLen != nullptr);
-
-  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
-    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
-    return _swift_stdlib_ProcessOverrideUnsafeArgv;
-  }
-
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
   __wasi_errno_t err;
 
   size_t argv_buf_size = 0;
@@ -253,52 +328,37 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   return argv;
 }
+
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) { }
 #elif defined(__OpenBSD__)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/exec.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
-  assert(outArgLen != nullptr);
-  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
-    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
-    return _swift_stdlib_ProcessOverrideUnsafeArgv;
-  }
-
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
   int mib[2] = {CTL_VM, VM_PSSTRINGS};
   struct _ps_strings _ps;
   size_t len = sizeof(_ps);
 
   if (sysctl(mib, 2, &_ps, &len, NULL, 0) == -1) {
-    char **empty_argv = static_cast<char **>(calloc(1, sizeof(char *)));
-    empty_argv[0] = nullptr;
-    *outArgLen = 0;
-    return empty_argv;
+    return nullptr;
   }
 
   struct ps_strings *ps = static_cast<struct ps_strings *>(_ps.val);
   *outArgLen = ps->ps_nargvstr;
-
-  char **argv_copy =
-      static_cast<char **>(calloc(ps->ps_nargvstr + 1, sizeof(char *)));
-  for(int i = 0; i < ps->ps_nargvstr; i++) {
-    argv_copy[i] = strdup(ps->ps_argvstr[i]);
-  }
-  argv_copy[ps->ps_nargvstr] = nullptr;
-
-  return argv_copy;
+  return ps->ps_argvstr;
 }
-#else // Add your favorite OS's command line arg grabber here.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
-  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
-    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
-    return _swift_stdlib_ProcessOverrideUnsafeArgv;
-  }
 
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) { }
+#else // Add your favorite OS's command line arg grabber here.
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
   swift::fatalError(
       0,
       "Fatal error: Command line arguments not supported on this platform.\n");
 }
+
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) { }
 #endif

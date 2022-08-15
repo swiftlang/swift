@@ -297,7 +297,9 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
 
   // If the argument is existential, open it.
   if (argTy->isClassExistentialType()) {
-    auto openedTy = OpenedArchetypeType::get(argTy->getCanonicalType());
+    auto openedTy =
+        OpenedArchetypeType::get(argTy->getCanonicalType(),
+                                 SGF.F.getGenericSignature());
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     arg = SGF.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
   }
@@ -790,7 +792,8 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
   
   // If the argument is existential, open it.
   if (sourceType->isClassExistentialType()) {
-    auto openedTy = OpenedArchetypeType::get(sourceType->getCanonicalType());
+    auto openedTy = OpenedArchetypeType::get(sourceType->getCanonicalType(),
+                                             SGF.F.getGenericSignature());
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     ref = SGF.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
   }
@@ -1414,6 +1417,43 @@ static ManagedValue emitBuiltinGetCurrentExecutor(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&preparedArgs, SGFContext C) {
   return ManagedValue::forUnmanaged(SGF.emitGetCurrentExecutor(loc));
+}
+
+// Emit SIL for sizeof/strideof/alignof.
+// These formally take a metatype argument that's never actually used, so
+// we ignore it.
+static ManagedValue emitBuiltinSizeof(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forUnmanaged(
+    SGF.B.createBuiltin(loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Sizeof)),
+      SILType::getBuiltinWordType(ctx),
+      subs,
+      {}));
+}
+static ManagedValue emitBuiltinStrideof(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forUnmanaged(
+    SGF.B.createBuiltin(loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Strideof)),
+      SILType::getBuiltinWordType(ctx),
+      subs,
+      {}));
+}
+static ManagedValue emitBuiltinAlignof(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forUnmanaged(
+    SGF.B.createBuiltin(loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Alignof)),
+      SILType::getBuiltinWordType(ctx),
+      subs,
+      {}));
 }
 
 // Helper to lower a function argument to be usable as the entry point of a

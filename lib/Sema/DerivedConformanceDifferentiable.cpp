@@ -130,7 +130,7 @@ static Type getTangentVectorInterfaceType(Type contextualType,
 /// `TangentVector` as `Self` in the given conformance context.
 static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
                                          DeclContext *DC) {
-  // `Self` must not be a class declaraiton.
+  // `Self` must not be a class declaration.
   if (nominal->getSelfClassDecl())
     return false;
 
@@ -651,7 +651,7 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
       return deriveDifferentiable_move(*this);
   }
 
-  // Otheriwse, return nullptr.
+  // Otherwise, return nullptr.
   return nullptr;
 }
 

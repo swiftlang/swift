@@ -134,7 +134,7 @@ func test_varArgs5() {
   // the GP register-save area after the SSE register-save area was
   // exhausted, rather than spilling into the overflow argument area.
   //
-  // This is not caught by test_varArgs1 above, because it exhauses the
+  // This is not caught by test_varArgs1 above, because it exhausts the
   // GP register-save area before the SSE area.
 
   var format = "rdar-32547102: "

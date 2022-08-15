@@ -189,9 +189,9 @@ bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
   %2a = project_box %2 : ${ var LogicValue }, 0
 // CHECK:  %2 = alloc_stack $LogicValue
   copy_addr [take] %0 to [initialization] %2a : $*LogicValue
-  %6 = open_existential_addr mutable_access %2a : $*LogicValue to $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue
-  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") LogicValue, #LogicValue.getLogicValue, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
-  %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000") LogicValue>(%6) : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
+  %6 = open_existential_addr mutable_access %2a : $*LogicValue to $*@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self
+  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self, #LogicValue.getLogicValue, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
+  %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self>(%6) : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
   destroy_value %2 : ${ var LogicValue }
 // CHECK:  destroy_addr %2 : $*LogicValue
 // CHECK-NEXT:  dealloc_stack %2 : $*LogicValue
@@ -467,6 +467,43 @@ bb0(%0 : $Int):
   apply %6() : $@callee_owned () -> ()
   destroy_value %5 : $@callee_owned () -> ()
   unreachable
+}
+
+sil [ossa] @closureWithBoxArg : $@convention(thin) (@guaranteed { var SomeClass }) -> () {
+bb0(%0 : @guaranteed ${ var SomeClass }):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @useClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @finalReleaseWithBorrow
+// CHECK:         [[S:%[0-9]+]] = alloc_stack {{.*}}$SomeClass
+// CHECK-NOT:     destroy_addr
+// CHECK:         [[F:%[0-9]+]] = function_ref @useClosure
+// CHECK:         apply [[F]]
+// CHECK:         destroy_addr [[S]]
+// CHECK:       } // end sil function 'finalReleaseWithBorrow'
+sil [ossa] @finalReleaseWithBorrow : $@convention(thin) (@owned SomeClass) -> () {
+bb0(%0 : @owned $SomeClass):
+  %1 = alloc_box $ { var SomeClass }
+  %2 = begin_borrow %1 : ${ var SomeClass }
+  %1a = project_box %2 : ${ var SomeClass }, 0
+  store %0 to [init] %1a : $*SomeClass
+  %3 = function_ref @closureWithBoxArg : $@convention(thin) (@guaranteed { var SomeClass }) -> ()
+  %4 = copy_value %2 : ${ var SomeClass }
+  %5 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (@guaranteed { var SomeClass }) -> ()
+  end_borrow %2 : ${ var SomeClass }
+  destroy_value %1 : ${ var SomeClass }
+  %6 = function_ref @useClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  apply %6(%5) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  destroy_value %5 : $@callee_guaranteed () -> ()
+  %10 = tuple ()
+  return %10 : $()
 }
 
 // CHECK-LABEL: sil [transparent] [serialized] [ossa] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> ()

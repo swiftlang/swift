@@ -13,6 +13,7 @@ function(_report_sdk prefix)
   message(STATUS "${SWIFT_SDK_${prefix}_NAME} SDK:")
   message(STATUS "  Object File Format: ${SWIFT_SDK_${prefix}_OBJECT_FORMAT}")
   message(STATUS "  Swift Standard Library Path: ${SWIFT_SDK_${prefix}_LIB_SUBDIR}")
+  message(STATUS "  Threading Package: ${SWIFT_SDK_${prefix}_THREADING_PACKAGE}")
 
   if("${prefix}" STREQUAL "WINDOWS")
     message(STATUS "  UCRT Version: ${UCRTVersion}")
@@ -85,12 +86,8 @@ function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
   foreach(arch ${${architectures_var}})
     if(sdk_supported_archs MATCHES "${arch}\n")
       list(APPEND architectures ${arch})
-    elseif(arch MATCHES "^armv7(s)?$" AND os STREQUAL "iphoneos")
-      # 32-bit iOS is not listed explicitly in SDK settings.
-      message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
-      list(APPEND architectures ${arch})
     elseif(arch STREQUAL "i386" AND os STREQUAL "iphonesimulator")
-      # 32-bit iOS simulatoris not listed explicitly in SDK settings.
+      # 32-bit iOS simulator is not listed explicitly in SDK settings.
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
     else()
@@ -99,6 +96,34 @@ function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
   endforeach()
 
   set("${architectures_var}" ${architectures} PARENT_SCOPE)
+endfunction()
+
+# Work out which threading package to use by consulting SWIFT_THREADING_PACKAGE
+function(get_threading_package sdk default package_var)
+  set(global_override)
+  foreach(elt ${SWIFT_THREADING_PACKAGE})
+    string(REPLACE ":" ";" elt_list "${elt}")
+    list(LENGTH elt_list elt_list_len)
+    if(elt_list_len EQUAL 1)
+      list(GET elt_list 0 global_override)
+      string(TOLOWER "${global_override}" global_override)
+    else()
+      list(GET elt_list 0 elt_sdk)
+      list(GET elt_list 1 elt_package)
+      string(TOUPPER "${elt_sdk}" elt_sdk)
+      string(TOLOWER "${elt_package}" elt_package)
+
+      if("${elt_sdk}" STREQUAL "${sdk}")
+        set("${package_var}" "${elt_package}" PARENT_SCOPE)
+        return()
+      endif()
+    endif()
+  endforeach()
+  if(global_override)
+    set("${package_var}" "${global_override}" PARENT_SCOPE)
+  else()
+    set("${package_var}" "${default}" PARENT_SCOPE)
+  endif()
 endfunction()
 
 # Configure an SDK
@@ -179,6 +204,7 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".a")
   set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
   set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX "")
+  get_threading_package(${prefix} "darwin" SWIFT_SDK_${prefix}_THREADING_PACKAGE)
 
   set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
   if(SWIFT_DARWIN_SUPPORTED_ARCHS)
@@ -282,6 +308,30 @@ macro(configure_sdk_unix name architectures)
   endif()
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
+  # GCC on Linux is usually located under `/usr`.
+  # However, Ubuntu 20.04 ships with another GCC installation under `/`, which
+  # does not include libstdc++. Swift build scripts pass `--sysroot=/` to
+  # Clang. By default, Clang tries to find GCC installation under sysroot, and
+  # if it doesn't exist, under `{sysroot}/usr`. On Ubuntu 20.04 and newer, it
+  # attempts to use the GCC without the C++ stdlib, which causes a build
+  # failure. To fix that, we tell Clang explicitly to use GCC from `/usr`.
+  # FIXME: This is a compromise. The value might depend on the architecture
+  # but add_swift_target_library does not allow passing different values
+  # depending on the architecture, so having a single value is the only
+  # possibility right now.
+  set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS
+      -Xcc --gcc-toolchain=/usr
+    CACHE STRING "Extra flags for compiling the C++ overlay")
+
+  set(_default_threading_package "pthreads")
+  if("${prefix}" STREQUAL "LINUX")
+    set(_default_threading_package "linux")
+  elseif("${prefix}" STREQUAL "WASI")
+    set(_default_threading_package "none")
+  endif()
+  get_threading_package(${prefix} ${_default_threading_package}
+    SWIFT_SDK_${prefix}_THREADING_PACKAGE)
+
   foreach(arch ${architectures})
     if("${prefix}" STREQUAL "ANDROID")
       swift_android_sysroot(android_sysroot)
@@ -323,9 +373,11 @@ macro(configure_sdk_unix name architectures)
       endif()
 
       if("${prefix}" STREQUAL "LINUX")
-        if(arch MATCHES "(armv6|armv7)")
+        if(arch MATCHES "(armv5)")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabi")
+        elseif(arch MATCHES "(armv6|armv7)")
           set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabihf")
-        elseif(arch MATCHES "(aarch64|i686|powerpc64|powerpc64le|s390x|x86_64)")
+        elseif(arch MATCHES "(aarch64|i686|powerpc|powerpc64|powerpc64le|s390x|x86_64)")
           set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnu")
         else()
           message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
@@ -406,6 +458,7 @@ macro(configure_sdk_windows name environment architectures)
   set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".lib")
   set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
   set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX ".lib")
+  get_threading_package(${prefix} "win32" SWIFT_SDK_${prefix}_THREADING_PACKAGE)
 
   foreach(arch ${architectures})
     if(arch STREQUAL armv7)
@@ -472,5 +525,6 @@ function(configure_target_variant prefix name sdk build_config lib_subdir)
   set(SWIFT_VARIANT_${prefix}_STATIC_LIBRARY_SUFFIX ${SWIFT_SDK_${sdk}_STATIC_LIBRARY_SUFFIX})
   set(SWIFT_VARIANT_${prefix}_IMPORT_LIBRARY_PREFIX ${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_PREFIX})
   set(SWIFT_VARIANT_${prefix}_IMPORT_LIBRARY_SUFFIX ${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_SUFFIX})
+  get_threading_package(${prefix} ${SWIFT_SDK_${sdk}_THREADING_PACKAGE} SWIFT_VARIANT_${prefix}_THREADING_PACKAGE)
 endfunction()
 

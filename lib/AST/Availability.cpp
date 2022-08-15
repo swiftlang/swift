@@ -30,6 +30,11 @@ AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &Ctx) {
       VersionRange::allGTE(Ctx.LangOpts.getMinPlatformVersion()));
 }
 
+AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &Ctx) {
+  return AvailabilityContext(
+      VersionRange::allGTE(Ctx.LangOpts.MinimumInliningTargetVersion));
+}
+
 namespace {
 
 /// The inferred availability required to access a group of declarations
@@ -41,6 +46,7 @@ struct InferredAvailability {
   Optional<llvm::VersionTuple> Introduced;
   Optional<llvm::VersionTuple> Deprecated;
   Optional<llvm::VersionTuple> Obsoleted;
+  bool IsSPI = false;
 };
 
 /// The type of a function that merges two version tuples.
@@ -51,17 +57,20 @@ typedef const llvm::VersionTuple &(*MergeFunction)(
 
 /// Apply a merge function to two optional versions, returning the result
 /// in Inferred.
-static void
+static bool
 mergeIntoInferredVersion(const Optional<llvm::VersionTuple> &Version,
                          Optional<llvm::VersionTuple> &Inferred,
                          MergeFunction Merge) {
   if (Version.hasValue()) {
     if (Inferred.hasValue()) {
       Inferred = Merge(Inferred.getValue(), Version.getValue());
+      return *Inferred == *Version;
     } else {
       Inferred = Version;
+      return true;
     }
   }
+  return false;
 }
 
 /// Merge an attribute's availability with an existing inferred availability
@@ -75,7 +84,9 @@ static void mergeWithInferredAvailability(const AvailableAttr *Attr,
                static_cast<unsigned>(Attr->getPlatformAgnosticAvailability())));
 
   // The merge of two introduction versions is the maximum of the two versions.
-  mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max);
+  if (mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max)) {
+    Inferred.IsSPI = Attr->IsSPI;
+  }
 
   // The merge of deprecated and obsoleted versions takes the minimum.
   mergeIntoInferredVersion(Attr->Deprecated, Inferred.Deprecated, std::min);
@@ -103,7 +114,8 @@ createAvailableAttr(PlatformKind Platform,
         Introduced, /*IntroducedRange=*/SourceRange(),
         Deprecated, /*DeprecatedRange=*/SourceRange(),
         Obsoleted, /*ObsoletedRange=*/SourceRange(),
-      Inferred.PlatformAgnostic, /*Implicit=*/true);
+      Inferred.PlatformAgnostic, /*Implicit=*/true,
+      Inferred.IsSPI);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
@@ -173,7 +185,13 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
     return None;
 
   return AvailabilityContext{
-    VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
+    VersionRange::allGTE(bestAvailAttr->Introduced.getValue()),
+    bestAvailAttr->IsSPI};
+}
+
+bool Decl::isAvailableAsSPI() const {
+  return AvailabilityInference::availableRange(this, getASTContext())
+    .isAvailableAsSPI();
 }
 
 AvailabilityContext
@@ -376,6 +394,18 @@ AvailabilityContext ASTContext::getObjCIsUniquelyReferencedAvailability() {
   return getSwift56Availability();
 }
 
+AvailabilityContext
+ASTContext::getParameterizedExistentialRuntimeAvailability() {
+  return getSwift57Availability();
+}
+
+AvailabilityContext
+ASTContext::getImmortalRefCountSymbolsAvailability() {
+  // TODO: replace this with a concrete swift version once we have it.
+  // rdar://94185998
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 
@@ -489,7 +519,20 @@ AvailabilityContext ASTContext::getSwift56Availability() {
 }
 
 AvailabilityContext ASTContext::getSwift57Availability() {
-  return getSwiftFutureAvailability();
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(13, 0, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(16, 0, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(9, 0, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
 }
 
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {

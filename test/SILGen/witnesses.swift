@@ -45,7 +45,7 @@ func protocol_method(x: Existentiable) -> Loadable {
   return x.foo()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s9witnesses15protocol_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed Existentiable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Existentiable]], #Existentiable.foo :
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened\(.*, Existentiable\) Self]], #Existentiable.foo :
 // CHECK:         apply [[METHOD]]<[[OPENED]]>({{%.*}})
 // CHECK:       }
 
@@ -53,7 +53,7 @@ func protocol_generic_method(x: Existentiable) -> Loadable {
   return x.generic()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s9witnesses23protocol_generic_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed Existentiable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Existentiable]], #Existentiable.generic :
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened\(.*, Existentiable\) Self]], #Existentiable.generic :
 // CHECK:         apply [[METHOD]]<[[OPENED]], Loadable>({{%.*}}, {{%.*}})
 // CHECK:       }
 
@@ -62,7 +62,7 @@ func protocol_generic_method(x: Existentiable) -> Loadable {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9witnesses20protocol_objc_method1xyAA8ObjCAble_p_tF : $@convention(thin) (@guaranteed ObjCAble) -> ()
-// CHECK:         objc_method {{%.*}} : $@opened({{.*}}) ObjCAble, #ObjCAble.foo!foreign
+// CHECK:         objc_method {{%.*}} : $@opened({{.*}}, ObjCAble) Self, #ObjCAble.foo!foreign
 func protocol_objc_method(x: ObjCAble) {
   x.foo()
 }

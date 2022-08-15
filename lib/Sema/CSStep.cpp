@@ -241,8 +241,12 @@ bool SplitterStep::mergePartialSolutions() const {
       // Finalize this solution.
       auto solution = CS.finalize();
       solutionMemory += solution.getTotalMemory();
-      if (CS.isDebugMode())
-        getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
+      if (CS.isDebugMode()) {
+        auto &log = getDebugLogger();
+        log << "(composed solution:";
+        CS.CurrentScore.print(log);
+        log << ")\n";
+      }
 
       // Save this solution.
       Solutions.push_back(std::move(solution));
@@ -251,7 +255,7 @@ bool SplitterStep::mergePartialSolutions() const {
 
     // Since merging partial solutions can go exponential, make sure we didn't
     // pass the "too complex" thresholds including allocated memory and time.
-    if (CS.getExpressionTooComplex(solutionMemory))
+    if (CS.isTooComplex(solutionMemory))
       return false;
 
   } while (nextCombination(counts, indices));
@@ -313,7 +317,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
   if ((prevFailed && DependsOnPartialSolutions.empty()) ||
-      CS.getExpressionTooComplex(Solutions))
+      CS.isTooComplex(Solutions))
     return done(/*isSuccess=*/false);
 
   // Setup active scope, only if previous component didn't fail.
@@ -429,8 +433,12 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto solution = CS.finalize();
-  if (CS.isDebugMode())
-    getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
+  if (CS.isDebugMode()) {
+    auto &log = getDebugLogger();
+    log << "(found solution:";
+    getCurrentScore().print(log);
+    log << ")\n";
+  }
 
   Solutions.push_back(std::move(solution));
   return finalize(/*isSuccess=*/true);
@@ -616,7 +624,7 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
       genericSignatureB.getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 
-  if (result != RequirementCheckResult::Success)
+  if (result != CheckGenericArgumentsResult::Success)
     return false;
 
   return substTypeA->isEqual(substTypeB);
@@ -648,7 +656,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (choice.isDisabled())
     return skip("disabled");
 
-  // Skip unavailable overloads (unless in dignostic mode).
+  // Skip unavailable overloads (unless in diagnostic mode).
   if (choice.isUnavailable() && !CS.shouldAttemptFixes())
     return skip("unavailable");
 
@@ -843,9 +851,6 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // attempted to apply information gained from the
   // isolated constraint to the outer context.
   if (Snapshot && Snapshot->isScoped()) {
-    if (CS.isDebugMode())
-      getDebugLogger() << ")\n";
-
     return done(/*isSuccess=*/!prevFailed);
   }
 
@@ -942,13 +947,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
         // and scoring information.
         Snapshot.reset();
 
-        // Restore original scores of outer context before
-        // trying to produce a combined solution.
-        restoreOriginalScores();
-
         // Apply all of the information deduced from the
         // conjunction (up to the point of ambiguity)
         // back to the outer context and form a joined solution.
+        unsigned numSolutions = 0;
         for (auto &solution : Solutions) {
           ConstraintSystem::SolverScope scope(CS);
 
@@ -958,24 +960,47 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
           // of the constraint system, so they have to be
           // restored right afterwards because score of the
           // element does contribute to the overall score.
-          restoreOriginalScores();
+          restoreBestScore();
+          restoreCurrentScore(solution.getFixedScore());
+
+          // Transform all of the unbound outer variables into
+          // placeholders since we are not going to solve for
+          // each ambiguous solution.
+          {
+            unsigned numHoles = 0;
+            for (auto *typeVar : CS.getTypeVariables()) {
+              if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
+                CS.assignFixedType(
+                    typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
+                ++numHoles;
+              }
+            }
+            CS.increaseScore(SK_Hole, numHoles);
+          }
+
+          if (CS.worseThanBestSolution())
+            continue;
 
           // Note that `worseThanBestSolution` isn't checked
           // here because `Solutions` were pre-filtered, and
           // outer score is the same for all of them.
           OuterSolutions.push_back(CS.finalize());
+          ++numSolutions;
         }
 
-        return done(/*isSuccess=*/true);
+        return done(/*isSuccess=*/numSolutions > 0);
       }
+
+      auto solution = Solutions.pop_back_val();
+      auto score = solution.getFixedScore();
 
       // Restore outer type variables and prepare to solve
       // constraints associated with outer context together
       // with information deduced from the conjunction.
-      Snapshot->setupOuterContext(Solutions.pop_back_val());
+      Snapshot->setupOuterContext(std::move(solution));
 
-      // Pretend that conjunction never happend.
-      restoreOuterState();
+      // Pretend that conjunction never happened.
+      restoreOuterState(score);
 
       // Now that all of the information from the conjunction has
       // been applied, let's attempt to solve the outer scope.
@@ -987,10 +1012,11 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   return take(prevFailed);
 }
 
-void ConjunctionStep::restoreOuterState() const {
+void ConjunctionStep::restoreOuterState(const Score &solutionScore) const {
   // Restore best/current score, since upcoming step is going to
   // work with outer scope in relation to the conjunction.
-  restoreOriginalScores();
+  restoreBestScore();
+  restoreCurrentScore(solutionScore);
 
   // Active all of the previously out-of-scope constraints
   // because conjunction can propagate type information up

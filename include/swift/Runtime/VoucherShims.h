@@ -22,8 +22,7 @@
 // swift-corelibs-libdispatch has os/voucher_private.h but it doesn't work for
 // us yet, so only look for it on Apple platforms.  We also don't need vouchers
 // in the single threaded concurrency runtime.
-#if __APPLE__ && !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME \
-  && __has_include(<os/voucher_private.h>)
+#if __APPLE__ && !SWIFT_THREADING_NONE && __has_include(<os/voucher_private.h>)
 #define SWIFT_HAS_VOUCHER_HEADER 1
 #include <os/voucher_private.h>
 #endif
@@ -35,7 +34,7 @@
 #define SWIFT_DEAD_VOUCHER ((voucher_t)-1)
 
 // The OS has voucher support if it has the header or if it has ObjC interop.
-#if SWIFT_HAS_VOUCHER_HEADER || SWIFT_OBJC_INTEROP
+#if (SWIFT_HAS_VOUCHER_HEADER || SWIFT_OBJC_INTEROP) && !SWIFT_THREADING_NONE
 #define SWIFT_HAS_VOUCHERS 1
 #endif
 

@@ -570,7 +570,7 @@ extension UnsafeMutableBufferPointer {
     // (b) - for c = runs.count - 1:
     //         - runs[c - 1].count > runs[c].count
     //
-    // Loop until the invariant is satisified for the top four elements of
+    // Loop until the invariant is satisfied for the top four elements of
     // `runs`. Because this method is called for every added run, and only
     // the top three runs are ever merged, this guarantees the invariant holds
     // for the whole array.

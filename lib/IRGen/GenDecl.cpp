@@ -556,7 +556,7 @@ static llvm::GlobalVariable *
 emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
                StringRef name, StringRef section,
                llvm::GlobalValue::LinkageTypes linkage, llvm::Type *eltTy,
-               bool isConstant, bool asContiguousArray) {
+               bool isConstant, bool asContiguousArray, bool canBeStrippedByLinker = false) {
   // Do nothing if the list is empty.
   if (handles.empty()) return nullptr;
 
@@ -578,8 +578,12 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
       var->setSection(section);
       var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
       disableAddressSanitizer(IGM, var);
-      if (llvm::GlobalValue::isLocalLinkage(linkage))
-        IGM.addUsedGlobal(var);
+      if (llvm::GlobalValue::isLocalLinkage(linkage)) {
+        if (canBeStrippedByLinker)
+          IGM.addCompilerUsedGlobal(var);
+        else
+          IGM.addUsedGlobal(var);
+      }
 
       if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
         // Allow dead-stripping `var` (the runtime record from the global list)
@@ -616,8 +620,12 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
   // Mark the variable as used if doesn't have external linkage.
   // (Note that we'd specifically like to not put @llvm.used in itself.)
-  if (llvm::GlobalValue::isLocalLinkage(linkage))
-    IGM.addUsedGlobal(var);
+  if (llvm::GlobalValue::isLocalLinkage(linkage)) {
+    if (canBeStrippedByLinker)
+      IGM.addCompilerUsedGlobal(var);
+    else
+      IGM.addUsedGlobal(var);
+  }
   return var;
 }
 
@@ -841,8 +849,8 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
       auto nominal = ext->getExtendedNominal();
       // If the extended type is an ObjC class, it won't have a nominal type
       // descriptor, so we'll just emit an extension context.
-      auto clas = dyn_cast<ClassDecl>(nominal);
-      if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
+      auto clazz = dyn_cast<ClassDecl>(nominal);
+      if (!clazz || clazz->isForeign() || hasKnownSwiftMetadata(*this, clazz)) {
         IRGen.noteUseOfTypeContextDescriptor(nominal, DontRequireMetadata);
         return getAddrOfLLVMVariableOrGOTEquivalent(
                                 LinkEntity::forNominalTypeDescriptor(nominal));
@@ -962,6 +970,10 @@ void IRGenModule::addCompilerUsedGlobal(llvm::GlobalValue *global) {
   LLVMCompilerUsed.push_back(global);
 }
 
+void IRGenModule::addGenericROData(llvm::Constant *RODataAddr) {
+  GenericRODatas.push_back(RODataAddr);
+}
+
 /// Add the given global value to the Objective-C class list.
 void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
   ObjCClasses.push_back(classPtr);
@@ -1067,6 +1079,14 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
 
 void IRGenModule::emitGlobalLists() {
   if (ObjCInterop) {
+    if (IRGen.Opts.EmitGenericRODatas) {
+      emitGlobalList(
+          *this, GenericRODatas, "generic_ro_datas",
+          GetObjCSectionName("__swift_rodatas", "regular"),
+          llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
+          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ true);
+    }
+
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
     emitGlobalList(
@@ -1905,6 +1925,7 @@ void IRGenerator::emitDynamicReplacements() {
       "\x01l_auto_dynamic_replacements_some", IGM.getPointerAlignment(),
       /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
   autoReplVar2->setSection(getDynamicReplacementSomeSection(IGM));
+  IGM.addUsedGlobal(autoReplVar2);
 }
 
 void IRGenerator::emitEagerClassInitialization() {
@@ -2025,7 +2046,9 @@ void IRGenModule::emitVTableStubs() {
       alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
     else
       ApplyIRLinkage(IRGen.Opts.InternalizeSymbols
-                        ? IRLinkage::Internal
+                        ? IRLinkage{llvm::GlobalValue::ExternalLinkage,
+                                    llvm::GlobalValue::HiddenVisibility,
+                                    llvm::GlobalValue::DefaultStorageClass}
                         : IRLinkage::ExternalExport).to(alias);
   }
 }
@@ -2061,7 +2084,7 @@ void IRGenerator::emitEntryPointInfo() {
   auto &IGM = *getGenModule(entrypoint);
   ConstantInitBuilder builder(IGM);
   auto entrypointInfo = builder.beginStruct();
-  entrypointInfo.addRelativeAddress(
+  entrypointInfo.addCompactFunctionReference(
       IGM.getAddrOfSILFunction(entrypoint, NotForDefinition));
   auto var = entrypointInfo.finishAndCreateGlobal(
       "\x01l_entry_point", Alignment(4),
@@ -2104,7 +2127,6 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
     return isDefinition ? RESULT(LinkOnceODR, Hidden, Default)
                         : RESULT(External, Hidden, Default);
 
@@ -2194,7 +2216,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
     if (const auto *MD = DC->getParentModule())
       isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
   } else if (entity.hasSILFunction()) {
-    // SIL serialized entitites (functions, witness tables, vtables) do not have
+    // SIL serialized entities (functions, witness tables, vtables) do not have
     // an associated DeclContext and are serialized into the current module.  As
     // a result, we explicitly handle SIL Functions here. We do not expect other
     // types to be referenced directly.
@@ -2224,11 +2246,11 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 }
 
 /// Get or create an LLVM function with these linkage rules.
-llvm::Function *irgen::createFunction(IRGenModule &IGM,
-                                      LinkInfo &linkInfo,
+llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
                                       const Signature &signature,
                                       llvm::Function *insertBefore,
-                                      OptimizationMode FuncOptMode) {
+                                      OptimizationMode FuncOptMode,
+                                      StackProtectorMode stackProtect) {
   auto name = linkInfo.getName();
 
   llvm::Function *existing = IGM.Module.getFunction(name);
@@ -2260,7 +2282,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
       .to(fn, linkInfo.isForDefinition());
 
   llvm::AttrBuilder initialAttrs;
-  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
+  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode, stackProtect);
   // Merge initialAttrs with attrs.
   auto updatedAttrs = signature.getAttributes().addFnAttributes(
       IGM.getLLVMContext(), initialAttrs);
@@ -2465,9 +2487,22 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forSILGlobalVariable(var, *this);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+
   if (auto clangDecl = var->getClangDecl()) {
     auto addr = getAddrOfClangGlobalDecl(cast<clang::VarDecl>(clangDecl),
                                          forDefinition);
+
+    // Override the linkage computed by Clang if the decl is from another
+    // module that imported @_weakLinked.
+    //
+    // FIXME: We should be able to set the linkage unconditionally here but
+    //        some fixes are needed for Cxx interop.
+    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr)) {
+      if (getSwiftModule()->isImportedAsWeakLinked(var->getDecl()))
+        globalVar->setLinkage(link.getLinkage());
+    }
 
     // If we're not emitting this to define it, make sure we cast it to the
     // right type.
@@ -2481,7 +2516,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     return Address(addr, alignment);
   }
 
-  LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
   llvm::Type *storageType;
@@ -2527,28 +2561,32 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  auto gvar = Module.getGlobalVariable(var->getName(), /*allowInternal*/ true);
+  auto gvar = Module.getGlobalVariable(link.getName(), /*allowInternal*/ true);
   if (gvar) {
     if (forDefinition)
       updateLinkageForDefinition(*this, gvar, entity);
   } else {
-    LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
     llvm::Type *storageTypeWithContainer = storageType;
     if (var->isInitializedObject()) {
-      // A statically initialized object must be placed into a container struct
-      // because the swift_initStaticObject needs a swift_once_t at offset -1:
-      //     struct Container {
-      //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
-      //       HeapObject object;
-      //     };
-      std::string typeName = storageType->getStructName().str() + 'c';
-      assert(fixedAlignment >= getPointerAlignment());
-      unsigned numTokens = fixedAlignment.getValue() /
-        getPointerAlignment().getValue();
-      storageTypeWithContainer = llvm::StructType::create(getLLVMContext(),
-              {llvm::ArrayType::get(OnceTy, numTokens), storageType}, typeName);
-      gvar = createVariable(*this, link, storageTypeWithContainer,
-                            fixedAlignment);
+      if (canMakeStaticObjectsReadOnly()) {
+        gvar = createVariable(*this, link, storageType, fixedAlignment);
+        gvar->setConstant(true);
+      } else {
+        // A statically initialized object must be placed into a container struct
+        // because the swift_initStaticObject needs a swift_once_t at offset -1:
+        //     struct Container {
+        //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
+        //       HeapObject object;
+        //     };
+        std::string typeName = storageType->getStructName().str() + 'c';
+        assert(fixedAlignment >= getPointerAlignment());
+        unsigned numTokens = fixedAlignment.getValue() /
+          getPointerAlignment().getValue();
+        storageTypeWithContainer = llvm::StructType::create(getLLVMContext(),
+                {llvm::ArrayType::get(OnceTy, numTokens), storageType}, typeName);
+        gvar = createVariable(*this, link, storageTypeWithContainer,
+                              fixedAlignment);
+      }
     } else {
       StringRef name;
       Optional<SILLocation> loc;
@@ -2573,7 +2611,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       gvar->setComdat(nullptr);
   }
   llvm::Constant *addr = gvar;
-  if (var->isInitializedObject()) {
+  if (var->isInitializedObject() && !canMakeStaticObjectsReadOnly()) {
     // Project out the object from the container.
     llvm::Constant *Indices[2] = {
       llvm::ConstantExpr::getIntegerValue(Int32Ty, APInt(32, 0)),
@@ -3032,7 +3070,7 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   LinkInfo implLink = LinkInfo::get(*this, entity, ForDefinition);
   auto implFn =
       createFunction(*this, implLink, signature, nullptr /*insertBefore*/,
-                     f->getOptimizationMode());
+                     f->getOptimizationMode(), shouldEmitStackProtector(f));
   implFn->addFnAttr(llvm::Attribute::NoInline);
 
   IRGenFunction IGF(*this, implFn);
@@ -3141,6 +3179,10 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   return thunk;
 }
 
+StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
+  return IRGen.Opts.getStackProtectorMode();
+}
+
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(
     SILFunction *f, ForDefinition_t forDefinition,
@@ -3191,6 +3233,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     }
   }
 
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   bool isDefinition = f->isDefinition();
   bool hasOrderNumber =
       isDefinition && !shouldCallPreviousImplementation;
@@ -3211,8 +3254,16 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   if (clangAddr) {
     fn = dyn_cast<llvm::Function>(clangAddr->stripPointerCasts());
 
-    // If we have a function, move it to the appropriate position.
     if (fn) {
+      // Override the linkage computed by Clang if the decl is from another
+      // module that imported @_weakLinked.
+      //
+      // FIXME: We should be able to set the linkage unconditionally here but
+      //        some fixes are needed for Cxx interop.
+      if (!forDefinition && f->isWeakImportedByModule())
+        fn->setLinkage(link.getLinkage());
+
+      // If we have a function, move it to the appropriate position.
       if (hasOrderNumber) {
         auto &fnList = Module.getFunctionList();
         fnList.remove(fn);
@@ -3233,10 +3284,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
       getSignature(f->getLoweredFunctionType(), fpKind);
   addLLVMFunctionAttributes(f, signature);
 
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-
   fn = createFunction(*this, link, signature, insertBefore,
-                      f->getOptimizationMode());
+                      f->getOptimizationMode(), shouldEmitStackProtector(f));
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition
@@ -3294,7 +3343,7 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   // rdar://problem/53836960: i386 ld64 also mis-links relative references
   // to GOT entries.
   // rdar://problem/59782487: issue with on-device JITd expressions.
-  // The JIT gets confused by private vars accessed accross object files.
+  // The JIT gets confused by private vars accessed across object files.
   if (!IGM.getOptions().UseJIT &&
       (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86)) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
@@ -3354,6 +3403,20 @@ static llvm::Constant *getElementBitCast(llvm::Constant *ptr,
     auto newPtrType = newEltType->getPointerTo(ptrType->getAddressSpace());
     return llvm::ConstantExpr::getBitCast(ptr, newPtrType);
   }
+}
+
+llvm::Constant *
+IRGenModule::getOrCreateLazyGlobalVariable(LinkEntity entity,
+    llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> build,
+    llvm::function_ref<void(llvm::GlobalVariable *)> finish) {
+  auto defaultType = entity.getDefaultDeclarationType(*this);
+
+  LazyConstantInitializer lazyInitializer = {
+    defaultType, build, finish
+  };
+  return getAddrOfLLVMVariable(entity,
+                               ConstantInit::getLazy(&lazyInitializer),
+                               DebugTypeInfo(), defaultType);
 }
 
 /// Return a reference to an object that's suitable for being used for
@@ -3428,7 +3491,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 
     // If we're looking to define something, we may need to replace a
     // forward declaration.
-    if (definitionType) {
+    if (!definition.isLazy() && definitionType) {
       assert(existing->isDeclaration() && "already defined");
       updateLinkageForDefinition(*this, existing, entity);
 
@@ -3460,6 +3523,21 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   if (auto existing = Module.getNamedGlobal(link.getName()))
     return getElementBitCast(existing, defaultType);
 
+  const LazyConstantInitializer *lazyInitializer = nullptr;
+  Optional<ConstantInitBuilder> lazyBuilder;
+  if (definition.isLazy()) {
+    lazyInitializer = definition.getLazy();
+    lazyBuilder.emplace(*this);
+
+    // Build the lazy initializer as a future.
+    auto future = lazyInitializer->Build(*lazyBuilder);
+
+    // Set the future as our definition and set its type as the
+    // definition type.
+    definitionType = future.getType();
+    definition = future;
+  }
+
   // If we're not defining the object now, forward declare it with the default
   // type.
   if (!definitionType) definitionType = defaultType;
@@ -3471,6 +3549,11 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   // Install the concrete definition if we have one.
   if (definition && definition.hasInit()) {
     definition.getInit().installInGlobal(var);
+  }
+
+  // Call the creation callback.
+  if (lazyInitializer) {
+    lazyInitializer->Create(var);
   }
 
   // If we have an existing entry, destroy it, replacing it with the
@@ -3672,21 +3755,21 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
   }
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    auto clas = dyn_cast<ClassDecl>(decl);
-    if (!clas || clas->isForeignReferenceType()) {
+    auto clazz = dyn_cast<ClassDecl>(decl);
+    if (!clazz || clazz->isForeignReferenceType()) {
       return getTypeContextDescriptorEntityReference(*this, nominal);
     }
 
-    switch (clas->getForeignClassKind()) {
+    switch (clazz->getForeignClassKind()) {
     case ClassDecl::ForeignKind::RuntimeOnly:
-      return getObjCClassByNameReference(*this, clas);
+      return getObjCClassByNameReference(*this, clazz);
 
     case ClassDecl::ForeignKind::CFType:
-      return getTypeContextDescriptorEntityReference(*this, clas);
+      return getTypeContextDescriptorEntityReference(*this, clazz);
 
     case ClassDecl::ForeignKind::Normal:
-      if (hasKnownSwiftMetadata(*this, clas)) {
-        return getTypeContextDescriptorEntityReference(*this, clas);
+      if (hasKnownSwiftMetadata(*this, clazz)) {
+        return getTypeContextDescriptorEntityReference(*this, clazz);
       }
 
       // Note: we would like to use an Objective-C class reference, but the
@@ -3694,7 +3777,7 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
       // *after* computing a relative offset, causing incorrect relative
       // offsets in the metadata. Therefore, reference Objective-C classes by
       // their runtime names.
-      return getObjCClassByNameReference(*this, clas);
+      return getObjCClassByNameReference(*this, clazz);
     }
   }
   llvm_unreachable("bad foreign type kind");
@@ -4171,7 +4254,10 @@ void IRGenModule::emitAccessibleFunctions() {
 
     GenericSignature signature;
     if (auto *env = func->getGenericEnvironment()) {
-      signature = env->getGenericSignature();
+      // Drop all of the marker protocols because they are effect-less
+      // at runtime.
+      signature = env->getGenericSignature().withoutMarkerProtocols();
+
       genericEnvironment =
           getAddrOfGenericEnvironment(signature.getCanonicalSignature());
     }
@@ -4314,6 +4400,14 @@ IRGenModule::getAddrOfObjCResilientClassStub(ClassDecl *classDecl,
   return getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo());
 }
 
+llvm::IntegerType *IRGenModule::getTypeMetadataRequestParamTy() {
+  return SizeTy;
+}
+
+llvm::StructType *IRGenModule::getTypeMetadataResponseTy() {
+  return TypeMetadataResponseTy;
+}
+
 /// Fetch the type metadata access function for a non-generic type.
 llvm::Function *
 IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
@@ -4329,8 +4423,9 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
     return entry;
   }
 
-  llvm::Type *params[] = { SizeTy }; // MetadataRequest
-  auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy, params, false);
+  llvm::Type *params[] = {getTypeMetadataRequestParamTy()}; // MetadataRequest
+  auto fnType =
+      llvm::FunctionType::get(getTypeMetadataResponseTy(), params, false);
   Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
@@ -5330,6 +5425,22 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   return address;
 }
 
+/// Can not treat a treat the layout of a class as resilient if the current
+///    class is defined in an external module and
+///    not publically accessible (e.g private or internal).
+/// This would normally not happen except if we compile theClass's module with
+/// enable-testing.
+static bool shouldTreatClassAsFragileBecauseOfEnableTesting(ClassDecl *D,
+                                                            IRGenModule &IGM) {
+    if (!D)
+      return false;
+
+    return D->getModuleContext() != IGM.getSwiftModule() &&
+           !D->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*treatUsableFromInlineAsPublic=*/true)
+           .isPublic();
+}
+
 /// Do we have to use resilient access patterns when working with this
 /// declaration?
 ///
@@ -5339,13 +5450,21 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D,
-                              ResilienceExpansion expansion) {
+                              ResilienceExpansion expansion,
+                              ClassDecl *asViewedFromRootClass) {
+  assert(!asViewedFromRootClass || isa<ClassDecl>(D));
+
   if (D->getModuleContext()->getBypassResilience())
     return false;
   if (expansion == ResilienceExpansion::Maximal &&
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
+
+  if (shouldTreatClassAsFragileBecauseOfEnableTesting(asViewedFromRootClass,
+                                                      *this))
+    return false;
+
   return D->isResilient(getSwiftModule(), expansion);
 }
 
@@ -5355,11 +5474,17 @@ bool IRGenModule::isResilient(NominalTypeDecl *D,
 /// For classes, this means that virtual method calls use dispatch thunks
 /// rather than accessing metadata members directly.
 bool IRGenModule::hasResilientMetadata(ClassDecl *D,
-                                       ResilienceExpansion expansion) {
+                                       ResilienceExpansion expansion,
+                                       ClassDecl *asViewedFromRootClass) {
   if (expansion == ResilienceExpansion::Maximal &&
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
+
+  if (shouldTreatClassAsFragileBecauseOfEnableTesting(asViewedFromRootClass,
+                                                      *this))
+    return false;
+
   return D->hasResilientMetadata(getSwiftModule(), expansion);
 }
 

@@ -178,6 +178,180 @@ private:
   evaluate(Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const;
 };
 
+enum class CxxRecordSemanticsKind {
+  Trivial,
+  Owned,
+  Reference,
+  Iterator,
+  // An API that has be annotated as explicitly unsafe, but still importable.
+  // TODO: we should rename these APIs.
+  ExplicitlyUnsafe,
+  // A record that is either not copyable or not destructible.
+  MissingLifetimeOperation,
+  // A record that contains a pointer (aka non-trivial type).
+  UnsafePointerMember
+};
+
+struct CxxRecordSemanticsDescriptor final {
+  const clang::CXXRecordDecl *decl;
+  ASTContext &ctx;
+
+  CxxRecordSemanticsDescriptor(const clang::CXXRecordDecl *decl,
+                               ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
+
+  friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
+    return llvm::hash_combine(desc.decl);
+  }
+
+  friend bool operator==(const CxxRecordSemanticsDescriptor &lhs,
+                         const CxxRecordSemanticsDescriptor &rhs) {
+    return lhs.decl == rhs.decl;
+  }
+
+  friend bool operator!=(const CxxRecordSemanticsDescriptor &lhs,
+                         const CxxRecordSemanticsDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, CxxRecordSemanticsDescriptor desc);
+SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
+
+/// What pattern does this C++ API fit? Uses attributes such as
+/// import_owned and import_as_reference to determine the pattern.
+class CxxRecordSemantics
+    : public SimpleRequest<CxxRecordSemantics,
+                           CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Caching
+  bool isCached() const { return true; }
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CxxRecordSemanticsKind evaluate(Evaluator &evaluator,
+                                  CxxRecordSemanticsDescriptor) const;
+};
+
+struct SafeUseOfCxxDeclDescriptor final {
+  const clang::Decl *decl;
+  ASTContext &ctx;
+
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
+
+  friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
+    return llvm::hash_combine(desc.decl);
+  }
+
+  friend bool operator==(const SafeUseOfCxxDeclDescriptor &lhs,
+                         const SafeUseOfCxxDeclDescriptor &rhs) {
+    return lhs.decl == rhs.decl;
+  }
+
+  friend bool operator!=(const SafeUseOfCxxDeclDescriptor &lhs,
+                         const SafeUseOfCxxDeclDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, SafeUseOfCxxDeclDescriptor desc);
+SourceLoc extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc);
+
+class IsSafeUseOfCxxDecl
+    : public SimpleRequest<IsSafeUseOfCxxDecl, bool(SafeUseOfCxxDeclDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Caching
+  bool isCached() const { return true; }
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
+};
+
+enum class CustomRefCountingOperationKind { retain, release };
+
+struct CustomRefCountingOperationDescriptor final {
+  const ClassDecl *decl;
+  CustomRefCountingOperationKind kind;
+
+  CustomRefCountingOperationDescriptor(const ClassDecl *decl,
+                                       CustomRefCountingOperationKind kind)
+      : decl(decl), kind(kind) {}
+
+  friend llvm::hash_code
+  hash_value(const CustomRefCountingOperationDescriptor &desc) {
+    return llvm::hash_combine(desc.decl, desc.kind);
+  }
+
+  friend bool operator==(const CustomRefCountingOperationDescriptor &lhs,
+                         const CustomRefCountingOperationDescriptor &rhs) {
+    return lhs.decl == rhs.decl && lhs.kind == rhs.kind;
+  }
+
+  friend bool operator!=(const CustomRefCountingOperationDescriptor &lhs,
+                         const CustomRefCountingOperationDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    CustomRefCountingOperationDescriptor desc);
+SourceLoc extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc);
+
+struct CustomRefCountingOperationResult {
+  enum CustomRefCountingOperationResultKind {
+    noAttribute,
+    immortal,
+    notFound,
+    tooManyFound,
+    foundOperation
+  };
+
+  CustomRefCountingOperationResultKind kind;
+  ValueDecl *operation;
+  std::string name;
+};
+
+class CustomRefCountingOperation
+    : public SimpleRequest<CustomRefCountingOperation,
+                           CustomRefCountingOperationResult(
+                               CustomRefCountingOperationDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Caching
+  bool isCached() const { return true; }
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CustomRefCountingOperationResult
+  evaluate(Evaluator &evaluator,
+           CustomRefCountingOperationDescriptor desc) const;
+};
+
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

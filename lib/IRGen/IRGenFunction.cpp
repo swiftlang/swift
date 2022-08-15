@@ -338,6 +338,20 @@ IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
 }
 
 llvm::Value *
+IRGenFunction::emitLoadOfCompactFunctionPointer(Address addr, bool isFar,
+                                                 llvm::PointerType *expectedType,
+                                                 const llvm::Twine &name) {
+  if (IGM.getOptions().CompactAbsoluteFunctionPointer) {
+    llvm::Value *value = Builder.CreateLoad(addr);
+    auto *uncastPointer = Builder.CreateIntToPtr(value, IGM.Int8PtrTy);
+    auto pointer = Builder.CreateBitCast(Address(uncastPointer, IGM.getPointerAlignment()), expectedType);
+    return pointer.getAddress();
+  } else {
+    return emitLoadOfRelativePointer(addr, isFar, expectedType, name);
+  }
+}
+
+llvm::Value *
 IRGenFunction::emitLoadOfRelativeIndirectablePointer(Address addr,
                                                 bool isFar,
                                                 llvm::PointerType *expectedType,
@@ -575,6 +589,13 @@ static Address emitAddrOfContinuationNormalResultPointer(IRGenFunction &IGF,
                                                          Address context) {
   assert(context.getType() == IGF.IGM.ContinuationAsyncContextPtrTy);
   auto offset = 5 * IGF.IGM.getPointerSize();
+  return IGF.Builder.CreateStructGEP(context, 4, offset);
+}
+
+static Address emitAddrOfContinuationErrorResultPointer(IRGenFunction &IGF,
+                                                        Address context) {
+  assert(context.getType() == IGF.IGM.ContinuationAsyncContextPtrTy);
+  auto offset = 4 * IGF.IGM.getPointerSize();
   return IGF.Builder.CreateStructGEP(context, 3, offset);
 }
 
@@ -693,7 +714,8 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     Explosion &outDirectResult, llvm::BasicBlock *&normalBB,
     llvm::PHINode *&optionalErrorResult, llvm::BasicBlock *&optionalErrorBB) {
   assert(AsyncCoroutineCurrentContinuationContext && "no active continuation");
-  auto pointerAlignment = IGM.getPointerAlignment();
+  Address continuationContext(AsyncCoroutineCurrentContinuationContext,
+                              IGM.getAsyncContextAlignment());
 
   // Call swift_continuation_await to check whether the continuation
   // has already been resumed.
@@ -703,11 +725,9 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   // swift_continuation_await, emit the old inline sequence.  This can
   // be removed as soon as we're sure that such SDKs don't exist.
   if (!useContinuationAwait) {
-    auto contAwaitSyncAddr = Builder.CreateStructGEP(
-        AsyncCoroutineCurrentContinuationContext->getType()
-            ->getScalarType()
-            ->getPointerElementType(),
-        AsyncCoroutineCurrentContinuationContext, 1);
+    auto contAwaitSyncAddr =
+      Builder.CreateStructGEP(continuationContext, 2,
+                              3 * IGM.getPointerSize()).getAddress();
 
     auto pendingV = llvm::ConstantInt::get(
         contAwaitSyncAddr->getType()->getPointerElementType(),
@@ -759,11 +779,11 @@ void IRGenFunction::emitAwaitAsyncContinuation(
         Builder.CreateBitOrPointerCast(awaitFnPtr, IGM.Int8PtrTy));
 
     if (useContinuationAwait) {
-      arguments.push_back(AsyncCoroutineCurrentContinuationContext);
+      arguments.push_back(continuationContext.getAddress());
     } else {
       arguments.push_back(AsyncCoroutineCurrentResume);
       arguments.push_back(Builder.CreateBitOrPointerCast(
-        AsyncCoroutineCurrentContinuationContext, IGM.Int8PtrTy));
+        continuationContext.getAddress(), IGM.Int8PtrTy));
     }
 
     auto resultTy =
@@ -777,12 +797,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   if (optionalErrorBB) {
     auto normalContBB = createBasicBlock("await.async.normal");
     auto contErrResultAddr =
-        Address(Builder.CreateStructGEP(
-                    AsyncCoroutineCurrentContinuationContext->getType()
-                        ->getScalarType()
-                        ->getPointerElementType(),
-                    AsyncCoroutineCurrentContinuationContext, 2),
-                pointerAlignment);
+        emitAddrOfContinuationErrorResultPointer(*this, continuationContext);
     auto errorRes = Builder.CreateLoad(contErrResultAddr);
     auto nullError = llvm::Constant::getNullValue(errorRes->getType());
     auto hasError = Builder.CreateICmpNE(errorRes, nullError);
@@ -795,13 +810,10 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   // result slot, load from the temporary we created during
   // get_async_continuation.
   if (!isIndirectResult) {
-    auto contResultAddrAddr = Builder.CreateStructGEP(
-        AsyncCoroutineCurrentContinuationContext->getType()
-            ->getScalarType()
-            ->getPointerElementType(),
-        AsyncCoroutineCurrentContinuationContext, 3);
+    auto contResultAddrAddr =
+        emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
     auto resultAddrVal =
-        Builder.CreateLoad(Address(contResultAddrAddr, pointerAlignment));
+        Builder.CreateLoad(contResultAddrAddr);
     // Take the result.
     auto &resumeTI = cast<LoadableTypeInfo>(getTypeInfo(resumeTy));
     auto resultStorageTy = resumeTI.getStorageType();

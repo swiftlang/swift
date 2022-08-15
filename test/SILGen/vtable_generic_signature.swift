@@ -3,9 +3,11 @@
 
 protocol P {}
 protocol Q : P {}
+class C : P {}
 
 class ConcreteBase {
   func f<U : Q>(_: U) {}
+  func g<U : C>(_: U) {}
 }
 
 class ConcreteDerivedFromConcreteBase : ConcreteBase {
@@ -37,6 +39,10 @@ func call<T, U : P>(_ t: T, _ u: U) {
   GenericDerivedFromGenericBase<T>().f(u)
 }
 
+class ConcreteDerived: ConcreteBase {
+  override func g<U : P>(_: U) {}
+}
+
 // All the vtable thunks should traffic in <U where U : Q>, because that's
 // what the base method declares.
 
@@ -47,12 +53,14 @@ func call<T, U : P>(_ t: T, _ u: U) {
 
 // CHECK-LABEL: sil_vtable ConcreteBase {
 // CHECK-NEXT:   #ConcreteBase.f: <U where U : Q> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature12ConcreteBaseC1fyyxAA1QRzlF
+// CHECK-NEXT:   #ConcreteBase.g: <U where U : C> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature12ConcreteBaseC1gyyxAA1CCRbzlF
 // CHECK-NEXT:   #ConcreteBase.init!allocator: (ConcreteBase.Type) -> () -> ConcreteBase : @$s24vtable_generic_signature12ConcreteBaseCACycfC
 // CHECK-NEXT:   #ConcreteBase.deinit!deallocator: @$s24vtable_generic_signature12ConcreteBaseCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable ConcreteDerivedFromConcreteBase {
 // CHECK-NEXT:   #ConcreteBase.f: <U where U : Q> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature019ConcreteDerivedFromD4BaseC1fyyxAA1PRzlFAA0dG0CADyyxAA1QRzlFTV [override]
+// CHECK-NEXT:   #ConcreteBase.g: <U where U : C> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature12ConcreteBaseC1gyyxAA1CCRbzlF
 // CHECK-NEXT:   #ConcreteBase.init!allocator: (ConcreteBase.Type) -> () -> ConcreteBase : @$s24vtable_generic_signature019ConcreteDerivedFromD4BaseCACycfC [override]
 // CHECK-NEXT:   #ConcreteDerivedFromConcreteBase.f: <U where U : P> (ConcreteDerivedFromConcreteBase) -> (U) -> () : @$s24vtable_generic_signature019ConcreteDerivedFromD4BaseC1fyyxAA1PRzlF
 // CHECK-NEXT:   #ConcreteDerivedFromConcreteBase.deinit!deallocator: @$s24vtable_generic_signature019ConcreteDerivedFromD4BaseCfD
@@ -60,6 +68,7 @@ func call<T, U : P>(_ t: T, _ u: U) {
 
 // CHECK-LABEL: sil_vtable GenericDerivedFromConcreteBase {
 // CHECK-NEXT:   #ConcreteBase.f: <U where U : Q> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature30GenericDerivedFromConcreteBaseC1fyyqd__AA1PRd__lFAA0gH0CADyyxAA1QRzlFTV [override]
+// CHECK-NEXT:   #ConcreteBase.g: <U where U : C> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature12ConcreteBaseC1gyyxAA1CCRbzlF
 // CHECK-NEXT:   #ConcreteBase.init!allocator: (ConcreteBase.Type) -> () -> ConcreteBase : @$s24vtable_generic_signature30GenericDerivedFromConcreteBaseCACyxGycfC [override]
 // CHECK-NEXT:   #GenericDerivedFromConcreteBase.f: <T><U where U : P> (GenericDerivedFromConcreteBase<T>) -> (U) -> () : @$s24vtable_generic_signature30GenericDerivedFromConcreteBaseC1fyyqd__AA1PRd__lF
 // CHECK-NEXT:   #GenericDerivedFromConcreteBase.deinit!deallocator: @$s24vtable_generic_signature30GenericDerivedFromConcreteBaseCfD
@@ -83,4 +92,12 @@ func call<T, U : P>(_ t: T, _ u: U) {
 // CHECK-NEXT:   #GenericBase.init!allocator: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : @$s24vtable_generic_signature018GenericDerivedFromD4BaseCACyxGycfC [override]
 // CHECK-NEXT:   #GenericDerivedFromGenericBase.f: <T><U where U : P> (GenericDerivedFromGenericBase<T>) -> (U) -> () : @$s24vtable_generic_signature018GenericDerivedFromD4BaseC1fyyqd__AA1PRd__lF
 // CHECK-NEXT:   #GenericDerivedFromGenericBase.deinit!deallocator: @$s24vtable_generic_signature018GenericDerivedFromD4BaseCfD
+// CHECK-NEXT: }
+
+// CHECK-LABEL: sil_vtable ConcreteDerived {
+// CHECK-NEXT:   #ConcreteBase.f: <U where U : Q> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature12ConcreteBaseC1fyyxAA1QRzlF [inherited]
+// CHECK-NEXT:   #ConcreteBase.g: <U where U : C> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature15ConcreteDerivedC1gyyxAA1PRzlFAA0D4BaseCADyyxAA1CCRbzlFTV [override]
+// CHECK-NEXT:   #ConcreteBase.init!allocator: (ConcreteBase.Type) -> () -> ConcreteBase : @$s24vtable_generic_signature15ConcreteDerivedCACycfC [override]
+// CHECK-NEXT:   #ConcreteDerived.g: <U where U : P> (ConcreteDerived) -> (U) -> () : @$s24vtable_generic_signature15ConcreteDerivedC1gyyxAA1PRzlF
+// CHECK-NEXT:   #ConcreteDerived.deinit!deallocator: @$s24vtable_generic_signature15ConcreteDerivedCfD  // ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }

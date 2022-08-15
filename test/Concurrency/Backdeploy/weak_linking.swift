@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -target x86_64-apple-macosx12.0 -module-name main -emit-ir -o %t/new.ir
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir -o %t/new.ir
 // RUN: %FileCheck %s --check-prefix=NEW < %t/new.ir
-// RUN: %target-swift-frontend %s -target x86_64-apple-macosx10.15 -module-name main -emit-ir -o %t/old.ir -disable-availability-checking
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -o %t/old.ir -disable-availability-checking
 // RUN: %FileCheck %s --check-prefix=OLD < %t/old.ir
-// RUN: %target-swift-frontend %s -target x86_64-apple-macosx10.15 -O -module-name main -emit-ir -o %t/optimized.ir -disable-availability-checking
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -O -module-name main -emit-ir -o %t/optimized.ir -disable-availability-checking
 // RUN: %FileCheck %s --check-prefix=OPTIMIZED < %t/optimized.ir
 
 

@@ -211,6 +211,8 @@ ERROR(return_from_init_without_initing_stored_properties,none,
       "return from initializer without initializing all"
       " stored properties", ())
 
+ERROR(explicit_store_of_compilerinitialized,none,
+      "illegal assignment to '@_compilerInitialized' storage", ())
 ERROR(variable_function_use_uninit,none,
       "%select{variable|constant}1 '%0' used by function definition before"
       " being initialized",
@@ -320,7 +322,7 @@ ERROR(performance_objectivec,none,
 ERROR(performance_unknown_callees,none,
       "called function is not known at compile time and can have unpredictable performance", ())
 ERROR(performance_callee_unavailable,none,
-      "called function is not availbale in this module and can have unpredictable performance", ())
+      "called function is not available in this module and can have unpredictable performance", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 
@@ -723,10 +725,15 @@ ERROR(noimplicitcopy_used_on_generic_or_existential, none,
       "binding or a nominal type containing such typed things", ())
 
 // move only checker diagnostics
-ERROR(sil_moveonlychecker_value_consumed_more_than_once, none,
+ERROR(sil_moveonlychecker_owned_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
+ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
+      "'%0' has guaranteed ownership but was consumed", (StringRef))
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use", ())
+ERROR(sil_moveonlychecker_not_understand_mark_move, none,
+      "Usage of @noImplicitCopy that the move checker does not know how to "
+      "check!", ())
 
 // move kills copyable values checker diagnostics
 ERROR(sil_movekillscopyablevalue_value_consumed_more_than_once, none,

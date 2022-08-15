@@ -1,4 +1,4 @@
-from .Node import error
+from .Utils import error
 from .kinds import lowercase_first_word  # noqa: I201
 
 
@@ -39,7 +39,7 @@ SYNTAX_CLASSIFICATIONS = [
     A string literal including multiline string literals.
     '''),
     SyntaxClassification('StringInterpolationAnchor', description='''
-    The opening and closing paranthesis of string interpolation.
+    The opening and closing parenthesis of string interpolation.
     '''),
     SyntaxClassification('PoundDirectiveKeyword', description='''
     A `#` keyword like `#warning`.

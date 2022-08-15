@@ -33,6 +33,21 @@ struct PossibleParamInfo {
     assert((Param || !IsRequired) &&
            "nullptr with required flag is not allowed");
   };
+
+  friend bool operator==(const PossibleParamInfo &lhs,
+                         const PossibleParamInfo &rhs) {
+    bool ParamsMatch;
+    if (lhs.Param == nullptr && rhs.Param == nullptr) {
+      ParamsMatch = true;
+    } else if (lhs.Param == nullptr || rhs.Param == nullptr) {
+      // One is nullptr but the other is not.
+      ParamsMatch = false;
+    } else {
+      // Both are not nullptr.
+      ParamsMatch = (*lhs.Param == *rhs.Param);
+    }
+    return ParamsMatch && (lhs.IsRequired == rhs.IsRequired);
+  }
 };
 
 } // end namespace ide

@@ -61,10 +61,12 @@ class CompilerInvocation;
 class ClangImporterOptions;
 class ClangModuleUnit;
 class ClangNode;
+class ConcreteDeclRef;
 class Decl;
 class DeclContext;
 class EffectiveClangContext;
 class EnumDecl;
+class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
 class ModuleDecl;
@@ -72,6 +74,7 @@ class NominalTypeDecl;
 class StructDecl;
 class SwiftLookupTable;
 class TypeDecl;
+class ValueDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
 
@@ -261,6 +264,9 @@ public:
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) override;
 
+  ConcreteDeclRef getCXXFunctionTemplateSpecialization(
+          SubstitutionMap subst, ValueDecl *decl) override;
+
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
   ClangNode getEffectiveClangNode(const Decl *decl) const;
@@ -303,7 +309,7 @@ public:
                               unsigned previousGeneration) override;
 
   virtual void loadObjCMethods(
-                 ClassDecl *classDecl,
+                 NominalTypeDecl *typeDecl,
                  ObjCSelector selector,
                  bool isInstanceMethod,
                  unsigned previousGeneration,
@@ -435,9 +441,12 @@ public:
 
   std::string getClangModuleHash() const;
 
-  /// If we already imported a given decl, return the corresponding Swift decl.
-  /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl);
+  /// If we already imported a given decl successfully, return the corresponding
+  /// Swift decl as an Optional<Decl *>, but if we previously tried and failed
+  /// to import said decl then return nullptr.
+  /// Otherwise, if we have never encountered this decl previously then return
+  /// None.
+  Optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl);
 
   // Returns true if it is expected that the macro is ignored.
   bool shouldIgnoreMacro(StringRef Name, const clang::MacroInfo *Macro);
@@ -507,6 +516,8 @@ public:
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
 
+  bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
+
   /// Find the lookup table that corresponds to the given Clang module.
   ///
   /// \param clangModule The module, or null to indicate that we're talking
@@ -519,6 +530,9 @@ public:
 
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
+
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl,
+                                  DeclContext *newContext) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.

@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
@@ -11,7 +12,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 distributed actor SomeSpecificDistributedActor {
@@ -33,19 +34,19 @@ func test_initializers() {
   let address = ActorAddress(parse: "")
   let system = DefaultDistributedActorSystem()
 
-  _ = SomeSpecificDistributedActor(system: system)
+  _ = SomeSpecificDistributedActor(actorSystem: system)
   _ = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
 }
 
 func test_address() {
   let system = DefaultDistributedActorSystem()
 
-  let actor = SomeSpecificDistributedActor(system: system)
+  let actor = SomeSpecificDistributedActor(actorSystem: system)
   _ = actor.id
 }
 
 func test_run(system: FakeActorSystem) async {
-  let actor = SomeSpecificDistributedActor(system: system)
+  let actor = SomeSpecificDistributedActor(actorSystem: system)
 
   print("before") // CHECK: before
   try! await actor.hello()
@@ -53,7 +54,7 @@ func test_run(system: FakeActorSystem) async {
 }
 
 func test_echo(system: FakeActorSystem) async {
-  let actor = SomeSpecificDistributedActor(system: system)
+  let actor = SomeSpecificDistributedActor(actorSystem: system)
 
   let echo = try! await actor.echo(int: 42)
   print("echo: \(echo)") // CHECK: echo: 42

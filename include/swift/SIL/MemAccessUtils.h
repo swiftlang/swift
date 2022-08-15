@@ -260,6 +260,16 @@ enum class NestedAccessType { StopAtAccessBegin, IgnoreAccessBegin };
 /// previous.
 enum class AccessUseType { Exact, Inner, Overlapping };
 
+/// When walking from a value to its storage, casts may be encountered.  The
+/// cases describe variety of encountered casts, categorized by the kind of
+/// transformation that the casts perform.
+///
+/// The enum values are ordered.  Each successive cast kind is more
+/// transformative than the last.
+///
+/// TODO: Distinguish between LayoutEquivalent and LayoutCompatible.
+enum class AccessStorageCast { Identity, Type };
+
 /// The physical representation used to identify access information and common
 /// API used by both AccessBase and AccessStorage.
 ///
@@ -357,7 +367,7 @@ protected:
     // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
     // in the function is mapped to one instance of this subclass.  Reserve a
     // bit for a seenNestedConflict flag, which is the per-begin-access result
-    // of pass-specific analysis. The remaning bits are sufficient to index all
+    // of pass-specific analysis. The remaining bits are sufficient to index all
     // begin_[unpaired_]access instructions.
     //
     // `AccessRepresentation` refers to the AccessRepresentationBitfield defined
@@ -549,7 +559,7 @@ public:
 private:
   // Disable direct comparison because we allow subclassing with bitfields.
   // Currently, we use DenseMapInfo to unique storage, which defines key
-  // equalilty only in terms of the base AccessStorage class bits.
+  // equality only in terms of the base AccessStorage class bits.
   bool operator==(const AccessRepresentation &) const = delete;
   bool operator!=(const AccessRepresentation &) const = delete;
 };
@@ -557,7 +567,7 @@ private:
 /// The base of a formal access.
 ///
 /// Note that the SILValue that represents a storage object is not
-/// necessarilly an address type. It may instead be a SILBoxType. So, even
+/// necessarily an address type. It may instead be a SILBoxType. So, even
 /// though address phis are not allowed, finding the base of an access may
 /// require traversing phis.
 class AccessBase : public AccessRepresentation {
@@ -617,7 +627,7 @@ public:
     return findReferenceRoot(getReference());
   }
 
-  /// Return the global variable being accessed.
+  /// Return the global variable being accessed. Always valid.
   ///
   /// Precondition: getKind() == Global
   SILGlobalVariable *getGlobal() const;
@@ -898,6 +908,30 @@ struct AccessStorageWithBase {
   void dump() const;
 };
 
+/// Extends AccessStorageWithBase by adding information that was obtained while
+/// visiting from a particular address, to which an instance of this is
+/// relative.
+struct RelativeAccessStorageWithBase {
+
+  /// Identical to AccessStorageWithBase::compute but preserves information
+  /// specific to the walk from address;
+  static RelativeAccessStorageWithBase compute(SILValue address);
+
+  /// Identical to AccessStorageWithBase::computeInScope but preserves
+  /// information specific to the walk from address;
+  static RelativeAccessStorageWithBase computeInScope(SILValue address);
+
+  /// The address to which this RelativeAccessStorageWithBase is relative.
+  SILValue address;
+  /// The underlying access storage and base.
+  AccessStorageWithBase storageWithBase;
+  /// The most transformative cast that was seen between when walking from
+  /// address to storage.base;
+  Optional<AccessStorageCast> cast;
+
+  AccessStorage getStorage() const { return storageWithBase.storage; }
+};
+
 /// Return an AccessStorage value that identifies formally accessed storage
 /// for \p beginAccess, considering any outer access scope as having distinct
 /// storage from this access scope. This is useful for exclusivity checking
@@ -957,7 +991,7 @@ namespace swift {
 /// this, we instead consider it an invalid AccessPath. This is the only case in
 /// which AccessPath::storage can differ from AccessStorage::compute().
 ///
-/// Storing an AccessPath ammortizes to constant space. To cache identification
+/// Storing an AccessPath amortizes to constant space. To cache identification
 /// of address locations, AccessPath should be used rather than the
 /// ProjectionPath which requires quadratic space in the number of address
 /// values and quadratic time when comparing addresses.
@@ -1165,7 +1199,7 @@ public:
 
 // Encapsulate the result of computing an AccessPath. AccessPath does not store
 // the base address of the formal access because it does not always uniquely
-// indentify the access, but AccessPath users may use the base address to to
+// identify the access, but AccessPath users may use the base address to to
 // recover the def-use chain for a specific global_addr or ref_element_addr.
 struct AccessPathWithBase {
   AccessPath accessPath;
@@ -1208,6 +1242,16 @@ struct AccessPathWithBase {
   void print(raw_ostream &os) const;
   void dump() const;
 };
+
+// Visits all the "product leaves" of the type tree of the specified value and
+// invokes provided visitor, identifying the leaf by its path node and
+// providing its type.
+//
+// The "product leaves" are the leaves obtained by only looking through type
+// products (structs and tuples) and NOT type sums (enums).
+void visitProductLeafAccessPathNodes(
+    SILValue address, TypeExpansionContext tec, SILModule &module,
+    std::function<void(AccessPath::PathNode, SILType)> visitor);
 
 inline AccessPath AccessPath::compute(SILValue address) {
   return AccessPathWithBase::compute(address).accessPath;
@@ -1267,6 +1311,18 @@ template <> struct DenseMapInfo<swift::AccessPathWithBase> {
   }
 };
 
+// Allow AccessPath::PathNode to be used as a pointer-like template argument.
+template<>
+struct PointerLikeTypeTraits<swift::AccessPath::PathNode> {
+  static inline void *getAsVoidPointer(swift::AccessPath::PathNode node) {
+    return (void *)node.node;
+  }
+  static inline swift::AccessPath::PathNode getFromVoidPointer(void *pointer) {
+    return swift::AccessPath::PathNode((swift::IndexTrieNode *)pointer);
+  }
+  enum { NumLowBitsAvailable =
+         PointerLikeTypeTraits<swift::IndexTrieNode *>::NumLowBitsAvailable };
+};
 } // end namespace llvm
 
 //===----------------------------------------------------------------------===//
@@ -1501,28 +1557,14 @@ inline Operand *getAccessProjectionOperand(SingleValueInstruction *svi) {
   };
 }
 
-/// An address, pointer, or box cast that occurs outside of the formal
-/// access. These convert the base of accessed storage without affecting the
-/// AccessPath. Useful for both use-def and def-use traversal. The source
-/// address must be at operand(0).
-///
-/// Some of these casts, such as address_to_pointer, may also occur inside of a
-/// formal access.
-///
-/// TODO: Add stricter structural guarantee such that these never
-/// occur within an access. It's important to be able to get the accessed
-/// address without looking though type casts or pointer_to_address [strict],
-/// which we can't do if those operations are behind access projections.
-inline bool isAccessStorageCast(SingleValueInstruction *svi) {
+/// A cast for the purposes of AccessStorage which may change the
+/// underlying type but doesn't affect the AccessPath.  See isAccessStorageCast.
+inline bool isAccessStorageTypeCast(SingleValueInstruction *svi) {
   switch (svi->getKind()) {
   default:
     return false;
-
-  // Simply pass-thru the incoming address.
-  case SILInstructionKind::MarkUninitializedInst:
+  // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::UncheckedAddrCastInst:
-  case SILInstructionKind::MarkDependenceInst:
-  case SILInstructionKind::CopyValueInst:
   // Casting to RawPointer does not affect the AccessPath. When converting
   // between address types, they must be layout compatible (with truncation).
   case SILInstructionKind::AddressToPointerInst:
@@ -1550,6 +1592,37 @@ inline bool isAccessStorageCast(SingleValueInstruction *svi) {
   case SILInstructionKind::PointerToAddressInst:
     return true;
   }
+}
+
+/// A cast for the purposes of AccessStorage which doesn't change the
+/// underlying type and doesn't affect the AccessPath.  See isAccessStorageCast.
+inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
+  switch (svi->getKind()) {
+  default:
+    return false;
+
+  // Simply pass-thru the incoming address.
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::CopyValueInst:
+    return true;
+  }
+}
+
+/// An address, pointer, or box cast that occurs outside of the formal
+/// access. These convert the base of accessed storage without affecting the
+/// AccessPath. Useful for both use-def and def-use traversal. The source
+/// address must be at operand(0).
+///
+/// Some of these casts, such as address_to_pointer, may also occur inside of a
+/// formal access.
+///
+/// TODO: Add stricter structural guarantee such that these never
+/// occur within an access. It's important to be able to get the accessed
+/// address without looking though type casts or pointer_to_address [strict],
+/// which we can't do if those operations are behind access projections.
+inline bool isAccessStorageCast(SingleValueInstruction *svi) {
+  return isAccessStorageTypeCast(svi) || isAccessStorageIdentityCast(svi);
 }
 
 /// Abstract CRTP class for a visiting instructions that are part of the use-def
@@ -1598,8 +1671,9 @@ public:
   // Result visitBase(SILValue base, AccessStorage::Kind kind);
   // Result visitNonAccess(SILValue base);
   // Result visitPhi(SILPhiArgument *phi);
-  // Result visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper);
-  // Result visitAccessProjection(SingleValueInstruction *projectedAddr,
+  // Result visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper,
+  // AccessStorageCast cast); Result
+  // visitAccessProjection(SingleValueInstruction *projectedAddr,
   //                              Operand *sourceOper);
 
   Result visit(SILValue sourceAddr);
@@ -1611,8 +1685,12 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     if (auto *projOper = getAccessProjectionOperand(svi))
       return asImpl().visitAccessProjection(svi, projOper);
 
-    if (isAccessStorageCast(svi))
-      return asImpl().visitStorageCast(svi, &svi->getAllOperands()[0]);
+    if (isAccessStorageTypeCast(svi))
+      return asImpl().visitStorageCast(svi, &svi->getAllOperands()[0],
+                                       AccessStorageCast::Type);
+    if (isAccessStorageIdentityCast(svi))
+      return asImpl().visitStorageCast(svi, &svi->getAllOperands()[0],
+                                       AccessStorageCast::Identity);
   }
   switch (sourceAddr->getKind()) {
   default:
@@ -1741,7 +1819,7 @@ public:
 
   // Secondary entry point to check that cloning will succeed.
   bool canCloneUseDefChain(SILValue addr) {
-    // Use any valid address as a placeholder. It is innaccessible.
+    // Use any valid address as a placeholder. It is inaccessible.
     placeHolder = addr;
     return cloneRecursive(addr);
   }
@@ -1787,7 +1865,8 @@ public:
     return SILValue();
   }
 
-  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
+  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper,
+                            AccessStorageCast) {
     // The cloner does not currently know how to create compensating
     // end_borrows or fix mark_dependence operands.
     if (isa<BeginBorrowInst>(cast) || isa<MarkDependenceInst>(cast))

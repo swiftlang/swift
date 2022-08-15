@@ -37,7 +37,7 @@ class Klass {}
 // CHECK-SIL-LABEL: sil @$s8moveonly7useCopyyAA5KlassCADF : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 // CHECK-SIL: bb0([[ARG:%.*]] : $Klass):
 // CHECK-SIL-NEXT: debug_value
-// CHECK-SIL-NEXT: [[INPUT:%.*]] = alloc_stack $Klass
+// CHECK-SIL-NEXT: [[INPUT:%.*]] = alloc_stack [lexical] $Klass
 // CHECK-SIL-NEXT: store [[ARG]] to [[INPUT]]
 // CHECK-SIL-NEXT: [[VALUE:%[0-9][0-9]*]] = load [[INPUT]]{{.*}}
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
@@ -50,7 +50,7 @@ class Klass {}
 // CHECK-SIL-NEXT: return [[VALUE]] : $Klass
 // CHECK-SIL: } // end sil function '$s8moveonly7useCopyyAA5KlassCADF'
 
-// CHECK-SIL-OPT-LABEL: sil @$s8moveonly7useCopyyAA5KlassCADF : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
+// CHECK-SIL-OPT-LABEL: sil {{.*}}@$s8moveonly7useCopyyAA5KlassCADF : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 // CHECK-SIL-OPT: bb0([[ARG:%.*]] : $Klass):
 // CHECK-SIL-OPT-NEXT: debug_value
 // CHECK-SIL-OPT-NEXT: strong_retain [[ARG]]
@@ -78,7 +78,7 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK-SIL-LABEL: sil @$s8moveonly7useCopyyxxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned T {
 // CHECK-SIL: bb0([[ARG:%.*]] :
 // CHECK-SIL-NEXT: debug_value
-// CHECK-SIL-NEXT: [[INPUT_TO_BE_ELIMINATED:%.*]] = alloc_stack $T
+// CHECK-SIL-NEXT: [[INPUT_TO_BE_ELIMINATED:%.*]] = alloc_stack [lexical] $T
 // CHECK-SIL-NEXT: store [[ARG]] to [[INPUT]] : $*T
 // CHECK-SIL-NEXT: [[VALUE:%.*]] = load [[INPUT]] : $*T
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
@@ -91,7 +91,7 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK-SIL-NEXT: return [[VALUE]] : $T
 // CHECK-SIL: } // end sil function '$s8moveonly7useCopyyxxRlzClF'
 
-// CHECK-SIL-OPT-LABEL: sil @$s8moveonly7useCopyyxxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned T {
+// CHECK-SIL-OPT-LABEL: sil {{.*}}@$s8moveonly7useCopyyxxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned T {
 // CHECK-SIL-OPT: bb0([[ARG:%.*]] :
 // CHECK-SIL-OPT-NEXT: debug_value
 // CHECK-SIL-OPT-NEXT: strong_retain [[ARG]]

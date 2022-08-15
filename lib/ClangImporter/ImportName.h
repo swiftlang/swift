@@ -412,7 +412,7 @@ public:
   /// If \p action returns false, the current name will \e not be added to the
   /// set of seen names.
   ///
-  /// The active name for \p activeVerion is always first, followed by the
+  /// The active name for \p activeVersion is always first, followed by the
   /// other names in the order of
   /// ImportNameVersion::forEachOtherImportNameVersion.
   ///

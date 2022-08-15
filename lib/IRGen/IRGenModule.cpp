@@ -28,6 +28,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
@@ -577,10 +578,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AtomicBoolSize = Size(ClangASTContext->getTypeSize(atomicBoolTy));
     AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
   }
-
-  IsSwiftErrorInRegister =
+  // On WebAssembly, tail optional arguments are not allowed because Wasm requires
+  // callee and caller signature to be the same. So LLVM adds dummy arguments for
+  // `swiftself` and `swifterror`. If there is `swiftself` but is no `swifterror` in
+  // a swiftcc function or invocation, then LLVM adds dummy `swifterror` parameter or
+  // argument. To count up how many dummy arguments should be added, we need to mark
+  // it as `swifterror` even though it's not in register.
+  ShouldUseSwiftError =
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
-      ClangCodeGen->CGM());
+      ClangCodeGen->CGM()) || TargetInfo.OutputObjectFormat == llvm::Triple::Wasm;
 
 #ifndef NDEBUG
   sanityCheckStdlib(*this);
@@ -662,9 +668,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   SwiftContextTy->setBody({
-    SwiftContextPtrTy,    // Parent
-    TaskContinuationFunctionPtrTy, // ResumeParent,
-    SizeTy,               // Flags
+    SwiftContextPtrTy,             // Parent
+    TaskContinuationFunctionPtrTy, // ResumeParent
   });
 
   AsyncTaskAndContextTy = createStructType(
@@ -674,6 +679,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ContinuationAsyncContextTy = createStructType(
       *this, "swift.continuation_context",
       {SwiftContextTy,       // AsyncContext header
+       SizeTy,               // flags
        SizeTy,               // await synchronization
        ErrorPtrTy,           // error result pointer
        OpaquePtrTy,          // normal result address
@@ -835,6 +841,15 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TaskRunInlineAvailability(ASTContext &context) {
+    if (context.LangOpts.isConcurrencyModelTaskToThread()) {
+      return RuntimeAvailability::AlwaysAvailable;
+    }
+    // swift_task_run_inline is only available under task-to-thread execution
+    // model.
+    return RuntimeAvailability::ConditionallyAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -881,7 +896,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       RuntimeAvailability availability,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
-                      ArrayRef<Attribute::AttrKind> attrs) {
+                      ArrayRef<Attribute::AttrKind> attrs,
+                      IRGenModule *IGM) {
 
   if (cache)
     return cache;
@@ -954,6 +970,22 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     fn->addFnAttrs(buildFnAttr);
     fn->addRetAttrs(buildRetAttr);
     fn->addParamAttrs(0, buildFirstParamAttr);
+
+    // Add swiftself and swifterror attributes only when swift_willThrow
+    // swift_willThrow is defined in RuntimeFunctions.def, but due to the
+    // DSL limitation, arguments attributes are not set.
+    // On the other hand, caller of `swift_willThrow` assumes that it's attributed
+    // with `swiftself` and `swifterror`.
+    // This mismatch of attributes would be issue when lowering to WebAssembly.
+    // While lowering, LLVM counts how many dummy params are necessary to match
+    // callee and caller signature. So we need to add them correctly.
+    if (functionName == "swift_willThrow") {
+      assert(IGM && "IGM is required for swift_willThrow.");
+      fn->addParamAttr(0, Attribute::AttrKind::SwiftSelf);
+      if (IGM->ShouldUseSwiftError) {
+        fn->addParamAttr(1, Attribute::AttrKind::SwiftError);
+      }
+    }
   }
 
   return cache;
@@ -997,7 +1029,7 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
     registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
                         AVAILABILITY(this->Context),                           \
-                        RETURNS, ARGS, ATTRS);                                 \
+                        RETURNS, ARGS, ATTRS, this);                           \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"
@@ -1152,7 +1184,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  if (auto *wt = SIL.lookUpWitnessTable(Conf, /*deserializeLazily=*/false)) {
+  if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
@@ -1214,8 +1246,9 @@ void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
 }
 
 /// Construct initial function attributes from options.
-void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
-                                               OptimizationMode FuncOptMode) {
+void IRGenModule::constructInitialFnAttributes(
+    llvm::AttrBuilder &Attrs, OptimizationMode FuncOptMode,
+    StackProtectorMode stackProtector) {
   // Add the default attributes for the Clang configuration.
   clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
 
@@ -1228,6 +1261,10 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
   } else {
     Attrs.removeAttribute(llvm::Attribute::MinSize);
     Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
+  }
+  if (stackProtector == StackProtectorMode::StackProtector) {
+    Attrs.addAttribute(llvm::Attribute::StackProtectStrong);
+    Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
 }
 
@@ -1614,12 +1651,7 @@ void IRGenModule::emitAutolinkInfo() {
   }
 }
 
-void IRGenModule::cleanupClangCodeGenMetadata() {
-  // Remove llvm.ident that ClangCodeGen might have left in the module.
-  auto *LLVMIdent = Module.getNamedMetadata("llvm.ident");
-  if (LLVMIdent)
-    Module.eraseNamedMetadata(LLVMIdent);
-
+void emitSwiftVersionNumberIntoModule(llvm::Module *Module) {
   // LLVM's object-file emission collects a fixed set of keys for the
   // image info.
   // Using "Objective-C Garbage Collection" as the key here is a hack,
@@ -1629,21 +1661,29 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
   const char *ObjectiveCGarbageCollection = "Objective-C Garbage Collection";
   uint8_t Major, Minor;
   std::tie(Major, Minor) = version::getSwiftNumericVersion();
-  uint32_t Value = (Major << 24) | (Minor << 16) | (swiftVersion << 8);
-
-  if (Module.getModuleFlag(ObjectiveCGarbageCollection)) {
+  uint32_t Value =
+      (Major << 24) | (Minor << 16) | (IRGenModule::swiftVersion << 8);
+  auto &llvmContext = Module->getContext();
+  if (Module->getModuleFlag(ObjectiveCGarbageCollection)) {
     bool FoundOldEntry = replaceModuleFlagsEntry(
-        Module.getContext(), Module, ObjectiveCGarbageCollection,
+        llvmContext, *Module, ObjectiveCGarbageCollection,
         llvm::Module::Override,
-        llvm::ConstantAsMetadata::get(
-            llvm::ConstantInt::get(Int32Ty, Value)));
+        llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+            llvm::Type::getInt32Ty(llvmContext), Value)));
 
     (void)FoundOldEntry;
     assert(FoundOldEntry && "Could not replace old module flag entry?");
   } else
-    Module.addModuleFlag(llvm::Module::Override,
-                         ObjectiveCGarbageCollection,
-                         Value);
+    Module->addModuleFlag(llvm::Module::Override, ObjectiveCGarbageCollection,
+                          Value);
+}
+
+void IRGenModule::cleanupClangCodeGenMetadata() {
+  // Remove llvm.ident that ClangCodeGen might have left in the module.
+  auto *LLVMIdent = Module.getNamedMetadata("llvm.ident");
+  if (LLVMIdent)
+    Module.eraseNamedMetadata(LLVMIdent);
+  emitSwiftVersionNumberIntoModule(&Module);
 }
 
 bool IRGenModule::finalize() {
@@ -1745,7 +1785,7 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() ||
+      (Triple.isOSDarwin() || Triple.isOSWindows() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
     return IRGen.Opts.PrespecializeGenericMetadata;
@@ -1757,6 +1797,19 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
          deploymentAvailability.isContainedIn(
              context.getPrespecializedGenericMetadataAvailability()) &&
          canPrespecializeTarget;
+}
+
+bool IRGenModule::canMakeStaticObjectsReadOnly() {
+  if (getOptions().DisableReadonlyStaticObjects)
+    return false;
+
+  // TODO: Support constant static arrays on other platforms, too.
+  // See also the comment in GlobalObjects.cpp.
+  if (!Triple.isOSDarwin())
+    return false;
+
+  return getAvailabilityContext().isContainedIn(
+          Context.getImmortalRefCountSymbolsAvailability());
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
@@ -1861,4 +1914,41 @@ bool IRGenModule::isConcurrencyAvailable() {
   auto deploymentAvailability =
     AvailabilityContext::forDeploymentTarget(ctx);
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
+}
+
+/// Pretend the other files that drivers/build systems expect exist by
+/// creating empty files. Used by UseSingleModuleLLVMEmission when
+/// num-threads > 0.
+bool swift::writeEmptyOutputFilesFor(
+  const ASTContext &Context,
+  std::vector<std::string>& ParallelOutputFilenames,
+  const IRGenOptions &IRGenOpts) {
+
+  for (auto fileName : ParallelOutputFilenames) {
+    // The first output file, was use for genuine output.
+    if (fileName == ParallelOutputFilenames[0])
+      continue;
+
+    std::unique_ptr<llvm::LLVMContext> llvmContext(new llvm::LLVMContext());
+    std::unique_ptr<clang::CodeGenerator> clangCodeGen(
+      createClangCodeGenerator(const_cast<ASTContext&>(Context),
+                               *llvmContext, IRGenOpts, fileName, ""));
+    auto *llvmModule = clangCodeGen->GetModule();
+
+    auto *clangImporter = static_cast<ClangImporter *>(
+      Context.getClangModuleLoader());
+    llvmModule->setTargetTriple(
+      clangImporter->getTargetInfo().getTargetOpts().Triple);
+
+    // Add LLVM module flags.
+    auto &clangASTContext = clangImporter->getClangASTContext();
+    clangCodeGen->HandleTranslationUnit(
+        const_cast<clang::ASTContext &>(clangASTContext));
+
+    emitSwiftVersionNumberIntoModule(llvmModule);
+
+    swift::performLLVM(IRGenOpts, const_cast<ASTContext&>(Context),
+                       llvmModule, fileName);
+  }
+  return false;
 }

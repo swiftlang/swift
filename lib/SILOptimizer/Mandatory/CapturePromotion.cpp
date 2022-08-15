@@ -510,7 +510,7 @@ void ClosureCloner::populateCloned() {
     // If SIL ownership is enabled, we need to perform a borrow here if we have
     // a non-trivial value. We know that our value is not written to and it does
     // not escape. The use of a borrow enforces this.
-    if (mappedValue.getOwnershipKind() != OwnershipKind::None) {
+    if (mappedValue->getOwnershipKind() != OwnershipKind::None) {
       SILLocation loc(const_cast<ValueDecl *>((*ai)->getDecl()));
       mappedValue = getBuilder().emitBeginBorrowOperation(loc, mappedValue);
     }
@@ -541,8 +541,8 @@ SILFunction *ClosureCloner::constructClonedFunction(
   SILFunction *origF = fri->getReferencedFunction();
 
   IsSerialized_t isSerialized = IsNotSerialized;
-  if (f->isSerialized() && origF->isSerialized())
-    isSerialized = IsSerialized_t::IsSerializable;
+  if (f->isSerialized())
+    isSerialized = IsSerialized_t::IsSerialized;
 
   auto clonedName = getSpecializedName(origF, isSerialized, promotableIndices);
 
@@ -603,7 +603,7 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *inst) {
 
       // We must have emitted a begin_borrow for any non-trivial value. Insert
       // an end_borrow if so.
-      if (value.getOwnershipKind() != OwnershipKind::None) {
+      if (value->getOwnershipKind() != OwnershipKind::None) {
         auto *bbi = cast<BeginBorrowInst>(value);
         value = bbi->getOperand();
         b.emitEndBorrowOperation(inst->getLoc(), bbi);
@@ -691,8 +691,27 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
     //
     // We assume that the value is already guaranteed.
     assert(
-        value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed) &&
+        value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed) &&
         "Expected argument value to be guaranteed");
+    recordFoldedValue(lbi, value);
+    return;
+  }
+
+  auto *seai = dyn_cast<StructElementAddrInst>(lbi->getOperand());
+  if (!seai) {
+    SILCloner<ClosureCloner>::visitLoadBorrowInst(lbi);
+    return;
+  }
+
+  if (SILValue value = getProjectBoxMappedVal(seai->getOperand())) {
+    // Loads of a struct_element_addr of an argument get replaced with a
+    // struct_extract of the new passed in value. The value should be borrowed
+    // already, so we can just extract the value.
+    assert(
+        !getBuilder().getFunction().hasOwnership() ||
+        value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
+    value = getBuilder().emitStructExtract(lbi->getLoc(), value,
+                                           seai->getField(), lbi->getType());
     recordFoldedValue(lbi, value);
     return;
   }
@@ -734,7 +753,7 @@ void ClosureCloner::visitLoadInst(LoadInst *li) {
     // already, so we can just extract the value.
     assert(
         !getBuilder().getFunction().hasOwnership() ||
-        value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
+        value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
     value = getBuilder().emitStructExtract(li->getLoc(), value,
                                            seai->getField(), li->getType());
 

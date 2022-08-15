@@ -33,12 +33,15 @@
 namespace swift {
 namespace ide {
 
-using DeclFilter = std::function<bool(ValueDecl *, DeclVisibilityKind)>;
+using DeclFilter =
+    std::function<bool(ValueDecl *, DeclVisibilityKind, DynamicLookupInfo)>;
 
 /// A filter that always returns \c true.
-bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind);
+bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind,
+                   DynamicLookupInfo dynamicLookupInfo);
 
-bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind);
+bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
+                   DynamicLookupInfo dynamicLookupInfo);
 
 /// Returns \c true only if the completion is happening for top-level
 /// declrarations. i.e.:
@@ -76,6 +79,9 @@ bool isCodeCompletionAtTopLevel(const DeclContext *DC);
 ///     }
 bool isCompletionDeclContextLocalContext(DeclContext *DC);
 
+/// Returns \c true if \p DC can handles async call.
+bool canDeclContextHandleAsync(const DeclContext *DC);
+
 /// Return \c true if the completion happens at top-level of a library file.
 bool isCodeCompletionAtTopLevelOfLibraryFile(const DeclContext *DC);
 
@@ -112,6 +118,12 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
 
   /// Expected types of the code completion expression.
   ExpectedTypeContext expectedTypeContext;
+
+  /// Variables whose type was determined while type checking the code
+  /// completion expression and that are thus not recorded in the AST.
+  /// This in particular applies to params of closures that contain the code
+  /// completion token.
+  llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
 
   bool CanCurrDeclContextHandleAsync = false;
   bool HaveDot = false;
@@ -197,14 +209,27 @@ public:
     static RequestedResultsTy toplevelResults() {
       return {nullptr, false, false, false, true};
     }
+
+    friend bool operator==(const RequestedResultsTy &LHS,
+                           const RequestedResultsTy &RHS) {
+      return LHS.TheModule == RHS.TheModule && LHS.OnlyTypes == RHS.OnlyTypes &&
+             LHS.OnlyPrecedenceGroups == RHS.OnlyPrecedenceGroups &&
+             LHS.NeedLeadingDot == RHS.NeedLeadingDot &&
+             LHS.IncludeModuleQualifier == RHS.IncludeModuleQualifier;
+    }
   };
 
-  std::vector<RequestedResultsTy> RequestedCachedResults;
+  llvm::SetVector<RequestedResultsTy> RequestedCachedResults;
 
 public:
   CompletionLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
                    const DeclContext *CurrDeclContext,
                    CodeCompletionContext *CompletionContext = nullptr);
+
+  void setSolutionSpecificVarTypes(
+      llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
+    this->SolutionSpecificVarTypes = SolutionSpecificVarTypes;
+  }
 
   void setHaveDot(SourceLoc DotLoc) {
     HaveDot = true;
@@ -215,16 +240,31 @@ public:
 
   void setIsStaticMetatype(bool value) { IsStaticMetatype = value; }
 
-  void setExpectedTypes(ArrayRef<Type> Types,
-                        bool isImplicitSingleExpressionReturn,
-                        bool preferNonVoid = false) {
+  void setExpectedTypes(
+      ArrayRef<Type> Types, bool isImplicitSingleExpressionReturn,
+      bool preferNonVoid = false,
+      OptionSet<CustomAttributeKind> expectedCustomAttributeKinds = {}) {
     expectedTypeContext.setIsImplicitSingleExpressionReturn(
         isImplicitSingleExpressionReturn);
     expectedTypeContext.setPreferNonVoid(preferNonVoid);
     expectedTypeContext.setPossibleTypes(Types);
+    expectedTypeContext.setExpectedCustomAttributeKinds(
+        expectedCustomAttributeKinds);
   }
 
   void setIdealExpectedType(Type Ty) { expectedTypeContext.setIdealType(Ty); }
+
+  bool canCurrDeclContextHandleAsync() const {
+    return CanCurrDeclContextHandleAsync;
+  }
+
+  void setCanCurrDeclContextHandleAsync(bool CanCurrDeclContextHandleAsync) {
+    this->CanCurrDeclContextHandleAsync = CanCurrDeclContextHandleAsync;
+  }
+
+  const ExpectedTypeContext *getExpectedTypeContext() const {
+    return &expectedTypeContext;
+  }
 
   CodeCompletionContext::TypeContextKind typeContextKind() const {
     if (expectedTypeContext.empty() &&
@@ -323,7 +363,7 @@ public:
 
   static bool hasInterestingDefaultValue(const ParamDecl *param);
 
-  bool addItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
+  bool shouldAddItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
 
   /// Build argument patterns for calling. Returns \c true if any content was
   /// added to \p Builder. If \p declParams is non-empty, the size must match
@@ -506,7 +546,7 @@ public:
         : Consumer(Consumer), Filter(Filter) {}
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Kind,
                    DynamicLookupInfo dynamicLookupInfo) override {
-      if (Filter(VD, Kind))
+      if (Filter(VD, Kind, dynamicLookupInfo))
         Consumer.foundDecl(VD, Kind, dynamicLookupInfo);
     }
   };
@@ -537,7 +577,6 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
-                                    bool IsDistributedEnabled,
                                     Optional<DeclKind> DK);
 
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK);
@@ -567,9 +606,36 @@ public:
                                  bool ResultsHaveLeadingDot);
 
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
+
+  void getOptionalBindingCompletions(SourceLoc Loc);
 };
 
 } // end namespace ide
 } // end namespace swift
+
+namespace llvm {
+using RequestedResultsTy = swift::ide::CompletionLookup::RequestedResultsTy;
+template <>
+struct DenseMapInfo<RequestedResultsTy> {
+  static inline RequestedResultsTy getEmptyKey() {
+    return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), false, false,
+            false, false};
+  }
+  static inline RequestedResultsTy getTombstoneKey() {
+    return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), false, false,
+            false, false};
+  }
+  static unsigned getHashValue(const RequestedResultsTy &Val) {
+    return hash_combine(
+        DenseMapInfo<swift::ModuleDecl *>::getHashValue(Val.TheModule),
+        Val.OnlyTypes, Val.OnlyPrecedenceGroups, Val.NeedLeadingDot,
+        Val.IncludeModuleQualifier);
+  }
+  static bool isEqual(const RequestedResultsTy &LHS,
+                      const RequestedResultsTy &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif // SWIFT_IDE_COMPLETIONLOOKUP_H

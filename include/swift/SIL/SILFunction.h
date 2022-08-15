@@ -36,6 +36,7 @@ class SILModule;
 class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
+class NodeBitfield;
 
 namespace Lowering {
 class TypeLowering;
@@ -62,6 +63,11 @@ enum IsExactSelfClass_t {
 enum IsDistributed_t {
   IsNotDistributed,
   IsDistributed,
+};
+enum IsWeakImported_t {
+  IsNotWeakImported,
+  IsWeakImportedByModule,
+  IsAlwaysWeakImported,
 };
 
 enum class PerformanceConstraints : uint8_t {
@@ -169,7 +175,9 @@ private:
   friend class SILModule;
   friend class SILFunctionBuilder;
   template <typename, unsigned> friend class BasicBlockData;
+  template <class, class> friend class SILBitfield;
   friend class BasicBlockBitfield;
+  friend class NodeBitfield;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -177,6 +185,16 @@ private:
   /// The mangled name of the SIL function, which will be propagated
   /// to the binary.  A pointer into the module's lookup table.
   StringRef Name;
+
+  /// A single-linked list of snapshots of the function.
+  ///
+  /// Snapshots are copies of the current function at a given point in time.
+  SILFunction *snapshots = nullptr;
+  
+  /// The snapshot ID of this function.
+  ///
+  /// 0 means, it's not a snapshot, but the original function.
+  int snapshotID = 0;
 
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
@@ -212,17 +230,33 @@ private:
   /// @_dynamicReplacement(for:) function.
   SILFunction *ReplacedFunction = nullptr;
 
+  /// This SILFunction REFerences an ad-hoc protocol requirement witness in
+  /// order to keep it alive, such that it main be obtained in IRGen. Without
+  /// this explicit reference, the witness would seem not-used, and not be
+  /// accessible for IRGen.
+  ///
+  /// Specifically, one such case is the DistributedTargetInvocationDecoder's
+  /// 'decodeNextArgument' which must be retained, as it is only used from IRGen
+  /// and such, appears as-if unused in SIL and would get optimized away.
+  // TODO: Consider making this a general "references adhoc functions" and make it an array?
+  SILFunction *RefAdHocRequirementFunction = nullptr;
+
   Identifier ObjCReplacementFor;
 
   /// The head of a single-linked list of currently alive BasicBlockBitfield.
-  BasicBlockBitfield *newestAliveBitfield = nullptr;
+  BasicBlockBitfield *newestAliveBlockBitfield = nullptr;
+
+  /// The head of a single-linked list of currently alive NodeBitfield.
+  NodeBitfield *newestAliveNodeBitfield = nullptr;
 
   /// A monotonically increasing ID which is incremented whenever a
-  /// BasicBlockBitfield is constructed.
-  /// Usually this stays below 100000, so a 32-bit unsigned is more than
-  /// sufficient.
-  /// For details see BasicBlockBitfield::bitfieldID;
-  unsigned currentBitfieldID = 1;
+  /// BasicBlockBitfield or NodeBitfield is constructed.
+  /// For details see SILBitfield::bitfieldID;
+  uint64_t currentBitfieldID = 1;
+
+  /// Unique identifier for vector indexing and deterministic sorting.
+  /// May be reused when zombie functions are recovered.
+  unsigned index;
 
   /// The function's set of semantics attributes.
   ///
@@ -262,7 +296,7 @@ private:
   unsigned Transparent : 1;
 
   /// The function's serialized attribute.
-  unsigned Serialized : 2;
+  bool Serialized : 1;
 
   /// Specifies if this function is a thunk or a reabstraction thunk.
   ///
@@ -288,13 +322,12 @@ private:
   /// would indicate.
   unsigned HasCReferences : 1;
 
-  /// Whether cross-module references to this function should always use
-  /// weak linking.
-  unsigned IsWeakImported : 1;
+  /// Whether cross-module references to this function should use weak linking.
+  unsigned IsWeakImported : 2;
 
   /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
-    
+
   /// If true, this indicates that a class method implementation will always be
   /// invoked with a `self` argument of the exact base class type.
   unsigned ExactSelfClass : 1;
@@ -375,11 +408,11 @@ private:
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-              Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-              IsTransparent_t isTrans, IsSerialized_t isSerialized,
-              ProfileCounter entryCount, IsThunk_t isThunk,
-              SubclassScope classSubclassScope, Inline_t inlineStrategy,
-              EffectsKind E, const SILDebugScope *debugScope,
+              IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+              IsSerialized_t isSerialized, ProfileCounter entryCount,
+              IsThunk_t isThunk, SubclassScope classSubclassScope,
+              Inline_t inlineStrategy, EffectsKind E,
+              const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass,
               IsDistributed_t isDistributed);
@@ -399,18 +432,14 @@ private:
          SILFunction *InsertBefore = nullptr,
          const SILDebugScope *DebugScope = nullptr);
 
-  void init(SILLinkage Linkage, StringRef Name,
-                         CanSILFunctionType LoweredType,
-                         GenericEnvironment *genericEnv,
-                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                         ProfileCounter entryCount, IsThunk_t isThunk,
-                         SubclassScope classSubclassScope,
-                         Inline_t inlineStrategy, EffectsKind E,
-                         const SILDebugScope *DebugScope,
-                         IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass,
-                         IsDistributed_t isDistributed);
+  void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
+            GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
+            IsTransparent_t isTrans, IsSerialized_t isSerialized,
+            ProfileCounter entryCount, IsThunk_t isThunk,
+            SubclassScope classSubclassScope, Inline_t inlineStrategy,
+            EffectsKind E, const SILDebugScope *DebugScope,
+            IsDynamicallyReplaceable_t isDynamic,
+            IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed);
 
   /// Set has ownership to the given value. True means that the function has
   /// ownership, false means it does not.
@@ -418,10 +447,30 @@ private:
   /// Only for use by FunctionBuilders!
   void setHasOwnership(bool newValue) { HasOwnership = newValue; }
 
+  void setName(StringRef name) {
+    // All the snapshots share the same name.
+    SILFunction *sn = this;
+    do {
+      sn->Name = name;
+    } while ((sn = sn->snapshots) != nullptr);
+  }
+
 public:
   ~SILFunction();
 
   SILModule &getModule() const { return Module; }
+
+  /// Creates a snapshot with a given `ID` from the current function.
+  void createSnapshot(int ID);
+  
+  /// Returns the snapshot with the given `ID` or null if no such snapshot exists.
+  SILFunction *getSnapshot(int ID);
+  
+  /// Restores the current function from a given snapshot.
+  void restoreFromSnapshot(int ID);
+  
+  /// Deletes a snapshot with the `ID`.
+  void deleteSnapshot(int ID);
 
   SILType getLoweredType() const {
     return SILType::getPrimitiveObjectType(LoweredType);
@@ -446,11 +495,16 @@ public:
     return SILFunctionConventions(fnType, getModule());
   }
 
+  unsigned getIndex() const { return index; }
+
   SILProfiler *getProfiler() const { return Profiler; }
 
   SILFunction *getDynamicallyReplacedFunction() const {
     return ReplacedFunction;
   }
+
+  static SILFunction *getFunction(SILDeclRef ref, SILModule &M);
+
   void setDynamicallyReplacedFunction(SILFunction *f) {
     assert(ReplacedFunction == nullptr && "already set");
     assert(!hasObjCReplacement());
@@ -460,22 +514,33 @@ public:
     ReplacedFunction = f;
     ReplacedFunction->incrementRefCount();
   }
-
-  SILFunction *getDistributedRecordArgumentFunction() const {
-    return ReplacedFunction;
-  }
-  void setDistributedRecordArgumentFunction(SILFunction *f) {
-    if (f == nullptr)
-      return;
-    f->incrementRefCount();
-  }
-
   /// This function should only be called when SILFunctions are bulk deleted.
   void dropDynamicallyReplacedFunction() {
     if (!ReplacedFunction)
       return;
     ReplacedFunction->decrementRefCount();
     ReplacedFunction = nullptr;
+  }
+
+  SILFunction *getReferencedAdHocRequirementWitnessFunction() const {
+    return RefAdHocRequirementFunction;
+  }
+  // Marks that this `SILFunction` uses the passed in ad-hoc protocol
+  // requirement witness `f` and therefore must retain it explicitly,
+  // otherwise we might not be able to get a reference to it.
+  void setReferencedAdHocRequirementWitnessFunction(SILFunction *f) {
+    assert(RefAdHocRequirementFunction == nullptr && "already set");
+
+    if (f == nullptr)
+      return;
+    RefAdHocRequirementFunction = f;
+    RefAdHocRequirementFunction->incrementRefCount();
+  }
+  void dropReferencedAdHocRequirementWitnessFunction() {
+    if (!RefAdHocRequirementFunction)
+      return;
+    RefAdHocRequirementFunction->decrementRefCount();
+    RefAdHocRequirementFunction = nullptr;
   }
 
   bool hasObjCReplacement() const {
@@ -689,10 +754,7 @@ public:
 
   /// Returns true if this function can be inlined into a fragile function
   /// body.
-  bool hasValidLinkageForFragileInline() const {
-    return (isSerialized() == IsSerialized ||
-            isSerialized() == IsSerializable);
-  }
+  bool hasValidLinkageForFragileInline() const { return isSerialized(); }
 
   /// Returns true if this function can be referenced from a fragile function
   /// body.
@@ -739,11 +801,17 @@ public:
 
   /// Returns whether this function's symbol must always be weakly referenced
   /// across module boundaries.
-  bool isAlwaysWeakImported() const { return IsWeakImported; }
-
-  void setAlwaysWeakImported(bool value) {
-    IsWeakImported = value;
+  bool isAlwaysWeakImported() const {
+    return IsWeakImported == IsWeakImported_t::IsAlwaysWeakImported;
   }
+
+  /// Returns whether this function's symbol was referenced by a module that
+  /// imports the defining module \c @_weakLinked.
+  bool isWeakImportedByModule() const {
+    return IsWeakImported == IsWeakImported_t::IsWeakImportedByModule;
+  }
+
+  void setIsWeakImported(IsWeakImported_t value) { IsWeakImported = value; }
 
   bool isWeakImported() const;
 
@@ -755,7 +823,7 @@ public:
     IsDynamicReplaceable = value;
     assert(!Transparent || !IsDynamicReplaceable);
   }
-    
+
   IsExactSelfClass_t isExactSelfClass() const {
     return IsExactSelfClass_t(ExactSelfClass);
   }
@@ -914,7 +982,11 @@ public:
 
   /// Get this function's serialized attribute.
   IsSerialized_t isSerialized() const { return IsSerialized_t(Serialized); }
-  void setSerialized(IsSerialized_t isSerialized) { Serialized = isSerialized; }
+  void setSerialized(IsSerialized_t isSerialized) {
+    Serialized = isSerialized;
+    assert(this->isSerialized() == isSerialized &&
+           "too few bits for Serialized storage");
+  }
 
   /// Get this function's thunk attribute.
   IsThunk_t isThunk() const { return IsThunk_t(Thunk); }
@@ -1049,6 +1121,10 @@ public:
     GenericEnv = env;
   }
 
+  /// Retrieve the generic signature from the generic environment of this
+  /// function, if any. Else returns the null \c GenericSignature.
+  GenericSignature getGenericSignature() const;
+
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
@@ -1085,6 +1161,32 @@ public:
     if (auto *dc = getDeclContext())
       if (auto *decl = dyn_cast_or_null<FuncDecl>(dc->getAsDecl()))
         return decl->isDeferBody();
+    return false;
+  }
+
+  /// Returns true if this function belongs to a declaration that
+  /// has `@_alwaysEmitIntoClient` attribute.
+  bool markedAsAlwaysEmitIntoClient() const {
+    if (!hasLocation())
+      return false;
+
+    auto *V = getLocation().getAsASTNode<ValueDecl>();
+    return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+  }
+
+  /// Returns true if this function belongs to a declaration that returns
+  /// an opaque result type with one or more availability conditions that are
+  /// allowed to produce a different underlying type at runtime.
+  bool hasOpaqueResultTypeWithAvailabilityConditions() const {
+    if (!hasLocation())
+      return false;
+
+    if (auto *V = getLocation().getAsASTNode<ValueDecl>()) {
+      auto *opaqueResult = V->getOpaqueResultTypeDecl();
+      return opaqueResult &&
+             opaqueResult->hasConditionallyAvailableSubstitutions();
+    }
+
     return false;
   }
 

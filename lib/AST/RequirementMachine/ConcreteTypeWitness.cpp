@@ -14,6 +14,10 @@
 // type requirements on nested types of type parameters which are subject to
 // both a protocol conformance and a concrete type (or superclass) requirement.
 //
+// This process runs during property map construction. It may introduce new
+// rewrite rules, together with rewrite loops relating the new rules to existing
+// rules via relations.
+//
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
@@ -24,6 +28,7 @@
 #include <vector>
 #include "PropertyMap.h"
 #include "RequirementLowering.h"
+#include "RuleBuilder.h"
 
 using namespace swift;
 using namespace rewriting;
@@ -131,17 +136,32 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     //
     // This occurs when a pair of rules are inherited from the property map
     // entry for this key's suffix.
-    auto pair = std::make_pair(concreteRuleID, conformanceRuleID);
-    auto found = ConcreteConformances.find(pair);
-    if (found != ConcreteConformances.end())
+    if (!checkRulePairOnce(concreteRuleID, conformanceRuleID))
       continue;
 
     // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
     // or pass the correct one down in here.
     auto *module = proto->getParentModule();
 
+    // For conformance to 'Sendable', allow synthesis of a missing conformance
+    // if the requirement is a concrete type requirement, that is, if we're
+    // looking at a signature of the form 'T == Foo, T : Sendable'.
+    //
+    // Otherwise, we have a superclass requirement, like 'T : C, T : Sendable'.
+    // Don't synthesize the conformance in this case since dropping
+    // 'T : Sendable' would be incorrect; we want to ensure that we only admit
+    // subclasses of 'C' which are 'Sendable'.
+    bool allowMissing = (requirementKind == RequirementKind::SameType);
+
     auto conformance = module->lookupConformance(concreteType,
-                                                 const_cast<ProtocolDecl *>(proto));
+                                                 const_cast<ProtocolDecl *>(proto),
+                                                 allowMissing);
+    if (!allowMissing &&
+        proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+        conformance.hasUnavailableConformance()) {
+      conformance = ProtocolConformanceRef::forInvalid();
+    }
+
     if (conformance.isInvalid()) {
       // For superclass rules, it is totally fine to have a signature like:
       //
@@ -152,16 +172,8 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       // There is no relation between P and C here.
       //
       // With concrete types, a missing conformance is a conflict.
-      if (requirementKind == RequirementKind::SameType) {
-        // FIXME: Diagnose conflict
-        auto &concreteRule = System.getRule(concreteRuleID);
-        if (concreteRule.getRHS().size() == key.size())
-          concreteRule.markConflicting();
-
-        auto &conformanceRule = System.getRule(conformanceRuleID);
-        if (conformanceRule.getRHS().size() == key.size())
-          conformanceRule.markConflicting();
-      }
+      if (requirementKind == RequirementKind::SameType)
+        System.recordConflict(conformanceRuleID, concreteRuleID);
 
       if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "^^ " << concreteType << " does not conform to "
@@ -171,44 +183,50 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       continue;
     }
 
-    // FIXME: Maybe this can happen if the concrete type is an
-    // opaque result type?
-    assert(!conformance.isAbstract());
-
-    // Save this conformance for later.
-    auto *concrete = conformance.getConcrete();
-    auto inserted = ConcreteConformances.insert(
-        std::make_pair(pair, concrete));
-    assert(inserted.second);
-    (void) inserted;
-
     auto concreteConformanceSymbol = Symbol::forConcreteConformance(
         concreteType, substitutions, proto, Context);
 
     recordConcreteConformanceRule(concreteRuleID, conformanceRuleID,
                                   requirementKind, concreteConformanceSymbol);
 
+    // This is disabled by default because we fail to produce a convergent
+    // rewrite system if the opaque archetype has infinitely-recursive
+    // nested types. Fixing this requires a better representation for
+    // concrete conformances in the rewrite system.
+    if (conformance.isAbstract() &&
+        !Context.getASTContext().LangOpts.EnableRequirementMachineOpaqueArchetypes) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+        llvm::dbgs() << "^^ " << "Skipping abstract conformance of "
+                     << concreteType << " to " << proto->getName() << "\n";
+      }
+
+      continue;
+    }
+
     for (auto *assocType : proto->getAssociatedTypeMembers()) {
       concretizeTypeWitnessInConformance(key, requirementKind,
                                          concreteConformanceSymbol,
-                                         concrete, assocType);
+                                         conformance, assocType);
     }
 
     // We only infer conditional requirements in top-level generic signatures,
     // not in protocol requirement signatures.
-    if (key.getRootProtocol() == nullptr)
-      inferConditionalRequirements(concrete, substitutions);
+    if (conformance.isConcrete() &&
+        key.getRootProtocol() == nullptr)
+      inferConditionalRequirements(conformance.getConcrete(), substitutions);
   }
 }
 
 void PropertyMap::concretizeTypeWitnessInConformance(
     Term key, RequirementKind requirementKind,
     Symbol concreteConformanceSymbol,
-    ProtocolConformance *concrete,
+    ProtocolConformanceRef conformance,
     AssociatedTypeDecl *assocType) const {
   auto concreteType = concreteConformanceSymbol.getConcreteType();
   auto substitutions = concreteConformanceSymbol.getSubstitutions();
-  auto *proto = concreteConformanceSymbol.getProtocol();
+
+  auto *proto = assocType->getProtocol();
+  assert(proto == concreteConformanceSymbol.getProtocol());
 
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ " << "Looking up type witness for "
@@ -216,17 +234,35 @@ void PropertyMap::concretizeTypeWitnessInConformance(
                  << " on " << concreteType << "\n";
   }
 
-  auto t = concrete->getTypeWitness(assocType);
-  if (!t) {
-    if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
-      llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
-                   << " of " << concreteType << " could not be inferred\n";
+  CanType typeWitness;
+  if (conformance.isConcrete()) {
+    auto t = conformance.getConcrete()->getTypeWitness(assocType);
+
+    if (!t) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+        llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
+                     << " of " << concreteType << " could not be inferred\n";
+      }
+
+      t = ErrorType::get(concreteType);
     }
 
-    t = ErrorType::get(concreteType);
-  }
+    typeWitness = t->getCanonicalType();
+  } else if (conformance.isAbstract()) {
+    auto archetype = concreteType->getAs<OpaqueTypeArchetypeType>();
+    if (archetype == nullptr) {
+      llvm::errs() << "Should only have an abstract conformance with an "
+                   << "opaque archetype type\n";
+      llvm::errs() << "Symbol: " << concreteConformanceSymbol << "\n";
+      llvm::errs() << "Term: " << key << "\n";
+      dump(llvm::errs());
+      abort();
+    }
 
-  auto typeWitness = t->getCanonicalType();
+    typeWitness = archetype->getNestedType(assocType)->getCanonicalType();
+  } else if (conformance.isInvalid()) {
+    typeWitness = CanType(ErrorType::get(Context.getASTContext()));
+  }
 
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
@@ -482,12 +518,27 @@ void PropertyMap::recordConcreteConformanceRule(
 
   auto protocolSymbol = *conformanceRule.isPropertyRule();
 
-  // Now, transform T''.[concrete: C].[P] into T''.[concrete: C : P].
+  // Now, transform T''.[concrete: C].[P] into T''.[concrete: C].[concrete: C : P].
   unsigned relationID = System.recordConcreteConformanceRelation(
       concreteSymbol, protocolSymbol, concreteConformanceSymbol);
 
   path.add(RewriteStep::forRelation(
       /*startOffset=*/rhs.size(), relationID,
+      /*inverse=*/false));
+
+  // If T' is a suffix of T, prepend the prefix to the concrete type's
+  // substitutions.
+  if (prefixLength > 0 &&
+      !concreteConformanceSymbol.getSubstitutions().empty()) {
+    path.add(RewriteStep::forPrefixSubstitutions(prefixLength, /*endOffset=*/1,
+                                                 /*inverse=*/true));
+  }
+
+  // Finally, apply the concrete type rule to obtain T''.[concrete: C : P].
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/rhs.size() - concreteRule.getRHS().size(),
+      /*endOffset=*/1,
+      /*ruleID=*/concreteRuleID,
       /*inverse=*/false));
 
   MutableTerm lhs(rhs);
@@ -522,8 +573,8 @@ void PropertyMap::inferConditionalRequirements(
     return;
 
   SmallVector<Requirement, 2> desugaredRequirements;
-  // FIXME: Store errors in the rewrite system to be diagnosed
-  // from the top-level generic signature requests.
+
+  // FIXME: Do we need to diagnose these errors?
   SmallVector<RequirementError, 2> errors;
 
   // First, desugar all conditional requirements.
@@ -534,48 +585,21 @@ void PropertyMap::inferConditionalRequirements(
       llvm::dbgs() << "\n";
     }
 
-    desugarRequirement(req, desugaredRequirements, errors);
+    desugarRequirement(req, SourceLoc(), desugaredRequirements, errors);
   }
 
   // Now, convert desugared conditional requirements to rules.
-  for (auto req : desugaredRequirements) {
-    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
-      llvm::dbgs() << "@@@ Desugared requirement: ";
-      req.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
 
-    if (req.getKind() == RequirementKind::Conformance) {
-      auto *proto = req.getProtocolDecl();
+  // This will update System.getReferencedProtocols() with any new
+  // protocols that were imported.
+  RuleBuilder builder(Context, System.getReferencedProtocols());
+  builder.initWithConditionalRequirements(desugaredRequirements,
+                                          substitutions);
 
-      // If we haven't seen this protocol before, add rules for its
-      // requirements.
-      if (!System.isKnownProtocol(proto)) {
-        if (Debug.contains(DebugFlags::ConditionalRequirements)) {
-          llvm::dbgs() << "@@@ Unknown protocol: "<< proto->getName() << "\n";
-        }
+  assert(builder.PermanentRules.empty());
+  assert(builder.WrittenRequirements.empty());
 
-        RuleBuilder builder(Context, System.getProtocolMap());
-        builder.addProtocol(proto, /*initialComponent=*/false);
-        builder.collectRulesFromReferencedProtocols();
-
-        for (const auto &rule : builder.PermanentRules)
-          System.addPermanentRule(rule.first, rule.second);
-
-        for (const auto &rule : builder.RequirementRules)
-          System.addExplicitRule(rule.first, rule.second);
-      }
-    }
-
-    auto pair = getRuleForRequirement(req.getCanonical(), /*proto=*/nullptr,
-                                      substitutions, Context);
-
-    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
-      llvm::dbgs() << "@@@ Induced rule from conditional requirement: "
-                   << pair.first << " => " << pair.second << "\n";
-    }
-
-    // FIXME: Do we need a rewrite path here?
-    (void) System.addRule(pair.first, pair.second);
-  }
+  System.addRules(std::move(builder.ImportedRules),
+                  std::move(builder.PermanentRules),
+                  std::move(builder.RequirementRules));
 }

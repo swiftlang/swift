@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,28 +8,33 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
-import _Distributed
+import Distributed
 
 actor A {}
 
 distributed actor DA {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 }
 
 distributed actor DA_userDefined {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {}
 }
 
 distributed actor DA_userDefined2 {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {
-    print("Deinitializing \(self.id)")
-    return
+    print("Deinitializing \(self.id) remote:\(__isRemoteActor(self))")
   }
 }
 
@@ -37,10 +42,12 @@ distributed actor DA_state {
   var name = "Hello"
   var age = 42
 
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {
-    print("Deinitializing \(self.id)")
+    print("Deinitializing \(self.id) remote:\(__isRemoteActor(self))")
     return
   }
 }
@@ -57,8 +64,9 @@ struct ActorAddress: Sendable, Hashable, Codable {
 final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   typealias ActorID = ActorAddress
   typealias SerializationRequirement = Codable
-  typealias InvocationDecoder = FakeDistributedInvocation
-  typealias InvocationEncoder = FakeDistributedInvocation
+  typealias InvocationDecoder = FakeDistributedInvocationEncoder
+  typealias InvocationEncoder = FakeDistributedInvocationEncoder
+  typealias ResultHandler = FakeResultHandler
 
   var n = 0
 
@@ -119,11 +127,11 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   }
 }
 
-class FakeDistributedInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+class FakeDistributedInvocationEncoder: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
   func recordGenericSubstitution<T>(_ type: T.Type) throws { }
-  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws { }
+  func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws { }
   func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws { }
   func recordErrorType<E: Error>(_ type: E.Type) throws { }
   func doneRecording() throws { }
@@ -141,6 +149,23 @@ class FakeDistributedInvocation: DistributedTargetInvocationEncoder, Distributed
   }
   func decodeErrorType() throws -> Any.Type? {
     nil
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    fatalError("Not implemented: \(#function)")
   }
 }
 
@@ -178,7 +203,7 @@ func test() {
   }()
   // CHECK: assign type:DA_userDefined2, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_userDefined2, address:ActorAddress(address: "[[ADDR3:addr-[0-9]]]")
-  // CHECK: Deinitializing ActorAddress(address: "[[ADDR3]]")
+  // CHECK: Deinitializing ActorAddress(address: "[[ADDR3]]") remote:false
   // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR3]]")
 
   // resign must happen as the _last thing_ after user-deinit completed
@@ -187,7 +212,7 @@ func test() {
   }()
   // CHECK: assign type:DA_state, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_state, address:ActorAddress(address: "[[ADDR4:addr-[0-9]]]")
-  // CHECK: Deinitializing ActorAddress(address: "[[ADDR4]]")
+  // CHECK: Deinitializing ActorAddress(address: "[[ADDR4]]") remote:false
   // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR4]]")
 
   // a remote actor should not resign it's address, it was never "assigned" it
@@ -196,7 +221,11 @@ func test() {
     try! DA_userDefined2.resolve(id: address, using: system)
   }()
   // CHECK-NEXT: resolve type:DA_userDefined2, address:ActorAddress(address: "[[ADDR5:remote-1]]")
-  // CHECK-NEXT: Deinitializing
+  // MUST NOT run deinit body for a remote distributed actor
+  // CHECK-NOT: Deinitializing ActorAddress(address: "remote-1") remote:true
+
+  print("DONE")
+  // CHECK-NEXT: DONE
 }
 
 @main struct Main {

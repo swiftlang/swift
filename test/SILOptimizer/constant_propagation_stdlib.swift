@@ -25,7 +25,7 @@ public func isConcrete_true(_ x: MyInt) -> Builtin.Int1 {
 // CHECK-ONONE:         [[RESULT:%.*]] = builtin "isConcrete"<T>([[METATYPE]] : $@thick T.Type) : $Builtin.Int1
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF'
-// CHECK-O-LABEL:     sil [signature_optimized_thunk] [always_inline] @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
+// CHECK-O-LABEL:     sil [signature_optimized_thunk] [always_inline] {{.*}}@$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
 // CHECK-O:           bb0(
 // CHECK-O:             [[GEN_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlFTf4d_n : $@convention(thin) <τ_0_0> () -> Builtin.Int1
 // CHECK-O:             [[RESULT:%.*]] = apply [[GEN_FUNC]]<T>() : $@convention(thin) <τ_0_0> () -> Builtin.Int1
@@ -41,7 +41,7 @@ public func isConcrete_false<T>(_ x: T) -> Builtin.Int1 {
 // CHECK-ONONE:         [[RESULT:%.*]] = apply [[GEN_FUNC]]<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF'
-// CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
+// CHECK-O-LABEL:     sil {{.*}}@$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
 // CHECK-O:           bb0(
 // CHECK-O:             [[GEN_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlFTf4d_n : $@convention(thin) <τ_0_0> () -> Builtin.Int1
 // CHECK-O:             [[RESULT:%.*]] = apply [[GEN_FUNC]]<T>() : $@convention(thin) <τ_0_0> () -> Builtin.Int1

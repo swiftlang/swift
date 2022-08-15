@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -debug-generic-signatures -requirement-machine-protocol-signatures=on -typecheck %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s 2>&1 | %FileCheck %s
 
 protocol R {}
 

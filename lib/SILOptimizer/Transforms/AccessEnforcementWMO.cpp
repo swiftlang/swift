@@ -55,6 +55,7 @@
 
 #define DEBUG_TYPE "access-enforcement-wmo"
 
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
@@ -66,6 +67,9 @@ using namespace swift;
 using llvm::DenseMap;
 using llvm::SmallDenseSet;
 
+using DisjointAccessLocationKey =
+    llvm::PointerUnion<const VarDecl *, const SILGlobalVariable *>;
+
 // Get the VarDecl that represents the DisjointAccessLocation for the given
 // storage and access base. Returns nullptr for any storage that can't be
 // partitioned into a disjoint location.
@@ -73,15 +77,18 @@ using llvm::SmallDenseSet;
 // Global storage is expected to be disjoint because identifyFormalAccess may
 // only return Unidentified storage for a global variable access if the global
 // is defined in a different module.
-const VarDecl *
+static DisjointAccessLocationKey
 getDisjointAccessLocation(AccessStorageWithBase storageAndBase) {
   auto storage = storageAndBase.storage;
   switch (storage.getKind()) {
+  case AccessStorage::Class: {
+    auto *varDecl = cast<VarDecl>(storageAndBase.getDecl());
+    // For class properties, a VarDecl can always be derived from AccessBase.
+    assert(varDecl && "no VarDecl for class property");
+    return varDecl;
+  }
   case AccessStorage::Global:
-  case AccessStorage::Class:
-    // Class and Globals are always a VarDecl, but the global decl may have a
-    // null value for global_addr -> phi.
-    return cast_or_null<VarDecl>(storageAndBase.getDecl());
+    return storageAndBase.getAccessBase().getGlobal();
   case AccessStorage::Box:
   case AccessStorage::Stack:
   case AccessStorage::Tail:
@@ -93,6 +100,21 @@ getDisjointAccessLocation(AccessStorageWithBase storageAndBase) {
     llvm_unreachable("Unexpected Nested access.");
   }
   llvm_unreachable("unhandled kind");
+}
+
+static bool isVisibleExternally(DisjointAccessLocationKey key, SILModule *mod) {
+  if (auto *decl = key.dyn_cast<const VarDecl *>())
+    return mod->isVisibleExternally(decl);
+
+  auto *global = key.get<const SILGlobalVariable *>();
+  return isPossiblyUsedExternally(global->getLinkage(), mod->isWholeModule());
+}
+
+static StringRef getName(DisjointAccessLocationKey key) {
+  if (auto *decl = key.dyn_cast<const VarDecl *>())
+    return decl->getNameStr();
+
+  return key.get<const SILGlobalVariable *>()->getName();
 }
 
 namespace {
@@ -122,6 +144,7 @@ namespace {
 // checks).
 class GlobalAccessRemoval {
   SILModule &module;
+  SmallPtrSetVector<SILFunction *, 8> changedFunctions;
 
   using BeginAccessSet = SmallDenseSet<BeginAccessInst *, 8>;
 
@@ -134,18 +157,20 @@ class GlobalAccessRemoval {
     BeginAccessSet beginAccessSet;
   };
 
-  DenseMap<const VarDecl *, DisjointAccessLocationInfo> disjointAccessMap;
+  DenseMap<DisjointAccessLocationKey, DisjointAccessLocationInfo>
+      disjointAccessMap;
 
 public:
   GlobalAccessRemoval(SILModule &module) : module(module) {}
 
   void perform();
+  
+  void invalidateAnalysis(SILModuleTransform *pass);
 
 protected:
-  void visitInstruction(SILInstruction *I);
-  void recordAccess(SILInstruction *beginAccess, const VarDecl *decl,
-                    AccessStorage::Kind storageKind,
-                    bool hasNoNestedConflict);
+  bool visitInstruction(SILInstruction *I);
+  void recordAccess(SILInstruction *beginAccess, DisjointAccessLocationKey key,
+                    AccessStorage::Kind storageKind, bool hasNoNestedConflict);
   void removeNonreentrantAccess();
 };
 } // namespace
@@ -159,27 +184,40 @@ void GlobalAccessRemoval::perform() {
       continue;
 
     for (auto &BB : F) {
-      for (auto &I : BB)
-        visitInstruction(&I);
+      for (auto &I : BB) {
+        if (!visitInstruction(&I))
+          return;
+      }
     }
   }
   removeNonreentrantAccess();
 }
 
-void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
+void GlobalAccessRemoval::invalidateAnalysis(SILModuleTransform *pass) {
+  for (SILFunction *changedFunction : changedFunctions) {
+    pass->invalidateAnalysis(changedFunction,
+                             SILAnalysis::InvalidationKind::Instructions);
+  }
+}
+
+bool GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(I)) {
     auto storageAndBase = AccessStorageWithBase::compute(BAI->getSource());
-    const VarDecl *decl = getDisjointAccessLocation(storageAndBase);
-    recordAccess(BAI, decl, storageAndBase.storage.getKind(),
+    if (!storageAndBase.base)
+      return false;
+    auto key = getDisjointAccessLocation(storageAndBase);
+    recordAccess(BAI, key, storageAndBase.storage.getKind(),
                  BAI->hasNoNestedConflict());
-    return;
+    return true;
   }
   if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I)) {
     auto storageAndBase = AccessStorageWithBase::compute(BUAI->getSource());
-    const VarDecl *decl = getDisjointAccessLocation(storageAndBase);
-    recordAccess(BUAI, decl, storageAndBase.storage.getKind(),
+    if (!storageAndBase.base)
+      return false;
+    auto key = getDisjointAccessLocation(storageAndBase);
+    recordAccess(BUAI, key, storageAndBase.storage.getKind(),
                  BUAI->hasNoNestedConflict());
-    return;
+    return true;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(I)) {
     for (const KeyPathPatternComponent &component :
@@ -198,8 +236,8 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
         break;
       }
     }
-    return;
   }
+  return true;
 }
 
 // Record an access in the disjointAccessMap.
@@ -213,21 +251,21 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
 // key_path instruction somewhere else in the same module (or it must be dead
 // code, or only access public properties).
 //
-// `decl` may be nullptr if the declaration can't be determined from the
+// `key` may be nullptr if the variable's identity cannot be determined from the
 // access. This is only legal when the access is known to be a local access, not
 // a class property or global.
 void GlobalAccessRemoval::recordAccess(SILInstruction *beginAccess,
-                                       const VarDecl *decl,
+                                       DisjointAccessLocationKey key,
                                        AccessStorage::Kind storageKind,
                                        bool hasNoNestedConflict) {
-  if (!decl || module.isVisibleExternally(decl))
+  if (key.isNull() || isVisibleExternally(key, &module))
     return;
 
   LLVM_DEBUG(if (!hasNoNestedConflict) llvm::dbgs()
-             << "Nested conflict on " << decl->getName() << " at"
-             << *beginAccess << "\n");
+             << "Nested conflict on " << getName(key) << " at" << *beginAccess
+             << "\n");
 
-  auto accessLocIter = disjointAccessMap.find(decl);
+  auto accessLocIter = disjointAccessMap.find(key);
   if (accessLocIter != disjointAccessMap.end()) {
     // Add this begin_access to an existing DisjointAccessLocationInfo.
     DisjointAccessLocationInfo &info = accessLocIter->second;
@@ -245,27 +283,27 @@ void GlobalAccessRemoval::recordAccess(SILInstruction *beginAccess,
   info.noNestedConflict = hasNoNestedConflict;
   if (auto *BA = dyn_cast<BeginAccessInst>(beginAccess))
     info.beginAccessSet.insert(BA);
-  disjointAccessMap.insert(std::make_pair(decl, info));
+  disjointAccessMap.insert(std::make_pair(key, info));
 }
 
 // For each unique storage within this function that is never reentrantly
 // accessed, promote all access checks for that storage to static enforcement.
 void GlobalAccessRemoval::removeNonreentrantAccess() {
-  for (auto &declAndInfo : disjointAccessMap) {
-    const DisjointAccessLocationInfo &info = declAndInfo.second;
+  for (auto &keyAndInfo : disjointAccessMap) {
+    const DisjointAccessLocationInfo &info = keyAndInfo.second;
     if (!info.noNestedConflict)
       continue;
 
-    const VarDecl *decl = declAndInfo.first;
-    LLVM_DEBUG(llvm::dbgs() << "Eliminating all formal access on "
-                            << decl->getName() << "\n");
-    assert(!module.isVisibleExternally(decl));
-    (void)decl;
+    auto key = keyAndInfo.first;
+    LLVM_DEBUG(llvm::dbgs()
+               << "Eliminating all formal access on " << getName(key) << "\n");
+    assert(!isVisibleExternally(key, &module));
 
     // Non-deterministic iteration, only used to set a flag.
     for (BeginAccessInst *beginAccess : info.beginAccessSet) {
       LLVM_DEBUG(llvm::dbgs() << "  Disabling access marker " << *beginAccess);
       beginAccess->setEnforcement(SILAccessEnforcement::Static);
+      changedFunctions.insert(beginAccess->getFunction());
     }
   }
 }
@@ -275,6 +313,7 @@ struct AccessEnforcementWMO : public SILModuleTransform {
   void run() override {
     GlobalAccessRemoval eliminationPass(*getModule());
     eliminationPass.perform();
+    eliminationPass.invalidateAnalysis(this);
   }
 };
 }

@@ -2,10 +2,15 @@
 #define TEST_INTEROP_CXX_FOREIGN_REFERENCE_INPUTS_NULLABLE_H
 
 #include <stdlib.h>
-
+#if defined(_WIN32)
 inline void *operator new(size_t, void *p) { return p; }
+#else
+#include <new>
+#endif
 
-struct __attribute__((swift_attr("import_as_ref"))) Empty {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) Empty {
   int test() const { return 42; }
 
   static Empty *create() { return new (malloc(sizeof(Empty))) Empty(); }
@@ -13,7 +18,9 @@ struct __attribute__((swift_attr("import_as_ref"))) Empty {
 
 void mutateIt(Empty &) {}
 
-struct __attribute__((swift_attr("import_as_ref"))) IntPair {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) IntPair {
   int a = 1;
   int b = 2;
 

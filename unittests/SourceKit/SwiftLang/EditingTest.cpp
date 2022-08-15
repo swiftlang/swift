@@ -32,6 +32,12 @@ static StringRef getRuntimeLibPath() {
   return sys::path::parent_path(SWIFTLIB_DIR);
 }
 
+static SmallString<128> getSwiftExecutablePath() {
+  SmallString<128> path = sys::path::parent_path(getRuntimeLibPath());
+  sys::path::append(path, "bin", "swift-frontend");
+  return path;
+}
+
 namespace {
 
 struct Token {
@@ -124,7 +130,8 @@ public:
     // This is avoiding destroying \p SourceKit::Context because another
     // thread may be active trying to use it to post notifications.
     // FIXME: Use shared_ptr ownership to avoid such issues.
-    Ctx = new SourceKit::Context(getRuntimeLibPath(),
+    Ctx = new SourceKit::Context(getSwiftExecutablePath(),
+                                 getRuntimeLibPath(),
                                  /*diagnosticDocumentationPath*/ "",
                                  SourceKit::createSwiftLangSupport,
                                  /*dispatchOnMain=*/false);

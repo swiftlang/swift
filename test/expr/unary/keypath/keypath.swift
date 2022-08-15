@@ -451,7 +451,7 @@ func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
   _ = concreteBase[keyPath: pkp]
 
   concreteBase[keyPath: kp] = s // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
-  concreteBase[keyPath: wkp] = s // expected-error {{key path with root type 'P' cannot be applied to a base of type 'B'}}
+  concreteBase[keyPath: wkp] = s // expected-error {{key path with root type 'any P' cannot be applied to a base of type 'B'}}
   concreteBase[keyPath: rkp] = s
   concreteBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'pkp' is a read-only key path}}
 
@@ -507,6 +507,7 @@ func testLabeledSubscript() {
   // TODO: These ought to work without errors.
   let _ = \AA.[keyPath: k]
   // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
+  // expected-error@-2 {{extraneous argument label 'keyPath:' in call}}
 
   let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{extraneous argument label 'keyPath:' in call}}
   // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
@@ -689,8 +690,8 @@ func testSubtypeKeypathClass(_ keyPath: ReferenceWritableKeyPath<Base, Int>) {
 
 func testSubtypeKeypathProtocol(_ keyPath: ReferenceWritableKeyPath<PP, Int>) {
   testSubtypeKeypathProtocol(\Base.i)
-  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Base, Int>' to expected argument type 'ReferenceWritableKeyPath<PP, Int>'}}
-  // expected-note@-2 {{arguments to generic parameter 'Root' ('Base' and 'PP') are expected to be equal}}
+  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Base, Int>' to expected argument type 'ReferenceWritableKeyPath<any PP, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('Base' and 'any PP') are expected to be equal}}
 }
 
 // rdar://problem/32057712
@@ -1093,8 +1094,6 @@ func rdar74711236() {
         // `isSupported` should be an invalid declaration to trigger a crash in `map(\.option)`
         let isSupported = context!.supported().contains(type)
         return (isSupported ? [type] : []).map(\.option)
-        // expected-error@-1 {{value of type 'Any' has no member 'option'}}
-        // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
       }
       return []
     }()

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -requirement-machine-abstract-signatures=verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 struct G<Key: CaseIterable, Value> where Key: RawRepresentable, Value: Codable {
   var key: Key.RawValue

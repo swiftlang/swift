@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-bound-generic-extensions
+// RUN: %target-typecheck-verify-swift
 
 extension Array<Int> {
   func someIntFuncOnArray() {}

@@ -39,11 +39,15 @@
 
 #endif
 
+#if __has_include(<unistd.h>)
+#include <unistd.h>
+#endif
+
 #include <stdlib.h>
 
-#include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Mutex.h"
 #include "SwiftShims/Random.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Threading/Mutex.h"
 
 #include <algorithm> // required for std::min
 
@@ -70,7 +74,7 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
                                     static_cast<ULONG>(nbytes),
                                     BCRYPT_USE_SYSTEM_PREFERRED_RNG);
   if (!BCRYPT_SUCCESS(status)) {
-    fatalError(0, "Fatal error: 0x%.8X in '%s'\n", status, __func__);
+    fatalError(0, "Fatal error: 0x%lX in '%s'\n", status, __func__);
   }
 }
 
@@ -108,7 +112,8 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
         WHILE_EINTR(open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
         
       if (fd != -1) {
-        static StaticMutex mutex;
+        // ###FIXME: Why is this locked?  None of the others are.
+        static LazyMutex mutex;
         mutex.withLock([&] {
           actual_nbytes = WHILE_EINTR(read(fd, buf, nbytes));
         });

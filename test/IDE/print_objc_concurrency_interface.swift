@@ -1,12 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-interface -source-filename %s -module-to-print=ObjCConcurrency -function-definitions=false > %t/ObjCConcurrency.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-interface -source-filename %s -module-to-print=ObjCConcurrency -function-definitions=false -enable-experimental-feature SendableCompletionHandlers > %t/ObjCConcurrency.printed.txt
 // RUN: %FileCheck -input-file %t/ObjCConcurrency.printed.txt %s
 // RUN: %FileCheck -check-prefix NEGATIVE -input-file %t/ObjCConcurrency.printed.txt %s
 
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+// REQUIRES: asserts
 import _Concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {
@@ -18,6 +19,8 @@ import _Concurrency
 
 // NEGATIVE-NOT: @Sendable{{.+}}class
 // NEGATIVE-NOT: @_nonSendable{{.+}}class
+// NEGATIVE-NOT: @Sendable{{.+}}func
+// NEGATIVE-NOT: @Sendable{{.+}}var
 
 // CHECK-LABEL: class SendableClass :
 // CHECK-SAME: @unchecked Sendable

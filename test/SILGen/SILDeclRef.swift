@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-sil %s | %FileCheck %s
-// RUN: %target-swift-emit-sil %s | %target-sil-opt -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
+// RUN: %target-swift-emit-sil %s | %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
 
 // Check that all SILDeclRefs are represented in the text form with a signature.
 // This allows to avoid ambiguities which sometimes arise e.g. when a
@@ -40,7 +40,7 @@ public class Derived2: Base {
 
 // CHECK-LABEL: sil @$s10SILDeclRef5testP1ps5Int32VAA1P_p_tF
 // Check that witness_method contains SILDeclRefs with a signature.
-// CHECK: witness_method $@opened({{.*}}) P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %{{.*}} : $*@opened({{.*}}) P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+// CHECK: witness_method $@opened({{.*}}, P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %{{.*}} : $*@opened({{.*}}, P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
 public func testP(p: P) -> Int32 {
   return p.foo()
 }

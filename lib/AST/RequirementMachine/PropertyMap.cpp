@@ -10,6 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// The property map is used to answer generic signature queries. It also
+// implements special behaviors of layout, superclass, and concrete type
+// requirements in the Swift language.
+//
+// # Property map construction
+//
+// Property map construction can add new rewrite rules when performing
+// property unification and nested type concretization, so it is iterated
+// until fixed point with the Knuth-Bendix algorithm. A third step, known as
+// substitution simplification is also performed.
+//
+// The Knuth-Bendix completion procedure is implemented in KnuthBendix.cpp.
+// Substitution simplification is implemented in SimplifySubstitutions.cpp.
+//
+// # Property map theory
+//
 // In the rewrite system, a conformance requirement 'T : P' is represented as
 // rewrite rule of the form:
 //
@@ -45,6 +61,32 @@
 // V.[p] => V into a multi-map keyed by V. Then given an arbitrary type T,
 // we can reduce it and look up successive suffixes to find all properties [p]
 // satisfied by T.
+//
+// # Property map implementation
+//
+// A set of property rules (V.[p1] => V), (V.[p2] => V), ... become a single
+// entry in the property map corresponding to V that stores information about
+// the properties [pN].
+//
+// The property map is indexed by a suffix trie, where the properties of a term
+// T are found by traversing a trie, starting from the _last_ symbol of T, which
+// is a key for the root of the trie. This is done since we might have an entry
+// for a suffix of T, but not T itself.
+//
+// For example, if a conformance requirement 'A : Q' in protocol P becomes a
+// rule ([P:A].[Q] => [P:A]). The term τ_0_0.[P:A], corresponding to the nested
+// type 'A' of a generic parameter 'τ_0_0', might not have a property map entry
+// of its own, if the only requirements on it are those implied by [P:A].
+//
+// In this case, a property map lookup for τ_0_0.[P:A] will find an entry for
+// the term [P:A].
+//
+// If multiple suffixes of a term T appear in the property map, the lookup
+// returns the entry for the _longest_ matching suffix. An important invariant
+// maintained during property map construction is that the contents of a
+// property map entry from a key V are copied into the entry for a key T
+// where T == U.V for some U. This means property map entries for longer
+// suffixes "inherit" the contents of entries for shorter suffixes.
 //
 //===----------------------------------------------------------------------===//
 
@@ -347,7 +389,7 @@ void PropertyMap::clear() {
 ///
 /// Also performs property unification, nested type concretization and
 /// concrete simplification. These phases can add new rules; if new rules
-/// were added, the the caller must run another round of Knuth-Bendix
+/// were added, the caller must run another round of Knuth-Bendix
 /// completion, and rebuild the property map again.
 void PropertyMap::buildPropertyMap() {
   if (System.getDebugOptions().contains(DebugFlags::PropertyMap)) {

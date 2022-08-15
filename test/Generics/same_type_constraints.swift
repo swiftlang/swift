@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -warn-redundant-requirements
 
 protocol Fooable {
   associatedtype Foo
@@ -328,12 +328,12 @@ protocol P9 {
 
 struct X7<T: P9> where T.A : C { }
 
-extension X7 where T.A == Int { } // expected-error {{'T.A' requires that 'Int' inherit from 'C'}}
-// expected-note@-1 {{same-type constraint 'T.A' == 'Int' implied here}}
+extension X7 where T.A == Int { } // expected-error {{no type for 'T.A' can satisfy both 'T.A : _NativeClass' and 'T.A == Int}}
+// expected-error@-1 {{no type for 'T.A' can satisfy both 'T.A : C' and 'T.A == Int'}}
 struct X8<T: C> { }
 
-extension X8 where T == Int { } // expected-error {{'T' requires that 'Int' inherit from 'C'}}
-// expected-note@-1 {{same-type constraint 'T' == 'Int' implied here}}
+extension X8 where T == Int { } // expected-error {{no type for 'T' can satisfy both 'T : _NativeClass' and 'T == Int'}}
+// expected-error@-1 {{no type for 'T' can satisfy both 'T : C' and 'T == Int'}}
 
 protocol P10 {
 	associatedtype A
@@ -345,17 +345,17 @@ protocol P10 {
 
 protocol P11: P10 where A == B { }
 
-func intracomponent<T: P11>(_: T) // expected-note{{previous same-type constraint 'T.A' == 'T.B' implied here}}
+func intracomponent<T: P11>(_: T)
   where T.A == T.B { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
 
 func intercomponentSameComponents<T: P10>(_: T)
-  where T.A == T.B, // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
-        T.B == T.A { } // expected-note{{previous same-type constraint 'T.B' == 'T.A' written here}}
+  where T.A == T.B,
+        T.B == T.A { } // expected-warning{{redundant same-type constraint 'T.B' == 'T.A'}}
 
 func intercomponentMoreThanSpanningTree<T: P10>(_: T)
   where T.A == T.B,
         T.B == T.C,
-        T.D == T.E, // expected-note{{previous same-type constraint 'T.D' == 'T.E' written here}}
+        T.D == T.E,
         T.D == T.B,
         T.E == T.B  // expected-warning{{redundant same-type constraint 'T.E' == 'T.B'}}
         { }
@@ -407,5 +407,6 @@ func bad<S: FakeSequence, O>(_: S, _: O) where S.Element : ObserverType, O == S.
 }
 
 func ugly<S: FakeSequence, O>(_: S, _: O) where S.Element : ObserverType, O == S.Iterator.Element.E, O == S.Element.E {
+// expected-warning@-1 {{redundant same-type constraint 'O' == 'S.Element.E'}}
   _ = Bad<S, O>()
 }

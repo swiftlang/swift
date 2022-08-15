@@ -15,6 +15,7 @@
 
 #include "FormalEvaluation.h"
 #include "Initialization.h"
+#include "InitializeDistActorIdentity.h"
 #include "JumpDest.h"
 #include "RValue.h"
 #include "SGFContext.h"
@@ -245,6 +246,8 @@ public:
   /// The SILModuleConventions for this SIL module.
   SILModuleConventions silConv;
 
+  bool useLoweredAddresses() const { return silConv.useLoweredAddresses(); }
+
   /// The DeclContext corresponding to the function currently being emitted.
   DeclContext * const FunctionDC;
 
@@ -396,6 +399,11 @@ public:
   llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
                       AsyncLetChildTask>
       AsyncLetChildTasks;
+
+  /// Indicates whether this function is a distributed actor's designated
+  /// initializer, providing the needed clean-up to emit an identity
+  /// assignment after initializing the actorSystem property.
+  Optional<InitializeDistActorIdentity> DistActorCtorContext;
 
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
@@ -677,8 +685,30 @@ public:
   ///
   /// \param selfValue The 'self' value.
   /// \param cd The class declaration whose members are being destroyed.
+  /// \param finishBB If set, used as the basic block after members have been
+  ///                 destroyed, and we're ready to perform final cleanups
+  ///                 before returning.
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
-                                  CleanupLocation cleanupLoc);
+                                  CleanupLocation cleanupLoc,
+                                  SILBasicBlock* finishBB);
+
+  /// Generates code to destroy linearly recursive data structures, without
+  /// building up the call stack.
+  ///
+  /// E.x.: In the following we want to deinit next without recursing into next.
+  ///
+  /// class Node<A> {
+  ///   let value: A
+  ///   let next: Node<A>?
+  /// }
+  ///
+  /// \param selfValue The 'self' value.
+  /// \param cd The class declaration whose members are being destroyed.
+  /// \param recursiveLink The property that forms the recursive structure.
+  void emitRecursiveChainDestruction(ManagedValue selfValue,
+                                ClassDecl *cd,
+                                VarDecl* recursiveLink,
+                                CleanupLocation cleanupLoc);
 
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
@@ -730,7 +760,8 @@ public:
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
-                           bool isSelfConformance);
+                           bool isSelfConformance,
+                           Optional<ActorIsolation> enterIsolation);
 
   /// Generates subscript arguments for keypath. This function handles lowering
   /// of all index expressions including default arguments.
@@ -1413,12 +1444,14 @@ public:
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
 
-  RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
-                         SubstitutionMap substitutions,
-                         ArgumentSource &&optionalSelfValue, bool isSuper,
-                         bool isDirectAccessorUse,
-                         PreparedArguments &&optionalSubscripts, SGFContext C,
-                         bool isOnSelfParameter);
+  RValue emitGetAccessor(
+      SILLocation loc, SILDeclRef getter,
+      SubstitutionMap substitutions,
+      ArgumentSource &&optionalSelfValue, bool isSuper,
+      bool isDirectAccessorUse,
+      PreparedArguments &&optionalSubscripts, SGFContext C,
+      bool isOnSelfParameter,
+      Optional<ImplicitActorHopTarget> implicitActorHopTarget = None);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
@@ -1430,7 +1463,7 @@ public:
 
   ManagedValue emitAsyncLetStart(SILLocation loc,
                                  SILValue taskOptions,
-                                 Type functionType, ManagedValue taskFunction,
+                                 AbstractClosureExpr *asyncLetEntryPoint,
                                  SILValue resultBuf);
 
   void emitFinishAsyncLet(SILLocation loc, SILValue asyncLet, SILValue resultBuf);
@@ -1450,7 +1483,8 @@ public:
   ManagedValue emitAddressorAccessor(
       SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
       ArgumentSource &&optionalSelfValue, bool isSuper,
-      bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
+      bool isDirectAccessorUse,
+      PreparedArguments &&optionalSubscripts,
       SILType addressType, bool isOnSelfParameter);
 
   CleanupHandle emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
@@ -1652,7 +1686,6 @@ public:
                                         ConcreteDeclRef defaultArgsOwner,
                                         unsigned destIndex,
                                         CanType resultType,
-                                        AbstractionPattern origResultType,
                                         SGFContext C = SGFContext());
 
   RValue emitApplyOfStoredPropertyInitializer(
@@ -1725,10 +1758,15 @@ public:
                                       bool isSuppressed);
 
   /// Emit a dynamic member reference.
-  RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
+  RValue emitDynamicMemberRef(SILLocation loc, SILValue operand,
+                              ConcreteDeclRef memberRef, CanType refTy,
+                              SGFContext C);
 
-  /// Emit a dynamic subscript.
-  RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
+  /// Emit a dynamic subscript getter application.
+  RValue emitDynamicSubscriptGetterApply(SILLocation loc, SILValue operand,
+                                         ConcreteDeclRef subscriptRef,
+                                         PreparedArguments &&indexArgs,
+                                         CanType resultTy, SGFContext C);
 
   /// Open up the given existential expression and emit its
   /// subexpression in a caller-specified manner.
@@ -2034,21 +2072,40 @@ public:
                                            CanSILFunctionType toType,
                                            bool reorderSelf);
 
+  //===--------------------------------------------------------------------===//
+  // Back Deployment thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Invokes an original function if it is available at runtime. Otherwise,
+  /// invokes a fallback copy of the function emitted into the client.
+  void emitBackDeploymentThunk(SILDeclRef thunk);
+
   //===---------------------------------------------------------------------===//
   // Distributed Actors
   //===---------------------------------------------------------------------===//
 
   /// Initializes the implicit stored properties of a distributed actor that correspond to
   /// its transport and identity.
-  void emitDistActorImplicitPropertyInits(
+  void emitDistributedActorImplicitPropertyInits(
       ConstructorDecl *ctor, ManagedValue selfArg);
+
+  /// Initializes just the implicit identity property of a distributed actor.
+  /// \param selfVal a value corresponding to the actor's self
+  /// \param actorSystemVal a value corresponding to the actorSystem, to be used
+  /// to invoke its \p assignIdentity method.
+  void emitDistActorIdentityInit(ConstructorDecl *ctor,
+                                 SILLocation loc,
+                                 SILValue selfVal,
+                                 SILValue actorSystemVal);
 
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
-  void emitDistributedActorFactory(FuncDecl *fd);
+  void emitDistributedActorFactory(FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
-  /// Generates a thunk from an actor function
-  void emitDistributedThunk(SILDeclRef thunk);
+  void emitDistributedIfRemoteBranch(SILLocation Loc,
+                                     ManagedValue selfValue, Type selfTy,
+                                     SILBasicBlock *isRemoteBB,
+                                     SILBasicBlock *isLocalBB);
 
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.
@@ -2078,11 +2135,14 @@ public:
   void emitConditionalResignIdentityCall(SILLocation loc,
                                          ClassDecl *actorDecl,
                                          ManagedValue actorSelf,
-                                         SILBasicBlock *continueBB);
+                                         SILBasicBlock *continueBB,
+                                         SILBasicBlock *finishBB);
 
   void emitDistributedActorClassMemberDestruction(
       SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
-      SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB);
+      SILBasicBlock *normalMemberDestroyBB,
+      SILBasicBlock *remoteMemberDestroyBB,
+      SILBasicBlock *finishBB);
 
   //===--------------------------------------------------------------------===//
   // Declarations

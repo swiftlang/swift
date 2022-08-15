@@ -1,0 +1,154 @@
+// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+
+class Klass {}
+
+class KlassUser {
+  var field: Klass
+}
+
+protocol Error {
+  var _code: Int { get }
+}
+
+sil @use_builtinnativeobject_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+
+// CHECK-LABEL: Function: 'simple_error_ref_element_addr'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $KlassUser               // users: %3, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $KlassUser                      // id: %3
+// CHECK-NEXT: Non Consuming User:   %5 = load [copy] %2 : $*Klass                   // user: %6
+// CHECK-NEXT: Block: bb0
+sil [ossa] @simple_error_ref_element_addr : $@convention(thin) (@owned KlassUser) -> @owned Klass {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0 : $KlassUser
+  %2 = ref_element_addr %1 : $KlassUser, #KlassUser.field
+  end_borrow %1 : $KlassUser
+  destroy_value %0 : $KlassUser
+  %3 = load [copy] %2 : $*Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: Function: 'simple_error_ref_tail_addr'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $KlassUser               // users: %3, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $KlassUser                      // id: %3
+// CHECK-NEXT: Non Consuming User:   %5 = load [copy] %2 : $*Klass                   // user: %6
+// CHECK-NEXT: Block: bb0
+sil [ossa] @simple_error_ref_tail_addr : $@convention(thin) (@owned KlassUser) -> @owned Klass {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0 : $KlassUser
+  %2 = ref_tail_addr %1 : $KlassUser, $Klass
+  end_borrow %1 : $KlassUser
+  destroy_value %0 : $KlassUser
+  %3 = load [copy] %2 : $*Klass
+  return %3 : $Klass
+}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+class OptionalBox<T> {
+  var t: FakeOptional<T>
+}
+
+// CHECK-NOT: Function: 'inject_enum_addr_test'
+sil [ossa] @inject_enum_addr_test : $@convention(thin) <T> (@owned OptionalBox<T>) -> () {
+bb0(%0 : @owned $OptionalBox<T>):
+  %1 = begin_borrow %0 : $OptionalBox<T>
+  %2 = ref_element_addr %1 : $OptionalBox<T>, #OptionalBox.t
+  inject_enum_addr %2 : $*FakeOptional<T>, #FakeOptional.none!enumelt
+  end_borrow %1 : $OptionalBox<T>
+  destroy_value %0 : $OptionalBox<T>
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-NOT: Function: 'init_enum_data_addr_test'
+sil [ossa] @init_enum_data_addr_test : $@convention(thin) <T> (@owned OptionalBox<T>, @in_guaranteed T) -> () {
+bb0(%0 : @owned $OptionalBox<T>, %1 : $*T):
+  %2 = begin_borrow %0 : $OptionalBox<T>
+  %3 = ref_element_addr %2 : $OptionalBox<T>, #OptionalBox.t
+  %4 = init_enum_data_addr %3 : $*FakeOptional<T>, #FakeOptional.some!enumelt
+  copy_addr %1 to [initialization] %4 : $*T
+  end_borrow %2 : $OptionalBox<T>
+  destroy_value %0 : $OptionalBox<T>
+  %5 = tuple ()
+  return %5 : $()
+}
+
+class Box<T> {
+  var t: T
+}
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+// CHECK-NOT: Function: 'unconditional_cast_test'
+sil [ossa] @unconditional_cast_test : $@convention(thin) <T> (@owned Box<T>, @in Int) -> () {
+bb0(%0 : @owned $Box<T>, %1 : $*Int):
+  %2 = begin_borrow %0 : $Box<T>
+  %3 = ref_element_addr %2 : $Box<T>, #Box.t
+  unconditional_checked_cast_addr Int in %1 : $*Int to T in %3 : $*T
+  end_borrow %2 : $Box<T>
+  destroy_value %0 : $Box<T>
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-NOT: Function: 'isunique_test'
+sil [ossa] @isunique_test : $@convention(thin) <T> (@owned Box<T>, @in Int) -> () {
+bb0(%0 : @owned $Box<T>, %1 : $*Int):
+  %2 = begin_borrow %0 : $Box<T>
+  %3 = ref_element_addr %2 : $Box<T>, #Box.t
+  %4 = is_unique %3 : $*T
+  end_borrow %2 : $Box<T>
+  destroy_value %0 : $Box<T>
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'store_borrow_result_used_outside_of_borrow_lifetime'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %4, %3
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject           // id: %4
+// CHECK-NEXT: Non Consuming User:   %7 = apply %6(%3) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+// CHECK-NEXT: Block: bb0
+sil [ossa] @store_borrow_result_used_outside_of_borrow_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %0a = begin_borrow %0 : $Builtin.NativeObject
+  %1 = alloc_stack $Builtin.NativeObject
+  %result = store_borrow %0a to %1 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %func = function_ref @use_builtinnativeobject_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %func(%result) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'open_existential_box_interior_pointer_error'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Error                   // users: %3, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Error                          // id: %3
+// CHECK-NEXT: Non Consuming User:   %6 = apply %5<@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self>(%2) : $@convention(witness_method: Error) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int // type-defs: %2; user: %7
+// CHECK-NEXT: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'open_existential_box_interior_pointer_error'
+sil [ossa] @open_existential_box_interior_pointer_error : $@convention(thin) (@owned Error) -> Int {
+bb0(%0 : @owned $Error):
+  %1 = begin_borrow %0 : $Error
+  %2 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self
+  end_borrow %1 : $Error
+  destroy_value %0 : $Error
+  %m = witness_method $@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self, #Error._code!getter, %2 : $*@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
+  %result = apply %m<@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self>(%2) : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
+  return %result : $Int
+}

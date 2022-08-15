@@ -72,7 +72,7 @@ class ValueDecl;
 /// The witness for \c R.foo(x:) is \c X<U, V>.foo(x:), but the generic
 /// functions that describe the generic requirement in \c R and the generic
 /// method in \c X have very different signatures. To handle this case, the
-/// \c Witness class produces a "synthetic" environment that pulls together
+/// \c Witness class produces a witness thunk signature that pulls together
 /// all of the information needed to map from the requirement to the witness.
 /// It is a generic environment that combines the constraints of the
 /// requirement with the constraints from the context of the protocol
@@ -81,22 +81,23 @@ class ValueDecl;
 /// environment are those of the context of the protocol conformance (\c U
 /// and \c V, in the example above) and the innermost generic parameters are
 /// those of the generic requirement (\c T, in the example above). The
-/// \c Witness class contains this synthetic environment (both its generic
+/// \c Witness class contains this witness thunk signature (both its generic
 /// signature and a generic environment providing archetypes), a substitution
 /// map that allows one to map the interface types of the requirement into
-/// the interface types of the synthetic domain, and the set of substitutions
-/// required to use the witness from the synthetic domain (e.g., how one would
+/// the interface types of the witness thunk domain, and the set of substitutions
+/// required to use the witness from the witness thunk domain (e.g., how one would
 /// call the witness from the witness thunk).
 class Witness {
   struct StoredWitness {
     /// The witness declaration, along with the substitutions needed to use
-    /// the witness declaration from the synthetic environment.
+    /// the witness declaration from the witness thunk signature.
     ConcreteDeclRef declRef;
-    GenericEnvironment *syntheticEnvironment;
-    SubstitutionMap reqToSyntheticEnvSubs;
+    GenericSignature witnessThunkSig;
+    SubstitutionMap reqToWitnessThunkSigSubs;
     /// The derivative generic signature, when the requirement is a derivative
     /// function.
     GenericSignature derivativeGenSig;
+    Optional<ActorIsolation> enterIsolation;
   };
 
   llvm::PointerUnion<ValueDecl *, StoredWitness *> storage;
@@ -123,12 +124,14 @@ public:
 
   /// Create a witness for the given requirement.
   ///
-  /// Deserialized witnesses do not have a synthetic environment.
+  /// Deserialized witnesses do not have a witness thunk signature.
   static Witness forDeserialized(ValueDecl *decl,
-                                 SubstitutionMap substitutions) {
+                                 SubstitutionMap substitutions,
+                                 Optional<ActorIsolation> enterIsolation) {
     // TODO: It's probably a good idea to have a separate 'deserialized' bit.
     return Witness(
-        decl, substitutions, nullptr, SubstitutionMap(), CanGenericSignature());
+        decl, substitutions, nullptr, SubstitutionMap(), CanGenericSignature(),
+        enterIsolation);
   }
 
   /// Create a witness that requires substitutions.
@@ -136,23 +139,27 @@ public:
   /// \param decl The declaration for the witness.
   ///
   /// \param substitutions The substitutions required to use the witness from
-  /// the synthetic environment.
+  /// the witness thunk signature.
   ///
-  /// \param syntheticEnv The synthetic environment.
+  /// \param witnessThunkSig The witness thunk signature.
   ///
-  /// \param reqToSyntheticEnvSubs The mapping from the interface types of the
-  /// requirement into the interface types of the synthetic environment.
+  /// \param reqToWitnessThunkSigSubs The mapping from the interface types of the
+  /// requirement into the interface types of the witness thunk signature.
   ///
   /// \param derivativeGenSig The derivative generic signature, when the
   /// requirement is a derivative function.
+  ///
+  /// \param enterIsolation The actor isolation that the witness thunk will
+  /// need to hop to before calling the witness.
   Witness(ValueDecl *decl,
           SubstitutionMap substitutions,
-          GenericEnvironment *syntheticEnv,
-          SubstitutionMap reqToSyntheticEnvSubs,
-          GenericSignature derivativeGenSig);
+          GenericSignature witnessThunkSig,
+          SubstitutionMap reqToWitnessThunkSigSubs,
+          GenericSignature derivativeGenSig,
+          Optional<ActorIsolation> enterIsolation);
 
   /// Retrieve the witness declaration reference, which includes the
-  /// substitutions needed to use the witness from the synthetic environment
+  /// substitutions needed to use the witness from the witness thunk signature
   /// (if any).
   ConcreteDeclRef getDeclRef() const {
     if (auto stored = storage.dyn_cast<StoredWitness *>())
@@ -168,26 +175,23 @@ public:
   explicit operator bool() const { return !storage.isNull(); }
 
   /// Retrieve the substitutions required to use this witness from the
-  /// synthetic environment.
-  ///
-  /// The substitutions are substitutions for the witness, providing interface
-  /// types from the synthetic environment.
+  /// witness thunk signature.
   SubstitutionMap getSubstitutions() const {
     return getDeclRef().getSubstitutions();
   }
 
-  /// Retrieve the synthetic generic environment.
-  GenericEnvironment *getSyntheticEnvironment() const {
+  /// Retrieve the witness thunk generic signature.
+  GenericSignature getWitnessThunkSignature() const {
     if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
-      return storedWitness->syntheticEnvironment;
+      return storedWitness->witnessThunkSig;
     return nullptr;
   }
 
   /// Retrieve the substitution map that maps the interface types of the
-  /// requirement to the interface types of the synthetic environment.
-  SubstitutionMap getRequirementToSyntheticSubs() const {
+  /// requirement to the interface types of the witness thunk signature.
+  SubstitutionMap getRequirementToWitnessThunkSubs() const {
     if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
-      return storedWitness->reqToSyntheticEnvSubs;
+      return storedWitness->reqToWitnessThunkSigSubs;
     return {};
   }
 
@@ -197,6 +201,17 @@ public:
       return storedWitness->derivativeGenSig;
     return GenericSignature();
   }
+
+  Optional<ActorIsolation> getEnterIsolation() const {
+    if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
+      return storedWitness->enterIsolation;
+
+    return None;
+  }
+
+  /// Retrieve a copy of the witness with an actor isolation that the
+  /// witness thunk will need to hop to.
+  Witness withEnterIsolation(ActorIsolation enterIsolation) const;
 
   SWIFT_DEBUG_DUMP;
 

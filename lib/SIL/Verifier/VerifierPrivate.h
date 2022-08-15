@@ -40,7 +40,6 @@ public:
 
 private:
   bool isImmutableInScope(LoadBorrowInst *lbi,
-                          ArrayRef<Operand *> endBorrowUses,
                           AccessPathWithBase accessPathWithBase);
 };
 

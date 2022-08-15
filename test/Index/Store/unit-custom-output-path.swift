@@ -43,7 +43,7 @@
 //    INDEX_WITH_NEGATIVE-NOT: main_out.o
 //    INDEX_WITH_NEGATIVE-NOT: different.o
 //
-//    Run with a diferent -index-unit-output-path
+//    Run with a different -index-unit-output-path
 //    RUN: %target-swift-frontend -typecheck -parse-stdlib \
 //    RUN:     -module-name mod_name -index-store-path %t/idx_with \
 //    RUN:     -primary-file %t/main.swift %t/second.swift \

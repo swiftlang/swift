@@ -16,7 +16,9 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/PathRemapper.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 #include <string>
@@ -30,7 +32,7 @@ namespace swift {
 enum class ModuleSearchPathKind {
   Import,
   Framework,
-  DarwinImplictFramework,
+  DarwinImplicitFramework,
   RuntimeLibrary,
 };
 
@@ -115,7 +117,7 @@ class ModuleSearchPathLookup {
   /// Scan the directory at \p SearchPath for files and add those files to the
   /// lookup table. \p Kind specifies the search path kind and \p Index the
   /// index of \p SearchPath within that search path kind. Search paths with
-  /// lower indicies are considered first.
+  /// lower indices are considered first.
   /// The \p SearchPath is stored by as a \c StringRef, so the string backing it
   /// must be alive as long as this lookup table is alive and not cleared.
   void addFilesInPathToLookupTable(llvm::vfs::FileSystem *FS,
@@ -325,14 +327,10 @@ public:
   /// would for a non-system header.
   bool DisableModulesValidateSystemDependencies = false;
 
-  /// Enforce loading only serialized modules built with the same SDK
-  /// as the context loading it.
-  bool EnableSameSDKCheck = true;
-
   /// A set of compiled modules that may be ready to use.
   std::vector<std::string> CandidateCompiledModules;
 
-  /// A map of explict Swift module information.
+  /// A map of explicit Swift module information.
   std::string ExplicitSwiftModuleMap;
 
   /// A map of placeholder Swift module dependency information.
@@ -340,6 +338,9 @@ public:
 
   /// A file containing modules we should perform batch scanning.
   std::string BatchScanInputFilePath;
+
+  /// A file containing a list of protocols whose conformances require const value extraction.
+  std::string ConstGatherProtocolListFilePath;
 
   /// Debug path mappings to apply to serialized search paths. These are
   /// specified in LLDB from the target.source-map entries.
@@ -356,6 +357,14 @@ public:
                                   llvm::vfs::FileSystem *FS, bool IsOSDarwin) {
     return Lookup.searchPathsContainingFile(this, Filenames, FS, IsOSDarwin);
   }
+
+  /// Creates a filesystem taking into account any overlays specified in
+  /// \c VFSOverlayFiles. Returns \p BaseFS if there were no overlays and
+  /// \c FileError(s) if any error occurred while attempting to parse the
+  /// overlay files.
+  llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+  makeOverlayFileSystem(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const;
 
 private:
   static StringRef

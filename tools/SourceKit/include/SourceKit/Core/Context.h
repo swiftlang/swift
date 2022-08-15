@@ -169,6 +169,9 @@ public:
 };
 
 class Context {
+  /// The path of the swift-frontend executable.
+  /// Used to find clang relative to it.
+  std::string SwiftExecutablePath;
   std::string RuntimeLibPath;
   std::string DiagnosticDocumentationPath;
   std::unique_ptr<LangSupport> SwiftLang;
@@ -178,11 +181,14 @@ class Context {
   std::shared_ptr<SlowRequestSimulator> SlowRequestSim;
 
 public:
-  Context(StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
+  Context(StringRef SwiftExecutablePath, StringRef RuntimeLibPath,
+          StringRef DiagnosticDocumentationPath,
           llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
               LangSupportFactoryFn,
           bool shouldDispatchNotificationsOnMain = true);
   ~Context();
+
+  StringRef getSwiftExecutablePath() const { return SwiftExecutablePath; }
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }
   StringRef getDiagnosticDocumentationPath() const {

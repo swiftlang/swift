@@ -1,6 +1,8 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
+// TODO: Fix CxxShim for Windows.
+// XFAIL: OS=windows-msvc
 
 import StdlibUnittest
 import Functions
@@ -67,6 +69,12 @@ FunctionsTestSuite.test("base member from derived from non trivial") {
   let dnt = DerivedFromNonTrivial()
   expectEqual(String(cString: dnt.inNonTrivial()!), "NonTrivial::inNonTrivial")
   expectEqual(String(cString: dnt.inNonTrivialWithArgs(0, 1)!), "NonTrivial::inNonTrivialWithArgs")
+}
+
+FunctionsTestSuite.test("non-empty derived from empty class") {
+  let derived = DerivedFromEmptyBaseClass()
+  expectEqual(String(cString: derived.inBase()!), "EmptyBaseClass::inBase")
+  expectEqual(derived.b, 42)
 }
 
 runAllTests()

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-partial-specialization -generic-specializer -save-optimization-record-path=%t.yaml %/s | %FileCheck %s
+// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer -save-optimization-record-path=%t.yaml %/s | %FileCheck %s
 // RUN: %FileCheck -check-prefix=YAML %s < %t.yaml
 
 sil_stage canonical
@@ -367,7 +367,7 @@ bb0(%0 : $Int32, %1 : $*T, %2 : $<τ_0_0> { var τ_0_0 } <U>):
 }
 
 // static Swift.+ infix (Swift.Int32, Swift.Int32) -> Swift.Int32
-sil public_external [transparent] [serialized] @$ss1poiys5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
+sil public_external [transparent] @$ss1poiys5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
   %2 = struct_extract %0 : $Int32, #Int32._value   // user: %5
   %3 = struct_extract %1 : $Int32, #Int32._value   // user: %5

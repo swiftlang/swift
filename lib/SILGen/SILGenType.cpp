@@ -483,6 +483,7 @@ private:
           witness.getDerivativeGenericSignature(), witnessRef.getASTContext());
       witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
     }
+
     return witnessRef;
   }
 };
@@ -533,7 +534,7 @@ public:
 
     // Check if we already have a declaration or definition for this witness
     // table.
-    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false)) {
+    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance)) {
       // If we have a definition already, just return it.
       //
       // FIXME: I am not sure if this is possible, if it is not change this to an
@@ -694,23 +695,44 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto requirementInfo =
       Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
+  auto shouldUseDistributedThunkWitness =
+      // always use a distributed thunk for distributed requirements:
+      requirement.isDistributedThunk() ||
+      // for non-distributed requirements, which are however async/throws,
+      // and have a proper witness (passed typechecking), we can still invoke
+      // them on the distributed actor; but must do so through the distributed
+      // thunk as the call "through an existential" we never statically know
+      // if the actor is local or not.
+      (requirement.hasDecl() && requirement.getFuncDecl() && requirement.hasAsync() &&
+       !requirement.getFuncDecl()->isDistributed() &&
+       witnessRef.hasDecl() && witnessRef.getFuncDecl() &&
+       witnessRef.getFuncDecl()->isDistributed());
+  // We only need to use thunks when we go cross-actor:
+  shouldUseDistributedThunkWitness = shouldUseDistributedThunkWitness &&
+                                     getActorIsolation(requirement.getDecl()) !=
+                                         getActorIsolation(witness.getDecl());
+  if (shouldUseDistributedThunkWitness) {
+    auto thunkDeclRef = SILDeclRef(
+        witnessRef.getFuncDecl()->getDistributedThunk(),
+        SILDeclRef::Kind::Func);
+    witnessRef = thunkDeclRef.asDistributed();
+  }
+
   // Work out the lowered function type of the SIL witness thunk.
   auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
 
   // Mapping from the requirement's generic signature to the witness
   // thunk's generic signature.
-  auto reqtSubMap = witness.getRequirementToSyntheticSubs();
+  auto reqtSubMap = witness.getRequirementToWitnessThunkSubs();
 
   // The generic environment for the witness thunk.
-  auto *genericEnv = witness.getSyntheticEnvironment();
-  CanGenericSignature genericSig;
-  if (genericEnv)
-    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
+  auto *genericEnv = witness.getWitnessThunkSignature().getGenericEnvironment();
+  auto genericSig = witness.getWitnessThunkSignature().getCanonicalSignature();
 
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-      ->getCanonicalType(genericSig));
+      ->getReducedType(genericSig));
 
   // Generic signatures where all parameters are concrete are lowered away
   // at the SILFunctionType level.
@@ -781,6 +803,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
                  derivativeId->getParameterIndices()->getString();
   }
 
+  if (requirement.isDistributedThunk()) {
+    nameBuffer = nameBuffer + "TE";
+  }
+
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
   // calls removed if possible, e.g. when we're able to devirtualize
@@ -812,7 +838,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubMap, witnessRef,
-                          witnessSubs, isFree, /*isSelfConformance*/ false);
+                          witnessSubs, isFree, /*isSelfConformance*/ false,
+                          witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
   return f;
@@ -843,7 +870,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(
-      protocol->getExistentialType()->getCanonicalType());
+      protocol->getExistentialType()->getCanonicalType(), GenericSignature());
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
@@ -884,7 +911,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement,
-                          witnessSubs, isFree, /*isSelfConformance*/ true);
+                          witnessSubs, isFree, /*isSelfConformance*/ true,
+                          None);
 
   SGM.emitLazyConformancesForFunction(f);
 
@@ -1159,6 +1187,12 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
+    if (auto *thunk = vd->getDistributedThunk()) {
+      auto thunkRef = SILDeclRef(thunk).asDistributed();
+      SGM.emitFunctionDefinition(thunkRef,
+                                 SGM.getFunction(thunkRef, ForDefinition));
+    }
+
     visitAbstractStorageDecl(vd);
   }
 
@@ -1285,6 +1319,13 @@ public:
         return;
       }
     }
+
+    if (auto *thunk = vd->getDistributedThunk()) {
+      auto thunkRef = SILDeclRef(thunk).asDistributed();
+      SGM.emitFunctionDefinition(thunkRef,
+                                 SGM.getFunction(thunkRef, ForDefinition));
+    }
+
     visitAbstractStorageDecl(vd);
   }
 

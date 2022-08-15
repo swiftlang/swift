@@ -1328,9 +1328,9 @@ entry(%either : @owned $E):
     %addr = alloc_stack [lexical] $E
     store %either to [init] %addr : $*E
     %either2 = load [take] %addr : $*E
+    dealloc_stack %addr : $*E
     switch_enum %either2 : $E, case #E.one!enumelt: one
 one(%instance : @owned $C):
-    dealloc_stack %addr : $*E
     return %instance : $C
 }
 

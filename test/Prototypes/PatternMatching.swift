@@ -302,7 +302,9 @@ extension Collection where Iterator.Element == UTF8.CodeUnit {
     a.reserveCapacity(count + 1)
     a.append(contentsOf: self)
     a.append(0)
-    return String(reflecting: String(cString: a))
+    return a.withUnsafeBufferPointer {
+      String(reflecting: String(cString: $0.baseAddress!))
+    }
   }
 }
 

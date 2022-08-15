@@ -25,6 +25,7 @@ toolchain as a one-off, there are a couple of differences:
 - [Editing code](#editing-code)
   - [Setting up your fork](#setting-up-your-fork)
   - [First time Xcode setup](#first-time-xcode-setup)
+  - [Other IDEs setup](#other-ides-setup)
   - [Editing](#editing)
   - [Incremental builds with Ninja](#incremental-builds-with-ninja)
   - [Incremental builds with Xcode](#incremental-builds-with-xcode)
@@ -84,7 +85,7 @@ toolchain as a one-off, there are a couple of differences:
    **Note:** If you've already forked the project on GitHub at this stage,
    **do not clone your fork** to start off. We describe
    [how to setup your fork](#setting-up-your-fork) in a subsection below.
-   <!-- Recommending against cloning the fork due to SR-13476 and SR-13505. -->
+   <!-- Recommending against cloning the fork due to https://github.com/apple/swift/issues/55918 and https://github.com/apple/swift/issues/55947. -->
 3. Double-check that `swift`'s sibling directories are present.
    ```sh
    ls ..
@@ -118,7 +119,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
 - If `update-checkout` failed, double-check that the absolute path to your
   working directory does not have non-ASCII characters.
 - If `update-checkout` failed and the absolute path to your working directory
-  had spaces in it, please [file a bug report][Swift JIRA] and change the path
+  had spaces in it, please [file a bug report][Swift Issues] and change the path
   to work around it.
 - Before running `update-checkout`, double-check that `swift` is the only
   repository inside the `swift-project` directory. Otherwise,
@@ -127,8 +128,6 @@ Double-check that running `pwd` prints a path ending with `swift`.
 ## Installing dependencies
 
 ### macOS
-
-⚠️ Since version 0.2.14, `sccache` no longer caches compile commands issued by `build-script` because of [sccache PR 898](https://github.com/mozilla/sccache/pull/898), since `build-script` adds the `-arch x86_64` argument twice. The instructions below may install `sccache` 0.2.14 or newer. You may want to instead download and install an older release from their [Releases page](https://github.com/mozilla/sccache/releases) until this issue is resolved.
 
 1. Install [Xcode 13 beta 4][Xcode] or newer:
    The required version of Xcode changes frequently and is often a beta release.
@@ -156,7 +155,6 @@ Double-check that running `pwd` prints a path ending with `swift`.
 1. The latest Linux dependencies are listed in the respective Dockerfiles:
    * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
-   * [CentOS 8](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/8/Dockerfile)
    * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
 2. To install sccache (optional):
@@ -224,7 +222,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    - If you use an editor other than Xcode and/or you want somewhat faster builds,
      go with Ninja.
    - If you are comfortable with using Xcode and would prefer to use it,
-     go with Xcode.
+     go with Xcode. If you run into issues building with Xcode, you can alternatively [integrate a Ninja build into Xcode](#integrate-a-ninja-build-with-xcode).
    There is also a third option, which is somewhat more involved:
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
@@ -240,9 +238,11 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```sh
      utils/build-script --skip-build-benchmarks \
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --swift-disable-dead-stripping --test \
+       --sccache --release-debuginfo --swift-disable-dead-stripping \
        --xcode
      ```
+     **Note:** Building `--xcode` together with `--test` is a common source of issues. So to run
+     tests is recommended to use `ninja` because is normally more stable. 
    Linux (uses Ninja):
      ```sh
      utils/build-script --release-debuginfo --test --skip-early-swift-driver
@@ -269,7 +269,7 @@ In the following sections, for simplicity, we will assume that you are using a
 unless explicitly mentioned otherwise. You will need to slightly tweak the paths
 for other build configurations.
 
-#### Using both Ninja and Xcode
+### Using both Ninja and Xcode
 
 Some contributors find it more convenient to use both Ninja and Xcode.
 Typically this configuration consists of:
@@ -284,6 +284,9 @@ The additional flexibility comes with two issues: (1) consuming much more disk
 space and (2) you need to maintain the two builds in sync, which needs extra
 care when moving across branches.
 
+### Integrate a Ninja build with Xcode
+It is possible to integrate the Ninja build into Xcode. For details on how to set this up see [Using Ninja with Xcode in DevelopmentTips.md](/docs/DevelopmentTips.md#using-ninja-with-xcode).
+
 ### Troubleshooting build issues
 
 - Double-check that all projects are checked out at the right branches.
@@ -295,9 +298,8 @@ care when moving across branches.
   [meet the minimum required versions](#spot-check-dependencies).
 - Check if there are spaces in the paths being used by `build-script` in
   the log. While `build-script` should work with paths containing spaces,
-  sometimes bugs do slip through, such as
-  [SR-13441](https://bugs.swift.org/browse/SR-13441).
-  If this is the case, please [file a bug report][Swift JIRA] and change the path
+  sometimes bugs do slip through, such as [#55883](https://github.com/apple/swift/issues/55883).
+  If this is the case, please [file a bug report][Swift Issues] and change the path
   to work around it.
 - Check that your `build-script` invocation doesn't have typos. You can compare
   the flags you passed against the supported flags listed by
@@ -306,16 +308,23 @@ care when moving across branches.
   In many situations, there are several errors, so scrolling further back
   and looking at the first error may be more helpful than simply looking
   at the last error.
-- Check if others have encountered the same issue on the Swift forums or on
-  [Swift JIRA][].
-- Create a new Swift forums thread in the Development category. Include
-  information about your configuration and the errors you are seeing.
+- Check if others have encountered the same issue on the [Swift Forums](https://forums.swift.org/c/development/compiler) or on [Swift repository 'Issues' tab][Swift Issues]. Here is a list of threads that describe common issues:
+  * [Problems with `build-script` building compiler with `–xcode`](https://forums.swift.org/t/problems-with-build-script-building-compiler-with-xcode/53477)
+  * [Error building the compiler (even with ninja)](https://forums.swift.org/t/error-building-the-compiler-even-with-ninja/54834)
+  * [Build failure on Apple MacBook Pro with Apple M1 Chip](https://forums.swift.org/t/build-failure-on-apple-silicon-m1-mac-mini/45011)
+  * [CMake cannot compile a test program](https://forums.swift.org/t/build-failure-locally/55695)
+  * [Building Swift compiler from source fails when not using Ninja](https://forums.swift.org/t/building-swift-compiler-from-source-fails-when-not-using-ninja/54656)
+  * [ALL_BUILD Target failing at validation](https://forums.swift.org/t/help-building-swift-in-xcode-error/49728)
+  * [“gtest/gtest.h” not found while compiling the compiler](https://forums.swift.org/t/gtest-gtest-h-not-found-in-typeref-cpp-while-compiling-the-compiler/44399)
+- If you still could not find a solution to your issue, feel free to create a new Swift Forums thread in the [Development/Compiler](https://forums.swift.org/c/development/compiler) category: 
+  - Include information about your configuration and the errors you are seeing.
   - You can [create a gist](https://gist.github.com) with the entire build
     output and link it, while highlighting the most important part of the
     build log in the post.
   - Include the output of `utils/update-checkout --dump-hashes`.
 
-[Swift JIRA]: https://bugs.swift.org
+[Swift Issues]: https://github.com/apple/swift/issues
+[Swift Forums]: https://forums.swift.org
 
 ## Editing code
 
@@ -354,9 +363,32 @@ select the following schemes:
 - `swift-frontend`: If you will be working on the compiler.
 - `check-swift-all`: This can be used to run the tests. The test runner does
   not integrate with Xcode though, so it may be easier to run tests directly
-  on the commandline for more fine-grained control over which exact tests are
+  on the command line for more fine-grained control over which exact tests are
   run.
 <!-- TODO: Insert SourceKit/stdlib specific instructions? -->
+
+### Other IDEs setup
+
+You can also use other editors and IDEs to work on Swift.
+
+#### IntelliJ CLion
+
+CLion supports CMake and Ninja. In order to configure it properly, build the swift project first using the `build-script`, then open the `swift` directory with CLion and proceed to project settings (`cmd + ,`).
+
+In project settings, locate `Build, Execution, Deployment > CMake`. You will need to create a new profile named `RelWithDebInfoAssert` (or `Debug` if going to point it at the debug build). Enter the following information:
+
+- Name: mirror the name of the build configuration here, e.g. `RelWithDebInfoAssert` or `Debug`
+- Build type: This corresponds to `CMAKE_BUILD_TYPE` so should be e.g. `RelWithDebInfoAssert` or `Debug`
+    - latest versions of the IDE suggest valid values here. Generally `RelWithDebInfoAssert` is a good one to work with
+- Toolchain: Default should be fine
+- Generator: Ninja
+- CMake options:
+    - `-D SWIFT_PATH_TO_CMARK_BUILD=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/cmark-macosx-arm64 -D LLVM_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/llvm -D Clang_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/clang -D CMAKE_BUILD_TYPE=RelWithDebInfoAssert -G Ninja -S .`
+    - replace the `SOME_PATH` to the path where your `swift-project` directory is
+    - the CMAKE_BUILD_TYPE should match the build configuration name, so if you named this profile `RelWithDebInfo` the CMAKE_BUILD_TYPE should also be `RelWithDebInfo`
+    - **Note**: If you're using an Intel machine to build swift, you'll need to replace the architecture in the options. (ex: `arm64` with `x86_64`)
+
+With this done, CLion should be able to successfully import the project and have full autocomplete and code navigation powers.
 
 ### Editing
 
@@ -402,7 +434,7 @@ This should print your updated version string.
 
 Starter bugs typically have small code examples that fit within a single file.
 You can reproduce such an issue in various ways, such as compiling it from the
-commandline using `/path/to/swiftc MyFile.swift`, pasting the code into
+command line using `/path/to/swiftc MyFile.swift`, pasting the code into
 [Compiler Explorer][] (aka godbolt) or using an Xcode Playground.
 
 [Compiler Explorer]: https://godbolt.org
@@ -601,4 +633,4 @@ Make sure you check out the following resources:
 If you see mistakes in the documentation (including typos, not just major
 errors) or identify gaps that you could potentially improve the contributing
 experience, please start a discussion on the forums, submit a pull request
-or file a bug report on [Swift JIRA][]. Thanks!
+or file a bug report on [Swift repository 'Issues' tab][Swift Issues]. Thanks!

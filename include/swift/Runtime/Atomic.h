@@ -20,6 +20,7 @@
 #include "swift/Runtime/Config.h"
 #include <assert.h>
 #include <atomic>
+#include <cstdlib>
 #if defined(_WIN64)
 #include <intrin.h>
 #endif
@@ -43,13 +44,12 @@
 
 namespace swift {
 namespace impl {
-
 /// The default implementation for swift::atomic<T>, which just wraps
 /// std::atomic with minor differences.
 ///
 /// TODO: should we make this use non-atomic operations when the runtime
 /// is single-threaded?
-template <class Value, size_t Size = sizeof(Value)>
+template <class Value, std::size_t Size = sizeof(Value)>
 class alignas(Size) atomic_impl {
   std::atomic<Value> value;
 public:
@@ -181,7 +181,7 @@ public:
 } // end namespace swift::impl
 
 /// A simple wrapper for std::atomic that provides the most important
-/// interfaces and fixes the API bug where all of the orderings dafault
+/// interfaces and fixes the API bug where all of the orderings default
 /// to sequentially-consistent.
 ///
 /// It also sometimes uses a different implementation in cases where

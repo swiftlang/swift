@@ -1,0 +1,106 @@
+// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
+// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
+
+sil_stage canonical
+
+import Builtin
+
+typealias AnyObject = Builtin.AnyObject
+
+class X {
+}
+
+sil [ossa] @get_owned_X : $@convention(thin) () -> @owned X 
+
+// Hoist the destroy_addr of an inout over a loop and over a deinit barrier to
+// the top of the enclosing function.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_loop_inout : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK-NEXT:    destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function 'hoist_over_loop_inout'
+sil [ossa] @hoist_over_loop_inout : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+ %1 = function_ref @get_owned_X : $@convention(thin) () -> @owned X 
+ %14 = apply %1() : $@convention(thin) () -> @owned X 
+ br bb1                        
+
+bb1:   
+ br bb2   
+
+bb2:   
+ cond_br undef, bb3, bb4   
+
+bb3:   
+ br bb1   
+
+bb4:   
+ destroy_addr %0 : $*X   
+ store %14 to [init] %0 : $*X            
+ %23 = tuple ()   
+ return %23 : $()   
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_into_unrelated_access_scope_above_loop_lexical : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @owned $X, [[REGISTER_1:%[^,]+]] : $*X):
+// CHECK:         end_access
+// CHECK-NEXT:    destroy_addr
+// CHECK-LABEL: } // end sil function 'nohoist_into_unrelated_access_scope_above_loop_lexical'
+sil [ossa] @nohoist_into_unrelated_access_scope_above_loop_lexical : $@convention(thin) (@owned X, @inout X) -> () {
+bb0(%instance : @owned $X, %second: $*X):
+ %addr = alloc_stack [lexical] $X
+ store %instance to [init] %addr : $*X
+ %scope = begin_access [modify] [static] %second : $*X
+ %1 = function_ref @get_owned_X : $@convention(thin) () -> @owned X 
+ %14 = apply %1() : $@convention(thin) () -> @owned X 
+ destroy_value %14 : $X
+ end_access %scope : $*X
+ br bb1                        
+
+bb1:   
+ br bb2   
+
+bb2:   
+ cond_br undef, bb3, bb4   
+
+bb3:   
+ br bb1   
+
+bb4:   
+ destroy_addr %addr : $*X
+ dealloc_stack %addr : $*X
+ %23 = tuple ()   
+ return %23 : $()   
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_into_unrelated_access_scope_above_loop_nonlexical : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @owned $X, [[REGISTER_1:%[^,]+]] : $*X):
+// CHECK:         destroy_addr
+// CHECK:         begin_access
+// CHECK-LABEL: } // end sil function 'nohoist_into_unrelated_access_scope_above_loop_nonlexical'
+sil [ossa] @nohoist_into_unrelated_access_scope_above_loop_nonlexical : $@convention(thin) (@owned X, @inout X) -> () {
+bb0(%instance : @owned $X, %second: $*X):
+ %addr = alloc_stack $X
+ store %instance to [init] %addr : $*X
+ %scope = begin_access [modify] [static] %second : $*X
+ %1 = function_ref @get_owned_X : $@convention(thin) () -> @owned X 
+ %14 = apply %1() : $@convention(thin) () -> @owned X 
+ destroy_value %14 : $X
+ end_access %scope : $*X
+ br bb1                        
+
+bb1:   
+ br bb2   
+
+bb2:   
+ cond_br undef, bb3, bb4   
+
+bb3:   
+ br bb1   
+
+bb4:   
+ destroy_addr %addr : $*X
+ dealloc_stack %addr : $*X
+ %23 = tuple ()   
+ return %23 : $()   
+}

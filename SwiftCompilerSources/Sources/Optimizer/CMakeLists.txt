@@ -7,10 +7,7 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 set(dependencies)
-list(APPEND dependencies Basic SIL)
-if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-  list(APPEND dependencies ExperimentalRegex)
-endif()
+list(APPEND dependencies Basic SIL Parse)
 
 add_swift_compiler_module(Optimizer DEPENDS ${dependencies})
 

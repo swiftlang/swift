@@ -268,7 +268,7 @@ public:
     // If we do not have ownership or already are guaranteed, just return a copy
     // of our state.
     if (!b.hasOwnership() ||
-        Value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed)) {
+        Value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed)) {
       return {Value, SubElementNumber, InsertionPoints};
     }
 
@@ -605,7 +605,7 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
   if (TupleType *tupleType = LoadTy.getAs<TupleType>()) {
     SILValue result =
         aggregateTupleSubElts(tupleType, LoadTy, Address, FirstElt);
-    if (isTopLevel && result.getOwnershipKind() == OwnershipKind::Guaranteed) {
+    if (isTopLevel && result->getOwnershipKind() == OwnershipKind::Guaranteed) {
       SILValue borrowedResult = result;
       SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
       result = builder.emitCopyValueOperation(Loc, borrowedResult);
@@ -626,7 +626,7 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
   if (auto *structDecl = getFullyReferenceableStruct(LoadTy)) {
     SILValue result =
         aggregateStructSubElts(structDecl, LoadTy, Address, FirstElt);
-    if (isTopLevel && result.getOwnershipKind() == OwnershipKind::Guaranteed) {
+    if (isTopLevel && result->getOwnershipKind() == OwnershipKind::Guaranteed) {
       SILValue borrowedResult = result;
       SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
       result = builder.emitCopyValueOperation(Loc, borrowedResult);
@@ -730,7 +730,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
 
   // Finally, grab the value from the SSA updater.
   SILValue result = updater.getValueInMiddleOfBlock(B.getInsertionBB());
-  assert(result.getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
+  assert(result->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
   if (isTake() || !B.hasOwnership()) {
     return result;
   }
@@ -847,7 +847,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     SILLocation loc = insertPts[0]->getLoc();
     SILValue eltVal = nonDestructivelyExtractSubElement(val, builder, loc);
     assert(!builder.hasOwnership() ||
-           eltVal.getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
+           eltVal->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
     assert(eltVal->getType() == loadTy && "Subelement types mismatch");
 
     if (!builder.hasOwnership()) {
@@ -874,7 +874,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     SILLocation loc = i->getLoc();
     SILValue eltVal = nonDestructivelyExtractSubElement(val, builder, loc);
     assert(!builder.hasOwnership() ||
-           eltVal.getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
+           eltVal->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
 
     if (!singularValue.hasValue()) {
       singularValue = eltVal;
@@ -905,7 +905,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   // Finally, grab the value from the SSA updater.
   SILValue eltVal = updater.getValueInMiddleOfBlock(insertBlock);
   assert(!B.hasOwnership() ||
-         eltVal.getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
+         eltVal->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
   assert(eltVal->getType() == loadTy && "Subelement types mismatch");
   if (!B.hasOwnership())
     return eltVal;
@@ -1140,7 +1140,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
 
       // If we had a non-trivial type with non-owned ownership, we will not see
       // a copy_value, so skip them here.
-      if (value.getOwnershipKind() != OwnershipKind::Owned)
+      if (value->getOwnershipKind() != OwnershipKind::Owned)
         continue;
 
       // Otherwise, value should be from a copy_value or a phi node.
@@ -2649,7 +2649,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
     if (!optV)
       continue;
     SILValue v = *optV;
-    if (v.getOwnershipKind() != OwnershipKind::Owned)
+    if (v->getOwnershipKind() != OwnershipKind::Owned)
       continue;
 
     // FIXME: This doesn't handle situations where non-consuming uses are in
@@ -2768,8 +2768,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
           case TermKind::DynamicMethodBranchInst:
           case TermKind::AwaitAsyncContinuationInst:
           case TermKind::CheckedCastBranchInst:
-          case TermKind::CheckedCastAddrBranchInst:
-          case TermKind::CheckedCastValueBranchInst: {
+          case TermKind::CheckedCastAddrBranchInst: {
             // Otherwise, we insert the destroy_addr /after/ the
             // terminator. All of these are guaranteed to have each successor
             // to have the block as its only predecessor block.

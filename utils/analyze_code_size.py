@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import re
@@ -475,7 +475,7 @@ def parse_segments(path, arch):
     demangle = subprocess.Popen(
         ['xcrun', 'swift-demangle'], stdin=subprocess.PIPE,
         stdout=subprocess.PIPE)
-    demangled = demangle.communicate(mangled)[0]
+    demangled = demangle.communicate(mangled)[0].decode('utf-8')
     symbols = {}
     segments = []
     segment_regex = re.compile(
@@ -491,7 +491,7 @@ def parse_segments(path, arch):
         r"^                0x[0-9a-f]+ \(\s*0x(?P<size>[0-9a-f]+)\) "
         r"(?P<name>.+?) \[[^\]]+\] $")
 
-    mangled_lines = mangled.splitlines()
+    mangled_lines = mangled.decode('utf-8').splitlines()
     current_line_number = 0
 
     for line in demangled.splitlines():

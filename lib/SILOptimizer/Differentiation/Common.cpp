@@ -257,6 +257,11 @@ findDebugLocationAndVariable(SILValue originalValue) {
   for (auto *use : originalValue->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
       return dvi->getVarInfo().map([&](SILDebugVariable var) {
+        // We need to drop `op_deref` here as we're transferring debug info
+        // location from debug_value instruction (which describes how to get value)
+        // into alloc_stack (which describes the location)
+        if (var.DIExpr.startsWithDeref())
+          var.DIExpr.eraseElement(var.DIExpr.element_begin());
         return std::make_pair(dvi->getDebugLocation(), var);
       });
   }
@@ -402,7 +407,7 @@ SILValue emitMemoryLayoutSize(
 SILValue emitProjectTopLevelSubcontext(
     SILBuilder &builder, SILLocation loc, SILValue context,
     SILType subcontextType) {
-  assert(context.getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(context->getOwnershipKind() == OwnershipKind::Guaranteed);
   auto &ctx = builder.getASTContext();
   auto id = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::AutoDiffProjectTopLevelSubcontext));

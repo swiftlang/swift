@@ -16,7 +16,32 @@ import Darwin
 internal typealias ProcessIdentifier = DarwinRemoteProcess.ProcessIdentifier
 
 internal func process(matching: String) -> ProcessIdentifier? {
-  return pidFromHint(matching)
+  if refersToSelf(matching) {
+    return getpid()
+  } else {
+    return pidFromHint(matching)
+  }
+}
+
+private func refersToSelf(_ str: String) -> Bool {
+  guard let myPath = CommandLine.arguments.first else {
+    return false
+  }
+
+  // If string matches the full path, success.
+  if myPath == str {
+    return true
+  }
+
+  // If there's a slash in the string, compare with the component following the
+  // slash.
+  if let slashIndex = myPath.lastIndex(of: "/") {
+    let myName = myPath[slashIndex...].dropFirst()
+    return myName == str
+  }
+
+  // No match.
+  return false
 }
 #elseif os(Windows)
 import WinSDK

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
 
 // We can't yet call member functions correctly on Windows (SR-13129).
 // XFAIL: OS=windows-msvc
@@ -16,8 +16,8 @@ import MemberTemplates
 // CHECK: [[ADD_ALL:%.*]] = function_ref @_ZN18HasMemberTemplates6addAllIiiEEiiT_T0_ : $@convention(cxx_method) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
 // CHECK: apply [[ADD_ALL]]({{.*}}) : $@convention(cxx_method) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK: [[DO_NOTHING:%.*]] = function_ref @_ZN18HasMemberTemplates17doNothingConstRefIiEEvRKT_ : $@convention(cxx_method) (@inout Int32, @inout HasMemberTemplates) -> ()
-// CHECK: apply [[DO_NOTHING]]({{.*}}) : $@convention(cxx_method) (@inout Int32, @inout HasMemberTemplates) -> ()
+// CHECK: [[DO_NOTHING:%.*]] = function_ref @_ZN18HasMemberTemplates17doNothingConstRefIiEEvRKT_ : $@convention(cxx_method) (@in Int32, @inout HasMemberTemplates) -> ()
+// CHECK: apply [[DO_NOTHING]]({{.*}}) : $@convention(cxx_method) (@in Int32, @inout HasMemberTemplates) -> ()
 
 // CHECK-LABEL: end sil function '$s4main9basicTestyyF'
 func basicTest() {
@@ -26,7 +26,7 @@ func basicTest() {
   obj.addSameTypeParams(i, i)
   obj.addMixedTypeParams(i, i)
   obj.addAll(i, i, i)
-  obj.doNothingConstRef(&i)
+  obj.doNothingConstRef(i)
 }
 
 // CHECK-LABEL: sil [clang HasMemberTemplates.addSameTypeParams] @_ZN18HasMemberTemplates17addSameTypeParamsIiEET_S1_S1_ : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
@@ -35,7 +35,7 @@ func basicTest() {
 
 // CHECK-LABEL: sil [clang HasMemberTemplates.addAll] @_ZN18HasMemberTemplates6addAllIiiEEiiT_T0_ : $@convention(cxx_method) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK-LABEL: sil [clang HasMemberTemplates.doNothingConstRef] @_ZN18HasMemberTemplates17doNothingConstRefIiEEvRKT_ : $@convention(cxx_method) (@inout Int32, @inout HasMemberTemplates) -> ()
+// CHECK-LABEL: sil [clang HasMemberTemplates.doNothingConstRef] @_ZN18HasMemberTemplates17doNothingConstRefIiEEvRKT_ : $@convention(cxx_method) (@in Int32, @inout HasMemberTemplates) -> ()
 
 // CHECK-LABEL: sil hidden @$s4main12testSetValueyyF : $@convention(thin) () -> ()
 

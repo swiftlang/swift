@@ -23,6 +23,9 @@
 //  ↑                             ↑
 //  first (leftmost) code unit    discriminator (incl. count)
 //
+// On Android AArch64, there is one less byte available because the discriminator
+// is stored in the penultimate code unit instead, to match where it's stored
+// for large strings.
 @frozen @usableFromInline
 internal struct _SmallString {
   @usableFromInline
@@ -78,6 +81,8 @@ extension _SmallString {
   internal static var capacity: Int {
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     return 10
+#elseif os(Android) && arch(arm64)
+    return 14
 #else
     return 15
 #endif
@@ -111,7 +116,11 @@ extension _SmallString {
   // usage: it always clears the discriminator and count (in case it's full)
   @inlinable @inline(__always)
   internal var zeroTerminatedRawCodeUnits: RawBitPattern {
+#if os(Android) && arch(arm64)
+    let smallStringCodeUnitMask = ~UInt64(0xFFFF).bigEndian // zero last two bytes
+#else
     let smallStringCodeUnitMask = ~UInt64(0xFF).bigEndian // zero last byte
+#endif
     return (self._storage.0, self._storage.1 & smallStringCodeUnitMask)
   }
 
@@ -232,22 +241,29 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
-    let len = try withUnsafeMutableBytes(of: &self._storage) {
-      (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
-      let len = try f(rawBufPtr)
-      UnsafeMutableRawBufferPointer(
-        rebasing: rawBufPtr[len...]
-      ).initializeMemory(as: UInt8.self, repeating: 0)
-      return len
-    }
-    if len == 0 {
+    let len = try withUnsafeMutableBytes(of: &_storage, f)
+
+    if len <= 0 {
+      _debugPrecondition(len == 0)
       self = _SmallString()
       return
     }
-    _internalInvariant(len <= _SmallString.capacity)
+    _SmallString.zeroTrailingBytes(of: &_storage, from: len)
+    self = _SmallString(leading: _storage.0, trailing: _storage.1, count: len)
+  }
 
-    let (leading, trailing) = self.zeroTerminatedRawCodeUnits
-    self = _SmallString(leading: leading, trailing: trailing, count: len)
+  @inlinable
+  @_alwaysEmitIntoClient
+  internal static func zeroTrailingBytes(
+    of storage: inout RawBitPattern, from index: Int
+  ) {
+    _internalInvariant(index > 0)
+    _internalInvariant(index <= _SmallString.capacity)
+    //FIXME: Verify this on big-endian architecture
+    let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* ( 8 &- Swift.min(index, 8))))
+    let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- Swift.max(index, 8))))
+    storage.0 &= (index <= 0) ? 0 : mask0.littleEndian
+    storage.1 &= (index <= 8) ? 0 : mask1.littleEndian
   }
 }
 
@@ -337,13 +353,22 @@ extension _SmallString {
   //
   @_effects(readonly) // @opaque
   @usableFromInline // testable
-  internal init(taggedCocoa cocoa: AnyObject) {
+  internal init?(taggedCocoa cocoa: AnyObject) {
     self.init()
+    var success = true
     self.withMutableCapacity {
-      let len = _bridgeTagged(cocoa, intoUTF8: $0)
-      _internalInvariant(len != nil && len! <= _SmallString.capacity,
-        "Internal invariant violated: large tagged NSStrings")
-      return len._unsafelyUnwrappedUnchecked
+      /*
+       For regular NSTaggedPointerStrings we will always succeed here, but
+       tagged NSLocalizedStrings may not fit in a SmallString
+       */
+      if let len = _bridgeTagged(cocoa, intoUTF8: $0) {
+        return len
+      }
+      success = false
+      return 0
+    }
+    if !success {
+      return nil
     }
     self._invariantCheck()
   }

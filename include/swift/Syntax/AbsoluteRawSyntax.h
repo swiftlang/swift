@@ -129,7 +129,7 @@ public:
   }
 };
 
-/// Represents a node's position in a syntax tree, described by its overal
+/// Represents a node's position in a syntax tree, described by its overall
 /// textual offset and the position within its parent.
 class AbsoluteSyntaxPosition {
 public:
@@ -254,7 +254,7 @@ public:
   }
 };
 
-/// A \c RawSyntax node that is enrichted with information of its position
+/// A \c RawSyntax node that is enriched with information of its position
 /// within the syntax tree it lives in.
 class AbsoluteRawSyntax {
   /// OptionalStorage is a friend so it can access the \c nullptr initializer
@@ -303,7 +303,7 @@ public:
     return Info;
   }
 
-  /// Get the position at which the leading triva of this node starts.
+  /// Get the position at which the leading trivia of this node starts.
   AbsoluteSyntaxPosition getPosition() const {
     return getInfo().getPosition();
   };
@@ -397,11 +397,11 @@ public:
 
   bool hasValue() const { return !Storage.isNull(); }
 
-  AbsoluteRawSyntax &getValue() LLVM_LVALUE_FUNCTION {
+  AbsoluteRawSyntax &getValue() & {
     assert(hasValue());
     return Storage;
   }
-  AbsoluteRawSyntax const &getValue() const LLVM_LVALUE_FUNCTION {
+  AbsoluteRawSyntax const &getValue() const & {
     assert(hasValue());
     return Storage;
   }

@@ -209,6 +209,9 @@ struct PrintOptions {
   /// \see FileUnit::getExportedModuleName
   bool UseExportedModuleNames = false;
 
+  /// Use the original module name to qualify a symbol.
+  bool UseOriginallyDefinedInModuleNames = false;
+
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
@@ -285,6 +288,9 @@ struct PrintOptions {
   /// types.
   bool PrintExplicitAny = false;
 
+  /// Whether to desugar the constraint for an existential type.
+  bool DesugarExistentialConstraint = false;
+
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
@@ -300,6 +306,9 @@ struct PrintOptions {
 
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
+
+  /// Suppress emitting @available(*, noasync)
+  bool SuppressNoAsyncAvailabilityAttr = false;
 
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
@@ -387,6 +396,12 @@ struct PrintOptions {
 
   /// Whether to use an empty line to separate two members in a single decl.
   bool EmptyLineBetweenMembers = false;
+
+  /// Whether to print empty members of a declaration on a single line, e.g.:
+  /// ```
+  /// extension Foo: Bar {}
+  /// ```
+  bool PrintEmptyMembersOnSameLine = false;
 
   /// Whether to print the extensions from conforming protocols.
   bool PrintExtensionFromConformingProtocols = false;
@@ -511,6 +526,12 @@ struct PrintOptions {
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
 
+  /// If true, we print a protocol's primary associated types using the
+  /// primary associated type syntax: protocol Foo<Type1, ...>.
+  ///
+  /// If false, we print them as ordinary associated types.
+  bool PrintPrimaryAssociatedTypes = true;
+
   /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
@@ -539,6 +560,13 @@ struct PrintOptions {
     result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
+    return result;
+  }
+
+  /// The print options used for formatting diagnostic arguments.
+  static PrintOptions forDiagnosticArguments() {
+    PrintOptions result;
+    result.PrintExplicitAny = true;
     return result;
   }
 

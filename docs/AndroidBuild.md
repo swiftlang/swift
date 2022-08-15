@@ -34,7 +34,7 @@ git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
 git clone https://github.com/compnerd/swift-build swift-build
 ```
 
-## 1. Acquire the lastest toolchain and dependencies
+## 1. Acquire the latest toolchain and dependencies
 
 1. Download the toolchain, ICU, libxml2, and curl for android from
    [Azure](https://dev.azure.com/compnerd/swift-build) into `S:\b\a\Library`.

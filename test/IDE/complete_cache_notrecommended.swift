@@ -20,12 +20,8 @@ import MyModule
 
 func testSync() -> Int{
     #^GLOBAL_IN_SYNC^#
-// FIXME: 'globalAsyncFunc()' *should* be "NotRecommended" because  it's 'async'
-// The curently behavior is due to completion cache. We should remember
-// 'async'-ness in the cache. (rdar://78317170)
-
 // GLOBAL_IN_SYNC: Begin completions
-// GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]: globalAsyncFunc()[' async'][#Int#];
+// GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended/TypeRelation[Convertible]: globalAsyncFunc()[' async'][#Int#];
 // GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended: deprecatedFunc()[#Void#];
 // GLOBAL_IN_SYNC-DAG: Decl[Actor]/OtherModule[MyModule]:  MyActor[#MyActor#];
 // GLOBAL_IN_SYNC: End completions
@@ -33,7 +29,7 @@ func testSync() -> Int{
 func testAsync() async -> Int {
     #^GLOBAL_IN_ASYNC^#
 // GLOBAL_IN_ASYNC: Begin completions
-// GLOBAL_IN_ASYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]: globalAsyncFunc()[' async'][#Int#];
+// GLOBAL_IN_ASYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/TypeRelation[Convertible]: globalAsyncFunc()[' async'][#Int#];
 // GLOBAL_IN_ASYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended: deprecatedFunc()[#Void#];
 // GLOBAL_IN_ASYNC-DAG: Decl[Actor]/OtherModule[MyModule]:  MyActor[#MyActor#];
 // GLOBAL_IN_ASYNC: End completions
@@ -42,7 +38,7 @@ func testSyncMember(obj: MyActor) -> Int {
     obj.#^MEMBER_IN_SYNC^#
 // MEMBER_IN_SYNC: Begin completions, 4 items
 // MEMBER_IN_SYNC-DAG: Keyword[self]/CurrNominal:          self[#MyActor#];
-// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Identical]: actorMethod()[' async'][#Int#];
+// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Convertible]: actorMethod()[' async'][#Int#];
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecatedMethod()[' async'][#Void#];
 // MEMBER_IN_SYNC-DAG: Decl[InstanceVar]/CurrNominal:      unownedExecutor[#UnownedSerialExecutor#];
 // MEMBER_IN_SYNC: End completions
@@ -52,7 +48,7 @@ func testSyncMember(obj: MyActor) async -> Int {
     obj.#^MEMBER_IN_ASYNC^#
 // MEMBER_IN_ASYNC: Begin completions, 4 items
 // MEMBER_IN_ASYNC-DAG: Keyword[self]/CurrNominal:          self[#MyActor#];
-// MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: actorMethod()[' async'][#Int#];
+// MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: actorMethod()[' async'][#Int#];
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecatedMethod()[' async'][#Void#];
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceVar]/CurrNominal:      unownedExecutor[#UnownedSerialExecutor#];
 // MEMBER_IN_ASYNC: End completions

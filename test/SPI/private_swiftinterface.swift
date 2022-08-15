@@ -90,7 +90,7 @@ public func foo() {}
 }
 
 public extension SPIClassLocal {
-  internal func internalExtensionMethode1() {}
+  internal func internalExtensionMethod1() {}
   // CHECK-PRIVATE-NOT: internalExtensionMethod1
   // CHECK-PUBLIC-NOT: internalExtensionMethod1
 }

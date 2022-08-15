@@ -67,7 +67,7 @@ enum class ProtocolConformanceKind {
   /// Conformance of a generic class type projected through one of its
   /// superclass's conformances.
   Inherited,
-  /// Builtin conformances are special conformaces that the runtime handles
+  /// Builtin conformances are special conformances that the runtime handles
   /// and isn't implemented directly in Swift.
   Builtin
 };
@@ -601,6 +601,9 @@ public:
   /// Set the witness for the given requirement.
   void setWitness(ValueDecl *requirement, Witness witness) const;
 
+  /// Override the witness for a given requirement.
+  void overrideWitness(ValueDecl *requirement, Witness newWitness);
+
   /// Retrieve the protocol conformances that satisfy the requirements of the
   /// protocol, which line up with the conformance constraints in the
   /// protocol's requirement signature.
@@ -750,7 +753,7 @@ public:
 class SpecializedProtocolConformance : public ProtocolConformance,
                                        public llvm::FoldingSetNode {
   /// The generic conformance from which this conformance was derived.
-  ProtocolConformance *GenericConformance;
+  RootProtocolConformance *GenericConformance;
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
@@ -769,7 +772,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
   friend class ASTContext;
 
   SpecializedProtocolConformance(Type conformingType,
-                                 ProtocolConformance *genericConformance,
+                                 RootProtocolConformance *genericConformance,
                                  SubstitutionMap substitutions);
 
   void computeConditionalRequirements() const;
@@ -777,7 +780,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 public:
   /// Get the generic conformance from which this conformance was derived,
   /// if there is one.
-  ProtocolConformance *getGenericConformance() const {
+  RootProtocolConformance *getGenericConformance() const {
     return GenericConformance;
   }
 
@@ -863,7 +866,7 @@ public:
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
-                      ProtocolConformance *genericConformance,
+                      RootProtocolConformance *genericConformance,
                       SubstitutionMap subs) {
     ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);

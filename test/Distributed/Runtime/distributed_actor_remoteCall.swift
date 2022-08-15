@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeCodableForDistributedTests.swiftmodule -module-name FakeCodableForDistributedTests -disable-availability-checking %S/../Inputs/FakeCodableForDistributedTests.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeCodableForDistributedTests.swift -o %t/a.out
+// RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeCodableForDistributedTests.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
@@ -12,9 +13,9 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
-import _Distributed
+import Distributed
 
 final class Obj: @unchecked Sendable, Codable  {}
 
@@ -107,7 +108,6 @@ distributed actor Greeter {
   }
 }
 
-
 // ==== Fake Transport ---------------------------------------------------------
 struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
@@ -121,6 +121,7 @@ struct FakeActorSystem: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -183,8 +184,8 @@ struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
     substitutions.append(type)
   }
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
-    arguments.append(argument)
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {
+    arguments.append(argument.value)
   }
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
     self.errorType = type
@@ -246,7 +247,6 @@ class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
       throw ExecuteDistributedTargetError(message: "Failed to decode of Int??? (for a test)")
     }
 
-
     argumentIndex += 1
     return argument
   }
@@ -264,11 +264,11 @@ class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
 struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   typealias SerializationRequirement = Codable
 
-  func onReturn<Res>(value: Res) async throws {
+  func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print("RETURN: \(value)")
   }
   func onReturnVoid() async throws {
-    print("RETURN VOID:()")
+    print("RETURN VOID: ()")
   }
   func onThrow<Err: Error>(error: Err) async throws {
     print("ERROR: \(error)")
@@ -281,39 +281,39 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // actual mangled name:
-let emptyName = "$s4main7GreeterC5emptyyyFTE"
-let helloName = "$s4main7GreeterC5helloSSyFTE"
-let answerName = "$s4main7GreeterC6answerSiyFTE"
-let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
-let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
-let echoName = "$s4main7GreeterC4echo4name3ageS2S_SitFTE"
-let generic1Name = "$s4main7GreeterC8generic11ayx_tSeRzSERzlFTE"
-let generic2Name = "$s4main7GreeterC8generic21a1byx_q_tSeRzSERzSeR_SER_r0_lFTE"
-let generic3Name = "$s4main7GreeterC8generic31a1b1cyx_Sayq_Gq0_tSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
-let generic4Name = "$s4main7GreeterC8generic41a1b1cyx_AA1SVyq_GSayq0_GtSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
-let generic5Name = "$s4main7GreeterC8generic51a1b1c1dyx_AA1SVyq_Gq0_q1_tSeRzSERzSeR_SER_SeR0_SER0_SeR1_SER1_r2_lFTE"
-let genericOptionalName = "$s4main7GreeterC15genericOptional1tyxSg_tSeRzSERzlFTE"
-let expectsDecodeErrorName = "$s4main7GreeterC18expectsDecodeError1vySiSgSgSg_tFTE"
+let emptyName = "$s4main7GreeterC5emptyyyYaKFTE"
+let helloName = "$s4main7GreeterC5helloSSyYaKFTE"
+let answerName = "$s4main7GreeterC6answerSiyYaKFTE"
+let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyYaKFTE"
+let enumResultName = "$s4main7GreeterC10enumResultAA1EOyYaKFTE"
+let echoName = "$s4main7GreeterC4echo4name3ageS2S_SitYaKFTE"
+let generic1Name = "$s4main7GreeterC8generic11ayx_tYaKSeRzSERzlFTE"
+let generic2Name = "$s4main7GreeterC8generic21a1byx_q_tYaKSeRzSERzSeR_SER_r0_lFTE"
+let generic3Name = "$s4main7GreeterC8generic31a1b1cyx_Sayq_Gq0_tYaKSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
+let generic4Name = "$s4main7GreeterC8generic41a1b1cyx_AA1SVyq_GSayq0_GtYaKSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
+let generic5Name = "$s4main7GreeterC8generic51a1b1c1dyx_AA1SVyq_Gq0_q1_tYaKSeRzSERzSeR_SER_SeR0_SER0_SeR1_SER1_r2_lFTE"
+let genericOptionalName = "$s4main7GreeterC15genericOptional1tyxSg_tYaKSeRzSERzlFTE"
+let expectsDecodeErrorName = "$s4main7GreeterC18expectsDecodeError1vySiSgSgSg_tYaKFTE"
 
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = Greeter(system: system)
+  let local = Greeter(actorSystem: system)
 
   // act as if we decoded an Invocation:
   var emptyInvocation = FakeInvocationDecoder(args: [])
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: emptyName,
+      target: RemoteCallTarget(emptyName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
-  // CHECK: RETURN: ()
+  // CHECK: RETURN VOID: ()
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: helloName,
+      target: RemoteCallTarget(helloName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
@@ -321,7 +321,7 @@ func test() async throws {
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: answerName,
+      target: RemoteCallTarget(answerName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
@@ -329,7 +329,7 @@ func test() async throws {
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: largeResultName,
+      target: RemoteCallTarget(largeResultName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
@@ -337,21 +337,21 @@ func test() async throws {
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: enumResultName,
+      target: RemoteCallTarget(enumResultName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: bar
 
   var echoInvocation = system.makeInvocationEncoder()
-  try echoInvocation.recordArgument("Caplin")
-  try echoInvocation.recordArgument(42)
+  try echoInvocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: "Caplin"))
+  try echoInvocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
   try echoInvocation.doneRecording()
 
   var echoDecoder = echoInvocation.makeDecoder()
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: echoName,
+      target: RemoteCallTarget(echoName),
       invocationDecoder: &echoDecoder,
       handler: FakeResultHandler()
   )
@@ -360,81 +360,81 @@ func test() async throws {
   var generic1Invocation = system.makeInvocationEncoder()
 
   try generic1Invocation.recordGenericSubstitution(Int.self)
-  try generic1Invocation.recordArgument(42)
+  try generic1Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
   try generic1Invocation.doneRecording()
 
   var generic1Decoder = generic1Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic1Name,
+    target: RemoteCallTarget(generic1Name),
     invocationDecoder: &generic1Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var generic2Invocation = system.makeInvocationEncoder()
 
   try generic2Invocation.recordGenericSubstitution(Int.self)
   try generic2Invocation.recordGenericSubstitution(String.self)
-  try generic2Invocation.recordArgument(42)
-  try generic2Invocation.recordArgument("Ultimate Question!")
+  try generic2Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
+  try generic2Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: "Ultimate Question!"))
   try generic2Invocation.doneRecording()
 
   var generic2Decoder = generic2Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic2Name,
+    target: RemoteCallTarget(generic2Name),
     invocationDecoder: &generic2Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: ---> B = Ultimate Question!, type(of:) = String
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var generic3Invocation = system.makeInvocationEncoder()
 
   try generic3Invocation.recordGenericSubstitution(Int.self)
   try generic3Invocation.recordGenericSubstitution(String.self)
   try generic3Invocation.recordGenericSubstitution(S<Int>.self)
-  try generic3Invocation.recordArgument(42)
-  try generic3Invocation.recordArgument(["a", "b", "c"])
-  try generic3Invocation.recordArgument(S(data: 42))
+  try generic3Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
+  try generic3Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: ["a", "b", "c"]))
+  try generic3Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: S(data: 42)))
   try generic3Invocation.doneRecording()
 
   var generic3Decoder = generic3Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic3Name,
+    target: RemoteCallTarget(generic3Name),
     invocationDecoder: &generic3Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: ---> B = ["a", "b", "c"], type(of:) = Array<String>
   // CHECK-NEXT: ---> C = S<Int>(data: 42), type(of:) = S<Int>
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var generic4Invocation = system.makeInvocationEncoder()
 
   try generic4Invocation.recordGenericSubstitution(Int.self)
   try generic4Invocation.recordGenericSubstitution(Int.self)
   try generic4Invocation.recordGenericSubstitution(String.self)
-  try generic4Invocation.recordArgument(42)
-  try generic4Invocation.recordArgument(S(data: 42))
-  try generic4Invocation.recordArgument(["a", "b", "c"])
+  try generic4Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
+  try generic4Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: S(data: 42)))
+  try generic4Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: ["a", "b", "c"]))
   try generic4Invocation.doneRecording()
 
   var generic4Decoder = generic4Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic4Name,
+    target: RemoteCallTarget(generic4Name),
     invocationDecoder: &generic4Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: ---> B = S<Int>(data: 42), type(of:) = S<Int>
   // CHECK-NEXT: ---> C = ["a", "b", "c"], type(of:) = Array<String>
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var generic5Invocation = system.makeInvocationEncoder()
 
@@ -442,16 +442,16 @@ func test() async throws {
   try generic5Invocation.recordGenericSubstitution(Int.self)
   try generic5Invocation.recordGenericSubstitution(String.self)
   try generic5Invocation.recordGenericSubstitution([Int].self)
-  try generic5Invocation.recordArgument(42)
-  try generic5Invocation.recordArgument(S(data: 42))
-  try generic5Invocation.recordArgument("Hello, World!")
-  try generic5Invocation.recordArgument([0, 42])
+  try generic5Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
+  try generic5Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: S(data: 42)))
+  try generic5Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: "Hello, World!"))
+  try generic5Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: [0, 42]))
   try generic5Invocation.doneRecording()
 
   var generic5Decoder = generic5Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic5Name,
+    target: RemoteCallTarget(generic5Name),
     invocationDecoder: &generic5Decoder,
     handler: FakeResultHandler()
   )
@@ -463,37 +463,37 @@ func test() async throws {
   // CHECK-NEXT: ---> B(SER) = data: 42;
   // CHECK-NEXT: ---> C(SER) = Hello, World!;
   // CHECK-NEXT: ---> D(SER) = 0: 0; 1: 42;
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var genericOptInvocation = system.makeInvocationEncoder()
 
   try genericOptInvocation.recordGenericSubstitution([Int].self)
-  try genericOptInvocation.recordArgument([0, 42])
+  try genericOptInvocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: [0, 42]))
   try genericOptInvocation.doneRecording()
 
   var genericOptDecoder = genericOptInvocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: genericOptionalName,
+    target: RemoteCallTarget(genericOptionalName),
     invocationDecoder: &genericOptDecoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> T = [0, 42], type(of:) = Optional<Array<Int>>
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var decodeErrInvocation = system.makeInvocationEncoder()
 
-  try decodeErrInvocation.recordArgument(42)
+  try decodeErrInvocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
   try decodeErrInvocation.doneRecording()
 
   var decodeErrDecoder = decodeErrInvocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: expectsDecodeErrorName,
+    target: RemoteCallTarget(expectsDecodeErrorName),
     invocationDecoder: &decodeErrDecoder,
     handler: FakeResultHandler()
   )
-  // CHECK: ERROR: ExecuteDistributedTargetError(message: "Failed to decode of Int??? (for a test)")
+  // CHECK: ERROR: ExecuteDistributedTargetError(errorCode: Distributed.ExecuteDistributedTargetError.ErrorCode.other, message: "Failed to decode of Int??? (for a test)")
 
   print("done")
   // CHECK-NEXT: done

@@ -73,6 +73,12 @@ a_array_3?.forEach { $0.preen() }
 // CHECK-NEXT: A10
 // CHECK-NEXT: A20
 
+let a_array_4 = preening_array_1 as! [A]
+a_array_4.forEach { $0.preen() }
+// CHECK-NEXT: A5
+// CHECK-NEXT: A10
+// CHECK-NEXT: A20
+
 }
 
 do {

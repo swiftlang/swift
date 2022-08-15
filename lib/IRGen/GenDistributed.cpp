@@ -216,7 +216,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   // A generic parameter that represents instance of invocation decoder.
   auto *decoderType =
       GenericTypeParamType::get(/*isTypeSequence=*/false,
-                                /*depth=*/0, /*index=*/0, Context);
+                                /*depth=*/1, /*index=*/0, Context);
 
   // decoder
   parameters.push_back(GenericFunctionType::Param(
@@ -257,9 +257,27 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
           .getProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder)
           ->getDeclaredInterfaceType();
 
-  auto signature = GenericSignature::get(
-      {decoderType},
-      {{RequirementKind::Conformance, decoderType, decoderProtocolTy}});
+  // Build generic signature that includes all contextual generic parameters.
+  GenericSignature signature;
+  {
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    SmallVector<Requirement, 4> genericRequirements;
+
+    auto *actor = getDistributedActorOf(Target);
+    assert(actor);
+
+    for (auto *genericParam : actor->getInnermostGenericParamTypes())
+      genericParams.push_back(genericParam);
+
+    // Add a generic parameter `D` which stands for decoder type in the
+    // accessor signature - `inout D`.
+    genericParams.push_back(decoderType);
+    // Add a requirement that decoder conforms to the expected protocol.
+    genericRequirements.push_back(
+        {RequirementKind::Conformance, decoderType, decoderProtocolTy});
+
+    signature = GenericSignature::get(genericParams, genericRequirements);
+  }
 
   auto accessorTy = GenericFunctionType::get(
       signature, parameters, Context.TheEmptyTupleType,
@@ -572,6 +590,7 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
 }
 
 void DistributedAccessor::emit() {
+  auto *actor = getDistributedActorOf(Target);
   auto targetTy = Target->getLoweredFunctionType();
   SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
@@ -604,6 +623,13 @@ void DistributedAccessor::emit() {
   auto *actorSelf = params.claimNext();
   // Metadata that represents passed in the invocation decoder.
   auto *decoderType = params.claimNext();
+
+  // If the distributed thunk is declared in a protocol that conforms
+  // to `DistributedActor` protocol, there is an extract parameter that
+  // represents a type of protocol witness.
+  if (isa<ProtocolDecl>(actor))
+    (void)params.claimNext();
+
   // Witness table for decoder conformance to DistributedTargetInvocationDecoder
   auto *decoderProtocolWitness = params.claimNext();
 
@@ -657,11 +683,17 @@ void DistributedAccessor::emit() {
     llvm::SmallVector<llvm::Type *, 4> targetGenericArguments;
     expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
 
-    unsigned numGenericArgs = genericEnvironment->getGenericParams().size();
-    unsigned expectedWitnessTables =
-        targetGenericArguments.size() - numGenericArgs;
+    // Generic arguments associated with the distributed thunk directly
+    // e.g. `distributed func echo<T, U>(...)`
+    auto numDirectGenericArgs =
+        llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
+          return type == IGM.TypeMetadataPtrTy;
+        });
 
-    for (unsigned index = 0; index < numGenericArgs; ++index) {
+    auto expectedWitnessTables =
+        targetGenericArguments.size() - numDirectGenericArgs;
+
+    for (unsigned index = 0; index < numDirectGenericArgs; ++index) {
       auto offset =
           Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
       auto alignment =
@@ -781,21 +813,13 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     decoder = instance.claimNext();
   }
 
-  if (isa<StructDecl>(decoderDecl) || isa<EnumDecl>(decoderDecl) ||
-      decoderDecl->isFinal()) {
-    auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
-    auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
-                                           /*isDynamicallyReplacible=*/false);
+  auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+  auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
+                                         /*isDynamicallyReplaceable=*/false);
 
-    auto methodPtr = FunctionPointer::forDirect(
-        classifyFunctionPointerKind(decodeSIL), fnPtr,
-        /*secondaryValue=*/nullptr, signature);
-
-    return {decoder, decoderTy, witnessTable, methodPtr, methodTy};
-  }
-
-  auto methodPtr =
-      emitVirtualMethodValue(IGF, decoderTy, SILDeclRef(decodeFn), methodTy);
+  auto methodPtr = FunctionPointer::forDirect(
+    classifyFunctionPointerKind(decodeSIL), fnPtr,
+    /*secondaryValue=*/nullptr, signature);
 
   return {decoder, decoderTy, witnessTable, methodPtr, methodTy};
 }

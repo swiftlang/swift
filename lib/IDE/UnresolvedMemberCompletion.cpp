@@ -21,126 +21,42 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
-/// If the code completion variable occurs in a pattern matching position, we
-/// have an AST that looks like this.
-/// \code
-/// (binary_expr implicit type='$T3'
-///   (overloaded_decl_ref_expr function_ref=compound decls=[
-///     Swift.(file).~=,
-///     Swift.(file).Optional extension.~=])
-///   (argument_list implicit
-///     (argument
-///       (code_completion_expr implicit type='$T1'))
-///     (argument
-///       (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match))))
-/// \endcode
-/// If the code completion expression occurs in such an AST, return the
-/// declaration of the \c $match variable, otherwise return \c nullptr.
-static VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
-                                            ConstraintSystem &CS) {
-  auto &Context = CS.getASTContext();
-
-  auto *Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(CompletionExpr));
-  if (!Binary || !Binary->isImplicit() || Binary->getLHS() != CompletionExpr) {
-    return nullptr;
-  }
-
-  auto CalledOperator = Binary->getFn();
-  if (!CalledOperator || !CalledOperator->isImplicit()) {
-    return nullptr;
-  }
-  // The reference to the ~= operator might be an OverloadedDeclRefExpr or a
-  // DeclRefExpr, depending on how many ~= operators are viable.
-  if (auto Overloaded =
-          dyn_cast_or_null<OverloadedDeclRefExpr>(CalledOperator)) {
-    if (!llvm::all_of(Overloaded->getDecls(), [&Context](ValueDecl *D) {
-          return D->getBaseName() == Context.Id_MatchOperator;
-        })) {
-      return nullptr;
-    }
-  } else if (auto Ref = dyn_cast_or_null<DeclRefExpr>(CalledOperator)) {
-    if (Ref->getDecl()->getBaseName() != Context.Id_MatchOperator) {
-      return nullptr;
-    }
-  } else {
-    return nullptr;
-  }
-
-  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(Binary->getRHS());
-  if (!MatchArg || !MatchArg->isImplicit()) {
-    return nullptr;
-  }
-
-  auto MatchVar = MatchArg->getDecl();
-  if (MatchVar && MatchVar->isImplicit() &&
-      MatchVar->getBaseName() == Context.Id_PatternMatchVar) {
-    return dyn_cast<VarDecl>(MatchVar);
-  } else {
-    return nullptr;
-  }
-}
-
-void UnresolvedMemberTypeCheckCompletionCallback::sawSolution(
+void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  GotCallback = true;
-
   auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
+
+  bool IsAsync = isContextAsync(S, DC);
+
   // If the type couldn't be determined (e.g. because there isn't any context
   // to derive it from), let's not attempt to do a lookup since it wouldn't
   // produce any useful results anyway.
-  if (ExpectedTy && !ExpectedTy->is<UnresolvedType>()) {
+  if (ExpectedTy) {
     // If ExpectedTy is a duplicate of any other result, ignore this solution.
-    if (!llvm::any_of(ExprResults, [&](const ExprResult &R) {
-          return R.ExpectedTy->isEqual(ExpectedTy);
-        })) {
+    auto IsEqual = [&](const Result &R) {
+      return R.ExpectedTy->isEqual(ExpectedTy);
+    };
+    if (!llvm::any_of(ExprResults, IsEqual)) {
       bool SingleExprBody =
           isImplicitSingleExpressionReturn(CS, CompletionExpr);
-      ExprResults.push_back({ExpectedTy, SingleExprBody});
+      ExprResults.push_back({ExpectedTy, SingleExprBody, IsAsync});
     }
   }
 
-  if (auto MatchVar = getMatchVarIfInPatternMatch(CompletionExpr, CS)) {
-    Type MatchVarType;
-    // If the MatchVar has an explicit type, it's not part of the solution. But
-    // we can look it up in the constraint system directly.
-    if (auto T = S.getConstraintSystem().getVarType(MatchVar)) {
-      MatchVarType = T;
-    } else {
-      MatchVarType = S.getResolvedType(MatchVar);
-    }
-    if (MatchVarType && !MatchVarType->is<UnresolvedType>()) {
-      if (!llvm::any_of(EnumPatternTypes, [&](const Type &R) {
-            return R->isEqual(MatchVarType);
-          })) {
-        EnumPatternTypes.push_back(MatchVarType);
-      }
+  if (auto PatternType = getPatternMatchType(S, CompletionExpr)) {
+    auto IsEqual = [&](const Result &R) {
+      return R.ExpectedTy->isEqual(PatternType);
+    };
+    if (!llvm::any_of(EnumPatternTypes, IsEqual)) {
+      EnumPatternTypes.push_back({PatternType,
+                                  /*IsImplicitSingleExpressionReturn=*/false,
+                                  IsAsync});
     }
   }
 }
 
-void UnresolvedMemberTypeCheckCompletionCallback::fallbackTypeCheck(
-    DeclContext *DC) {
-  assert(!gotCallback());
-
-  CompletionContextFinder finder(DC);
-  if (!finder.hasCompletionExpr())
-    return;
-
-  auto fallback = finder.getFallbackCompletionExpr();
-  if (!fallback)
-    return;
-
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
-  typeCheckForCodeCompletion(completionTarget, /*needsPrecheck*/ true,
-                             [&](const Solution &S) { sawSolution(S); });
-}
-
-void swift::ide::deliverUnresolvedMemberResults(
-    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::ExprResult> Results,
-    ArrayRef<Type> EnumPatternTypes, DeclContext *DC, SourceLoc DotLoc,
+void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
+    DeclContext *DC, SourceLoc DotLoc,
     ide::CodeCompletionContext &CompletionCtx,
     CodeCompletionConsumer &Consumer) {
   ASTContext &Ctx = DC->getASTContext();
@@ -149,18 +65,20 @@ void swift::ide::deliverUnresolvedMemberResults(
 
   assert(DotLoc.isValid());
   Lookup.setHaveDot(DotLoc);
-  Lookup.shouldCheckForDuplicates(Results.size() + EnumPatternTypes.size() > 1);
+  Lookup.shouldCheckForDuplicates(ExprResults.size() + EnumPatternTypes.size() >
+                                  1);
 
   // Get the canonical versions of the top-level types
   SmallPtrSet<CanType, 4> originalTypes;
-  for (auto &Result : Results)
+  for (auto &Result : ExprResults)
     originalTypes.insert(Result.ExpectedTy->getCanonicalType());
 
-  for (auto &Result : Results) {
+  for (auto &Result : ExprResults) {
     Lookup.setExpectedTypes({Result.ExpectedTy},
                             Result.IsImplicitSingleExpressionReturn,
                             /*expectsNonVoid*/ true);
     Lookup.setIdealExpectedType(Result.ExpectedTy);
+    Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
 
     // For optional types, also get members of the unwrapped type if it's not
     // already equivalent to one of the top-level types. Handling it via the top
@@ -176,10 +94,12 @@ void swift::ide::deliverUnresolvedMemberResults(
 
   // Offer completions when interpreting the pattern match as an
   // EnumElementPattern.
-  for (auto &Ty : EnumPatternTypes) {
+  for (auto &Result : EnumPatternTypes) {
+    Type Ty = Result.ExpectedTy;
     Lookup.setExpectedTypes({Ty}, /*IsImplicitSingleExpressionReturn=*/false,
                             /*expectsNonVoid=*/true);
     Lookup.setIdealExpectedType(Ty);
+    Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
 
     // We can pattern match MyEnum against Optional<MyEnum>
     if (Ty->getOptionalObjectType()) {

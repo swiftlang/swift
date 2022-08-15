@@ -1526,7 +1526,7 @@ const LoadableTypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
     getSpareBitsForAlignedPointer(IGM, IGM.getWitnessTableAlignment());
 
   // This is sub-optimal because it doesn't consider that there are
-  // also potential extra inhabitants in witnesss table pointers, but
+  // also potential extra inhabitants in witness table pointers, but
   // it's what we're currently doing, so we might be stuck.
   // TODO: it's likely that this never matters in the current ABI,
   // so we can just switch to using AlignedRawPointerTypeInfo; but
@@ -1600,6 +1600,7 @@ IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   case ReferenceCounting::Block:
   case ReferenceCounting::Error:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::Custom:
   case ReferenceCounting::None:
     llvm_unreachable("not implemented");
   }
@@ -1985,7 +1986,7 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   // scalar.
   auto storageType = llvm::ArrayType::get(IGM.Int8Ty, size.getValue());
 
-  // Create chunks of MAX_INT_BITS integer scalar types if neccessary.
+  // Create chunks of MAX_INT_BITS integer scalar types if necessary.
   std::vector<llvm::IntegerType*> scalarTypes;
   Size chunkSize = size;
   auto maxChunkSize = Size(llvm::IntegerType::MAX_INT_BITS/8);
@@ -2169,6 +2170,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
     return convertAnyNominalType(ty, cast<BoundGenericType>(ty)->getDecl());
+  case TypeKind::SILMoveOnlyWrapped:
+    llvm_unreachable("implement this");
   case TypeKind::InOut:
     return convertInOutType(cast<InOutType>(ty));
   case TypeKind::Tuple:

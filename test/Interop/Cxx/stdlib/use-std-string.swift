@@ -1,13 +1,18 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
 //
-// Enable this everywhere once we have a solution for modularizing libstdc++: rdar://87654514
-// REQUIRES: OS=macosx
+// Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 import StdlibUnittest
 import StdString
+#if os(Linux)
+import std
+// FIXME: import std.string once libstdc++ is split into submodules.
+#else
 import std.string
+#endif
 
 var StdStringTestSuite = TestSuite("StdString")
 
@@ -17,13 +22,12 @@ StdStringTestSuite.test("init") {
     expectTrue(s.empty())
 }
 
-// LLVM module verification fails for calls to std::string::push_back: rdar://88343327
-// StdStringTestSuite.test("push back") {
-//     var s = CxxString()
-//     s.push_back(42)
-//     expectEqual(s.size(), 1)
-//     expectFalse(s.empty())
-//     expectEqual(s[0], 42)
-// }
+StdStringTestSuite.test("push back") {
+    var s = CxxString()
+    s.push_back(42)
+    expectEqual(s.size(), 1)
+    expectFalse(s.empty())
+    expectEqual(s[0], 42)
+}
 
 runAllTests()

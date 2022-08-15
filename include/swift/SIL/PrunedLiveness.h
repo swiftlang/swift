@@ -26,7 +26,7 @@
 /// Dead, LiveWithin, LiveOut.
 ///
 /// A LiveWithin block has a liveness boundary within the block. The client can
-/// determine the boundary's intruction position by searching for the last use.
+/// determine the boundary's instruction position by searching for the last use.
 ///
 /// LiveOut indicates that liveness extends into a successor edges, therefore,
 /// no uses within that block can be on the liveness boundary, unless that use
@@ -164,7 +164,6 @@ public:
   }
 
   void initializeDefBlock(SILBasicBlock *defBB) {
-    assert(!seenUse && "cannot initialize more defs with partial liveness");
     markBlockLive(defBB, LiveWithin);
   }
 
@@ -181,9 +180,16 @@ public:
 protected:
   void markBlockLive(SILBasicBlock *bb, IsLive isLive) {
     assert(isLive != Dead && "erasing live blocks isn't implemented.");
-    liveBlocks[bb] = (isLive == LiveOut);
-    if (discoveredBlocks)
-      discoveredBlocks->push_back(bb);
+    bool isLiveOut = (isLive == LiveOut);
+    auto iterAndInserted =
+      liveBlocks.insert(std::make_pair(bb, isLiveOut));
+    if (iterAndInserted.second) {
+      if (discoveredBlocks)
+        discoveredBlocks->push_back(bb);
+    } else if (isLiveOut) {
+      // Update the existing entry to be live-out.
+      iterAndInserted.first->getSecond() = true;
+    }
   }
 
   void computeUseBlockLiveness(SILBasicBlock *userBB);
@@ -199,7 +205,7 @@ protected:
 /// if they don't occur on the liveness boundary. Lifetime-ending uses that end
 /// up on the final liveness boundary may be used to end the lifetime. It is up
 /// to the client to determine which uses are potentially lifetime-ending. In
-/// OSSA, the lifetime-ending property might be detemined by
+/// OSSA, the lifetime-ending property might be determined by
 /// OwnershipConstraint::isLifetimeEnding(). In non-OSSA, it might be determined
 /// by deallocation. If a lifetime-ending use ends up within the liveness
 /// boundary, then it is up to the client to figure out how to "extend" the
@@ -228,6 +234,15 @@ class PrunedLiveness {
   /// blocks. This is used to enable our callers to emit errors on non-lifetime
   /// ending uses that extend liveness into a loop body.
   SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut;
+
+private:
+  bool isWithinBoundaryHelper(SILInstruction *inst, SILValue def) const;
+
+  bool areUsesWithinBoundaryHelper(ArrayRef<Operand *> uses, SILValue def,
+                                   DeadEndBlocks *deadEndBlocks) const;
+
+  bool areUsesOutsideBoundaryHelper(ArrayRef<Operand *> uses, SILValue def,
+                                    DeadEndBlocks *deadEndBlocks) const;
 
 public:
   PrunedLiveness(SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr,
@@ -342,6 +357,25 @@ public:
   bool areUsesOutsideBoundary(ArrayRef<Operand *> uses,
                               DeadEndBlocks *deadEndBlocks) const;
 
+  /// PrunedLiveness utilities can be used with multiple defs. This api can be
+  /// used to check if \p inst occurs in between the definition \p def and the
+  /// liveness boundary.
+  // This api varies from isWithinBoundary(SILInstruction *inst) which cannot
+  // distinguish when \p inst is a use before definition in the same block as
+  // the definition.
+  bool isWithinBoundaryOfDef(SILInstruction *inst, SILValue def) const;
+
+  /// Returns true when all \p uses are between \p def and the liveness boundary
+  /// \p deadEndBlocks is optional.
+  bool areUsesWithinBoundaryOfDef(ArrayRef<Operand *> uses, SILValue def,
+                                  DeadEndBlocks *deadEndBlocks) const;
+
+  /// Returns true if any of the \p uses are before the \p def or after the
+  /// liveness boundary
+  /// \p deadEndBlocks is optional.
+  bool areUsesOutsideBoundaryOfDef(ArrayRef<Operand *> uses, SILValue def,
+                                   DeadEndBlocks *deadEndBlocks) const;
+
   /// Compute liveness for a single SSA definition.
   void computeSSALiveness(SILValue def);
 };
@@ -384,7 +418,7 @@ struct PrunedLivenessBoundary {
   /// If the jointly post-dominating destroys do not include dead end paths,
   /// then any uses on those paths will not be included in the boundary. The
   /// resulting partial boundary will have holes along those paths. The dead end
-  /// successors of blocks in this live set on are not necessarilly identified
+  /// successors of blocks in this live set on are not necessarily identified
   /// by DeadEndBlocks.
   void compute(const PrunedLiveness &liveness,
                ArrayRef<SILBasicBlock *> postDomBlocks);

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // This file defines extensions for interpolating integer expressions into an
-// OSLogMesage. It defines `appendInterpolation` functions for standard integer
+// OSLogMessage. It defines `appendInterpolation` functions for standard integer
 // types. It also defines extensions for serializing integer types into the
 // argument buffer passed to os_log ABIs.
 //
@@ -21,6 +21,8 @@
 //
 //  1.  "\(x, format: .hex, privacy: .private, align: .right\)"
 //  2.  "\(x, format: .hex(minDigits: 10), align: .right(columns: 10)\)"
+
+import ObjectiveC
 
 extension OSLogInterpolation {
 

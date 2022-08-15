@@ -33,7 +33,7 @@ typealias A1 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'P1
 
 // BEGIN swift4.swift
 
-func foo(x: P1 & Any & P2.Type?) { // expected-error {{non-protocol, non-class type 'P2.Type?' cannot be used within a protocol-constrained type}}
+func foo(x: P1 & Any & P2.Type?) { // expected-error {{non-protocol, non-class type '(any P2.Type)?' cannot be used within a protocol-constrained type}}
   let _: (P1 & P2).Type? = x
   let _: (P1 & P2).Type = x!
 
@@ -42,8 +42,8 @@ func foo(x: P1 & Any & P2.Type?) { // expected-error {{non-protocol, non-class t
 }
 
 func bar() -> ((P1 & P2)?).Type {
-  let x = (P1 & P2?).self // expected-error {{non-protocol, non-class type 'P2?' cannot be used within a protocol-constrained type}}
+  let x = (P1 & P2?).self // expected-error {{non-protocol, non-class type '(any P2)?' cannot be used within a protocol-constrained type}}
   return x
 }
 
-typealias A1 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'P1.Type' cannot be used within a protocol-constrained type}}
+typealias A1 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'any P1.Type' cannot be used within a protocol-constrained type}}

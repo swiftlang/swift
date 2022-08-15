@@ -215,26 +215,30 @@ class HasIVarCaptures {
   }
 }
 
-// https://bugs.swift.org/browse/SR-9760
-protocol SR_9760 {
+// https://github.com/apple/swift/issues/52188
+
+protocol P_52188 {
   typealias F = () -> Void
   typealias G<T> = (T) -> Void
   func foo<T>(_: T, _: @escaping F) // Ok
   func bar<T>(_: @escaping G<T>) // Ok
 }
 
-extension SR_9760 {
+extension P_52188 {
   func fiz<T>(_: T, _: @escaping F) {} // Ok
   func baz<T>(_: @escaping G<T>) {} // Ok
 }
 
-// SR-9178
-func foo<T>(_ x: @escaping T) {} // expected-error 1{{@escaping attribute only applies to function types}}
+// https://github.com/apple/swift/issues/51669
 
-// SR-14720
-var global: ((() -> Void) -> Void)? = nil // expected-note {{add explicit @escaping to function parameter #0}} {{15-15=@escaping }}
+func f_51669<T>(_ x: @escaping T) {} // expected-error 1{{@escaping attribute only applies to function types}}
 
-class SR14720 {
+// https://github.com/apple/swift/issues/57070
+
+var global: ((() -> Void) -> Void)? = nil
+// expected-note@-1 {{add explicit @escaping to function parameter #0}} {{15-15=@escaping }}
+
+class C_57070 {
   let ok: (@escaping () -> Void) -> Void // OK
   let callback: (() -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #0}} {{18-18=@escaping }}
   let callback1: (() -> Void, () -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #1}} {{31-31=@escaping }} 

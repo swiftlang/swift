@@ -23,7 +23,7 @@ using namespace swift;
 
 llvm::cl::opt<bool> DontAbortOnMemoryLifetimeErrors(
     "dont-abort-on-memory-lifetime-errors",
-    llvm::cl::desc("Don't abort compliation if the memory lifetime checker "
+    llvm::cl::desc("Don't abort compilation if the memory lifetime checker "
                    "detects an error."));
 
 namespace {
@@ -88,6 +88,9 @@ class MemoryLifetimeVerifier {
 
   /// Register the destination address of a store_borrow as borrowed location.
   void registerStoreBorrowLocation(SILValue addr);
+
+  /// Registers all store_borrow instructions in a block.
+  void registerStoreBorrowsInBlock(SILBasicBlock *block);
 
   /// Handles locations of the predecessor's terminator, which are only valid
   /// in \p block.
@@ -185,12 +188,6 @@ static bool injectsNoPayloadCase(InjectEnumAddrInst *IEAI) {
   return elemType.isEmpty(*function);
 }
 
-static bool isOrHasEnum(SILType type) {
-  return type.getASTType().findIf([](Type ty) {
-    return ty->getEnumOrBoundGenericEnum() != nullptr;
-  });
-}
-
 bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
                         SILBasicBlock::reverse_iterator start,
                         SILBasicBlock::reverse_iterator end) {
@@ -204,7 +201,7 @@ bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
     if (auto *SI = dyn_cast<StoreInst>(&inst)) {
       const Location *loc = locations.getLocation(SI->getDest());
       if (loc && loc->isSubLocation(locIdx) &&
-          isOrHasEnum(SI->getSrc()->getType())) {
+          SI->getSrc()->getType().isOrHasEnum()) {
         return SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
       }
     }
@@ -292,6 +289,13 @@ void MemoryLifetimeVerifier::registerStoreBorrowLocation(SILValue addr) {
   }
 }
 
+void MemoryLifetimeVerifier::registerStoreBorrowsInBlock(SILBasicBlock *block) {
+  for (SILInstruction &inst : *block) {
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst))
+      registerStoreBorrowLocation(sbi->getDest());
+  }
+}
+
 void MemoryLifetimeVerifier::initDataflow(BitDataflow &dataFlow) {
   // Initialize the entry and exit sets to all-bits-set. Except for the function
   // entry.
@@ -310,7 +314,7 @@ void MemoryLifetimeVerifier::initDataflow(BitDataflow &dataFlow) {
     }
     bs.data.exitSet.set();
 
-    // Anything weired can happen in unreachable blocks. So just ignore them.
+    // Anything weird can happen in unreachable blocks. So just ignore them.
     // Note: while solving the dataflow, unreachable blocks are implicitly
     // ignored, because their entry/exit sets are all-ones and their gen/kill
     // sets are all-zeroes.
@@ -585,7 +589,6 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::StoreBorrowInst: {
         SILValue destAddr = cast<StoreBorrowInst>(&I)->getDest();
         locations.setBits(bits, destAddr);
-        registerStoreBorrowLocation(destAddr);
         break;
       }
       case SILInstructionKind::CopyAddrInst: {
@@ -635,7 +638,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         // We don't want to check `debug_value` instructions that
         // are used to mark variable declarations (e.g. its SSA value is
         // an alloc_stack), which don't have any `op_deref` in its
-        // di-expression, because that memory does't need to be initialized
+        // di-expression, because that memory doesn't need to be initialized
         // when `debug_value` is referencing it.
         if (cast<DebugValueInst>(&I)->hasAddrVal() &&
             cast<DebugValueInst>(&I)->exprStartsWithDeref())
@@ -770,6 +773,7 @@ void MemoryLifetimeVerifier::verify() {
   locations.handleSingleBlockLocations([this](SILBasicBlock *block) {
     storeBorrowLocations.clear();
     Bits bits(locations.getNumLocations());
+    registerStoreBorrowsInBlock(block);
     checkBlock(block, bits);
   });
 }

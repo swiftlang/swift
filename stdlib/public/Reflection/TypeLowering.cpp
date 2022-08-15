@@ -20,6 +20,7 @@
 
 #if SWIFT_ENABLE_REFLECTION
 
+#include "llvm/Support/MathExtras.h"
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Reflection/TypeLowering.h"
@@ -645,6 +646,8 @@ public:
 // A variable-length bitmap used to track "spare bits" for general multi-payload
 // enums.
 class BitMask {
+  static constexpr unsigned maxSize = 128 * 1024 * 1024; // 128MB
+
   unsigned size; // Size of mask in bytes
   uint8_t *mask;
 public:
@@ -654,18 +657,72 @@ public:
   // Construct a bitmask of the appropriate number of bytes
   // initialized to all bits set
   BitMask(unsigned sizeInBytes): size(sizeInBytes) {
-    assert(sizeInBytes < std::numeric_limits<uint32_t>::max());
+    // Gracefully fail by constructing an empty mask if we exceed the size
+    // limit.
+    if (size > maxSize) {
+      size = 0;
+      mask = nullptr;
+      return;
+    }
+
     mask = (uint8_t *)malloc(size);
+
+    if (!mask) {
+      // Malloc might fail if size is large due to some bad data. Assert in
+      // asserts builds, and fail gracefully in non-asserts builds by
+      // constructing an empty BitMask.
+      assert(false && "Failed to allocate BitMask");
+      size = 0;
+      return;
+    }
+
     memset(mask, 0xff, size);
   }
   // Construct a bitmask of the appropriate number of bytes
   // initialized with bits from the specified buffer
-  BitMask(unsigned sizeInBytes, const uint8_t *initialValue, unsigned initialValueBytes, unsigned offset)
-    : size(sizeInBytes)
-  {
-    assert(sizeInBytes < std::numeric_limits<uint32_t>::max());
-    assert(initialValueBytes + offset <= sizeInBytes);
+  BitMask(unsigned sizeInBytes, const uint8_t *initialValue,
+          unsigned initialValueBytes, unsigned offset)
+      : size(sizeInBytes) {
+    // Gracefully fail by constructing an empty mask if we exceed the size
+    // limit.
+    if (size > maxSize) {
+      size = 0;
+      mask = nullptr;
+      return;
+    }
+
+    // Bad data could cause the initial value location to be off the end of our
+    // size. If initialValueBytes + offset is beyond sizeInBytes (or overflows),
+    // assert in asserts builds, and fail gracefully in non-asserts builds by
+    // constructing an empty BitMask.
+    bool overflowed = false;
+    unsigned initialValueEnd =
+        llvm::SaturatingAdd(initialValueBytes, offset, &overflowed);
+    if (overflowed) {
+      assert(false && "initialValueBytes + offset overflowed");
+      size = 0;
+      mask = nullptr;
+      return;
+    }
+    assert(initialValueEnd <= sizeInBytes);
+    if (initialValueEnd > size) {
+      assert(false && "initialValueBytes + offset is greater than size");
+      size = 0;
+      mask = nullptr;
+      return;
+    }
+
     mask = (uint8_t *)calloc(1, size);
+
+    if (!mask) {
+      // Malloc might fail if size is large due to some bad data. Assert in
+      // asserts builds, and fail gracefully in non-asserts builds by
+      // constructing an empty BitMask.
+      assert(false && "Failed to allocate BitMask");
+      size = 0;
+      return;
+    }
+
     memcpy(mask + offset, initialValue, initialValueBytes);
   }
   // Move constructor moves ownership and zeros the src
@@ -864,10 +921,12 @@ private:
 
   void andNotMask(void *maskData, unsigned len, unsigned offset) {
     assert(offset < size);
-    unsigned common = std::min(len, size - offset);
-    uint8_t *maskBytes = (uint8_t *)maskData;
-    for (unsigned i = 0; i < common; ++i) {
-      mask[i + offset] &= ~maskBytes[i];
+    if (offset < size) {
+      unsigned common = std::min(len, size - offset);
+      uint8_t *maskBytes = (uint8_t *)maskData;
+      for (unsigned i = 0; i < common; ++i) {
+        mask[i + offset] &= ~maskBytes[i];
+      }
     }
   }
 };
@@ -1699,6 +1758,11 @@ public:
   }
 
   bool
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return true;
+  }
+
+  bool
   visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return true;
   }
@@ -1811,6 +1875,11 @@ public:
 
   MetatypeRepresentation
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -2260,6 +2329,11 @@ public:
     return builder.build(ExternalTypeInfo);
   }
 
+  const TypeInfo *
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return visitProtocolCompositionTypeRef(CET->getBase());
+  }
+
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
@@ -2412,6 +2486,11 @@ public:
 const TypeInfo *
 TypeConverter::getTypeInfo(const TypeRef *TR,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
+  if (!TR) {
+    DEBUG_LOG(fprintf(stderr, "null TypeRef"));
+    return nullptr;
+  }
+
   // See if we already computed the result
   auto found = Cache.find({TR, ExternalTypeInfo});
   if (found != Cache.end())

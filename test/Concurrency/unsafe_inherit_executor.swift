@@ -31,7 +31,6 @@ func useNonSendable(object: NonSendableObject) async {}
 actor MyActor {
   var object = NonSendableObject()
   func foo() async {
-    // This should not be diagnosed when we implement SE-0338 checking.
     await useNonSendable(object: self.object)
   }
 }

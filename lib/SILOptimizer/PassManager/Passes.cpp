@@ -213,7 +213,7 @@ void swift::runSILLoweringPasses(SILModule &Module) {
                           SILPassPipelinePlan::getLoweringPassPipeline(opts),
                           /*isMandatory*/ true);
 
-  assert(Module.getStage() == SILStage::Lowered);
+  Module.setStage(SILStage::Lowered);
 }
 
 /// Registered briged pass run functions.
@@ -245,9 +245,9 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
 }
 
 // Called from initializeSwiftModules().
-void SILPassManager_registerFunctionPass(BridgedStringRef name,
+void SILPassManager_registerFunctionPass(llvm::StringRef name,
                                          BridgedFunctionPassRunFn runFn) {
-  bridgedPassRunFunctions[getStringRef(name)] = runFn;
+  bridgedPassRunFunctions[name] = runFn;
   passesRegistered = true;
 }
 

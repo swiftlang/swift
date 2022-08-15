@@ -45,6 +45,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -71,6 +72,13 @@ static bool isRecursiveCall(FullApplySite applySite) {
 
   if (auto *CMI = dyn_cast<ClassMethodInst>(callee)) {
 
+    SILModule &module = parentFunc->getModule();
+    CanType classType = CMI->getOperand()->getType().getASTType();
+    if (auto mt = dyn_cast<MetatypeType>(classType)) {
+      classType = mt.getInstanceType();
+    }
+    ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+
     // FIXME: If we're not inside the module context of the method,
     // we may have to deserialize vtables.  If the serialized tables
     // are damaged, the pass will crash.
@@ -78,29 +86,41 @@ static bool isRecursiveCall(FullApplySite applySite) {
     // Though, this has the added bonus of not looking into vtables
     // outside the current module.  Because we're not doing IPA, let
     // alone cross-module IPA, this is all well and good.
-    SILModule &module = parentFunc->getModule();
-    CanType classType = CMI->getOperand()->getType().getASTType();
-    ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
     if (classDecl && classDecl->getModuleContext() != module.getSwiftModule())
       return false;
 
-    if (!calleesAreStaticallyKnowable(module, CMI->getMember()))
-      return false;
-
-    // The "statically knowable" check just means that we have all the
-    // callee candidates available for analysis. We still need to check
-    // if the current function has a known override point.
-    auto *methodDecl = CMI->getMember().getAbstractFunctionDecl();
-    if (methodDecl->isOverridden())
-      return false;
-
     SILFunction *method = getTargetClassMethod(module, classDecl, CMI);
-    return method == parentFunc;
+    if (method != parentFunc)
+      return false;
+
+    SILDeclRef member = CMI->getMember();
+    if (calleesAreStaticallyKnowable(module, member) &&
+        // The "statically knowable" check just means that we have all the
+        // callee candidates available for analysis. We still need to check
+        // if the current function has a known override point.
+        !member.getAbstractFunctionDecl()->isOverridden()) {
+      return true;
+    }
+
+    // Even if the method is (or could be) overridden, it's a recursive call if
+    // it's called on the self argument:
+    // ```
+    // class X {
+    //   // Even if foo() is overridden in a derived class, it'll end up in an
+    //   // infinite recursion if initially called on an instance of `X`.
+    //   func foo() { foo() }
+    // }
+    // ```
+    if (parentFunc->hasSelfParam() &&
+        CMI->getOperand() == SILValue(parentFunc->getSelfArgument())) {
+      return true;
+    }
+    return false;
   }
 
   if (auto *WMI = dyn_cast<WitnessMethodInst>(callee)) {
     auto funcAndTable = parentFunc->getModule().lookUpFunctionInWitnessTable(
-        WMI->getConformance(), WMI->getMember());
+        WMI->getConformance(), WMI->getMember(), SILModule::LinkingMode::LinkNormal);
     return funcAndTable.first == parentFunc;
   }
   return false;
@@ -159,11 +179,11 @@ class Invariants {
   /// Recursively walks the use-def chain starting at \p value and returns
   /// true if all visited values are invariant.
   bool isInvariantValue(SILValue value,
-                        SmallPtrSetImpl<SILInstruction *> &visited) const {
+                        InstructionSet &visited) const {
     if (SILInstruction *inst = value->getDefiningInstruction()) {
       // Avoid exponential complexity in case a value is used by multiple
       // operands.
-      if (!visited.insert(inst).second)
+      if (!visited.insert(inst))
         return true;
 
       if (!isMemoryInvariant() && inst->mayReadFromMemory())
@@ -225,9 +245,8 @@ public:
     case TermKind::CondBranchInst:
     case TermKind::SwitchValueInst:
     case TermKind::SwitchEnumInst:
-    case TermKind::CheckedCastBranchInst:
-    case TermKind::CheckedCastValueBranchInst: {
-      SmallPtrSet<SILInstruction *, 16> visited;
+    case TermKind::CheckedCastBranchInst: {
+      InstructionSet visited(term->getFunction());
       return isInvariantValue(term->getOperand(0), visited);
     }
     default:

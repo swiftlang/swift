@@ -107,7 +107,7 @@ public class RemoveSetters {
   }
 }
 
-public protocol RequiementChanges {
+public protocol RequirementChanges {
   associatedtype addedTypeWithDefault = Int
   associatedtype addedTypeWithoutDefault
   func addedFunc()
@@ -115,7 +115,7 @@ public protocol RequiementChanges {
 }
 
 /// This protocol shouldn't be complained because its requirements are all derived.
-public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
+public protocol DerivedProtocolRequirementChanges: RequirementChanges {}
 
 public class SuperClassRemoval {}
 

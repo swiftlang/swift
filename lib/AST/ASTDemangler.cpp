@@ -595,6 +595,10 @@ Type ASTBuilder::createProtocolCompositionType(
   return ExistentialType::get(composition);
 }
 
+Type ASTBuilder::createProtocolTypeFromDecl(ProtocolDecl *protocol) {
+  return protocol->getDeclaredInterfaceType();
+}
+
 static MetatypeRepresentation
 getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
   switch (repr) {
@@ -619,6 +623,45 @@ Type ASTBuilder::createExistentialMetatypeType(Type instance,
 
   return ExistentialMetatypeType::get(instance,
                                       getMetatypeRepresentation(*repr));
+}
+
+Type ASTBuilder::createConstrainedExistentialType(
+    Type base, ArrayRef<BuiltRequirement> constraints) {
+  // FIXME: Generalize to other kinds of bases.
+  if (!base->getAs<ProtocolType>())
+    return Type();
+  auto baseTy = base->castTo<ProtocolType>();
+  auto baseDecl = baseTy->getDecl();
+  llvm::SmallDenseMap<Identifier, Type> cmap;
+  for (const auto &req : constraints) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+      continue;
+
+    case RequirementKind::SameType:
+      if (auto *DMT = req.getFirstType()->getAs<DependentMemberType>())
+        if (baseDecl->getAssociatedType(DMT->getName()))
+          cmap[DMT->getName()] = req.getSecondType();
+    }
+  }
+  llvm::SmallVector<Type, 4> args;
+  for (auto *assocTy : baseDecl->getPrimaryAssociatedTypes()) {
+    auto argTy = cmap.find(assocTy->getName());
+    if (argTy == cmap.end()) {
+      return Type();
+    }
+    args.push_back(argTy->getSecond());
+  }
+  auto constrainedBase =
+      ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
+  return ExistentialType::get(constrainedBase);
+}
+
+Type ASTBuilder::createSymbolicExtendedExistentialType(NodePointer shapeNode,
+                                                       ArrayRef<Type> genArgs) {
+  return Type();
 }
 
 Type ASTBuilder::createMetatypeType(Type instance,
@@ -698,7 +741,8 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
     silFields.emplace_back(field.getPointer()->getCanonicalType(),
                            field.getInt());
   SILLayout *layout =
-      SILLayout::get(Ctx, signature.getCanonicalSignature(), silFields);
+      SILLayout::get(Ctx, signature.getCanonicalSignature(), silFields,
+                     /*captures generics*/ false);
 
   SubstitutionMap substs;
   if (signature)
@@ -784,6 +828,29 @@ Type ASTBuilder::createDictionaryType(Type key, Type value) {
 
 Type ASTBuilder::createParenType(Type base) {
   return ParenType::get(Ctx, base);
+}
+
+GenericSignature
+ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
+                                   ArrayRef<BuiltRequirement> requirements) {
+  std::vector<BuiltGenericTypeParam> params;
+  for (auto &param : builtParams) {
+    auto paramTy = param->getAs<GenericTypeParamType>();
+    if (!paramTy)
+      return GenericSignature();
+    params.push_back(paramTy);
+  }
+  return GenericSignature::get(params, requirements);
+}
+
+SubstitutionMap
+ASTBuilder::createSubstitutionMap(BuiltGenericSignature sig,
+                                  ArrayRef<BuiltType> replacements) {
+  return SubstitutionMap::get(sig, replacements, {});
+}
+
+Type ASTBuilder::subst(Type subject, const BuiltSubstitutionMap &Subs) const {
+  return subject.subst(Subs);
 }
 
 bool ASTBuilder::validateParentType(TypeDecl *decl, Type parent) {

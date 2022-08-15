@@ -69,6 +69,8 @@ func _deallocateUninitializedArray<Element>(
 @_alwaysEmitIntoClient
 @_semantics("array.finalize_intrinsic")
 @_effects(readnone)
+@_effects(escaping array.value** => return.value**)
+@_effects(escaping array.value**.class*.value** => return.value**.class*.value**)
 public // COMPILER_INTRINSIC
 func _finalizeUninitializedArray<Element>(
   _ array: __owned Array<Element>

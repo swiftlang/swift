@@ -14,6 +14,8 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 
+#include <new>
+
 using namespace swift;
 using namespace llvm;
 
@@ -59,7 +61,7 @@ AutoDiffLinearMapContext *swift::swift_autoDiffCreateLinearMapContext(
       sizeof(AutoDiffLinearMapContext), alignof(AutoDiffLinearMapContext))
       + topLevelLinearMapStructSize;
   auto *buffer = (AutoDiffLinearMapContext *)malloc(allocationSize);
-  return new (buffer) AutoDiffLinearMapContext;
+  return ::new (buffer) AutoDiffLinearMapContext;
 }
 
 void *swift::swift_autoDiffProjectTopLevelSubcontext(

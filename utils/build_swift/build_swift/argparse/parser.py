@@ -13,13 +13,8 @@ destination actions as well as a new builder DSL for declaratively
 constructing complex parsers.
 """
 
-
-from __future__ import absolute_import, unicode_literals
-
 import argparse
 from contextlib import contextmanager
-
-import six
 
 from . import Namespace, SUPPRESS, actions
 from .actions import Action
@@ -133,7 +128,7 @@ class _Builder(object):
             *names, action=action, **kwargs)
 
     def add_positional(self, dests, action=None, **kwargs):
-        if isinstance(dests, six.string_types):
+        if isinstance(dests, (str,)):
             dests = [dests]
 
         if any(dest.startswith('-') for dest in dests):
@@ -145,7 +140,7 @@ class _Builder(object):
         return self._add_argument(dests, action, **kwargs)
 
     def add_option(self, option_strings, *actions, **kwargs):
-        if isinstance(option_strings, six.string_types):
+        if isinstance(option_strings, (str,)):
             option_strings = [option_strings]
 
         if not all(opt.startswith('-') for opt in option_strings):

@@ -392,11 +392,11 @@ public:
 
   std::string getOutputFilenameForAtMostOnePrimary() const;
   std::string getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
-  std::string getObjCHeaderOutputPathForAtMostOnePrimary() const;
-  std::string getCxxHeaderOutputPathForAtMostOnePrimary() const;
+  std::string getClangHeaderOutputPathForAtMostOnePrimary() const;
   std::string getModuleOutputPathForAtMostOnePrimary() const;
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
+  std::string getConstValuesFilePathForPrimary(StringRef filename) const;
   std::string getSerializedDiagnosticsPathForAtMostOnePrimary() const;
 
   /// TBDPath only makes sense in whole module compilation mode,
@@ -437,7 +437,6 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
-  TBDSymbolSetPtr publicCMOSymbols;
 
   /// A cache describing the set of inter-module dependencies that have been queried.
   /// Null if not present.
@@ -564,6 +563,10 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftStringProcessing() const;
 
+  /// Whether the CxxShim library can be imported
+  /// i.e. if it can be found.
+  bool canImportCxxShim() const;
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.
@@ -589,10 +592,6 @@ public:
   /// file.
   SourceFile *getCodeCompletionFile() const;
 
-  /// Return the symbols (e.g. function names) which are made public by the
-  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
-  TBDSymbolSetPtr getPublicCMOSymbols() const { return publicCMOSymbols; }
-
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
   /// files. If the process of validating VFS files failed, or the overlay
@@ -607,7 +606,7 @@ private:
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
 
-  /// \return false if successsful, true on error.
+  /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();
 
   Optional<unsigned> setUpCodeCompletionBuffer();
@@ -675,6 +674,7 @@ public:
 
   /// If \p fn returns true, exits early and returns true.
   bool forEachFileToTypeCheck(llvm::function_ref<bool(SourceFile &)> fn);
+  bool forEachSourceFile(llvm::function_ref<bool(SourceFile &)> fn);
 
   /// Whether the cancellation of the current operation has been requested.
   bool isCancellationRequested() const;

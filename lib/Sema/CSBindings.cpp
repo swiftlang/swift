@@ -109,6 +109,16 @@ bool BindingSet::isDelayed() const {
     if (locator->directlyAt<NilLiteralExpr>())
       return true;
 
+    // When inferring the type of a variable in a pattern, delay its resolution
+    // so that we resolve type variables inside the expression as placeholders
+    // instead of marking the type of the variable itself as a placeholder. This
+    // allows us to produce more specific errors because the type variable in
+    // the expression that introduced the placeholder might be diagnosable using
+    // fixForHole.
+    if (locator->isLastElement<LocatorPathElt::PatternDecl>()) {
+      return true;
+    }
+
     // It's possible that type of member couldn't be determined,
     // and if so it would be beneficial to bind member to a hole
     // early to propagate that information down to arguments,
@@ -353,7 +363,7 @@ void BindingSet::inferTransitiveProtocolRequirements(
     std::tie(parent, currentVar) = workList.pop_back_val();
 
     // At all of the protocols associated with current type variable
-    // are transitive to its parent, propogate them down the subtype/equivalence
+    // are transitive to its parent, propagate them down the subtype/equivalence
     // chain.
     if (parent) {
       propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
@@ -378,7 +388,7 @@ void BindingSet::inferTransitiveProtocolRequirements(
                                      inferredProtocols.end());
     }
 
-    // Propogate inferred protocols to all of the members of the
+    // Propagate inferred protocols to all of the members of the
     // equivalence class.
     for (const auto &equivalence : bindings.Info.EquivalentTo) {
       auto eqBindings = inferredBindings.find(equivalence.first);
@@ -731,7 +741,7 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
   return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
                          b.isDelayed(), b.isSubtypeOfExistentialType(),
                          b.involvesTypeVariables(),
-                         static_cast<unsigned char>(b.getLiteralKind()),
+                         static_cast<unsigned char>(b.getLiteralForScore()),
                          -numNonDefaultableBindings);
 }
 
@@ -798,7 +808,7 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
       continue;
 
     if (isDebugMode()) {
-      bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
+      bindings.dump(typeVar, llvm::errs(), solverState->getCurrentIndent());
     }
 
     // If these are the first bindings, or they are better than what
@@ -1301,7 +1311,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       EquivalentTo.insert({bindingTypeVar, constraint});
 
       // Don't record adjacency between base and result types,
-      // this is just an auxiliary contraint to enforce ordering.
+      // this is just an auxiliary constraint to enforce ordering.
       break;
     }
 
@@ -1385,7 +1395,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::KeyPath:
-  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::SyntacticElement:
   case ConstraintKind::Conjunction:
   case ConstraintKind::BindTupleOfFunctionParams:
     // Constraints from which we can't do anything.
@@ -1467,7 +1477,6 @@ void PotentialBindings::infer(Constraint *constraint) {
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::PropertyWrapper: {
     // If current type variable represents a member type of some reference,
     // it would be bound once member is resolved either to a actual member
@@ -1568,9 +1577,8 @@ void PotentialBindings::retract(Constraint *constraint) {
   EquivalentTo.remove_if(hasMatchingSource);
 }
 
-LiteralBindingKind BindingSet::getLiteralKind() const {
-  LiteralBindingKind kind = LiteralBindingKind::None;
-
+void BindingSet::forEachLiteralRequirement(
+    llvm::function_ref<void(KnownProtocolKind)> callback) const {
   for (const auto &literal : Literals) {
     auto *protocol = literal.first;
     const auto &info = literal.second;
@@ -1578,8 +1586,17 @@ LiteralBindingKind BindingSet::getLiteralKind() const {
     // Only uncovered defaultable literal protocols participate.
     if (!info.viableAsBinding())
       continue;
+    
+    if (auto protocolKind = protocol->getKnownProtocolKind())
+      callback(*protocolKind);
+  }
+}
 
-    switch (*protocol->getKnownProtocolKind()) {
+LiteralBindingKind BindingSet::getLiteralForScore() const {
+  LiteralBindingKind kind = LiteralBindingKind::None;
+
+  forEachLiteralRequirement([&](KnownProtocolKind protocolKind) {
+    switch (protocolKind) {
     case KnownProtocolKind::ExpressibleByDictionaryLiteral:
     case KnownProtocolKind::ExpressibleByArrayLiteral:
     case KnownProtocolKind::ExpressibleByStringInterpolation:
@@ -1595,8 +1612,7 @@ LiteralBindingKind BindingSet::getLiteralKind() const {
         kind = LiteralBindingKind::Atom;
       break;
     }
-  }
-
+  });
   return kind;
 }
 
@@ -1604,6 +1620,39 @@ unsigned BindingSet::getNumViableLiteralBindings() const {
   return llvm::count_if(Literals, [&](const auto &literal) {
     return literal.second.viableAsBinding();
   });
+}
+
+/// Return string for atomic literal kinds (integer, string, & boolean) for
+/// printing in debug output.
+static std::string getAtomLiteralAsString(ExprKind EK) {
+#define ENTRY(Kind, String)                                                    \
+  case ExprKind::Kind:                                                         \
+    return String
+  switch (EK) {
+    ENTRY(IntegerLiteral, "integer");
+    ENTRY(StringLiteral, "string");
+    ENTRY(BooleanLiteral, "boolean");
+    ENTRY(NilLiteral, "nil");
+  default:
+    return "";
+  }
+#undef ENTRY
+}
+
+/// Return string for collection literal kinds (interpolated string, array,
+/// dictionary) for printing in debug output.
+static std::string getCollectionLiteralAsString(KnownProtocolKind KPK) {
+#define ENTRY(Kind, String)                                                    \
+  case KnownProtocolKind::Kind:                                                \
+    return String
+  switch (KPK) {
+    ENTRY(ExpressibleByDictionaryLiteral, "dictionary");
+    ENTRY(ExpressibleByArrayLiteral, "array");
+    ENTRY(ExpressibleByStringInterpolation, "interpolated string");
+  default:
+    return "";
+  }
+#undef ENTRY
 }
 
 void BindingSet::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
@@ -1621,28 +1670,69 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   PO.PrintTypesForDebugging = true;
 
   out.indent(indent);
+  std::vector<std::string> attributes;
   if (isDirectHole())
-    out << "hole ";
+    attributes.push_back("hole");
   if (isPotentiallyIncomplete())
-    out << "potentially_incomplete ";
+    attributes.push_back("potentially_incomplete");
   if (isDelayed())
-    out << "delayed ";
+    attributes.push_back("delayed");
   if (isSubtypeOfExistentialType())
-    out << "subtype_of_existential ";
-  auto literalKind = getLiteralKind();
-  if (literalKind != LiteralBindingKind::None)
-    out << "literal=" << static_cast<int>(literalKind) << " ";
+    attributes.push_back("subtype_of_existential");
+  if (!attributes.empty()) {
+    out << "[attributes: ";
+    interleave(attributes, out, ", ");
+  }
+  
+  auto literalKind = getLiteralForScore();
+  if (literalKind != LiteralBindingKind::None) {
+    if (!attributes.empty()) {
+      out << ", ";
+    } else {
+      out << "[attributes: ";
+    }
+    out << "[literal: ";
+    switch (literalKind) {
+    case LiteralBindingKind::Atom: {
+      if (auto atomKind = TypeVar->getImpl().getAtomicLiteralKind()) {
+        out << getAtomLiteralAsString(*atomKind);
+      }
+      break;
+    }
+    case LiteralBindingKind::Collection: {
+      std::vector<std::string> collectionLiterals;
+      forEachLiteralRequirement([&](KnownProtocolKind protocolKind) {
+        collectionLiterals.push_back(
+            getCollectionLiteralAsString(protocolKind));
+      });
+      interleave(collectionLiterals, out, ", ");
+      break;
+    }
+    case LiteralBindingKind::Float:
+    case LiteralBindingKind::None:
+        out << getLiteralBindingKind(literalKind).str();
+      break;
+    }
+    if (attributes.empty()) {
+      out << "]] ";
+    } else {
+      out << "]";
+    }
+  }
+  if (!attributes.empty())
+    out << "] ";
+
   if (involvesTypeVariables()) {
-    out << "involves_type_vars=[";
+    out << "[involves_type_vars: ";
     interleave(AdjacentVars,
                [&](const auto *typeVar) { out << typeVar->getString(PO); },
-               [&out]() { out << " "; });
+               [&out]() { out << ", "; });
     out << "] ";
   }
 
   auto numDefaultable = getNumViableDefaultableBindings();
   if (numDefaultable > 0)
-    out << "#defaultable_bindings=" << numDefaultable << " ";
+    out << "#defaultable_bindings: " << numDefaultable << " ";
 
   auto printBinding = [&](const PotentialBinding &binding) {
     auto type = binding.BindingType;
@@ -1663,19 +1753,21 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << type.getString(PO);
   };
 
-  out << "bindings={";
+  out << "[with possible bindings: ";
   interleave(Bindings, printBinding, [&]() { out << "; "; });
-  out << "}";
+  if (Bindings.empty())
+    out << "<empty>";
+  out << "]";
 
   if (!Defaults.empty()) {
-    out << " defaults={";
+    out << "[defaults: ";
     for (const auto &entry : Defaults) {
       auto *constraint = entry.second;
       PotentialBinding binding{constraint->getSecondType(),
                                AllowedBindingKind::Exact, constraint};
       printBinding(binding);
     }
-    out << "}";
+    out << "] ";
   }
 }
 
@@ -1894,7 +1986,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   unsigned defaultImpact = 1;
 
   if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-    // If it is represetative for a key path root, let's emit a more
+    // If it is representative for a key path root, let's emit a more
     // specific diagnostic.
     auto *keyPathRoot =
         cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
@@ -1969,6 +2061,20 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     return std::make_pair(fix, /*impact=*/(unsigned)10);
   }
 
+  if (auto pattern = getAsPattern(dstLocator->getAnchor())) {
+    if (dstLocator->getPath().size() == 1 &&
+        dstLocator->isLastElement<LocatorPathElt::PatternDecl>()) {
+      // Not being able to infer the type of a variable in a pattern binding
+      // decl is more dramatic than anything that could happen inside the
+      // expression because we want to preferrably point the diagnostic to a
+      // part of the expression that caused us to be unable to infer the
+      // variable's type.
+      ConstraintFix *fix =
+          IgnoreUnresolvedPatternVar::create(cs, pattern, dstLocator);
+      return std::make_pair(fix, /*impact=*/(unsigned)100);
+    }
+  }
+
   return None;
 }
 
@@ -1993,10 +2099,16 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   // without any contextual information, so even though `x` would get
   // bound to result type of the chain, underlying type variable wouldn't
   // be resolved, so we need to propagate holes up the conversion chain.
+  // Also propagate in code completion mode because in some cases code
+  // completion relies on type variable being a potential hole.
   if (TypeVar->getImpl().canBindToHole()) {
-    if (auto objectTy = type->getOptionalObjectType()) {
-      if (auto *typeVar = objectTy->getAs<TypeVariableType>())
-        cs.recordPotentialHole(typeVar);
+    if (srcLocator->directlyAt<OptionalEvaluationExpr>() ||
+        cs.isForCodeCompletion()) {
+      if (auto objectTy = type->getOptionalObjectType()) {
+        if (auto *typeVar = objectTy->getAs<TypeVariableType>()) {
+          cs.recordPotentialHole(typeVar);
+        }
+      }
     }
   }
 
@@ -2016,11 +2128,22 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       // Don't penalize solutions with unresolved generics.
       if (TypeVar->getImpl().getGenericParameter())
         return false;
+
       // Don't penalize solutions with holes due to missing arguments after the
       // code completion position.
       auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
       if (argLoc && argLoc->isAfterCodeCompletionLoc())
         return false;
+
+      // Don't penalize solutions that have holes for ignored arguments.
+      if (cs.hasArgumentsIgnoredForCodeCompletion()) {
+        // Avoid simplifying the locator if the constraint system didn't ignore
+        // any arguments.
+        auto argExpr = simplifyLocatorToAnchor(TypeVar->getImpl().getLocator());
+        if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {
+          return false;
+        }
+      }
     }
     // Reflect in the score that this type variable couldn't be
     // resolved and had to be bound to a placeholder "hole" type.

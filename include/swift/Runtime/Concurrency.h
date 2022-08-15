@@ -26,10 +26,17 @@
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
 // Does the runtime use a cooperative global executor?
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if defined(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
 #else
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 0
+#endif
+
+// Does the runtime use a task-thread model?
+#if defined(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+#define SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL 1
+#else
+#define SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL 0
 #endif
 
 // Does the runtime integrate with libdispatch?
@@ -84,6 +91,20 @@ AsyncTaskAndContext swift_task_create_common(
     const Metadata *futureResultType,
     TaskContinuationFunction *function, void *closureContext,
     size_t initialContextSize);
+
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+#define SWIFT_TASK_RUN_INLINE_INITIAL_CONTEXT_BYTES 4096
+/// Begin an async context in the current sync context and run the indicated
+/// closure in it.
+///
+/// This is only supported under the task-to-thread concurrency model and
+/// relies on a synchronous implementation of task blocking in order to work.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_task_run_inline(OpaqueValue *result, void *closureAFP,
+                           OpaqueValue *closureContext,
+                           const Metadata *futureResultType);
+#endif
 
 /// Allocate memory in a task.
 ///
@@ -216,7 +237,7 @@ void swift_taskGroup_destroy(TaskGroup *group);
 /// more 'pending' child to account for.
 ///
 /// This function SHOULD be called from the AsyncTask running the task group,
-/// however is generally thread-safe as it only only works with the group status.
+/// however is generally thread-safe as it only works with the group status.
 ///
 /// Its Swift signature is
 ///

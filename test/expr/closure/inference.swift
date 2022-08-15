@@ -34,10 +34,9 @@ func unnamed() {
 // Regression tests.
 
 var nestedClosuresWithBrokenInference = { f: Int in {} }
-    // expected-error@-1 {{closure expression is unused}} expected-note@-1 {{did you mean to use a 'do' statement?}} {{53-53=do }}
-    // expected-error@-2 {{consecutive statements on a line must be separated by ';'}} {{44-44=;}}
-    // expected-error@-3 {{expected expression}}
-    // expected-error@-4 {{cannot find 'f' in scope}}
+    // expected-error@-1 {{consecutive statements on a line must be separated by ';'}} {{44-44=;}}
+    // expected-error@-2 {{expected expression}}
+    // expected-error@-3 {{cannot find 'f' in scope}}
 
 // SR-11540
 
@@ -77,4 +76,13 @@ cc(1) // Ok
 // SR-12955
 func SR12955() {
   let f: @convention(c) (T) -> Void // expected-error {{cannot find type 'T' in scope}}
+}
+
+// https://github.com/apple/swift/issues/42790
+do {
+  func foo<T>(block: () -> ()) -> T.Type { T.self } // expected-note {{in call to function 'foo(block:)'}}
+
+  let x = foo { // expected-error {{generic parameter 'T' could not be inferred}}
+    print("")
+  }
 }

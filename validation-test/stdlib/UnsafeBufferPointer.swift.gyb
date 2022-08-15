@@ -179,6 +179,32 @@ ${SelfName}TestSuite.test("nilBaseAddress") {
   expectEqualSequence([], emptyBuffer)
 }
 
+% if IsMutable:
+${SelfName}TestSuite.test("copyFromEmptyBuffer") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+% if IsRaw:
+  var memory: UnsafeMutableRawPointer
+  let empty = UnsafeRawBufferPointer(start: nil, count: 0)
+% else:
+  var memory: UnsafeMutablePointer<Float>
+  let empty = UnsafeBufferPointer<Float>(start: nil, count: 0)
+% end
+
+  let count = 4
+  memory = allocateFor${Raw}Buffer(count: count)
+  defer { deallocateFor${Raw}Buffer(memory, count: count) }
+
+  let buffer = UnsafeMutable${Raw}BufferPointer(start: memory, count: count)
+
+% if IsRaw:
+  buffer.copyMemory(from: empty)
+% else:
+  _ = buffer.initialize(from: empty)
+% end
+}
+% end
+
 ${SelfName}TestSuite.test("nonNilButEmpty") {
   let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
   defer { emptyAllocated.deallocate() }
@@ -429,9 +455,7 @@ UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable
 }
 
 UnsafeMutableRawBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
-  guard #available(SwiftStdlib 5.7, *) else {
-    return
-  }
+  guard #available(SwiftStdlib 5.7, *) else { return }
 
   for test in subscriptRangeTests {
     let c = test.collection.map({ UInt8($0.value/1000) })

@@ -19,6 +19,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/Basic/LangOptions.h"
 #include "llvm/ADT/None.h"
 
 namespace swift {
@@ -60,6 +61,12 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Make internal @usableFromInline and @inlinable decls visible.
   AllowUsableFromInline = 1 << 8,
+
+  /// Forbid \c some types from resolving as opaque types.
+  ///
+  /// Needed to enforce that \c any P<some Q> does not resolve to a
+  /// parameterized existential with an opaque type constraint.
+  DisallowOpaqueTypes = 1 << 9,
 };
 
 /// Type resolution contexts that require special handling.
@@ -125,7 +132,7 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are in the constraint type of an existential type.
   ExistentialConstraint,
 
-  /// Whether we are in a requirement of a generic declaration.
+  /// Whether we are in the constraint type of a conformance requirement.
   GenericRequirement,
 
   /// Whether we are in a same-type requirement of a generic
@@ -281,13 +288,13 @@ public:
     switch (context) {
     case Context::Inherited:
     case Context::ExtensionBinding:
-    case Context::GenericRequirement:
-      return true;
-    case Context::None:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
-    case Context::MetatypeBase:
+    case Context::GenericRequirement:
     case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+      return true;
+    case Context::None:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
@@ -393,8 +400,7 @@ class TypeResolution {
   HandlePlaceholderTypeReprFn placeholderHandler;
 
 private:
-  /// The generic environment used to map to archetypes.
-  GenericEnvironment *genericEnv;
+  GenericSignature genericSig;
 
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
@@ -402,8 +408,7 @@ private:
                  HandlePlaceholderTypeReprFn placeholderHandler)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
-        placeholderHandler(placeholderHandler),
-        genericEnv(nullptr) {}
+        placeholderHandler(placeholderHandler) {}
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -424,7 +429,7 @@ public:
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution
-  forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
+  forInterface(DeclContext *dc, GenericSignature genericSig,
                TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler);
@@ -440,7 +445,7 @@ public:
                         GenericParamList *silParams = nullptr);
 
   static Type resolveContextualType(
-      TypeRepr *TyR, DeclContext *dc, GenericEnvironment *genericEnv,
+      TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
       TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
       HandlePlaceholderTypeReprFn placeholderHandler,
       GenericParamList *silParams = nullptr);

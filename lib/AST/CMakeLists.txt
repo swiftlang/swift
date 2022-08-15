@@ -14,6 +14,7 @@ add_swift_host_library(swiftAST STATIC
   AccessNotes.cpp
   AccessRequests.cpp
   ArgumentList.cpp
+  ASTBridging.cpp
   ASTContext.cpp
   ASTDemangler.cpp
   ASTDumper.cpp
@@ -47,6 +48,7 @@ add_swift_host_library(swiftAST STATIC
   DocComment.cpp
   Effects.cpp
   Evaluator.cpp
+  ExistentialGeneralization.cpp
   Expr.cpp
   ExtInfo.cpp
   FineGrainedDependencies.cpp
@@ -55,7 +57,6 @@ add_swift_host_library(swiftAST STATIC
   GenericEnvironment.cpp
   GenericParamList.cpp
   GenericSignature.cpp
-  GenericSignatureBuilder.cpp
   Identifier.cpp
   ImportCache.cpp
   IndexSubset.cpp
@@ -75,21 +76,28 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
+  RequirementMachine/Diagnostics.cpp
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/HomotopyReduction.cpp
   RequirementMachine/InterfaceType.cpp
   RequirementMachine/KnuthBendix.cpp
   RequirementMachine/MinimalConformances.cpp
+  RequirementMachine/NameLookup.cpp
+  RequirementMachine/NormalizeRewritePath.cpp
   RequirementMachine/PropertyMap.cpp
   RequirementMachine/PropertyRelations.cpp
   RequirementMachine/PropertyUnification.cpp
+  RequirementMachine/RequirementBuilder.cpp
   RequirementMachine/RequirementLowering.cpp
   RequirementMachine/RequirementMachine.cpp
   RequirementMachine/RequirementMachineRequests.cpp
   RequirementMachine/RewriteContext.cpp
   RequirementMachine/RewriteLoop.cpp
   RequirementMachine/RewriteSystem.cpp
+  RequirementMachine/Rule.cpp
+  RequirementMachine/RuleBuilder.cpp
   RequirementMachine/SimplifySubstitutions.cpp
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp

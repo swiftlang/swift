@@ -84,12 +84,17 @@ enum class ImportFlags {
   /// concurrency.
   Preconcurrency = 0x20,
 
+  /// The module's symbols are linked weakly.
+  WeakLinked = 0x40,
+
   /// Used for DenseMap.
   Reserved = 0x80
 };
 
 /// \see ImportFlags
 using ImportOptions = OptionSet<ImportFlags>;
+
+void simple_display(llvm::raw_ostream &out, ImportOptions options);
 
 // MARK: - Import Paths
 
@@ -372,7 +377,7 @@ public:
   /// the name of the module being imported, possibly including submodules.
   ///
   /// \c ImportPath::Module contains one or more identifiers. The first
-  /// identiifer names a top-level module. The second and subsequent
+  /// identifier names a top-level module. The second and subsequent
   /// identifiers, if present, chain together to name a specific submodule to
   /// import. (Although Swift modules cannot currently contain submodules, Swift
   /// can import Clang submodules.)

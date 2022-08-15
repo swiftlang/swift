@@ -68,9 +68,6 @@ TinyPtrVector<FileUnit *> IRGenDescriptor::getFilesToEmit() const {
   TinyPtrVector<FileUnit *> files;
   files.push_back(primary);
 
-  if (auto *synthesizedFile = primary->getSynthesizedFile())
-    files.push_back(synthesizedFile);
-
   return files;
 }
 
@@ -81,13 +78,11 @@ ModuleDecl *IRGenDescriptor::getParentModule() const {
 }
 
 TBDGenDescriptor IRGenDescriptor::getTBDGenDescriptor() const {
-  TBDSymbolSetPtr cmoSymbolSet = (SILMod ? SILMod->getPublicCMOSymbols()
-                                         : nullptr);
   if (auto *file = Ctx.dyn_cast<FileUnit *>()) {
-    return TBDGenDescriptor::forFile(file, TBDOpts, cmoSymbolSet);
+    return TBDGenDescriptor::forFile(file, TBDOpts);
   } else {
     auto *M = Ctx.get<ModuleDecl *>();
-    return TBDGenDescriptor::forModule(M, TBDOpts, cmoSymbolSet);
+    return TBDGenDescriptor::forModule(M, TBDOpts);
   }
 }
 

@@ -74,6 +74,10 @@ llvm::Value *emitCreateTaskGroup(IRGenFunction &IGF, SubstitutionMap subs);
 /// Emit the destroyTaskGroup builtin.
 void emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group);
 
+void emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
+                       llvm::Value *result, llvm::Value *closure,
+                       llvm::Value *closureContext);
+
 } // end namespace irgen
 } // end namespace swift
 

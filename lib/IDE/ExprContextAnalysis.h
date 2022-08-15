@@ -14,6 +14,7 @@
 #define SWIFT_IDE_EXPRCONTEXTANALYSIS_H
 
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -29,7 +30,8 @@ enum class SemanticContextKind : uint8_t;
 
 /// Type check parent contexts of the given decl context, and the body of the
 /// given context until \c Loc if the context is a function body.
-void typeCheckContextAt(DeclContext *DC, SourceLoc Loc);
+void typeCheckContextAt(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                        SourceLoc Loc);
 
 /// From \p DC, find and returns the outer most expression which source range is
 /// exact the same as \p TargetRange. Returns \c nullptr if not found.

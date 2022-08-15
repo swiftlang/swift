@@ -7,7 +7,7 @@ public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
 
 #if !CGFLOAT_IN_COREFOUNDATION
 public struct CGFloat {
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(powerpc)
   public typealias UnderlyingType = Float
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64le) || arch(s390x)
   public typealias UnderlyingType = Double
@@ -52,3 +52,9 @@ public extension Double {
   }
 }
 #endif
+
+import CoreFoundation
+
+extension CGFloat: CustomStringConvertible {
+  public var description: String { "" }
+}

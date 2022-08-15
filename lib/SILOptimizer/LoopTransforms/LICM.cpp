@@ -1173,7 +1173,8 @@ static SILValue projectLoadValue(SILValue addr, AccessPath accessPath,
     assert(ProjectionIndex(SEI).Index == elementIdx);
     SILValue val = projectLoadValue(
         SEI->getOperand(),
-        AccessPath(accessPath.getStorage(), pathNode.getParent(), 0),
+        AccessPath(accessPath.getStorage(), pathNode.getParent(),
+                   accessPath.getOffset()),
         rootVal, rootAccessPath, beforeInst);
     SILBuilder B(beforeInst);
     return B.createStructExtract(beforeInst->getLoc(), val, SEI->getField(),
@@ -1183,7 +1184,8 @@ static SILValue projectLoadValue(SILValue addr, AccessPath accessPath,
     assert(ProjectionIndex(TEI).Index == elementIdx);
     SILValue val = projectLoadValue(
         TEI->getOperand(),
-        AccessPath(accessPath.getStorage(), pathNode.getParent(), 0),
+        AccessPath(accessPath.getStorage(), pathNode.getParent(),
+                   accessPath.getOffset()),
         rootVal, rootAccessPath, beforeInst);
     SILBuilder B(beforeInst);
     return B.createTupleExtract(beforeInst->getLoc(), val, TEI->getFieldIndex(),
@@ -1329,7 +1331,7 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
       if (!storeAddr) {
         storeAddr = SI->getDest();
         ssaUpdater.initialize(storeAddr->getType().getObjectType(),
-                              storeAddr.getOwnershipKind());
+                              storeAddr->getOwnershipKind());
       } else if (SI->getDest()->getType() != storeAddr->getType()) {
         // This transformation assumes that the values of all stores in the loop
         // must be interchangeable. It won't work if stores different types

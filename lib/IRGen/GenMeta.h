@@ -29,6 +29,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  struct ExistentialTypeGeneralization;
   class FileUnit;
   class FuncDecl;
   enum class ResilienceExpansion : unsigned;

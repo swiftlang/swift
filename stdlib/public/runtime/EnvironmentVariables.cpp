@@ -93,6 +93,36 @@ static uint8_t parse_uint8_t(const char *name,
   return n;
 }
 
+static uint32_t parse_uint32_t(const char *name,
+                               const char *value,
+                               uint32_t defaultValue) {
+  if (!value)
+    return defaultValue;
+  char *end;
+  long long n = strtoll(value, &end, 0);
+  if (*end != '\0') {
+    swift::warning(RuntimeErrorFlagNone,
+                   "Warning: cannot parse value %s=%s, defaulting to %u.\n",
+                   name, value, defaultValue);
+    return defaultValue;
+  }
+
+  if (n < 0) {
+    swift::warning(RuntimeErrorFlagNone,
+                   "Warning: %s=%s out of bounds, clamping to 0.\n",
+                   name, value);
+    return 0;
+  }
+  if (n > UINT32_MAX) {
+    swift::warning(RuntimeErrorFlagNone,
+                   "Warning: %s=%s out of bounds, clamping to %d.\n",
+                   name, value, UINT32_MAX);
+    return UINT32_MAX;
+  }
+
+  return n;
+}
+
 // Print a list of all the environment variables. Lazy initialization makes
 // this a bit odd, but the use of these variables in the metadata system means
 // it's almost certain to run early.
@@ -120,7 +150,7 @@ void printHelp(const char *extra) {
 #include "EnvironmentVariables.def"
 
 // Initialization code.
-OnceToken_t swift::runtime::environment::initializeToken;
+swift::once_t swift::runtime::environment::initializeToken;
 
 #if SWIFT_STDLIB_HAS_ENVIRON && (defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__))
 extern "C" char **environ;

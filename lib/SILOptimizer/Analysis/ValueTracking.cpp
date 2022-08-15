@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-value-tracking"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -37,19 +38,22 @@ bool swift::isExclusiveArgument(SILValue V) {
 /// Returns a found local object. If a local object was not found, returns an
 /// empty SILValue.
 static bool isLocalObject(SILValue Obj) {
+  // Check for SILUndef.
+  if (!Obj->getFunction())
+    return false;
+
   // Set of values to be checked for their locality.
   SmallVector<SILValue, 8> WorkList;
   // Set of processed values.
-  llvm::SmallPtrSet<SILValue, 8> Processed;
+  ValueSet Processed(Obj->getFunction());
   WorkList.push_back(Obj);
 
   while (!WorkList.empty()) {
     auto V = WorkList.pop_back_val();
-    if (!V)
+    if (!V || isa<SILUndef>(V))
       return false;
-    if (Processed.count(V))
+    if (!Processed.insert(V))
       continue;
-    Processed.insert(V);
     // It should be a local object.
     V = getUnderlyingObject(V);
     if (isa<AllocationInst>(V))

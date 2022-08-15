@@ -13,12 +13,14 @@
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <vector>
 
@@ -50,6 +52,9 @@ class SwiftPassInvocation {
   /// Backlink to the pass manager.
   SILPassManager *passManager;
 
+  /// The current transform.
+  SILTransform *transform = nullptr;
+
   /// The currently optimized function.
   SILFunction *function = nullptr;
 
@@ -62,8 +67,12 @@ class SwiftPassInvocation {
   static constexpr int BlockSetCapacity = 8;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
-
   int numBlockSetsAllocated = 0;
+
+  static constexpr int NodeSetCapacity = 8;
+  char nodeSetStorage[sizeof(NodeSet) * NodeSetCapacity];
+  bool aliveNodeSets[NodeSetCapacity];
+  int numNodeSetsAllocated = 0;
 
   void endPassRunChecks();
 
@@ -76,6 +85,8 @@ public:
     passManager(passManager) {}
 
   SILPassManager *getPassManager() const { return passManager; }
+  
+  SILTransform *getTransform() const { return transform; }
 
   SILFunction *getFunction() const { return function; }
 
@@ -87,6 +98,10 @@ public:
 
   void freeBlockSet(BasicBlockSet *set);
 
+  NodeSet *allocNodeSet();
+
+  void freeNodeSet(NodeSet *set);
+
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst);
 
@@ -94,7 +109,7 @@ public:
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
 
   /// Called by the pass manager before the pass starts running.
-  void startFunctionPassRun(SILFunction *function);
+  void startFunctionPassRun(SILFunctionTransform *transform);
 
   /// Called by the SILCombiner before the instruction pass starts running.
   void startInstructionPassRun(SILInstruction *inst);
@@ -188,6 +203,8 @@ class SILPassManager {
   /// bare pointer to ensure that we can deregister the notification after this
   /// pass manager is destroyed.
   DeserializationNotificationHandler *deserializationNotificationHandler;
+
+  std::chrono::nanoseconds totalPassRuntime = std::chrono::nanoseconds(0);
 
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def. This is private as it should only be used by
@@ -329,11 +346,7 @@ public:
   ~SILPassManager();
 
   /// Verify all analyses.
-  void verifyAnalyses() const {
-    for (auto *A : Analyses) {
-      A->verify();
-    }
-  }
+  void verifyAnalyses() const;
 
   /// Precompute all analyses.
   void forcePrecomputeAnalyses(SILFunction *F) {
@@ -348,11 +361,7 @@ public:
   /// Discussion: We leave it up to the analyses to decide how to implement
   /// this. If no override is provided the SILAnalysis should just call the
   /// normal verify method.
-  void verifyAnalyses(SILFunction *F) const {
-    for (auto *A : Analyses) {
-      A->verify(F);
-    }
-  }
+  void verifyAnalyses(SILFunction *F) const;
 
   void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 

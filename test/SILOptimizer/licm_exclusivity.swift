@@ -69,7 +69,7 @@ public class ClassWithArrs {
 // TESTLICMWMO: Successfully hoisted and sank pair
 // TESTLICMWMO: Hoisted
 // TESTLICMWMO: Successfully hoisted and sank pair
-// TESTSILWMO-LABEL: sil @$s16licm_exclusivity13ClassWithArrsC7readArryyF : $@convention(method) (@guaranteed ClassWithArrs) -> () {
+// TESTSILWMO-LABEL: sil {{.*}}@$s16licm_exclusivity13ClassWithArrsC7readArryyF : $@convention(method) (@guaranteed ClassWithArrs) -> () {
 // TESTSILWMO: [[R1:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.A
 // TESTSILWMO: [[R2:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.B
 // TESTSILWMO:  begin_access [read] [static] [no_nested_conflict] [[R1]]

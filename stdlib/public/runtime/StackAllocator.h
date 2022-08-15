@@ -25,6 +25,7 @@
 #include "swift/Runtime/Debug.h"
 #include "llvm/Support/Alignment.h"
 #include <cstddef>
+#include <new>
 
 // Notes: swift::fatalError is not shared between libswiftCore and libswift_Concurrency
 // and libswift_Concurrency uses swift_Concurrency_fatalError instead.
@@ -71,11 +72,11 @@ private:
   /// The first slab.
   Slab *firstSlab;
 
+  /// True if the first slab is pre-allocated.
   uint32_t firstSlabIsPreallocated:1;
   /// Used for unit testing.
-  uint32_t numAllocatedSlabs:31 = 0;
+  uint32_t numAllocatedSlabs:31;
 
-  /// True if the first slab is pre-allocated.
 
   /// The minimal alignment of allocated memory.
   static constexpr size_t alignment = MaximumAlignment;
@@ -170,7 +171,7 @@ private:
       assert(llvm::isAligned(llvm::Align(alignment), alignedSize));
       assert(canAllocate(alignedSize));
       void *buffer = getAddr(currentOffset);
-      auto *allocation = new (buffer) Allocation(lastAllocation, this);
+      auto *allocation = ::new (buffer) Allocation(lastAllocation, this);
       currentOffset += Allocation::includingHeader(alignedSize);
       if (guardAllocations) {
         uintptr_t *endOfCurrentAllocation = (uintptr_t *)getAddr(currentOffset);
@@ -251,7 +252,7 @@ private:
     size_t capacity = std::max(SlabCapacity,
                                Allocation::includingHeader(size));
     void *slabBuffer = malloc(Slab::includingHeader(capacity));
-    Slab *newSlab = new (slabBuffer) Slab(capacity);
+    Slab *newSlab = ::new (slabBuffer) Slab(capacity);
     if (slab)
       slab->next = newSlab;
     else
@@ -278,17 +279,23 @@ private:
 
 public:
   /// Construct a StackAllocator without a pre-allocated first slab.
-  StackAllocator() : firstSlab(nullptr), firstSlabIsPreallocated(false) { }
+  StackAllocator()
+      : firstSlab(nullptr), firstSlabIsPreallocated(false),
+        numAllocatedSlabs(0) {}
 
   /// Construct a StackAllocator with a pre-allocated first slab.
-  StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) {
+  StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) : StackAllocator() {
+    // If the pre-allocated buffer can't hold a slab header, ignore it.
+    if (bufferCapacity <= Slab::headerSize())
+      return;
     char *start = (char *)llvm::alignAddr(firstSlabBuffer,
                                           llvm::Align(alignment));
     char *end = (char *)firstSlabBuffer + bufferCapacity;
     assert(start + Slab::headerSize() <= end &&
            "buffer for first slab too small");
-    firstSlab = new (start) Slab(end - start - Slab::headerSize());
+    firstSlab = ::new (start) Slab(end - start - Slab::headerSize());
     firstSlabIsPreallocated = true;
+    numAllocatedSlabs = 0;
   }
 
   ~StackAllocator() {

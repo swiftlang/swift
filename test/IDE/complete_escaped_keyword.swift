@@ -65,11 +65,11 @@ enum MyEnum {
   func testInstance(val: MyEnum) {
     let _ = #^INSTANCE_PRIMARY^#
 // INSTANCE_PRIMARY: Begin completion
+// INSTANCE_PRIMARY-NOT: self[#Int#];
 // INSTANCE_PRIMARY-DAG: Decl[LocalVar]/Local:               self[#MyEnum#]; name=self
-// INSTANCE_PRIMARY-DAG: Decl[InstanceVar]/CurrNominal:      self[#Int#]; name=self
-// FIXME: ^ This is shadowed. We should hide this.
 // INSTANCE_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#deinit: String#})[#Int#]; name=`init`(deinit:)
 // INSTANCE_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `if`({#else: String#})[#Int#]; name=`if`(else:)
+// INSTANCE_PRIMARY-NOT: self[#Int#];
 // INSTANCE_PRIMARY: End completion
 
     let _ = self#^INSTANCE_SELF_NODOT^#

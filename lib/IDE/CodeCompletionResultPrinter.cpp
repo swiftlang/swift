@@ -410,7 +410,7 @@ constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
   OS << "<#T##" << Display;
   if (Display == Type && Display == ExpansionType) {
     // Short version, display and type are the same.
-  } else {
+  } else if (!Type.empty()) {
     OS << "##" << Type;
     if (ExpansionType != Type)
       OS << "##" << ExpansionType;
@@ -496,6 +496,10 @@ static void printCodeCompletionResultFilterName(
       case ChunkKind::DeclIntroducer:
         ++i;
         continue;
+      case ChunkKind::ParameterDeclExternalName:
+        // Skip '_' parameter external name.
+        shouldPrint = shouldPrint && C.hasText() && C.getText() != "_";
+        break;
       case ChunkKind::CallArgumentTypeBegin:
       case ChunkKind::ParameterDeclTypeBegin:
       case ChunkKind::TypeAnnotationBegin:

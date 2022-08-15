@@ -20,8 +20,8 @@ internal enum BacktraceStyle {
 internal func backtrace(_ stack: [swift_reflection_ptr_t], style: BacktraceStyle,
                         _ symbolicate: (swift_addr_t) -> (module: String?, symbol: String?)) -> String {
   func entry(_ address: swift_reflection_ptr_t) -> String {
-    let (module, symbol) = symbolicate(address)
-    return "\(hex: address) (\(module ?? "<uknown>")) \(symbol ??  "<unknown>")"
+    let (module, symbol) = symbolicate(swift_addr_t(address))
+    return "\(hex: address) (\(module ?? "<unknown>")) \(symbol ??  "<unknown>")"
   }
 
   // The pointers to the locations in the backtrace are stored from deepest to

@@ -121,15 +121,6 @@ class DarwinPlatform(Platform):
         # The names match up with the xcrun SDK names.
         xcrun_sdk_name = self.name
 
-        # 32-bit iOS and iOS simulator are supported, but are not covered
-        # by the SDK settings. Handle this special case here.
-        if (xcrun_sdk_name == 'iphoneos' and
-           (arch == 'armv7' or arch == 'armv7s')):
-            return True
-
-        if (xcrun_sdk_name == 'iphonesimulator' and arch == 'i386'):
-            return True
-
         sdk_path = xcrun.sdk_path(sdk=xcrun_sdk_name, toolchain=toolchain)
         if not sdk_path:
             raise RuntimeError('Cannot find SDK path for %s' % xcrun_sdk_name)
@@ -234,14 +225,11 @@ class StdlibDeploymentTarget(object):
     OSX = DarwinPlatform("macosx", archs=["x86_64", "arm64"],
                          sdk_name="OSX")
 
-    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
+    iOS = DarwinPlatform("iphoneos", archs=["arm64", "arm64e"],
                          sdk_name="IOS")
-    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64", "arm64"],
+    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["x86_64", "arm64"],
                                   sdk_name="IOS_SIMULATOR",
                                   is_simulator=True)
-
-    # Never build/test benchmarks on iOS armv7s.
-    iOS.armv7s.supports_benchmark = False
 
     AppleTV = DarwinPlatform("appletvos", archs=["arm64"],
                              sdk_name="TVOS")
@@ -266,9 +254,11 @@ class StdlibDeploymentTarget(object):
     Linux = Platform("linux", archs=[
         "x86_64",
         "i686",
+        "armv5",
         "armv6",
         "armv7",
         "aarch64",
+        "powerpc",
         "powerpc64",
         "powerpc64le",
         "s390x"])
@@ -346,8 +336,13 @@ class StdlibDeploymentTarget(object):
             elif machine.startswith('armv6'):
                 # linux-armv6* is canonicalized to 'linux-armv6'
                 return StdlibDeploymentTarget.Linux.armv6
+            elif machine.startswith('armv5'):
+                # linux-armv5* is canonicalized to 'linux-armv5'
+                return StdlibDeploymentTarget.Linux.armv5
             elif machine == 'aarch64':
                 return StdlibDeploymentTarget.Linux.aarch64
+            elif machine == 'ppc':
+                return StdlibDeploymentTarget.Linux.powerpc
             elif machine == 'ppc64':
                 return StdlibDeploymentTarget.Linux.powerpc64
             elif machine == 'ppc64le':

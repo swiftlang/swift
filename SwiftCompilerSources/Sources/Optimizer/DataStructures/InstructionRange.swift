@@ -12,7 +12,7 @@
 
 import SIL
 
-/// A range of basic blocks.
+/// A range of instructions.
 ///
 /// The `InstructionRange` defines a range from a dominating "begin" instruction to one or more "end" instructions.
 /// The range is "exclusive", which means that the "end" instructions are not part of the range.
@@ -46,18 +46,25 @@ struct InstructionRange : CustomStringConvertible, CustomReflectable {
   /// The underlying block range.
   private(set) var blockRange: BasicBlockRange
 
-  private var insertedInsts: Set<Instruction>
+  private var insertedInsts: InstructionSet
 
   init(begin beginInst: Instruction, _ context: PassContext) {
     self.begin = beginInst
-    self.insertedInsts = Set<Instruction>()
     self.blockRange = BasicBlockRange(begin: beginInst.block, context)
+    self.insertedInsts = InstructionSet(context)
   }
 
   /// Insert a potential end instruction.
   mutating func insert(_ inst: Instruction) {
     insertedInsts.insert(inst)
     blockRange.insert(inst.block)
+  }
+
+  /// Insert a sequence of potential end instructions.
+  mutating func insert<S: Sequence>(contentsOf other: S) where S.Element == Instruction {
+    for inst in other {
+      insert(inst)
+    }
   }
 
   /// Returns true if the exclusive range contains `inst`.
@@ -99,7 +106,7 @@ struct InstructionRange : CustomStringConvertible, CustomReflectable {
 
   /// Returns the exit instructions.
   var exits: LazyMapSequence<LazySequence<FlattenSequence<
-                               LazyMapSequence<Stack<BasicBlock>,
+                               LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
                                                LazyFilterSequence<SuccessorArray>>>>,
                              Instruction> {
     blockRange.exits.lazy.map { $0.instructions.first! }
@@ -116,7 +123,6 @@ struct InstructionRange : CustomStringConvertible, CustomReflectable {
           let isInterior = include
           include = true
           return isInterior
-          
         }
         return false
       }
@@ -124,19 +130,20 @@ struct InstructionRange : CustomStringConvertible, CustomReflectable {
   }
 
   var description: String {
-    """
-    begin:    \(begin)
-    range:      \(blockRange.range)
-    ends:     \(ends.map { $0.description }.joined(separator: "\n          "))
-    exits:    \(exits.map { $0.description }.joined(separator: "\n          "))
-    interiors:\(interiors.map { $0.description }.joined(separator: "\n          "))
-    """
+    return (isValid ? "" : "<invalid>\n") +
+      """
+      begin:    \(begin)
+      ends:     \(ends.map { $0.description }.joined(separator: "\n          "))
+      exits:    \(exits.map { $0.description }.joined(separator: "\n          "))
+      interiors:\(interiors.map { $0.description }.joined(separator: "\n          "))
+      """
   }
 
   var customMirror: Mirror { Mirror(self, children: []) }
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
+    insertedInsts.deinitialize()
     blockRange.deinitialize()
   }
 }

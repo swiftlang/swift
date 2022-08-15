@@ -87,12 +87,12 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[THIS:%.*]] : @guaranteed $NSRuncing):
 // -- Result of runce is autoreleased according to default objc conv
-// CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
+// CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED:@opened\(.*, NSRuncing\) Self]]
 // CHECK: [[METHOD:%.*]] = objc_method [[THIS1]] : $[[OPENED]], #NSRuncing.runce!foreign
 // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<[[OPENED]]>([[THIS1]])
 
 // -- Result of copyRuncing is received copy_valued according to -copy family
-// CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
+// CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED2:@opened\(.*, NSRuncing\) Self]]
 // CHECK: [[METHOD:%.*]] = objc_method [[THIS2]] : $[[OPENED2]], #NSRuncing.copyRuncing!foreign
 // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<[[OPENED2]]>([[THIS2:%.*]])
 
@@ -116,12 +116,12 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
-  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
+  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened\(.*, NSFunging & NSRuncing\) Self]]
   // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSRuncing.runce!foreign
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])
   x.runce()
 
-  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
+  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened\(.*, NSFunging & NSRuncing\) Self]]
   // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSFunging.funge!foreign
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])
   x.funge()
@@ -145,10 +145,10 @@ class Foo : NSRuncing, NSFunging, Ansible {
   func anse() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3FooC5runce{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3FooC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3FooC5funge{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3FooC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3FooC5runce{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3FooC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3FooC5funge{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3FooC3foo{{[_0-9a-zA-Z]*}}FTo
 // CHECK-NOT: sil hidden [ossa] @_TToF{{.*}}anse{{.*}}
 
 class Bar { }
@@ -160,9 +160,9 @@ extension Bar : NSRuncing {
   @objc static func mince() -> NSObject { return NSObject() }
 }
 
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3BarC5runce{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3BarC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3BarC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3BarC5runce{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3BarC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3BarC3foo{{[_0-9a-zA-Z]*}}FTo
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -172,8 +172,8 @@ extension Bas : NSRuncing {
   @objc static func mince() -> NSObject { return NSObject() }
 }
 
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s18objc_protocols_Bas0C0C0a1_B0E11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s18objc_protocols_Bas0C0C0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s18objc_protocols_Bas0C0C0a1_B0E11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s18objc_protocols_Bas0C0C0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
 
 // -- Inherited objc protocols
 
@@ -184,8 +184,8 @@ class Zim : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3ZimC5funge{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3ZimC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3ZimC5funge{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols3ZimC3foo{{[_0-9a-zA-Z]*}}FTo
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
@@ -193,7 +193,7 @@ extension Zang : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s18objc_protocols_Bas4ZangC0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s18objc_protocols_Bas4ZangC0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
 
 // -- objc protocols with property requirements in extensions
 //    <rdar://problem/16284574>
@@ -207,14 +207,14 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s14objc_protocols19StoredPropertyCountC5countSivgTo
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s14objc_protocols19StoredPropertyCountC5countSivgTo
 
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
 }
 
 extension ComputedPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols21ComputedPropertyCountC5countSivgTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols21ComputedPropertyCountC5countSivgTo
 
 // -- adding @objc protocol conformances to native ObjC classes should not
 //    emit thunks since the methods are already available to ObjC.
@@ -241,12 +241,12 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
   // CHECK:   [[I2_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[I2_BOX]]
   // CHECK:   [[PB:%.*]] = project_box [[I2_LIFETIME]]
-  // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
-  // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]]) Initializable).Type to $@objc_metatype (@opened([[N]]) Initializable).Type
-  // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]]) Initializable).Type, $@opened([[N]]) Initializable
-  // CHECK:   [[INIT_WITNESS:%[0-9]+]] = objc_method [[I2_ALLOC]] : $@opened([[N]]) Initializable, #Initializable.init!initializer.foreign : {{.*}}
-  // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[I]], [[I2_ALLOC]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
-  // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
+  // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]], Initializable) Self).Type
+  // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]], Initializable) Self).Type to $@objc_metatype (@opened([[N]], Initializable) Self).Type
+  // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]], Initializable) Self).Type, $@opened([[N]], Initializable) Self
+  // CHECK:   [[INIT_WITNESS:%[0-9]+]] = objc_method [[I2_ALLOC]] : $@opened([[N]], Initializable) Self, #Initializable.init!initializer.foreign : {{.*}}
+  // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]], Initializable) Self>([[I]], [[I2_ALLOC]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
+  // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]], Initializable) Self : $@opened([[N]], Initializable) Self, $Initializable
   // CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*Initializable
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Initializable
   // CHECK:   [[I2:%[0-9]+]] = load [copy] [[READ]] : $*Initializable
@@ -261,7 +261,7 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
 class InitializableConformer: Initializable {
   @objc required init(int: Int) {}
 }
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols22InitializableConformerC{{[_0-9a-zA-Z]*}}fcTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols22InitializableConformerC{{[_0-9a-zA-Z]*}}fcTo
 
 final class InitializableConformerByExtension {
   init() {}
@@ -272,7 +272,7 @@ extension InitializableConformerByExtension: Initializable {
     self.init()
   }
 }
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols33InitializableConformerByExtensionC{{[_0-9a-zA-Z]*}}fcTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s14objc_protocols33InitializableConformerByExtensionC{{[_0-9a-zA-Z]*}}fcTo
 
 // Make sure we're crashing from trying to use materializeForSet here.
 @objc protocol SelectionItem {
@@ -309,8 +309,8 @@ public protocol DangerousEscaper {
 // CHECK:  destroy_addr [[BLOCK_ADDR]] : $*@callee_guaranteed () -> ()
 // CHECK:  dealloc_stack [[BLOCK]] : $*@block_storage @callee_guaranteed () -> ()
 // CHECK:  destroy_value [[CLOSURE_COPY1]] : $@callee_guaranteed () -> ()
-// CHECK:  [[METH:%.*]] = objc_method [[OE]] : {{.*}} DangerousEscaper, #DangerousEscaper.malicious!foreign
-// CHECK:  apply [[METH]]<@opened("{{.*}}") DangerousEscaper>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:  [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}", DangerousEscaper) Self, #DangerousEscaper.malicious!foreign
+// CHECK:  apply [[METH]]<@opened("{{.*}}", DangerousEscaper) Self>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 // CHECK:  destroy_value [[BLOCK_CLOSURE_COPY]] : $@convention(block) @noescape () -> ()
 // CHECK:  return {{.*}} : $()
 

@@ -80,7 +80,7 @@ extension Wrapper2.NonGenericWrapped where Wrapper2Param: P1 {
   func bar(x: Wrapper2Param.Assoc) {}
 }
 
-// MARK: - Test extending an unkown type
+// MARK: - Test extending an unknown type
 
 // Check that we don't crash. We don't expect the generic params to show up in the index.
 extension MyUnknownType where Wrapper2Param: P1 {

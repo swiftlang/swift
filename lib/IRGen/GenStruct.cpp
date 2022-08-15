@@ -338,7 +338,9 @@ namespace {
 
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
         for (auto base : cxxRecord->bases()) {
-          auto baseRecord = cast<clang::RecordType>(base.getType())->getDecl();
+          auto baseType = base.getType().getCanonicalType();
+
+          auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
           auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
 
           if (baseCxxRecord->isEmpty())
@@ -346,8 +348,8 @@ namespace {
 
           auto offset = layout.getBaseClassOffset(baseCxxRecord);
           auto size =
-              ClangDecl->getASTContext().getTypeSizeInChars(base.getType());
-          fn(base.getType(), offset, size);
+              ClangDecl->getASTContext().getTypeSizeInChars(baseType);
+          fn(baseType, offset, size);
         }
       }
     }
@@ -374,8 +376,8 @@ namespace {
         if (offset.getQuantity() != 0) {
           auto baseAddrVal =
               IGF.Builder.CreateBitCast(addr.getAddress(), IGF.IGM.Int8PtrTy);
-          baseAddrVal =
-              IGF.Builder.CreateConstGEP1_64(baseAddrVal, offset.getQuantity());
+          baseAddrVal = IGF.Builder.CreateConstGEP1_64(
+              IGF.IGM.Int8Ty, baseAddrVal, offset.getQuantity());
           baseAddr = Address(baseAddrVal, Alignment(1));
         }
 
@@ -427,8 +429,6 @@ namespace {
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
-      auto &layout = ClangDecl->getASTContext().getASTRecordLayout(ClangDecl);
-
       forEachNonEmptyBase([&](clang::QualType type, clang::CharUnits offset,
                               clang::CharUnits) {
         lowering.addTypedData(type, offset);
@@ -458,8 +458,14 @@ namespace {
 
       unsigned baseOffset = 0;
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        baseOffset =
-            std::distance(cxxRecord->bases().begin(), cxxRecord->bases().end());
+        baseOffset = llvm::count_if(cxxRecord->bases(), [](auto base) {
+          auto baseType = base.getType().getCanonicalType();
+
+          auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
+          auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
+
+          return !baseCxxRecord->isEmpty();
+        });
       }
 
       // Otherwise, project from the base.
@@ -724,6 +730,52 @@ namespace {
                          ClangFieldInfo>::initializeWithCopy(IGF, destAddr,
                                                              srcAddr, T,
                                                              isOutlined);
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
+      if (auto copyConstructor = findCopyConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    srcAddr.getAddress(),
+                                    destAddr.getAddress());
+        return;
+      }
+      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::assignWithCopy(IGF, destAddr,
+                                                         srcAddr, T,
+                                                         isOutlined);
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                            SILType T, bool isOutlined) const override {
+      if (auto copyConstructor = findCopyConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
+      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::initializeWithTake(IGF, dest,
+                                                             src, T,
+                                                             isOutlined);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                        bool isOutlined) const override {
+      if (auto copyConstructor = findCopyConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
+      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::assignWithTake(IGF, dest,
+                                                         src, T,
+                                                         isOutlined);
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }

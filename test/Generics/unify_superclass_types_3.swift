@@ -1,7 +1,11 @@
-// RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures -disable-requirement-machine-reuse 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -dump-requirement-machine -disable-requirement-machine-reuse 2>&1 | %FileCheck %s --check-prefix=CHECK-RULE
 
 // Note: The GSB fails this test, because it doesn't implement unification of
 // superclass type constructor arguments.
+
+// FIXME: The Requirement Machine also fails to minimize the signature of
+// unifySuperclassTest(). rdar://90469643
 
 class Generic<T, U, V> {}
 
@@ -23,6 +27,12 @@ func sameType<T>(_: T.Type, _: T.Type) {}
 
 func takesDerivedString<U>(_: Derived<String, U>.Type) {}
 
+// CHECK-LABEL: .unifySuperclassTest@
+// CHECK-NEXT: Generic signature: <T where T : P1, T : P2, T.[P2]A2 == Int>
+
+// FIXME: The 'T.[P2]A2 == Int' requirement is redundant and should not appear
+// in the minimal signature.
+
 func unifySuperclassTest<T : P1 & P2>(_: T) {
   sameType(T.A1.self, String.self)
   sameType(T.A2.self, Int.self)
@@ -30,25 +40,25 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
   takesDerivedString(T.X.self)
 }
 
-// CHECK-LABEL: Requirement machine for <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2>
-// CHECK-NEXT: Rewrite system: {
-// CHECK:      - τ_0_0.[P2:X] => τ_0_0.[P1:X]
-// CHECK:      - [P1:X].[layout: _NativeClass] => [P1:X]
-// CHECK:      - [P2:X].[layout: _NativeClass] => [P2:X]
-// CHECK:      - τ_0_0.[P1:X].[superclass: Generic<Int, τ_0_0.[P1:A1], τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
-// CHECK:      - τ_0_0.[P1:X].[superclass: Generic<Int, String, τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
-// CHECK:      - τ_0_0.[P2:A2].[concrete: Int] => τ_0_0.[P2:A2]
-// CHECK:      - τ_0_0.[P2:B2] => τ_0_0.[P1:B1]
-// CHECK:      - τ_0_0.[P1:A1].[concrete: String] => τ_0_0.[P1:A1]
-// CHECK:      - τ_0_0.B2 => τ_0_0.[P1:B1]
-// CHECK:      }
-// CHECK: Property map: {
-// CHECK-NEXT:   [P1] => { conforms_to: [P1] }
-// CHECK-NEXT:   [P2] => { conforms_to: [P2] }
-// CHECK-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Derived<[P1:A1], [P1:B1]>] }
-// CHECK-NEXT:   [P2:X] => { layout: _NativeClass superclass: [superclass: Generic<[P2:A2], String, [P2:B2]>] }
-// CHECK-NEXT:   τ_0_0 => { conforms_to: [P1 P2] }
-// CHECK-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Derived<τ_0_0.[P1:A1], τ_0_0.[P1:B1]>] }
-// CHECK-NEXT:   τ_0_0.[P2:A2] => { concrete_type: [concrete: Int] }
-// CHECK-NEXT:   τ_0_0.[P1:A1] => { concrete_type: [concrete: String] }
-// CHECK-NEXT: }
+// CHECK-RULE-LABEL: Requirement machine for <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2, τ_0_0.A2 == Int>
+// CHECK-RULE-NEXT: Rewrite system: {
+// CHECK-RULE:      - [P1:X].[layout: _NativeClass] => [P1:X]
+// CHECK-RULE:      - [P2:X].[layout: _NativeClass] => [P2:X]
+// CHECK-RULE:      - τ_0_0.[P2:A2].[concrete: Int] => τ_0_0.[P2:A2]
+// CHECK-RULE:      - τ_0_0.[P2:X] => τ_0_0.[P1:X]
+// CHECK-RULE:      - τ_0_0.[P1:X].[superclass: Generic<Int, τ_0_0.[P1:A1], τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
+// CHECK-RULE:      - τ_0_0.[P1:X].[superclass: Generic<Int, String, τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
+// CHECK-RULE:      - τ_0_0.[P2:B2] => τ_0_0.[P1:B1]
+// CHECK-RULE:      - τ_0_0.[P1:A1].[concrete: String] => τ_0_0.[P1:A1]
+// CHECK-RULE:      - τ_0_0.B2 => τ_0_0.[P1:B1]
+// CHECK-RULE:      }
+// CHECK-RULE: Property map: {
+// CHECK-RULE-NEXT:   [P1] => { conforms_to: [P1] }
+// CHECK-RULE-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Derived<[P1:A1], [P1:B1]>] }
+// CHECK-RULE-NEXT:   [P2] => { conforms_to: [P2] }
+// CHECK-RULE-NEXT:   [P2:X] => { layout: _NativeClass superclass: [superclass: Generic<[P2:A2], String, [P2:B2]>] }
+// CHECK-RULE-NEXT:   τ_0_0 => { conforms_to: [P1 P2] }
+// CHECK-RULE-NEXT:   τ_0_0.[P2:A2] => { concrete_type: [concrete: Int] }
+// CHECK-RULE-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Derived<τ_0_0.[P1:A1], τ_0_0.[P1:B1]>] }
+// CHECK-RULE-NEXT:   τ_0_0.[P1:A1] => { concrete_type: [concrete: String] }
+// CHECK-RULE-NEXT: }

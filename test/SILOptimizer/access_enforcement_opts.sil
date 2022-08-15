@@ -52,8 +52,8 @@ bb0(%0 : $@thin X.Type):
 //
 // CHECK-LABEL: sil hidden @testNestedAccess1 : $@convention(thin) () -> () {
 // CHECK: [[F1:%.*]] = function_ref @testNestedAccessClosure1 : $@convention(thin) () -> ()
-// CHECK: [[C1:%.*]] = convert_function [[F1]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF1:%.*]] = thin_to_thick_function [[C1]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed ()
+// CHECK: [[C1:%.*]] = convert_function [[F1]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF1:%.*]] = thin_to_thick_function [[C1]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed ()
 // CHECK: [[A1:%.*]] = begin_access [read] [dynamic] %0 : $*X
 // CHECK: apply [[TF1]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A1]] : $*X
@@ -62,8 +62,8 @@ sil hidden @testNestedAccess1 : $@convention(thin) () -> () {
 bb0:
   %2 = global_addr @globalX: $*X
   %3 = function_ref @testNestedAccessClosure1 : $@convention(thin) () -> ()
-  %4 = convert_function %3 : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-  %5 = thin_to_thick_function %4 : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = convert_function %3 : $@convention(thin) () -> () to $@convention(thin) () -> ()
+  %5 = thin_to_thick_function %4 : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
   %6 = begin_access [read] [dynamic] %2 : $*X
   %9 = apply %5() : $@noescape @callee_guaranteed () -> ()
   end_access %6 : $*X
@@ -72,8 +72,8 @@ bb0:
 }
 // CHECK-LABEL: sil hidden @testNestedAccess2 : $@convention(thin) () -> () {
 // CHECK: [[F2:%.*]] = function_ref @testNestedAccessClosure2 : $@convention(thin) () -> ()
-// CHECK: [[C2:%.*]] = convert_function [[F2]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF2:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[C2:%.*]] = convert_function [[F2]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF2:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[A2:%.*]] = begin_access [modify] [dynamic] %0 : $*X
 // CHECK: apply [[TF2]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A2]] : $*X
@@ -92,8 +92,8 @@ bb0:
 }
 // CHECK-LABEL: sil hidden @testNestedAccess3 : $@convention(thin) () -> () {
 // CHECK: [[F3:%.*]] = function_ref @testNestedAccessClosure3 : $@convention(thin) () -> ()
-// CHECK: [[C3:%.*]] = convert_function [[F3]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF3:%.*]] = thin_to_thick_function [[C3]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[C3:%.*]] = convert_function [[F3]] : $@convention(thin) () -> () to $@convention(thin) () -> ()
+// CHECK: [[TF3:%.*]] = thin_to_thick_function [[C3]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK: [[A3:%.*]] = begin_access [modify] [dynamic] %0 : $*X
 // CHECK: apply [[TF3]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A3]] : $*X

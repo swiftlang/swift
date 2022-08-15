@@ -317,6 +317,15 @@ public:
     return { Files.begin(), Files.size() };
   }
 
+  /// Add the given file to this module.
+  ///
+  /// FIXME: Remove this function from public view. Modules never need to add
+  /// files once they are created.
+  ///
+  /// \warning There are very few safe points to call this function once a
+  /// \c ModuleDecl has been created. If you find yourself needing to insert
+  /// a file in the middle of e.g. semantic analysis, use a \c
+  /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
 
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
@@ -405,11 +414,10 @@ private:
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
 
+public:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
   ///  module if one exists.
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
-
-public:
 
   /// Returns true if this module is an underscored cross import overlay
   /// declared by \p other or its underlying clang module, either directly or
@@ -677,6 +685,10 @@ public:
   // Is \p spiGroup accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(Identifier spiGroup, const ModuleDecl *fromModule) const;
 
+  /// Is \p targetDecl from a module that is imported as \c @_weakLinked from
+  /// this module?
+  bool isImportedAsWeakLinked(const Decl *targetDecl) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
@@ -938,6 +950,11 @@ inline bool DeclContext::isModuleScopeContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
+
+/// Collects modules that this module imports via `@_exported import`.
+void collectParsedExportedImports(const ModuleDecl *M,
+                                  SmallPtrSetImpl<ModuleDecl *> &Imports,
+                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports);
 
 } // end namespace swift
 

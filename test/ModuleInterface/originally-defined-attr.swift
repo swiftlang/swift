@@ -1,11 +1,12 @@
 // RUN: %empty-directory(%t)
 
 // Ensure the attribute is printed in swiftinterface files
-// RUN: %target-swift-frontend-typecheck -emit-module-interface-path %t/Foo.swiftinterface %s -module-name Foo \
+// RUN: %target-swift-emit-module-interface(%t/Foo.swiftinterface) %s -module-name Foo \
 // RUN:   -define-availability "_iOS8Aligned:macOS 10.10, iOS 8.0" \
 // RUN:   -define-availability "_iOS9:iOS 9.0" \
 // RUN:   -define-availability "_macOS10_11:macOS 10.11" \
 // RUN:   -define-availability "_myProject 1.0:macOS 10.11"
+// RUN: %target-swift-typecheck-module-from-interface(%t/Foo.swiftinterface) -module-name Foo
 // RUN: %FileCheck %s < %t/Foo.swiftinterface
 
 // Ensure the attribute is in .swiftmodule files

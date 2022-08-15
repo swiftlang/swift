@@ -301,6 +301,10 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
+Expr *ForEachStmt::getTypeCheckedSequence() const {
+  return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
+}
+
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
                                  ArrayRef<CaseStmt *> catches,
@@ -495,6 +499,13 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
   return ::new (mem)
       CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                body, caseVarDecls, implicit, fallthroughStmt);
+}
+
+DoStmt *DoStmt::createImplicit(ASTContext &C, LabeledStmtInfo labelInfo,
+                               ArrayRef<ASTNode> body) {
+  return new (C) DoStmt(labelInfo, /*doLoc=*/SourceLoc(),
+                        BraceStmt::createImplicit(C, body),
+                        /*implicit=*/true);
 }
 
 namespace {

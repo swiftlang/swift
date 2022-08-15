@@ -15,6 +15,7 @@
 // RUN: %target-build-swift %s -DCLIENT -parse-as-library -module-name Main -experimental-hermetic-seal-at-link -lto=llvm-full %lto_flags \
 // RUN:     -Xfrontend -disable-reflection-metadata -Xfrontend -disable-reflection-names -Xfrontend -disable-objc-interop \
 // RUN:     -I%t -L%t -lLibrary -o %t/main
+// RUN: %target-codesign %t/main
 
 // (4) Check that unused symbols are not present in final executable
 // RUN: %llvm-nm %t/main | %FileCheck %s --check-prefix CHECK-NM-EXEC

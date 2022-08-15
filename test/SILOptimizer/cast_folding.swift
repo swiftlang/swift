@@ -740,8 +740,9 @@ public class DD : PP {
 // Check that the body of the function
 // contains a trap followed by unreachable
 // and no code afterwards.
-// CHECK-LABEL: sil @$s12cast_folding7getAsDDyAA0E0CAA2CCCF
-// CHECK: builtin "int_trap"
+// CHECK-LABEL: sil {{.*}}@$s12cast_folding7getAsDDyAA0E0CAA2CCCF
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 public func getAsDD(_ c: CC) -> DD {
@@ -751,8 +752,9 @@ public func getAsDD(_ c: CC) -> DD {
 // Check that the body of the function
 // contains a trap followed by unreachable
 // and no code afterwards.
-// CHECK-LABEL: sil @$s12cast_folding7callFooySiAA2CCCF
-// CHECK: builtin "int_trap"
+// CHECK-LABEL: sil {{.*}}@$s12cast_folding7callFooySiAA2CCCF
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 public func callFoo(_ c: CC) -> Int {
@@ -767,8 +769,9 @@ func callFooGeneric<T : PP>(_ c: T) -> Int {
 
 // Check that the inlined version of callFooGeneric contains only a trap
 // followed by unreachable and no code afterwards
-// CHECK-LABEL: sil [noinline] @$s12cast_folding16callForGenericCCyyAA0F0CF
-// CHECK: builtin "int_trap"
+// CHECK-LABEL: sil [noinline] {{.*}}@$s12cast_folding16callForGenericCCyyAA0F0CF
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 @inline(never)
@@ -943,7 +946,7 @@ public func test41() -> Bool {
     return cast41(A(), P.self)
 }
 
-// CHECK-LABEL: sil [noinline] @$s12cast_folding6test42{{.*}}F
+// CHECK-LABEL: sil [noinline] {{.*}}@$s12cast_folding6test42{{.*}}F
 // CHECK: bb0
 // CHECK-NOT: return:
 // CHECK: checked_cast

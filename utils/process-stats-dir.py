@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # ==-- process-stats-dir - summarize one or more Swift -stats-output-dirs --==#
 #
@@ -356,7 +356,7 @@ def write_comparison(args, old_stats, new_stats):
                         s += " :white_check_mark:"
                 return s
             else:
-                v = int(vars(row)[field])
+                v = int(getattr(row, field))
                 if row.name.startswith('time.'):
                     return format_time(v)
                 else:
@@ -561,12 +561,37 @@ def render_profiles(args):
             webbrowser.open_new_tab("file://" + os.path.abspath(index_path))
 
 
+def process(args):
+    if args.catapult:
+        write_catapult_trace(args)
+    elif args.compare_stats_dirs:
+        return compare_stats_dirs(args)
+    elif args.set_csv_baseline is not None:
+        return set_csv_baseline(args)
+    elif args.compare_to_csv_baseline is not None:
+        return compare_to_csv_baseline(args)
+    elif args.incrementality:
+        if args.paired:
+            show_paired_incrementality(args)
+        else:
+            show_incrementality(args)
+    elif args.lnt:
+        write_lnt_values(args)
+    elif args.evaluate:
+        return evaluate(args)
+    elif args.evaluate_delta:
+        return evaluate_delta(args)
+    elif args.render_profiles:
+        return render_profiles(args)
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true",
                         help="Report activity verbosely")
     parser.add_argument("--output", default="-",
-                        type=argparse.FileType('wb', 0),
+                        type=argparse.FileType('w'),
                         help="Write output to file")
     parser.add_argument("--paired", action="store_true",
                         help="Process two dirs-of-stats-dirs, pairwise")
@@ -677,28 +702,10 @@ def main():
     if len(args.remainder) == 0:
         parser.print_help()
         return 1
-    if args.catapult:
-        write_catapult_trace(args)
-    elif args.compare_stats_dirs:
-        return compare_stats_dirs(args)
-    elif args.set_csv_baseline is not None:
-        return set_csv_baseline(args)
-    elif args.compare_to_csv_baseline is not None:
-        return compare_to_csv_baseline(args)
-    elif args.incrementality:
-        if args.paired:
-            show_paired_incrementality(args)
-        else:
-            show_incrementality(args)
-    elif args.lnt:
-        write_lnt_values(args)
-    elif args.evaluate:
-        return evaluate(args)
-    elif args.evaluate_delta:
-        return evaluate_delta(args)
-    elif args.render_profiles:
-        return render_profiles(args)
-    return None
+    try:
+        return process(args)
+    finally:
+        args.output.close()
 
 
 sys.exit(main())

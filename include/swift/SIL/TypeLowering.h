@@ -98,6 +98,15 @@ enum IsTrivial_t : bool {
   IsTrivial = true
 };
 
+/// Is a lowered SIL type the Builtin.RawPointer or a struct/tuple/enum which
+/// contains a Builtin.RawPointer?
+/// HasRawPointer is true only for types that are known to contain
+/// Builtin.RawPointer. It is not assumed true for generic or resilient types.
+enum HasRawPointer_t : bool {
+  DoesNotHaveRawPointer = false,
+  HasRawPointer = true
+};
+
 /// Is a lowered SIL type fixed-ABI?  That is, can the current context
 /// assign it a fixed size and alignment and perform value operations on it
 /// (such as copies, destroys, constructions, and projections) without
@@ -165,6 +174,8 @@ class TypeLowering {
 public:
   class RecursiveProperties {
     // These are chosen so that bitwise-or merges the flags properly.
+    //
+    // clang-format off
     enum : unsigned {
       NonTrivialFlag             = 1 << 0,
       NonFixedABIFlag            = 1 << 1,
@@ -172,7 +183,9 @@ public:
       ResilientFlag              = 1 << 3,
       TypeExpansionSensitiveFlag = 1 << 4,
       InfiniteFlag               = 1 << 5,
+      HasRawPointerFlag          = 1 << 6,
     };
+    // clang-format on
 
     uint8_t Flags;
   public:
@@ -184,12 +197,14 @@ public:
         IsTrivial_t isTrivial, IsFixedABI_t isFixedABI,
         IsAddressOnly_t isAddressOnly, IsResilient_t isResilient,
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
-            IsNotTypeExpansionSensitive)
+            IsNotTypeExpansionSensitive,
+        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
-                (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U)) {}
+                (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
+                (hasRawPointer ? HasRawPointerFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -197,6 +212,11 @@ public:
 
     static constexpr RecursiveProperties forTrivial() {
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
+    }
+
+    static constexpr RecursiveProperties forRawPointer() {
+      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
+              IsNotTypeExpansionSensitive, HasRawPointer};
     }
 
     static constexpr RecursiveProperties forReference() {
@@ -211,13 +231,15 @@ public:
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient};
     }
 
-
     void addSubobject(RecursiveProperties other) {
       Flags |= other.Flags;
     }
 
     IsTrivial_t isTrivial() const {
       return IsTrivial_t((Flags & NonTrivialFlag) == 0);
+    }
+    IsTrivial_t isOrContainsRawPointer() const {
+      return IsTrivial_t((Flags & HasRawPointerFlag) != 0);
     }
     IsFixedABI_t isFixedABI() const {
       return IsFixedABI_t((Flags & NonFixedABIFlag) == 0);
@@ -313,6 +335,10 @@ public:
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
     return Properties.isTrivial();
+  }
+  
+  bool isOrContainsRawPointer() const {
+    return Properties.isOrContainsRawPointer();
   }
   
   /// Returns true if the type is a scalar reference-counted reference, which
@@ -421,7 +447,7 @@ public:
     DirectChildren, ///> Expand the value into its direct children and place
                     ///> operations on the children.
     MostDerivedDescendents, ///> Expand the value into its most derived
-                            ///> substypes and perform operations on these
+                            ///> subtypes and perform operations on these
                             ///> types.
   };
 
@@ -752,6 +778,8 @@ class TypeConverter {
   
   llvm::DenseMap<AbstractClosureExpr *, Optional<AbstractionPattern>>
     ClosureAbstractionPatterns;
+  llvm::DenseMap<SILDeclRef, TypeExpansionContext>
+    CaptureTypeExpansionContexts;
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
@@ -933,12 +961,12 @@ public:
   }
 
   CanType getLoweredRValueType(TypeExpansionContext context, Type t) {
-    return getLoweredType(t, context).getASTType();
+    return getLoweredType(t, context).getRawASTType();
   }
 
   CanType getLoweredRValueType(TypeExpansionContext context,
                                AbstractionPattern origType, Type substType) {
-    return getLoweredType(origType, substType, context).getASTType();
+    return getLoweredType(origType, substType, context).getRawASTType();
   }
 
   AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
@@ -1156,6 +1184,7 @@ public:
   /// the abstraction pattern is queried using this function. Once the
   /// abstraction pattern has been asked for, it may not be changed.
   Optional<AbstractionPattern> getConstantAbstractionPattern(SILDeclRef constant);
+  TypeExpansionContext getCaptureTypeExpansionContext(SILDeclRef constant);
   
   /// Set the preferred abstraction pattern for a closure.
   ///
@@ -1165,6 +1194,8 @@ public:
   void setAbstractionPattern(AbstractClosureExpr *closure,
                              AbstractionPattern pattern);
   
+  void setCaptureTypeExpansionContext(SILDeclRef constant,
+                                      SILModule &M);
 private:
   CanType computeLoweredRValueType(TypeExpansionContext context,
                                    AbstractionPattern origType,
@@ -1203,6 +1234,39 @@ CanSILFunctionType getNativeSILFunctionType(
     Optional<SILDeclRef> constant = None,
     Optional<SubstitutionMap> reqtSubs = None,
     ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
+
+/// The thunk kinds used in the differentiation transform.
+enum class DifferentiationThunkKind {
+  /// A reabstraction thunk.
+  ///
+  /// Reabstraction thunks transform a function-typed value to another one with
+  /// different parameter/result abstraction patterns. This is identical to the
+  /// thunks generated by SILGen.
+  Reabstraction,
+
+  /// An index subset thunk.
+  ///
+  /// An index subset thunk is used transform JVP/VJPs into a version that is
+  /// "wrt" fewer differentiation parameters.
+  /// - Differentials of thunked JVPs use zero for non-requested differentiation
+  ///    parameters.
+  /// - Pullbacks of thunked VJPs discard results for non-requested
+  ///   differentiation parameters.
+  IndexSubset
+};
+
+/// Build the type of a function transformation thunk.
+CanSILFunctionType buildSILFunctionThunkType(
+    SILFunction *fn,
+    CanSILFunctionType &sourceType,
+    CanSILFunctionType &expectedType,
+    CanType &inputSubstType,
+    CanType &outputSubstType,
+    GenericEnvironment *&genericEnv,
+    SubstitutionMap &interfaceSubs,
+    CanType &dynamicSelfType,
+    bool withoutActuallyEscaping,
+    Optional<DifferentiationThunkKind> differentiationThunkKind = None);
 
 } // namespace swift
 

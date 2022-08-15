@@ -52,3 +52,33 @@ func passAvailableConformance1a(x: HasAvailableConformance1) {
   _ = x.isGalloping
   _ = UsesHorse<HasAvailableConformance1>.self
 }
+
+// Explicit unavailability
+public struct HasAvailableConformance2 {}
+
+@available(*, unavailable)
+extension HasAvailableConformance2 : Horse {} // expected-note 6 {{conformance of 'HasAvailableConformance2' to 'Horse' has been explicitly marked unavailable here}}
+
+// Some availability diagnostics become warnings in Swift 5 mode without
+// -enable-conformance-availability-errors because they were incorrectly
+// accepted before and rejecting them would break source compatibility. Others
+// are unaffected because they have always been rejected.
+
+func passAvailableConformance2(x: HasAvailableConformance2) {
+  takesHorse(x) // expected-error {{conformance of 'HasAvailableConformance2' to 'Horse' is unavailable}}
+  takesHorseExistential(x) // expected-warning {{conformance of 'HasAvailableConformance2' to 'Horse' is unavailable; this is an error in Swift 6}}
+  x.giddyUp() // expected-error {{conformance of 'HasAvailableConformance2' to 'Horse' is unavailable}}
+  _ = x.isGalloping // expected-error {{conformance of 'HasAvailableConformance2' to 'Horse' is unavailable}}
+  _ = x[keyPath: \.isGalloping] // expected-error {{conformance of 'HasAvailableConformance2' to 'Horse' is unavailable}}
+  _ = UsesHorse<HasAvailableConformance2>.self // expected-error {{conformance of 'HasAvailableConformance2' to 'Horse' is unavailable}}
+}
+
+@available(*, unavailable)
+func passAvailableConformance2a(x: HasAvailableConformance2) {
+  takesHorse(x)
+  takesHorseExistential(x)
+  x.giddyUp()
+  _ = x.isGalloping
+  _ = UsesHorse<HasAvailableConformance2>.self
+}
+

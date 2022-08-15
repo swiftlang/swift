@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
 protocol P1 {
@@ -48,8 +48,7 @@ struct OriginalExampleWithWarning<A, B> where A : P2, B : P2, A.T == B.T {
   init<C, D, E>(_: C)
     where C : P1,
           D : P1, // expected-warning {{redundant conformance constraint 'D' : 'P1'}}
-          C.T : P1, // expected-warning {{redundant conformance constraint 'D' : 'P1'}}
-          // expected-note@-1 {{conformance constraint 'D' : 'P1' implied here}}
+          C.T : P1, // expected-warning {{redundant conformance constraint 'C.T' : 'P1'}}
           A == S1<C, C.T.T, S2<C.T>>,
           C.T == D,
           E == D.T { }

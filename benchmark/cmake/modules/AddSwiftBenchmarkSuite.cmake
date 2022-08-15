@@ -106,7 +106,7 @@ endmacro()
 
 macro(configure_sdks_darwin)
   set(macosx_arch "x86_64" "arm64")
-  set(iphoneos_arch "arm64" "arm64e" "armv7")
+  set(iphoneos_arch "arm64" "arm64e")
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k" "arm64_32")
 
@@ -478,10 +478,10 @@ function (swift_benchmark_compile_archopts)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
       list(APPEND bench_library_swiftmodules "${swiftmodule}")
 
-      # Only set "enable-cxx-interop" for tests in the "cxx-source" directory.
+      # Only set "enable-experimental-cxx-interop" for tests in the "cxx-source" directory.
       set(cxx_options "")
       if ("${module_name_path}" MATCHES ".*cxx-source/.*")
-        list(APPEND cxx_options "-Xfrontend" "-enable-cxx-interop" "-I" "${srcdir}/utils/CxxTests/")
+        list(APPEND cxx_options "-Xfrontend" "-enable-experimental-cxx-interop" "-I" "${srcdir}/utils/CxxTests/")
       endif()
 
       if ("${bench_flags}" MATCHES "-whole-module.*")
@@ -590,7 +590,7 @@ function (swift_benchmark_compile_archopts)
       "-whole-module-optimization"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
-      "-Xfrontend" "-enable-cxx-interop"
+      "-Xfrontend" "-enable-experimental-cxx-interop"
       "-I" "${srcdir}/utils/CxxTests/"
       "-o" "${objdir}/${module_name}.o"
       "${source}")

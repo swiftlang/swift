@@ -17,12 +17,23 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
 
 class PersistentParserState;
+
+/// Kind of import affecting how a decl can be reexported.
+/// This is a subset of \c DisallowedOriginKind.
+///
+/// \sa getRestrictedImportKind
+enum class RestrictedImportKind {
+  ImplementationOnly,
+  Implicit,
+  None // No restriction, i.e. the module is imported publicly.
+};
 
 /// A file containing Swift source code.
 ///
@@ -163,6 +174,16 @@ private:
   ParserStatePtr DelayedParserState =
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
+  friend class HasImportsMatchingFlagRequest;
+
+  /// Indicates which import options have valid caches. Storage for
+  /// \c HasImportsMatchingFlagRequest.
+  ImportOptions validCachedImportOptions;
+
+  /// The cached computation of which import flags are present in the file.
+  /// Storage for \c HasImportsMatchingFlagRequest.
+  ImportOptions cachedImportOptions;
+
   friend ASTContext;
 
 public:
@@ -243,11 +264,20 @@ public:
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
   /// A selector that is used by two different declarations in the same class.
-  /// Fields: classDecl, selector, isInstanceMethod.
-  using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
+  struct ObjCMethodConflict {
+    NominalTypeDecl *typeDecl;
+    ObjCSelector selector;
+    bool isInstanceMethod;
+
+    ObjCMethodConflict(NominalTypeDecl *typeDecl, ObjCSelector selector,
+                       bool isInstanceMethod)
+        : typeDecl(typeDecl), selector(selector),
+          isInstanceMethod(isInstanceMethod)
+    {}
+  };
 
   /// List of Objective-C member conflicts we have found during type checking.
-  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
+  llvm::SetVector<ObjCMethodConflict> ObjCMethodConflicts;
 
   /// List of attributes added by access notes, used to emit remarks for valid
   /// ones.
@@ -322,11 +352,12 @@ public:
   hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
                              ImportQueryKind kind = TestableAndPrivate) const;
 
-  /// Does this source file have any implementation-only imports?
+  /// Does this source file have any imports with \c flag?
   /// If not, we can fast-path module checks.
-  bool hasImplementationOnlyImports() const;
+  bool hasImportsWithFlag(ImportFlags flag) const;
 
-  bool isImportedImplementationOnly(const ModuleDecl *module) const;
+  /// Get the most permissive restriction applied to the imports of \p module.
+  RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
 
   /// Find all SPI names imported from \p importedModule by this file,
   /// collecting the identifiers in \p spiGroups.
@@ -335,7 +366,10 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
-  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  /// Is \p module imported as \c @_weakLinked by this file?
+  bool importsModuleAsWeakLinked(const ModuleDecl *module) const override;
+
+  // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 
   bool shouldCrossImport() const;
@@ -635,5 +669,31 @@ inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
   out << "source_file " << '\"' << SF->getFilename() << '\"';
 }
 } // end namespace swift
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::SourceFile::ObjCMethodConflict> {
+  using ObjCMethodConflict = swift::SourceFile::ObjCMethodConflict;
+
+  static inline ObjCMethodConflict getEmptyKey() {
+    return ObjCMethodConflict(nullptr, {}, false);
+  }
+  static inline ObjCMethodConflict getTombstoneKey() {
+    return ObjCMethodConflict(nullptr, {}, true);
+  }
+  static inline unsigned getHashValue(ObjCMethodConflict a) {
+    return hash_combine(hash_value(a.typeDecl),
+                  DenseMapInfo<swift::ObjCSelector>::getHashValue(a.selector),
+                  hash_value(a.isInstanceMethod));
+  }
+  static bool isEqual(ObjCMethodConflict a, ObjCMethodConflict b) {
+    return a.typeDecl == b.typeDecl && a.selector == b.selector &&
+           a.isInstanceMethod == b.isInstanceMethod;
+  }
+};
+
+}
+
 
 #endif

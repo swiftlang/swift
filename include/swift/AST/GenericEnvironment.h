@@ -51,7 +51,7 @@ public:
   Type operator()(SubstitutableType *type) const;
 };
 
-/// Extra data in a generic environment for an opened existentiak.
+/// Extra data in a generic environment for an opened existential.
 struct OpenedGenericEnvironmentData {
   Type existential;
   UUID uuid;
@@ -157,7 +157,29 @@ public:
   GenericEnvironment *getIncomplete(GenericSignature signature);
 
   /// Create a new generic environment for an opened existential.
-  static GenericEnvironment *forOpenedExistential(Type existential, UUID uuid);
+  ///
+  /// This function uses the provided parent signature to construct a new
+  /// signature suitable for use with an opened archetype. If you have an
+  /// existing generic signature from e.g. deserialization use
+  /// \c GenericEnvironment::forOpenedArchetypeSignature instead.
+  ///
+  /// \param existential The subject existential type
+  /// \param parentSig The signature of the context where this existential type is being opened
+  /// \param uuid The unique identifier for this opened existential
+  static GenericEnvironment *
+  forOpenedExistential(Type existential, GenericSignature parentSig, UUID uuid);
+
+  /// Create a new generic environment for an opened existential.
+  ///
+  /// It is unlikely you want to use this function.
+  /// Call \c GenericEnvironment::forOpenedExistential instead.
+  ///
+  /// \param existential The subject existential type
+  /// \param signature The signature of the opened archetype
+  /// \param uuid The unique identifier for this opened existential
+  static GenericEnvironment *
+  forOpenedArchetypeSignature(Type existential,
+                              GenericSignature signature, UUID uuid);
 
   /// Create a new generic environment for an opaque type with the given set of
   /// outer substitutions.

@@ -443,8 +443,15 @@ class LetValueInitialization : public Initialization {
 
 public:
   LetValueInitialization(VarDecl *vd, SILGenFunction &SGF) : vd(vd) {
-    auto &lowering = SGF.getTypeLowering(vd->getType());
-    
+    const TypeLowering *lowering = nullptr;
+    if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
+        vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
+      lowering = &SGF.getTypeLowering(
+          SILMoveOnlyWrappedType::get(vd->getType()->getCanonicalType()));
+    } else {
+      lowering = &SGF.getTypeLowering(vd->getType());
+    }
+
     // Decide whether we need a temporary stack buffer to evaluate this 'let'.
     // There are four cases we need to handle here: parameters, initialized (or
     // bound) decls, uninitialized ones, and async let declarations.
@@ -469,13 +476,13 @@ public:
       // If this is a let with an initializer or bound value, we only need a
       // buffer if the type is address only.
       needsTemporaryBuffer =
-          lowering.isAddressOnly() && SGF.silConv.useLoweredAddresses();
+          lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses();
     }
 
     // Make sure that we have a non-address only type when binding a
     // @_noImplicitCopy let.
-    if (SGF.getASTContext().LangOpts.EnableExperimentalMoveOnly &&
-        lowering.isAddressOnly() &&
+    if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
+        lowering->isAddressOnly() &&
         vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
       auto d = diag::noimplicitcopy_used_on_generic_or_existential;
       diagnose(SGF.getASTContext(), vd->getLoc(), d);
@@ -485,13 +492,13 @@ public:
       bool isLexical =
           SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule());
       address =
-          SGF.emitTemporaryAllocation(vd, lowering.getLoweredType(),
+          SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
                                       false /*hasDynamicLifetime*/, isLexical);
       if (isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
-      DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, lowering);
+      DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
       SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
-    } else if (!lowering.isTrivial()) {
+    } else if (!lowering->isTrivial()) {
       // Push a cleanup to destroy the let declaration.  This has to be
       // inactive until the variable is initialized: if control flow exits the
       // before the value is bound, we don't want to destroy the value.
@@ -545,6 +552,81 @@ public:
                                             SplitCleanups);
   }
 
+  /// This is a helper method for bindValue that handles any changes to the
+  /// value needed for lexical lifetime or no implicit copy purposes.
+  SILValue getValueForLexicalLifetimeBinding(SILGenFunction &SGF,
+                                             SILLocation PrologueLoc,
+                                             SILValue value, bool wasPlusOne) {
+    // If we have none...
+    if (value->getOwnershipKind() == OwnershipKind::None) {
+      // ... and we don't have a no implicit copy trivial type, just return
+      // value.
+      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) ||
+          !vd->getAttrs().hasAttribute<NoImplicitCopyAttr>() ||
+          !value->getType().isTrivial(SGF.F))
+        return value;
+
+      // Otherwise, we have a no implicit copy trivial type, so wrap it in the
+      // move only wrapper and mark it as needing checking by the move cherk.
+      value =
+          SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
+      value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+      return SGF.B.createMarkMustCheckInst(
+          PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
+
+    // Then if we don't have move only, just perform a lexical borrow.
+    if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly))
+      return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
+
+    // Otherwise, we need to perform some additional processing. First, if we
+    // have an owned moveonly value that had a cleanup, then create a move_value
+    // that acts as a consuming use of the value. The reason why we want this is
+    // even if we are only performing a borrow for our lexical lifetime, we want
+    // to ensure that our defs see this initialization as consuming this value.
+    if (value->getOwnershipKind() == OwnershipKind::Owned &&
+        value->getType().isMoveOnlyWrapped()) {
+      assert(wasPlusOne);
+      // NOTE: If our type is trivial when not wrapped in a
+      // SILMoveOnlyWrappedType, this will return a trivial value. We rely
+      // on the checker to determine if this is an acceptable use of the
+      // value.
+      value =
+          SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(PrologueLoc, value);
+    }
+
+    // If we still have a trivial thing, just return that.
+    if (value->getType().isTrivial(SGF.F))
+      return value;
+
+    // Check if we have a move only type. In that case, we perform a lexical
+    // move and insert a mark_must_check.
+    //
+    // We do this before the begin_borrow "normal" path below since move only
+    // types do not have no implicit copy attr on them.
+    if (value->getOwnershipKind() == OwnershipKind::Owned &&
+        value->getType().isMoveOnly() &&
+        !value->getType().isMoveOnlyWrapped()) {
+      value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
+      return SGF.B.createMarkMustCheckInst(
+          PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
+
+    // Otherwise, if we do not have a no implicit copy variable, just do a
+    // borrow lexical. This is the "normal path".
+    if (!vd->getAttrs().hasAttribute<NoImplicitCopyAttr>())
+      return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
+
+    // If we have a no implicit copy lexical, emit the instruction stream so
+    // that the move checker knows to check this variable.
+    value = SGF.B.createBeginBorrow(PrologueLoc, value,
+                                    /*isLexical*/ true);
+    value = SGF.B.createCopyValue(PrologueLoc, value);
+    value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
+    return SGF.B.createMarkMustCheckInst(
+        PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+  }
+
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne) {
     assert(!SGF.VarLocs.count(vd) && "Already emitted this vardecl?");
     // If we're binding an address to this let value, then we can use it as an
@@ -554,33 +636,9 @@ public:
       address = value;
     SILLocation PrologueLoc(vd);
 
-    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()) &&
-        value->getOwnershipKind() != OwnershipKind::None) {
-      if (!SGF.getASTContext().LangOpts.EnableExperimentalMoveOnly) {
-        value = SILValue(
-            SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true));
-      } else {
-        // If we have an owned value that had a cleanup, then create a
-        // move_value that acts as a consuming use of the value. The reason why
-        // we want this is even if we are only performing a borrow for our
-        // lexical lifetime, we want to ensure that our defs see this
-        // initialization as consuming this value.
-        if (value->getOwnershipKind() == OwnershipKind::Owned) {
-          assert(wasPlusOne);
-          value = SILValue(SGF.B.createMoveValue(PrologueLoc, value));
-        }
-
-        if (vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
-          value = SILValue(SGF.B.createBeginBorrow(PrologueLoc, value,
-                                                   /*isLexical*/ true));
-          value = SGF.B.createCopyValue(PrologueLoc, value);
-          value = SGF.B.createMarkMustCheckInst(
-              PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
-        } else {
-          value = SILValue(
-              SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true));
-        }
-      }
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      value = getValueForLexicalLifetimeBinding(SGF, PrologueLoc, value,
+                                                wasPlusOne);
     }
 
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
@@ -608,7 +666,8 @@ public:
       // Disable the rvalue expression cleanup, since the let value
       // initialization has a cleanup that lives for the entire scope of the
       // let declaration.
-      bindValue(value.forward(SGF), SGF, value.isPlusOne(SGF));
+      bool isPlusOne = value.isPlusOne(SGF);
+      bindValue(value.forward(SGF), SGF, isPlusOne);
     } else {
       // Disable the expression cleanup of the copy, since the let value
       // initialization has a cleanup that lives for the entire scope of the
@@ -631,8 +690,9 @@ public:
       SGF.Cleanups.forwardCleanup(cleanup);
 
     // Activate the destroy cleanup.
-    if (DestroyCleanup != CleanupHandle::invalid())
+    if (DestroyCleanup != CleanupHandle::invalid()) {
       SGF.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
+    }
 
     DidFinish = true;
   }
@@ -1212,8 +1272,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     if (auto tryExpr = dyn_cast<TryExpr>(init))
       init = tryExpr->getSubExpr();
     init = cast<CallExpr>(init)->getFn();
-    assert(isa<AutoClosureExpr>(init) &&
-           "Could not find async let autoclosure");
+    auto initClosure = cast<AutoClosureExpr>(init);
     bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
 
     // Allocate space to receive the child task's result.
@@ -1240,8 +1299,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
       alet = emitAsyncLetStart(
           loc,
           options.forward(*this), // options is B.createManagedOptionalNone
-          init->getType(),
-          emitRValue(init).getScalarValue(),
+          initClosure,
           resultBufPtr
         ).forward(*this);
     }
@@ -1797,15 +1855,18 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     return;
   }
 
+  // This handles any case where we copy + begin_borrow or copyable_to_moveonly
+  // + begin_borrow. In either case we just need to end the lifetime of the
+  // begin_borrow's operand.
   if (auto *bbi = dyn_cast<BeginBorrowInst>(Val.getDefiningInstruction())) {
     B.createEndBorrow(silLoc, bbi);
     B.emitDestroyValueOperation(silLoc, bbi->getOperand());
     return;
   }
 
-  if (getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+  if (getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
     if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
-      if (mvi->isNoImplicitCopy()) {
+      if (mvi->hasMoveCheckerKind()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
           if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
             if (bbi->isLexical()) {
@@ -1814,6 +1875,39 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
               B.emitDestroyValueOperation(silLoc, bbi->getOperand());
               return;
             }
+          }
+        }
+
+        if (auto *copyToMove = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
+                mvi->getOperand())) {
+          if (auto *cvi = dyn_cast<CopyValueInst>(copyToMove->getOperand())) {
+            if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+              if (bbi->isLexical()) {
+                B.emitDestroyValueOperation(silLoc, mvi);
+                B.createEndBorrow(silLoc, bbi);
+                B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+                return;
+              }
+            }
+          }
+        }
+
+        if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mvi->getOperand())) {
+          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+            if (bbi->isLexical()) {
+              B.emitDestroyValueOperation(silLoc, mvi);
+              B.createEndBorrow(silLoc, bbi);
+              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+              return;
+            }
+          }
+        }
+
+        // Handle trivial arguments.
+        if (auto *move = dyn_cast<MoveValueInst>(mvi->getOperand())) {
+          if (move->isLexical()) {
+            B.emitDestroyValueOperation(silLoc, mvi);
+            return;
           }
         }
       }

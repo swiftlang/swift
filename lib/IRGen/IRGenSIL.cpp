@@ -29,13 +29,14 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -682,7 +683,7 @@ public:
 
   /// To make it unambiguous whether a `var` binding has been initialized,
   /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
-  /// field to recognize to detect uninitizialized variables. This can be
+  /// field to recognize to detect uninitialized variables. This can be
   /// removed once swiftc switches to @llvm.dbg.addr() intrinsics.
   void zeroInit(llvm::AllocaInst *AI) {
     if (!AI)
@@ -1086,14 +1087,9 @@ public:
       const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
       IndirectionKind Indirection,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
-    // TODO: fix demangling for C++ types (SR-13223).
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
         ty = metaTy->getRootClass().getPointer();
-      if (ty->getStructOrBoundGenericStruct() &&
-          isa_and_nonnull<clang::CXXRecordDecl>(
-              ty->getStructOrBoundGenericStruct()->getClangDecl()))
-        return;
     }
 
     assert(IGM.DebugInfo && "debug info not enabled");
@@ -1189,6 +1185,16 @@ public:
   }
   void visitMarkMustCheckInst(MarkMustCheckInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
+  }
+  void visitCopyableToMoveOnlyWrapperValueInst(
+      CopyableToMoveOnlyWrapperValueInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
+  }
+  void visitMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
   }
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);
@@ -1299,6 +1305,7 @@ public:
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
 
   void visitCopyAddrInst(CopyAddrInst *i);
+  void visitExplicitCopyAddrInst(ExplicitCopyAddrInst *i);
   void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *mai) {
     llvm_unreachable("Valid only when ownership is enabled");
   }
@@ -1311,8 +1318,6 @@ public:
   
   void visitConvertFunctionInst(ConvertFunctionInst *i);
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *i);
-  void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *i);
-  void visitPointerToThinFunctionInst(PointerToThinFunctionInst *i);
   void visitUpcastInst(UpcastInst *i);
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitPointerToAddressInst(PointerToAddressInst *i);
@@ -1331,8 +1336,6 @@ public:
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *i);
-  void
-  visitUnconditionalCheckedCastValueInst(UnconditionalCheckedCastValueInst *i);
   void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *i);
   void visitObjCExistentialMetatypeToObjectInst(
                                         ObjCExistentialMetatypeToObjectInst *i);
@@ -1363,7 +1366,6 @@ public:
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *i);
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
   void visitGetAsyncContinuationInst(GetAsyncContinuationInst *i);
@@ -2225,6 +2227,19 @@ void IRGenSILFunction::emitSILFunction() {
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
+  if (CurSILFn->getLinkage() == SILLinkage::Shared) {
+    if (CurSILFn->markedAsAlwaysEmitIntoClient() &&
+        CurSILFn->hasOpaqueResultTypeWithAvailabilityConditions()) {
+      auto *V = CurSILFn->getLocation().castToASTNode<ValueDecl>();
+      auto *opaqueResult = V->getOpaqueResultTypeDecl();
+      // `@_alwaysEmitIntoClient` declaration with opaque result
+      // has to emit opaque type descriptor into client module
+      // when it has availability conditions because the underlying
+      // type in such cases is unknown until runtime.
+      IGM.maybeEmitOpaqueTypeDecl(opaqueResult);
+    }
+  }
+
   auto funcTy = CurSILFn->getLoweredFunctionType();
   bool isAsyncFn = funcTy->isAsync();
   if (isAsyncFn && funcTy->getLanguage() == SILFunctionLanguage::Swift) {
@@ -2239,7 +2254,7 @@ void IRGenSILFunction::emitSILFunction() {
 
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
-  if (CurSILFn->isDistributed() && CurSILFn->isThunk()) {
+  if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
   }
@@ -2759,7 +2774,7 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
                                                 NotForDefinition).getAddress();
   // We don't need to initialize the global object if it's never used for
   // something which can access the object header.
-  if (!hasOnlyProjections(i)) {
+  if (!hasOnlyProjections(i) && !IGM.canMakeStaticObjectsReadOnly()) {
     auto ClassType = loweredTy.getASTType();
     llvm::Value *Metadata =
       emitClassHeapMetadataRef(*this, ClassType, MetadataValueType::TypeMetadata,
@@ -2812,12 +2827,14 @@ void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
   if (instanceTy.getClassOrBoundGenericClass()) {
     e.add(emitDynamicTypeOfHeapObject(*this,
                            getClassBaseValue(*this, i->getOperand()),
-                           metaTy->getRepresentation(), instanceTy));
+                           metaTy->getRepresentation(), instanceTy,
+                           CurSILFn->getGenericSignature()));
   } else if (auto arch = instanceTy.getAs<ArchetypeType>()) {
     if (arch->requiresClass()) {
       e.add(emitDynamicTypeOfHeapObject(*this,
                              getClassBaseValue(*this, i->getOperand()),
-                             metaTy->getRepresentation(), instanceTy));
+                             metaTy->getRepresentation(), instanceTy,
+                             CurSILFn->getGenericSignature()));
     } else {
       Address base = getLoweredAddress(i->getOperand());
       e.add(emitDynamicTypeOfOpaqueArchetype(*this, base,
@@ -2850,7 +2867,8 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   case ExistentialRepresentation::Class: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfClassExistential(*this, existential, i->getType(),
-                                   opType, result);
+                                   opType, CurSILFn->getGenericSignature(),
+                                   result);
     break;
   }
   case ExistentialRepresentation::Boxed: {
@@ -4731,8 +4749,10 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   llvm::Value *value = base.claimNext();
 
   SILType baseTy = i->getOperand()->getType();
+  auto fnSig = CurSILFn->getGenericSignature();
   Address field = projectPhysicalClassMemberAddress(*this, value, baseTy,
-                                                    i->getType(), i->getField())
+                                                    i->getType(), i->getField(),
+                                                    fnSig)
                       .getAddress();
   setLoweredAddress(i, field);
 }
@@ -4742,7 +4762,8 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
   llvm::Value *RefValue = getLoweredExplosion(Ref).claimNext();
 
   Address TailAddr = emitTailProjection(*this, RefValue, Ref->getType(),
-                                            i->getTailType());
+                                        i->getTailType(),
+                                        CurSILFn->getGenericSignature());
   setLoweredAddress(i, TailAddr);
 }
 
@@ -4753,7 +4774,7 @@ static bool isInvariantAddress(SILValue v) {
   }
   // TODO: We could be more aggressive about considering addresses based on
   // `let` variables as invariant when the type of the address is known not to
-  // have any sharably-mutable interior storage (in other words, no weak refs,
+  // have any shareably-mutable interior storage (in other words, no weak refs,
   // atomics, etc.). However, this currently miscompiles some programs.
   // if (accessedAddress->getType().isAddress() && isLetAddress(accessedAddress)) {
   //  return true;
@@ -4811,7 +4832,7 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
                                           DebugValueInst *DbgValue) {
   // We don't need a shadow error variable for debugging on ABI's that return
   // swifterror in a register.
-  if (IGM.IsSwiftErrorInRegister)
+  if (IGM.ShouldUseSwiftError)
     return;
   auto ErrorResultSlot = getCalleeErrorResultSlot(IGM.silConv.getSILType(
       ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext()));
@@ -5307,7 +5328,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     return;
 
   VarDecl *Decl = i->getDecl();
-  // Describe the underlying alloca. This way an llvm.dbg.declare instrinsic
+  // Describe the underlying alloca. This way an llvm.dbg.declare intrinsic
   // is used, which is valid for the entire lifetime of the alloca.
   if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr)) {
     auto *Op0 = BitCast->getOperand(0);
@@ -5545,7 +5566,8 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
     return;
   }
   auto classType = i->getOperand()->getType();
-  emitClassDeallocation(*this, classType, selfValue);
+  emitClassDeallocation(*this, classType, selfValue,
+                        CurSILFn->getGenericSignature());
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {
@@ -5555,7 +5577,8 @@ void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *
   auto metadataValue = metadata.claimNext();
   auto classType = i->getInstance()->getType();
 
-  emitPartialClassDeallocation(*this, classType, selfValue, metadataValue);
+  emitPartialClassDeallocation(*this, classType, selfValue, metadataValue,
+                               CurSILFn->getGenericSignature());
 }
 
 void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
@@ -5762,7 +5785,9 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
     // in which case we should use the caller, which is generally ok because
     // materializeForSet can't usually be thunked.
     llvm::Value *pc;
-    if (hasBeenInlined(access)) {
+    // Wasm doesn't have returnaddress because it can't access call frame
+    // for security purposes
+    if (IGM.Triple.isWasm() || hasBeenInlined(access)) {
       pc = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     } else {
       auto retAddrFn =
@@ -5848,26 +5873,6 @@ void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     out.add(fn);
     out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
   }
-  setLoweredExplosion(i, out);
-}
-
-void IRGenSILFunction::visitThinFunctionToPointerInst(
-                                          swift::ThinFunctionToPointerInst *i) {
-  Explosion in = getLoweredExplosion(i->getOperand());
-  llvm::Value *fn = in.claimNext();
-  fn = Builder.CreateBitCast(fn, IGM.Int8PtrTy);
-  Explosion out;
-  out.add(fn);
-  setLoweredExplosion(i, out);
-}
-
-void IRGenSILFunction::visitPointerToThinFunctionInst(
-                                          swift::PointerToThinFunctionInst *i) {
-  Explosion in = getLoweredExplosion(i->getOperand());
-  llvm::Value *fn = in.claimNext();
-  fn = Builder.CreateBitCast(fn, IGM.FunctionPtrTy);
-  Explosion out;
-  out.add(fn);
   setLoweredExplosion(i, out);
 }
 
@@ -6169,7 +6174,9 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                         i->getSourceFormalType(),
                         i->getTargetLoweredType(),
                         i->getTargetFormalType(),
-                        CheckedCastMode::Unconditional, ex);
+                        CheckedCastMode::Unconditional,
+                        CurSILFn->getGenericSignature(),
+                        ex);
   setLoweredExplosion(i, ex);
 }
 
@@ -6360,16 +6367,6 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                   CheckedCastMode::Unconditional);
 }
 
-void IRGenSILFunction::visitUnconditionalCheckedCastValueInst(
-    swift::UnconditionalCheckedCastValueInst *i) {
-  llvm_unreachable("unsupported instruction during IRGen");
-}
-
-void IRGenSILFunction::visitCheckedCastValueBranchInst(
-    swift::CheckedCastValueBranchInst *i) {
-  llvm_unreachable("unsupported instruction during IRGen");
-}
-
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
   FailableCastResult castResult;
@@ -6379,7 +6376,8 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
     Explosion source = getLoweredExplosion(operand);
     castResult = emitClassIdenticalCast(*this, source.claimNext(),
                                         i->getSourceLoweredType(),
-                                        i->getTargetLoweredType());
+                                        i->getTargetLoweredType(),
+                                        CurSILFn->getGenericSignature());
   } else {
     Explosion value = getLoweredExplosion(i->getOperand());
     emitScalarCheckedCast(*this, value,
@@ -6387,7 +6385,9 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
                           i->getSourceFormalType(),
                           i->getTargetLoweredType(),
                           i->getTargetFormalType(),
-                          CheckedCastMode::Conditional, ex);
+                          CheckedCastMode::Conditional,
+                          CurSILFn->getGenericSignature(),
+                          ex);
     auto val = ex.claimNext();
     castResult.casted = val;
     llvm::Value *nil =
@@ -6493,8 +6493,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
         [&](GenericRequirement reqt) -> llvm::Value * {
           return emitGenericRequirementFromSubstitutions(*this, sig,
-                                           *IGM.getSwiftModule(),
-                                           reqt, subs);
+                                                         reqt, subs);
         });
     }
     
@@ -6671,7 +6670,8 @@ void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) 
   // Insert a copy of the boxed value for COW semantics if necessary.
   auto accessKind = i->getAccessKind();
   Address object = emitOpaqueBoxedExistentialProjection(
-      *this, accessKind, base, baseTy, openedArchetype);
+      *this, accessKind, base, baseTy, openedArchetype,
+      CurSILFn->getGenericSignature());
 
   setLoweredAddress(i, object);
 }
@@ -6685,7 +6685,8 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
   Explosion result;
   llvm::Value *instance
     = emitClassExistentialProjection(*this, base, baseTy,
-                                     openedArchetype);
+                                     openedArchetype,
+                                     CurSILFn->getGenericSignature());
   result.add(instance);
   setLoweredExplosion(i, result);
 }
@@ -6754,7 +6755,8 @@ void IRGenSILFunction::visitAllocExistentialBoxInst(AllocExistentialBoxInst *i){
   OwnedAddress boxWithAddr =
     emitBoxedExistentialContainerAllocation(*this, i->getExistentialType(),
                                             i->getFormalConcreteType(),
-                                            i->getConformances());
+                                            i->getConformances(),
+                                            CurSILFn->getGenericSignature());
   setLoweredBox(i, boxWithAddr);
 }
 
@@ -6856,6 +6858,30 @@ void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
 }
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
+  SILType addrTy = i->getSrc()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
+  Address src = getLoweredAddress(i->getSrc());
+  // See whether we have a deferred fixed-size buffer initialization.
+  auto &loweredDest = getLoweredValue(i->getDest());
+  assert(!loweredDest.isUnallocatedAddressInBuffer());
+  Address dest = loweredDest.getAnyAddress();
+  if (i->isInitializationOfDest()) {
+    if (i->isTakeOfSrc()) {
+      addrTI.initializeWithTake(*this, dest, src, addrTy, false);
+    } else {
+      addrTI.initializeWithCopy(*this, dest, src, addrTy, false);
+    }
+  } else {
+    if (i->isTakeOfSrc()) {
+      addrTI.assignWithTake(*this, dest, src, addrTy, false);
+    } else {
+      addrTI.assignWithCopy(*this, dest, src, addrTy, false);
+    }
+  }
+}
+
+void IRGenSILFunction::visitExplicitCopyAddrInst(
+    swift::ExplicitCopyAddrInst *i) {
   SILType addrTy = i->getSrc()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   Address src = getLoweredAddress(i->getSrc());
@@ -7014,6 +7040,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
 
   auto fn =
       emitVirtualMethodValue(*this, baseValue, baseType, method, methodType,
+                             CurSILFn->getGenericSignature(),
                              /*useSuperVTable*/ true);
 
   setLoweredFunctionPointer(i, fn);
@@ -7076,6 +7103,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // FIXME: better explosion kind, map as static.
   FunctionPointer fn = emitVirtualMethodValue(
       *this, baseValue, i->getOperand()->getType(), method, methodType,
+      CurSILFn->getGenericSignature(),
       /*useSuperVTable*/ false);
 
   setLoweredFunctionPointer(i, fn);
@@ -7104,8 +7132,11 @@ void IRGenModule::emitSILStaticInitializers() {
            "cannot emit a static initializer for dynamically-sized global");
 #endif
 
+    LinkEntity entity = LinkEntity::forSILGlobalVariable(&Global, *this);
+    std::string name = entity.mangleAsString();
+
     auto *IRGlobal =
-        Module.getGlobalVariable(Global.getName(), true /* = AllowLocal */);
+        Module.getGlobalVariable(name, true /* = AllowLocal */);
 
     // A check for multi-threaded compilation: Is this the llvm module where the
     // global is defined and not only referenced (or not referenced at all).
@@ -7115,10 +7146,14 @@ void IRGenModule::emitSILStaticInitializers() {
     if (auto *OI = dyn_cast<ObjectInst>(InitValue)) {
       StructLayout *Layout = StaticObjectLayouts[&Global].get();
       llvm::Constant *InitVal = emitConstantObject(*this, OI, Layout);
-      auto *ContainerTy = cast<llvm::StructType>(IRGlobal->getValueType());
-      auto *zero = llvm::ConstantAggregateZero::get(ContainerTy->getElementType(0));
-      IRGlobal->setInitializer(llvm::ConstantStruct::get(ContainerTy,
-                                                         {zero , InitVal}));
+      if (canMakeStaticObjectsReadOnly()) {
+        IRGlobal->setInitializer(InitVal);
+      } else {
+        auto *ContainerTy = cast<llvm::StructType>(IRGlobal->getValueType());
+        auto *zero = llvm::ConstantAggregateZero::get(ContainerTy->getElementType(0));
+        IRGlobal->setInitializer(llvm::ConstantStruct::get(ContainerTy,
+                                                           {zero , InitVal}));
+      }
       continue;
     }
 

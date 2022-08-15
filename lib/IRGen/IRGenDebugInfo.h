@@ -145,6 +145,16 @@ public:
   void emitArtificialFunction(IRBuilder &Builder,
                               llvm::Function *Fn, SILType SILTy = SILType());
 
+  inline void emitOutlinedFunction(IRGenFunction &IGF,
+                                   llvm::Function *Fn,
+                                   StringRef outlinedFromName) {
+    emitOutlinedFunction(IGF.Builder, Fn, outlinedFromName);
+  }
+
+  void emitOutlinedFunction(IRBuilder &Builder,
+                            llvm::Function *Fn,
+                            StringRef outlinedFromName);
+
   /// Emit a dbg.declare intrinsic at the current insertion point and
   /// the Builder's current debug location.
   void emitVariableDeclaration(IRBuilder &Builder,

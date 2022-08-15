@@ -220,13 +220,13 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
@@ -235,7 +235,7 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     auto Ty = Open->getType().getASTType();
     while (auto Metatype = dyn_cast<MetatypeType>(Ty))
       Ty = Metatype.getInstanceType();
-    OpenedArchetype = cast<ArchetypeType>(Ty);
+    OpenedArchetype = cast<OpenedArchetypeType>(Ty);
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
   }
@@ -249,14 +249,15 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
   // Construct a single-generic-parameter substitution map directly to the
   // ConcreteType with this existential's full list of conformances.
   //
-  // NOTE: getOpenedArchetypeSignature() generates the signature for passing an
+  // NOTE: getOpenedExistentialSignature() generates the signature for passing an
   // opened existential as a generic parameter. No opened archetypes are
   // actually involved here--the API is only used as a convenient way to create
   // a substitution map. Since opened archetypes have different conformances
   // than their corresponding existential, ExistentialConformances needs to be
   // filtered when using it with this (phony) generic signature.
   CanGenericSignature ExistentialSig =
-      M->getASTContext().getOpenedArchetypeSignature(ExistentialType);
+      M->getASTContext().getOpenedExistentialSignature(ExistentialType,
+                                                       GenericSignature());
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
       [&](CanType /*depType*/, Type /*replaceType*/,

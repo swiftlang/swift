@@ -12,9 +12,11 @@
 
 #include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/SILNode.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILBuilder.h"
+#include <string>
 
 using namespace swift;
 
@@ -73,20 +75,19 @@ static void setUnimplementedRange(SwiftMetatype metatype,
 
 /// Registers the metatype of a swift SIL class.
 /// Called by initializeSwiftModules().
-void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
+void registerBridgedClass(StringRef className, SwiftMetatype metatype) {
   nodeMetatypesInitialized = true;
 
   // Handle the important non Node classes.
-  StringRef clName = getStringRef(className);
-  if (clName == "BasicBlock")
+  if (className == "BasicBlock")
     return SILBasicBlock::registerBridgedMetatype(metatype);
-  if (clName == "GlobalVariable")
+  if (className == "GlobalVariable")
     return SILGlobalVariable::registerBridgedMetatype(metatype);
-  if (clName == "BlockArgument") {
+  if (className == "BlockArgument") {
     nodeMetatypes[(unsigned)SILNodeKind::SILPhiArgument] = metatype;
     return;
   }
-  if (clName == "FunctionArgument") {
+  if (className == "FunctionArgument") {
     nodeMetatypes[(unsigned)SILNodeKind::SILFunctionArgument] = metatype;
     return;
   }
@@ -97,11 +98,11 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   // instructions gracefully, without the need to define the not-yet-used
   // classes in Swift.
 #define VALUE_RANGE(ID) SILNodeKind::First_##ID, SILNodeKind::Last_##ID
-  if (clName == "UnimplementedRefCountingInst")
+  if (className == "UnimplementedRefCountingInst")
     return setUnimplementedRange(metatype, VALUE_RANGE(RefCountingInst));
-  if (clName == "UnimplementedSingleValueInst")
+  if (className == "UnimplementedSingleValueInst")
     return setUnimplementedRange(metatype, VALUE_RANGE(SingleValueInstruction));
-  if (clName == "UnimplementedInstruction")
+  if (className == "UnimplementedInstruction")
     return setUnimplementedRange(metatype, VALUE_RANGE(SILInstruction));
 #undef VALUE_RANGE
 
@@ -120,21 +121,21 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   }
 
   std::string prefixedName;
-  auto iter = valueNamesToKind.find(clName);
+  auto iter = valueNamesToKind.find(className);
   if (iter == valueNamesToKind.end()) {
     // Try again with a "SIL" prefix. For example Argument -> SILArgument.
-    prefixedName = std::string("SIL") + std::string(clName);
+    prefixedName = std::string("SIL") + std::string(className);
     iter = valueNamesToKind.find(prefixedName);
     if (iter == valueNamesToKind.end()) {
-      llvm::errs() << "Unknown bridged node class " << clName << '\n';
+      llvm::errs() << "Unknown bridged node class " << className << '\n';
       abort();
     }
-    clName = prefixedName;
+    className = prefixedName;
   }
   SILNodeKind kind = iter->second;
   SwiftMetatype existingTy = nodeMetatypes[(unsigned)kind];
   if (existingTy && !unimplementedTypes.count(existingTy)) {
-    llvm::errs() << "Double registration of class " << clName << '\n';
+    llvm::errs() << "Double registration of class " << className << '\n';
     abort();
   }
   nodeMetatypes[(unsigned)kind] = metatype;
@@ -144,15 +145,20 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
 //                                SILFunction
 //===----------------------------------------------------------------------===//
 
-BridgedStringRef SILFunction_getName(BridgedFunction function) {
-  return getBridgedStringRef(castToFunction(function)->getName());
+llvm::StringRef SILFunction_getName(BridgedFunction function) {
+  return castToFunction(function)->getName();
 }
 
-BridgedStringRef SILFunction_debugDescription(BridgedFunction function) {
+std::string SILFunction_debugDescription(BridgedFunction function) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToFunction(function)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+SwiftInt SILFunction_hasOwnership(BridgedFunction function) {
+  return castToFunction(function)->hasOwnership() ? 1 : 0;
 }
 
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
@@ -211,6 +217,12 @@ SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
     ctxt.getSwift51Availability());
 }
 
+SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
+                                      StringRef attrName) {
+  SILFunction *f = castToFunction(function);
+  return f->hasSemanticsAttr(attrName) ? 1 : 0;
+}
+
 //===----------------------------------------------------------------------===//
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//
@@ -238,11 +250,12 @@ BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->getParent()};
 }
 
-BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block) {
+std::string SILBasicBlock_debugDescription(BridgedBasicBlock block) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToBasicBlock(block)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block) {
@@ -265,6 +278,17 @@ SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block) {
 
 BridgedArgument SILBasicBlock_getArgument(BridgedBasicBlock block, SwiftInt index) {
   return {castToBasicBlock(block)->getArgument(index)};
+}
+
+BridgedArgument SILBasicBlock_addBlockArgument(BridgedBasicBlock block,
+                                               BridgedType type,
+                                               BridgedOwnership ownership) {
+  return {castToBasicBlock(block)->createPhiArgument(castToSILType(type),
+                                                castToOwnership(ownership))};
+}
+
+void SILBasicBlock_eraseArgument(BridgedBasicBlock block, SwiftInt index) {
+  castToBasicBlock(block)->eraseArgument(index);
 }
 
 OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block) {
@@ -292,7 +316,12 @@ BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ) {
 //===----------------------------------------------------------------------===//
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
-  return {static_cast<SILArgument *>(argument.obj)->getParent()};
+  return {castToArgument(argument)->getParent()};
+}
+
+SwiftInt SILArgument_isExclusiveIndirectParameter(BridgedArgument argument) {
+  auto *arg = castToArgument<SILFunctionArgument>(argument);
+  return arg->getArgumentConvention().isExclusiveIndirectParameter();
 }
 
 //===----------------------------------------------------------------------===//
@@ -302,11 +331,12 @@ BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
 static_assert(BridgedOperandSize == sizeof(Operand),
               "wrong bridged Operand size");
 
-BridgedStringRef SILNode_debugDescription(BridgedNode node) {
+std::string SILNode_debugDescription(BridgedNode node) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToSILNode(node)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 static Operand *castToOperand(BridgedOperand operand) {
@@ -337,15 +367,27 @@ BridgedType SILValue_getType(BridgedValue value) {
   return { castToSILValue(value)->getType().getOpaqueValue() };
 }
 
+BridgedOwnership SILValue_getOwnership(BridgedValue value) {
+  switch (castToSILValue(value)->getOwnershipKind()) {
+    case OwnershipKind::Any:
+      llvm_unreachable("Invalid ownership for value");
+    case OwnershipKind::Unowned:    return Ownership_Unowned;
+    case OwnershipKind::Owned:      return Ownership_Owned;
+    case OwnershipKind::Guaranteed: return Ownership_Guaranteed;
+    case OwnershipKind::None:       return Ownership_None;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                            SILType
 //===----------------------------------------------------------------------===//
 
-BridgedStringRef SILType_debugDescription(BridgedType type) {
+std::string SILType_debugDescription(BridgedType type) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToSILType(type).print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 SwiftInt SILType_isAddress(BridgedType type) {
@@ -354,6 +396,17 @@ SwiftInt SILType_isAddress(BridgedType type) {
 
 SwiftInt SILType_isTrivial(BridgedType type, BridgedFunction function) {
   return castToSILType(type).isTrivial(*castToFunction(function));
+}
+
+SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  return castToSILType(type).isReferenceCounted(f->getModule()) ? 1 : 0;
+}
+
+SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
+                                                  BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  return castToSILType(type).isNonTrivialOrContainsRawPointer(*f);
 }
 
 SwiftInt SILType_isNominal(BridgedType type) {
@@ -409,7 +462,7 @@ BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
 }
 
 SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
-                                          BridgedStringRef fieldName) {
+                                          StringRef fieldName) {
   SILType ty = castToSILType(type);
   auto *nominal = ty.getNominalOrBoundGenericNominal();
   if (!nominal)
@@ -425,10 +478,9 @@ SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
   std::reverse(decls.begin(), decls.end());
 
   SwiftInt idx = 0;
-  StringRef fieldNm((const char *)fieldName.data, fieldName.length);
   for (auto *decl : decls) {
     for (VarDecl *field : decl->getStoredProperties()) {
-      if (field->getName().str() == fieldNm)
+      if (field->getName().str() == fieldName)
         return idx;
       idx++;
     }
@@ -436,19 +488,49 @@ SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
   return -1;
 }
 
+SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
+                                      StringRef caseName) {
+  SILType ty = castToSILType(type);
+  auto *enumDecl = ty.getEnumOrBoundGenericEnum();
+  if (!enumDecl)
+    return -1;
+
+  SwiftInt idx = 0;
+  for (EnumElementDecl *elem : enumDecl->getAllElements()) {
+    if (elem->getNameStr() == caseName)
+      return idx;
+    idx++;
+  }
+  return -1;
+}
+
+
+//===----------------------------------------------------------------------===//
+//                            SubstitutionMap
+//===----------------------------------------------------------------------===//
+
+BridgedSubstitutionMap SubstitutionMap_getEmpty() {
+  return {SubstitutionMap().getOpaqueValue()};
+}
+
 //===----------------------------------------------------------------------===//
 //                            SILGlobalVariable
 //===----------------------------------------------------------------------===//
 
-BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
-  return getBridgedStringRef(castToGlobal(global)->getName());
+llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
+  return castToGlobal(global)->getName();
 }
 
-BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
+std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToGlobal(global)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global) {
+  return castToGlobal(global)->isLet();
 }
 
 //===----------------------------------------------------------------------===//
@@ -505,6 +587,11 @@ BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result
   return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
 }
 
+SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result) {
+  auto *rs = static_cast<MultipleValueInstructionResult *>(result.obj);
+  return (SwiftInt)rs->getIndex();
+}
+
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst) {
   return castToInst<MultipleValueInstruction>(inst)->getNumResults();
 }
@@ -522,8 +609,8 @@ BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term) {
 //                            Instruction classes
 //===----------------------------------------------------------------------===//
 
-BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi) {
-  return getBridgedStringRef(castToInst<CondFailInst>(cfi)->getMessage());
+llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi) {
+  return castToInst<CondFailInst>(cfi)->getMessage();
 }
 
 BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi) {
@@ -536,6 +623,10 @@ BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst) {
 
 BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri) {
   return {castToInst<FunctionRefInst>(fri)->getReferencedFunction()};
+}
+
+llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli) {
+  return castToInst<StringLiteralInst>(sli)->getValue();
 }
 
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei) {
@@ -558,16 +649,36 @@ SwiftInt StructElementAddrInst_fieldIndex(BridgedInstruction seai) {
   return castToInst<StructElementAddrInst>(seai)->getFieldIndex();
 }
 
+SwiftInt ProjectBoxInst_fieldIndex(BridgedInstruction pbi) {
+  return castToInst<ProjectBoxInst>(pbi)->getFieldIndex();
+}
+
 SwiftInt EnumInst_caseIndex(BridgedInstruction ei) {
-  return getCaseIndex(castToInst<EnumInst>(ei)->getElement());
+  return castToInst<EnumInst>(ei)->getCaseIndex();
 }
 
 SwiftInt UncheckedEnumDataInst_caseIndex(BridgedInstruction uedi) {
-  return getCaseIndex(castToInst<UncheckedEnumDataInst>(uedi)->getElement());
+  return castToInst<UncheckedEnumDataInst>(uedi)->getCaseIndex();
+}
+
+SwiftInt InitEnumDataAddrInst_caseIndex(BridgedInstruction ieda) {
+  return castToInst<InitEnumDataAddrInst>(ieda)->getCaseIndex();
+}
+
+SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex(BridgedInstruction utedi) {
+  return castToInst<UncheckedTakeEnumDataAddrInst>(utedi)->getCaseIndex();
+}
+
+SwiftInt InjectEnumAddrInst_caseIndex(BridgedInstruction ieai) {
+  return castToInst<InjectEnumAddrInst>(ieai)->getCaseIndex();
 }
 
 SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai) {
   return castToInst<RefElementAddrInst>(reai)->getFieldIndex();
+}
+
+SwiftInt RefElementAddrInst_fieldIsLet(BridgedInstruction reai) {
+  return castToInst<RefElementAddrInst>(reai)->getField()->isLet();
 }
 
 SwiftInt PartialApplyInst_numArguments(BridgedInstruction pai) {
@@ -576,6 +687,15 @@ SwiftInt PartialApplyInst_numArguments(BridgedInstruction pai) {
 
 SwiftInt ApplyInst_numArguments(BridgedInstruction ai) {
   return castToInst<ApplyInst>(ai)->getNumArguments();
+}
+
+SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg(BridgedInstruction pai) {
+  auto *paiInst = castToInst<PartialApplyInst>(pai);
+  return ApplySite(paiInst).getCalleeArgIndexOfFirstAppliedArg();
+}
+
+SwiftInt PartialApplyInst_isOnStack(BridgedInstruction pai) {
+  return castToInst<PartialApplyInst>(pai)->isOnStack() ? 1 : 0;
 }
 
 SwiftInt AllocRefInstBase_isObjc(BridgedInstruction arb) {
@@ -603,11 +723,34 @@ SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se) {
 }
 
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx) {
-  return getCaseIndex(castToInst<SwitchEnumInst>(se)->getCase(idx).first);
+	auto *seInst = castToInst<SwitchEnumInst>(se);
+  return seInst->getModule().getCaseIndex(seInst->getCase(idx).first);
 }
 
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
   return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
+}
+
+BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess) {
+  auto kind = castToInst<BeginAccessInst>(beginAccess)->getAccessKind();
+  switch (kind) {
+    case SILAccessKind::Init:
+      return BridgedAccessKind::AccessKind_Init;
+    case SILAccessKind::Read:
+      return BridgedAccessKind::AccessKind_Read;
+    case SILAccessKind::Modify:
+      return BridgedAccessKind::AccessKind_Modify;
+    case SILAccessKind::Deinit:
+      return BridgedAccessKind::AccessKind_Deinit;
+  }
+}
+
+SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr) {
+  return castToInst<CopyAddrInst>(copyAddr)->isTakeOfSrc() ? 1 : 0;
+}
+
+SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr) {
+  return castToInst<CopyAddrInst>(copyAddr)->isInitializationOfDest() ? 1 : 0;
 }
 
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic) {
@@ -621,81 +764,196 @@ bool RefCountingInst_getIsAtomic(BridgedInstruction rc) {
          RefCountingInst::Atomicity::Atomic;
 }
 
+SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr) {
+  return castToInst<CondBranchInst>(cbr)->getNumTrueArgs();
+}
+
+BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst) {
+  auto as = ApplySite(castToInst(inst));
+  return {as.getSubstitutionMap().getOpaqueValue()};
+}
+
+BridgedArgumentConvention
+ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx) {
+  auto as = ApplySite(castToInst(inst));
+  auto conv = as.getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
+  switch (conv.Value) {
+    case SILArgumentConvention::Indirect_Inout:
+      return ArgumentConvention_Indirect_In;
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      return ArgumentConvention_Indirect_In_Constant;
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      return ArgumentConvention_Indirect_In_Guaranteed;
+    case SILArgumentConvention::Indirect_In:
+      return ArgumentConvention_Indirect_Inout;
+    case SILArgumentConvention::Indirect_In_Constant:
+      return ArgumentConvention_Indirect_InoutAliasable;
+    case SILArgumentConvention::Indirect_Out:
+      return ArgumentConvention_Indirect_Out;
+    case SILArgumentConvention::Direct_Unowned:
+      return ArgumentConvention_Direct_Owned;
+    case SILArgumentConvention::Direct_Owned:
+      return ArgumentConvention_Direct_Unowned;
+    case SILArgumentConvention::Direct_Guaranteed:
+      return ArgumentConvention_Direct_Guaranteed;
+  }
+}
+
+SwiftInt ApplySite_getNumArguments(BridgedInstruction inst) {
+  auto as = ApplySite(castToInst(inst));
+  return as.getNumArguments();
+}
+
 //===----------------------------------------------------------------------===//
 //                                SILBuilder
 //===----------------------------------------------------------------------===//
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
-          BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedStringRef name,
+          BridgedBuilder b, StringRef name,
           BridgedType operandType, BridgedType resultType,
           BridgedValueArray arguments) {
-    SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-    SmallVector<SILValue, 16> argValues;
-    return {builder.createBuiltinBinaryFunction(getRegularLocation(loc),
-      getStringRef(name), getSILType(operandType), getSILType(resultType),
-      getSILValues(arguments, argValues))};
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  SmallVector<SILValue, 16> argValues;
+  return {builder.createBuiltinBinaryFunction(getRegularLocation(b.loc),
+    name, getSILType(operandType), getSILType(resultType),
+    getSILValues(arguments, argValues))};
 }
 
-BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createCondFail(getRegularLocation(loc),
-    castToSILValue(condition), getStringRef(messge))};
+BridgedInstruction SILBuilder_createCondFail(BridgedBuilder b,
+          BridgedValue condition, StringRef message) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createCondFail(getRegularLocation(b.loc),
+    castToSILValue(condition), message)};
 }
 
-BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedType type, SwiftInt value) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createIntegerLiteral(getRegularLocation(loc),
+BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder b,
+          BridgedType type, SwiftInt value) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createIntegerLiteral(getRegularLocation(b.loc),
                                        getSILType(type), value)};
 }
 
-BridgedInstruction SILBuilder_createDeallocStackRef(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue operand) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createDeallocStackRef(getRegularLocation(loc),
+BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder b,
+          BridgedValue operand) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createDeallocStackRef(getRegularLocation(b.loc),
                                         castToSILValue(operand))};
 }
 
 BridgedInstruction
-SILBuilder_createUncheckedRefCast(BridgedInstruction insertionPoint,
-                                  BridgedLocation loc, BridgedValue op,
+SILBuilder_createUncheckedRefCast(BridgedBuilder b,
+                                  BridgedValue op,
                                   BridgedType type) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createUncheckedRefCast(getRegularLocation(loc),
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createUncheckedRefCast(getRegularLocation(b.loc),
                                          castToSILValue(op), getSILType(type))};
 }
 
-BridgedInstruction
-SILBuilder_createSetDeallocating(BridgedInstruction insertionPoint,
-                                 BridgedLocation loc, BridgedValue op,
-                                 bool isAtomic) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+BridgedInstruction SILBuilder_createSetDeallocating(BridgedBuilder b,
+                                 BridgedValue op, bool isAtomic) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
   return {builder.createSetDeallocating(
-      getRegularLocation(loc), castToSILValue(op),
+      getRegularLocation(b.loc), castToSILValue(op),
       isAtomic ? RefCountingInst::Atomicity::Atomic
                : RefCountingInst::Atomicity::NonAtomic)};
 }
 
 BridgedInstruction
-SILBuilder_createFunctionRef(BridgedInstruction insertionPoint,
-                             BridgedLocation loc,
+SILBuilder_createFunctionRef(BridgedBuilder b,
                              BridgedFunction function) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createFunctionRef(getRegularLocation(loc),
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createFunctionRef(getRegularLocation(b.loc),
                                     castToFunction(function))};
 }
 
-BridgedInstruction SILBuilder_createApply(BridgedInstruction insertionPoint,
-                                          BridgedLocation loc,
+BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder b,
+                                              BridgedValue op) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createCopyValue(getRegularLocation(b.loc),
+                                  castToSILValue(op))};
+}
+
+BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder b,
+                                                 BridgedValue op) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createDestroyValue(getRegularLocation(b.loc),
+                                     castToSILValue(op))};
+}
+
+BridgedInstruction SILBuilder_createApply(BridgedBuilder b,
                                           BridgedValue function,
                                           BridgedSubstitutionMap subMap,
                                           BridgedValueArray arguments) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
   SmallVector<SILValue, 16> argValues;
-  return {builder.createApply(getRegularLocation(loc), castToSILValue(function),
+  return {builder.createApply(getRegularLocation(b.loc), castToSILValue(function),
                               castToSubstitutionMap(subMap),
                               getSILValues(arguments, argValues))};
 }
 
+static EnumElementDecl *getEnumElement(SILType enumType, int caseIndex) {
+  EnumDecl *enumDecl = enumType.getEnumOrBoundGenericEnum();
+  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+    if ((int)elemWithIndex.index() == caseIndex)
+      return elemWithIndex.value();
+  }
+  llvm_unreachable("invalid enum case index");
+}
+
+BridgedInstruction SILBuilder_createUncheckedEnumData(BridgedBuilder b,
+          BridgedValue enumVal, SwiftInt caseIdx,
+          BridgedType resultType) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  SILValue en = castToSILValue(enumVal);
+  return {builder.createUncheckedEnumData(getRegularLocation(b.loc),
+                                       castToSILValue(enumVal),
+                                       getEnumElement(en->getType(), caseIdx),
+                                       castToSILType(resultType))};
+}
+
+BridgedInstruction SILBuilder_createSwitchEnumInst(BridgedBuilder b,
+                                          BridgedValue enumVal,
+                                          OptionalBridgedBasicBlock defaultBlock,
+                                          const void * _Nullable enumCases,
+                                          SwiftInt numEnumCases) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  using BridgedCase = const std::pair<SwiftInt, BridgedBasicBlock>;
+  ArrayRef<BridgedCase> cases(static_cast<BridgedCase *>(enumCases),
+                              (unsigned)numEnumCases);
+  llvm::SmallDenseMap<SwiftInt, EnumElementDecl *> mappedElements;
+  SILValue en = castToSILValue(enumVal);
+  EnumDecl *enumDecl = en->getType().getEnumOrBoundGenericEnum();
+  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+    mappedElements[elemWithIndex.index()] = elemWithIndex.value();
+  }
+  SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 16> convertedCases;
+  for (auto c : cases) {
+    assert(mappedElements.count(c.first) && "wrong enum element index");
+    convertedCases.push_back({mappedElements[c.first], castToBasicBlock(c.second)});
+  }
+  return {builder.createSwitchEnum(getRegularLocation(b.loc),
+                                   castToSILValue(enumVal),
+                                   castToBasicBlock(defaultBlock), convertedCases)};
+}
+
+BridgedInstruction SILBuilder_createBranch(
+          BridgedBuilder b, BridgedBasicBlock destBlock,
+          BridgedValueArray arguments) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  SmallVector<SILValue, 16> argValues;
+  return {builder.createBranch(getRegularLocation(b.loc),
+    castToBasicBlock(destBlock), getSILValues(arguments, argValues))};
+}

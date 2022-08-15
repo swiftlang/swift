@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -target x86_64-apple-macosx12.0 -module-name main -emit-ir -o %t/new.ir
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir -o %t/new.ir
 // RUN: %FileCheck %s --check-prefix=NEW < %t/new.ir
-// RUN: %target-swift-frontend %s -target x86_64-apple-macosx10.15 -module-name main -emit-ir -o %t/old.ir -disable-availability-checking
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -o %t/old.ir -disable-availability-checking
 // RUN: %FileCheck %s --check-prefix=OLD < %t/old.ir
 
 // Check that we add extra type metadata accessors for new kinds of functions
@@ -9,13 +9,13 @@
 // variables since old runtimes cannot synthesize type metadata based on the
 // new mangling.
 
-// RUN: %target-build-swift -target x86_64-apple-macosx10.15 %s -o %t/test_mangling -Xfrontend -disable-availability-checking
+// RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 %s -o %t/test_mangling -Xfrontend -disable-availability-checking
 // RUN: %target-run %t/test_mangling
 
-// REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 actor MyActor { }
 

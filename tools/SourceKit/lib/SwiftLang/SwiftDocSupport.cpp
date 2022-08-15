@@ -787,6 +787,7 @@ public:
         return true;
       break;
 
+    case SyntaxNodeKind::Operator:
     case SyntaxNodeKind::DollarIdent:
     case SyntaxNodeKind::Integer:
     case SyntaxNodeKind::Floating:
@@ -1085,6 +1086,12 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
 
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
+
+  // Load implict imports so that Clang importer can use it.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Ctx.getModule(unloadedImport.module.getModulePath());
+  }
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))

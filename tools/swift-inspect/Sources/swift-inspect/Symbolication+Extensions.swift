@@ -231,4 +231,10 @@ func task_enumerate_malloc_blocks(
   Sym.task_enumerate_malloc_blocks(task, context, type_mask, recorder)
 }
 
+func machErrStr(_ kr: kern_return_t) -> String {
+  let errStr = String(cString: mach_error_string(kr))
+  let errHex = String(kr, radix: 16)
+  return "\(errStr) (0x\(errHex))"
+}
+
 #endif

@@ -96,8 +96,8 @@ else:
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
-if "@SWIFT_STDLIB_SINGLE_THREADED_RUNTIME@" == "TRUE":
-    config.available_features.add("single_threaded_runtime")
+if "@SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY@" == "TRUE":
+    config.available_features.add("single_threaded_concurrency")
 
 if "@SWIFT_ENABLE_REFLECTION@" == "TRUE":
     config.available_features.add("reflection")

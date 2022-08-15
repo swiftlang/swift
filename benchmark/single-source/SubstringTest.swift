@@ -28,7 +28,7 @@ public let benchmarks = [
   BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongString2", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringFromLongStringGeneric", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringFromLongStringGeneric2", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringTrimmingASCIIWhitespace", runFunction: run_SubstringTrimmingASCIIWhitespace, tags: [.validation, .api, .String]),
 ]
 
@@ -58,16 +58,20 @@ func create<T : RangeReplaceableCollection, U : Collection>(
 public func run_SubstringFromLongStringGeneric(_ n: Int) {
   var s = longWide
   s += "!" // ensure the string has a real buffer
-  for _ in 1...n*500 {
+  for _ in 1...n*5000 {
     create(Substring.self, from: s)
   }
 }
 
-@inline(never)
-public func run_StringFromLongWholeSubstring(_ n: Int) {
+private func getLongWideRealBuffer() -> String {
   var s0 = longWide
   s0 += "!" // ensure the string has a real buffer
-  let s = Substring(s0)
+  return s0
+}
+
+@inline(never)
+public func run_StringFromLongWholeSubstring(_ n: Int) {
+  let s = Substring(getLongWideRealBuffer())
   for _ in 1...n*500 {
     blackHole(String(s))
   }
@@ -75,9 +79,7 @@ public func run_StringFromLongWholeSubstring(_ n: Int) {
 
 @inline(never)
 public func run_StringFromLongWholeSubstringGeneric(_ n: Int) {
-  var s0 = longWide
-  s0 += "!" // ensure the string has a real buffer
-  let s = Substring(s0)
+  let s = Substring(getLongWideRealBuffer())
   for _ in 1...n*500 {
     create(String.self, from: s)
   }

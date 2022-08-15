@@ -31,10 +31,12 @@ class Type;
 
 namespace swift {
 
+class ConcreteDeclRef;
 class Decl;
 class DeclContext;
 class EffectiveClangContext;
 class SwiftLookupTable;
+class ValueDecl;
 class VisibleDeclConsumer;
 
 /// Represents the different namespaces for types in C.
@@ -182,6 +184,11 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Imports a clang decl from a base class, cloning it for \param newContext
+  /// if it wasn't cloned for this specific context before.
+  virtual ValueDecl *importBaseMemberDecl(ValueDecl *decl,
+                                          DeclContext *newContext) = 0;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   virtual void diagnoseTopLevelValue(const DeclName &name) = 0;
@@ -200,6 +207,10 @@ public:
   virtual StructDecl *
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) = 0;
+
+  virtual ConcreteDeclRef
+  getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
+                                       ValueDecl *decl) = 0;
 
   /// Try to parse the string as a Clang function type.
   ///

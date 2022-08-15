@@ -13,8 +13,6 @@ Centralized command line and file system interface for the build script.
 """
 # ----------------------------------------------------------------------------
 
-from __future__ import print_function
-
 import os
 import pipes
 import platform
@@ -132,12 +130,11 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         _env = dict(os.environ)
         _env.update(env)
     try:
-        out = subprocess.check_output(command, env=_env, stderr=stderr)
-        # Coerce to `str` hack. not py3 `byte`, not py2 `unicode`.
-        return str(out.decode())
+        return subprocess.check_output(command, env=_env, stderr=stderr,
+                                       universal_newlines=True)
     except subprocess.CalledProcessError as e:
         if allow_non_zero_exit:
-            return str(e.output.decode())
+            return e.output
         if optional:
             return None
         _fatal_error(
@@ -212,26 +209,30 @@ def run(*args, **kwargs):
     repo_path = os.getcwd()
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
-    env = kwargs.pop('env', None)
+    env = kwargs.get('env', None)
+    prefix = kwargs.pop('prefix', '')
     if dry_run:
-        _echo_command(dry_run, *args, env=env)
+        _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
         return(None, 0, args)
 
     my_pipe = subprocess.Popen(
-        *args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8', **kwargs)
-    (stdout, stderr) = my_pipe.communicate()
+        *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        universal_newlines=True,
+        **kwargs)
+    (output, _) = my_pipe.communicate()
     ret = my_pipe.wait()
 
     if lock:
         lock.acquire()
     if echo_output:
-        print(repo_path)
-        _echo_command(dry_run, *args, env=env)
-        if stdout:
-            print(stdout, end="")
-        if stderr:
-            print(stderr, end="")
-        print()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
+        if output:
+            for line in output.splitlines():
+                print("{0}{1}".format(prefix, line))
+        sys.stdout.flush()
+        sys.stderr.flush()
     if lock:
         lock.release()
 
@@ -240,6 +241,6 @@ def run(*args, **kwargs):
         eout.ret = ret
         eout.args = args
         eout.repo_path = repo_path
-        eout.stderr = stderr
+        eout.stderr = output
         raise eout
-    return (stdout, 0, args)
+    return (output, 0, args)

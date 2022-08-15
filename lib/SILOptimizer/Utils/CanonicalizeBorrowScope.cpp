@@ -40,8 +40,8 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 static bool hasValueOwnership(SILValue value) {
-  return value.getOwnershipKind() == OwnershipKind::Guaranteed
-         || value.getOwnershipKind() == OwnershipKind::Owned;
+  return value->getOwnershipKind() == OwnershipKind::Guaranteed ||
+         value->getOwnershipKind() == OwnershipKind::Owned;
 }
 
 /// Delete a chain of unused copies leading to \p v.
@@ -264,11 +264,12 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
         // which means that the escaped value must be confined to the current
         // borrow scope. visitBorrowScopeUses must never return false when
         // borrowedValue is a SILFunctionArgument.
-        if (use->get().getOwnershipKind() != OwnershipKind::Guaranteed
-            && !isa<SILFunctionArgument>(borrowedValue.value)) {
+        if (use->get()->getOwnershipKind() != OwnershipKind::Guaranteed &&
+            !isa<SILFunctionArgument>(borrowedValue.value)) {
           return false;
         }
         if (!visitor.visitUse(use)) {
+          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
         }
         break;
@@ -276,8 +277,10 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::ForwardingConsume:
         if (CanonicalizeBorrowScope::isRewritableOSSAForward(user)) {
-          if (!visitor.visitForwardingUse(use))
+          if (!visitor.visitForwardingUse(use)) {
+            assert(!isa<SILFunctionArgument>(borrowedValue.value));
             return false;
+          }
           break;
         }
         LLVM_FALLTHROUGH;
@@ -287,8 +290,10 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::BitwiseEscape:
       case OperandOwnership::DestroyingConsume:
-        if (!visitor.visitUse(use))
+        if (!visitor.visitUse(use)) {
+          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
+        }
         break;
       } // end switch OperandOwnership
     }
@@ -324,7 +329,7 @@ public:
 
   bool visitUse(Operand *use) {
     // A guaranteed use can never be outside this borrow scope
-    if (use->get().getOwnershipKind() == OwnershipKind::Guaranteed)
+    if (use->get()->getOwnershipKind() == OwnershipKind::Guaranteed)
       return true;
     
     auto *user = use->getUser();

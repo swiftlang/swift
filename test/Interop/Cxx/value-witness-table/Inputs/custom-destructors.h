@@ -1,12 +1,13 @@
 #ifndef TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_CUSTOM_DESTRUCTORS_H
 #define TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_CUSTOM_DESTRUCTORS_H
 
-struct HasUserProvidedDestructor {
+struct __attribute__((swift_attr("import_unsafe"))) HasUserProvidedDestructor {
   int *value;
   ~HasUserProvidedDestructor() { *value = 42; }
 };
 
-struct HasEmptyDestructorAndMemberWithUserDefinedConstructor {
+struct __attribute__((swift_attr("import_unsafe")))
+HasEmptyDestructorAndMemberWithUserDefinedConstructor {
   HasUserProvidedDestructor member;
   ~HasEmptyDestructorAndMemberWithUserDefinedConstructor() { /* empty */
   }
@@ -26,17 +27,18 @@ struct HasDefaultedDestructor {
 };
 
 // For the following objects with virtual bases / destructors, make sure that
-// any exectuable user of these objects disable rtti and exceptions. Otherwise,
+// any executable user of these objects disable rtti and exceptions. Otherwise,
 // the linker will error because of undefined vtables.
 // FIXME: Once we can link with libc++ we can enable RTTI.
 
-struct HasVirtualBaseAndDestructor : virtual HasDefaultedDestructor {
+struct __attribute__((swift_attr("import_unsafe"))) HasVirtualBaseAndDestructor
+    : virtual HasDefaultedDestructor {
   int *value;
   HasVirtualBaseAndDestructor(int *value) : value(value) {}
   ~HasVirtualBaseAndDestructor() { *value = 42; }
 };
 
-struct HasVirtualDestructor {
+struct __attribute__((swift_attr("import_unsafe"))) HasVirtualDestructor {
   // An object with a virtual destructor requires a delete operator in case
   // we try to delete the base object. Until we can link against libc++, use
   // this dummy implementation.
@@ -44,18 +46,21 @@ struct HasVirtualDestructor {
   virtual ~HasVirtualDestructor(){};
 };
 
-struct HasVirtualDefaultedDestructor {
+struct __attribute__((swift_attr("import_unsafe")))
+HasVirtualDefaultedDestructor {
   static void operator delete(void *p) { __builtin_unreachable(); }
   virtual ~HasVirtualDefaultedDestructor() = default;
 };
 
-struct HasBaseWithVirtualDestructor : HasVirtualDestructor {
+struct __attribute__((swift_attr("import_unsafe"))) HasBaseWithVirtualDestructor
+    : HasVirtualDestructor {
   int *value;
   HasBaseWithVirtualDestructor(int *value) : value(value) {}
   ~HasBaseWithVirtualDestructor() { *value = 42; }
 };
 
-struct HasVirtualBaseWithVirtualDestructor : virtual HasVirtualDestructor {
+struct __attribute__((swift_attr("import_unsafe")))
+HasVirtualBaseWithVirtualDestructor : virtual HasVirtualDestructor {
   int *value;
   HasVirtualBaseWithVirtualDestructor(int *value) : value(value) {}
   ~HasVirtualBaseWithVirtualDestructor() { *value = 42; }
@@ -63,13 +68,15 @@ struct HasVirtualBaseWithVirtualDestructor : virtual HasVirtualDestructor {
 
 struct DummyStruct {};
 
-struct HasUserProvidedDestructorAndDummy {
+struct __attribute__((swift_attr("import_unsafe")))
+HasUserProvidedDestructorAndDummy {
   DummyStruct dummy;
   ~HasUserProvidedDestructorAndDummy() {}
 };
 
 // Make sure that we don't crash on struct templates with destructors.
-template <typename T> struct S {
+template <typename T>
+struct __attribute__((swift_attr("import_unsafe"))) S {
   ~S() {}
 };
 

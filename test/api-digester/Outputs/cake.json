@@ -20,6 +20,13 @@
       },
       {
         "kind": "Import",
+        "name": "_StringProcessing",
+        "printedName": "_StringProcessing",
+        "declKind": "Import",
+        "moduleName": "cake"
+      },
+      {
+        "kind": "Import",
         "name": "cake",
         "printedName": "cake",
         "declKind": "Import",
@@ -63,6 +70,7 @@
             "moduleName": "cake",
             "genericSig": "<Self where Self : cake.P1>",
             "static": true,
+            "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           }
         ],
@@ -223,6 +231,7 @@
             "mangledName": "$s4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
             "moduleName": "cake",
             "genericSig": "<T1, T2, T3 where T1 == cake.S1, T2 == cake.S1, T3 == cake.S1>",
+            "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           },
           {
@@ -241,6 +250,7 @@
             "mangledName": "$s4cake2C0C19unconditionalFooExtyyF",
             "moduleName": "cake",
             "genericSig": "<T1, T2, T3>",
+            "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           }
         ],
@@ -921,6 +931,7 @@
             "mangledName": "$s4cake21ProWithAssociatedTypePAAE10NonReqFuncyyF",
             "moduleName": "cake",
             "genericSig": "<Self where Self : cake.ProWithAssociatedType>",
+            "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           },
           {
@@ -939,6 +950,7 @@
             "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
             "mangledName": "$s4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
             "moduleName": "cake",
+            "isFromExtension": true,
             "accessors": [
               {
                 "kind": "Accessor",
@@ -957,6 +969,7 @@
                 "mangledName": "$s4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
                 "moduleName": "cake",
                 "genericSig": "<Self where Self : cake.ProWithAssociatedType>",
+                "isFromExtension": true,
                 "accessorKind": "get"
               }
             ]
@@ -977,7 +990,8 @@
             "usr": "s:4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
             "mangledName": "$s4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
             "moduleName": "cake",
-            "genericSig": "<Self where Self : cake.ProWithAssociatedType>"
+            "genericSig": "<Self where Self : cake.ProWithAssociatedType>",
+            "isFromExtension": true
           }
         ],
         "declKind": "Protocol",
@@ -1187,6 +1201,7 @@
             "mangledName": "$s4cake6PSuperPAAE9futureFooyyF",
             "moduleName": "cake",
             "genericSig": "<Self where Self : cake.PSuper>",
+            "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           }
         ],
@@ -1490,6 +1505,50 @@
       },
       {
         "kind": "TypeDecl",
+        "name": "SinkingClass",
+        "printedName": "SinkingClass",
+        "children": [
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "SinkingClass",
+                "printedName": "Bread.SinkingClass",
+                "usr": "s:4cake12SinkingClassC"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:4cake12SinkingClassCACycfc",
+            "mangledName": "$s5Bread12SinkingClassCACycfc",
+            "moduleName": "cake",
+            "spi_group_names": [
+              "top_secret_2",
+              "top_secret_1"
+            ],
+            "init_kind": "Designated"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "s:4cake12SinkingClassC",
+        "mangledName": "$s5Bread12SinkingClassC",
+        "moduleName": "cake",
+        "intro_Macosx": "10.7",
+        "declAttributes": [
+          "SPIAccessControl",
+          "SPIAccessControl",
+          "OriginallyDefinedIn",
+          "Available"
+        ],
+        "spi_group_names": [
+          "top_secret_2",
+          "top_secret_1"
+        ]
+      },
+      {
+        "kind": "TypeDecl",
         "name": "Int",
         "printedName": "Int",
         "children": [
@@ -1508,6 +1567,7 @@
             "usr": "s:Si4cakeE3fooyyF",
             "mangledName": "$sSi4cakeE3fooyyF",
             "moduleName": "cake",
+            "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           },
           {
@@ -1525,6 +1585,7 @@
             "usr": "s:Si4cakeE3baryyF",
             "mangledName": "$sSi4cakeE3baryyF",
             "moduleName": "cake",
+            "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           }
         ],
@@ -1868,6 +1929,6 @@
         ]
       }
     ],
-    "json_format_version": 7
+    "json_format_version": 8
   }
 }

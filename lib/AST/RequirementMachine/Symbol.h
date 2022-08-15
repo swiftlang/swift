@@ -12,6 +12,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 
 #ifndef SWIFT_RQM_SYMBOL_H
@@ -55,7 +56,7 @@ class Term;
 ///
 /// This transformation allows DependentMemberTypes to be manipulated as
 /// terms, with the actual concrete type structure remaining opaque to
-/// the requirement machine. This tranformation is implemented in
+/// the requirement machine. This transformation is implemented in
 /// RewriteContext::getConcreteSubstitutionSchema().
 ///
 /// For example, the superclass requirement
@@ -121,17 +122,12 @@ public:
     Layout,
 
     /// When appearing at the end of a term, denotes that the term
-    /// is exactly equal to the concrete type.
-    ConcreteType,
+    /// is a subclass of the superclass constraint.
+    Superclass,
 
     /// When appearing at the end of a term, denotes that the term
-    /// is a subclass of the superclass constraint.
-    ///
-    /// Note that this orders after ConcreteType, to ensure compatibility
-    /// with the GenericSignatureBuilder on pathological generic signatures
-    /// where a type is subject to both a superclass and concrete type
-    /// requirement that imply each other.
-    Superclass,
+    /// is exactly equal to the concrete type.
+    ConcreteType,
   };
 
   static const unsigned NumKinds = 8;

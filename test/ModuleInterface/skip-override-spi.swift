@@ -1,11 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %empty-directory(%t/inputs)
-// RUN: %empty-directory(%t/modulecache)
-// RUN: echo "public class HideyHole { @_spi(Private) public init() {} }" > %t/Foo.swift
-// RUN: echo "public class StashyCache: HideyHole {}" >> %t/Foo.swift
+// RUN: %target-swift-emit-module-interface(%t/Foo.swiftinterface) %s -module-name Foo
+// RUN: %target-swift-typecheck-module-from-interface(%t/Foo.swiftinterface) -module-name Foo
+// RUN: %FileCheck %s < %t/Foo.swiftinterface
 
-// RUN: %target-swift-frontend -emit-module -emit-module-interface-path %t/inputs/Foo.swiftinterface %t/Foo.swift -module-name Foo
+// CHECK: public class HideyHole
+public class HideyHole {
+  // CHECK-NOT: public init()
+  @_spi(Private) public init() {}
+}
 
-// RUN: %target-swift-frontend -emit-module-path %t/Bar.swiftmodule -enable-library-evolution -enable-objc-interop -disable-objc-attr-requires-foundation-module -module-name Bar %s -I %t/inputs -disable-availability-checking -module-cache-path %t/modulecache
-
-import Foo
+// CHECK: @_inheritsConvenienceInitializers public class StashyCache : Foo.HideyHole
+public class StashyCache: HideyHole {
+  // CHECK: public init()
+}

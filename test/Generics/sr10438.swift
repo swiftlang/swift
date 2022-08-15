@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK: sr10438.(file).AuthenticationFlowStateMachine@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[AuthenticationFlowStateMachine]FlowError.[AuthenticationFlowStateMachineFlowError]StateMachine, Self.[AuthenticationFlowStateMachine]FlowError : AuthenticationFlowStateMachineFlowError, Self.[AuthenticationFlowStateMachine]NonFinalState : AuthenticationFlowStateMachineNonFinalState, Self.[AuthenticationFlowStateMachine]StartState : AuthenticationFlowStateMachineStartState, Self.[AuthenticationFlowStateMachine]FlowError.[AuthenticationFlowStateMachineFlowError]StateMachine == Self.[AuthenticationFlowStateMachine]NonFinalState.[AuthenticationFlowStateMachineNonFinalState]StateMachine, Self.[AuthenticationFlowStateMachine]NonFinalState.[AuthenticationFlowStateMachineNonFinalState]StateMachine == Self.[AuthenticationFlowStateMachine]StartState.[AuthenticationFlowStateMachineStartState]StateMachine>

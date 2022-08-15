@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -I %t/Inputs  %t/test.swift  -enable-cxx-interop
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop
 
 // REQUIRES: objc_interop
 
@@ -15,7 +15,7 @@ module Test {
 
 inline void* operator new(unsigned long, void* p) { return p; }
 
-struct __attribute__((swift_attr("import_as_ref"))) Empty {
+struct __attribute__((swift_attr("import_reference"))) Empty {
   static Empty *create() { return new (malloc(sizeof(Empty))) Empty(); }
 };
 

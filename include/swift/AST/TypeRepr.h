@@ -19,6 +19,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -34,7 +35,6 @@
 namespace swift {
   class ASTWalker;
   class DeclContext;
-  class GenericEnvironment;
   class IdentTypeRepr;
   class TupleTypeRepr;
   class TypeDecl;
@@ -164,7 +164,7 @@ public:
   /// its children.
   bool findIf(llvm::function_ref<bool(TypeRepr *)> pred);
 
-  /// Check recursively whether this type repr or any of its decendants are
+  /// Check recursively whether this type repr or any of its descendants are
   /// opaque return type reprs.
   bool hasOpaque();
 
@@ -492,14 +492,14 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 ///   (x: Foo, y: Bar) -> Baz
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  // The generic params / environment / substitutions fields are only used
+  // The generic params / signature / substitutions fields are only used
   // in SIL mode, which is the only time we can have polymorphic and
   // substituted function values.
   GenericParamList *GenericParams;
-  GenericEnvironment *GenericEnv;
+  GenericSignature GenericSig;
   ArrayRef<TypeRepr *> InvocationSubs;
   GenericParamList *PatternGenericParams;
-  GenericEnvironment *PatternGenericEnv;
+  GenericSignature PatternGenericSig;
   ArrayRef<TypeRepr *> PatternSubs;
 
   TupleTypeRepr *ArgsTy;
@@ -516,22 +516,22 @@ public:
                    ArrayRef<TypeRepr *> patternSubs = {},
                    ArrayRef<TypeRepr *> invocationSubs = {})
     : TypeRepr(TypeReprKind::Function),
-      GenericParams(genericParams), GenericEnv(nullptr),
+      GenericParams(genericParams),
       InvocationSubs(invocationSubs),
-      PatternGenericParams(patternGenericParams), PatternGenericEnv(nullptr),
+      PatternGenericParams(patternGenericParams),
       PatternSubs(patternSubs),
       ArgsTy(argsTy), RetTy(retTy),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  GenericSignature getGenericSignature() const { return GenericSig; }
 
   GenericParamList *getPatternGenericParams() const {
     return PatternGenericParams;
   }
-  GenericEnvironment *getPatternGenericEnvironment() const {
-    return PatternGenericEnv;
+  GenericSignature getPatternGenericSignature() const {
+    return PatternGenericSig;
   }
 
   ArrayRef<TypeRepr*> getPatternSubstitutions() const { return PatternSubs; }
@@ -539,14 +539,14 @@ public:
     return InvocationSubs;
   }
 
-  void setPatternGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert(PatternGenericEnv == nullptr);
-    PatternGenericEnv = genericEnv;
+  void setPatternGenericSignature(GenericSignature genericSig) {
+    assert(!PatternGenericSig);
+    PatternGenericSig = genericSig;
   }
 
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert(GenericEnv == nullptr);
-    GenericEnv = genericEnv;
+  void setGenericSignature(GenericSignature genericSig) {
+    assert(!GenericSig);
+    GenericSig = genericSig;
   }
 
   TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
@@ -1239,7 +1239,7 @@ class SILBoxTypeRepr final : public TypeRepr,
                                   SILBoxTypeReprField, TypeRepr *> {
   friend TrailingObjects;
   GenericParamList *GenericParams;
-  GenericEnvironment *GenericEnv = nullptr;
+  GenericSignature GenericSig;
 
   SourceLoc LBraceLoc, RBraceLoc;
   SourceLoc ArgLAngleLoc, ArgRAngleLoc;
@@ -1280,9 +1280,9 @@ public:
                       SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
                       SourceLoc ArgRAngleLoc);
   
-  void setGenericEnvironment(GenericEnvironment *Env) {
-    assert(!GenericEnv);
-    GenericEnv = Env;
+  void setGenericSignature(GenericSignature Sig) {
+    assert(!GenericSig);
+    GenericSig = Sig;
   }
   
   ArrayRef<Field> getFields() const {
@@ -1297,8 +1297,8 @@ public:
   GenericParamList *getGenericParams() const {
     return GenericParams;
   }
-  GenericEnvironment *getGenericEnvironment() const {
-    return GenericEnv;
+  GenericSignature getGenericSignature() const {
+    return GenericSig;
   }
 
   SourceLoc getLBraceLoc() const { return LBraceLoc; }

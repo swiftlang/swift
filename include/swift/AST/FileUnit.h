@@ -55,6 +55,8 @@ public:
   /// Returns the synthesized file for this source file, if it exists.
   SynthesizedFileUnit *getSynthesizedFile() const;
 
+  /// Returns the synthesized file for this source file, creating one and
+  /// inserting it into the module if it does not exist.
   SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -120,6 +122,17 @@ public:
   virtual void lookupImportedSPIGroups(
                             const ModuleDecl *importedModule,
                             SmallSetVector<Identifier, 4> &spiGroups) const {};
+
+  /// Checks whether this file imports \c module as \c @_weakLinked.
+  virtual bool importsModuleAsWeakLinked(const ModuleDecl *module) const {
+    // For source files, this should be overridden to inspect the import
+    // declarations in the file. Other kinds of file units, like serialized
+    // modules, can just use this default implementation since the @_weakLinked
+    // attribute is not transitive. If module C is imported @_weakLinked by
+    // module B, that does not imply that module A imports module C @_weakLinked
+    // if it imports module B.
+    return false;
+  }
 
   virtual Optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const { return None; }

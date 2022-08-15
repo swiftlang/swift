@@ -136,7 +136,7 @@ static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
 }
 
 // A cache of string-related, SIL information that is needed to create and
-// initalize strings from raw string literals. This information is
+// initialize strings from raw string literals. This information is
 // extracted from instructions while they are constant evaluated. Though the
 // information contained here can be constructed from scratch, extracting it
 // from existing instructions is more efficient.
@@ -496,7 +496,8 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   std::string allocatorMangledName =
       SILDeclRef(arrayAllocateDecl, SILDeclRef::Kind::Func).mangle();
   SILFunction *arrayAllocateFun =
-      module.findFunction(allocatorMangledName, SILLinkage::PublicExternal);
+      module.loadFunction(allocatorMangledName,
+                          SILModule::LinkingMode::LinkNormal);
   assert(arrayAllocateFun);
 
   SILFunction *arrayFinalizeFun = nullptr;
@@ -505,9 +506,9 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
       std::string finalizeMangledName =
           SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
       arrayFinalizeFun =
-          module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
+          module.loadFunction(finalizeMangledName,
+                              SILModule::LinkingMode::LinkNormal);
       assert(arrayFinalizeFun);
-      module.linkFunction(arrayFinalizeFun);
     }
   }
 
@@ -839,7 +840,7 @@ getEndPointsOfDataDependentChain(SingleValueInstruction *value, SILFunction *fun
 /// from a guaranteed basic block parameter representing a phi node.
 static Optional<BorrowedValue>
 getUniqueBorrowScopeIntroducingValue(SILValue value) {
-  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed &&
+  assert(value->getOwnershipKind() == OwnershipKind::Guaranteed &&
          "parameter must be a guarenteed value");
   return getSingleBorrowIntroducingValue(value);
 }
@@ -871,10 +872,10 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   }
   assert(!foldedVal->getType().isTrivial(*fun));
   assert(fun->hasOwnership());
-  assert(foldedVal.getOwnershipKind() == OwnershipKind::Owned &&
+  assert(foldedVal->getOwnershipKind() == OwnershipKind::Owned &&
          "constant value must have owned ownership kind");
 
-  if (originalVal.getOwnershipKind() == OwnershipKind::Owned) {
+  if (originalVal->getOwnershipKind() == OwnershipKind::Owned) {
     originalVal->replaceAllUsesWith(foldedVal);
     // Destroy originalVal, which is now unused, immediately after its
     // definition. Note that originalVal's destorys are now transferred to
@@ -892,7 +893,7 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   // Therefore, create a borrow of foldedVal at the beginning of the scope and
   // use the borrow in place of the originalVal. Also, end the borrow and
   // destroy foldedVal at the end of the borrow scope.
-  assert(originalVal.getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(originalVal->getOwnershipKind() == OwnershipKind::Guaranteed);
 
   // FIXME: getUniqueBorrowScopeIntroducingValue may look though various storage
   // casts. There's no reason to think that it's valid to replace uses of
@@ -956,7 +957,7 @@ static void substituteConstants(FoldState &foldState) {
     // other hand, if we are folding an owned value, we can insert the constant
     // value at the point where the owned value is defined.
     SILInstruction *insertionPoint = definingInst;
-    if (constantSILValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+    if (constantSILValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
       Optional<BorrowedValue> borrowIntroducer =
           getUniqueBorrowScopeIntroducingValue(constantSILValue);
       if (!borrowIntroducer) {

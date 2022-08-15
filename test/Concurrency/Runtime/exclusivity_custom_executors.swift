@@ -6,11 +6,10 @@
 // rdar://76038845
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deploy_concurrency
 
 // Crash expectations can't be implemented on WASI/WebAssembly.
 // UNSUPPORTED: OS=wasi
-
-// UNSUPPORTED: use_os_stdlib
 
 // This test makes sure that we properly save/restore access when we
 // synchronously launch a task from a serial executor. The access from the task
@@ -97,13 +96,13 @@ public final class MySerialExecutor : SerialExecutor {
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-      debugLog("==> MyMainActor: Getting unowned exector!")
+      debugLog("==> MyMainActor: Getting unowned executor!")
       return executor.asUnownedSerialExecutor()
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-      debugLog("==> MyMainActor: Getting shared unowned exector!")
+      debugLog("==> MyMainActor: Getting shared unowned executor!")
       return MySerialExecutor.sharedUnownedExecutor
   }
 
@@ -124,14 +123,14 @@ public final class MySerialExecutor : SerialExecutor {
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-      debugLog("==> MyMainActorWithAccessInUnownedExecAccessor: Getting unowned exector!")
+      debugLog("==> MyMainActorWithAccessInUnownedExecAccessor: Getting unowned executor!")
       withExclusiveAccess(to: &global) { _ in debugLog("Crash!") }
       return executor.asUnownedSerialExecutor()
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-      debugLog("==> MyMainActorWithAccessInUnownedExecAccessor: Getting shared unowned exector!")
+      debugLog("==> MyMainActorWithAccessInUnownedExecAccessor: Getting shared unowned executor!")
       return MySerialExecutor.sharedUnownedExecutor
   }
 
@@ -377,6 +376,7 @@ struct Runner {
 
                 await withExclusiveAccessAsync(to: &global) {
                     @MyMainActorWithAccessInUnownedExecAccessor (x: inout Int) async -> Void in
+                    print("do something to avoid optimizing away to executor switch")
                     debugLog("==> Making sure can push/pop access")
                 }
                 // In order to test that we properly hand off the access, we

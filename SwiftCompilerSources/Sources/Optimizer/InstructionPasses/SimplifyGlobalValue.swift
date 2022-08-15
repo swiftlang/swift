@@ -37,22 +37,20 @@ let simplifyGlobalValuePass = InstructionPass<GlobalValueInst>(
 private func checkUsers(of val: Value, users: inout Stack<Instruction>) -> Bool {
   for use in val.uses {
     let user = use.instruction
-    if user is RefCountingInst || user is DebugValueInst {
-      users.push(user)
-      continue
-    }
-    if let upCast = user as? UpcastInst {
-      if !checkUsers(of: upCast, users: &users) {
+    switch user {
+      case is RefCountingInst, is DebugValueInst, is FixLifetimeInst:
+        users.push(user)
+      case let upCast as UpcastInst:
+        if !checkUsers(of: upCast, users: &users) {
+          return false
+        }
+      case is RefElementAddrInst, is RefTailAddrInst:
+        // Projection instructions don't access the object header, so they don't
+        // prevent deleting reference counting instructions.
+        break
+      default:
         return false
-      }
-      continue
     }
-    // Projection instructions don't access the object header, so they don't
-    // prevent deleting reference counting instructions.
-    if user is RefElementAddrInst || user is RefTailAddrInst {
-      continue
-    }
-    return false
   }
   return true
 }

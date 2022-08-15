@@ -80,6 +80,10 @@ class NodeFactory {
 #endif
 
 public:
+#ifndef NDEBUG
+  /// Enabled only by the unit tests to test the failure paths.
+  bool disableAssertionsForUnitTest = false;
+#endif
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
@@ -343,6 +347,10 @@ enum class SymbolicReferenceKind : uint8_t {
   /// A symbolic reference to an accessor function, which can be executed in
   /// the process to get a pointer to the referenced entity.
   AccessorFunctionReference,
+  /// A symbolic reference to a unique extended existential type shape.
+  UniqueExtendedExistentialTypeShape,
+  /// A symbolic reference to a non-unique extended existential type shape.
+  NonUniqueExtendedExistentialTypeShape,
 };
 
 using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
@@ -516,6 +524,7 @@ protected:
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx);
   NodePointer popAnyProtocolConformanceList();
+  NodePointer popRetroactiveConformances();
   NodePointer demangleRetroactiveConformance();
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
@@ -529,6 +538,8 @@ protected:
   NodePointer demangleArchetype();
   NodePointer demangleAssociatedTypeSimple(NodePointer GenericParamIdx);
   NodePointer demangleAssociatedTypeCompound(NodePointer GenericParamIdx);
+  NodePointer demangleExtendedExistentialShape(char kind);
+  NodePointer demangleSymbolicExtendedExistentialType();
 
   NodePointer popAssocTypeName();
   NodePointer popAssocTypePath();
@@ -579,6 +590,8 @@ protected:
   NodePointer demangleIndexSubset();
   NodePointer demangleDifferentiableFunctionType();
 
+  NodePointer demangleConstrainedExistentialRequirementList();
+
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
   
@@ -622,7 +635,7 @@ public:
 
 /// A demangler which uses stack space for its initial memory.
 ///
-/// The \p Size paramter specifies the size of the stack space.
+/// The \p Size parameter specifies the size of the stack space.
 template <size_t Size> class StackAllocatedDemangler : public Demangler {
   char StackSpace[Size];
 

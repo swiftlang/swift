@@ -1,0 +1,12 @@
+framework module TextualHeaders [system] {
+  umbrella "PrivateHeaders"
+  
+  explicit module TextualHeader {
+    textual header "TextualHeader.h"
+    export *
+  }
+
+  explicit module * { export * }
+
+  export_as TextualHeaders_Private
+}

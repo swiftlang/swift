@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 func bet() where A : B {} // expected-error {{'where' clause cannot be applied to a non-generic top-level declaration}}
 
@@ -91,12 +91,12 @@ extension Class {
 extension Class where T: Equatable {
   func extensionFunc() where T: Comparable { } // expected-note {{where 'T' = 'T'}}
 
-  // expected-error@+1 {{same-type constraint type 'Class<Int>' does not conform to required protocol 'Equatable'}}
+  // expected-error@+1 {{no type for 'T' can satisfy both 'T == Class<Int>' and 'T : Equatable'}}
   func badRequirement1() where T == Class<Int> { }
 }
 
 extension Class where T == Bool {
-  // expected-error@+1 {{generic parameter 'T' cannot be equal to both 'Int' and 'Bool'}}
+  // expected-error@+1 {{no type for 'T' can satisfy both 'T == Int' and 'T == Bool'}}
   func badRequirement2() where T == Int { }
 }
 

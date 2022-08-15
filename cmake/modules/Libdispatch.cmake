@@ -74,8 +74,10 @@ foreach(sdk ${DISPATCH_SDKS})
       set(SWIFT_LIBDISPATCH_COMPILER_TRIPLE_CMAKE_ARGS -DCMAKE_C_COMPILER_TARGET=${SWIFT_SDK_WINDOWS_ARCH_${arch}_TRIPLE};-DCMAKE_CXX_COMPILER_TARGET=${SWIFT_SDK_WINDOWS_ARCH_${arch}_TRIPLE})
     endif()
 
-
-    if(NOT sdk STREQUAL ANDROID)
+    if("${sdk}" STREQUAL "ANDROID")
+      file(TO_CMAKE_PATH "${SWIFT_ANDROID_NDK_PATH}" _ANDROID_NDK)
+      set(SWIFT_LIBDISPATCH_ANDROID_NDK -DCMAKE_ANDROID_NDK=${_ANDROID_NDK})
+    else()
       set(SWIFT_LIBDISPATCH_SYSTEM_PROCESSOR  -DCMAKE_SYSTEM_PROCESSOR=${arch})
     endif()
 
@@ -89,6 +91,8 @@ foreach(sdk ${DISPATCH_SDKS})
                           ${SWIFT_LIBDISPATCH_COMPILER_TRIPLE_CMAKE_ARGS}
                           -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
                           -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                          -DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}
+                          -DCMAKE_SHARED_LINKER_FLAGS=${CMAKE_SHARED_LINKER_FLAGS}
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                           -DCMAKE_INSTALL_LIBDIR=lib
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
@@ -98,7 +102,7 @@ foreach(sdk ${DISPATCH_SDKS})
                           -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                           -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
                           ${SWIFT_LIBDISPATCH_SYSTEM_PROCESSOR}
-                          "-DCMAKE_ANDROID_NDK=${SWIFT_ANDROID_NDK_PATH}"
+                          "${SWIFT_LIBDISPATCH_ANDROID_NDK}"
                           -DCMAKE_ANDROID_ARCH_ABI=${SWIFT_SDK_ANDROID_ARCH_${arch}_ABI}
                           -DCMAKE_ANDROID_API=${SWIFT_ANDROID_API_LEVEL}
                           -DBUILD_SHARED_LIBS=YES

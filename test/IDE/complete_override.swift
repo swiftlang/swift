@@ -277,13 +277,13 @@ class OuterNominal : ProtocolA {
 class OuterNominal2: ProtocolA {
   var f = { #^NESTED_CLOSURE_1?keywords=false^# }()
 }
-// NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super: func
 // NESTED_CLOSURE_1-NOT: {|}
 
 class OuterNominal3: ProtocolA {
   var f = { static #^NESTED_CLOSURE_2?keywords=false^# }()
 }
-// NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super: func
 // NESTED_CLOSURE_2-NOT: {|}
 
 class OmitKW1 : ProtocolA {

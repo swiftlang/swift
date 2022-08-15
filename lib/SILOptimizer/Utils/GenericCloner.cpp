@@ -52,6 +52,7 @@ SILFunction *GenericCloner::createDeclaration(
   if (!Orig->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }
+  NewF->copyEffects(Orig);
   return NewF;
 }
 
@@ -104,6 +105,12 @@ void GenericCloner::populateCloned() {
           entryArgs.push_back(ASI);
           return true;
         }
+      } else if (ReInfo.isDroppedMetatypeArg(ArgIdx)) {
+        // Replace the metatype argument with an `metatype` instruction in the
+        // entry block.
+        auto *mtInst = getBuilder().createMetatype(Loc, mappedType);
+        entryArgs.push_back(mtInst);
+        return true;
       } else {
         // Handle arguments for formal parameters.
         unsigned paramIdx = ArgIdx - origConv.getSILArgIndexOfFirstParam();

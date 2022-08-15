@@ -61,6 +61,7 @@ ID file_types::lookupTypeForName(StringRef Name) {
 #define TYPE(NAME, ID, EXTENSION, FLAGS) \
            .Case(NAME, TY_##ID)
 #include "swift/Basic/FileTypes.def"
+      .Case("objc-header", TY_ClangHeader)
       .Default(TY_INVALID);
 }
 
@@ -73,8 +74,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
   case file_types::TY_LLVM_IR:
-  case file_types::TY_ObjCHeader:
-  case file_types::TY_CXXHeader:
+  case file_types::TY_ClangHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_ImportedModules:
   case file_types::TY_TBD:
@@ -86,6 +86,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONFeatures:
   case file_types::TY_SwiftABIDescriptor:
+  case file_types::TY_ConstValues:
     return true;
   case file_types::TY_Image:
   case file_types::TY_Object:
@@ -132,8 +133,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_Dependencies:
   case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
-  case file_types::TY_ObjCHeader:
-  case file_types::TY_CXXHeader:
+  case file_types::TY_ClangHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_Image:
   case file_types::TY_dSYM:
@@ -161,6 +161,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_JSONFeatures:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
+  case file_types::TY_ConstValues:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -183,8 +184,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_LLVM_BC:
   case file_types::TY_Object:
   case file_types::TY_Dependencies:
-  case file_types::TY_ObjCHeader:
-  case file_types::TY_CXXHeader:
+  case file_types::TY_ClangHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_PCH:
   case file_types::TY_ImportedModules:
@@ -214,6 +214,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_JSONFeatures:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
+  case file_types::TY_ConstValues:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");

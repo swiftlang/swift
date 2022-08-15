@@ -7,3 +7,18 @@ module ScopedEnums {
   header "scoped-enums.h"
   requires cplusplus
 }
+
+module AnonymousWithSwiftName {
+  header "anonymous-with-swift-name.h"
+  requires cplusplus
+}
+
+module CenumsWithOptionsOmit {
+  header "c-enums-withOptions-omit.h"
+  requires cplusplus
+}
+
+module CenumsNSOptions {
+  header "c-enums-NS_OPTIONS.h"
+  requires cplusplus
+}

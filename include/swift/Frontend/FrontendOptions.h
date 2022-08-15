@@ -99,8 +99,18 @@ public:
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
+  /// Avoid emitting index data for imported clang modules (pcms).
+  bool IndexIgnoreClangModules = false;
+
   /// If indexing system modules, don't index the stdlib.
   bool IndexIgnoreStdlib = false;
+
+  /// Include local definitions/references in the index data.
+  bool IndexIncludeLocals = false;
+
+  /// If building a module from interface, ignore compiler flags
+  /// specified in the swiftinterface.
+  bool IgnoreInterfaceProvidedOptions = false;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
@@ -378,6 +388,10 @@ public:
   /// '.../lib/swift', otherwise '.../lib/swift_static'.
   bool UseSharedResourceFolder = true;
 
+  /// Indicates whether to expose all public declarations in the generated clang
+  /// header.
+  bool ExposePublicDeclsInClangHeader = false;
+
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
 
@@ -440,8 +454,8 @@ public:
   bool IncludeSPISymbolsInSymbolGraph = false;
 
   /// Whether to reuse a frontend (i.e. compiler instance) for multiple
-  /// compiletions. This prevents ASTContext being freed.
-  bool ReuseFrontendForMutipleCompilations = false;
+  /// compilations. This prevents ASTContext being freed.
+  bool ReuseFrontendForMultipleCompilations = false;
 
   /// This is used to obfuscate the serialized search paths so we don't have
   /// to encode the actual paths into the .swiftmodule file.
@@ -462,6 +476,7 @@ private:
   static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
   static bool canActionEmitABIDescriptor(ActionType);
+  static bool canActionEmitConstValues(ActionType);
   static bool canActionEmitModuleSemanticInfo(ActionType);
 
 public:

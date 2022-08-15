@@ -81,17 +81,6 @@ bb2(%err : $Error):
   throw %err : $Error
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @testThinFuncPointer(%swift.type* %"BigTempStruct<Element>", %T22big_types_corner_cases13BigTempStructV* noalias nocapture swiftself dereferenceable({{.*}})
-// CHECK-NEXT: entry
-// CHECK-NEXT: ret i8* bitcast (i8* (%swift.type*, %T22big_types_corner_cases13BigTempStructV*)* @testThinFuncPointer to i8*)
-sil @testThinFuncPointer : $@convention(method) <Element> (@guaranteed BigTempStruct<Element>) -> @owned Builtin.RawPointer {
-bb0(%0 : $BigTempStruct<Element>):
-  // function_ref specialized BigTempStruct.subscript.getter
-  %fref = function_ref @testThinFuncPointer : $@convention(method) <τ_0_0> (@guaranteed BigTempStruct<τ_0_0>) -> @owned Builtin.RawPointer
-  %ret = thin_function_to_pointer %fref : $@convention(method) <τ_0_0> (@guaranteed BigTempStruct<τ_0_0>) -> @owned Builtin.RawPointer to $Builtin.RawPointer
-  return %ret : $Builtin.RawPointer
-}
-
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testFuncWithModBlockStorageApply({ %objc_block, %swift.function }* nocapture dereferenceable({{.*}}) %0, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}})
 // CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) %1
 // CHECK: ret void
@@ -314,14 +303,14 @@ sil @$crash_on_objc_apply : $@convention(thin) (@guaranteed AnyObject) -> () {
 // %0                                             // users: %2, %1
 bb0(%0 : $AnyObject):
   debug_value %0 : $AnyObject, let, name "object", argno 1
-  %2 = open_existential_ref %0 : $AnyObject to $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
-  strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
+  %2 = open_existential_ref %0 : $AnyObject to $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self
+  strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self
   %4 = alloc_stack $Optional<BitfieldOne>
-  dynamic_method_br %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject, #X.foo!foreign, bb1, bb2
+  dynamic_method_br %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self, #X.foo!foreign, bb1, bb2
 
-bb1(%6 : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject) -> BitfieldOne): // Preds: bb0
-  strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
-  %8 = partial_apply [callee_guaranteed] %6(%2) : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject) -> BitfieldOne
+bb1(%6 : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self) -> BitfieldOne): // Preds: bb0
+  strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self
+  %8 = partial_apply [callee_guaranteed] %6(%2) : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self) -> BitfieldOne
   %9 = apply %8() : $@callee_guaranteed () -> BitfieldOne
   %10 = init_enum_data_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt
   store %9 to %10 : $*BitfieldOne
@@ -336,7 +325,7 @@ bb2:                                              // Preds: bb0
 bb3:                                              // Preds: bb2 bb1
   %17 = load %4 : $*Optional<BitfieldOne>
   dealloc_stack %4 : $*Optional<BitfieldOne>
-  strong_release %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
+  strong_release %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self
   %20 = tuple ()
   return %20 : $()
 } // end sil function '$crash_on_objc_apply'

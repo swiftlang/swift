@@ -92,14 +92,9 @@ CompilerInvocation::getMainInputFilenameForDebugInfoForAtMostOnePrimary()
       .MainInputFilenameForDebugInfo;
 }
 std::string
-CompilerInvocation::getObjCHeaderOutputPathForAtMostOnePrimary() const {
+CompilerInvocation::getClangHeaderOutputPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.ObjCHeaderOutputPath;
-}
-std::string
-CompilerInvocation::getCxxHeaderOutputPathForAtMostOnePrimary() const {
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.CxxHeaderOutputPath;
+      .SupplementaryOutputs.ClangHeaderOutputPath;
 }
 std::string CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
@@ -109,6 +104,11 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
     StringRef filename) const {
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
+}
+std::string CompilerInvocation::getConstValuesFilePathForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.ConstValuesOutputPath;
 }
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
@@ -261,9 +261,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 }
 
 void CompilerInstance::setupStatsReporter() {
-  const auto &Invok = getInvocation();
+  const auto &Invoke = getInvocation();
   const std::string &StatsOutputDir =
-      Invok.getFrontendOptions().StatsOutputDir;
+      Invoke.getFrontendOptions().StatsOutputDir;
   if (StatsOutputDir.empty())
     return;
 
@@ -286,9 +286,9 @@ void CompilerInstance::setupStatsReporter() {
     return nullptr;
   };
 
-  const auto &FEOpts = Invok.getFrontendOptions();
-  const auto &LangOpts = Invok.getLangOptions();
-  const auto &SILOpts = Invok.getSILOptions();
+  const auto &FEOpts = Invoke.getFrontendOptions();
+  const auto &LangOpts = Invoke.getLangOptions();
+  const auto &SILOpts = Invoke.getSILOptions();
   const std::string &OutFile =
       FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
   auto Reporter = std::make_unique<UnifiedStatsReporter>(
@@ -301,9 +301,9 @@ void CompilerInstance::setupStatsReporter() {
       StatsOutputDir,
       &getSourceMgr(),
       getClangSourceManager(getASTContext()),
-      Invok.getFrontendOptions().TraceStats,
-      Invok.getFrontendOptions().ProfileEvents,
-      Invok.getFrontendOptions().ProfileEntities);
+      Invoke.getFrontendOptions().TraceStats,
+      Invoke.getFrontendOptions().ProfileEvents,
+      Invoke.getFrontendOptions().ProfileEntities);
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
   getASTContext().setStatsReporter(Reporter.get());
@@ -363,9 +363,9 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-bool CompilerInstance::setup(const CompilerInvocation &Invok,
+bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error) {
-  Invocation = Invok;
+  Invocation = Invoke;
 
   setupDependencyTrackerIfNeeded();
 
@@ -410,47 +410,26 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok,
   return false;
 }
 
-static bool loadAndValidateVFSOverlay(
-    const std::string &File,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &BaseFS,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> &OverlayFS,
-    DiagnosticEngine &Diag) {
-  auto Buffer = BaseFS->getBufferForFile(File);
-  if (!Buffer) {
-    Diag.diagnose(SourceLoc(), diag::cannot_open_file, File,
-                         Buffer.getError().message());
-    return true;
-  }
-
-  auto VFS = llvm::vfs::getVFSFromYAML(std::move(Buffer.get()),
-                                        nullptr, File);
-  if (!VFS) {
-    Diag.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file, File);
-    return true;
-  }
-  OverlayFS->pushOverlay(std::move(VFS));
-  return false;
-}
-
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  auto BaseFS = SourceMgr.getFileSystem();
-  auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
-                    new llvm::vfs::OverlayFileSystem(BaseFS));
-  bool hadAnyFailure = false;
-  bool hasOverlays = false;
-  for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
-    hasOverlays = true;
-    hadAnyFailure |=
-        loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
+  auto ExpectedOverlay =
+      Invocation.getSearchPathOptions().makeOverlayFileSystem(
+          SourceMgr.getFileSystem());
+  if (!ExpectedOverlay) {
+    llvm::handleAllErrors(
+        ExpectedOverlay.takeError(), [&](const llvm::FileError &FE) {
+          if (FE.convertToErrorCode() == std::errc::no_such_file_or_directory) {
+            Diagnostics.diagnose(SourceLoc(), diag::cannot_open_file,
+                                 FE.getFileName(), FE.messageWithoutFileInfo());
+          } else {
+            Diagnostics.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file,
+                                 FE.getFileName());
+          }
+        });
+    return true;
   }
 
-  // If we successfully loaded all the overlays, let the source manager and
-  // diagnostic engine take advantage of the overlay file system.
-  if (!hadAnyFailure && hasOverlays) {
-    SourceMgr.setFileSystem(OverlayFS);
-  }
-
-  return hadAnyFailure;
+  SourceMgr.setFileSystem(*ExpectedOverlay);
+  return false;
 }
 
 void CompilerInstance::setUpLLVMArguments() {
@@ -819,7 +798,10 @@ bool CompilerInvocation::shouldImportSwiftConcurrency() const {
 }
 
 bool CompilerInvocation::shouldImportSwiftStringProcessing() const {
-  return getLangOptions().EnableExperimentalStringProcessing;
+  return getLangOptions().EnableExperimentalStringProcessing &&
+      !getLangOptions().DisableImplicitStringProcessingModuleImport &&
+      getFrontendOptions().InputMode !=
+        FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
@@ -879,6 +861,14 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   return getASTContext().canImportModule(modulePath);
 }
 
+bool CompilerInstance::canImportCxxShim() const {
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(CXX_SHIM_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath) &&
+         !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
+}
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
@@ -931,6 +921,10 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
         pushImport(SWIFT_STRING_PROCESSING_NAME);
       break;
     }
+  }
+
+  if (Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
+    pushImport(CXX_SHIM_NAME);
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
@@ -1043,8 +1037,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     }
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    if (Invocation.getLangOptions().WarnConcurrency ||
-        Invocation.getLangOptions().isSwiftVersionAtLeast(6))
+    if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);
 
     // Register the main module with the AST context.
@@ -1199,7 +1192,6 @@ bool CompilerInstance::forEachFileToTypeCheck(
       }
       if (fn(*SF))
         return true;
-      ;
     }
   } else {
     for (auto *SF : getPrimarySourceFiles()) {
@@ -1210,9 +1202,29 @@ bool CompilerInstance::forEachFileToTypeCheck(
   return false;
 }
 
+bool CompilerInstance::forEachSourceFile(
+    llvm::function_ref<bool(SourceFile &)> fn) {
+  for (auto fileName : getMainModule()->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(fileName);
+    if (!SF) {
+      continue;
+    }
+    if (fn(*SF))
+      return true;
+    ;
+  }
+
+  return false;
+}
+
 void CompilerInstance::finishTypeChecking() {
   forEachFileToTypeCheck([](SourceFile &SF) {
     performWholeModuleTypeChecking(SF);
+    return false;
+  });
+
+  forEachSourceFile([](SourceFile &SF) {
+    loadDerivativeConfigurations(SF);
     return false;
   });
 }
@@ -1255,7 +1267,7 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
   if (forPrimary ||
       typeOpts.SkipFunctionBodies ==
           FunctionBodySkipping::NonInlinableWithoutTypes ||
-      frontendOpts.ReuseFrontendForMutipleCompilations) {
+      frontendOpts.ReuseFrontendForMultipleCompilations) {
     opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
   return opts;
@@ -1353,8 +1365,6 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   }
 
   performSILOptimizations(Invocation, silModule);
-
-  publicCMOSymbols = silModule->getPublicCMOSymbols();
 
   if (auto *stats = getStatsReporter())
     countStatsPostSILOpt(*stats, *silModule);

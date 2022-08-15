@@ -4,6 +4,8 @@
 //
 // Test speculative devirtualization.
 
+// REQUIRES: swift_in_compiler
+
 public class Cat {
   var cats: Int
 

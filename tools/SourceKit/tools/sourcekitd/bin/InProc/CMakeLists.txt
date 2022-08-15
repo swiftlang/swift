@@ -21,6 +21,7 @@ if (SOURCEKIT_INSTALLING_INPROC)
       ${sourcekitdInProc_args}
       MODULEMAP module.modulemap
       INSTALL_IN_COMPONENT sourcekit-inproc
+      HAS_SWIFT_MODULES
     )
     set_property(TARGET sourcekitdInProc APPEND_STRING PROPERTY LINK_FLAGS " -fapplication-extension")
     if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
@@ -35,6 +36,7 @@ if (SOURCEKIT_INSTALLING_INPROC)
         ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
       INSTALL_IN_COMPONENT sourcekit-inproc
       SHARED
+      HAS_SWIFT_MODULES
     )
   endif()
 else()
@@ -44,6 +46,7 @@ else()
       ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
     INSTALL_IN_COMPONENT sourcekit-inproc
     SHARED
+    HAS_SWIFT_MODULES
   )
 endif()
 target_link_libraries(sourcekitdInProc PRIVATE

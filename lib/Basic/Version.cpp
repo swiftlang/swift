@@ -16,6 +16,7 @@
 
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "swift/AST/DiagnosticsParse.h"
@@ -132,9 +133,29 @@ Optional<Version> Version::parseCompilerVersionString(
     // The second version component isn't used for comparison.
     if (i == 1) {
       if (!SplitComponent.equals("*")) {
-        if (Diags)
-          Diags->diagnose(Range.Start, diag::unused_compiler_version_component)
-          .fixItReplaceChars(Range.Start, Range.End, "*");
+        if (Diags) {
+          // Majors 600-1300 were used for Swift 1.0-5.5 (based on clang
+          // versions), but then we reset the numbering based on Swift versions,
+          // so 5.6 had major 5. We assume that majors below 600 use the new
+          // scheme and equal/above it use the old scheme.
+          bool firstComponentLooksNew = CV.Components[0] < 600;
+
+          auto diag = Diags->diagnose(Range.Start,
+                                      diag::unused_compiler_version_component,
+                                      firstComponentLooksNew);
+
+          if (firstComponentLooksNew &&
+              !SplitComponent.getAsInteger(10, ComponentNumber)) {
+            // Fix-it version like "5.7.1.2.3" to "5007.*.1.2.3".
+            auto newDigits = llvm::formatv("{0}{1,0+3}.*", CV.Components[0],
+                                           ComponentNumber).str();
+            diag.fixItReplaceChars(SplitComponents[0].second.Start,
+                                   Range.End, newDigits);
+          }
+          else {
+            diag.fixItReplaceChars(Range.Start, Range.End, "*");
+          }
+        }
       }
 
       CV.Components.push_back(0);
@@ -157,6 +178,38 @@ Optional<Version> Version::parseCompilerVersionString(
     if (Diags)
       Diags->diagnose(Loc, diag::compiler_version_too_many_components);
     isValidVersion = false;
+  }
+
+  // In the beginning, '_compiler_version(string-literal)' was designed for a
+  // different version scheme where the major was fairly large and the minor
+  // was ignored; now we use one where the minor is significant and major and
+  // minor match the Swift language version. See the comment above on
+  // `firstComponentLooksNew` for details.
+  //
+  // However, we want the string literal variant of '_compiler_version' to
+  // maintain source compatibility with old checks; that means checks for new
+  // versions have to be written so that old compilers will think they represent
+  // newer versions, while new compilers have to interpret old version number
+  // strings in a way that will compare correctly to the new versions compiled
+  // into them.
+  //
+  // To achieve this, modern compilers divide the major by 1000 and overwrite
+  // the wildcard component with the remainder, effectively shifting the last
+  // three digits of the major into the minor, before comparing it to the
+  // compiler version:
+  //
+  //     _compiler_version("5007.*.1.2.3") -> 5.7.1.2.3
+  //     _compiler_version("1300.*.1.2.3") -> 1.300.1.2.3 (smaller than 5.6)
+  //     _compiler_version( "600.*.1.2.3") -> 0.600.1.2.3 (smaller than 5.6)
+  //
+  // So if you want to specify a 5.7.z.a.b version, we ask users to either write
+  // it as 5007.*.z.a.b, or to use the new '_compiler_version(>= version)'
+  // syntax instead, which does not perform this conversion.
+  if (!CV.Components.empty()) {
+    if (CV.Components.size() == 1)
+      CV.Components.push_back(0);
+    CV.Components[1] = CV.Components[0] % 1000;
+    CV.Components[0] = CV.Components[0] / 1000;
   }
 
   return isValidVersion ? Optional<Version>(CV) : None;
@@ -443,6 +496,22 @@ StringRef getSwiftRevision() {
   return SWIFT_REVISION;
 #else
   return "";
+#endif
+}
+
+bool isCurrentCompilerTagged() {
+#ifdef SWIFT_COMPILER_VERSION
+  return true;
+#else
+  return false;
+#endif
+}
+
+StringRef getCurrentCompilerTag() {
+#ifdef SWIFT_COMPILER_VERSION
+  return SWIFT_COMPILER_VERSION;
+#else
+  return StringRef();
 #endif
 }
 

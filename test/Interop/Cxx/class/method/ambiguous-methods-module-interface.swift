@@ -1,7 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=AmbiguousMethods -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
-
-// CHECK: mutating func pingMutating()
-// CHECK: func ping()
+// RUN: %target-swift-ide-test -print-module -module-to-print=AmbiguousMethods -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: func increment(_ a: Int32) -> Int32
 // CHECK: mutating func incrementMutating(_ a: Int32) -> Int32
@@ -14,3 +11,7 @@
 
 // CHECK: func numberOfMutableMethodsCalled() -> Int32
 // CHECK: mutating func numberOfMutableMethodsCalledMutating() -> Int32
+
+// CHECK: struct HasAmbiguousMethods2
+// CHECK: func increment(_ a: Int32) -> Int32
+// CHECK-NOT: mutating func incrementMutating(_ a: Int32) -> Int32

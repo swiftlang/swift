@@ -131,20 +131,22 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<AnyObject>
   ) -> UnsafeMutablePointer<AnyObject> {
-    let nsSubRange = SwiftShims._SwiftNSRange(
-      location: bounds.lowerBound,
-      length: bounds.upperBound - bounds.lowerBound)
+    return withExtendedLifetime(buffer) {
+      let nsSubRange = SwiftShims._SwiftNSRange(
+        location: bounds.lowerBound,
+        length: bounds.upperBound - bounds.lowerBound)
 
-    // Copies the references out of the NSArray without retaining them
-    core.getObjects(target, range: nsSubRange)
+      // Copies the references out of the NSArray without retaining them
+      core.getObjects(target, range: nsSubRange)
 
-    // Make another pass to retain the copied objects
-    var result = target
-    for _ in bounds {
-      result.initialize(to: result.pointee)
-      result += 1
+      // Make another pass to retain the copied objects
+      var result = target
+      for _ in bounds {
+        result.initialize(to: result.pointee)
+        result += 1
+      }
+      return result
     }
-    return result
   }
 
   @_alwaysEmitIntoClient

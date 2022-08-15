@@ -17,10 +17,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -34,6 +37,22 @@ using namespace swift;
 using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
+
+Optional<ScoreKind> ConstraintFix::impact() const {
+  switch (fixBehavior) {
+  case FixBehavior::AlwaysWarning:
+    return None;
+
+  case FixBehavior::Error:
+    return SK_Fix;
+
+  case FixBehavior::DowngradeToWarning:
+    return SK_DisfavoredOverload;
+
+  case FixBehavior::Suppress:
+    return None;
+  }
+}
 
 ASTNode ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
 
@@ -152,8 +171,7 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
     return nullptr;
 
   const auto castKind = TypeChecker::typeCheckCheckedCast(
-      fromType, toType, CheckedCastContextKind::Coercion, cs.DC,
-      SourceLoc(), coerceExpr->getSubExpr(), SourceRange());
+      fromType, toType, CheckedCastContextKind::Coercion, cs.DC);
 
   // Invalid cast.
   if (castKind == CheckedCastKind::Unresolved)
@@ -172,12 +190,37 @@ bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,
 }
 
 TreatArrayLiteralAsDictionary *
-TreatArrayLiteralAsDictionary::create(ConstraintSystem &cs,
-                                      Type dictionaryTy, Type arrayTy,
-                                      ConstraintLocator *locator) {
-  assert(getAsExpr<ArrayExpr>(locator->getAnchor())->getNumElements() <= 1);
+TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
+                                       Type arrayTy,
+                                       ConstraintLocator *locator) {
+  if (!cs.isArrayType(arrayTy))
+    return nullptr;
+
+  // Determine the ArrayExpr from the locator.
+  auto *expr = getAsExpr(simplifyLocatorToAnchor(locator));
+  if (!expr)
+    return nullptr;
+
+  if (auto *AE = dyn_cast<AssignExpr>(expr))
+    expr = AE->getSrc();
+
+  auto *arrayExpr = dyn_cast<ArrayExpr>(expr);
+  if (!arrayExpr)
+    return nullptr;
+
+  // This fix only applies if the array is used as a dictionary.
+  auto unwrappedDict = dictionaryTy->lookThroughAllOptionalTypes();
+  if (unwrappedDict->isTypeVariableOrMember())
+    return nullptr;
+
+  if (!TypeChecker::conformsToKnownProtocol(
+          unwrappedDict, KnownProtocolKind::ExpressibleByDictionaryLiteral,
+          cs.DC->getParentModule()))
+    return nullptr;
+
+  auto arrayLoc = cs.getConstraintLocator(arrayExpr);
   return new (cs.getAllocator())
-      TreatArrayLiteralAsDictionary(cs, dictionaryTy, arrayTy, locator);
+      TreatArrayLiteralAsDictionary(cs, dictionaryTy, arrayTy, arrayLoc);
 }
 
 bool MarkExplicitlyEscaping::diagnose(const Solution &solution,
@@ -199,28 +242,78 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
 }
 
 bool MarkGlobalActorFunction::diagnose(const Solution &solution,
-                                      bool asNote) const {
+                                       bool asNote) const {
   DroppedGlobalActorFunctionAttr failure(
-      solution, getFromType(), getToType(), getLocator(), isWarning());
+      solution, getFromType(), getToType(), getLocator(), fixBehavior);
   return failure.diagnose(asNote);
+}
+
+/// The fix behavior to apply to a concurrency-related diagnostic.
+static Optional<FixBehavior>
+getConcurrencyFixBehavior(
+    ConstraintSystem &cs, ConstraintKind constraintKind,
+    ConstraintLocatorBuilder locator, bool forSendable) {
+  // We can only handle the downgrade for conversions.
+  switch (constraintKind) {
+  case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentConversion:
+    break;
+
+  default:
+    if (!cs.shouldAttemptFixes())
+      return None;
+
+    return FixBehavior::Error;
+  }
+
+  // For a @preconcurrency callee outside of a strict concurrency
+  // context, ignore.
+  if (cs.hasPreconcurrencyCallee(locator) &&
+      !contextRequiresStrictConcurrencyChecking(
+          cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs}))
+    return FixBehavior::Suppress;
+
+  // Otherwise, warn until Swift 6.
+  if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+    return FixBehavior::DowngradeToWarning;
+
+  return FixBehavior::Error;
 }
 
 MarkGlobalActorFunction *
 MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                               ConstraintLocator *locator, bool warning) {
+                                ConstraintLocator *locator,
+                                FixBehavior fixBehavior) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forGlobalActor());
 
   return new (cs.getAllocator()) MarkGlobalActorFunction(
-      cs, lhs, rhs, locator, warning);
+      cs, lhs, rhs, locator, fixBehavior);
+}
+
+bool MarkGlobalActorFunction::attempt(ConstraintSystem &cs,
+                                      ConstraintKind constraintKind,
+                                      FunctionType *fromType,
+                                      FunctionType *toType,
+                                      ConstraintLocatorBuilder locator) {
+  auto fixBehavior = getConcurrencyFixBehavior(
+      cs, constraintKind, locator, /*forSendable=*/false);
+  if (!fixBehavior)
+    return true;
+
+  auto *fix = MarkGlobalActorFunction::create(
+      cs, fromType, toType, cs.getConstraintLocator(locator),
+      *fixBehavior);
+
+  return cs.recordFix(fix);
 }
 
 bool AddSendableAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(
       solution, getFromType(), getToType(), getLocator(),
-      AttributedFuncToTypeConversionFailure::Concurrent, isWarning());
+      AttributedFuncToTypeConversionFailure::Concurrent, fixBehavior);
   return failure.diagnose(asNote);
 }
 
@@ -229,17 +322,65 @@ AddSendableAttribute::create(ConstraintSystem &cs,
                              FunctionType *fromType,
                              FunctionType *toType,
                              ConstraintLocator *locator,
-                             bool warning) {
+                             FixBehavior fixBehavior) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forConcurrent());
 
   return new (cs.getAllocator()) AddSendableAttribute(
-      cs, fromType, toType, locator, warning);
+      cs, fromType, toType, locator, fixBehavior);
 }
+
+bool AddSendableAttribute::attempt(ConstraintSystem &cs,
+                                   ConstraintKind constraintKind,
+                                   FunctionType *fromType,
+                                   FunctionType *toType,
+                                   ConstraintLocatorBuilder locator) {
+  auto fixBehavior = getConcurrencyFixBehavior(
+      cs, constraintKind, locator, /*forSendable=*/true);
+  if (!fixBehavior)
+    return true;
+
+  auto *fix = AddSendableAttribute::create(
+      cs, fromType, toType, cs.getConstraintLocator(locator), *fixBehavior);
+  return cs.recordFix(fix);
+}
+
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
   LabelingFailure failure(solution, getLocator(), getLabels());
   return failure.diagnose(asNote);
+}
+
+bool RelabelArguments::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  SmallPtrSet<ValueDecl *, 4> overloadChoices;
+
+  // First, let's find overload choice associated with each
+  // re-labeling fix.
+  for (const auto &fix : commonFixes) {
+    auto &solution = *fix.first;
+
+    auto calleeLocator = solution.getCalleeLocator(getLocator());
+    if (!calleeLocator)
+      return false;
+
+    auto overloadChoice = solution.getOverloadChoiceIfAvailable(calleeLocator);
+    if (!overloadChoice)
+      return false;
+
+    auto *decl = overloadChoice->choice.getDeclOrNull();
+    if (!decl)
+      return false;
+
+    (void)overloadChoices.insert(decl);
+  }
+
+  // If all of the fixes point to the same overload choice then it's
+  // exactly the same issue since the call site is static.
+  if (overloadChoices.size() == 1)
+    return diagnose(*commonFixes.front().first);
+
+  return false;
 }
 
 RelabelArguments *
@@ -372,7 +513,7 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) ContextualMismatch(
-      cs, lhs, rhs, locator, /*warning=*/false);
+      cs, lhs, rhs, locator, FixBehavior::Error);
 }
 
 bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
@@ -550,7 +691,7 @@ bool AllowFunctionTypeMismatch::diagnoseForAmbiguity(
       auto *decl = overload->choice.getDecl();
       if (decl->getLoc().isValid()) {
         DE.diagnose(decl, diag::found_candidate_type,
-                    solution.simplifyType(overload->openedType));
+                    solution.simplifyType(overload->adjustedOpenedType));
       }
     }
 
@@ -778,7 +919,7 @@ AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
 
 bool AllowInvalidPartialApplication::diagnose(const Solution &solution,
                                               bool asNote) const {
-  PartialApplicationFailure failure(isWarning(), solution, getLocator());
+  PartialApplicationFailure failure(isWarning, solution, getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -1133,7 +1274,7 @@ NotCompileTimeConst::NotCompileTimeConst(ConstraintSystem &cs, Type paramTy,
                                          ConstraintLocator *locator):
   ContextualMismatch(cs, FixKind::NotCompileTimeConst, paramTy,
                      cs.getASTContext().TheEmptyTupleType, locator,
-                     /*warning*/true) {}
+                     FixBehavior::AlwaysWarning) {}
 
 NotCompileTimeConst *
 NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
@@ -1143,12 +1284,26 @@ NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
 
 bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const {
   auto *locator = getLocator();
-  // Referencing an enum element directly is considered a compile-time literal.
-  if (auto *d = solution.resolveLocatorToDecl(locator).getDecl()) {
-    if (isa<EnumElementDecl>(d)) {
+  if (auto *E = getAsExpr(locator->getAnchor())) {
+    auto isAccepted = E->isSemanticallyConstExpr([&](Expr *E) {
+      if (auto *UMC = dyn_cast<UnresolvedMemberChainResultExpr>(E)) {
+        E = UMC->getSubExpr();
+      }
+      auto locator = solution.getConstraintSystem().getConstraintLocator(E);
+      // Referencing an enum element directly is considered a compile-time literal.
+      if (auto *d = solution.resolveLocatorToDecl(locator).getDecl()) {
+        if (isa<EnumElementDecl>(d)) {
+          if (!d->hasParameterList()) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+    if (isAccepted)
       return true;
-    }
   }
+
   NotCompileTimeConstFailure failure(solution, locator);
   return failure.diagnose(asNote);
 }
@@ -1550,7 +1705,7 @@ bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
   NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),
                                         getToType(), ConversionKind,
-                                        isWarning());
+                                        fixBehavior);
   return failure.diagnose(asNote);
 }
 
@@ -1559,7 +1714,9 @@ TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
     Type dstType, ConversionRestrictionKind conversionKind,
     bool downgradeToWarning) {
   return new (cs.getAllocator()) TreatEphemeralAsNonEphemeral(
-      cs, locator, srcType, dstType, conversionKind, downgradeToWarning);
+      cs, locator, srcType, dstType, conversionKind,
+      downgradeToWarning ? FixBehavior::DowngradeToWarning
+                         : FixBehavior::Error);
 }
 
 std::string TreatEphemeralAsNonEphemeral::getName() const {
@@ -1667,7 +1824,7 @@ AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
 
 bool AddQualifierToAccessTopLevelName::diagnose(const Solution &solution,
                                                 bool asNote) const {
-  MissingQuialifierInMemberRefFailure failure(solution, getLocator());
+  MissingQualifierInMemberRefFailure failure(solution, getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -1788,6 +1945,16 @@ IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) IgnoreInvalidResultBuilderBody(cs, locator);
 }
 
+bool IgnoreInvalidASTNode::diagnose(const Solution &solution,
+                                    bool asNote) const {
+  return true; // Already diagnosed by the producer of ErrorExpr or ErrorType.
+}
+
+IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidASTNode(cs, locator);
+}
+
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
                                            bool asNote) const {
   MissingContextualTypeForNil failure(solution, getLocator());
@@ -1835,6 +2002,20 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
                                            ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
+}
+
+bool IgnoreUnresolvedPatternVar::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  // Not being able to infer the type of a pattern should already have been
+  // diagnosed on the pattern's initializer or as a structural issue of the AST.
+  return true;
+}
+
+IgnoreUnresolvedPatternVar *
+IgnoreUnresolvedPatternVar::create(ConstraintSystem &cs, Pattern *pattern,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreUnresolvedPatternVar(cs, pattern, locator);
 }
 
 bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
@@ -1985,9 +2166,36 @@ bool AllowNoopCheckedCast::diagnose(const Solution &solution,
   return warning.diagnose(asNote);
 }
 
+AllowNoopExistentialToCFTypeCheckedCast *
+AllowNoopExistentialToCFTypeCheckedCast::attempt(ConstraintSystem &cs,
+                                                 Type fromType, Type toType,
+                                                 CheckedCastKind kind,
+                                                 ConstraintLocator *locator) {
+  if (!isExpr<IsExpr>(locator->getAnchor()))
+    return nullptr;
+
+  if (!fromType->isExistentialType())
+    return nullptr;
+
+  const auto *cls = toType->getAs<ClassType>();
+  if (!(cls && cls->getDecl()->getForeignClassKind() ==
+                   ClassDecl::ForeignKind::CFType))
+    return nullptr;
+
+  return new (cs.getAllocator()) AllowNoopExistentialToCFTypeCheckedCast(
+      cs, fromType, toType, kind, locator);
+}
+
+bool AllowNoopExistentialToCFTypeCheckedCast::diagnose(const Solution &solution,
+                                                       bool asNote) const {
+  NoopExistentialToCFTypeCheckedCast warning(
+      solution, getFromType(), getToType(), CastKind, getLocator());
+  return warning.diagnose(asNote);
+}
+
 // Although function types maybe compile-time convertible because
 // compiler can emit thunks at SIL to handle the conversion when
-// required, only convertions that are supported by the runtime are
+// required, only conversions that are supported by the runtime are
 // when types are trivially equal or non-throwing from type is equal
 // to throwing to type without throwing clause conversions are not
 // possible at runtime.
@@ -2025,6 +2233,26 @@ bool AllowUnsupportedRuntimeCheckedCast::diagnose(const Solution &solution,
   UnsupportedRuntimeCheckedCastFailure failure(
       solution, getFromType(), getToType(), CastKind, getLocator());
   return failure.diagnose(asNote);
+}
+
+AllowCheckedCastToUnrelated *
+AllowCheckedCastToUnrelated::attempt(ConstraintSystem &cs, Type fromType,
+                                     Type toType, CheckedCastKind kind,
+                                     ConstraintLocator *locator) {
+  // Explicit optional-to-optional casts always succeed because a nil
+  // value of any optional type can be cast to any other optional type.
+  if (fromType->getOptionalObjectType() && toType->getOptionalObjectType()) {
+    return nullptr;
+  }
+  return new (cs.getAllocator())
+      AllowCheckedCastToUnrelated(cs, fromType, toType, kind, locator);
+}
+
+bool AllowCheckedCastToUnrelated::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  CheckedCastToUnrelatedFailure warning(solution, getFromType(), getToType(),
+                                        CastKind, getLocator());
+  return warning.diagnose(asNote);
 }
 
 bool AllowInvalidStaticMemberRefOnProtocolMetatype::diagnose(
@@ -2090,4 +2318,262 @@ IgnoreDefaultExprTypeMismatch::create(ConstraintSystem &cs, Type argType,
                                       ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreDefaultExprTypeMismatch(cs, argType, paramType, locator);
+}
+
+bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
+                                              bool asNote) const {
+  MissingExplicitExistentialCoercion failure(solution, ErasedResultType,
+                                             getLocator(), fixBehavior);
+  return failure.diagnose(asNote);
+}
+
+bool AddExplicitExistentialCoercion::isRequired(
+    ConstraintSystem &cs, Type resultTy,
+    llvm::function_ref<Optional<Type>(TypeVariableType *)> findExistentialType,
+    ConstraintLocatorBuilder locator) {
+  using ExistentialTypeFinder =
+      llvm::function_ref<Optional<Type>(TypeVariableType *)>;
+
+  struct CoercionChecker : public TypeWalker {
+    bool RequiresCoercion = false;
+
+    ConstraintSystem &cs;
+    ExistentialTypeFinder GetExistentialType;
+
+    CoercionChecker(ConstraintSystem &cs,
+                    ExistentialTypeFinder getExistentialType)
+        : cs(cs), GetExistentialType(getExistentialType) {}
+
+    Action walkToTypePre(Type componentTy) override {
+      // In cases where result references a member type, we need to check
+      // whether such type would is resolved to concrete or not.
+      if (auto *member = componentTy->getAs<DependentMemberType>()) {
+        auto memberBaseTy = getBaseTypeOfDependentMemberChain(member);
+
+        auto typeVar = memberBaseTy->getAs<TypeVariableType>();
+        if (!typeVar)
+          return Action::SkipChildren;
+
+        // If the base is an opened existential type, let's see whether
+        // erase would produce an existential in this case and if so,
+        // we need to check whether any requirements are going to be lost
+        // in process.
+
+        auto existentialType = GetExistentialType(typeVar);
+        if (!existentialType)
+          return Action::SkipChildren;
+
+        auto erasedMemberTy = typeEraseOpenedExistentialReference(
+            Type(member), *existentialType, typeVar, TypePosition::Covariant);
+
+        // If result is an existential type and the base has `where` clauses
+        // associated with its associated types, the call needs a coercion.
+        if (erasedMemberTy->isExistentialType() &&
+            hasConstrainedAssociatedTypes(member, *existentialType)) {
+          RequiresCoercion = true;
+          return Action::Stop;
+        }
+
+        return Action::SkipChildren;
+      }
+
+      // The case where there is a direct access to opened existential type
+      // e.g. `$T` or `[$T]`.
+      if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+        if (auto existentialType = GetExistentialType(typeVar)) {
+          RequiresCoercion |= hasAnyConstrainedAssociatedTypes(
+              (*existentialType)->getExistentialLayout());
+          return RequiresCoercion ? Action::Stop : Action::SkipChildren;
+        }
+      }
+
+      return Action::Continue;
+    }
+
+  private:
+    /// Check whether the given member type has any of its associated
+    /// types constrained by requirements associated with the given
+    /// existential type.
+    static bool hasConstrainedAssociatedTypes(DependentMemberType *member,
+                                              Type existentialTy) {
+      auto layout = existentialTy->getExistentialLayout();
+      for (auto *protocol : layout.getProtocols()) {
+        auto requirementSig = protocol->getRequirementSignature();
+        if (hasConstrainedAssociatedTypes(member,
+                                          requirementSig.getRequirements()))
+          return true;
+      }
+      return false;
+    }
+
+    /// Check whether the given member type has any of its associated
+    /// types constrained by the given requirement set.
+    static bool
+    hasConstrainedAssociatedTypes(DependentMemberType *member,
+                                  ArrayRef<Requirement> requirements) {
+      for (const auto &req : requirements) {
+        switch (req.getKind()) {
+        case RequirementKind::Superclass:
+        case RequirementKind::Conformance:
+        case RequirementKind::Layout: {
+          if (isAnchoredOn(req.getFirstType(), member->getAssocType()))
+            return true;
+          break;
+        }
+
+        case RequirementKind::SameType: {
+          auto lhsTy = req.getFirstType();
+          auto rhsTy = req.getSecondType();
+
+          if (isAnchoredOn(lhsTy, member->getAssocType()) ||
+              isAnchoredOn(rhsTy, member->getAssocType()))
+            return true;
+
+          break;
+        }
+        }
+      }
+
+      return false;
+    }
+
+    /// Check whether any of the protocols mentioned in the given
+    /// existential layout have constraints associated with their
+    /// associated types via a `where` clause, for example:
+    /// `associatedtype A: P where A.B == Int`
+    static bool hasAnyConstrainedAssociatedTypes(ExistentialLayout layout) {
+      for (auto *protocol : layout.getProtocols()) {
+        auto requirementSig = protocol->getRequirementSignature();
+        for (const auto &req : requirementSig.getRequirements()) {
+          switch (req.getKind()) {
+          case RequirementKind::Conformance:
+          case RequirementKind::Layout:
+          case RequirementKind::Superclass: {
+            if (getMemberChainDepth(req.getFirstType()) > 1)
+              return true;
+            break;
+          }
+
+          case RequirementKind::SameType:
+            auto lhsTy = req.getFirstType();
+            auto rhsTy = req.getSecondType();
+
+            if (getMemberChainDepth(lhsTy) > 1 ||
+                getMemberChainDepth(rhsTy) > 1)
+              return true;
+
+            break;
+          }
+        }
+      }
+      return false;
+    }
+
+    /// Check whether the given type is a dependent member type and
+    /// is anchored on the given associated type e.g. type is `A.B.C`
+    /// and associated type is `A.B`.
+    static bool isAnchoredOn(Type type, AssociatedTypeDecl *assocTy,
+                             unsigned depth = 0) {
+      if (auto *member = type->getAs<DependentMemberType>()) {
+        if (member->getAssocType() == assocTy)
+          return depth > 0;
+
+        return isAnchoredOn(member->getBase(), assocTy, depth + 1);
+      }
+
+      return false;
+    }
+
+    static unsigned getMemberChainDepth(Type type, unsigned currDepth = 0) {
+      if (auto *memberTy = type->getAs<DependentMemberType>())
+        return getMemberChainDepth(memberTy->getBase(), currDepth + 1);
+      return currDepth;
+    }
+
+    static Type getBaseTypeOfDependentMemberChain(DependentMemberType *member) {
+      if (!member->getBase())
+        return member;
+
+      auto base = member->getBase();
+
+      if (auto *DMT = base->getAs<DependentMemberType>())
+        return getBaseTypeOfDependentMemberChain(DMT);
+
+      return base;
+    }
+  };
+
+  // First, let's check whether coercion is already there.
+  if (auto *anchor = getAsExpr(locator.getAnchor())) {
+    // If this is erasure related to `Self`, let's look through
+    // the call, if any.
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+      // If this is an implicit `makeIterator` call, let's skip the check.
+      if (UDE->isImplicit() &&
+          cs.getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence)
+        return false;
+
+      auto parentExpr = cs.getParentExpr(anchor);
+      if (parentExpr && isa<CallExpr>(parentExpr))
+        anchor = parentExpr;
+    }
+
+    auto *parent = cs.getParentExpr(anchor);
+    // Support both `as` and `as!` coercions.
+    if (parent &&
+        (isa<CoerceExpr>(parent) || isa<ForcedCheckedCastExpr>(parent)))
+      return false;
+  }
+
+  CoercionChecker check(cs, findExistentialType);
+  resultTy.walk(check);
+
+  return check.RequiresCoercion;
+}
+
+bool AddExplicitExistentialCoercion::isRequired(
+    ConstraintSystem &cs, Type resultTy,
+    ArrayRef<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+        openedExistentials,
+    ConstraintLocatorBuilder locator) {
+  return isRequired(
+      cs, resultTy,
+      [&](TypeVariableType *typeVar) -> Optional<Type> {
+        auto opened =
+            llvm::find_if(openedExistentials, [&typeVar](const auto &entry) {
+              return typeVar == entry.first;
+            });
+
+        if (opened == openedExistentials.end())
+          return None;
+
+        return opened->second->getExistentialType();
+      },
+      locator);
+}
+
+AddExplicitExistentialCoercion *
+AddExplicitExistentialCoercion::create(ConstraintSystem &cs, Type resultTy,
+                                       ConstraintLocator *locator) {
+  FixBehavior fixBehavior = FixBehavior::Error;
+  return new (cs.getAllocator())
+      AddExplicitExistentialCoercion(cs, resultTy, locator, fixBehavior);
+}
+
+bool RenameConflictingPatternVariables::diagnose(const Solution &solution,
+                                                 bool asNote) const {
+  ConflictingPatternVariables failure(solution, ExpectedType,
+                                      getConflictingVars(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RenameConflictingPatternVariables *
+RenameConflictingPatternVariables::create(ConstraintSystem &cs, Type expectedTy,
+                                          ArrayRef<VarDecl *> conflicts,
+                                          ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<VarDecl *>(conflicts.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(RenameConflictingPatternVariables));
+  return new (mem)
+      RenameConflictingPatternVariables(cs, expectedTy, conflicts, locator);
 }

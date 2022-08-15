@@ -87,8 +87,11 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       CodeCompletionDiagnosticSeverity::None;
   NullTerminatedStringRef ContextFreeDiagnosticMessage;
   if (ContextFreeNotRecReason != ContextFreeNotRecommendedReason::None) {
+    assert(AssociatedDecl != nullptr &&
+           "There should be no case where ContextFreeNotRecReason != None && "
+           "AssociatedDecl == nulptr");
     // FIXME: We should generate the message lazily.
-    if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
+    if (const auto *VD = dyn_cast_or_null<ValueDecl>(AssociatedDecl)) {
       CodeCompletionDiagnosticSeverity severity;
       SmallString<256> message;
       llvm::raw_svector_ostream messageOS(message);
@@ -125,7 +128,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
-        Allocator, CCS, AssociatedDecl, ModuleName,
+        Sink, CCS, AssociatedDecl, IsAsync, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
@@ -135,14 +138,14 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
   case CodeCompletionResultKind::Keyword:
     ContextFreeResult = ContextFreeCodeCompletionResult::createKeywordResult(
-        Allocator, KeywordKind, CCS,
+        Sink, KeywordKind, CCS,
         NullTerminatedStringRef(BriefDocComment, Allocator), ResultType);
     break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            Allocator, Kind, CCS, CodeCompletionOperatorKind::None,
+            Sink, Kind, CCS, CodeCompletionOperatorKind::None, IsAsync,
             NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
@@ -150,35 +153,32 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Literal:
     assert(LiteralKind.hasValue());
     ContextFreeResult = ContextFreeCodeCompletionResult::createLiteralResult(
-        Allocator, *LiteralKind, CCS, ResultType);
+        Sink, *LiteralKind, CCS, ResultType);
     break;
   }
 
-  CodeCompletionDiagnosticSeverity ContextualDiagnosticSeverity =
-      CodeCompletionDiagnosticSeverity::None;
-  NullTerminatedStringRef ContextualDiagnosticMessage;
-  if (ContextualNotRecReason != ContextualNotRecommendedReason::None) {
-    // FIXME: We should generate the message lazily.
-    if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
-      CodeCompletionDiagnosticSeverity severity;
-      SmallString<256> message;
-      llvm::raw_svector_ostream messageOS(message);
-      if (!getContextualCompletionDiagnostics(ContextualNotRecReason, VD,
-                                              severity, messageOS)) {
-        ContextualDiagnosticSeverity = severity;
-        ContextualDiagnosticMessage =
-            NullTerminatedStringRef(message, Allocator);
-      }
-    }
+  if (Sink.shouldProduceContextFreeResults()) {
+    // If the sink only intends to store the context free results in the cache,
+    // we don't need to compute any contextual properties.
+    return new (Allocator) CodeCompletionResult(
+        *ContextFreeResult, SemanticContextKind::None, CodeCompletionFlair(),
+        /*NumBytesToErase=*/0, /*TypeContext=*/nullptr,
+        /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
+        /*CanCurrDeclContextHandleAsync=*/false,
+        ContextualNotRecommendedReason::None);
+  } else {
+    assert(
+        ContextFreeResult != nullptr &&
+        "ContextFreeResult should have been constructed by the switch above");
+    // We know that the ContextFreeResult has an AST-based type because it was
+    // just computed and not read from the cache and
+    // Sink.shouldProduceContextFreeResults() is false. So we can pass nullptr
+    // for USRTypeContext.
+    return new (Allocator) CodeCompletionResult(
+        *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
+        TypeContext, DC, /*USRTypeContext=*/nullptr,
+        CanCurrDeclContextHandleAsync, ContextualNotRecReason);
   }
-
-  assert(ContextFreeResult != nullptr &&
-         "ContextFreeResult should have been constructed by the switch above");
-  CodeCompletionResult *result = new (Allocator) CodeCompletionResult(
-      *ContextFreeResult, SemanticContext, Flair, NumBytesToErase, TypeContext,
-      DC, ContextualNotRecReason, ContextualDiagnosticSeverity,
-      ContextualDiagnosticMessage);
-  return result;
 }
 
 void CodeCompletionResultBuilder::finishResult() {

@@ -56,6 +56,11 @@
   can compile to a fused check-and-branch, even if that burns part of the
   encoding space.
 
+  On Android AArch64, we cannot use the top byte for large strings because it is
+  reserved by the OS for memory tagging since Android 11, so shift the
+  discriminator to the second byte instead. This burns one more byte on small
+  strings.
+
   On 32-bit platforms, we store an explicit discriminator (as a UInt8) with the
   same encoding as above, placed in the high bits. E.g. `b62` above is in
   `_discriminator`'s `b6`.
@@ -111,8 +116,13 @@ internal struct _StringObject {
 
   @inlinable @inline(__always)
   init(count: Int, variant: Variant, discriminator: UInt64, flags: UInt16) {
+#if os(Android) && arch(arm64)
+    _internalInvariant(discriminator & 0x00FF_0000_0000_0000 == discriminator,
+      "only the second byte can carry the discriminator and small count on Android AArch64")
+#else
     _internalInvariant(discriminator & 0xFF00_0000_0000_0000 == discriminator,
       "only the top byte can carry the discriminator and small count")
+#endif
 
     self._count = count
     self._variant = variant
@@ -349,7 +359,13 @@ extension _StringObject.Nibbles {
 extension _StringObject.Nibbles {
   // Mask for address bits, i.e. non-discriminator and non-extra high bits
   @inlinable @inline(__always)
-  static internal var largeAddressMask: UInt64 { return 0x0FFF_FFFF_FFFF_FFFF }
+  static internal var largeAddressMask: UInt64 {
+#if os(Android) && arch(arm64)
+    return 0xFF0F_FFFF_FFFF_FFFF
+#else
+    return 0x0FFF_FFFF_FFFF_FFFF
+#endif
+  }
 
   // Mask for address bits, i.e. non-discriminator and non-extra high bits
   @inlinable @inline(__always)
@@ -360,20 +376,32 @@ extension _StringObject.Nibbles {
   // Discriminator for small strings
   @inlinable @inline(__always)
   internal static func small(isASCII: Bool) -> UInt64 {
+#if os(Android) && arch(arm64)
+    return isASCII ? 0x00E0_0000_0000_0000 : 0x00A0_0000_0000_0000
+#else
     return isASCII ? 0xE000_0000_0000_0000 : 0xA000_0000_0000_0000
+#endif
   }
 
   // Discriminator for small strings
   @inlinable @inline(__always)
   internal static func small(withCount count: Int, isASCII: Bool) -> UInt64 {
     _internalInvariant(count <= _SmallString.capacity)
+#if os(Android) && arch(arm64)
+    return small(isASCII: isASCII) | UInt64(truncatingIfNeeded: count) &<< 48
+#else
     return small(isASCII: isASCII) | UInt64(truncatingIfNeeded: count) &<< 56
+#endif
   }
 
   // Discriminator for large, immortal, swift-native strings
   @inlinable @inline(__always)
   internal static func largeImmortal() -> UInt64 {
+#if os(Android) && arch(arm64)
+    return 0x0080_0000_0000_0000
+#else
     return 0x8000_0000_0000_0000
+#endif
   }
 
   // Discriminator for large, mortal (i.e. managed), swift-native strings
@@ -397,7 +425,11 @@ extension _StringObject {
 
   @inlinable @inline(__always)
   internal var isImmortal: Bool {
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x0080_0000_0000_0000) != 0
+#else
     return (discriminatedObjectRawBits & 0x8000_0000_0000_0000) != 0
+#endif
   }
 
   @inlinable @inline(__always)
@@ -405,7 +437,11 @@ extension _StringObject {
 
   @inlinable @inline(__always)
   internal var isSmall: Bool {
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x0020_0000_0000_0000) != 0
+#else
     return (discriminatedObjectRawBits & 0x2000_0000_0000_0000) != 0
+#endif
   }
 
   @inlinable @inline(__always)
@@ -419,7 +455,11 @@ extension _StringObject {
   //     - Non-Cocoa shared strings
   @inlinable @inline(__always)
   internal var providesFastUTF8: Bool {
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x0010_0000_0000_0000) == 0
+#else
     return (discriminatedObjectRawBits & 0x1000_0000_0000_0000) == 0
+#endif
   }
 
   @inlinable @inline(__always)
@@ -429,16 +469,26 @@ extension _StringObject {
   // conforms to `_AbstractStringStorage`
   @inline(__always)
   internal var hasStorage: Bool {
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x00F0_0000_0000_0000) == 0
+#else
     return (discriminatedObjectRawBits & 0xF000_0000_0000_0000) == 0
+#endif
   }
 
   // Whether we are a mortal, native (tail-allocated) string
   @inline(__always)
   internal var hasNativeStorage: Bool {
+#if os(Android) && arch(arm64)
+    // Android uses the same logic as explained below for other platforms,
+    // except isSmall is at b53, so shift it to b61 first before proceeding.
+    let bits = ~(discriminatedObjectRawBits << 8) & self._countAndFlagsBits
+#else
     // b61 on the object means isSmall, and on countAndFlags means
     // isNativelyStored. We just need to check that b61 is 0 on the object and 1
     // on countAndFlags.
     let bits = ~discriminatedObjectRawBits & self._countAndFlagsBits
+#endif
     let result = bits & 0x2000_0000_0000_0000 != 0
     _internalInvariant(!result || hasStorage, "native storage needs storage")
     return result
@@ -466,7 +516,11 @@ extension _StringObject {
   @inline(__always)
   internal var largeIsCocoa: Bool {
     _internalInvariant(isLarge)
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x0040_0000_0000_0000) != 0
+#else
     return (discriminatedObjectRawBits & 0x4000_0000_0000_0000) != 0
+#endif
   }
 
   // Whether this string is in one of our fastest representations:
@@ -535,7 +589,11 @@ extension _StringObject {
 
   @inlinable
   internal static func getSmallCount(fromRaw x: UInt64) -> Int {
+#if os(Android) && arch(arm64)
+    return Int(truncatingIfNeeded: (x & 0x000F_0000_0000_0000) &>> 48)
+#else
     return Int(truncatingIfNeeded: (x & 0x0F00_0000_0000_0000) &>> 56)
+#endif
   }
 
   @inlinable @inline(__always)
@@ -546,7 +604,11 @@ extension _StringObject {
 
   @inlinable
   internal static func getSmallIsASCII(fromRaw x: UInt64) -> Bool {
+#if os(Android) && arch(arm64)
+    return x & 0x0040_0000_0000_0000 != 0
+#else
     return x & 0x4000_0000_0000_0000 != 0
+#endif
   }
   @inlinable @inline(__always)
   internal var smallIsASCII: Bool {
@@ -580,40 +642,70 @@ extension _StringObject {
 
  All non-small forms share the same structure for the other half of the bits
  (i.e. non-object bits) as a word containing code unit count and various
- performance flags. The top 16 bits are for performance flags, which are not
- semantically relevant but communicate that some operations can be done more
- efficiently on this particular string, and the lower 48 are the code unit
- count (aka endIndex).
+ performance flags. The top 16 bits are nonessential flags; these aren't
+ critical for correct operation, but they may provide additional guarantees that
+ allow more efficient operation or more reliable detection of runtime errors.
+ The lower 48 bits contain the code unit count (aka endIndex).
 
-┌─────────┬───────┬──────────────────┬─────────────────┬────────┬───────┐
-│   b63   │  b62  │       b61        │       b60       │ b59:48 │ b47:0 │
-├─────────┼───────┼──────────────────┼─────────────────┼────────┼───────┤
-│ isASCII │ isNFC │ isNativelyStored │ isTailAllocated │  TBD   │ count │
-└─────────┴───────┴──────────────────┴─────────────────┴────────┴───────┘
+┌──────┬──────┬──────┬──────┬──────┬──────────┬───────────────────────────────┐
+│ b63  │ b62  │ b61  │ b60  │ b59  │  b58:48  │             b47:0             │
+├──────┼──────┼──────┼──────┼──────┼──────────┼───────────────────────────────┤
+│ ASCII│ NFC  │native│ tail │ UTF8 │ reserved │             count             │
+└──────┴──────┴──────┴──────┴──────┴──────────┴───────────────────────────────┘
 
- isASCII: set when all code units are known to be ASCII, enabling:
+ b63: isASCII. set when all code units are known to be ASCII, enabling:
    - Trivial Unicode scalars, they're just the code units
    - Trivial UTF-16 transcoding (just bit-extend)
    - Also, isASCII always implies isNFC
- isNFC: set when the contents are in normal form C
+
+ b62: isNFC. set when the contents are in normal form C
    - Enables trivial lexicographical comparisons: just memcmp
    - `isASCII` always implies `isNFC`, but not vice versa
- isNativelyStored: set for native stored strings
+
+ b61: isNativelyStored. set for native stored strings
    - `largeAddressBits` holds an instance of `_StringStorage`.
    - I.e. the start of the code units is at the stored address + `nativeBias`
- isTailAllocated: contiguous UTF-8 code units starts at address + `nativeBias`
+   - NOTE: isNativelyStored is *specifically* allocated to b61 to align with the
+     bit-position of isSmall on the BridgeObject. This allows us to check for
+     native storage without an extra branch guarding against smallness. See
+     `_StringObject.hasNativeStorage` for this usage.
+
+ b60: isTailAllocated. contiguous UTF-8 code units starts at address + `nativeBias`
    - `isNativelyStored` always implies `isTailAllocated`, but not vice versa
       (e.g. literals)
    - `isTailAllocated` always implies `isFastUTF8`
- TBD: Reserved for future usage
-   - Setting a TBD bit to 1 must be semantically equivalent to 0
-   - I.e. it can only be used to "cache" fast-path information in the future
- count: stores the number of code units, corresponds to `endIndex`.
 
- NOTE: isNativelyStored is *specifically* allocated to b61 to align with the
- bit-position of isSmall on the BridgeObject. This allows us to check for
- native storage without an extra branch guarding against smallness. See
- `_StringObject.hasNativeStorage` for this usage.
+ b59: isForeignUTF8. This bit is to be set on future UTF-8 encoded string
+      variants, i.e. on strings whose index positions are measured in UTF-8 code
+      units, even though their storage isn't continuous. As of Swift 5.7, we
+      don't have any such foreign forms, but inlinable index validation methods
+      need to prepare for the possibility of their introduction, so we need to
+      assign this bit in preparation.
+
+      If we decide to never introduce such forms, we can stop checking this bit
+      at any time, but we cannot reuse it for something else -- we need to
+      preserve its current meaning to keep inlined index validation code
+      working.
+
+ b48-58: Reserved for future usage.
+   - Because Swift is ABI stable (on some platforms at least), these bits can
+     only be assigned semantics that don't affect interoperability with code
+     built with previous releases of the Standard Library, from 5.0 onward.
+   - Older binaries will not look at newly assigned bits, and they will not
+     set them, either (unless by side effect of calling into newly built code).
+     Such code must continue working.
+   - Code in new versions of the stdlib must continue to work correctly even if
+     some of these newly assigned bits are never set -- as may be the case when
+     the initialization of a string was emitted entirely into an older client
+     binary.
+   - This typically means that these bits can only be used as optional
+     performance shortcuts, e.g. to signal the availability of a potential fast
+     path. (However, it is also possible to store information here that allows
+     more reliable detection & handling of runtime errors, like the
+     `isForeignUTF8` bit above.)
+
+ b0-47: count. Stores the number of code units. Corresponds to the position of
+     the `endIndex`.
 
 */
 extension _StringObject.CountAndFlags {
@@ -637,6 +729,12 @@ extension _StringObject.CountAndFlags {
   @inlinable @inline(__always)
   internal static var isTailAllocatedMask: UInt64 {
     return 0x1000_0000_0000_0000
+  }
+
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal static var isForeignUTF8Mask: UInt64 {
+    return 0x0800_0000_0000_0000
   }
 
   // General purpose bottom initializer
@@ -679,8 +777,8 @@ extension _StringObject.CountAndFlags {
 
   @inlinable @inline(__always)
   internal init(count: Int, flags: UInt16) {
-    // Currently, we only use top 4 flags
-    _internalInvariant(flags & 0xF000 == flags)
+    // Currently, we only use top 5 flags
+    _internalInvariant(flags & 0xF800 == flags)
 
     let rawBits = UInt64(truncatingIfNeeded: flags) &<< 48
                 | UInt64(truncatingIfNeeded: count)
@@ -751,6 +849,17 @@ extension _StringObject.CountAndFlags {
     return 0 != _storage & _StringObject.CountAndFlags.isTailAllocatedMask
   }
 
+  /// Returns whether this string is a foreign form with a UTF-8 storage
+  /// representation.
+  ///
+  /// As of Swift 5.7, this bit is never set; however, future releases may
+  /// introduce such forms.
+  @_alwaysEmitIntoClient
+  @inline(__always) // Swift 5.7
+  internal var isForeignUTF8: Bool {
+    (_storage & Self.isForeignUTF8Mask) != 0
+  }
+
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
   #else
@@ -761,6 +870,10 @@ extension _StringObject.CountAndFlags {
     }
     if isNativelyStored {
       _internalInvariant(isTailAllocated)
+    }
+    if isForeignUTF8 {
+      _internalInvariant(!isNativelyStored)
+      _internalInvariant(!isTailAllocated)
     }
   }
   #endif // INTERNAL_CHECKS_ENABLED
@@ -887,12 +1000,35 @@ extension _StringObject {
   @inline(__always)
   internal var isNFC: Bool {
     if isSmall {
-      // TODO(String performance): Worth implementing more sophisiticated
+      // TODO(String performance): Worth implementing more sophisticated
       // check, or else performing normalization on- construction. For now,
       // approximate it with isASCII
       return smallIsASCII
     }
     return _countAndFlags.isNFC
+  }
+
+  /// Returns whether this string has a UTF-8 storage representation.
+  /// If this returns false, then the string is encoded in UTF-16.
+  ///
+  /// This always returns a value corresponding to the string's actual encoding.
+  @_alwaysEmitIntoClient
+  @inline(__always) // Swift 5.7
+  internal var isUTF8: Bool {
+    // This is subtle. It is designed to return the right value in all past &
+    // future stdlibs.
+    //
+    // If `providesFastUTF8` is true, then we know we have an UTF-8 string.
+    //
+    // Otherwise we have a foreign string. On Swift <=5.7, foreign strings are
+    // always UTF-16 encoded, but a future Swift release may introduce UTF-8
+    // encoded foreign strings. To allow this, we have a dedicated
+    // `isForeignUTF8` bit that future UTF-8 encoded foreign forms will need to
+    // set to avoid breaking index validation.
+    //
+    // Note that `providesFastUTF8` returns true for small strings, so we don't
+    // need to check for smallness before accessing the `isForeignUTF8` bit.
+    providesFastUTF8 || _countAndFlags.isForeignUTF8
   }
 
   // Get access to fast UTF-8 contents for large strings which provide it.

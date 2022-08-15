@@ -3,10 +3,6 @@
 
 struct HasAmbiguousMethods {
 
-  // No input
-  void ping() { ++mutableMethodsCalledCount; }
-  void ping() const {}
-
   // One input (const first)
   int increment(int a) const {
     return a + 1;
@@ -43,6 +39,12 @@ struct HasAmbiguousMethods {
 
 private:
   int mutableMethodsCalledCount = 0;
+};
+
+struct HasAmbiguousMethods2 {
+  int increment(int a) const {
+    return a + 1;
+  }
 };
 
 #endif // TEST_INTEROP_CXX_CLASS_AMBIGUOUS_METHOD_METHODS_H

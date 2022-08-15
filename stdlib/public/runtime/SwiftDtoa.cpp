@@ -967,7 +967,7 @@ size_t swift_dtoa_optimal_binary64_p(const void *d, char *dest, size_t length)
     // Calculations above used an estimate for the power-of-ten scale.
     // Here, we compensate for any error in that estimate by testing
     // whether we have the expected number of digits in the integer
-    // portion and correcting as necesssary.  This also serves to
+    // portion and correcting as necessary.  This also serves to
     // prune leading zeros from subnormals.
 
     // Except for subnormals, this loop should never run more than once.
@@ -1734,7 +1734,7 @@ static int finishFormatting(char *dest, size_t length,
 // low-order part (rounding).  So most of the arithmetic helpers here
 // are for multiplication.
 
-// Note: With 64-bit GCC and Clang, we get a noticable performance
+// Note: With 64-bit GCC and Clang, we get a noticeable performance
 // gain by using `__uint128_t`.  Otherwise, we have to break things
 // down into 32-bit chunks so we don't overflow 64-bit temporaries.
 
@@ -2622,7 +2622,7 @@ static const uint64_t powersOf10_Binary128[] = {
 // * 64-bit fractions `lower` and `upper`
 // * integer `exponent`
 //
-// The returned values satisty the following:
+// The returned values satisfy the following:
 // ```
 //    lower * 2^exponent <= 10^p <= upper * 2^exponent
 // ```
@@ -2656,7 +2656,7 @@ static void intervalContainingPowerOf10_Binary32(int p, uint64_t *lower, uint64_
 // multiplications to accurately reconstruct the lower and upper
 // bounds.
 //
-// The returned values satisty the following:
+// The returned values satisfy the following:
 // ```
 //    lower * 2^exponent <= 10^p <= upper * 2^exponent
 // ```

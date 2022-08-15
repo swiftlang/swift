@@ -76,10 +76,11 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     const Options &options, Completion *prefix, bool clearFlair) {
 
   ImportDepth depth;
-  if (info.swiftASTContext) {
+  if (info.compilerInstance) {
     // Build import depth map.
-    depth = ImportDepth(*info.swiftASTContext,
-                        info.invocation->getFrontendOptions());
+    depth = ImportDepth(
+        info.compilerInstance->getASTContext(),
+        info.compilerInstance->getInvocation().getFrontendOptions());
   }
 
   if (info.completionContext)
@@ -133,17 +134,17 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         CodeCompletionString::create(sink.allocator, chunk);
     auto *contextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            sink.allocator, CodeCompletionResultKind::Pattern, completionString,
-            CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
-            CodeCompletionResultType::unknown(),
+            sink.swiftSink, CodeCompletionResultKind::Pattern, completionString,
+            CodeCompletionOperatorKind::None, /*IsAsync=*/false,
+            /*BriefDocComment=*/"", CodeCompletionResultType::unknown(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
         *contextFreeResult, SemanticContextKind::Local,
         CodeCompletionFlairBit::ExpressionSpecific,
         /*NumBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-        ContextualNotRecommendedReason::None,
-        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+        /*USRTypeContext=*/nullptr, /*CanCurrDeclContextHandleAsync=*/false,
+        ContextualNotRecommendedReason::None);
 
     CompletionBuilder builder(sink, *swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -682,7 +683,6 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
   case CodeCompletionResultKind::Declaration:
     switch (completion->getExpectedTypeRelation()) {
     case swift::ide::CodeCompletionResultTypeRelation::Convertible:
-    case swift::ide::CodeCompletionResultTypeRelation::Identical:
       return ResultBucket::NormalTypeMatch;
     case swift::ide::CodeCompletionResultTypeRelation::NotApplicable:
     case swift::ide::CodeCompletionResultTypeRelation::Unknown:
@@ -1167,15 +1167,16 @@ Completion *CompletionBuilder::finish() {
         new (sink.allocator) ContextFreeCodeCompletionResult(
             contextFreeBase.getKind(),
             contextFreeBase.getOpaqueAssociatedKind(), opKind,
-            contextFreeBase.isSystem(), newCompletionString,
+            contextFreeBase.isSystem(), contextFreeBase.isAsync(),
+            contextFreeBase.hasAsyncAlternative(), newCompletionString,
             contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
             contextFreeBase.getAssociatedUSRs(),
             contextFreeBase.getResultType(),
             contextFreeBase.getNotRecommendedReason(),
             contextFreeBase.getDiagnosticSeverity(),
-            contextFreeBase.getDiagnosticMessage(),
-            newFilterName);
+            contextFreeBase.getDiagnosticMessage(), newFilterName,
+            contextFreeBase.getNameForDiagnostics());
     newBase = base.withContextFreeResultSemanticContextAndFlair(
         *contextFreeResult, semanticContext, flair, sink.swiftSink);
   }

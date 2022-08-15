@@ -608,15 +608,19 @@ extension Dictionary {
   public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Key: Value] {
-    // FIXME(performance): Try building a bitset of elements to keep, so that we
-    // eliminate rehashings during insertion.
-    var result = _NativeDictionary<Key, Value>()
-    for element in self {
-      if try isIncluded(element) {
-        result.insertNew(key: element.key, value: element.value)
+  #if _runtime(_ObjC)
+    guard _variant.isNative else {
+      // Slow path for bridged dictionaries
+      var result = _NativeDictionary<Key, Value>()
+      for element in self {
+        if try isIncluded(element) {
+          result.insertNew(key: element.key, value: element.value)
+        }
       }
+      return Dictionary(_native: result)
     }
-    return Dictionary(_native: result)
+  #endif
+    return Dictionary(_native: try _variant.asNative.filter(isIncluded))
   }
 }
 

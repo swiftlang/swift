@@ -1044,7 +1044,8 @@ private:
       // had its generic arguments applied.
       NodePointer result = Factory.createNode(nominalType->getKind());
       result->addChild(parentOrModule, Factory);
-      result->addChild(nominalType->getChild(1), Factory);
+      for (unsigned ndx = 1; ndx < nominalType->getNumChildren(); ++ndx)
+        result->addChild(nominalType->getChild(ndx), Factory);
 
       nominalType = result;
     }

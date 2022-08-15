@@ -137,7 +137,7 @@ class VJPCloner::Implementation final
   SILType getLoweredType(Type type) {
     auto vjpGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
     Lowering::AbstractionPattern pattern(vjpGenSig,
-                                         type->getCanonicalType(vjpGenSig));
+                                         type->getReducedType(vjpGenSig));
     return vjp->getLoweredType(pattern, type);
   }
 
@@ -231,10 +231,7 @@ public:
     extractAllElements(origResult, Builder, origResults);
 
     // Get and partially apply the pullback.
-    auto vjpGenericEnv = vjp->getGenericEnvironment();
-    auto vjpSubstMap = vjpGenericEnv
-                           ? vjpGenericEnv->getForwardingSubstitutionMap()
-                           : vjp->getForwardingSubstitutionMap();
+    auto vjpSubstMap = vjp->getForwardingSubstitutionMap();
     auto *pullbackRef = Builder.createFunctionRef(loc, pullback);
 
     // Prepare partial application arguments.
@@ -257,13 +254,10 @@ public:
     auto *pullbackPartialApply = Builder.createPartialApply(
         loc, pullbackRef, vjpSubstMap, {partialApplyArg},
         ParameterConvention::Direct_Guaranteed);
-    auto pullbackType = vjp->getLoweredFunctionType()
-                            ->getResults()
-                            .back()
-                            .getSILStorageInterfaceType();
-    pullbackType = pullbackType.substGenericArgs(
-        getModule(), vjpSubstMap, TypeExpansionContext::minimal());
-    pullbackType = pullbackType.subst(getModule(), vjpSubstMap);
+    auto pullbackType = vjp->mapTypeIntoContext(
+        vjp->getConventions().getSILType(
+            vjp->getLoweredFunctionType()->getResults().back(),
+            vjp->getTypeExpansionContext()));
     auto pullbackFnType = pullbackType.castTo<SILFunctionType>();
     auto pullbackSubstType =
         pullbackPartialApply->getType().castTo<SILFunctionType>();
@@ -375,20 +369,6 @@ public:
         createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getSuccessBB()),
         createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getFailureBB()),
         ccbi->getTrueBBCount(), ccbi->getFalseBBCount());
-  }
-
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *ccvbi) {
-    Builder.setCurrentDebugScope(getOpScope(ccvbi->getDebugScope()));
-    // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(ccvbi);
-    // Create a new `checked_cast_value_branch` instruction.
-    getBuilder().createCheckedCastValueBranch(
-        ccvbi->getLoc(), getOpValue(ccvbi->getOperand()),
-        getOpASTType(ccvbi->getSourceFormalType()),
-        getOpType(ccvbi->getTargetLoweredType()),
-        getOpASTType(ccvbi->getTargetFormalType()),
-        createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getSuccessBB()),
-        createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getFailureBB()));
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi) {
@@ -829,7 +809,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
       [&](CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
-    tanType = tanType->getCanonicalType(witnessCanGenSig);
+    tanType = tanType->getReducedType(witnessCanGenSig);
     Lowering::AbstractionPattern pattern(witnessCanGenSig, tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
         pattern, tanType, TypeExpansionContext::minimal());
@@ -856,7 +836,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // Given a type, returns its formal SIL result info.
   auto getTangentResultInfoForOriginalParameter =
       [&](CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
-    tanType = tanType->getCanonicalType(witnessCanGenSig);
+    tanType = tanType->getReducedType(witnessCanGenSig);
     Lowering::AbstractionPattern pattern(witnessCanGenSig, tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
         pattern, tanType, TypeExpansionContext::minimal());
@@ -906,12 +886,12 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     if (resultIndex < origTy->getNumResults()) {
       auto origResult = origTy->getResults()[resultIndex];
       origResult = origResult.getWithInterfaceType(
-          origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+          origResult.getInterfaceType()->getReducedType(witnessCanGenSig));
       pbParams.push_back(getTangentParameterInfoForOriginalResult(
           origResult.getInterfaceType()
               ->getAutoDiffTangentSpace(lookupConformance)
               ->getType()
-              ->getCanonicalType(witnessCanGenSig),
+              ->getReducedType(witnessCanGenSig),
           origResult.getConvention()));
       continue;
     }
@@ -931,7 +911,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     }
     auto inoutParam = origParams[paramIndex];
     auto origResult = inoutParam.getWithInterfaceType(
-        inoutParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+        inoutParam.getInterfaceType()->getReducedType(witnessCanGenSig));
     auto inoutParamTanConvention =
         config.isWrtParameter(paramIndex)
             ? inoutParam.getConvention()
@@ -940,7 +920,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
             ->getType()
-            ->getCanonicalType(witnessCanGenSig),
+            ->getReducedType(witnessCanGenSig),
         inoutParamTanConvention);
     pbParams.push_back(inoutParamTanParam);
   }
@@ -957,7 +937,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     auto *origExit = &*original->findReturnBB();
     auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
     auto pbStructType =
-    pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
+    pbStruct->getDeclaredInterfaceType()->getReducedType(witnessCanGenSig);
     pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
   }
 
@@ -967,12 +947,12 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     if (origParam.isIndirectMutating())
       continue;
     origParam = origParam.getWithInterfaceType(
-        origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+        origParam.getInterfaceType()->getReducedType(witnessCanGenSig));
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
             ->getType()
-            ->getCanonicalType(witnessCanGenSig),
+            ->getReducedType(witnessCanGenSig),
         origParam.getConvention()));
   }
 
