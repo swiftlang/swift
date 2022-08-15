@@ -691,6 +691,21 @@ public:
             // to the allowlist.
             ShouldComplain = false;
           }
+          if (ShouldComplain) {
+            // Providing a default implementation via a protocol extension for
+            // a protocol requirement is both ABI and API safe.
+            if (auto *PD = dyn_cast<SDKNodeDecl>(D->getParent())) {
+              for (auto *SIB: PD->getChildren()) {
+                if (auto *SIBD = dyn_cast<SDKNodeDecl>(SIB)) {
+                  if (SIBD->isFromExtension() &&
+                      SIBD->getPrintedName() == D->getPrintedName()) {
+                    ShouldComplain = false;
+                    break;
+                  }
+                }
+              }
+            }
+          }
           if (ShouldComplain)
             D->emitDiag(D->getLoc(), diag::protocol_req_added);
         }
