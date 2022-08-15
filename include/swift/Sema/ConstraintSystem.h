@@ -1545,6 +1545,10 @@ public:
   /// Retrieve the fixed score of this solution
   Score &getFixedScore() { return FixedScore; }
 
+  /// Check whether this solution has a fixed binding for the given type
+  /// variable.
+  bool hasFixedType(TypeVariableType *typeVar) const;
+
   /// Retrieve the fixed type for the given type variable.
   Type getFixedType(TypeVariableType *typeVar) const;
 
