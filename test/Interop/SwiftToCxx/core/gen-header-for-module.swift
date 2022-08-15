@@ -8,6 +8,15 @@
 // RUN: %target-swift-frontend -parse-as-library %t-evo/Core.swiftmodule -enable-library-evolution -typecheck -module-name Core -clang-header-expose-public-decls -emit-clang-header-path %t-evo/core.h
 // RUN: %FileCheck %s < %t-evo/core.h
 
+// RUN: %empty-directory(%t-int)
+// RUN: %target-swift-frontend %s -typecheck -emit-module-interface-path %t-int/Core.swiftinterface -module-name Core
+// RUN: %target-swift-frontend -parse-as-library %t-int/Core.swiftinterface -typecheck -module-name Core -clang-header-expose-public-decls -emit-clang-header-path %t-int/core.h
+// RUN: %FileCheck %s < %t-int/core.h
+
+// RUN: %empty-directory(%t-int-evo)
+// RUN: %target-swift-frontend %s -typecheck -enable-library-evolution -emit-module-interface-path %t-int-evo/Core.swiftinterface -module-name Core
+// RUN: %target-swift-frontend -parse-as-library %t-int-evo/Core.swiftinterface -typecheck -enable-library-evolution -module-name Core -clang-header-expose-public-decls -emit-clang-header-path %t-int-evo/core.h
+// RUN: %FileCheck %s < %t-int-evo/core.h
 
 public func reprintedInImportedModule() -> Int {
     return 42
