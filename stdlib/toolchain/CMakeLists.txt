@@ -50,6 +50,7 @@ if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
   add_subdirectory(legacy_layouts)
   add_subdirectory(Compatibility50)
   add_subdirectory(Compatibility51)
+  add_subdirectory(Compatibility56)
   add_subdirectory(CompatibilityDynamicReplacements)
   add_subdirectory(CompatibilityConcurrency)
   add_subdirectory(CompatibilityThreading)
@@ -63,6 +64,7 @@ if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     swiftCompatibilityConcurrency${vsuffix}
     swiftCompatibilityDynamicReplacements${vsuffix}
     swiftCompatibility50${vsuffix}
-    swiftCompatibility51${vsuffix})
+    swiftCompatibility51${vsuffix}
+    swiftCompatibility56${vsuffix})
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS HostCompatibilityLibs)
 endif()
