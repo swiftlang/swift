@@ -51,6 +51,9 @@ public:
     return Argument(SourceLoc(), Identifier(), expr);
   }
 
+  /// Make an implicit unlabeled 'inout' argument.
+  static Argument implicitInOut(ASTContext &ctx, Expr *expr);
+
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   SourceRange getSourceRange() const;
@@ -64,6 +67,11 @@ public:
 
   /// The argument label written in the call.
   Identifier getLabel() const { return Label; }
+
+  /// Whether the argument has a non-empty label. Note that this returns `false`
+  /// for an explicitly specified empty label e.g `_: {}` for a trailing
+  /// closure.
+  bool hasLabel() const { return !Label.empty(); }
 
   /// Set a new argument label.
   ///
