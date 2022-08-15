@@ -167,7 +167,13 @@ void swift::swift_asyncLet_start(AsyncLet *alet,
                                  void *closureEntryPoint,
                                  HeapObject *closureContext) {
   auto flags = TaskCreateFlags();
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  // In the task to thread model, we don't want tasks to start running on
+  // separate threads - they will run in the context of the parent
+  flags.setEnqueueJob(false);
+#else
   flags.setEnqueueJob(true);
+#endif
 
   AsyncLetTaskOptionRecord asyncLetOptionRecord(alet);
   asyncLetOptionRecord.Parent = options;
@@ -191,7 +197,14 @@ void swift::swift_asyncLet_begin(AsyncLet *alet,
                        resultBuffer);
 
   auto flags = TaskCreateFlags();
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  // In the task to thread model, we don't want tasks to start running on
+  // separate threads - they will run in the context of the parent
+  flags.setEnqueueJob(false);
+#else
   flags.setEnqueueJob(true);
+#endif
+
 
   AsyncLetWithBufferTaskOptionRecord asyncLetOptionRecord(alet, resultBuffer);
   asyncLetOptionRecord.Parent = options;

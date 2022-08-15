@@ -187,6 +187,29 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       escalatedPriority = waitingStatus.getStoredPriority();
     }
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    // In the task to thread model, we will execute the task that we are waiting
+    // on, on the current thread itself. As a result, do not bother adding the
+    // waitingTask to any thread queue. Instead, we will clear the old task, run
+    // the new one and then reattempt to continue running the old task
+
+    auto oldTask = _swift_task_clearCurrent();
+    assert(oldTask == waitingTask);
+
+    SWIFT_TASK_DEBUG_LOG("[RunInline] Switching away from running %p to now running %p", oldTask, this);
+    // Run the new task on the same thread now - this should run the new task to
+    // completion. All swift tasks in task-to-thread model run on generic
+    // executor
+    swift_job_run(this, ExecutorRef::generic());
+
+    SWIFT_TASK_DEBUG_LOG("[RunInline] Switching back from running %p to now running %p", this, oldTask);
+
+    // We now are back in the context of the waiting task and need to reevaluate
+    // our state
+    _swift_task_setCurrent(oldTask);
+    queueHead = fragment->waitQueue.load(std::memory_order_acquire);
+    continue;
+#else
     // Put the waiting task at the beginning of the wait queue.
     waitingTask->getNextWaitingTask() = queueHead.getTask();
     auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
@@ -198,6 +221,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       _swift_task_clearCurrent();
       return FutureFragment::Status::Executing;
     }
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   }
 }
 
@@ -255,8 +279,13 @@ void AsyncTask::completeFuture(AsyncContext *context) {
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
 
-  if (!waitingTask)
+  if (!waitingTask) {
     SWIFT_TASK_DEBUG_LOG("task %p had no waiting tasks", this);
+  } else {
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    assert(false && "Task should have no waiters in task-to-thread model");
+#endif
+  }
 
   while (waitingTask) {
     // Find the next waiting task before we invalidate it by resuming
