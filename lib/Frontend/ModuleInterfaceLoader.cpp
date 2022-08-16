@@ -337,58 +337,100 @@ struct ModuleRebuildInfo {
   }
 };
 
-/// Handles the details of loading module interfaces as modules, and will
-/// do the necessary lookup to determine if we should be loading from the
-/// normal cache, the prebuilt cache, a module adjacent to the interface, or
-/// a module that we'll build from a module interface.
-class ModuleInterfaceLoaderImpl {
-  friend class swift::ModuleInterfaceLoader;
-  friend class swift::ModuleInterfaceCheckerImpl;
+/// Constructs the full path of the dependency \p dep by prepending the SDK
+/// path if necessary.
+StringRef getFullDependencyPath(const FileDependency &dep,
+                                const ASTContext &ctx,
+                                SmallVectorImpl<char> &scratch) {
+  if (!dep.isSDKRelative())
+    return dep.getPath();
+
+  path::native(ctx.SearchPathOpts.getSDKPath(), scratch);
+  llvm::sys::path::append(scratch, dep.getPath());
+  return StringRef(scratch.data(), scratch.size());
+}
+
+class UpToDateModuleCheker {
   ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
-  DiagnosticEngine &diags;
-  ModuleRebuildInfo rebuildInfo;
-  const StringRef modulePath;
-  const std::string interfacePath;
-  const StringRef moduleName;
-  const StringRef prebuiltCacheDir;
-  const StringRef backupInterfaceDir;
-  const StringRef cacheDir;
-  const SourceLoc diagnosticLoc;
-  DependencyTracker *const dependencyTracker;
-  const ModuleLoadingMode loadMode;
-  ModuleInterfaceLoaderOptions Opts;
   RequireOSSAModules_t requiresOSSAModules;
 
-  ModuleInterfaceLoaderImpl(
-      ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
-      StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
-      StringRef backupInterfaceDir,
-      SourceLoc diagLoc, ModuleInterfaceLoaderOptions Opts,
-      RequireOSSAModules_t requiresOSSAModules,
-      DependencyTracker *dependencyTracker = nullptr,
-      ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
-      : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
-        modulePath(modulePath), interfacePath(interfacePath),
-        moduleName(moduleName),
-        prebuiltCacheDir(prebuiltCacheDir),
-        backupInterfaceDir(backupInterfaceDir),
-        cacheDir(cacheDir), diagnosticLoc(diagLoc),
-        dependencyTracker(dependencyTracker), loadMode(loadMode), Opts(Opts),
-        requiresOSSAModules(requiresOSSAModules) {}
-
-  /// Constructs the full path of the dependency \p dep by prepending the SDK
-  /// path if necessary.
-  StringRef getFullDependencyPath(const FileDependency &dep,
-                                  SmallVectorImpl<char> &scratch) const {
-    if (!dep.isSDKRelative())
-      return dep.getPath();
-
-    path::native(ctx.SearchPathOpts.getSDKPath(), scratch);
-    llvm::sys::path::append(scratch, dep.getPath());
-    return StringRef(scratch.data(), scratch.size());
+public:
+  UpToDateModuleCheker(ASTContext &ctx, RequireOSSAModules_t requiresOSSAModules)
+     : ctx(ctx),
+       fs(*ctx.SourceMgr.getFileSystem()),
+       requiresOSSAModules(requiresOSSAModules) {}
+  
+  // Check if all the provided file dependencies are up-to-date compared to
+  // what's currently on disk.
+  bool dependenciesAreUpToDate(StringRef modulePath,
+                               ModuleRebuildInfo &rebuildInfo,
+                               ArrayRef<FileDependency> deps,
+                               bool skipSystemDependencies) {
+    SmallString<128> SDKRelativeBuffer;
+    for (auto &in : deps) {
+      if (skipSystemDependencies && in.isSDKRelative() &&
+          in.isModificationTimeBased()) {
+        continue;
+      }
+      StringRef fullPath = getFullDependencyPath(in, ctx, SDKRelativeBuffer);
+      switch (checkDependency(modulePath, in, fullPath)) {
+      case DependencyStatus::UpToDate:
+        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is up to date\n");
+        break;
+      case DependencyStatus::OutOfDate:
+        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is out of date\n");
+        rebuildInfo.addOutOfDateDependency(modulePath, fullPath);
+        return false;
+      case DependencyStatus::Missing:
+        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is missing\n");
+        rebuildInfo.addMissingDependency(modulePath, fullPath);
+        return false;
+      }
+    }
+    return true;
   }
 
+  // Check that the output .swiftmodule file is at least as new as all the
+  // dependencies it read when it was built last time.
+  bool serializedASTBufferIsUpToDate(
+      StringRef path, const llvm::MemoryBuffer &buf,
+      ModuleRebuildInfo &rebuildInfo,
+      SmallVectorImpl<FileDependency> &allDeps) {
+
+    // Clear the existing dependencies, because we're going to re-fill them
+    // in validateSerializedAST.
+    allDeps.clear();
+
+    LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
+    auto validationInfo = serialization::validateSerializedAST(
+        buf.getBuffer(), requiresOSSAModules, ctx.LangOpts.SDKName,
+        /*ExtendedValidationInfo=*/nullptr, &allDeps);
+
+    if (validationInfo.status != serialization::Status::Valid) {
+      rebuildInfo.setSerializationStatus(path, validationInfo.status);
+      return false;
+    }
+
+    bool skipCheckingSystemDependencies =
+        ctx.SearchPathOpts.DisableModulesValidateSystemDependencies;
+    return dependenciesAreUpToDate(path, rebuildInfo, allDeps,
+                                   skipCheckingSystemDependencies);
+  }
+
+  // Check that the output .swiftmodule file is at least as new as all the
+  // dependencies it read when it was built last time.
+  bool swiftModuleIsUpToDate(
+    StringRef modulePath, ModuleRebuildInfo &rebuildInfo,
+    SmallVectorImpl<FileDependency> &AllDeps,
+    std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer) {
+    auto OutBuf = fs.getBufferForFile(modulePath);
+    if (!OutBuf)
+      return false;
+    moduleBuffer = std::move(*OutBuf);
+    return serializedASTBufferIsUpToDate(modulePath, *moduleBuffer, rebuildInfo, AllDeps);
+  }
+  
   enum class DependencyStatus {
     UpToDate,
     OutOfDate,
@@ -429,6 +471,49 @@ class ModuleInterfaceLoaderImpl {
         DependencyStatus::UpToDate :
         DependencyStatus::OutOfDate;
   }
+};
+
+/// Handles the details of loading module interfaces as modules, and will
+/// do the necessary lookup to determine if we should be loading from the
+/// normal cache, the prebuilt cache, a module adjacent to the interface, or
+/// a module that we'll build from a module interface.
+class ModuleInterfaceLoaderImpl {
+  friend class swift::ModuleInterfaceLoader;
+  friend class swift::ModuleInterfaceCheckerImpl;
+  ASTContext &ctx;
+  llvm::vfs::FileSystem &fs;
+  DiagnosticEngine &diags;
+  ModuleRebuildInfo rebuildInfo;
+  UpToDateModuleCheker upToDateChecker;
+  const StringRef modulePath;
+  const std::string interfacePath;
+  const StringRef moduleName;
+  const StringRef prebuiltCacheDir;
+  const StringRef backupInterfaceDir;
+  const StringRef cacheDir;
+  const SourceLoc diagnosticLoc;
+  DependencyTracker *const dependencyTracker;
+  const ModuleLoadingMode loadMode;
+  ModuleInterfaceLoaderOptions Opts;
+  RequireOSSAModules_t requiresOSSAModules;
+
+  ModuleInterfaceLoaderImpl(
+      ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
+      StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
+      StringRef backupInterfaceDir,
+      SourceLoc diagLoc, ModuleInterfaceLoaderOptions Opts,
+      RequireOSSAModules_t requiresOSSAModules,
+      DependencyTracker *dependencyTracker = nullptr,
+      ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
+      : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
+        upToDateChecker(ctx, requiresOSSAModules),
+        modulePath(modulePath), interfacePath(interfacePath),
+        moduleName(moduleName),
+        prebuiltCacheDir(prebuiltCacheDir),
+        backupInterfaceDir(backupInterfaceDir),
+        cacheDir(cacheDir), diagnosticLoc(diagLoc),
+        dependencyTracker(dependencyTracker), loadMode(loadMode), Opts(Opts),
+        requiresOSSAModules(requiresOSSAModules) {}
 
   std::string getBackupPublicModuleInterfacePath() {
     return getBackupPublicModuleInterfacePath(ctx.SourceMgr, backupInterfaceDir,
@@ -461,73 +546,6 @@ class ModuleInterfaceLoaderImpl {
     return std::string();
   }
 
-  // Check if all the provided file dependencies are up-to-date compared to
-  // what's currently on disk.
-  bool dependenciesAreUpToDate(StringRef modulePath,
-                               ArrayRef<FileDependency> deps,
-                               bool skipSystemDependencies) {
-    SmallString<128> SDKRelativeBuffer;
-    for (auto &in : deps) {
-      if (skipSystemDependencies && in.isSDKRelative() &&
-          in.isModificationTimeBased()) {
-        continue;
-      }
-      StringRef fullPath = getFullDependencyPath(in, SDKRelativeBuffer);
-      switch (checkDependency(modulePath, in, fullPath)) {
-      case DependencyStatus::UpToDate:
-        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is up to date\n");
-        break;
-      case DependencyStatus::OutOfDate:
-        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is out of date\n");
-        rebuildInfo.addOutOfDateDependency(modulePath, fullPath);
-        return false;
-      case DependencyStatus::Missing:
-        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is missing\n");
-        rebuildInfo.addMissingDependency(modulePath, fullPath);
-        return false;
-      }
-    }
-    return true;
-  }
-
-  // Check that the output .swiftmodule file is at least as new as all the
-  // dependencies it read when it was built last time.
-  bool serializedASTBufferIsUpToDate(
-      StringRef path, const llvm::MemoryBuffer &buf,
-      SmallVectorImpl<FileDependency> &allDeps) {
-
-    // Clear the existing dependencies, because we're going to re-fill them
-    // in validateSerializedAST.
-    allDeps.clear();
-
-    LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
-    auto validationInfo = serialization::validateSerializedAST(
-        buf.getBuffer(), requiresOSSAModules, ctx.LangOpts.SDKName,
-        /*ExtendedValidationInfo=*/nullptr, &allDeps);
-
-    if (validationInfo.status != serialization::Status::Valid) {
-      rebuildInfo.setSerializationStatus(path, validationInfo.status);
-      return false;
-    }
-
-    bool skipCheckingSystemDependencies =
-        ctx.SearchPathOpts.DisableModulesValidateSystemDependencies;
-    return dependenciesAreUpToDate(path, allDeps,
-                                   skipCheckingSystemDependencies);
-  }
-
-  // Check that the output .swiftmodule file is at least as new as all the
-  // dependencies it read when it was built last time.
-  bool swiftModuleIsUpToDate(
-    StringRef modulePath, SmallVectorImpl<FileDependency> &AllDeps,
-    std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer) {
-    auto OutBuf = fs.getBufferForFile(modulePath);
-    if (!OutBuf)
-      return false;
-    moduleBuffer = std::move(*OutBuf);
-    return serializedASTBufferIsUpToDate(modulePath, *moduleBuffer, AllDeps);
-  }
-
   // Check that a "forwarding" .swiftmodule file is at least as new as all the
   // dependencies it read when it was built last time. Requires that the
   // forwarding module has been loaded from disk.
@@ -557,7 +575,8 @@ class ModuleInterfaceLoaderImpl {
 
     bool skipCheckingSystemDependencies =
         ctx.SearchPathOpts.DisableModulesValidateSystemDependencies;
-    if (!dependenciesAreUpToDate(path, deps, skipCheckingSystemDependencies))
+    if (!upToDateChecker.dependenciesAreUpToDate(path, rebuildInfo, deps,
+                                                 skipCheckingSystemDependencies))
       return false;
 
     moduleBuffer = std::move(*modBuf);
@@ -729,8 +748,8 @@ class ModuleInterfaceLoaderImpl {
     if (!adjacentMod.empty()) {
       auto adjacentModuleBuffer = fs.getBufferForFile(adjacentMod);
       if (adjacentModuleBuffer) {
-        if (serializedASTBufferIsUpToDate(adjacentMod, *adjacentModuleBuffer.get(),
-                                          deps)) {
+        if (upToDateChecker.serializedASTBufferIsUpToDate(adjacentMod, *adjacentModuleBuffer.get(),
+                                                          rebuildInfo, deps)) {
           LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
                                   << adjacentMod
                                   << "; deferring to serialized module loader\n");
@@ -767,7 +786,8 @@ class ModuleInterfaceLoaderImpl {
 
     if(!prebuiltMod.empty()) {
       std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-      if (swiftModuleIsUpToDate(prebuiltMod, deps, moduleBuffer)) {
+      if (upToDateChecker.swiftModuleIsUpToDate(prebuiltMod, rebuildInfo,
+                                                deps, moduleBuffer)) {
         LLVM_DEBUG(llvm::dbgs() << "Found up-to-date prebuilt module at "
                                 << prebuiltMod << "\n");
         UsableModulePath = prebuiltMod;
@@ -819,7 +839,8 @@ class ModuleInterfaceLoaderImpl {
                                     ModuleRebuildInfo::ModuleKind::Forwarding);
         }
       // Otherwise, check if the AST buffer itself is up to date.
-      } else if (serializedASTBufferIsUpToDate(cachedOutputPath, *buf, deps)) {
+      } else if (upToDateChecker.serializedASTBufferIsUpToDate(cachedOutputPath, *buf,
+                                                               rebuildInfo, deps)) {
         LLVM_DEBUG(llvm::dbgs() << "Found up-to-date cached module at "
                                 << cachedOutputPath << "\n");
         return DiscoveredModule::normal(cachedOutputPath, std::move(buf));
@@ -854,7 +875,7 @@ class ModuleInterfaceLoaderImpl {
     //        we may record out-of-date information.
     SmallString<128> SDKRelativeBuffer;
     auto addDependency = [&](FileDependency dep) -> FileDependency {
-      auto status = fs.status(getFullDependencyPath(dep, SDKRelativeBuffer));
+      auto status = fs.status(getFullDependencyPath(dep, ctx, SDKRelativeBuffer));
       uint64_t mtime =
         status->getLastModificationTime().time_since_epoch().count();
       fwd.addDependency(dep.getPath(), dep.isSDKRelative(), status->getSize(),
@@ -955,7 +976,7 @@ class ModuleInterfaceLoaderImpl {
       if (dependencyTracker) {
         SmallString<128> SDKRelativeBuffer;
         for (auto &dep: allDeps) {
-          StringRef fullPath = getFullDependencyPath(dep, SDKRelativeBuffer);
+          StringRef fullPath = getFullDependencyPath(dep, ctx, SDKRelativeBuffer);
           dependencyTracker->addDependency(fullPath,
                                            /*IsSystem=*/dep.isSDKRelative());
         }
@@ -1197,7 +1218,8 @@ bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
   std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
   for (auto mod: candidates) {
     // Check if the candidate compiled module is still up-to-date.
-    if (Impl.swiftModuleIsUpToDate(mod, deps, moduleBuffer)) {
+    if (Impl.upToDateChecker.swiftModuleIsUpToDate(mod, Impl.rebuildInfo,
+                                                   deps, moduleBuffer)) {
       // If so, emit a forwarding module to the candidate.
       ForwardingModule FM(mod);
       auto hadError = withOutputFile(Ctx.Diags, outputPath,
