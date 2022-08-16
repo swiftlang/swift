@@ -113,6 +113,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Types, core->Types);
   allocateBuffer(ClangTypes, core->ClangTypes);
   allocateBuffer(GenericSignatures, core->GenericSignatures);
+  allocateBuffer(GenericEnvironments, core->GenericEnvironments);
   allocateBuffer(SubstitutionMaps, core->SubstitutionMaps);
   allocateBuffer(Identifiers, core->Identifiers);
 }
