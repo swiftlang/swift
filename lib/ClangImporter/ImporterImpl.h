@@ -769,7 +769,7 @@ public:
   /// Tracks macro definitions from the bridging header.
   std::vector<clang::IdentifierInfo *> BridgeHeaderMacros;
   /// Tracks included headers from the bridging header.
-  llvm::DenseSet<const clang::FileEntry *> BridgeHeaderFiles;
+  llvm::DenseSet<clang::FileEntryRef> BridgeHeaderFiles;
 
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);

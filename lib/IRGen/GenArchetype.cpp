@@ -342,7 +342,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   }
 
   // Otherwise, for now, always use an opaque indirect type.
-  llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
+  llvm::Type *storageType = IGM.OpaquePtrTy->getPointerElementType();
 
   // Opaque result types can be private and from a different module. In this
   // case we can't access their type metadata from another module.

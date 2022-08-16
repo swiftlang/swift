@@ -276,7 +276,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     // optimization pipeline.
     SerializationOptions SerializationOpts;
     std::string OutPathStr = OutPath.str();
-    SerializationOpts.OutputPath = OutPathStr.c_str();
+    SerializationOpts.OutputPath = OutPathStr;
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
     SerializationOpts.AutolinkForceLoad =
       !subInvocation.getIRGenOptions().ForceLoadSymbolName.empty();

@@ -222,15 +222,15 @@ public func mutateRef() {
 // CHECK-CC: declare %struct.__CFString* @getMyABINewType()
 // CHECK-CC: declare %struct.__CFString* @getMyABIOldType()
 //
-// CHECK-CC: declare void @takeMyABINewType(%struct.__CFString*)
-// CHECK-CC: declare void @takeMyABIOldType(%struct.__CFString*)
+// CHECK-CC: declare void @takeMyABINewType(%struct.__CFString* noundef)
+// CHECK-CC: declare void @takeMyABIOldType(%struct.__CFString* noundef)
 //
-// CHECK-CC: declare void @takeMyABINewTypeNonNull(%struct.__CFString*)
-// CHECK-CC: declare void @takeMyABIOldTypeNonNull(%struct.__CFString*)
+// CHECK-CC: declare void @takeMyABINewTypeNonNull(%struct.__CFString* noundef)
+// CHECK-CC: declare void @takeMyABIOldTypeNonNull(%struct.__CFString* noundef)
 //
 // CHECK-CC: declare %0* @getMyABINewTypeNS()
 // CHECK-CC: declare %0* @getMyABIOldTypeNS()
 //
-// CHECK-CC: declare void @takeMyABINewTypeNonNullNS(%0*)
-// CHECK-CC: declare void @takeMyABIOldTypeNonNullNS(%0*)
+// CHECK-CC: declare void @takeMyABINewTypeNonNullNS(%0* noundef)
+// CHECK-CC: declare void @takeMyABIOldTypeNonNullNS(%0* noundef)
 

@@ -456,7 +456,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
     NameGEP = llvm::ConstantExpr::getGetElementPtr(
-        ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
+        ((llvm::PointerType *)FuncNamePtr->getType())->getPointerElementType(),
         FuncNamePtr, makeArrayRef(Indices));
 
     // Replace the placeholder value with the new GEP.

@@ -35,6 +35,7 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -137,12 +138,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.TrapFuncName = Opts.TrapFuncName;
   }
 
+  auto &VFS = Importer->getClangInstance().getVirtualFileSystem();
   auto &HSI = Importer->getClangPreprocessor()
                   .getHeaderSearchInfo()
                   .getHeaderSearchOpts();
   auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, HSI, PPO, CGO,
+                                                ModuleName, &VFS, HSI, PPO, CGO,
                                                 LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
   return ClangCodeGen;
@@ -955,9 +957,9 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
         && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
 
-    llvm::AttrBuilder buildFnAttr;
-    llvm::AttrBuilder buildRetAttr;
-    llvm::AttrBuilder buildFirstParamAttr;
+    llvm::AttrBuilder buildFnAttr(Module.getContext());
+    llvm::AttrBuilder buildRetAttr(Module.getContext());
+    llvm::AttrBuilder buildFirstParamAttr(Module.getContext());
 
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
@@ -1089,7 +1091,7 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
   if (ObjCInterop) {
     // struct objc_cache _objc_empty_cache;
     ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
-                                                 OpaquePtrTy->getElementType());
+                                                 OpaquePtrTy->getPointerElementType());
     ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalVariable>(ObjCEmptyCachePtr));
   } else {
@@ -1240,7 +1242,7 @@ void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
 }
 
 void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   setHasNoFramePointer(b);
   F->addFnAttrs(b);
 }
@@ -1269,7 +1271,7 @@ void IRGenModule::constructInitialFnAttributes(
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   constructInitialFnAttributes(b);
   return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
 }
@@ -1624,6 +1626,7 @@ static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
     auto BB = llvm::BasicBlock::Create(IGM.getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);
     IRB.CreateRetVoid();
+    IGM.addUsedGlobal(ForceImportThunk);
     return ForceImportThunk;
   }
 }
