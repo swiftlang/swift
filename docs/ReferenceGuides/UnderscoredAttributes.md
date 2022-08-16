@@ -131,6 +131,23 @@ library), instead of at an arbitrary point in time.
 For more details, see the forum post on
 [dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
 
+## `@_eagerMove`
+
+When applied to a value, indicates that the value's lifetime is _not_ lexical,
+that releases of the value may be hoisted without respect to deinit barriers.
+
+When applied to a type, indicates that all values which are _statically_
+instances of that type are themselves `@_eagerMove` as above, unless overridden
+with `@_lexical`.
+
+Aggregates all of whose fields are `@_eagerMove` or trivial are inferred to be
+`@_eagerMove`.
+
+Note that a value of an `@_eagerMove` type that is passed to a generic API (to a
+parameter not annotated `@_eagerMove` will, in that generic function's context,
+not be statically an instance of the `@_eagerMove` type.  As a result it will
+have a lexical lifetime in that function.
+
 ## `@_effects(effectname)`
 
 Tells the compiler that the implementation of the defined function is limited
@@ -473,12 +490,28 @@ initializers from its superclass. This implies that all designated initializers
 overridden. This attribute is often printed alongside
 `@_hasMissingDesignatedInitializers` in this case.
 
+## `@_lexical`
+
+When applied to a value, indicates that the value's lifetime is lexical, that
+releases of the value may not be hoisted over deinit barriers.  
+
+This is the default behavior, unless the value's type is annotated
+`@_eagerMove`, in which case this attribute overrides that type-level
+annotation.
+
+When applied to a type, indicates that all values which are instances of that
+type are themselves `@_lexical` as above.
+
+This is the default behavior, unless the type annotated is an aggregate that
+consists entirely of `@_eagerMove` or trivial values, in which case the
+attribute overrides the inferred type-level annotation.
+
 ## `@_marker`
 
 Indicates that a protocol is a marker protocol. Marker protocols represent some
 meaningful property at compile-time but have no runtime representation.
 
-For more details, see [SE-0302](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
+For more details, see [](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
 At the moment, the language only has one marker protocol: `Sendable`.
 
 Fun fact: Rust has a very similar concept called
