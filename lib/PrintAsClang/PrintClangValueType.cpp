@@ -257,8 +257,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "};\n";
   // Print the definition of enum static struct data memebers
   if (isa<EnumDecl>(typeDecl)) {
-    auto tagMapping = interopContext.getIrABIDetails().getEnumTagMapping(cast<EnumDecl>(typeDecl));
-    for (const auto& pair : tagMapping) {
+    auto tagMapping = interopContext.getIrABIDetails().getEnumTagMapping(
+        cast<EnumDecl>(typeDecl));
+    for (const auto &pair : tagMapping) {
       os << "decltype(";
       printer.printBaseName(typeDecl);
       os << "::";

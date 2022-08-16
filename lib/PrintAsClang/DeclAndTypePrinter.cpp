@@ -416,22 +416,25 @@ private:
 
       os << '\n';
       os << "  enum class cases {";
-      llvm::interleave(elementTagMapping, os, [&](const auto &pair){
-        os << "\n    ";
-        syntaxPrinter.printIdentifier(pair.first->getNameStr());
-      }, ",");
+      llvm::interleave(
+          elementTagMapping, os,
+          [&](const auto &pair) {
+            os << "\n    ";
+            syntaxPrinter.printIdentifier(pair.first->getNameStr());
+          },
+          ",");
       // TODO: allow custom name for this special case
       auto resilientUnknownDefaultCaseName = "unknownDefault";
       if (ED->isResilient()) {
         os << ",\n    " << resilientUnknownDefaultCaseName;
       }
       os << "\n  };\n\n"; // enum class cases' closing bracket
-      
+
       // Printing struct, is, and get functions for each case
       DeclAndTypeClangFunctionPrinter clangFuncPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext);
-      
+
       auto printIsFunction = [&](StringRef caseName, EnumDecl *ED) {
         os << "  inline bool is";
         std::string name;
@@ -446,7 +449,7 @@ private:
         os << ";\n";
         os << "  }\n";
       };
-      
+
       auto printGetFunction = [&](EnumElementDecl *elementDecl) {
         auto associatedValueList = elementDecl->getParameterList();
         // TODO: add tuple type support
@@ -458,10 +461,10 @@ private:
         OptionalTypeKind optKind;
         std::tie(firstType, optKind) =
             getObjectTypeAndOptionality(firstTypeDecl, firstType);
-        
+
         auto name = elementDecl->getNameStr().str();
         name[0] = std::toupper(name[0]);
-        
+
         // FIXME: may have to forward declare return type
         os << "  inline ";
         clangFuncPrinter.printClangFunctionReturnType(
@@ -492,7 +495,8 @@ private:
         } else {
           os << "    return ";
           syntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-              firstTypeDecl->getModuleContext(), elementDecl->getParentEnum()->getModuleContext());
+              firstTypeDecl->getModuleContext(),
+              elementDecl->getParentEnum()->getModuleContext());
           os << cxx_synthesis::getCxxImplNamespaceName();
           os << "::";
           ClangValueTypePrinter::printCxxImplClassName(os, firstTypeDecl);
@@ -503,9 +507,9 @@ private:
           os << "::initializeWithTake(result, payloadFromDestruction);\n";
           os << "    });\n";
         }
-        os << "  }\n";  // closing bracket of get function
+        os << "  }\n"; // closing bracket of get function
       };
-      
+
       auto printStruct = [&](StringRef caseName, EnumElementDecl *elementDecl) {
         os << "  static struct {  // impl struct for case " << caseName << '\n';
         os << "    inline constexpr operator cases() const {\n";
@@ -519,7 +523,7 @@ private:
           os << " operator()(";
           // TODO: implement parameter for associated value
           os << ") const {\n";
-          // TODO: print _make for now; need to implement actual code making an enum
+          // TODO: print _make for now; need to print actual code making an enum
           os << "      return ";
           syntaxPrinter.printBaseName(elementDecl->getParentEnum());
           os << "::_make();\n";
@@ -541,7 +545,7 @@ private:
         }
         os << '\n';
       }
-      
+
       if (ED->isResilient()) {
         // Printing struct for unknownDefault
         printStruct(resilientUnknownDefaultCaseName, /* elementDecl */ nullptr);
@@ -550,7 +554,7 @@ private:
         os << '\n';
       }
       os << '\n';
-      
+
       // Printing operator cases()
       os << "  inline operator cases() const {\n";
       if (ED->isResilient()) {
@@ -573,7 +577,7 @@ private:
         os << "      default: abort();\n";
         os << "    }\n"; // switch's closing bracket
       }
-      os << "  }\n";   // operator cases()'s closing bracket
+      os << "  }\n"; // operator cases()'s closing bracket
       os << "\n";
     });
     os << outOfLineDefinitions;
