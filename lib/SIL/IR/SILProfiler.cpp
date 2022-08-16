@@ -814,7 +814,17 @@ private:
     if (ControlFlowAdjust)
       Count = &createCounter(CounterExpr::Sub(*Count, *ControlFlowAdjust));
 
-    RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
+    if (Count->isSemanticallyZero()) {
+      // If the counter is semantically zero, form an 'incomplete' region with
+      // no starting location. This prevents forming unreachable regions unless
+      // there is a following statement or expression to extend the region.
+      RegionStack.emplace_back(ASTNode(), *Count, None, None);
+    } else {
+      // Otherwise, we have a non-zero counter, so form a new region starting
+      // at the end of the previous scope. This ensures the user covers both
+      // branches of a condition.
+      RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
+    }
   }
 
   /// Push a region covering \c Node onto the stack.
