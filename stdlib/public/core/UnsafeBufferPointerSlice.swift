@@ -952,24 +952,6 @@ extension Slice {
     base.baseAddress.unsafelyUnwrapped.advanced(by: index).initialize(to: value)
   }
 
-  /// Updates the initialized element at `index` to the given value.
-  ///
-  /// The memory underlying the destination element must be initialized,
-  /// or `Element` must be a trivial type. This method is equivalent to:
-  ///
-  ///     self[index] = value
-  ///
-  /// - Parameters:
-  ///   - value: The value used to update the buffer element's memory.
-  ///   - index: The index of the element to update
-  @inlinable
-  @_alwaysEmitIntoClient
-  public func updateElement<Element>(at index: Index, to value: Element)
-    where Base == UnsafeMutableBufferPointer<Element> {
-    assert(startIndex <= index && index < endIndex)
-    base.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee = value
-  }
-
   /// Retrieves and returns the element at `index`,
   /// leaving that element's underlying memory uninitialized.
   ///

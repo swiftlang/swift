@@ -938,24 +938,6 @@ extension Unsafe${Mutable}BufferPointer {
     p.initialize(to: value)
   }
 
-  /// Updates the initialized element at `index` to the given value.
-  ///
-  /// The memory underlying the destination element must be initialized,
-  /// or `Element` must be a trivial type. This method is equivalent to:
-  ///
-  ///     self[index] = value
-  ///
-  /// - Parameters:
-  ///   - value: The value used to update the buffer element's memory.
-  ///   - index: The index of the element to update
-  @inlinable
-  @_alwaysEmitIntoClient
-  public func updateElement(at index: Index, to value: Element) {
-    precondition(startIndex <= index && index < endIndex)
-    let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
-    p.pointee = value
-  }
-
   /// Retrieves and returns the element at `index`,
   /// leaving that element's underlying memory uninitialized.
   ///

@@ -263,17 +263,12 @@ UnsafeMutableBufferPointerSliceTests.test(
   b[...].initializeElement(at: n, to: s)
   expectEqual(b[n], s)
 
-  a.updateElement(at: n, to: t)
-  expectEqual(a[n], t)
-  b[...].initializeElement(at: n, to: t)
-  expectEqual(b[n], t)
+  expectEqual(a.moveElement(from: n), s)
+  expectEqual(b[...].moveElement(from: n), s)
 
-  expectEqual(a.moveElement(from: n), t)
-  expectEqual(b[...].moveElement(from: n), t)
-
-  a.initializeElement(at: 0, to: s)
+  a.initializeElement(at: 0, to: t)
   a.deinitializeElement(at: 0)
-  b.initializeElement(at: 0, to: s)
+  b.initializeElement(at: 0, to: t)
   b[...].deinitializeElement(at: 0)
 }
 
