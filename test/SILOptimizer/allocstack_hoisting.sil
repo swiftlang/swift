@@ -45,7 +45,7 @@ bb3:
   return %3 : $()
 }
 
-sil @throwing_fun : $@convention(thin) () -> @error Error
+sil @throwing_fun : $@convention(thin) () -> @error any Error
 
 // CHECK-LABEL: sil @hoist_generic
 // CHECK: bb0({{.*}}):
@@ -63,7 +63,7 @@ sil @throwing_fun : $@convention(thin) () -> @error Error
 // CHECK:   dealloc_stack [[AS]]
 // CHECK:   throw
 
-sil @hoist_generic_throwing : $@convention(thin) <T> (@in T, Builtin.Int1) -> @error Error {
+sil @hoist_generic_throwing : $@convention(thin) <T> (@in T, Builtin.Int1) -> @error any Error {
 bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
@@ -76,8 +76,8 @@ bb2:
   destroy_addr %0 : $*T
   br bb3
 bb3:
-  %3 = function_ref @throwing_fun : $@convention(thin) () -> @error Error
-  try_apply %3() : $@convention(thin) () -> @error Error, normal bb4, error bb5
+  %3 = function_ref @throwing_fun : $@convention(thin) () -> @error any Error
+  try_apply %3() : $@convention(thin) () -> @error any Error, normal bb4, error bb5
 
 bb4(%6: $()):
   %4 = tuple ()

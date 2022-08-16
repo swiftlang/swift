@@ -28,20 +28,20 @@ struct SomeStruct {
   var someRef: SomeClass
 }
 
-// CHECK-LABEL: sil @testTempRvalueEscapeAnalysisUpdate : $@convention(thin) (@in_guaranteed SomeProtocol, @guaranteed SomeClass) -> () {
-// CHECK: bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
+// CHECK-LABEL: sil @testTempRvalueEscapeAnalysisUpdate : $@convention(thin) (@in_guaranteed any SomeProtocol, @guaranteed SomeClass) -> () {
+// CHECK: bb0(%0 : $*any SomeProtocol, %1 : $SomeClass):
 // CHECK: alloc_ref $SomeClass
 // CHECK: alloc_stack $SomeStruct
-// CHECK-NOT: alloc_stack $SomeProtocol
+// CHECK-NOT: alloc_stack $any SomeProtocol
 // CHECK-NOT: copy_addr
-// CHECK: init_existential_addr %{{.*}} : $*SomeProtocol, $SomeInstance
-// CHECK: [[OPEN1:%.*]] = open_existential_addr immutable_access %0 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self
-// CHECK: apply %{{.*}}<@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self>([[OPEN1]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK: init_existential_addr %{{.*}} : $*any SomeProtocol, $SomeInstance
+// CHECK: [[OPEN1:%.*]] = open_existential_addr immutable_access %0 : $*any SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001122", any SomeProtocol) Self
+// CHECK: apply %{{.*}}<@opened("6419340C-0B14-11EA-9897-ACDE48001122", any SomeProtocol) Self>([[OPEN1]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
 // CHECK-NOT: destroy_addr
-// CHECK-NOT: alloc_stack $SomeProtocol
+// CHECK-NOT: alloc_stack $any SomeProtocol
 // CHECK-NOT: copy_addr
-// CHECK: [[OPEN2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self
-// CHECK: apply %{{.*}}<@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self>([[OPEN2]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[OPEN2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001123", any SomeProtocol) Self
+// CHECK: apply %{{.*}}<@opened("6419340C-0B14-11EA-9897-ACDE48001123", any SomeProtocol) Self>([[OPEN2]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
 // CHECK-NOT: destroy_addr
 // CHECK-LABEL: } // end sil function 'testTempRvalueEscapeAnalysisUpdate'
 sil @testTempRvalueEscapeAnalysisUpdate : $@convention(thin) (@in_guaranteed SomeProtocol, @guaranteed SomeClass) -> () {

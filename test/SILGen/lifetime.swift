@@ -260,8 +260,8 @@ struct Daleth {
   var c:Unloadable
 
   // -- address-only value constructor:
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime6DalethV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> @out Daleth {
-  // CHECK: bb0([[THIS:%.*]] : $*Daleth, [[A:%.*]] : @owned $Aleph, [[B:%.*]] : @owned $Beth, [[C:%.*]] : $*Unloadable, {{%.*}} : $@thin Daleth.Type):
+  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime6DalethV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned Aleph, @owned Beth, @in any Unloadable, @thin Daleth.Type) -> @out Daleth {
+  // CHECK: bb0([[THIS:%.*]] : $*Daleth, [[A:%.*]] : @owned $Aleph, [[B:%.*]] : @owned $Beth, [[C:%.*]] : $*any Unloadable, {{%.*}} : $@thin Daleth.Type):
   // CHECK-NEXT:   [[A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.a
   // CHECK-NEXT:   store [[A]] to [init] [[A_ADDR]]
   // CHECK-NEXT:   [[B_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.b
@@ -314,8 +314,8 @@ struct Zayin {
   var b:Unloadable
 
   // -- address-only value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime5ZayinV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> @out Zayin
-  // CHECK: bb0([[THIS:%.*]] : $*Zayin, [[A0:%.*]] : $*Unloadable, [[A1:%.*]] : $Val, [[B:%.*]] : $*Unloadable, {{%.*}} : $@thin Zayin.Type):
+  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime5ZayinV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@in any Unloadable, Val, @in any Unloadable, @thin Zayin.Type) -> @out Zayin
+  // CHECK: bb0([[THIS:%.*]] : $*Zayin, [[A0:%.*]] : $*any Unloadable, [[A1:%.*]] : $Val, [[B:%.*]] : $*any Unloadable, {{%.*}} : $@thin Zayin.Type):
   // CHECK-NEXT:   [[THIS_A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.a
   // CHECK-NEXT:   [[THIS_A0_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 0
   // CHECK-NEXT:   [[THIS_A1_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 1

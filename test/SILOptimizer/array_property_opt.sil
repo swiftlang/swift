@@ -112,7 +112,7 @@ bb0(%0: $MyArray<MyClass>):
 
 // Make sure we can handle try_apply when splitting edges. This test used to crash.
 
-sil @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
+sil @throwing_fun : $@convention(thin) () -> (MyBool, @error any Error)
 
 // CHECK-LABEL: sil @clone_try_apply_exit : 
 // CHECK: bb1:
@@ -125,7 +125,7 @@ sil @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
 // CHECK_LABEL: } // end sil function 'clone_try_apply_exit'
-sil @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error Error) {
+sil @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error any Error) {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
   %3 = load %0 : $*MyArray<MyClass>
   br bb1
@@ -135,8 +135,8 @@ bb1:
   %4 = load %1 : $*MyBool
   retain_value %3 : $MyArray<MyClass>
   %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
-  %7 = function_ref @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
-  try_apply %7() : $@convention(thin) () -> (MyBool, @error Error), normal bb2, error bb6
+  %7 = function_ref @throwing_fun : $@convention(thin) () -> (MyBool, @error any Error)
+  try_apply %7() : $@convention(thin) () -> (MyBool, @error any Error), normal bb2, error bb6
 
 bb2(%8 : $MyBool):
  %6 = integer_literal $Builtin.Int1, -1

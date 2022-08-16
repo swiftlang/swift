@@ -3230,8 +3230,8 @@ struct T : Q {
 // CHECK: metatype $@thick T.Type
 // CHECK-NOT: checked_cast_addr_br
 // CHECK: checked_cast_br
-// CHECK: bb1(%[[ARG:[0-9]+]] : $@thick Q.Type)
-// CHECK: store %[[ARG]] to {{.*}} : $*@thick Q.Type
+// CHECK: bb1(%[[ARG:[0-9]+]] : $@thick any Q.Type)
+// CHECK: store %[[ARG]] to {{.*}} : $*@thick any Q.Type
 // CHECK: }
 sil [ossa] @silcombine_checked_cast_addr_br_on_metatype_into_checked_cast_br_on_metatype : $@convention(thin) () -> Bool {
 bb0:
@@ -3417,7 +3417,7 @@ struct OtherError: Error {
 // CHECK:      [[ERROR_COPY_2:%.*]] = copy_value [[ERROR]]
 // CHECK:      [[BOX:%.*]] = alloc_existential_box
 // CHECK:      [[ERROR_COPY_1:%.*]] = copy_value [[ERROR]]
-// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $any Error
 // CHECK:      [[BOX_COPY:%.*]] = copy_value [[BOX]]
 // CHECK:      store [[BOX_COPY]] to [init] [[E]]
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
@@ -3638,7 +3638,7 @@ bb4:
 
 // CHECK-LABEL: sil [ossa] @conditional_existential_box_cast :
 // CHECK:      [[LIFETIME_EXTENDING_COPY:%.*]] = copy_value %0
-// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $any Error
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
 // CHECK:      store [[LIFETIME_EXTENDING_COPY]] to [init] [[T]]
 // CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
@@ -3674,7 +3674,7 @@ bb2:
 
 // CHECK-LABEL: sil [ossa] @taking_conditional_existential_box_cast :
 // CHECK:      [[LIFETIME_EXTENDING_COPY:%.*]] = copy_value %0
-// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $any Error
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
 // CHECK:      destroy_addr [[E]]
 // CHECK-NEXT: store [[LIFETIME_EXTENDING_COPY]] to [init] [[T]]

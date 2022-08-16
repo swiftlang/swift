@@ -26,10 +26,10 @@ distributed actor MyDistActor {
     self.actorSystem = try getSystem()
   }
 
-// CHECK:  sil hidden @$s14default_deinit11MyDistActorCACyKcfc : $@convention(method) (@owned MyDistActor) -> (@owned MyDistActor, @error Error) {
+// CHECK:  sil hidden @$s14default_deinit11MyDistActorCACyKcfc : $@convention(method) (@owned MyDistActor) -> (@owned MyDistActor, @error any Error) {
 // CHECK:  bb0([[SELF:%[0-9]+]] : $MyDistActor):
 // CHECK:    builtin "initializeDefaultActor"([[SELF]] : $MyDistActor)
-// CHECK:    try_apply {{%[0-9]+}}() : $@convention(thin) () -> (@owned FakeActorSystem, @error Error), normal [[SUCCESS_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+// CHECK:    try_apply {{%[0-9]+}}() : $@convention(thin) () -> (@owned FakeActorSystem, @error any Error), normal [[SUCCESS_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
 
 // CHECK:  [[SUCCESS_BB]]([[SYSTEM_VAL:%[0-9]+]] : $FakeActorSystem):
                 // *** save system ***
@@ -54,11 +54,11 @@ distributed actor MyDistActor {
 // CHECK:    = apply [[READY_FN]]<MyDistActor>([[SELF]], [[RELOADED_SYS2]])
 // CHECK:    return [[SELF]]
 
-// CHECK:       [[ERROR_BB]]([[ERRVAL:%[0-9]+]] : $Error):
+// CHECK:       [[ERROR_BB]]([[ERRVAL:%[0-9]+]] : $any Error):
 // CHECK-NEXT:      = metatype $@thick MyDistActor.Type
 // CHECK-NEXT:      = builtin "destroyDefaultActor"([[SELF]] : $MyDistActor) : $()
 // CHECK-NEXT:      dealloc_partial_ref [[SELF]]
-// CHECK:           throw [[ERRVAL]] : $Error
+// CHECK:           throw [[ERRVAL]] : $any Error
 
 // CHECK:  } // end sil function '$s14default_deinit11MyDistActorCACyKcfc'
 

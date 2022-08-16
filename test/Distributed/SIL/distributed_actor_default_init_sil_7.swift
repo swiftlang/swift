@@ -34,10 +34,10 @@ distributed actor MyDistActor {
     someField = try getSomeClass()
   }
 
-// CHECK:  sil hidden @$s14default_deinit11MyDistActorCACyKcfc : $@convention(method) (@owned MyDistActor) -> (@owned MyDistActor, @error Error) {
+// CHECK:  sil hidden @$s14default_deinit11MyDistActorCACyKcfc : $@convention(method) (@owned MyDistActor) -> (@owned MyDistActor, @error any Error) {
 // CHECK:  bb0([[SELF:%[0-9]+]] : $MyDistActor):
 // CHECK:    builtin "initializeDefaultActor"([[SELF]] : $MyDistActor)
-// CHECK:    try_apply {{%[0-9]+}}() : $@convention(thin) () -> (@owned FakeActorSystem, @error Error), normal [[SYSTEM_SUCCESS_BB:bb[0-9]+]], error [[SYSTEM_ERROR_BB:bb[0-9]+]]
+// CHECK:    try_apply {{%[0-9]+}}() : $@convention(thin) () -> (@owned FakeActorSystem, @error any Error), normal [[SYSTEM_SUCCESS_BB:bb[0-9]+]], error [[SYSTEM_ERROR_BB:bb[0-9]+]]
 
 // CHECK:  [[SYSTEM_SUCCESS_BB]]([[SYSTEM_VAL:%[0-9]+]] : $FakeActorSystem):
                 // *** save system ***
@@ -56,7 +56,7 @@ distributed actor MyDistActor {
 // CHECK:    br [[JOIN_PT:bb[0-9]+]]
 
 // CHECK:  [[JOIN_PT]]:
-// CHECK:    try_apply {{.*}}() : $@convention(thin) () -> (@owned SomeClass, @error Error), normal [[CLASS_SUCCESS_BB:bb[0-9]+]], error [[CLASS_ERROR_BB:bb[0-9]+]]
+// CHECK:    try_apply {{.*}}() : $@convention(thin) () -> (@owned SomeClass, @error any Error), normal [[CLASS_SUCCESS_BB:bb[0-9]+]], error [[CLASS_ERROR_BB:bb[0-9]+]]
 
 // CHECK:  [[CLASS_SUCCESS_BB]]{{.*}}:
 // CHECK:    store {{.*}} to {{.*}} : $*SomeClass

@@ -906,10 +906,10 @@ bb0(%0 : $*MyError, %1 : $*E2<X>):
 // Check casts to Error.
 // CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_error_existential 
 // CHECK-NOT: unconditional_checked_cast_addr
-// CHECK: [[ALLOC_BOX:%.*]] = alloc_existential_box $Error, $E1
-// CHECK: [[PROJ:%.*]] = project_existential_box $E1 in [[ALLOC_BOX]] : $Error
+// CHECK: [[ALLOC_BOX:%.*]] = alloc_existential_box $any Error, $E1
+// CHECK: [[PROJ:%.*]] = project_existential_box $E1 in [[ALLOC_BOX]] : $any Error
 // CHECK: copy_addr [take] %1 to [initialization] [[PROJ]]
-// CHECK: store [[ALLOC_BOX]] to %0 : $*Error
+// CHECK: store [[ALLOC_BOX]] to %0 : $*any Error
 // CHECK: return
 sil @replace_unconditional_check_cast_addr_for_type_to_error_existential : $@convention(thin) (@in E1) -> (@out Error) {
 bb0(%0 : $*Error, %1 : $*E1):

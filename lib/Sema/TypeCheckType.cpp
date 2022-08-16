@@ -2507,6 +2507,9 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       attrs.has(TAK_objc_metatype)) {
     if (auto SF = getDeclContext()->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
+        if (auto existential = dyn_cast<ExistentialTypeRepr>(repr))
+          repr = existential->getConstraint();
+
         TypeRepr *base;
         if (auto metatypeRepr = dyn_cast<MetatypeTypeRepr>(repr)) {
           base = metatypeRepr->getBase();

@@ -1566,10 +1566,10 @@ class IsQ : Q {}
 // ---
 // CHECK-LABEL: sil [ossa] @test_dead_checked_cast_br : $@convention(thin) (@in IsQ) -> () {
 // CHECK: bb0(%0 : $*IsQ):
-// CHECK:   [[Q:%.*]] = alloc_stack $Q
+// CHECK:   [[Q:%.*]] = alloc_stack $any Q
 // CHECK:   [[LD:%.*]] = load [take] %0 : $*IsQ
 // CHECK:   destroy_value [[LD]] : $IsQ
-// CHECK:   dealloc_stack [[Q]] : $*Q
+// CHECK:   dealloc_stack [[Q]] : $*any Q
 // CHECK:   [[R:%.*]] = tuple ()
 // CHECK:   return [[R]] : $()
 // CHECK-LABEL: } // end sil function 'test_dead_checked_cast_br'

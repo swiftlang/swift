@@ -8,10 +8,10 @@ protocol ClassProtocol: AnyObject { func method() }
 
 class C: ClassProtocol { func method() {} }
 
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] {{.*}}@test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> ()
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] {{.*}}@test_indirect_class_protocol : $@convention(thin) (@in any ClassProtocol) -> ()
 sil @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> () {
 // CHECK-NEXT: //
-// CHECK-NEXT: bb0(%0 : $*ClassProtocol):
+// CHECK-NEXT: bb0(%0 : $*any ClassProtocol):
 bb0(%0 : $*ClassProtocol):
   // CHECK-NEXT: %1 = load %0
   // CHECK-NEXT: strong_release %1

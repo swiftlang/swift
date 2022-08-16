@@ -336,11 +336,11 @@ struct Z : P { func p() {} }
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch10test_isa_11pyAA1P_p_tF
 func test_isa_1(p: P) {
-  // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*P
+  // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $any P
+  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*any P
   switch p {
     // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P:%.*]] : $*any P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   case is X:
   // CHECK: [[IS_X]]:
@@ -355,7 +355,7 @@ func test_isa_1(p: P) {
     // CHECK:   br [[CONT:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P]] : $*any P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
 // CHECK: [[IS_Y]]:
   case is Y:
@@ -364,7 +364,7 @@ func test_isa_1(p: P) {
     b()
 
   // CHECK: [[IS_NOT_Y]]:
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Z in {{%.*}} : $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P]] : $*any P to Z in {{%.*}} : $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
 
   // CHECK: [[IS_Z]]:
   case is Z:
@@ -386,7 +386,7 @@ func test_isa_1(p: P) {
 // CHECK-LABEL: sil hidden [ossa] @$s6switch10test_isa_21pyAA1P_p_tF
 func test_isa_2(p: P) {
   switch (p, foo()) {
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P:%.*]] : $*any P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   // CHECK: [[IS_X]]:
   // CHECK:   function_ref @$s6switch3fooSiyF
@@ -398,7 +398,7 @@ func test_isa_2(p: P) {
     a()
 
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P]] : $*any P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
   // CHECK: [[IS_Y]]:
   // CHECK:   function_ref @$s6switch3fooSiyF
@@ -412,7 +412,7 @@ func test_isa_2(p: P) {
   // CHECK: [[NOT_CASE2]]:
   // CHECK: [[IS_NOT_Y]]:
 
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[CASE3:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P:%.*]] : $*any P to X in {{%.*}} : $*X, [[CASE3:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   case (is X, _):
   // CHECK: [[CASE3]]:
@@ -422,7 +422,7 @@ func test_isa_2(p: P) {
 
   // -- case (is Y, foo()):
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P]] : $*any P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
   // CHECK: [[IS_Y]]:
   // CHECK:   function_ref @$s6switch3barSiyF
   // CHECK:   cond_br {{%.*}}, [[CASE4:bb[0-9]+]], [[NOT_CASE4:bb[0-9]+]]

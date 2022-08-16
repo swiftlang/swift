@@ -20,7 +20,7 @@ actor MyActor {
     print(x)
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC14throwingCalleeyySiYaKF : $@convention(method) @async (Int, @guaranteed MyActor) -> @error Error {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC14throwingCalleeyySiYaKF : $@convention(method) @async (Int, @guaranteed MyActor) -> @error any Error {
   // CHECK:       [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
   // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
   // CHECK:     } // end sil function '$s4test7MyActorC14throwingCalleeyySiYaKF'
@@ -28,7 +28,7 @@ actor MyActor {
     print(x)
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A13AsyncFunctionyyYaKF : $@convention(method) @async (@guaranteed MyActor) -> @error Error {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A13AsyncFunctionyyYaKF : $@convention(method) @async (@guaranteed MyActor) -> @error any Error {
   // CHECK:        hop_to_executor %0 : $MyActor 
   // CHECK:        = apply {{.*}} : $@convention(method) @async (Int, @guaranteed MyActor) -> ()
   // CHECK-NEXT:   hop_to_executor %0 : $MyActor 
