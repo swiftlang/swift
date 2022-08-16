@@ -12,13 +12,13 @@ import Swift
 import SwiftShims
 
 class List {
-  var x: Int
+  var x: Int64
   let next: List
 }
 
 struct S {
   var l: List
-  var y: Int
+  var y: Int64
 }
 
 struct Ptr {
@@ -26,39 +26,39 @@ struct Ptr {
 }
 
 // CHECK-LABEL: Accesses for readIdentifiedArg
-// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int
+// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Path: ""
-// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Int
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:     Path: ""
 // CHECK-NEXT: End accesses for readIdentifiedArg
-sil [ossa] @readIdentifiedArg : $@convention(thin) (@in Int) -> Int {
-bb0(%0 : $*Int):
-  %res = load [trivial] %0 : $*Int
-  return %res : $Int
+sil [ossa] @readIdentifiedArg : $@convention(thin) (@in Int64) -> Int64 {
+bb0(%0 : $*Int64):
+  %res = load [trivial] %0 : $*Int64
+  return %res : $Int64
 }
 
 // CHECK-LABEL: Accesses for writeIdentifiedArg
-// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int
+// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Path: ""
-// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Int
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:     Path: ""
 // CHECK-NEXT: End accesses for writeIdentifiedArg
-sil [ossa] @writeIdentifiedArg : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
+sil [ossa] @writeIdentifiedArg : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
   %2 = integer_literal $Builtin.Int64, 42
-  %3 = struct $Int (%2 : $Builtin.Int64)
-  store %3 to [trivial] %0 : $*Int
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to [trivial] %0 : $*Int64
   %5 = tuple ()
   return %5 : $()
 }
 
 // CHECK-LABEL: Accesses for $writeToHead
-// CHECK-NEXT: Value:   %7 = begin_access [modify] [dynamic] %6 : $*Int
-// CHECK-NEXT:   Scope:   %7 = begin_access [modify] [dynamic] %6 : $*Int
+// CHECK-NEXT: Value:   %7 = begin_access [modify] [dynamic] %6 : $*Int64
+// CHECK-NEXT:   Scope:   %7 = begin_access [modify] [dynamic] %6 : $*Int64
 // CHECK-NEXT:   Base: class -   %6 = ref_element_addr %5 : $List, #List.x
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $S
@@ -69,26 +69,26 @@ bb0(%0 : @guaranteed $S):
   debug_value %0 : $S, let, name "s", argno 1
   %2 = struct_extract %0 : $S, #S.l
   %3 = integer_literal $Builtin.Int64, 10
-  %4 = struct $Int (%3 : $Builtin.Int64)
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_borrow [lexical] %2 : $List
   %6 = ref_element_addr %5 : $List, #List.x
-  %7 = begin_access [modify] [dynamic] %6 : $*Int
-  store %4 to [trivial] %7 : $*Int
-  end_access %7 : $*Int
+  %7 = begin_access [modify] [dynamic] %6 : $*Int64
+  store %4 to [trivial] %7 : $*Int64
+  end_access %7 : $*Int64
   end_borrow %5 : $List
   %11 = tuple ()
   return %11 : $()
 }
 
 // CHECK-LABEL: Accesses for storeToArgs
-// CHECK-NEXT: Value:   %6 = begin_access [modify] [dynamic] %5 : $*Int
-// CHECK-NEXT:   Scope:   %6 = begin_access [modify] [dynamic] %5 : $*Int
+// CHECK-NEXT: Value:   %6 = begin_access [modify] [dynamic] %5 : $*Int64
+// CHECK-NEXT:   Scope:   %6 = begin_access [modify] [dynamic] %5 : $*Int64
 // CHECK-NEXT:   Base: class -   %5 = ref_element_addr %0 : $List, #List.x
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $List
 // CHECK-NEXT:     Path: "c0"
-// CHECK-NEXT: Value:   %14 = begin_access [modify] [dynamic] %13 : $*Int
-// CHECK-NEXT:   Scope:   %14 = begin_access [modify] [dynamic] %13 : $*Int
+// CHECK-NEXT: Value:   %14 = begin_access [modify] [dynamic] %13 : $*Int64
+// CHECK-NEXT:   Scope:   %14 = begin_access [modify] [dynamic] %13 : $*Int64
 // CHECK-NEXT:   Base: class -   %13 = ref_element_addr %1 : $List, #List.x
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage: %1 = argument of bb0 : $List
@@ -100,21 +100,21 @@ bb0(%1 : @guaranteed $List, %2 : @guaranteed $List):
 
 bb1:
   %8 = integer_literal $Builtin.Int64, 10
-  %9 = struct $Int (%8 : $Builtin.Int64)
+  %9 = struct $Int64 (%8 : $Builtin.Int64)
   %10 = ref_element_addr %1 : $List, #List.x
-  %11 = begin_access [modify] [dynamic] %10 : $*Int
-  store %9 to [trivial] %11 : $*Int
-  end_access %11 : $*Int
+  %11 = begin_access [modify] [dynamic] %10 : $*Int64
+  store %9 to [trivial] %11 : $*Int64
+  end_access %11 : $*Int64
   %14 = tuple ()
   br bb3
 
 bb2:
   %16 = integer_literal $Builtin.Int64, 20
-  %17 = struct $Int (%16 : $Builtin.Int64)
+  %17 = struct $Int64 (%16 : $Builtin.Int64)
   %18 = ref_element_addr %2 : $List, #List.x
-  %19 = begin_access [modify] [dynamic] %18 : $*Int
-  store %17 to [trivial] %19 : $*Int
-  end_access %19 : $*Int
+  %19 = begin_access [modify] [dynamic] %18 : $*Int64
+  store %17 to [trivial] %19 : $*Int64
+  end_access %19 : $*Int64
   %22 = tuple ()
   br bb3
 
@@ -124,8 +124,8 @@ bb3:
 }
 
 // CHECK-LABEL: Accesses for storeMaybeLocalPhi
-// CHECK-NEXT: Value:   %10 = begin_access [modify] [dynamic] %9 : $*Int
-// CHECK-NEXT:   Scope:   %10 = begin_access [modify] [dynamic] %9 : $*Int
+// CHECK-NEXT: Value:   %10 = begin_access [modify] [dynamic] %9 : $*Int64
+// CHECK-NEXT:   Scope:   %10 = begin_access [modify] [dynamic] %9 : $*Int64
 // CHECK-NEXT:   Base: class -   %9 = ref_element_addr %6 : $List, #List.x
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage:   %4 = alloc_ref $List
@@ -147,11 +147,11 @@ bb2:
 
 bb3(%12 : $List):
   %14 = integer_literal $Builtin.Int64, 20
-  %15 = struct $Int (%14 : $Builtin.Int64)
+  %15 = struct $Int64 (%14 : $Builtin.Int64)
   %16 = ref_element_addr %12 : $List, #List.x
-  %17 = begin_access [modify] [dynamic] %16 : $*Int
-  store %15 to %17 : $*Int
-  end_access %17 : $*Int
+  %17 = begin_access [modify] [dynamic] %16 : $*Int64
+  store %15 to %17 : $*Int64
+  end_access %17 : $*Int64
   %20 = tuple ()
   strong_release %12 : $List
   %22 = tuple ()
@@ -224,20 +224,20 @@ bb3(%6 : $Builtin.RawPointer) :
 
 
 // CHECK-LABEL: Accesses for readIdentifiedBoxArg
-// CHECK-NEXT: Value:   %2 = begin_access [read] [dynamic] %1 : $*Int
-// CHECK-NEXT:   Scope:   %2 = begin_access [read] [dynamic] %1 : $*Int
-// CHECK-NEXT:   Base: box -   %1 = project_box %0 : ${ var Int }, 0
+// CHECK-NEXT: Value:   %2 = begin_access [read] [dynamic] %1 : $*Int64
+// CHECK-NEXT:   Scope:   %2 = begin_access [read] [dynamic] %1 : $*Int64
+// CHECK-NEXT:   Base: box -   %1 = project_box %0 : ${ var Int64 }, 0
 // CHECK-NEXT:   Path: ""
-// CHECK-NEXT:     Storage: %0 = argument of bb0 : ${ var Int }
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : ${ var Int64 }
 // CHECK-NEXT:     Path: "c0"
 // CHECK-NEXT: End accesses for readIdentifiedBoxArg
-sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }) -> Int {
-bb0(%0 : @guaranteed ${ var Int }):
-  %1 = project_box %0 : ${ var Int }, 0
-  %5 = begin_access [read] [dynamic] %1 : $*Int
-  %6 = load [trivial] %5 : $*Int
-  end_access %5 : $*Int
-  return %6 : $Int
+sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int64 }) -> Int64 {
+bb0(%0 : @guaranteed ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %5 = begin_access [read] [dynamic] %1 : $*Int64
+  %6 = load [trivial] %5 : $*Int64
+  end_access %5 : $*Int64
+  return %6 : $Int64
 }
 
 
@@ -274,6 +274,18 @@ bb0(%0 : $Int64):
   return %99 : $()
 }
 
+struct MySwiftArrayBodyStorage {
+  @_hasStorage var count : Int64
+}
+
+struct MyArrayBody {
+  @_hasStorage var _storage : MySwiftArrayBodyStorage
+}
+
+class MyContiguousArrayStorageBase {
+  @_hasStorage var countAndCapacity : MyArrayBody
+}
+
 struct _MyBridgeStorage {
   @_hasStorage var rawValue : Builtin.BridgeObject
 }
@@ -288,21 +300,21 @@ struct MyArray<T> {
 }
 
 // CHECK-LABEL: Accesses for testRefTailAndStruct0
-// CHECK-NEXT: Value:   %8 = struct_element_addr %7 : $*Int, #Int._value // user: %9
+// CHECK-NEXT: Value:   %8 = struct_element_addr %7 : $*Int64, #Int64._value // user: %9
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: class -   %5 = ref_element_addr [immutable] %4 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+// CHECK-NEXT:   Base: class -   %5 = ref_element_addr [immutable] %4 : $MyContiguousArrayStorageBase, #MyContiguousArrayStorageBase.countAndCapacity
 // CHECK-NEXT:   Path: "s0.s0.s0"
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
 // CHECK-NEXT:     Path: "s0.s0.s0.c0.s0.s0.s0"
 // CHECK-NEXT: Value:   %11 = struct_element_addr %10 : $*String, #String._guts
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: tail -   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT:   Base: tail -   %10 = ref_tail_addr [immutable] %4 : $MyContiguousArrayStorageBase, $String
 // CHECK-NEXT:   Path: "s0"
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
 // CHECK-NEXT:     Path: "s0.s0.s0.ct.s0"
-// CHECK-NEXT: Value:   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT: Value:   %10 = ref_tail_addr [immutable] %4 : $MyContiguousArrayStorageBase, $String
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: tail -   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT:   Base: tail -   %10 = ref_tail_addr [immutable] %4 : $MyContiguousArrayStorageBase, $String
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
 // CHECK-NEXT:     Path: "s0.s0.s0.ct"
@@ -312,13 +324,13 @@ bb0(%0 : $MyArray<String>):
   %1 = struct_extract %0 : $MyArray<String>, #MyArray._buffer
   %2 = struct_extract %1 : $_MyArrayBuffer<String>, #_MyArrayBuffer._storage
   %3 = struct_extract %2 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
-  %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
-  %5 = ref_element_addr [immutable] %4 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
-  %6 = struct_element_addr %5 : $*_ArrayBody, #_ArrayBody._storage
-  %7 = struct_element_addr %6 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
-  %8 = struct_element_addr %7 : $*Int, #Int._value
+  %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $MyContiguousArrayStorageBase
+  %5 = ref_element_addr [immutable] %4 : $MyContiguousArrayStorageBase, #MyContiguousArrayStorageBase.countAndCapacity
+  %6 = struct_element_addr %5 : $*MyArrayBody, #MyArrayBody._storage
+  %7 = struct_element_addr %6 : $*MySwiftArrayBodyStorage, #MySwiftArrayBodyStorage.count
+  %8 = struct_element_addr %7 : $*Int64, #Int64._value
   %9 = load %8 : $*Builtin.Int64
-  %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+  %10 = ref_tail_addr [immutable] %4 : $MyContiguousArrayStorageBase, $String
   %11 = struct_element_addr %10 : $*String, #String._guts
   %12 = load %11 : $*_StringGuts
   %13 = load %10 : $*String
