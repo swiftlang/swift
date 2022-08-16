@@ -617,6 +617,9 @@ public:
   void setInitializer(ConcreteDeclRef initializer) {
     Initializer = initializer;
   }
+
+  /// Get description string for the literal expression.
+  StringRef getLiteralKindDescription() const;
 };
 
 /// BuiltinLiteralExpr - Common base class between all literals

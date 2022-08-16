@@ -3768,7 +3768,11 @@ ERROR(should_use_empty_dictionary_literal,none,
 // Dictionary literals
 ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
-
+WARNING(duplicated_literal_keys_in_dictionary_literal, none,
+        "dictionary literal of type %0 has duplicate entries for %1 literal key%select{ %3|}2",
+        (Type, StringRef, bool, StringRef))
+NOTE(duplicated_key_declared_here, none, 
+     "duplicate key declared here", ())
 
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,none,
