@@ -68,8 +68,25 @@ public let benchmarks = [
   ),
 ]
 
+/**
+ There are several types of KeyPathComponents.
+ The following table indicates which type is featured in which benchmark.
+ Note that some types may be observed in other benchmarks as well.
+
+ | KeyPathComponent Type |Featured in Benchmark             |
+ |-----------------------|:---------------------------------|
+ | struct                |*run_KeyPathNestedStruct()*       |
+ | class                 |*run_KeyPathNestedClasses()*      |
+ | get                   |*run_KeyPathGet()*                |
+ | mutatingGetSet        |*run_KeyPathMutatingGetSet()*     |
+ | nonmutatingGetSet     |*run_KeyPathNonmutatingGetSet()*  |
+ | optionalChain         |*run_KeyPathOptionals()*          |
+ | optionalForce         |*run_KeyPathOptionals()*          |
+ | optionalWrap          |*run_KeyPathOptionals()*          |
+ */
+
 let numberOfElementsForNestedStructs = 20000
-let expectedIntForNestedStructs = 3
+let expectedIntForNestedItems = 3
 
 // Make it easy to switch between primitives of different types (Int, Float, Double, etc.).
 typealias ElementType = Double
@@ -103,18 +120,18 @@ class FixedSizeArrayHolder {
 public func setupKeyPathNestedStructs() {
   let holder = FixedSizeArrayHolder.shared
   for _ in 0 ..< numberOfElementsForNestedStructs {
-    let instance = A(a: 0, b: B(b: 0, c: C(c: 0, d: D(d: 0, e: E(e: expectedIntForNestedStructs)))))
+    let instance = A(a: 0, b: B(b: 0, c: C(c: 0, d: D(d: 0, e: E(e: expectedIntForNestedItems)))))
     holder.mainArrayForNestedStructs.append(instance)
 
     var mutatingGetSetInstance = MutatingGetSetNested1()
     mutatingGetSetInstance.nestedItem.nestedItem.nestedItem.nestedItem
-      .mutating = expectedIntForNestedStructs
+      .storage = expectedIntForNestedItems
     holder.arrayForMutatingGetSet.append(mutatingGetSetInstance)
     holder.arrayForGet.append(GetNested1())
     holder.arrayForOptionals.append(Optional1())
     holder.arrayForNestedClasses.append(C1())
     holder.arrayForNonMutatingGetSet
-      .append(M(n: N(o: O(p: P(q: Q(q: expectedIntForNestedStructs))))))
+      .append(M(n: N(o: O(p: P(q: Q(q: expectedIntForNestedItems))))))
   }
 }
 
@@ -122,6 +139,8 @@ public func setupSingleton() {
   blackHole(FixedSizeArrayHolder.shared)
 }
 
+// We would like to compute the sums of the arrays once the iterations finish,
+// and doing it this way it likely faster than using keypaths via getKeypathToElement().
 func computeSumOfFixedSizeArray100(fixedSizeArray100: inout FixedSizeArray100<ElementType>)
   -> ElementType
 {
@@ -175,6 +194,7 @@ struct E {
   var e: Int
 }
 
+// Used for run_KeyPathNestedClasses()
 class C1 {
   let a: Int = 0
   let r: C2 = .init()
@@ -188,13 +208,14 @@ class C1 {
         let a: Int = 0
         let r: C5 = .init()
         class C5 {
-          let a: Int = expectedIntForNestedStructs
+          let a: Int = expectedIntForNestedItems
         }
       }
     }
   }
 }
 
+// Used for run_KeyPathNonmutatingGetSet()
 class M {
   var n: N
   init(n: N) { self.n = n }
@@ -224,7 +245,7 @@ class Q {
 struct MutatingGetSetNested1 {
   var _storage: Int
   var _nestedItemStorage: MutatingGetSetNested2
-  var mutating: Int {
+  var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
@@ -243,7 +264,7 @@ struct MutatingGetSetNested1 {
 struct MutatingGetSetNested2 {
   var _storage: Int
   var _nestedItemStorage: MutatingGetSetNested3
-  var mutating: Int {
+  var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
@@ -262,7 +283,7 @@ struct MutatingGetSetNested2 {
 struct MutatingGetSetNested3 {
   var _storage: Int
   var _nestedItemStorage: MutatingGetSetNested4
-  var mutating: Int {
+  var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
@@ -281,7 +302,7 @@ struct MutatingGetSetNested3 {
 struct MutatingGetSetNested4 {
   var _storage: Int
   var _nestedItemStorage: MutatingGetSetNested5
-  var mutating: Int {
+  var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
@@ -299,7 +320,7 @@ struct MutatingGetSetNested4 {
 
 struct MutatingGetSetNested5 {
   var _storage: Int
-  var mutating: Int {
+  var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
@@ -309,13 +330,12 @@ struct MutatingGetSetNested5 {
   }
 }
 
+// Used for run_KeyPathGet().
 struct GetNested1 {
   var _storage: Int
   var _nestedItemStorage: GetNested2
-  var mutating: Int { return _storage }
-
+  var storage: Int { return _storage }
   var nestedItem: GetNested2 { return _nestedItemStorage }
-
   init() {
     _storage = 0
     _nestedItemStorage = GetNested2()
@@ -325,10 +345,8 @@ struct GetNested1 {
 struct GetNested2 {
   var _storage: Int
   var _nestedItemStorage: GetNested3
-  var mutating: Int { return _storage }
-
+  var storage: Int { return _storage }
   var nestedItem: GetNested3 { return _nestedItemStorage }
-
   init() {
     _storage = 0
     _nestedItemStorage = GetNested3()
@@ -338,10 +356,8 @@ struct GetNested2 {
 struct GetNested3 {
   var _storage: Int
   var _nestedItemStorage: GetNested4
-  var mutating: Int { return _storage }
-
+  var storage: Int { return _storage }
   var nestedItem: GetNested4 { return _nestedItemStorage }
-
   init() {
     _storage = 0
     _nestedItemStorage = GetNested4()
@@ -351,10 +367,8 @@ struct GetNested3 {
 struct GetNested4 {
   var _storage: Int
   var _nestedItemStorage: GetNested5
-  var mutating: Int { return _storage }
-
+  var storage: Int { return _storage }
   var nestedItem: GetNested5 { return _nestedItemStorage }
-
   init() {
     _storage = 0
     _nestedItemStorage = GetNested5()
@@ -363,13 +377,13 @@ struct GetNested4 {
 
 struct GetNested5 {
   var _storage: Int
-  var mutating: Int { return _storage }
-
+  var storage: Int { return _storage }
   init() {
-    _storage = expectedIntForNestedStructs
+    _storage = expectedIntForNestedItems
   }
 }
 
+// Used for run_KeyPathOptionals().
 struct Optional1 {
   var _storage: Int
   var _nestedItemStorage: Optional2??
@@ -409,7 +423,7 @@ struct Optional4 {
 struct Optional5 {
   public var _storage: Int
   init() {
-    _storage = expectedIntForNestedStructs
+    _storage = expectedIntForNestedItems
   }
 }
 
@@ -943,6 +957,7 @@ struct FixedSizeArray100<Element>: Sequence, IteratorProtocol {
   }
 }
 
+// Used for run_testKeyPathSmallStruct().
 struct FixedSizeArray10<Element>: Sequence, IteratorProtocol {
   let count: Int = 10
 
@@ -1144,6 +1159,7 @@ func initializeFixedSizeArray100() -> FixedSizeArray100<ElementType> {
   )
 }
 
+// This measures the performance of keypath reads though nested structs.
 @inline(never)
 public func run_KeyPathNestedStructs(n: Int) {
   var sum = 0
@@ -1166,7 +1182,7 @@ public func run_KeyPathNestedStructs(n: Int) {
     sum += element[keyPath: identity(appendedKeyPath)]
     index = (index + 1) % elementCount
   }
-  check(sum == iterationMultipier * n * expectedIntForNestedStructs)
+  check(sum == iterationMultipier * n * expectedIntForNestedItems)
 }
 
 // This is meant as a baseline, from a timing perspective,
@@ -1208,6 +1224,7 @@ public func run_testDirectAccess(n: Int) {
   check(sum > ElementType(0))
 }
 
+// This measures read performance of keypaths.
 @inline(never)
 public func run_testKeyPathReadPerformance(n: Int) {
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
@@ -1388,7 +1405,7 @@ public func run_testKeyPathWritePerformance(n: Int) {
 // Intended to showcase the difference in performance between 10 and 100-element structs.
 @inline(never)
 public func run_testKeyPathSmallStruct(n: Int) {
-  var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray10
+  var fixedSizeArray10 = FixedSizeArrayHolder.shared.fixedSizeArray10
   let iterationMultipier = 25
 
   let kp0 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 0)
@@ -1403,59 +1420,59 @@ public func run_testKeyPathSmallStruct(n: Int) {
   let kp9 = FixedSizeArray10<ElementType>.getKeypathToElement(index: 9)
 
   for t in 1 ... iterationMultipier * n {
-    fixedSizeArray100.element0 += fixedSizeArray100.element1 + ElementType(t)
-    fixedSizeArray100.element6 += fixedSizeArray100
-      .element3 - fixedSizeArray100[keyPath: identity(kp9)]
-    fixedSizeArray100.element3 += fixedSizeArray100
-      .element9 * fixedSizeArray100[keyPath: identity(kp7)]
-    fixedSizeArray100.element1 += fixedSizeArray100
-      .element9 / fixedSizeArray100[keyPath: identity(kp9)]
-    fixedSizeArray100.element1 += fixedSizeArray100
-      .element0 + fixedSizeArray100[keyPath: identity(kp4)]
-    fixedSizeArray100.element5 += fixedSizeArray100
-      .element6 - fixedSizeArray100[keyPath: identity(kp2)]
-    fixedSizeArray100.element4 += fixedSizeArray100
-      .element7 * fixedSizeArray100[keyPath: identity(kp2)]
-    fixedSizeArray100.element1 += fixedSizeArray100
-      .element0 / fixedSizeArray100[keyPath: identity(kp6)]
-    fixedSizeArray100.element4 += fixedSizeArray100
-      .element3 + fixedSizeArray100[keyPath: identity(kp9)]
-    fixedSizeArray100.element0 += fixedSizeArray100
-      .element5 - fixedSizeArray100[keyPath: identity(kp8)]
-    fixedSizeArray100.element0 += fixedSizeArray100
-      .element5 * fixedSizeArray100[keyPath: identity(kp7)]
-    fixedSizeArray100.element7 += fixedSizeArray100
-      .element5 / fixedSizeArray100[keyPath: identity(kp9)]
-    fixedSizeArray100.element2 += fixedSizeArray100
-      .element0 + fixedSizeArray100[keyPath: identity(kp6)]
-    fixedSizeArray100.element8 += fixedSizeArray100
-      .element2 - fixedSizeArray100[keyPath: identity(kp2)]
-    fixedSizeArray100.element9 += fixedSizeArray100
-      .element9 * fixedSizeArray100[keyPath: identity(kp2)]
-    fixedSizeArray100.element6 += fixedSizeArray100
-      .element0 / fixedSizeArray100[keyPath: identity(kp4)]
-    fixedSizeArray100.element4 += fixedSizeArray100
-      .element1 + fixedSizeArray100[keyPath: identity(kp7)]
-    fixedSizeArray100.element5 += fixedSizeArray100
-      .element2 - fixedSizeArray100[keyPath: identity(kp7)]
-    fixedSizeArray100.element9 += fixedSizeArray100
-      .element1 * fixedSizeArray100[keyPath: identity(kp5)]
-    fixedSizeArray100.element6 += fixedSizeArray100
-      .element5 / fixedSizeArray100[keyPath: identity(kp3)]
-    fixedSizeArray100.element0 += fixedSizeArray100
-      .element2 + fixedSizeArray100[keyPath: identity(kp2)]
-    fixedSizeArray100.element1 += fixedSizeArray100
-      .element0 - fixedSizeArray100[keyPath: identity(kp1)]
-    fixedSizeArray100.element6 += fixedSizeArray100
-      .element0 * fixedSizeArray100[keyPath: identity(kp7)]
-    fixedSizeArray100.element6 += fixedSizeArray100
-      .element2 / fixedSizeArray100[keyPath: identity(kp0)]
-    fixedSizeArray100.element6 += fixedSizeArray100
-      .element5 + fixedSizeArray100[keyPath: identity(kp0)]
-    fixedSizeArray100.element3 += fixedSizeArray100
-      .element8 - fixedSizeArray100[keyPath: identity(kp0)]
+    fixedSizeArray10.element0 += fixedSizeArray10.element1 + ElementType(t)
+    fixedSizeArray10.element6 += fixedSizeArray10
+      .element3 - fixedSizeArray10[keyPath: identity(kp9)]
+    fixedSizeArray10.element3 += fixedSizeArray10
+      .element9 * fixedSizeArray10[keyPath: identity(kp7)]
+    fixedSizeArray10.element1 += fixedSizeArray10
+      .element9 / fixedSizeArray10[keyPath: identity(kp9)]
+    fixedSizeArray10.element1 += fixedSizeArray10
+      .element0 + fixedSizeArray10[keyPath: identity(kp4)]
+    fixedSizeArray10.element5 += fixedSizeArray10
+      .element6 - fixedSizeArray10[keyPath: identity(kp2)]
+    fixedSizeArray10.element4 += fixedSizeArray10
+      .element7 * fixedSizeArray10[keyPath: identity(kp2)]
+    fixedSizeArray10.element1 += fixedSizeArray10
+      .element0 / fixedSizeArray10[keyPath: identity(kp6)]
+    fixedSizeArray10.element4 += fixedSizeArray10
+      .element3 + fixedSizeArray10[keyPath: identity(kp9)]
+    fixedSizeArray10.element0 += fixedSizeArray10
+      .element5 - fixedSizeArray10[keyPath: identity(kp8)]
+    fixedSizeArray10.element0 += fixedSizeArray10
+      .element5 * fixedSizeArray10[keyPath: identity(kp7)]
+    fixedSizeArray10.element7 += fixedSizeArray10
+      .element5 / fixedSizeArray10[keyPath: identity(kp9)]
+    fixedSizeArray10.element2 += fixedSizeArray10
+      .element0 + fixedSizeArray10[keyPath: identity(kp6)]
+    fixedSizeArray10.element8 += fixedSizeArray10
+      .element2 - fixedSizeArray10[keyPath: identity(kp2)]
+    fixedSizeArray10.element9 += fixedSizeArray10
+      .element9 * fixedSizeArray10[keyPath: identity(kp2)]
+    fixedSizeArray10.element6 += fixedSizeArray10
+      .element0 / fixedSizeArray10[keyPath: identity(kp4)]
+    fixedSizeArray10.element4 += fixedSizeArray10
+      .element1 + fixedSizeArray10[keyPath: identity(kp7)]
+    fixedSizeArray10.element5 += fixedSizeArray10
+      .element2 - fixedSizeArray10[keyPath: identity(kp7)]
+    fixedSizeArray10.element9 += fixedSizeArray10
+      .element1 * fixedSizeArray10[keyPath: identity(kp5)]
+    fixedSizeArray10.element6 += fixedSizeArray10
+      .element5 / fixedSizeArray10[keyPath: identity(kp3)]
+    fixedSizeArray10.element0 += fixedSizeArray10
+      .element2 + fixedSizeArray10[keyPath: identity(kp2)]
+    fixedSizeArray10.element1 += fixedSizeArray10
+      .element0 - fixedSizeArray10[keyPath: identity(kp1)]
+    fixedSizeArray10.element6 += fixedSizeArray10
+      .element0 * fixedSizeArray10[keyPath: identity(kp7)]
+    fixedSizeArray10.element6 += fixedSizeArray10
+      .element2 / fixedSizeArray10[keyPath: identity(kp0)]
+    fixedSizeArray10.element6 += fixedSizeArray10
+      .element5 + fixedSizeArray10[keyPath: identity(kp0)]
+    fixedSizeArray10.element3 += fixedSizeArray10
+      .element8 - fixedSizeArray10[keyPath: identity(kp0)]
   }
-  let sum = computeSumOfFixedSizeArray10(fixedSizeArray10: &fixedSizeArray100)
+  let sum = computeSumOfFixedSizeArray10(fixedSizeArray10: &fixedSizeArray10)
   blackHole(sum)
 }
 
@@ -1466,7 +1483,7 @@ public func run_KeyPathMutatingGetSet(n: Int) {
   let iterationMultipier = 200
 
   let destinationKeyPath = \MutatingGetSetNested1.nestedItem.nestedItem.nestedItem.nestedItem
-    .mutating
+    .storage
 
   let elementCount = FixedSizeArrayHolder.shared.arrayForMutatingGetSet.count
   for _ in 1 ... iterationMultipier * n {
@@ -1474,7 +1491,7 @@ public func run_KeyPathMutatingGetSet(n: Int) {
     sum += element[keyPath: identity(destinationKeyPath)]
     index = (index + 1) % elementCount
   }
-  check(sum == iterationMultipier * n * expectedIntForNestedStructs)
+  check(sum == iterationMultipier * n * expectedIntForNestedItems)
 }
 
 // Benchmarks traversal through `KeyPathComponents` of type `.get`.
@@ -1483,14 +1500,14 @@ public func run_KeyPathGet(n: Int) {
   var index = 0
   let iterationMultipier = 200
 
-  let destinationKeyPath = \GetNested1.nestedItem.nestedItem.nestedItem.nestedItem.mutating
+  let destinationKeyPath = \GetNested1.nestedItem.nestedItem.nestedItem.nestedItem.storage
   let elementCount = FixedSizeArrayHolder.shared.arrayForGet.count
   for _ in 1 ... iterationMultipier * n {
     let element = FixedSizeArrayHolder.shared.arrayForGet[index]
     sum += element[keyPath: identity(destinationKeyPath)]
     index = (index + 1) % elementCount
   }
-  check(sum == iterationMultipier * n * expectedIntForNestedStructs)
+  check(sum == iterationMultipier * n * expectedIntForNestedItems)
 }
 
 // Benchmarks traversal through `KeyPathComponents` of type `.optionalChain,` `.optionalForce,` and `.optionalWrap`.
@@ -1509,7 +1526,7 @@ public func run_KeyPathOptionals(n: Int) {
     sum += element[keyPath: identity(destinationKeyPath)]!
     index = (index + 1) % elementCount
   }
-  check(sum == iterationMultipier * n * expectedIntForNestedStructs)
+  check(sum == iterationMultipier * n * expectedIntForNestedItems)
 }
 
 // Benchmarks traversal through `KeyPathComponents` of type `.class`.
@@ -1525,29 +1542,22 @@ public func run_KeyPathNestedClasses(n: Int) {
     sum += element[keyPath: identity(destinationKeyPath)]
     index = (index + 1) % elementCount
   }
-  check(sum == iterationMultipier * n * expectedIntForNestedStructs)
+  check(sum == iterationMultipier * n * expectedIntForNestedItems)
 }
 
 // Benchmarks traversal through `KeyPathComponents` of type `.nonmutatingGetSet`.
-// Note: There may be other, simpler ways of getting a `.nonmutatingGetSet`.
+// Note: There may be other, simpler ways of getting consecutive `.nonmutatingGetSet`. components.
 public func run_KeyPathNonmutatingGetSet(n: Int) {
   var sum = 0
   var index = 0
   let iterationMultipier = 200
 
-  let kp0: WritableKeyPath<M, N> = \M.n
-  let kp1: WritableKeyPath<N, O> = \N.o
-  let kp2: WritableKeyPath<O, P> = \O.p
-  let kp3: WritableKeyPath<P, Q> = \P.q
-  let kp4: WritableKeyPath<Q, Int> = \Q.q
-  let appendedKeyPath = kp0.appending(path: kp1).appending(path: kp2).appending(path: kp3)
-    .appending(path: kp4)
-
+  let destinationKeyPath = \M.n.o.p.q.q
   let elementCount = FixedSizeArrayHolder.shared.arrayForNonMutatingGetSet.count
   for _ in 1 ... iterationMultipier * n {
     let element = FixedSizeArrayHolder.shared.arrayForNonMutatingGetSet[index]
-    sum += element[keyPath: identity(appendedKeyPath)]
+    sum += element[keyPath: identity(destinationKeyPath)]
     index = (index + 1) % elementCount
   }
-  check(sum == iterationMultipier * n * expectedIntForNestedStructs)
+  check(sum == iterationMultipier * n * expectedIntForNestedItems)
 }
