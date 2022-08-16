@@ -2398,7 +2398,7 @@ void EnumTypeLayoutEntry::storeEnumTagMultipayload(IRGenFunction &IGF,
   //   } else {
   //     unsigned numPayloadBits = layout.payloadSize * CHAR_BIT;
   //     whichTag = numPayloads + (whichEmptyCase >> numPayloadBits);
-  //     whichPayloadValue = whichEmptyCase & ((1U << numPayloads) - 1U);
+  //     whichPayloadValue = whichEmptyCase & ((1U << numPayloadBits) - 1U);
   //   }
   //   storeMultiPayloadTag(value, layout, whichTag);
   //   storeMultiPayloadValue(value, layout, whichPayloadValue);
@@ -2444,7 +2444,7 @@ void EnumTypeLayoutEntry::storeEnumTagMultipayload(IRGenFunction &IGF,
     whichTag->addIncoming(tmp2, Builder.GetInsertBlock());
 
     auto tmp3 = Builder.CreateSub(
-        Builder.CreateShl(IGM.getInt32(1), numPayloads), IGM.getInt32(1));
+        Builder.CreateShl(IGM.getInt32(1), numPayloadBits), IGM.getInt32(1));
     auto tmp4 = Builder.CreateAnd(whichEmptyCase, tmp3);
     whichPayloadValue->addIncoming(tmp4, Builder.GetInsertBlock());
     Builder.CreateBr(storeBB);
