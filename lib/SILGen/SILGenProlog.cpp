@@ -301,7 +301,7 @@ struct ArgumentInitHelper {
 
     if (value->getType().isTrivial(SGF.F)) {
       value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, value);
-      value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
+      value = SGF.B.createMoveValue(loc, value, /*isLexical=*/true);
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
