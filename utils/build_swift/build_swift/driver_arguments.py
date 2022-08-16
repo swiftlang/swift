@@ -6,9 +6,6 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-
-from __future__ import absolute_import, unicode_literals
-
 import multiprocessing
 import os
 

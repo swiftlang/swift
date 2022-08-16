@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # update-dependencies.py - Fake build for dependency analysis -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -26,8 +26,6 @@
 # If invoked in non-primary-file mode, it only creates the output file.
 #
 # ----------------------------------------------------------------------------
-
-from __future__ import print_function
 
 import os
 import shutil

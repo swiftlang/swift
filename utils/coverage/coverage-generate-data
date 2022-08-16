@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # utils/coverage/coverage-generate-data - Generate, parse test run profdata
 #
 # This source file is part of the Swift.org open source project
