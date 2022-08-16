@@ -109,13 +109,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
     bool IsExprStmt;
+    bool HasReachedSemanticsProvidingExpr;
 
-  public:
     ASTContext &Ctx;
     const DeclContext *DC;
 
+  public:
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
-      : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
+        : IsExprStmt(isExprStmt), HasReachedSemanticsProvidingExpr(false),
+          Ctx(DC->getASTContext()), DC(DC) {}
 
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
       return { false, P };
@@ -128,6 +130,17 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+
+      if (auto collection = dyn_cast<CollectionExpr>(E)) {
+        if (collection->isTypeDefaulted()) {
+          // Diagnose type defaulted collection literals in subexpressions as
+          // warnings to preserve source compatibility.
+          diagnoseTypeDefaultedCollectionExpr(
+              collection, Ctx,
+              /*downgradeToWarning=*/HasReachedSemanticsProvidingExpr);
+        }
+      }
+
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
       auto Base = E;
@@ -328,6 +341,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         checkMoveExpr(moveExpr);
       }
 
+      if (!HasReachedSemanticsProvidingExpr &&
+          E == E->getSemanticsProvidingExpr()) {
+        HasReachedSemanticsProvidingExpr = true;
+      }
+
       return { true, E };
     }
 
@@ -444,23 +462,34 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return false;
     }
 
-    /// We have a collection literal with a defaulted type, e.g. of [Any].  Emit
-    /// an error if it was inferred to this type in an invalid context, which is
-    /// one in which the parent expression is not itself a collection literal.
-    void checkTypeDefaultedCollectionExpr(CollectionExpr *c) {
-      // If the parent is a non-expression, or is not itself a literal, then
-      // produce an error with a fixit to add the type as an explicit
-      // annotation.
-      if (c->getNumElements() == 0)
-        Ctx.Diags.diagnose(c->getLoc(), diag::collection_literal_empty)
-          .highlight(c->getSourceRange());
-      else {
+    /// Diagnose a collection literal with a defaulted type such as \c [Any].
+    static void diagnoseTypeDefaultedCollectionExpr(CollectionExpr *c,
+                                                    ASTContext &ctx,
+                                                    bool downgradeToWarning) {
+      // Produce a diagnostic with a fixit to add the defaulted type as an
+      // explicit annotation.
+      auto &diags = ctx.Diags;
+
+      if (c->getNumElements() == 0) {
+        InFlightDiagnostic inFlight =
+            diags.diagnose(c->getLoc(), diag::collection_literal_empty);
+        inFlight.highlight(c->getSourceRange());
+
+        if (downgradeToWarning) {
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+        }
+      } else {
         assert(c->getType()->hasTypeRepr() &&
                "a defaulted type should always be printable");
-        Ctx.Diags.diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
-                           c->getType())
-          .highlight(c->getSourceRange())
-          .fixItInsertAfter(c->getEndLoc(), " as " + c->getType()->getString());
+        InFlightDiagnostic inFlight = diags.diagnose(
+            c->getLoc(), diag::collection_literal_heterogeneous, c->getType());
+        inFlight.highlight(c->getSourceRange());
+        inFlight.fixItInsertAfter(c->getEndLoc(),
+                                  " as " + c->getType()->getString());
+
+        if (downgradeToWarning) {
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+        }
       }
     }
 
@@ -1334,16 +1363,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   DiagnoseWalker Walker(DC, isExprStmt);
   const_cast<Expr *>(E)->walk(Walker);
-
-  // Diagnose uses of collection literals with defaulted types at the top
-  // level.
-  if (auto collection
-        = dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (collection->isTypeDefaulted()) {
-      Walker.checkTypeDefaultedCollectionExpr(
-        const_cast<CollectionExpr *>(collection));
-    }
-  }
 }
 
 
