@@ -979,6 +979,10 @@ REMARK(cross_import_added,none,
 REMARK(module_loaded,none,
        "loaded module at %0",
        (StringRef))
+       
+REMARK(explicit_interface_build_skipped,none,
+       "Skipped rebuilding module at %0 - up-to-date",
+       (StringRef))
 
 WARNING(cannot_find_project_version,none,
         "cannot find user version number for %0 module '%1'; version number ignored", (StringRef, StringRef))

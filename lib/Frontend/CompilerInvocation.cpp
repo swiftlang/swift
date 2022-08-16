@@ -797,6 +797,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
 
+  Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
+  
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   std::string TargetArgScratch;
