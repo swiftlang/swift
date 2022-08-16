@@ -161,6 +161,15 @@ bool SILType::isNoReturnFunction(SILModule &M,
   return false;
 }
 
+Lifetime SILType::getLifetime(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  const auto &lowering = F.getTypeLowering(contextType);
+  auto properties = lowering.getRecursiveProperties();
+  if (properties.isTrivial())
+    return Lifetime::None;
+  return properties.isLexical() ? Lifetime::Lexical : Lifetime::EagerMove;
+}
+
 std::string SILType::getMangledName() const {
   Mangle::ASTMangler mangler;
   return mangler.mangleTypeWithoutPrefix(getRawASTType());

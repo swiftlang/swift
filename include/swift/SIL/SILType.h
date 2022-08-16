@@ -20,9 +20,10 @@
 
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/Lifetime.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/ADT/Hashing.h"
 
 namespace swift {
 
@@ -350,6 +351,15 @@ public:
   bool hasReferenceSemantics() const {
     return getASTType().hasReferenceSemantics();
   }
+
+  /// The lifetime of values of this type (which are not otherwise annotated).
+  ///
+  /// Trivial types are ::None.
+  /// Non-trivial types are ::Lexical by default.
+  /// Non-trivial types which are annotated @_eagerMove are ::EagerMove.
+  /// Aggregates which consist entirely of ::EagerMove fields are ::EagerMove.
+  /// All other types are ::Lexical.
+  Lifetime getLifetime(const SILFunction &F) const;
 
   /// Returns true if the referenced type is any sort of class-reference type,
   /// meaning anything with reference semantics that is not a function type.
