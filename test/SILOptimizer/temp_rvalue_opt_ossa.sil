@@ -19,6 +19,10 @@ class Klass {
   init()
 }
 
+class OtherClass {
+  var klass: Klass
+}
+
 struct Two {
   var a: Klass
   var b: Klass
@@ -1544,3 +1548,35 @@ bb1(%6 : @guaranteed $Klass):
   return %res : $()
 }
 
+// Lexical alloc_stacks can still be eliminated if their sources are guaranteed
+// function arguments (because those are lexical and have a live range that
+// contains the live range of the value stored into the alloc stack).
+// CHECK-LABEL: sil [ossa] @copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg : {{.*}} {
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg'
+sil [ossa] @copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg : $@convention(thin) (@guaranteed OtherClass) -> () {
+entry(%instance : @guaranteed $OtherClass):
+  %field_ptr = ref_element_addr %instance : $OtherClass, #OtherClass.klass
+  %addr = alloc_stack [lexical] $Klass
+  copy_addr %field_ptr to [initialization] %addr : $*Klass
+  destroy_addr %addr : $*Klass
+  dealloc_stack %addr : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Lexical alloc_stacks can't be eliminated even if their source is a function
+// argument if that function argument is inout.
+// CHECK-LABEL: sil [ossa] @copy_addr__lexical_alloc_stack_temporary__inout_function_arg : {{.*}} {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'copy_addr__lexical_alloc_stack_temporary__inout_function_arg'
+sil [ossa] @copy_addr__lexical_alloc_stack_temporary__inout_function_arg : $@convention(thin) (@inout NonTrivialStruct) -> () {
+entry(%instance : $*NonTrivialStruct):
+  %field_ptr = struct_element_addr %instance : $*NonTrivialStruct, #NonTrivialStruct.val
+  %addr = alloc_stack [lexical] $Klass
+  copy_addr %field_ptr to [initialization] %addr : $*Klass
+  destroy_addr %addr : $*Klass
+  dealloc_stack %addr : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}

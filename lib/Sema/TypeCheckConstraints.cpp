@@ -1362,10 +1362,19 @@ void Solution::dump(raw_ostream &out) const {
             Type(opened.first).print(out, PO);
             out << ")";
             out << " -> ";
-            out << getFixedType(opened.second);
-            out << " [from ";
-            Type(opened.second).print(out, PO);
-            out << "]";
+            // Let's check whether the type variable has been bound.
+            // This is important when solver is working on result
+            // builder transformed code, because dependent sub-components
+            // would not have parent type variables but `OpenedTypes`
+            // cannot be erased, so we'll just print them as unbound.
+            if (hasFixedType(opened.second)) {
+              out << getFixedType(opened.second);
+              out << " [from ";
+              Type(opened.second).print(out, PO);
+              out << "]";
+            } else {
+              Type(opened.second).print(out, PO);
+            }
           },
           [&]() { out << ", "; });
       out << "\n";

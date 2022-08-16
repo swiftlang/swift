@@ -962,9 +962,9 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
 
     SmallVector<Requirement, 4> newReqs;
     for (auto oldReq : *parentCondReqs) {
-      if (auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
-                                     LookUpConformanceInModule(module)))
-        newReqs.push_back(*newReq);
+      auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
+                                 LookUpConformanceInModule(module));
+      newReqs.push_back(newReq);
     }
     auto &ctxt = getProtocol()->getASTContext();
     ConditionalRequirements = ctxt.AllocateCopy(newReqs);
@@ -1163,7 +1163,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     SmallVector<Requirement, 2> requirements;
     for (auto req : getConditionalRequirements()) {
-      requirements.push_back(*req.subst(subs, conformances, options));
+      requirements.push_back(req.subst(subs, conformances, options));
     }
 
     auto kind = cast<BuiltinProtocolConformance>(this)

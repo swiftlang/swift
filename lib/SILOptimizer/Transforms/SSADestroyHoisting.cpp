@@ -962,7 +962,7 @@ void SSADestroyHoisting::run() {
   }
   // Alloc stacks always enclose their accesses.
   for (auto *asi : asis) {
-    changed |= hoistDestroys(asi, /*ignoreDeinitBarriers=*/false,
+    changed |= hoistDestroys(asi, /*ignoreDeinitBarriers=*/!asi->isLexical(),
                              remainingDestroyAddrs, deleter);
   }
   // Arguments enclose everything.
