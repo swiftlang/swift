@@ -101,11 +101,11 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       llvm::raw_svector_ostream OS { Scratch };
       auto cID = Factory.makeIdentifier("c", "", "");
       Factory
-          .makeAttribute(/*GarbageNodes=*/None, At, /*GarbageNodes=*/None,
-                         conventionID, /*GarbageNodes=*/None, LeftParen,
-                         /*GarbageNodes=*/None, cID, /*GarbageNodes=*/None,
+          .makeAttribute(/*UnexpectedNodes=*/None, At, /*UnexpectedNodes=*/None,
+                         conventionID, /*UnexpectedNodes=*/None, LeftParen,
+                         /*UnexpectedNodes=*/None, cID, /*UnexpectedNodes=*/None,
                          RightParen,
-                         /*GarbageNodes=*/None, None)
+                         /*UnexpectedNodes=*/None, None)
           .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(c)");
     }
@@ -115,11 +115,11 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       llvm::raw_svector_ostream OS { Scratch };
       auto swiftID = Factory.makeIdentifier("swift", "", "");
       Factory
-          .makeAttribute(/*GarbageNodes=*/None, At, /*GarbageNodes=*/None,
-                         conventionID, /*GarbageNodes=*/None, LeftParen,
-                         /*GarbageNodes=*/None, swiftID, /*GarbageNodes=*/None,
+          .makeAttribute(/*UnexpectedNodes=*/None, At, /*UnexpectedNodes=*/None,
+                         conventionID, /*UnexpectedNodes=*/None, LeftParen,
+                         /*UnexpectedNodes=*/None, swiftID, /*UnexpectedNodes=*/None,
                          RightParen,
-                         /*GarbageNodes=*/None, None)
+                         /*UnexpectedNodes=*/None, None)
           .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(swift)");
     }
@@ -129,11 +129,11 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       llvm::raw_svector_ostream OS { Scratch };
       auto blockID = Factory.makeIdentifier("block", "", "");
       Factory
-          .makeAttribute(/*GarbageNodes=*/None, At, /*GarbageNodes=*/None,
-                         conventionID, /*GarbageNodes=*/None, LeftParen,
-                         /*GarbageNodes=*/None, blockID, /*GarbageNodes=*/None,
+          .makeAttribute(/*UnexpectedNodes=*/None, At, /*UnexpectedNodes=*/None,
+                         conventionID, /*UnexpectedNodes=*/None, LeftParen,
+                         /*UnexpectedNodes=*/None, blockID, /*UnexpectedNodes=*/None,
                          RightParen,
-                         /*GarbageNodes=*/None, None)
+                         /*UnexpectedNodes=*/None, None)
           .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(block)");
     }
@@ -214,12 +214,12 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
     auto IntId = Factory.makeIdentifier("Int", "", "");
     auto IntType = Factory.makeSimpleTypeIdentifier(
-        /*GarbageNodes=*/None, IntId, /*GarbageNodes=*/None, None);
+        /*UnexpectedNodes=*/None, IntId, /*UnexpectedNodes=*/None, None);
     auto Int = Factory.makeTupleTypeElement(IntType, NoComma);
     auto IntWithComma = Factory.makeTupleTypeElement(IntType, Comma);
     auto StringId = Factory.makeIdentifier("String", "", "");
     auto StringType = Factory.makeSimpleTypeIdentifier(
-        /*GarbageNodes=*/None, StringId, /*GarbageNodes=*/None, None);
+        /*UnexpectedNodes=*/None, StringId, /*UnexpectedNodes=*/None, None);
     auto String = Factory.makeTupleTypeElement(StringType, Comma);
     Builder.addElement(IntWithComma);
     Builder.addElement(String);
@@ -284,9 +284,9 @@ TEST(TypeSyntaxTests, TupleMakeAPIs) {
          Factory.makeTupleTypeElement(Int, None)});
     auto RightParen = Factory.makeRightParenToken("", "");
     auto TupleType =
-        Factory.makeTupleType(/*GarbageNodes=*/None, LeftParen,
-                              /*GarbageNodes=*/None, TupleElementList,
-                              /*GarbageNodes=*/None, RightParen);
+        Factory.makeTupleType(/*UnexpectedNodes=*/None, LeftParen,
+                              /*UnexpectedNodes=*/None, TupleElementList,
+                              /*UnexpectedNodes=*/None, RightParen);
     TupleType.print(OS);
     ASSERT_EQ(OS.str().str(),
               "(Int, Bool, Int, Bool, Int)");
@@ -322,7 +322,7 @@ TEST(TypeSyntaxTests, OptionalTypeMakeAPIs) {
     auto Int = Factory.makeTypeIdentifier("Int", "", "");
     auto Question = Factory.makePostfixQuestionMarkToken("", "");
     auto OptionalInt = Factory.makeOptionalType(
-        /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, Question);
+        /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, Question);
     OptionalInt.print(OS);
     ASSERT_EQ(OS.str(), "Int?");
   }
@@ -352,7 +352,7 @@ TEST(TypeSyntaxTests, ImplicitlyUnwrappedOptionalTypeMakeAPIs) {
     auto Int = Factory.makeTypeIdentifier("Int", "", "");
     auto Bang = Factory.makeExclamationMarkToken("", "");
     auto IntBang = Factory.makeImplicitlyUnwrappedOptionalType(
-        /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, Bang);
+        /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, Bang);
     IntBang.print(OS);
     ASSERT_EQ(OS.str(), "Int!");
   }
@@ -383,8 +383,8 @@ TEST(TypeSyntaxTests, MetatypeTypeMakeAPIs) {
     auto Dot = Factory.makePeriodToken("", "");
     auto Type = Factory.makeTypeToken("", "");
     Factory
-        .makeMetatypeType(/*GarbageNodes=*/None, Int, /*GarbageNodes=*/None,
-                          Dot, /*GarbageNodes=*/None, Type)
+        .makeMetatypeType(/*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None,
+                          Dot, /*UnexpectedNodes=*/None, Type)
         .print(OS);
     ASSERT_EQ(OS.str(), "T.Type");
   }
@@ -459,8 +459,8 @@ TEST(TypeSyntaxTests, ArrayTypeMakeAPIs) {
     auto RightSquare = Factory.makeRightSquareBracketToken("", "");
     auto Void = Factory.makeVoidTupleType();
     Factory
-        .makeArrayType(/*GarbageNodes=*/None, LeftSquare, /*GarbageNodes=*/None,
-                       Void, /*GarbageNodes=*/None, RightSquare)
+        .makeArrayType(/*UnexpectedNodes=*/None, LeftSquare, /*UnexpectedNodes=*/None,
+                       Void, /*UnexpectedNodes=*/None, RightSquare)
         .print(OS);
     ASSERT_EQ(OS.str(), "[()]");
   }
@@ -502,10 +502,10 @@ TEST(TypeSyntaxTests, DictionaryTypeMakeAPIs) {
     auto Value = Factory.makeTypeIdentifier("Int", "", "");
     auto Colon = Factory.makeColonToken("", " ");
     Factory
-        .makeDictionaryType(/*GarbageNodes=*/None, LeftSquare,
-                            /*GarbageNodes=*/None, Key, /*GarbageNodes=*/None,
-                            Colon, /*GarbageNodes=*/None, Value,
-                            /*GarbageNodes=*/None, RightSquare)
+        .makeDictionaryType(/*UnexpectedNodes=*/None, LeftSquare,
+                            /*UnexpectedNodes=*/None, Key, /*UnexpectedNodes=*/None,
+                            Colon, /*UnexpectedNodes=*/None, Value,
+                            /*UnexpectedNodes=*/None, RightSquare)
         .print(OS);
     ASSERT_EQ(OS.str(), "[String : Int]");
   }
@@ -544,10 +544,10 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     auto TypeList = Factory.makeTupleTypeElementList({xArg, yArg});
     Factory
         .makeFunctionType(
-            /*GarbageNodes=*/None, LeftParen, /*GarbageNodes=*/None, TypeList,
-            /*GarbageNodes=*/None, RightParen, /*GarbageNodes=*/None, Async,
-            /*GarbageNodes=*/None, Throws, /*GarbageNodes=*/None, Arrow,
-            /*GarbageNodes=*/None, Int)
+            /*UnexpectedNodes=*/None, LeftParen, /*UnexpectedNodes=*/None, TypeList,
+            /*UnexpectedNodes=*/None, RightParen, /*UnexpectedNodes=*/None, Async,
+            /*UnexpectedNodes=*/None, Throws, /*UnexpectedNodes=*/None, Arrow,
+            /*UnexpectedNodes=*/None, Int)
         .print(OS);
     ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) async throws -> Int");
   }
@@ -571,10 +571,10 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     auto TypeList = Factory.makeTupleTypeElementList({xArg, yArg});
     Factory
         .makeFunctionType(
-            /*GarbageNodes=*/None, LeftParen, /*GarbageNodes=*/None, TypeList,
-            /*GarbageNodes=*/None, RightParen, /*GarbageNodes=*/None, None,
-            /*GarbageNodes=*/None, Throws, /*GarbageNodes=*/None, Arrow,
-            /*GarbageNodes=*/None, Int)
+            /*UnexpectedNodes=*/None, LeftParen, /*UnexpectedNodes=*/None, TypeList,
+            /*UnexpectedNodes=*/None, RightParen, /*UnexpectedNodes=*/None, None,
+            /*UnexpectedNodes=*/None, Throws, /*UnexpectedNodes=*/None, Arrow,
+            /*UnexpectedNodes=*/None, Int)
         .print(OS);
     ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws -> Int");
   }
@@ -585,10 +585,10 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
         {IntArg.withTrailingComma(Comma), IntArg});
     Factory
         .makeFunctionType(
-            /*GarbageNodes=*/None, LeftParen, /*GarbageNodes=*/None, TypeList,
-            /*GarbageNodes=*/None, RightParen, /*GarbageNodes=*/None, None,
-            /*GarbageNodes=*/None, Rethrows,
-            /*GarbageNodes=*/None, Arrow, /*GarbageNodes=*/None, Int)
+            /*UnexpectedNodes=*/None, LeftParen, /*UnexpectedNodes=*/None, TypeList,
+            /*UnexpectedNodes=*/None, RightParen, /*UnexpectedNodes=*/None, None,
+            /*UnexpectedNodes=*/None, Rethrows,
+            /*UnexpectedNodes=*/None, Arrow, /*UnexpectedNodes=*/None, Int)
         .print(OS);
     ASSERT_EQ(OS.str().str(), "(Int, Int) rethrows -> Int");
   }
@@ -601,10 +601,10 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     auto ThrowsTok = TokenSyntax::missingToken(tok::kw_throws, "throws", Arena);
     Factory
         .makeFunctionType(
-            /*GarbageNodes=*/None, LeftParen, /*GarbageNodes=*/None, TypeList,
-            /*GarbageNodes=*/None, RightParen, /*GarbageNodes=*/None, None,
-            /*GarbageNodes=*/None, ThrowsTok, /*GarbageNodes=*/None, Arrow,
-            /*GarbageNodes=*/None, Void)
+            /*UnexpectedNodes=*/None, LeftParen, /*UnexpectedNodes=*/None, TypeList,
+            /*UnexpectedNodes=*/None, RightParen, /*UnexpectedNodes=*/None, None,
+            /*UnexpectedNodes=*/None, ThrowsTok, /*UnexpectedNodes=*/None, Arrow,
+            /*UnexpectedNodes=*/None, Void)
         .print(OS);
     ASSERT_EQ(OS.str().str(), "() -> ()");
   }
@@ -618,10 +618,10 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
   auto RightParen = Factory.makeRightParenToken("", " ");
   auto Int = Factory.makeTypeIdentifier("Int", "", "");
   auto IntArg = Factory.makeTupleTypeElement(
-      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None,
-      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None,
-      /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, None,
-      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None);
+      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None);
   auto Throws = Factory.makeThrowsKeyword("", " ");
   auto Rethrows = Factory.makeRethrowsKeyword("", " ");
   auto Arrow = Factory.makeArrowToken("", " ");
@@ -633,15 +633,15 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
     auto y = Factory.makeIdentifier("y", "", "");
     auto Colon = Factory.makeColonToken("", " ");
     auto xArg = Factory.makeTupleTypeElement(
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, x,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, Colon,
-        /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, None,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, Comma);
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, x,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, Colon,
+        /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, None,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, Comma);
     auto yArg = Factory.makeTupleTypeElement(
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, y,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, Colon,
-        /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, None,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None);
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, y,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, Colon,
+        /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, None,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None);
 
     Factory.makeBlankFunctionType()
         .withLeftParen(LeftParen)
@@ -705,15 +705,15 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
     auto y = Factory.makeIdentifier("y", "", "");
     auto Colon = Factory.makeColonToken("", " ");
     auto xArg = Factory.makeTupleTypeElement(
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, x,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, Colon,
-        /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, None,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, Comma);
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, x,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, Colon,
+        /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, None,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, Comma);
     auto yArg = Factory.makeTupleTypeElement(
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, y,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, Colon,
-        /*GarbageNodes=*/None, Int, /*GarbageNodes=*/None, None,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None);
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, y,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, Colon,
+        /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, None,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None);
 
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
@@ -732,11 +732,11 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     FunctionTypeSyntaxBuilder Builder(Arena);
     auto IntArg = Factory.makeTupleTypeElement(
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None,
-        /*GarbageNodes=*/None, Int,
-        /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None,
-        /*GarbageNodes=*/None, None);
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None,
+        /*UnexpectedNodes=*/None, Int,
+        /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None,
+        /*UnexpectedNodes=*/None, None);
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
       .addArgument(IntArg.withTrailingComma(Comma))

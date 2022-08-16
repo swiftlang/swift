@@ -12,12 +12,12 @@ func b() {}
 // CHECK-NEXT:(Token equal
 // CHECK-NEXT: (text="=")
 // CHECK-NEXT: (trivia space 1)
-// CHECK-NEXT: (trivia garbageText \000))
+// CHECK-NEXT: (trivia unexpectedText \000))
 
 // CHECK-LABEL: 4:10
 // CHECK-NEXT:(Token integer_literal
 // CHECK-NEXT: (text="3")
-// CHECK-NEXT: (trivia garbageText \000)
+// CHECK-NEXT: (trivia unexpectedText \000)
 // CHECK-NEXT: (trivia space 1))
 
 // CHECK-LABEL: 5:1

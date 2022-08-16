@@ -24,27 +24,27 @@ class Node(object):
 
         self.traits = traits or []
         self.children = []
-        # Add implicitly generated GarbageNodes children in between any two 
+        # Add implicitly generated UnexpectedNodes children in between any two 
         # defined children
         if kind != 'SyntaxCollection':
             for i in range(2 * len(children)):
                 if i % 2 == 0:
                     if i == 0:
-                        name = 'GarbageBefore' + children[0].name
+                        name = 'UnexpectedBefore' + children[0].name
                     else:
-                        name = 'GarbageBetween%sAnd%s' % \
+                        name = 'UnexpectedBetween%sAnd%s' % \
                             (children[int(i / 2) - 1].name, children[int(i / 2)].name)
                     self.children.append(Child(
                         name, 
-                        kind='GarbageNodes', 
+                        kind='UnexpectedNodes', 
                         collection_element_name=name,
                         is_optional=True
                     ))
                 else:
                     self.children.append(children[int((i - 1) / 2)])
 
-        self.non_garbage_children = \
-            [child for child in children if not child.is_garbage_nodes()]
+        self.non_unexpected_children = \
+            [child for child in children if not child.is_unexpected_nodes()]
 
         self.base_kind = kind
         if self.base_kind == 'SyntaxCollection':
