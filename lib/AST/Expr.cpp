@@ -993,9 +993,9 @@ StringRef LiteralExpr::getLiteralKindDescription() const {
     return "nil";
   case ExprKind::ObjectLiteral:
     return "object";
-    // Define an unreachable case for all non-literal expressions.
-    // This way, if a new literal is added in the future, the compiler
-    // will warn that a case is missing from this switch.
+  // Define an unreachable case for all non-literal expressions.
+  // This way, if a new literal is added in the future, the compiler
+  // will warn that a case is missing from this switch.
   #define LITERAL_EXPR(Id, Parent)
   #define EXPR(Id, Parent) case ExprKind::Id:
   #include "swift/AST/ExprNodes.def"

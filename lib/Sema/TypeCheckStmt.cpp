@@ -1227,34 +1227,8 @@ static bool isDiscardableType(Type type) {
 }
 
 static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
-  const auto getLiteralDescription = [](LiteralExpr *LE) -> StringRef {
-    switch (LE->getKind()) {
-    case ExprKind::IntegerLiteral: return "integer";
-    case ExprKind::FloatLiteral: return "floating-point";
-    case ExprKind::BooleanLiteral: return "boolean";
-    case ExprKind::StringLiteral: return "string";
-    case ExprKind::InterpolatedStringLiteral: return "string";
-    case ExprKind::RegexLiteral: return "regular expression";
-    case ExprKind::MagicIdentifierLiteral:
-      return MagicIdentifierLiteralExpr::getKindString(
-          cast<MagicIdentifierLiteralExpr>(LE)->getKind());
-    case ExprKind::NilLiteral: return "nil";
-    case ExprKind::ObjectLiteral: return "object";
-
-    // Define an unreachable case for all non-literal expressions.
-    // This way, if a new literal is added in the future, the compiler
-    // will warn that a case is missing from this switch.
-#define LITERAL_EXPR(Id, Parent)
-#define EXPR(Id, Parent) case ExprKind::Id:
-#include "swift/AST/ExprNodes.def"
-      llvm_unreachable("Not a literal expression");
-    }
-
-    llvm_unreachable("Unhandled ExprKind in switch.");
-  };
-
   Ctx.Diags.diagnose(LE->getLoc(), diag::expression_unused_literal,
-                     getLiteralDescription(LE))
+                     LE->getLiteralKindDescription())
     .highlight(LE->getSourceRange());
 }
 
