@@ -114,11 +114,11 @@ import SubE
 // CHECK-NEXT: "-frontend"
 // CHECK-NEXT: "-only-use-extra-clang-opts
 // CHECK-NOT: "BUILD_DIR/bin/clang"
-// CHECK-NEXT: "-Xcc"
+// CHECK: "-Xcc"
 // CHECK-NEXT: "-fsyntax-only",
-// CHECK:      "-fsystem-module",
-// CHECK-NEXT: "-emit-pcm",
-// CHECK-NEXT: "-module-name",
+// CHECK: "-fsystem-module",
+// CHECK: "-emit-pcm",
+// CHECK: "-module-name",
 // CHECK-NEXT: "C"
 
 /// --------Swift module E
@@ -132,7 +132,7 @@ import SubE
 // CHECK-SAME: E.swiftinterface
 
 /// --------Swift module F
-// CHECK:      "modulePath": "F.swiftmodule",
+// CHECK-LABEL: "modulePath": "F.swiftmodule",
 // CHECK-NEXT: "sourceFiles": [
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [

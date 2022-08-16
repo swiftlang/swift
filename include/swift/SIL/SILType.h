@@ -200,8 +200,7 @@ public:
 
 public:
   // FIXME -- Temporary until LLDB adopts getASTType()
-  LLVM_ATTRIBUTE_DEPRECATED(CanType getSwiftRValueType() const,
-                            "Please use getASTType()") {
+  [[deprecated("Please use getASTType()")]] CanType getSwiftRValueType() const {
     return getASTType();
   }
 

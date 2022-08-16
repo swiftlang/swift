@@ -15,17 +15,17 @@ SymbolicReferenceExprSyntax getCannedSymbolicRef(const RC<SyntaxArena> &Arena) {
   // First, make a symbolic reference to an 'Array<Int>'
   auto Array = Factory.makeIdentifier("Array", {}, {});
   auto Int = Factory.makeIdentifier("Int", {}, {});
-  auto IntType = Factory.makeSimpleTypeIdentifier(/*GarbageNodes=*/None, Int,
-                                                  /*GarbageNodes=*/None, None);
-  auto IntArg = Factory.makeGenericArgument(/*GarbageNodes=*/None, IntType,
-                                            /*GarbageNodes=*/None, None);
+  auto IntType = Factory.makeSimpleTypeIdentifier(/*UnexpectedNodes=*/None, Int,
+                                                  /*UnexpectedNodes=*/None, None);
+  auto IntArg = Factory.makeGenericArgument(/*UnexpectedNodes=*/None, IntType,
+                                            /*UnexpectedNodes=*/None, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder(Arena);
   ArgBuilder.useLeftAngleBracket(Factory.makeLeftAngleToken({}, {}))
       .useRightAngleBracket(Factory.makeRightAngleToken({}, {}))
       .addArgument(IntArg);
 
   return Factory.makeSymbolicReferenceExpr(
-      /*GarbageNodes=*/None, Array, /*GarbageNodes=*/None, ArgBuilder.build());
+      /*UnexpectedNodes=*/None, Array, /*UnexpectedNodes=*/None, ArgBuilder.build());
 }
 
 FunctionCallExprSyntax getCannedFunctionCall(const RC<SyntaxArena> &Arena) {
@@ -38,21 +38,21 @@ FunctionCallExprSyntax getCannedFunctionCall(const RC<SyntaxArena> &Arena) {
   auto OneDigits = Factory.makeIntegerLiteral("1", {}, {});
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "", Arena);
   auto OneLiteral =
-      Factory.makeIntegerLiteralExpr(/*GarbageNodes=*/None, OneDigits);
-  auto One = Factory.makePrefixOperatorExpr(/*GarbageNodes=*/None, NoSign,
-                                            /*GarbageNodes=*/None, OneLiteral);
+      Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, OneDigits);
+  auto One = Factory.makePrefixOperatorExpr(/*UnexpectedNodes=*/None, NoSign,
+                                            /*UnexpectedNodes=*/None, OneLiteral);
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
 
   auto Arg = Factory.makeTupleExprElement(
-      /*GarbageNodes=*/None, Label, /*GarbageNodes=*/None, Colon,
-      /*GarbageNodes=*/None, One, /*GarbageNodes=*/None, NoComma);
+      /*UnexpectedNodes=*/None, Label, /*UnexpectedNodes=*/None, Colon,
+      /*UnexpectedNodes=*/None, One, /*UnexpectedNodes=*/None, NoComma);
   auto Args = Factory.makeTupleExprElementList({Arg});
 
   return Factory.makeFunctionCallExpr(
-      /*GarbageNodes=*/None, getCannedSymbolicRef(Arena), /*GarbageNodes=*/None,
-      LParen, /*GarbageNodes=*/None, Args,
-      /*GarbageNodes=*/None, RParen, /*GarbageNodes=*/None, None,
-      /*GarbageNodes=*/None, None);
+      /*UnexpectedNodes=*/None, getCannedSymbolicRef(Arena), /*UnexpectedNodes=*/None,
+      LParen, /*UnexpectedNodes=*/None, Args,
+      /*UnexpectedNodes=*/None, RParen, /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None);
 }
 
 TEST(UnknownSyntaxTests, UnknownSyntaxMakeAPIs) {
@@ -157,9 +157,9 @@ TEST(UnknownSyntaxTests, EmbedUnknownExpr) {
   SmallString<48> KnownScratch;
   llvm::raw_svector_ostream KnownOS(KnownScratch);
   auto CallWithKnownExpr = Factory.makeFunctionCallExpr(
-      /*GarbageNodes=*/None, SymbolicRef, /*GarbageNodes=*/None, LParen,
-      /*GarbageNodes=*/None, EmptyArgs, /*GarbageNodes=*/None, RParen,
-      /*GarbageNodes=*/None, None, /*GarbageNodes=*/None, None);
+      /*UnexpectedNodes=*/None, SymbolicRef, /*UnexpectedNodes=*/None, LParen,
+      /*UnexpectedNodes=*/None, EmptyArgs, /*UnexpectedNodes=*/None, RParen,
+      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, None);
   CallWithKnownExpr.print(KnownOS);
 
   // Let's make a function call expression where the called expression is
