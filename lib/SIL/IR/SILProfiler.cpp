@@ -341,29 +341,63 @@ public:
   /// Returns true if this is a Zero node.
   bool isZero() const { return K == Kind::Zero; }
 
+  /// Returns true if the counter is semantically a Zero node. This considers
+  /// the simplified version of the counter that has eliminated redundant
+  /// operations.
+  bool isSemanticallyZero() const {
+    // Run the counter through the counter builder to simplify it, using a dummy
+    // mapping of unique counter indices for each node reference. The value of
+    // the indices doesn't matter, but we need to ensure that e.g subtraction
+    // of a node from itself cancels out.
+    llvm::coverage::CounterExpressionBuilder Builder;
+    llvm::DenseMap<ASTNode, unsigned> DummyIndices;
+    unsigned LastIdx = 0;
+    auto Counter = expand(Builder, [&](auto Node) {
+      if (!DummyIndices.count(Node)) {
+        DummyIndices[Node] = LastIdx;
+        LastIdx += 1;
+      }
+      return DummyIndices[Node];
+    });
+    return Counter.isZero();
+  }
+
   /// Expand this node into an llvm::coverage::Counter.
   ///
   /// Updates \c Builder with any expressions that are needed to represent this
   /// counter.
   llvm::coverage::Counter
   expand(llvm::coverage::CounterExpressionBuilder &Builder,
-         llvm::DenseMap<ASTNode, unsigned> &Counters) const {
+         llvm::function_ref<unsigned(ASTNode)> GetCounterIdx) const {
     switch (K) {
     case Kind::Zero:
       return llvm::coverage::Counter::getZero();
     case Kind::Node:
-      return llvm::coverage::Counter::getCounter(Counters[Node]);
+      return llvm::coverage::Counter::getCounter(GetCounterIdx(Node));
     case Kind::Add:
-      return Builder.add(LHS->expand(Builder, Counters),
-                         RHS->expand(Builder, Counters));
+      return Builder.add(LHS->expand(Builder, GetCounterIdx),
+                         RHS->expand(Builder, GetCounterIdx));
     case Kind::Sub:
-      return Builder.subtract(LHS->expand(Builder, Counters),
-                              RHS->expand(Builder, Counters));
+      return Builder.subtract(LHS->expand(Builder, GetCounterIdx),
+                              RHS->expand(Builder, GetCounterIdx));
     case Kind::Ref:
-      return LHS->expand(Builder, Counters);
+      return LHS->expand(Builder, GetCounterIdx);
     }
 
     llvm_unreachable("Unhandled Kind in switch.");
+  }
+
+  /// Expand this node into an llvm::coverage::Counter.
+  ///
+  /// Updates \c Builder with any expressions that are needed to represent this
+  /// counter.
+  llvm::coverage::Counter
+  expand(llvm::coverage::CounterExpressionBuilder &Builder,
+         const llvm::DenseMap<ASTNode, unsigned> &Counters) const {
+    return expand(Builder, [&](auto Node) {
+      // FIXME: We ought to assert that the node is present.
+      return Counters.lookup(Node);
+    });
   }
 
   void print(raw_ostream &OS) const {
