@@ -11,7 +11,6 @@ struct S {}
 // CHECK-LABEL: sil hidden [ossa] @$s26guaranteed_closure_context0A9_capturesyyF
 func guaranteed_captures() {
   // CHECK: [[MUTABLE_TRIVIAL_BOX:%.*]] = alloc_box ${ var S }
-  // CHECK: [[MUTABLE_TRIVIAL_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MUTABLE_TRIVIAL_BOX]]
   var mutableTrivial = S()
   // CHECK: [[MUTABLE_RETAINABLE_BOX:%.*]] = alloc_box ${ var C }
   // CHECK: [[MUTABLE_RETAINABLE_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MUTABLE_RETAINABLE_BOX]]
@@ -33,23 +32,24 @@ func guaranteed_captures() {
          immutableTrivial, immutableRetainable, immutableAddressOnly))
   }
 
-  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]
   // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[IMMUTABLE_RETAINABLE]]
 
+  // CHECK: [[MUTABLE_TRIVIAL_BOX_BORROW:%[^,]+]] = begin_borrow [[MUTABLE_TRIVIAL_BOX]]
   // CHECK: [[FN:%.*]] = function_ref [[FN_NAME:@\$s26guaranteed_closure_context0A9_capturesyyF17captureEverythingL_yyF]]
-  // CHECK: apply [[FN]]([[MUTABLE_TRIVIAL_BOX_LIFETIME]], [[MUTABLE_RETAINABLE_BOX_LIFETIME]], [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]], [[IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE]], [[IMMUTABLE_ADDRESS_ONLY]])
+  // CHECK: apply [[FN]]([[MUTABLE_TRIVIAL_BOX_BORROW]], [[MUTABLE_RETAINABLE_BOX_LIFETIME]], [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]], [[IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE]], [[IMMUTABLE_ADDRESS_ONLY]])
   captureEverything()
 
-  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]
   // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[IMMUTABLE_RETAINABLE]]
 
   // -- partial_apply still takes ownership of its arguments.
   // CHECK: [[FN:%.*]] = function_ref [[FN_NAME]]
-  // CHECK: [[MUTABLE_TRIVIAL_BOX_COPY:%.*]] = copy_value [[MUTABLE_TRIVIAL_BOX_LIFETIME]]
+  // CHECK: [[MUTABLE_TRIVIAL_BOX_COPY:%.*]] = copy_value [[MUTABLE_TRIVIAL_BOX]]
   // CHECK: [[MUTABLE_RETAINABLE_BOX_COPY:%.*]] = copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
   // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX_COPY:%.*]] = copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK: [[IMMUTABLE_RETAINABLE_COPY:%.*]] = copy_value [[B_IMMUTABLE_RETAINABLE]]
@@ -58,7 +58,7 @@ func guaranteed_captures() {
   // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
   // CHECK: apply {{.*}}[[CONVERT]]
 
-  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]
   // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[IMMUTABLE_RETAINABLE]]

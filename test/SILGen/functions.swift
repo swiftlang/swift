@@ -103,14 +103,11 @@ func calls(_ i:Int, j:Int, k:Int) {
   var k = k
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   // CHECK: [[IBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[ILIFETIME:%[^,]+]] = begin_borrow [lexical] [[IBOX]]
-  // CHECK: [[IADDR:%.*]] = project_box [[ILIFETIME]]
+  // CHECK: [[IADDR:%.*]] = project_box [[IBOX]]
   // CHECK: [[JBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[JLIFETIME:%[^,]+]] = begin_borrow [lexical] [[JBOX]]
-  // CHECK: [[JADDR:%.*]] = project_box [[JLIFETIME]]
+  // CHECK: [[JADDR:%.*]] = project_box [[JBOX]]
   // CHECK: [[KBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[KLIFETIME:%[^,]+]] = begin_borrow [lexical] [[KBOX]]
-  // CHECK: [[KADDR:%.*]] = project_box [[KLIFETIME]]
+  // CHECK: [[KADDR:%.*]] = project_box [[KBOX]]
 
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]

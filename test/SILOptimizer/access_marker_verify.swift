@@ -53,15 +53,13 @@ struct StructOfInt {
 // CHECK: bb0(%0 : $@thin StructOfInt.Type):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var StructOfInt }, var, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]] : ${ var StructOfInt }
-// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT]]
-// CHECK:   [[PROJ:%.*]] = project_box [[UNINIT_LIFETIME]] : ${ var StructOfInt }, 0
+// CHECK:   [[PROJ:%.*]] = project_box [[UNINIT]] : ${ var StructOfInt }, 0
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]] : $*StructOfInt
 // CHECK:   [[ADR:%.*]] = struct_element_addr [[ACCESS]] : $*StructOfInt, #StructOfInt.i
 // CHECK:   assign %{{.*}} to [[ADR]] : $*Int
 // CHECK:   end_access [[ACCESS]] : $*StructOfInt
 // CHECK-NOT: begin_access
 // CHECK:   [[VAL:%.*]] = load [trivial] [[PROJ]] : $*StructOfInt
-// CHECK:   end_borrow [[UNINIT_LIFETIME]]
 // CHECK:   destroy_value [[UNINIT]] : ${ var StructOfInt }
 // CHECK:   return [[VAL]] : $StructOfInt
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify11StructOfIntVACycfC'
@@ -222,12 +220,11 @@ func testCaptureLocal() -> ()->() {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify16testCaptureLocalyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var Int }, var, name "x"
-// CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
-// CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
+// CHECK:   [[PROJ:%.*]] = project_box [[BOX]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]] : $*Int
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]]
 // CHECK:   end_access
-// CHECK:   [[CAPTURE:%.*]] = copy_value [[LIFETIME]] : ${ var Int }
+// CHECK:   [[CAPTURE:%.*]] = copy_value [[BOX]] : ${ var Int }
 // CHECK:   partial_apply [callee_guaranteed] %{{.*}}([[CAPTURE]]) : $@convention(thin) (@guaranteed { var Int }) -> ()
 // CHECK:   begin_access [read] [unknown] [[PROJ]]
 // CHECK:   [[VAL:%.*]] = load [trivial]
@@ -296,7 +293,7 @@ func testCopyS(_ arg: StructOfInt) -> StructOfInt {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify9testCopySyAA11StructOfIntVADF : $@convention(thin) (StructOfInt) -> StructOfInt {
 // CHECK: bb0(%0 : $StructOfInt):
-// CHECK:   alloc_stack [lexical] $StructOfInt, let, name "lhs"
+// CHECK:   alloc_stack $StructOfInt, let, name "lhs"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [var]
 // CHECK-NOT: begin_access
 // CHECK:   assign %0 to [[UNINIT]] : $*StructOfInt
