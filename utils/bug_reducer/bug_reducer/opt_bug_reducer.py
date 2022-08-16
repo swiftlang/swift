@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import json
 import md5
 import subprocess
