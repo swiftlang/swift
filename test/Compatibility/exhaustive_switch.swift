@@ -803,7 +803,8 @@ func checkLiteralTuples() {
   }
 }
 
-func sr6975() {
+// https://github.com/apple/swift/issues/49523
+do {
   enum E {
     case a, b
   }
@@ -1177,42 +1178,43 @@ extension Result where T == NoError {
   }
 }
 
-enum SR10301<T,E> {
-  case value(T)
-  case error(E)
-}
-enum SR10301Error: Error {
-  case bad
-}
-
-func sr10301(_ foo: SR10301<String,(Int,Error)>) {
-  switch foo {
-  case .value: return
-  case .error((_, SR10301Error.bad)): return
-  case .error((_, let err)):
-    _ = err
-    return
+// https://github.com/apple/swift/issues/52701
+do {
+  enum Enum<T,E> {
+    case value(T)
+    case error(E)
   }
-}
-
-func sr10301_is(_ foo: SR10301<String,(Int,Error)>) {
-  switch foo {
-  case .value: return
-  case .error((_, is SR10301Error)): return
-  case .error((_, let err)):
-    _ = err
-    return
+  enum MyError: Error {
+    case bad
   }
-}
 
-func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
+  let foo: Enum<String, (Int, Error)>
+
   switch foo {
-  case .value: return
-  case .error((_, let err as SR10301Error)):
-    _ = err
-    return
+  case .value: break
+  case .error((_, MyError.bad)): break
   case .error((_, let err)):
     _ = err
-    return
+    break
+  }
+
+  // 'is'
+  switch foo {
+  case .value: break
+  case .error((_, is MyError)): break
+  case .error((_, let err)):
+    _ = err
+    break
+  }
+
+  // 'as'
+  switch foo {
+  case .value: break
+  case .error((_, let err as MyError)):
+    _ = err
+    break
+  case .error((_, let err)):
+    _ = err
+    break
   }
 }
