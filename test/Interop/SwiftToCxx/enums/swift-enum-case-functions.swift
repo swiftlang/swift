@@ -207,6 +207,7 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
+// CHECK:      private:
 // CHECK:      inline int _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums12BoolWithCaseOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
@@ -218,6 +219,10 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
+// CHECK:      };
+// CHECK-NEXT: decltype(BoolWithCase::first) BoolWithCase::first;
+// CHECK-NEXT: decltype(BoolWithCase::second) BoolWithCase::second;
+// CHECK-NEXT: decltype(BoolWithCase::third) BoolWithCase::third;
 
 // CHECK: class CLikeEnum final {
 
@@ -277,6 +282,10 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
+// CHECK:      };
+// CHECK-NEXT: decltype(CLikeEnum::one) CLikeEnum::one;
+// CHECK-NEXT: decltype(CLikeEnum::two) CLikeEnum::two;
+// CHECK-NEXT: decltype(CLikeEnum::three) CLikeEnum::three;
 
 // CHECK: class DataCase final {
 
@@ -319,6 +328,8 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
+// CHECK:      };
+// CHECK-NEXT: decltype(DataCase::one) DataCase::one;
 
 // CHECK: class IntDoubleOrBignum final {
 
@@ -402,6 +413,10 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
+// CHECK:      };
+// CHECK-NEXT: decltype(IntDoubleOrBignum::Int) IntDoubleOrBignum::Int;
+// CHECK-NEXT: decltype(IntDoubleOrBignum::Double) IntDoubleOrBignum::Double;
+// CHECK-NEXT: decltype(IntDoubleOrBignum::Bignum) IntDoubleOrBignum::Bignum;
 
 // CHECK: class IntOrInfinity final {
 
@@ -470,6 +485,10 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
+// CHECK:      };
+// CHECK-NEXT: decltype(IntOrInfinity::NegInfinity) IntOrInfinity::NegInfinity;
+// CHECK-NEXT: decltype(IntOrInfinity::Int) IntOrInfinity::Int;
+// CHECK-NEXT: decltype(IntOrInfinity::PosInfinity) IntOrInfinity::PosInfinity;
 
 // CHECK: class MultipleBoolWithCase final {
 
@@ -560,3 +579,8 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:   return enumVWTable->getEnumTag(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT: }
+// CHECK:      };
+// CHECK-NEXT: decltype(MultipleBoolWithCase::first) MultipleBoolWithCase::first;
+// CHECK-NEXT: decltype(MultipleBoolWithCase::second) MultipleBoolWithCase::second;
+// CHECK-NEXT: decltype(MultipleBoolWithCase::third) MultipleBoolWithCase::third;
+// CHECK-NEXT: decltype(MultipleBoolWithCase::fourth) MultipleBoolWithCase::fourth;
