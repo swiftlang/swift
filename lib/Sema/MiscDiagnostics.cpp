@@ -5011,6 +5011,163 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void
+diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
+                                             const DeclContext *DC) {
+  class DiagnoseWalker : public ASTWalker {
+    ASTContext &Ctx;
+
+  private:
+    std::string getKeyStringValue(const LiteralExpr *keyExpr) {
+      if (isa<MagicIdentifierLiteralExpr>(keyExpr)) {
+        return keyExpr->getLiteralKindDescription().str();
+      }
+      std::string out;
+      llvm::raw_string_ostream OS(out);
+      keyExpr->printConstExprValue(&OS, /*additionalCheck=*/nullptr);
+      return out;
+    }
+
+    std::string getKeyStringValueForDiagnostic(const LiteralExpr *keyExpr) {
+      std::string out;
+      switch (keyExpr->getKind()) {
+      case ExprKind::NilLiteral:
+      case ExprKind::MagicIdentifierLiteral:
+        return out;
+      case ExprKind::StringLiteral: {
+        const auto *SL = cast<StringLiteralExpr>(keyExpr);
+        out = SL->getValue().str();
+        break;
+      }
+      default:
+        llvm::raw_string_ostream OS(out);
+        keyExpr->printConstExprValue(&OS, /*additionalCheck=*/nullptr);
+        break;
+      }
+      return "'" + out + "'";
+    }
+    
+    bool shouldDiagnoseLiteral(const LiteralExpr *LE) {
+      switch (LE->getKind()) {
+      case ExprKind::IntegerLiteral:
+      case ExprKind::FloatLiteral:
+      case ExprKind::BooleanLiteral:
+      case ExprKind::StringLiteral:
+      case ExprKind::MagicIdentifierLiteral:
+      case ExprKind::NilLiteral:
+        return true;
+      // Skip interpolated literals because they
+      // can contain expressions that although equal
+      // maybe be evaluated to different values. e.g.
+      // "\(a) \(a)" where 'a' is a computed variable.
+      case ExprKind::InterpolatedStringLiteral:
+      // Also skip object literals as most of them takes paramenters that can
+      // contain expressions that altough equal may evaluate to different
+      // values e.g. #fileLiteral(resourceName: a) where 'a' is a computed
+      // property is valid.
+      case ExprKind::ObjectLiteral:
+      // Literal expressions produce Regex<Out> type result,
+      // which cannot be keys due to not conforming to hashable.
+      case ExprKind::RegexLiteral:
+        return false;
+      // If a new literal is added in the future, the compiler
+      // will warn that a case is missing from this switch.
+      #define LITERAL_EXPR(Id, Parent)
+      #define EXPR(Id, Parent) case ExprKind::Id:
+      #include "swift/AST/ExprNodes.def"
+        llvm_unreachable("Not a literal expression");
+      }
+      llvm_unreachable("Unhandled literal");
+    }
+  public:
+    DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
+
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);
+      if (!DLE)
+        return {true, E};
+
+      auto type = DLE->getType();
+      // For other types conforming with `ExpressibleByDictionaryLiteral`
+      // protocol, duplicated keys may be allowed.
+      if (!(type && type->isDictionary())) {
+        return {true, E};
+      }
+
+      using LiteralKey = std::pair<std::string, ExprKind>;
+      using Element = std::pair<const TupleExpr *, size_t>;
+
+      std::map<LiteralKey, llvm::SmallVector<Element, 4>> groupedLiteralKeys;
+
+      for (size_t i = 0; i < DLE->getElements().size(); ++i) {
+        const auto *elt = DLE->getElement(i);
+        const auto *tupleElt = cast<TupleExpr>(elt);
+        const auto *keyExpr =
+            tupleElt->getElement(0)->getSemanticsProvidingExpr();
+        auto *LE = dyn_cast<LiteralExpr>(keyExpr);
+        if (!LE)
+          continue;
+        
+        if (!shouldDiagnoseLiteral(LE))
+          continue;
+
+        auto keyStringValue = getKeyStringValue(LE);
+        auto literalKey = std::make_pair(keyStringValue, keyExpr->getKind());
+        groupedLiteralKeys[literalKey].push_back({tupleElt, i});
+      }
+
+      // All keys are unique.
+      if (groupedLiteralKeys.size() == DLE->getNumElements()) {
+        return {true, E};
+      }
+
+      auto &DE = Ctx.Diags;
+      auto emitNoteWithFixit = [&](const Element &duplicated) {
+        auto note = DE.diagnose(duplicated.first->getLoc(),
+                                diag::duplicated_key_declared_here);
+        auto duplicatedEltIdx = duplicated.second;
+        const auto commanLocs = DLE->getCommaLocs();
+        note.fixItRemove(duplicated.first->getSourceRange());
+        if (duplicatedEltIdx < commanLocs.size()) {
+          note.fixItRemove(commanLocs[duplicatedEltIdx]);
+        } else {
+          // For the last element remove the previous comma.
+          note.fixItRemove(commanLocs[duplicatedEltIdx - 1]);
+        }
+      };
+
+      for (auto &entry : groupedLiteralKeys) {
+        auto &keyValuePairs = entry.second;
+        if (keyValuePairs.size() == 1) {
+          continue;
+        }
+
+        auto elt = keyValuePairs.front();
+        const auto keyValue = entry.first.first;
+        const auto keyExpr = cast<LiteralExpr>(
+            elt.first->getElement(0)->getSemanticsProvidingExpr());
+        const auto value = getKeyStringValueForDiagnostic(keyExpr);
+        DE.diagnose(elt.first->getLoc(),
+                    diag::duplicated_literal_keys_in_dictionary_literal, type,
+                    keyExpr->getLiteralKindDescription(), value.empty(), value);
+        for (auto &duplicated : keyValuePairs) {
+          emitNoteWithFixit(duplicated);
+        }
+      }
+      return {true, E};
+    }
+  };
+
+  DiagnoseWalker Walker(DC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 namespace {
 
 class CompletionHandlerUsageChecker final : public ASTWalker {
@@ -5098,6 +5255,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
+  diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

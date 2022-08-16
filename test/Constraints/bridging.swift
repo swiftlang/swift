@@ -391,7 +391,7 @@ func rdar60501780() {
   func foo(_: [String: NSObject]) {}
 
   func bar(_ v: String) {
-    foo(["": "", "": v as NSString])
+    foo(["a": "", "b": v as NSString])
   }
 }
 
