@@ -688,3 +688,19 @@ func reinitInPieces1<T : P>(_ k: ProtPair<T>) {
     k2.lhs = selfType.getP()
     k2.rhs = selfType.getP()
 }
+
+////////////////////////
+// InOut and Use Test //
+////////////////////////
+
+func useValueAndInOut<T>(_ x: T, _ y: inout T) {}
+func useValueAndInOut<T>(_ x: inout T, _ y: T) {}
+
+func inoutAndUseTest<T>(_ x: T) {
+    var y = x // expected-error {{'y' used after being moved}}
+              // expected-error @-1 {{'y' used after being moved}}
+    useValueAndInOut(_move y, &y) // expected-note {{use here}}
+                                  // expected-note @-1 {{move here}}
+    useValueAndInOut(&y, _move y) // expected-note {{use here}}
+                                  // expected-note @-1 {{move here}}
+}
