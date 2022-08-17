@@ -1147,9 +1147,11 @@ static bool checkObjCDeclContext(Decl *D) {
   return false;
 }
 
-static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl,
+static void diagnoseObjCAttrWithoutFoundation(DeclAttribute *attr, Decl *decl,
                                               ObjCReason reason,
                                               DiagnosticBehavior behavior) {
+  assert(attr->getKind() == DeclAttrKind::DAK_ObjC ||
+         attr->getKind() == DeclAttrKind::DAK_ObjCMembers);
   auto *SF = decl->getDeclContext()->getParentSourceFile();
   assert(SF);
 
@@ -1369,6 +1371,10 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
 void AttributeChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
   if (!isa<ClassDecl>(D))
     diagnoseAndRemoveAttr(attr, diag::objcmembers_attribute_nonclass);
+
+  auto reason = ObjCReason(ObjCReason::ExplicitlyObjCMembers, attr);
+  auto behavior = behaviorLimitForObjCReason(reason, Ctx);
+  diagnoseObjCAttrWithoutFoundation(attr, D, reason, behavior);
 }
 
 void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
