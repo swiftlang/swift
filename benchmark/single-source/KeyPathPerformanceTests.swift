@@ -43,8 +43,8 @@ public let benchmarks = [
     setUpFunction: setupSingleton
   ),
   BenchmarkInfo(
-    name: "KeyPathMutatingGetSet",
-    runFunction: run_KeyPathMutatingGetSet,
+    name: "KeyPathMutatingGetset",
+    runFunction: run_KeyPathMutatingGetset,
     tags: [.validation, .api],
     setUpFunction: setupKeyPathNestedStructs
   ),
@@ -78,8 +78,8 @@ public let benchmarks = [
  | struct                |*run_KeyPathNestedStruct()*       |
  | class                 |*run_KeyPathNestedClasses()*      |
  | get                   |*run_KeyPathGet()*                |
- | mutatingGetSet        |*run_KeyPathMutatingGetSet()*     |
- | nonmutatingGetSet     |*run_KeyPathNonmutatingGetSet()*  |
+ | mutatingGetset        |*run_KeyPathMutatingGetset()*     |
+ | nonmutatingGetset     |*run_KeyPathNonmutatingGetset()*  |
  | optionalChain         |*run_KeyPathOptionals()*          |
  | optionalForce         |*run_KeyPathOptionals()*          |
  | optionalWrap          |*run_KeyPathOptionals()*          |
@@ -97,22 +97,125 @@ class FixedSizeArrayHolder {
   var fixedSizeArray100: FixedSizeArray100<ElementType>
   var fixedSizeArray10: FixedSizeArray10<ElementType>
   var mainArrayForNestedStructs: [A]
-  var arrayForMutatingGetSet: [MutatingGetSetNested1]
+  var arrayForMutatingGetset: [MutatingGetsetNested1]
   var arrayForGet: [GetNested1]
   var arrayForOptionals: [Optional1]
   var arrayForNestedClasses: [C1]
-  var arrayForNonMutatingGetSet: [M]
+  var arrayForNonMutatingGetset: [M]
+
+  // Same order as in KeyPathWritePerformance
+  var kp46: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp43: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp81: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp31: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp35: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp14: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp51: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp24: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp90: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp80: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp47: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp92: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp78: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp79: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp48: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp64: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp65: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp19: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp66: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp10: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp89: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp16: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp06: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp26: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp83: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+
+  // Same order as in KeyPathReadPerformance, with duplicates removed.
+  var kp99: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp27: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp09: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp84: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp22: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp82: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp86: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp49: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp18: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp97: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp69: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp76: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp32: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp52: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp87: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp67: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp12: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp21: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp77: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp40: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp60: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
+  var kp50: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
 
   static let shared = FixedSizeArrayHolder()
   init() {
     fixedSizeArray100 = initializeFixedSizeArray100()
     fixedSizeArray10 = initializeFixedSizeArray10()
     mainArrayForNestedStructs = [A]()
-    arrayForMutatingGetSet = [MutatingGetSetNested1]()
+    arrayForMutatingGetset = [MutatingGetsetNested1]()
     arrayForGet = [GetNested1]()
     arrayForOptionals = [Optional1]()
     arrayForNestedClasses = [C1]()
-    arrayForNonMutatingGetSet = [M]()
+    arrayForNonMutatingGetset = [M]()
+
+    kp46 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 46)
+    kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
+    kp81 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 81)
+    kp31 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 31)
+    kp35 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 35)
+    kp14 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 14)
+    kp51 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 51)
+    kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
+    kp90 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 90)
+    kp80 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 80)
+    kp47 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 47)
+    kp92 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 92)
+    kp78 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 78)
+    kp79 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 79)
+    kp48 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 48)
+    kp64 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 64)
+    kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
+    kp19 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 19)
+    kp66 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 66)
+    kp10 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 10)
+    kp89 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 89)
+    kp16 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 16)
+    kp06 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 06)
+    kp26 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 26)
+    kp83 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 83)
+
+    kp99 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 99)
+    kp27 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 27)
+    kp09 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 09)
+    kp84 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 84)
+    kp22 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 22)
+    kp82 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 82)
+    kp86 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 86)
+    kp49 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 49)
+    kp18 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 18)
+    kp97 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 97)
+    kp69 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 69)
+    kp76 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 76)
+    kp32 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 32)
+    kp52 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 52)
+    kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
+    kp87 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 87)
+    kp67 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 67)
+    kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
+    kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
+    kp12 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 12)
+    kp21 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 21)
+    kp77 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 77)
+    kp40 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 40)
+    kp60 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 60)
+    kp50 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 50)
   }
 }
 
@@ -123,14 +226,14 @@ public func setupKeyPathNestedStructs() {
     let instance = A(a: 0, b: B(b: 0, c: C(c: 0, d: D(d: 0, e: E(e: expectedIntForNestedItems)))))
     holder.mainArrayForNestedStructs.append(instance)
 
-    var mutatingGetSetInstance = MutatingGetSetNested1()
-    mutatingGetSetInstance.nestedItem.nestedItem.nestedItem.nestedItem
+    var mutatingGetsetInstance = MutatingGetsetNested1()
+    mutatingGetsetInstance.nestedItem.nestedItem.nestedItem.nestedItem
       .storage = expectedIntForNestedItems
-    holder.arrayForMutatingGetSet.append(mutatingGetSetInstance)
+    holder.arrayForMutatingGetset.append(mutatingGetsetInstance)
     holder.arrayForGet.append(GetNested1())
     holder.arrayForOptionals.append(Optional1())
     holder.arrayForNestedClasses.append(C1())
-    holder.arrayForNonMutatingGetSet
+    holder.arrayForNonMutatingGetset
       .append(M(n: N(o: O(p: P(q: Q(q: expectedIntForNestedItems))))))
   }
 }
@@ -215,7 +318,7 @@ class C1 {
   }
 }
 
-// Used for run_KeyPathNonmutatingGetSet()
+// Used for run_KeyPathNonmutatingGetset()
 class M {
   var n: N
   init(n: N) { self.n = n }
@@ -241,84 +344,84 @@ class Q {
   init(q: Int) { self.q = q }
 }
 
-// Used for run_KeyPathMutatingGetSet()
-struct MutatingGetSetNested1 {
+// Used for run_KeyPathMutatingGetset()
+struct MutatingGetsetNested1 {
   var _storage: Int
-  var _nestedItemStorage: MutatingGetSetNested2
+  var _nestedItemStorage: MutatingGetsetNested2
   var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
 
-  var nestedItem: MutatingGetSetNested2 {
+  var nestedItem: MutatingGetsetNested2 {
     get { return _nestedItemStorage }
     set { _nestedItemStorage = newValue }
   }
 
   init() {
     _storage = 0
-    _nestedItemStorage = MutatingGetSetNested2()
+    _nestedItemStorage = MutatingGetsetNested2()
   }
 }
 
-struct MutatingGetSetNested2 {
+struct MutatingGetsetNested2 {
   var _storage: Int
-  var _nestedItemStorage: MutatingGetSetNested3
+  var _nestedItemStorage: MutatingGetsetNested3
   var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
 
-  var nestedItem: MutatingGetSetNested3 {
+  var nestedItem: MutatingGetsetNested3 {
     get { return _nestedItemStorage }
     set { _nestedItemStorage = newValue }
   }
 
   init() {
     _storage = 0
-    _nestedItemStorage = MutatingGetSetNested3()
+    _nestedItemStorage = MutatingGetsetNested3()
   }
 }
 
-struct MutatingGetSetNested3 {
+struct MutatingGetsetNested3 {
   var _storage: Int
-  var _nestedItemStorage: MutatingGetSetNested4
+  var _nestedItemStorage: MutatingGetsetNested4
   var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
 
-  var nestedItem: MutatingGetSetNested4 {
+  var nestedItem: MutatingGetsetNested4 {
     get { return _nestedItemStorage }
     set { _nestedItemStorage = newValue }
   }
 
   init() {
     _storage = 0
-    _nestedItemStorage = MutatingGetSetNested4()
+    _nestedItemStorage = MutatingGetsetNested4()
   }
 }
 
-struct MutatingGetSetNested4 {
+struct MutatingGetsetNested4 {
   var _storage: Int
-  var _nestedItemStorage: MutatingGetSetNested5
+  var _nestedItemStorage: MutatingGetsetNested5
   var storage: Int {
     get { return _storage }
     set { _storage = newValue }
   }
 
-  var nestedItem: MutatingGetSetNested5 {
+  var nestedItem: MutatingGetsetNested5 {
     get { return _nestedItemStorage }
     set { _nestedItemStorage = newValue }
   }
 
   init() {
     _storage = 0
-    _nestedItemStorage = MutatingGetSetNested5()
+    _nestedItemStorage = MutatingGetsetNested5()
   }
 }
 
-struct MutatingGetSetNested5 {
+struct MutatingGetsetNested5 {
   var _storage: Int
   var storage: Int {
     get { return _storage }
@@ -1230,31 +1333,31 @@ public func run_testKeyPathReadPerformance(n: Int) {
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
   let iterationMultipier = 25
 
-  let kp99 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 99)
-  let kp27 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 27)
-  let kp09 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 09)
-  let kp84 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 84)
-  let kp22 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 22)
-  let kp82 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 82)
-  let kp86 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 86)
-  let kp49 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 49)
-  let kp18 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 18)
-  let kp97 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 97)
-  let kp69 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 69)
-  let kp76 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 76)
-  let kp32 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 32)
-  let kp52 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 52)
-  let kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
-  let kp87 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 87)
-  let kp67 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 67)
-  let kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
-  let kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
-  let kp12 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 12)
-  let kp21 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 21)
-  let kp77 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 77)
-  let kp40 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 40)
-  let kp60 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 60)
-  let kp50 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 50)
+  let kp99 = FixedSizeArrayHolder.shared.kp99
+  let kp27 = FixedSizeArrayHolder.shared.kp27
+  let kp09 = FixedSizeArrayHolder.shared.kp09
+  let kp84 = FixedSizeArrayHolder.shared.kp84
+  let kp22 = FixedSizeArrayHolder.shared.kp22
+  let kp82 = FixedSizeArrayHolder.shared.kp82
+  let kp86 = FixedSizeArrayHolder.shared.kp86
+  let kp49 = FixedSizeArrayHolder.shared.kp49
+  let kp18 = FixedSizeArrayHolder.shared.kp18
+  let kp97 = FixedSizeArrayHolder.shared.kp97
+  let kp69 = FixedSizeArrayHolder.shared.kp69
+  let kp76 = FixedSizeArrayHolder.shared.kp76
+  let kp32 = FixedSizeArrayHolder.shared.kp32
+  let kp52 = FixedSizeArrayHolder.shared.kp52
+  let kp24 = FixedSizeArrayHolder.shared.kp24
+  let kp87 = FixedSizeArrayHolder.shared.kp87
+  let kp67 = FixedSizeArrayHolder.shared.kp67
+  let kp65 = FixedSizeArrayHolder.shared.kp65
+  let kp43 = FixedSizeArrayHolder.shared.kp43
+  let kp12 = FixedSizeArrayHolder.shared.kp12
+  let kp21 = FixedSizeArrayHolder.shared.kp21
+  let kp77 = FixedSizeArrayHolder.shared.kp77
+  let kp40 = FixedSizeArrayHolder.shared.kp40
+  let kp60 = FixedSizeArrayHolder.shared.kp60
+  let kp50 = FixedSizeArrayHolder.shared.kp50
 
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
@@ -1319,31 +1422,31 @@ public func run_testKeyPathWritePerformance(n: Int) {
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
   let iterationMultipier = 150
 
-  let kp46 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 46)
-  let kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
-  let kp81 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 81)
-  let kp31 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 31)
-  let kp35 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 35)
-  let kp14 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 14)
-  let kp51 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 51)
-  let kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
-  let kp90 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 90)
-  let kp80 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 80)
-  let kp47 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 47)
-  let kp92 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 92)
-  let kp78 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 78)
-  let kp79 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 79)
-  let kp48 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 48)
-  let kp64 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 64)
-  let kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
-  let kp19 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 19)
-  let kp66 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 66)
-  let kp10 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 10)
-  let kp89 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 89)
-  let kp16 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 16)
-  let kp06 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 06)
-  let kp26 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 26)
-  let kp83 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 83)
+  let kp46 = FixedSizeArrayHolder.shared.kp46
+  let kp43 = FixedSizeArrayHolder.shared.kp43
+  let kp81 = FixedSizeArrayHolder.shared.kp81
+  let kp31 = FixedSizeArrayHolder.shared.kp31
+  let kp35 = FixedSizeArrayHolder.shared.kp35
+  let kp14 = FixedSizeArrayHolder.shared.kp14
+  let kp51 = FixedSizeArrayHolder.shared.kp51
+  let kp24 = FixedSizeArrayHolder.shared.kp24
+  let kp90 = FixedSizeArrayHolder.shared.kp90
+  let kp80 = FixedSizeArrayHolder.shared.kp80
+  let kp47 = FixedSizeArrayHolder.shared.kp47
+  let kp92 = FixedSizeArrayHolder.shared.kp92
+  let kp78 = FixedSizeArrayHolder.shared.kp78
+  let kp79 = FixedSizeArrayHolder.shared.kp79
+  let kp48 = FixedSizeArrayHolder.shared.kp48
+  let kp64 = FixedSizeArrayHolder.shared.kp64
+  let kp65 = FixedSizeArrayHolder.shared.kp65
+  let kp19 = FixedSizeArrayHolder.shared.kp19
+  let kp66 = FixedSizeArrayHolder.shared.kp66
+  let kp10 = FixedSizeArrayHolder.shared.kp10
+  let kp89 = FixedSizeArrayHolder.shared.kp89
+  let kp16 = FixedSizeArrayHolder.shared.kp16
+  let kp06 = FixedSizeArrayHolder.shared.kp06
+  let kp26 = FixedSizeArrayHolder.shared.kp26
+  let kp83 = FixedSizeArrayHolder.shared.kp83
 
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
@@ -1476,18 +1579,18 @@ public func run_testKeyPathSmallStruct(n: Int) {
   blackHole(sum)
 }
 
-// Benchmarks traversal through `KeyPathComponents` of type `.mutatingGetSet`.
-public func run_KeyPathMutatingGetSet(n: Int) {
+// Benchmarks traversal through `KeyPathComponents` of type `.mutatingGetset`.
+public func run_KeyPathMutatingGetset(n: Int) {
   var sum = 0
   var index = 0
   let iterationMultipier = 200
 
-  let destinationKeyPath = \MutatingGetSetNested1.nestedItem.nestedItem.nestedItem.nestedItem
+  let destinationKeyPath = \MutatingGetsetNested1.nestedItem.nestedItem.nestedItem.nestedItem
     .storage
 
-  let elementCount = FixedSizeArrayHolder.shared.arrayForMutatingGetSet.count
+  let elementCount = FixedSizeArrayHolder.shared.arrayForMutatingGetset.count
   for _ in 1 ... iterationMultipier * n {
-    let element = FixedSizeArrayHolder.shared.arrayForMutatingGetSet[index]
+    let element = FixedSizeArrayHolder.shared.arrayForMutatingGetset[index]
     sum += element[keyPath: identity(destinationKeyPath)]
     index = (index + 1) % elementCount
   }
@@ -1545,17 +1648,17 @@ public func run_KeyPathNestedClasses(n: Int) {
   check(sum == iterationMultipier * n * expectedIntForNestedItems)
 }
 
-// Benchmarks traversal through `KeyPathComponents` of type `.nonmutatingGetSet`.
-// Note: There may be other, simpler ways of getting consecutive `.nonmutatingGetSet`. components.
-public func run_KeyPathNonmutatingGetSet(n: Int) {
+// Benchmarks traversal through `KeyPathComponents` of type `.nonmutatingGetset`.
+// Note: There may be other, simpler ways of getting consecutive `.nonmutatingGetset`. components.
+public func run_KeyPathNonmutatingGetset(n: Int) {
   var sum = 0
   var index = 0
   let iterationMultipier = 200
 
   let destinationKeyPath = \M.n.o.p.q.q
-  let elementCount = FixedSizeArrayHolder.shared.arrayForNonMutatingGetSet.count
+  let elementCount = FixedSizeArrayHolder.shared.arrayForNonMutatingGetset.count
   for _ in 1 ... iterationMultipier * n {
-    let element = FixedSizeArrayHolder.shared.arrayForNonMutatingGetSet[index]
+    let element = FixedSizeArrayHolder.shared.arrayForNonMutatingGetset[index]
     sum += element[keyPath: identity(destinationKeyPath)]
     index = (index + 1) % elementCount
   }
