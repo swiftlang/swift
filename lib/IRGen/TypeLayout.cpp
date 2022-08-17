@@ -2330,11 +2330,11 @@ EnumTypeLayoutEntry::getEnumTagMultipayload(IRGenFunction &IGF,
   auto truncSize = Builder.CreateZExtOrTrunc(maxPayloadSize(IGF), IGM.Int32Ty);
   auto sizeGTE4 = Builder.CreateICmpUGE(truncSize, four);
   auto sizeClampedTo4 = Builder.CreateSelect(sizeGTE4, four, truncSize);
-  auto sizeIsZeroBB = IGF.createBasicBlock("");
   auto sizeGreaterZeroBB = IGF.createBasicBlock("");
   auto zero = IGM.getInt32(0);
   auto sizeGreaterZero = Builder.CreateICmpUGT(sizeClampedTo4, zero);
-  Builder.CreateCondBr(sizeGreaterZero, sizeGreaterZeroBB, sizeIsZeroBB);
+  tagValue->addIncoming(loadedTag, Builder.GetInsertBlock());
+  Builder.CreateCondBr(sizeGreaterZero, sizeGreaterZeroBB, resultBB);
 
   Builder.emitBlock(sizeGreaterZeroBB);
   auto payloadValue = emitLoad1to4Bytes(IGF, enumAddr, sizeClampedTo4);
@@ -2355,10 +2355,6 @@ EnumTypeLayoutEntry::getEnumTagMultipayload(IRGenFunction &IGF,
   auto tmp3 = Builder.CreateOr(payloadValue, tmp2);
   auto result3 = Builder.CreateAdd(tmp3, numPayloads);
   tagValue->addIncoming(result3, Builder.GetInsertBlock());
-  Builder.CreateBr(resultBB);
-
-  Builder.emitBlock(sizeIsZeroBB);
-  tagValue->addIncoming(loadedTag, Builder.GetInsertBlock());
   Builder.CreateBr(resultBB);
 
   Builder.emitBlock(resultBB);
