@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15
-
-// REQUIRES: objc_interop
-// REQUIRES: OS=macosx
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 protocol P {
   associatedtype T
