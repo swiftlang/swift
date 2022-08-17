@@ -289,10 +289,20 @@ static Type getIdentityOpaqueTypeArchetypeType(
 /// Adjust the underlying type of a typealias within the given context to
 /// account for @preconcurrency.
 static Type adjustTypeAliasTypeInContext(
-    Type type, TypeAliasDecl *aliasDecl, DeclContext *fromDC) {
+    Type type, TypeAliasDecl *aliasDecl, DeclContext *fromDC,
+    TypeResolutionOptions options) {
+  // If we are in a @preconcurrency declaration, don't adjust the types of
+  // type aliases.
+  if (options.contains(TypeResolutionFlags::Preconcurrency))
+    return type;
+
+  // If the type alias itself isn't marked with @preconcurrency, don't
+  // adjust the type.
   if (!aliasDecl->preconcurrency())
     return type;
 
+  // Only adjust the type within a strict concurrency context, so we don't
+  // change the types as seen by code that hasn't adopted concurrency.
   if (contextRequiresStrictConcurrencyChecking(
           fromDC,
           [](const AbstractClosureExpr *closure) {
@@ -332,7 +342,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
   /// to adjust its type for concurrency.
   auto adjustAliasType = [&](Type type) -> Type {
     return adjustTypeAliasTypeInContext(
-        type, cast<TypeAliasDecl>(typeDecl), fromDC);
+        type, cast<TypeAliasDecl>(typeDecl), fromDC, options);
   };
 
   if (!isSpecialized) {
@@ -1622,7 +1632,8 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
     // Type aliases might require adjustment due to @preconcurrency.
     if (auto aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
       memberType = adjustTypeAliasTypeInContext(
-          memberType, aliasDecl, resolution.getDeclContext());
+          memberType, aliasDecl, resolution.getDeclContext(),
+          resolution.getOptions());
     }
 
     if (options.contains(TypeResolutionFlags::SilenceErrors)) {
