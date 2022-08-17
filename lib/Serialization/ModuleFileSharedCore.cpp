@@ -564,6 +564,8 @@ void ModuleFileSharedCore::fatal(llvm::Error error) const {
   llvm::raw_svector_ostream out(errorStr);
 
   out << "*** DESERIALIZATION FAILURE ***\n";
+  out << "*** If any module named here was modified in the SDK, please delete the ***\n";
+  out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
   outputDiagnosticInfo(out);
   out << "\n";
   if (error) {
