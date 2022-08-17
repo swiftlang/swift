@@ -284,6 +284,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into", NTD);
+#endif
 
     bool WalkGenerics = visitGenericParamListIfNeeded(NTD);
 
