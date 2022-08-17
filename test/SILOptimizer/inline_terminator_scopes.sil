@@ -1,26 +1,26 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-print-debuginfo | %FileCheck %s
 
 // Generated from:
-// func g(_ x: Int) -> Int {
+// func g(_ x: Int64) -> Int64 {
 //   if (x > 0) {
 //     return 1
 //   }
 //   return 0
 // }
 //  
-// public func f(_ x: Int) -> Int { return g(x) }
+// public func f(_ x: Int64) -> Int64 { return g(x) }
 
-// CHECK: sil @$s1a1fyS2iF : $@convention(thin) (Int) -> Int {
-// CHECK: bb0(%0 : $Int):
+// CHECK: sil @$s1a1gys5Int64VADF : $@convention(thin) (Int64) -> Int64 {
+// CHECK: bb0(%0 : $Int64):
 // CHECK-NEXT:   scope [[SCOPE_10:[0-9]+]]
-// CHECK:        cond_br {{.*}}, bb1, bb2, loc "t.swift":3:9, scope [[SCOPE_10]]
+// CHECK:        cond_br {{.*}}, bb1, bb2, loc "t.swift":2:9, scope [[SCOPE_10]]
 // CHECK:      bb1:
 // CHECK-NEXT:   scope [[SCOPE_11:[0-9]+]]
-// CHECK:        br bb3({{.*}} : $Int), loc "t.swift":4:5, scope [[SCOPE_11]]
+// CHECK:        br bb3({{.*}} : $Int64), loc "t.swift":3:5, scope [[SCOPE_11]]
 // CHECK:      bb2:
 // CHECK-NEXT:   scope [[SCOPE_9:[0-9]+]]
-// CHECK:        br bb3({{.*}} : $Int), loc "t.swift":6:3, scope [[SCOPE_9]]
-// CHECK:      bb3({{.*}} : $Int):
+// CHECK:        br bb3({{.*}} : $Int64), loc "t.swift":5:3, scope [[SCOPE_9]]
+// CHECK:      bb3({{.*}} : $Int64):
 
 sil_stage canonical
 
@@ -28,48 +28,48 @@ import Builtin
 import Swift
 import SwiftShims
 
-func g(_ x: Int) -> Int
+func g(_ x: Int64) -> Int64
 
-public func f(_ x: Int) -> Int
+public func f(_ x: Int64) -> Int64
 
-sil_scope 1 { loc "t.swift":2:6 parent @$s1a1gyS2iF : $@convention(thin) (Int) -> Int }
-sil_scope 2 { loc "t.swift":2:25 parent 1 }
-sil_scope 3 { loc "t.swift":3:3 parent 2 }
-sil_scope 4 { loc "t.swift":3:14 parent 3 }
+sil_scope 1 { loc "t.swift":1:6 parent @$s1a1gys5Int64VADF : $@convention(thin) (Int64) -> Int64 }
+sil_scope 2 { loc "t.swift":1:29 parent 1 }
+sil_scope 3 { loc "t.swift":2:3 parent 2 }
+sil_scope 4 { loc "t.swift":2:14 parent 3 }
 
 // g(_:)
-sil hidden @$s1a1gyS2iF : $@convention(thin) (Int) -> Int {
+sil @$s1a1gys5Int64VADF : $@convention(thin) (Int64) -> Int64 {
 // %0 "x"                                         // users: %3, %1
-bb0(%0 : $Int):
-  %2 = integer_literal $Builtin.Int64, 0, loc "t.swift":3:11, scope 3 // user: %4
-  %3 = struct_extract %0 : $Int, #Int._value, loc "t.swift":3:9, scope 3 // user: %4
-  %4 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1, loc "t.swift":3:9, scope 3 // user: %5
-  cond_br %4, bb1, bb2, loc "t.swift":3:9, scope 3 // id: %5
+bb0(%0 : $Int64):
+  %2 = integer_literal $Builtin.Int64, 0, loc "t.swift":2:11, scope 3 // user: %4
+  %3 = struct_extract %0 : $Int64, #Int64._value, loc "t.swift":2:9, scope 3 // user: %4
+  %4 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1, loc "t.swift":2:9, scope 3 // user: %5
+  cond_br %4, bb1, bb2, loc "t.swift":2:9, scope 3 // id: %5
 
 bb1:                                              // Preds: bb0
-  %6 = integer_literal $Builtin.Int64, 1, loc "t.swift":4:12, scope 4 // user: %7
-  %7 = struct $Int (%6 : $Builtin.Int64), loc "t.swift":4:12, scope 4 // user: %8
-  br bb3(%7 : $Int), loc "t.swift":4:5, scope 4 // id: %8
+  %6 = integer_literal $Builtin.Int64, 1, loc "t.swift":3:12, scope 4 // user: %7
+  %7 = struct $Int64 (%6 : $Builtin.Int64), loc "t.swift":3:12, scope 4 // user: %8
+  br bb3(%7 : $Int64), loc "t.swift":3:5, scope 4 // id: %8
 
 bb2:                                              // Preds: bb0
-  %9 = integer_literal $Builtin.Int64, 0, loc "t.swift":6:10, scope 2 // user: %10
-  %10 = struct $Int (%9 : $Builtin.Int64), loc "t.swift":6:10, scope 2 // user: %11
-  br bb3(%10 : $Int), loc "t.swift":6:3, scope 2 // id: %11
+  %9 = integer_literal $Builtin.Int64, 0, loc "t.swift":5:10, scope 2 // user: %10
+  %10 = struct $Int64 (%9 : $Builtin.Int64), loc "t.swift":5:10, scope 2 // user: %11
+  br bb3(%10 : $Int64), loc "t.swift":5:3, scope 2 // id: %11
 
 // %12                                            // user: %13
-bb3(%12 : $Int):                                  // Preds: bb2 bb1
-  return %12 : $Int, loc "t.swift":7:1, scope 2 // id: %13
-} // end sil function '$s1a1gyS2iF'
+bb3(%12 : $Int64):                                // Preds: bb2 bb1
+  return %12 : $Int64, loc "t.swift":6:1, scope 2 // id: %13
+} // end sil function '$s1a1gys5Int64VADF'
 
-sil_scope 7 { loc "t.swift":9:13 parent @$s1a1fyS2iF : $@convention(thin) (Int) -> Int }
-sil_scope 8 { loc "t.swift":9:32 parent 7 }
+sil_scope 7 { loc "t.swift":8:13 parent @$s1a1fys5Int64VADF : $@convention(thin) (Int64) -> Int64 }
+sil_scope 8 { loc "t.swift":8:36 parent 7 }
 
 // f(_:)
-sil @$s1a1fyS2iF : $@convention(thin) (Int) -> Int {
+sil @$s1a1fys5Int64VADF : $@convention(thin) (Int64) -> Int64 {
 // %0 "x"                                         // users: %3, %1
-bb0(%0 : $Int):
+bb0(%0 : $Int64):
   // function_ref g(_:)
-  %2 = function_ref @$s1a1gyS2iF : $@convention(thin) (Int) -> Int, loc "t.swift":9:41, scope 8 // user: %3
-  %3 = apply %2(%0) : $@convention(thin) (Int) -> Int, loc "t.swift":9:41, scope 8 // user: %4
-  return %3 : $Int, loc "t.swift":9:34, scope 8 // id: %4
-} // end sil function '$s1a1fyS2iF'
+  %2 = function_ref @$s1a1gys5Int64VADF : $@convention(thin) (Int64) -> Int64, loc "t.swift":8:45, scope 8 // user: %3
+  %3 = apply %2(%0) : $@convention(thin) (Int64) -> Int64, loc "t.swift":8:45, scope 8 // user: %4
+  return %3 : $Int64, loc "t.swift":8:38, scope 8 // id: %4
+} // end sil function '$s1a1fys5Int64VADF'
