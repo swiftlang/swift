@@ -12,13 +12,6 @@ struct Outer {
 
 @preconcurrency func preconcurrencyFunc(callback: FN) {}
 
-func usage() {
-}
-
-func usageAsync() async {
-}
-
-
 func test() {
   var _: Outer.FN = {
     f()
