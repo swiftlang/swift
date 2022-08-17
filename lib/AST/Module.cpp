@@ -3035,13 +3035,16 @@ ArrayRef<Decl *> SourceFile::getHoistedDecls() const {
 }
 
 bool FileUnit::walk(ASTWalker &walker) {
+  bool SkipInternal = getKind() == FileUnitKind::SerializedAST &&
+                      !walker.shouldWalkSerializedTopLevelInternalDecls();
+  auto MinAccessLevel = SkipInternal? AccessLevel::Public :
+                                      AccessLevel::Private;
+
   SmallVector<Decl *, 64> Decls;
-  getTopLevelDecls(Decls);
+  getTopLevelDecls(Decls, MinAccessLevel);
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
 
-  bool SkipInternal = getKind() == FileUnitKind::SerializedAST &&
-      !walker.shouldWalkSerializedTopLevelInternalDecls();
   for (Decl *D : Decls) {
     if (SkipInternal) {
       // Ignore if the decl isn't visible
