@@ -67,6 +67,9 @@ enum class TypeResolutionFlags : uint16_t {
   /// Needed to enforce that \c any P<some Q> does not resolve to a
   /// parameterized existential with an opaque type constraint.
   DisallowOpaqueTypes = 1 << 9,
+
+  /// We are in a `@preconcurrency` declaration.
+  Preconcurrency = 1 << 10,
 };
 
 /// Type resolution contexts that require special handling.

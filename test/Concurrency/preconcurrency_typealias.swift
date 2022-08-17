@@ -10,6 +10,15 @@ struct Outer {
   @preconcurrency typealias FN = @Sendable () -> Void
 }
 
+@preconcurrency func preconcurrencyFunc(callback: FN) {}
+
+func usage() {
+}
+
+func usageAsync() async {
+}
+
+
 func test() {
   var _: Outer.FN = {
     f()
@@ -19,6 +28,12 @@ func test() {
     f()
     print("Hello")
   }
+
+  var mutableVariable = 0
+  preconcurrencyFunc {
+    mutableVariable += 1 // no sendable warning
+  }
+  mutableVariable += 1
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -31,4 +46,10 @@ func testAsync() async {
     f() // expected-error{{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
     print("Hello")
   }
+
+  var mutableVariable = 0
+  preconcurrencyFunc {
+    mutableVariable += 1 // expected-warning{{mutation of captured var 'mutableVariable' in concurrently-executing code; this is an error in Swift 6}}
+  }
+  mutableVariable += 1
 }
