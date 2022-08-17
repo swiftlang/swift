@@ -5570,6 +5570,36 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   return RValue(SGF, E, ptr);
 }
 
+/// Implicit conversion from a nontrivial inout type to a raw pointer are
+/// dangerous. For example:
+///
+///   func bar(_ p: UnsafeRawPointer) { ... }
+///   func foo(object: inout AnyObject) {
+///       bar(&object)
+///   }
+///
+/// These conversions should be done explicitly.
+enum ConverterKind { InoutConverter, ArrayConverter };
+static void diagnoseImplicitRawConversion(SILType sourceTy, Type pointerTy,
+                                          ConverterKind kind,
+                                          SILLocation loc,
+                                          SILGenFunction &SGF) {
+    if (sourceTy.isTrivial(SGF.F))
+      return;
+
+    PointerTypeKind kindOfPtr;
+    auto pointerElt = pointerTy->getAnyPointerElementType(kindOfPtr);
+    assert(!pointerElt.isNull() && "expected an unsafe pointer type");
+
+    // The type checker treats Int8/UInt8 like a raw pointer for C calls.
+    // Trivial source types are checked above, so these dest types can't match.
+    if (pointerElt->isVoid() || pointerElt->isInt8() || pointerElt->isUInt8()) {
+      SGF.SGM.diagnose(
+        loc, diag::nontrivial_to_rawpointer_conversion, kind == ArrayConverter,
+        sourceTy.getASTType(), pointerTy);
+    }
+}
+
 /// Convert an l-value to a pointer type: unsafe, unsafe-mutable, or
 /// autoreleasing-unsafe-mutable.
 ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
@@ -5583,6 +5613,10 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   if (lv.getTypeOfRValue().getASTType() != loweredTy.getASTType()) {
     lv.addSubstToOrigComponent(opaqueTy, loweredTy);
   }
+
+  diagnoseImplicitRawConversion(loweredTy, pointerInfo.PointerType,
+                                InoutConverter, loc, *this);
+
   switch (pointerInfo.PointerKind) {
   case PTK_UnsafeMutablePointer:
   case PTK_UnsafePointer:
@@ -5694,6 +5728,10 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   auto subMap = SubstitutionMap::combineSubstitutionMaps(
       firstSubMap, secondSubMap, CombineSubstitutionMaps::AtIndex, 1, 0,
       genericSig);
+
+  SILType eltTy = getLoweredType(subMap.getReplacementTypes()[0]);
+  diagnoseImplicitRawConversion(eltTy, accessInfo.PointerType, ArrayConverter,
+                                loc, *this);
 
   SmallVector<ManagedValue, 2> resultScalars;
   emitApplyOfLibraryIntrinsic(loc, converter, subMap, array, SGFContext())

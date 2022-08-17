@@ -748,5 +748,12 @@ ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
       "_move applied to value that the compiler does not support checking",
       ())
 
+// Implicit inout-to-UnsafeRawPointer conversions
+WARNING(nontrivial_to_rawpointer_conversion,none,
+        "cannot implicitly convert an %select{inout value|array}0 of type %1 "
+        "to expected argument type %2 because %1 may contain an object "
+        "reference. Consider using a 'withUnsafeBytes' API instead.",
+        (bool, Type, Type))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
