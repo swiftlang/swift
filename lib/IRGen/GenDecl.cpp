@@ -474,6 +474,10 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
       this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
     else if (Context.LangOpts.Target.isOSLinux())
       this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
+
+    // Do not try to link Cxx with itself.
+    if (!getSwiftModule()->getName().is("Cxx"))
+      this->addLinkLibrary(LinkLibrary("swiftCxx", LibraryKind::Library));
   }
 
   // FIXME: It'd be better to have the driver invocation or build system that
