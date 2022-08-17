@@ -467,17 +467,20 @@ struct PGOMapping : public ASTWalker {
   /// The next counter value to assign.
   unsigned NextCounter;
 
+  /// The loaded counter data.
+  const llvm::InstrProfRecord &LoadedCounts;
+
   /// The map of statements to counters.
   llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap;
-  llvm::Expected<llvm::InstrProfRecord> &LoadedCounts;
   llvm::DenseMap<ASTNode, ASTNode> &CondToParentMap;
   llvm::DenseMap<ASTNode, unsigned> CounterMap;
 
   PGOMapping(llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap,
-             llvm::Expected<llvm::InstrProfRecord> &LoadedCounts,
+             const llvm::InstrProfRecord &LoadedCounts,
              llvm::DenseMap<ASTNode, ASTNode> &RegionCondToParentMap)
-      : NextCounter(0), LoadedCounterMap(LoadedCounterMap),
-        LoadedCounts(LoadedCounts), CondToParentMap(RegionCondToParentMap) {}
+      : NextCounter(0), LoadedCounts(LoadedCounts),
+        LoadedCounterMap(LoadedCounterMap),
+        CondToParentMap(RegionCondToParentMap) {}
 
   unsigned getParentCounter() const {
     if (Parent.isNull())
@@ -516,7 +519,7 @@ struct PGOMapping : public ASTWalker {
            "region does not have an associated counter");
 
     unsigned CounterIndexForFunc = CounterIt->second;
-    return LoadedCounts->Counts[CounterIndexForFunc];
+    return LoadedCounts.Counts[CounterIndexForFunc];
   }
 
   bool walkToDeclPre(Decl *D) override {
@@ -552,7 +555,7 @@ struct PGOMapping : public ASTWalker {
         if (!parent) {
           auto thenVal = thenCount.getValue();
           for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
-            auto cCount = LoadedCounts->Counts[pCount];
+            auto cCount = LoadedCounts.Counts[pCount];
             if (cCount > thenVal) {
               count = cCount;
               break;
@@ -642,7 +645,7 @@ struct PGOMapping : public ASTWalker {
       if (!parent) {
         auto thenVal = thenCount.getValue();
         for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
-          auto cCount = LoadedCounts->Counts[pCount];
+          auto cCount = LoadedCounts.Counts[pCount];
           if (cCount > thenVal) {
             count = cCount;
             break;
@@ -1186,7 +1189,7 @@ void SILProfiler::assignRegionCounters() {
       llvm::dbgs() << PGOFuncName << "\n";
       return;
     }
-    PGOMapping pgoMapper(RegionLoadedCounterMap, LoadedCounts,
+    PGOMapping pgoMapper(RegionLoadedCounterMap, LoadedCounts.get(),
                          RegionCondToParentMap);
     Root.walk(pgoMapper);
   }
