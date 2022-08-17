@@ -371,6 +371,11 @@ public struct UnsafePointer<Pointee>: _Pointer {
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
+    _internalInvariant(o >= 0)
+    _debugPrecondition(
+      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      "Overflow in pointer arithmetic"
+    )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 
@@ -1088,6 +1093,11 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
+    _internalInvariant(o >= 0)
+    _debugPrecondition(
+      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      "Overflow in pointer arithmetic"
+    )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 
@@ -1105,6 +1115,11 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     to property: WritableKeyPath<Pointee, Property>
   ) -> UnsafeMutablePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
+    _internalInvariant(o >= 0)
+    _debugPrecondition(
+      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      "Overflow in pointer arithmetic"
+    )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 

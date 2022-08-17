@@ -499,6 +499,7 @@ extension UnsafeRawPointer {
   public func alignedUp<T>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 
@@ -515,6 +516,7 @@ extension UnsafeRawPointer {
   public func alignedDown<T>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 
@@ -536,6 +538,7 @@ extension UnsafeRawPointer {
       "alignment must be a whole power of 2."
     )
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 
@@ -557,6 +560,7 @@ extension UnsafeRawPointer {
       "alignment must be a whole power of 2."
     )
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 }
@@ -1351,6 +1355,7 @@ extension UnsafeMutableRawPointer {
   public func alignedUp<T>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 
@@ -1367,6 +1372,7 @@ extension UnsafeMutableRawPointer {
   public func alignedDown<T>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 
@@ -1388,6 +1394,7 @@ extension UnsafeMutableRawPointer {
       "alignment must be a whole power of 2."
     )
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 
@@ -1409,6 +1416,7 @@ extension UnsafeMutableRawPointer {
       "alignment must be a whole power of 2."
     )
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 }
