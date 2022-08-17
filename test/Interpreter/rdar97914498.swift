@@ -3,6 +3,9 @@
 // RUN: %target-codesign %t/out
 // RUN: %target-run %t/out
 
+// REQUIRES: executable_test
+// REQUIRES: foundation
+
 // This is a regression test that ensures that empty payloads in multi
 // payload enums are properly handled.
 
