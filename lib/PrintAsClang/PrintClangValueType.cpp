@@ -257,7 +257,36 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
-  os << "};\n\n";
+  os << "};\n";
+  // Print the definition of enum static struct data memebers
+  if (isa<EnumDecl>(typeDecl)) {
+    auto tagMapping = interopContext.getIrABIDetails().getEnumTagMapping(
+        cast<EnumDecl>(typeDecl));
+    for (const auto &pair : tagMapping) {
+      os << "decltype(";
+      printer.printBaseName(typeDecl);
+      os << "::";
+      printer.printIdentifier(pair.first->getNameStr());
+      os << ") ";
+      printer.printBaseName(typeDecl);
+      os << "::";
+      printer.printIdentifier(pair.first->getNameStr());
+      os << ";\n";
+    }
+    if (isOpaqueLayout) {
+      os << "decltype(";
+      printer.printBaseName(typeDecl);
+      // TODO: allow custom name for this special case
+      os << "::";
+      printer.printIdentifier("unknownDefault");
+      os << ") ";
+      printer.printBaseName(typeDecl);
+      os << "::";
+      printer.printIdentifier("unknownDefault");
+      os << ";\n";
+    }
+  }
+  os << '\n';
 
   const auto *moduleContext = typeDecl->getModuleContext();
   // Print out the "hidden" _impl class.
