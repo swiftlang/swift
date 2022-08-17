@@ -2612,6 +2612,7 @@ namespace {
       if (clangModule && requiresCPlusPlus(clangModule)) {
         if (auto structDecl = dyn_cast_or_null<NominalTypeDecl>(result)) {
           conformToCxxIteratorIfNeeded(Impl, structDecl, decl);
+          conformToCxxSequenceIfNeeded(Impl, structDecl, decl);
         }
       }
 
