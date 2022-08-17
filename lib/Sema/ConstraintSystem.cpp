@@ -5619,9 +5619,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  return FunctionArgApplyInfo(argList, argExpr, argIdx,
-                              simplifyType(getType(argExpr)), paramIdx,
-                              fnInterfaceType, fnType, callee);
+  return FunctionArgApplyInfo::get(argList, argExpr, argIdx,
+                                   simplifyType(getType(argExpr)), paramIdx,
+                                   fnInterfaceType, fnType, callee);
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
