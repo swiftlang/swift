@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/54962
+
 @propertyWrapper
 @dynamicMemberLookup
 struct Binding<Value> {

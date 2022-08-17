@@ -52,15 +52,17 @@ class B {
   }
 }
 
-// SR-2484: Bad diagnostic for incorrectly calling private init
-class SR_2484 {
+/// https://github.com/apple/swift/issues/45089
+/// Bad diagnostic for incorrectly calling private `init`
+
+class C_45089 {
   private init() {} // expected-note {{'init()' declared here}}
   private init(a: Int) {}
 }
 
-class Impl_2484 : SR_2484 {
+class Impl_45089 : C_45089 {
   init() {
-    super.init() // expected-error {{'SR_2484' initializer is inaccessible due to 'private' protection level}}
+    super.init() // expected-error {{'C_45089' initializer is inaccessible due to 'private' protection level}}
   }
 }
 

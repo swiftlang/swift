@@ -117,14 +117,17 @@ func r23670252(_ dictionary: [String : AnyObject], someObject: AnyObject) {
 }
 
 
-// SR-718 - Type mismatch reported as extraneous parameter
-struct SR718 {
-  subscript(b : Int) -> Int
-    { return 0 }
-  subscript(a a : UInt) -> Int { return 0 }
-}
+// https://github.com/apple/swift/issues/43333
+// Type mismatch reported as extraneous parameter
+do {
+  struct S {
+    subscript(b : Int) -> Int
+      { return 0 }
+    subscript(a a : UInt) -> Int { return 0 }
+  }
 
-SR718()[a: Int()] // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+  S()[a: Int()] // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+}
 
 // rdar://problem/25601561 - Qol: Bad diagnostic for failed assignment from Any to more specific type
 
@@ -166,8 +169,10 @@ func rdar_45819956() {
   // expected-error@-1 {{cannot pass an inout argument to a subscript; use 'withUnsafeMutablePointer' to explicitly convert argument to a pointer}}
 }
 
-// rdar://problem/45825806 - [SR-7190] Array-to-pointer in subscript arg crashes compiler
-func rdar_45825806() {
+// rdar://problem/45825806
+// https://github.com/apple/swift/issues/49738
+// Array-to-pointer in subscript arg crashes compiler
+do {
   struct S {
     subscript(takesPtr ptr: UnsafePointer<Int>) -> Int {
       get { return 0 }
