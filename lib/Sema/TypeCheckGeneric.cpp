@@ -925,9 +925,10 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       Requirement substReq = req;
       if (isPrimaryReq) {
         // Primary requirements do not have substitutions applied.
-        if (auto resolved =
-                req.subst(substitutions, LookUpConformanceInModule(module))) {
-          substReq = *resolved;
+        auto resolved =
+            req.subst(substitutions, LookUpConformanceInModule(module));
+        if (!resolved.hasError()) {
+          substReq = resolved;
         } else {
           // Another requirement might fail later; just continue.
           hadSubstFailure = true;
@@ -969,9 +970,10 @@ CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
   bool valid = true;
 
   for (auto req : requirements) {
-    if (auto resolved = req.subst(substitutions,
-                                  LookUpConformanceInModule(module), options)) {
-      worklist.push_back(*resolved);
+    auto resolved = req.subst(substitutions,
+                              LookUpConformanceInModule(module), options);
+    if (!resolved.hasError()) {
+      worklist.push_back(resolved);
     } else {
       valid = false;
     }

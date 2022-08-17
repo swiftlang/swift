@@ -529,9 +529,10 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       };
 
       SmallVector<Requirement, 2> requirements;
-      for (auto reqt : superclassCtorSig.getRequirements())
-        if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
-          requirements.push_back(*substReqt);
+      for (auto reqt : superclassCtorSig.getRequirements()) {
+        auto substReqt = reqt.subst(substFn, lookupConformanceFn);
+        requirements.push_back(substReqt);
+      }
 
       // Now form the substitution map that will be used to remap parameter
       // types.

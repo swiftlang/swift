@@ -391,8 +391,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
              witnessConfig.derivativeGenericSignature.getRequirements()) {
           auto substReq = req.subst(result.WitnessSubstitutions);
           bool reqDiffGenSigSatisfies =
-              reqDiffGenSig && substReq &&
-              reqDiffGenSig->isRequirementSatisfied(*substReq);
+              reqDiffGenSig && !substReq.hasError() &&
+              reqDiffGenSig->isRequirementSatisfied(substReq);
           bool conformanceGenSigSatisfies =
               conformanceGenSig &&
               conformanceGenSig->isRequirementSatisfied(req);
