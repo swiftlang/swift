@@ -716,6 +716,8 @@ private:
                          .printSwiftABIFunctionSignatureAsCxxFunction(
                              AFD, methodTy,
                              /*selfTypeDeclContext=*/typeDeclContext);
+      if (!funcABI)
+        return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
       DeclAndTypeClangFunctionPrinter declPrinter(os, owningPrinter.prologueOS,
@@ -723,11 +725,11 @@ private:
                                                   owningPrinter.interopContext);
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
         declPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI.getSymbolName(), resultTy,
+            typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
             /*isDefinition=*/false);
       } else {
         declPrinter.printCxxMethod(typeDeclContext, AFD,
-                                   funcABI.getSymbolName(), resultTy,
+                                   funcABI->getSymbolName(), resultTy,
                                    /*isDefinition=*/false);
       }
 
@@ -739,11 +741,12 @@ private:
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
 
         defPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI.getSymbolName(), resultTy,
+            typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
             /*isDefinition=*/true);
       } else {
-        defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI.getSymbolName(),
-                                  resultTy, /*isDefinition=*/true);
+        defPrinter.printCxxMethod(typeDeclContext, AFD,
+                                  funcABI->getSymbolName(), resultTy,
+                                  /*isDefinition=*/true);
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
@@ -1074,7 +1077,8 @@ private:
   }
 
   // Print out the extern C Swift ABI function signature.
-  FuncionSwiftABIInformation printSwiftABIFunctionSignatureAsCxxFunction(
+  Optional<FuncionSwiftABIInformation>
+  printSwiftABIFunctionSignatureAsCxxFunction(
       AbstractFunctionDecl *FD, Optional<FunctionType *> givenFuncType = None,
       Optional<NominalTypeDecl *> selfTypeDeclContext = None) {
     assert(outputLang == OutputLanguageMode::Cxx);
@@ -1094,13 +1098,16 @@ private:
     auto resultTy =
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
+    std::string cRepresentationString;
+    llvm::raw_string_ostream cRepresentationOS(cRepresentationString);
+
     FuncionSwiftABIInformation funcABI(FD);
 
-    os << "SWIFT_EXTERN ";
+    cRepresentationOS << "SWIFT_EXTERN ";
 
-    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
-                                                owningPrinter.typeMapping,
-                                                owningPrinter.interopContext);
+    DeclAndTypeClangFunctionPrinter funcPrinter(
+        cRepresentationOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
+        owningPrinter.interopContext);
     auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
                          .getFunctionABIAdditionalParams(FD);
     llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
@@ -1116,10 +1123,16 @@ private:
     if (!selfTypeDeclContext && !ABIparams.empty())
       convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
 
-    funcPrinter.printFunctionSignature(
+    auto representation = funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto,
         additionalParams);
+    if (representation.isUnsupported()) {
+      // FIXME: Emit remark about unemitted declaration.
+      return None;
+    }
+
+    os << cRepresentationOS.str();
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
@@ -1402,8 +1415,10 @@ private:
       llvm::raw_string_ostream cFuncPrologueOS(cFuncDecl);
       auto funcABI = Implementation(cFuncPrologueOS, owningPrinter, outputLang)
                          .printSwiftABIFunctionSignatureAsCxxFunction(FD);
+      if (!funcABI)
+        return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
-      printAbstractFunctionAsCxxFunctionThunk(FD, funcABI);
+      printAbstractFunctionAsCxxFunctionThunk(FD, *funcABI);
       return;
     }
     if (FD->getDeclContext()->isTypeContext())
