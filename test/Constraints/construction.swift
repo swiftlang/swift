@@ -153,22 +153,25 @@ extension S3 {
 
 let s3b = S3(maybe: s3a)
 
-// SR-5245 - Erroneous diagnostic - Type of expression is ambiguous without more context
-class SR_5245 {
-    struct S {
-        enum E {
-            case e1
-            case e2
-        }
+// https://github.com/apple/swift/issues/47820
+// Erroneous diagnostic: type of expression is ambiguous without more context
+do {
+  class C {
+      struct S {
+          enum E {
+              case e1
+              case e2
+          }
 
-        let e: [E]
-    }
+          let e: [E]
+      }
 
-    init(s: S) {}
+      init(s: S) {}
+  }
+
+  C(s: C.S(f: [.e1, .e2]))
+  // expected-error@-1 {{incorrect argument label in call (have 'f:', expected 'e:')}} {{12-13=e}}
 }
-
-SR_5245(s: SR_5245.S(f: [.e1, .e2]))
-// expected-error@-1 {{incorrect argument label in call (have 'f:', expected 'e:')}} {{22-23=e}}
 
 // rdar://problem/34670592 - Compiler crash on heterogeneous collection literal
 _ = Array([1, "hello"]) // Ok
@@ -219,8 +222,10 @@ func rdar_50668864() {
   }
 }
 
-// SR-10837 (rdar://problem/51442825) - init partial application regression
-func sr_10837() {
+/// rdar://problem/51442825
+/// https://github.com/apple/swift/issues/53227
+/// `init` partial application regression
+do {
   struct S {
     let value: Int
 

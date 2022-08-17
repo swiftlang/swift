@@ -318,12 +318,15 @@ let routerFruit = Company(
   ]
 )
 
-// Infer [[Int]] for SR3786aa.
-// FIXME: As noted in SR-3786, this was the behavior in Swift 3, but
-//        it seems like the wrong choice and is less by design than by
-//        accident.
-let SR3786a: [Int] = [1, 2, 3]
-let SR3786aa = [SR3786a.reversed(), SR3786a]
+// https://github.com/apple/swift/issues/46371
+do {
+  let x: [Int] = [1, 2, 3]
+
+  // Infer '[[Int]]'.
+  // FIXME: As noted in the issue, this was the behavior in Swift 3, but
+  // it seems like the wrong choice and is less by design than by accident.
+  let _ = [x.reversed(), x]
+}
 
 // Conditional conformance
 protocol P { }
@@ -344,19 +347,19 @@ func testConditional(i: Int, s: String) {
 }
 
 
-// SR-8385
-enum SR8385: ExpressibleByStringLiteral {
-  case text(String)
-  init(stringLiteral value: String) {
-    self = .text(value)
+// https://github.com/apple/swift/issues/50912
+do {
+  enum Enum: ExpressibleByStringLiteral {
+    case text(String)
+    init(stringLiteral value: String) {
+      self = .text(value)
+    }
   }
-}
 
-func testSR8385() {
-  let _: [SR8385] = [SR8385("hello")]
-  let _: [SR8385] = [.text("hello")]
-  let _: [SR8385] = ["hello", SR8385.text("world")]
-  let _: [SR8385] = ["hello", .text("world")]
+  let _: [Enum] = [Enum("hello")]
+  let _: [Enum] = [.text("hello")]
+  let _: [Enum] = ["hello", Enum.text("world")]
+  let _: [Enum] = ["hello", .text("world")]
 }
 
 struct TestMultipleOverloadedInits {
