@@ -37,4 +37,53 @@ struct SimpleEmptySequence {
   const int *end() const { return nullptr; }
 };
 
+struct HasMutatingBeginEnd {
+  ConstIterator begin() { return ConstIterator(1); }
+  ConstIterator end() { return ConstIterator(5); }
+};
+
+// TODO: this should conform to CxxSequence.
+struct __attribute__((swift_attr("import_reference"),
+                      swift_attr("retain:immortal"),
+                      swift_attr("release:immortal"))) ImmortalSequence {
+  ConstIterator begin() { return ConstIterator(1); }
+  ConstIterator end() { return ConstIterator(5); }
+};
+
+// MARK: Types that are not actually sequences
+
+struct HasNoBeginMethod {
+  ConstIterator end() const { return ConstIterator(1); }
+};
+
+struct HasNoEndMethod {
+  ConstIterator begin() const { return ConstIterator(1); }
+};
+
+struct HasBeginEndTypeMismatch {
+  ConstIterator begin() const { return ConstIterator(1); }
+  ConstIteratorOutOfLineEq end() const { return ConstIteratorOutOfLineEq(3); }
+};
+
+struct HasBeginEndReturnNonIterators {
+  struct NotIterator {};
+
+  NotIterator begin() const { return NotIterator(); }
+  NotIterator end() const { return NotIterator(); }
+};
+
+// TODO: this should not be conformed to CxxSequence, because
+//  `const ConstIterator &` is imported as `UnsafePointer<ConstIterator>`, and
+//  calling `successor()` is not actually going to call
+//  `ConstIterator::operator++()`. It will increment the address instead.
+struct HasBeginEndReturnRef {
+private:
+  ConstIterator b = ConstIterator(1);
+  ConstIterator e = ConstIterator(5);
+
+public:
+  const ConstIterator &begin() const { return b; }
+  const ConstIterator &end() const { return e; }
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_SEQUENCE_H
