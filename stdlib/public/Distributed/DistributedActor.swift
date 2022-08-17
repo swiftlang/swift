@@ -101,7 +101,7 @@ import _Concurrency
 /// It is possible to explicitly declare an parameter-free initializer (`init()`),
 /// however the `actorSystem` property still must be assigned a concrete actor
 /// system instance the actor shall be part of.
-
+///
 /// In general it is recommended to always have an `actorSystem` parameter as
 /// the last non-defaulted non-closure parameter in every distributed actors
 /// initializer parameter list. This way it is simple to swap in a "test actor
@@ -224,10 +224,13 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
 
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor {
+
+  /// A distributed actor's hash and equality is implemented by directly delegating to it's ``id``.
   nonisolated public func hash(into hasher: inout Hasher) {
     self.id.hash(into: &hasher)
   }
 
+  /// A distributed actor's hash and equality is implemented by directly delegating to it's ``id``.
   nonisolated public static func ==(lhs: Self, rhs: Self) -> Bool {
     lhs.id == rhs.id
   }
@@ -249,6 +252,18 @@ extension CodingUserInfoKey {
 
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor /*: implicitly Decodable */ where Self.ID: Decodable {
+
+  /// Initializes an instance of this distributed actor by decoding its ``id``,
+  /// and passing it to the ``DistributedActorSystem`` obtained from `decoder.userInfo[`actorSystemKey]`.
+  ///
+  /// ## Requires: The decoder must have the ``CodingUserInfoKey/actorSystemKey`` set to
+  /// the ``ActorSystem`` that this actor expects, as it will be used to call ``DistributedActor/resolve(id:using:)``
+  /// on, in order to obtain the instance this initializer should return.
+  ///
+  /// - Parameter decoder: used to decode the ``ID`` of this distributed actor.
+  /// - Throws: If the actor system value in `decoder.userInfo` is missing, or mis-typed;
+  ///           the `ID` fails to decode from the passed `decoder`;
+  //            or if the ``DistributedActor/resolve(id:using:)`` method invoked by this initializer throws.
   nonisolated public init(from decoder: Decoder) throws {
     guard let system = decoder.userInfo[.actorSystemKey] as? ActorSystem else {
       throw DistributedActorCodingError(message:
@@ -263,6 +278,8 @@ extension DistributedActor /*: implicitly Decodable */ where Self.ID: Decodable 
 
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor /*: implicitly Encodable */ where Self.ID: Encodable {
+
+  /// Encodes the ``actor.id`` as a single value into the passed `encoder`.
   nonisolated public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.id)
