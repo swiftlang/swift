@@ -414,86 +414,47 @@ private:
         return p1.second.tag < p2.second.tag;
       });
 
-      if (elementTagMapping.empty()) {
-        os << "\n";
-        return;
-      }
-
-      os << "  enum class cases {\n";
-      for (const auto &pair : elementTagMapping) {
-        os << "    ";
-        syntaxPrinter.printIdentifier(pair.first->getNameStr());
-        os << ",\n";
-      }
-      os << "  };\n"; // enum class cases' closing bracket
-
-      // Printing operator cases()
-      os << "  inline operator cases() const {\n";
+      os << '\n';
+      os << "  enum class cases {";
+      llvm::interleave(
+          elementTagMapping, os,
+          [&](const auto &pair) {
+            os << "\n    ";
+            syntaxPrinter.printIdentifier(pair.first->getNameStr());
+          },
+          ",");
+      // TODO: allow custom name for this special case
+      auto resilientUnknownDefaultCaseName = "unknownDefault";
       if (ED->isResilient()) {
-        os << "    auto tag = _getEnumTag();\n";
-        for (const auto &pair : elementTagMapping) {
-          os << "    if (tag == " << cxx_synthesis::getCxxImplNamespaceName();
-          os << "::" << pair.second.globalVariableName << ") return cases::";
-          syntaxPrinter.printIdentifier(pair.first->getNameStr());
-          os << ";\n";
-        }
-        // TODO: change to Swift's fatalError when it's available in C++
-        os << "    abort();\n";
-      } else { // non-resilient enum
-        os << "    switch (_getEnumTag()) {\n";
-        for (const auto &pair : elementTagMapping) {
-          os << "      case " << pair.second.tag << ": return cases::";
-          syntaxPrinter.printIdentifier(pair.first->getNameStr());
-          os << ";\n";
-        }
-        // TODO: change to Swift's fatalError when it's available in C++
-        os << "      default: abort();\n";
-        os << "    }\n"; // switch's closing bracket
+        os << ",\n    " << resilientUnknownDefaultCaseName;
       }
-      os << "  }\n";   // operator cases()'s closing bracket
+      os << "\n  };\n\n"; // enum class cases' closing bracket
 
-      if (ED->isResilient()) {
-        os << "  inline bool inResilientUnknownCase() const {\n";
-        os << "    auto tag = _getEnumTag();\n";
-        os << "    return";
-        llvm::interleave(
-            elementTagMapping, os,
-            [&](const auto &pair) {
-              os << "\n      tag != " << cxx_synthesis::getCxxImplNamespaceName()
-                 << "::" << pair.second.globalVariableName;
-            },
-            " &&");
-        os << ";\n";
-        os << "  }\n";
-      }
-
-      // Printing case-related functions
+      // Printing struct, is, and get functions for each case
       DeclAndTypeClangFunctionPrinter clangFuncPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext);
 
-      for (const auto &pair : elementTagMapping) {
+      auto printIsFunction = [&](StringRef caseName, EnumDecl *ED) {
         os << "  inline bool is";
-        auto name = pair.first->getNameStr().str();
+        std::string name;
+        llvm::raw_string_ostream nameStream(name);
+        ClangSyntaxPrinter(nameStream).printIdentifier(caseName);
         name[0] = std::toupper(name[0]);
         os << name << "() const {\n";
-        os << "    return _getEnumTag() == ";
-        if (ED->isResilient()) {
-          os << cxx_synthesis::getCxxImplNamespaceName()
-             << "::" << pair.second.globalVariableName;
-        } else {
-          os << pair.second.tag;
-        }
-        os << ";\n  }\n";
+        os << "    return *this == ";
+        syntaxPrinter.printBaseName(ED);
+        os << "::";
+        syntaxPrinter.printIdentifier(caseName);
+        os << ";\n";
+        os << "  }\n";
+      };
 
-        if (!pair.first->hasAssociatedValues()) {
-          continue;
-        }
-
-        auto associatedValueList = pair.first->getParameterList();
+      auto printGetFunction = [&](EnumElementDecl *elementDecl) {
+        auto associatedValueList = elementDecl->getParameterList();
         // TODO: add tuple type support
         if (associatedValueList->size() > 1) {
-          continue;
+          return;
         }
         auto firstType = associatedValueList->front()->getType();
         auto firstTypeDecl = firstType->getNominalOrBoundGenericNominal();
@@ -501,7 +462,10 @@ private:
         std::tie(firstType, optKind) =
             getObjectTypeAndOptionality(firstTypeDecl, firstType);
 
-        // FIXME: (tongjie) may have to forward declare return type
+        auto name = elementDecl->getNameStr().str();
+        name[0] = std::toupper(name[0]);
+
+        // FIXME: may have to forward declare return type
         os << "  inline ";
         clangFuncPrinter.printClangFunctionReturnType(
             firstType, optKind, firstTypeDecl->getModuleContext(),
@@ -509,12 +473,12 @@ private:
         os << " get" << name << "() const {\n";
         os << "    if (!is" << name << "()) abort();\n";
         os << "    alignas(";
-        syntaxPrinter.printBaseName(ED);
+        syntaxPrinter.printBaseName(elementDecl->getParentEnum());
         os << ") unsigned char buffer[sizeof(";
-        syntaxPrinter.printBaseName(ED);
+        syntaxPrinter.printBaseName(elementDecl->getParentEnum());
         os << ")];\n";
         os << "    auto *thisCopy = new(buffer) ";
-        syntaxPrinter.printBaseName(ED);
+        syntaxPrinter.printBaseName(elementDecl->getParentEnum());
         os << "(*this);\n";
         os << "    char * _Nonnull payloadFromDestruction = "
               "thisCopy->_destructiveProjectEnumData();\n";
@@ -531,7 +495,8 @@ private:
         } else {
           os << "    return ";
           syntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-              firstTypeDecl->getModuleContext(), ED->getModuleContext());
+              firstTypeDecl->getModuleContext(),
+              elementDecl->getParentEnum()->getModuleContext());
           os << cxx_synthesis::getCxxImplNamespaceName();
           os << "::";
           ClangValueTypePrinter::printCxxImplClassName(os, firstTypeDecl);
@@ -542,8 +507,77 @@ private:
           os << "::initializeWithTake(result, payloadFromDestruction);\n";
           os << "    });\n";
         }
-        os << "  }\n";
+        os << "  }\n"; // closing bracket of get function
+      };
+
+      auto printStruct = [&](StringRef caseName, EnumElementDecl *elementDecl) {
+        os << "  static struct {  // impl struct for case " << caseName << '\n';
+        os << "    inline constexpr operator cases() const {\n";
+        os << "      return cases::";
+        syntaxPrinter.printIdentifier(caseName);
+        os << ";\n";
+        os << "    }\n";
+        if (elementDecl != nullptr) {
+          os << "    inline ";
+          syntaxPrinter.printBaseName(elementDecl->getParentEnum());
+          os << " operator()(";
+          // TODO: implement parameter for associated value
+          os << ") const {\n";
+          // TODO: print _make for now; need to print actual code making an enum
+          os << "      return ";
+          syntaxPrinter.printBaseName(elementDecl->getParentEnum());
+          os << "::_make();\n";
+          os << "    }\n";
+        }
+        os << "  } ";
+        syntaxPrinter.printIdentifier(caseName);
+        os << ";\n";
+      };
+
+      for (const auto &pair : elementTagMapping) {
+        // Printing struct
+        printStruct(pair.first->getNameStr(), pair.first);
+        // Printing `is` function
+        printIsFunction(pair.first->getNameStr(), ED);
+        if (pair.first->hasAssociatedValues()) {
+          // Printing `get` function
+          printGetFunction(pair.first);
+        }
+        os << '\n';
       }
+
+      if (ED->isResilient()) {
+        // Printing struct for unknownDefault
+        printStruct(resilientUnknownDefaultCaseName, /* elementDecl */ nullptr);
+        // Printing isUnknownDefault
+        printIsFunction(resilientUnknownDefaultCaseName, ED);
+        os << '\n';
+      }
+      os << '\n';
+
+      // Printing operator cases()
+      os << "  inline operator cases() const {\n";
+      if (ED->isResilient()) {
+        os << "    auto tag = _getEnumTag();\n";
+        for (const auto &pair : elementTagMapping) {
+          os << "    if (tag == " << cxx_synthesis::getCxxImplNamespaceName();
+          os << "::" << pair.second.globalVariableName << ") return cases::";
+          syntaxPrinter.printIdentifier(pair.first->getNameStr());
+          os << ";\n";
+        }
+        os << "    return cases::" << resilientUnknownDefaultCaseName << ";\n";
+      } else { // non-resilient enum
+        os << "    switch (_getEnumTag()) {\n";
+        for (const auto &pair : elementTagMapping) {
+          os << "      case " << pair.second.tag << ": return cases::";
+          syntaxPrinter.printIdentifier(pair.first->getNameStr());
+          os << ";\n";
+        }
+        // TODO: change to Swift's fatalError when it's available in C++
+        os << "      default: abort();\n";
+        os << "    }\n"; // switch's closing bracket
+      }
+      os << "  }\n"; // operator cases()'s closing bracket
       os << "\n";
     });
     os << outOfLineDefinitions;
