@@ -3885,16 +3885,13 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   if (!parentExpr)
     return false;
 
-  auto parentType = getType(parentExpr);
-
-  if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
-    return false;
-
-  if (isa<TupleExpr>(parentExpr)) {
+  // This could happen if collection is a dictionary literal i.e.
+  // ["a": .test] - the element is a tuple - ("a", .test).
+  if (isExpr<TupleExpr>(parentExpr))
     parentExpr = findParentExpr(parentExpr);
-    if (!parentExpr)
-      return false;
-  }
+
+  if (!isExpr<CollectionExpr>(parentExpr))
+    return false;
 
   if (auto *defaultableVar =
           getRawType(parentExpr)->getAs<TypeVariableType>()) {
