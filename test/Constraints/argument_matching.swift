@@ -1802,3 +1802,11 @@ do {
   // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
   // expected-error@-2 {{missing argument label 'file:' in call}}
 }
+
+// https://github.com/apple/swift/issues/60436
+func test_extraneous_argument_with_inout() {
+  func test(_: Int) {}
+
+  var x: Int = 0
+  test(42, &x) // expected-error {{extra argument in call}}
+}
