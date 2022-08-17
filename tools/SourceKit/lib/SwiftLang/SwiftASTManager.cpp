@@ -1069,6 +1069,7 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     }
     return nullptr;
   }
+  CompIns.getASTContext().CancellationFlag = CancellationFlag;
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);
@@ -1112,9 +1113,19 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     // don't block any other AST processing for the same SwiftInvocation.
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
+      if (CancellationFlag->load(std::memory_order_relaxed)) {
+        return nullptr;
+      }
+      // Disable cancellation while performing SILGen. If the cancellation flag
+      // is set, type checking performed during SILGen checks the cancellation
+      // flag and might thus fail, which SILGen cannot handle.
+      llvm::SaveAndRestore<std::shared_ptr<std::atomic<bool>>> DisableCancellationDuringSILGen(CompIns.getASTContext().CancellationFlag, nullptr);
       SILOptions SILOpts = Invocation.getSILOptions();
       auto &TC = CompIns.getSILTypes();
       std::unique_ptr<SILModule> SILMod = performASTLowering(*SF, TC, SILOpts);
+      if (CancellationFlag->load(std::memory_order_relaxed)) {
+        return nullptr;
+      }
       runSILDiagnosticPasses(*SILMod);
     }
   }
