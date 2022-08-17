@@ -807,5 +807,14 @@ ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
       "_move applied to value that the compiler does not support checking",
       ())
 
+// Implicit inout-to-UnsafeRawPointer conversions
+WARNING(nontrivial_to_rawpointer_conversion,none,
+        "forming %1 to a variable of type %0; this is likely incorrect because %2 may contain "
+        "an object reference.", (Type, Type, Type))
+
+WARNING(nontrivial_string_to_rawpointer_conversion,none,
+        "forming %0 to an inout variable of type String exposes the internal representation "
+        "rather than the string contents.", (Type))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

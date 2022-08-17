@@ -5701,11 +5701,65 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   return RValue(SGF, E, ptr);
 }
 
+/// Implicit conversion from a nontrivial inout type to a raw pointer are
+/// dangerous. For example:
+///
+///   func bar(_ p: UnsafeRawPointer) { ... }
+///   func foo(object: inout AnyObject) {
+///       bar(&object)
+///   }
+///
+/// These conversions should be done explicitly.
+///
+static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
+                                          SILLocation loc,
+                                          SILGenFunction &SGF) {
+  // Array conversion does not always go down the ArrayConverter
+  // path. Recognize the Array source type here both for ArrayToPointer and
+  // InoutToPointer cases and diagnose on the element type.
+  Type eltTy = sourceTy->isArrayType();
+  if (!eltTy)
+    eltTy = sourceTy;
+
+  if (SGF.getLoweredType(eltTy).isTrivial(SGF.F))
+    return;
+
+  auto *SM = SGF.getModule().getSwiftModule();
+  if (auto *fixedWidthIntegerDecl = SM->getASTContext().getProtocol(
+          KnownProtocolKind::FixedWidthInteger)) {
+    if (SM->conformsToProtocol(eltTy, fixedWidthIntegerDecl))
+      return;
+  }
+
+  PointerTypeKind kindOfPtr;
+  auto pointerElt = pointerTy->getAnyPointerElementType(kindOfPtr);
+  assert(!pointerElt.isNull() && "expected an unsafe pointer type");
+
+  // The element type may contain a reference. Disallow conversion to a "raw"
+  // pointer type. Consider Int8/UInt8 to be raw pointers. Trivial element types
+  // are filtered out above, so Int8/UInt8 pointers can't match the source
+  // type. But the type checker may have allowed these for direct C calls, in
+  // which Int8/UInt8 are equivalent to raw pointers..
+  if (!(pointerElt->isVoid() || pointerElt->isInt8() || pointerElt->isUInt8()))
+    return;
+
+  if (sourceTy->isString()) {
+    SGF.SGM.diagnose(loc, diag::nontrivial_string_to_rawpointer_conversion,
+                     pointerTy);
+  } else {
+    SGF.SGM.diagnose(loc, diag::nontrivial_to_rawpointer_conversion, sourceTy,
+                     pointerTy, eltTy);
+  }
+}
+
 /// Convert an l-value to a pointer type: unsafe, unsafe-mutable, or
 /// autoreleasing-unsafe-mutable.
 ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
                                                 PointerAccessInfo pointerInfo) {
   assert(pointerInfo.AccessKind == lv.getAccessKind());
+
+  diagnoseImplicitRawConversion(lv.getSubstFormalType(),
+                                pointerInfo.PointerType, loc, *this);
 
   // The incoming lvalue should be at the abstraction level of T in
   // Unsafe*Pointer<T>. Reabstract it if necessary.
@@ -5714,6 +5768,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   if (lv.getTypeOfRValue().getASTType() != loweredTy.getASTType()) {
     lv.addSubstToOrigComponent(opaqueTy, loweredTy);
   }
+
   switch (pointerInfo.PointerKind) {
   case PTK_UnsafeMutablePointer:
   case PTK_UnsafePointer:
@@ -5826,6 +5881,9 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   auto subMap = SubstitutionMap::combineSubstitutionMaps(
       firstSubMap, secondSubMap, CombineSubstitutionMaps::AtIndex, 1, 0,
       genericSig);
+
+  diagnoseImplicitRawConversion(accessInfo.ArrayType, accessInfo.PointerType,
+                                loc, *this);
 
   SmallVector<ManagedValue, 2> resultScalars;
   emitApplyOfLibraryIntrinsic(loc, converter, subMap, array, SGFContext())
