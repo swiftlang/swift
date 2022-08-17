@@ -83,6 +83,9 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
 void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl,
     llvm::function_ref<void(void)> bodyPrinter) {
+  // FIXME: Add support for generic structs.
+  if (typeDecl->isGeneric())
+    return;
   llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
   if (!typeDecl->isResilient()) {
 

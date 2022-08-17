@@ -36,6 +36,25 @@ class ParameterList;
 class PrimitiveTypeMapping;
 class SwiftToClangInteropContext;
 
+struct ClangRepresentation {
+  enum Kind { representable, unsupported };
+
+  ClangRepresentation(Kind kind) : kind(kind) {}
+
+  /// Returns true if the given Swift node is unsupported in Clang in any
+  /// language mode.
+  bool isUnsupported() const { return kind == unsupported; }
+
+  const ClangRepresentation &merge(ClangRepresentation other) {
+    if (kind != unsupported)
+      kind = other.kind;
+    return *this;
+  }
+
+private:
+  Kind kind;
+};
+
 /// Responsible for printing a Swift function decl or type in C or C++ mode, to
 /// be included in a Swift module's generated clang header.
 class DeclAndTypeClangFunctionPrinter {
@@ -79,10 +98,14 @@ public:
 
   /// Print the C function declaration or the C++ function thunk that
   /// corresponds to the given function declaration.
-  void printFunctionSignature(const AbstractFunctionDecl *FD, StringRef name,
-                              Type resultTy, FunctionSignatureKind kind,
-                              ArrayRef<AdditionalParam> additionalParams = {},
-                              FunctionSignatureModifiers modifiers = {});
+  ///
+  /// \return value describing in which Clang language mode the function is
+  /// supported, if any.
+  ClangRepresentation
+  printFunctionSignature(const AbstractFunctionDecl *FD, StringRef name,
+                         Type resultTy, FunctionSignatureKind kind,
+                         ArrayRef<AdditionalParam> additionalParams = {},
+                         FunctionSignatureModifiers modifiers = {});
 
   /// Print the use of the C++ function thunk parameter as it's passed to the C
   /// function declaration.
@@ -110,9 +133,10 @@ public:
                                       bool isDefinition);
 
   /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
-  void printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
-                                    ModuleDecl *moduleContext,
-                                    OutputLanguageMode outputLang);
+  ClangRepresentation
+  printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
+                               ModuleDecl *moduleContext,
+                               OutputLanguageMode outputLang);
 
 private:
   void printCxxToCFunctionParameterUse(
