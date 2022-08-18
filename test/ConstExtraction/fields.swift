@@ -18,6 +18,41 @@
 // CHECK-NEXT:        "value": "Hello, World"
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "p5",
+// CHECK-NEXT:        "type": "[Int]",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "value": "[1, 2, 3, 4, 5, 6, 7, 8, 9]"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "p6",
+// CHECK-NEXT:        "type": "Bool",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "value": "false"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "p7",
+// CHECK-NEXT:        "type": "Bool?",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "value": "nil"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "p8",
+// CHECK-NEXT:        "type": "(Int, Float)",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "value": "(42, 6.6)"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "p9",
+// CHECK-NEXT:        "type": "[String : Int]",
+// CHECK-NEXT:        "isStatic": "false",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "value": "[(\"One\", 1), (\"Two\", 2), (\"Three\", 3)]"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "p0",
 // CHECK-NEXT:        "type": "Int",
 // CHECK-NEXT:        "isStatic": "true",
@@ -57,6 +92,11 @@ public struct Foo {
     static let p2: Float = 42.2
     var p3: Int {3}
     static var p4: Int {3}
+    let p5: [Int] = [1,2,3,4,5,6,7,8,9]
+    let p6: Bool = false
+    let p7: Bool? = nil
+    let p8: (Int, Float) = (42, 6.6)
+    let p9: [String: Int] = ["One": 1, "Two": 2, "Three": 3]
 }
 
 extension Foo : MyProto {}

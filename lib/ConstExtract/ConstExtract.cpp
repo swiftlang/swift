@@ -103,27 +103,11 @@ extractPropertyInitializationValue(VarDecl *propertyDecl) {
   if (binding) {
     auto originalInit = binding->getOriginalInit(0);
     if (originalInit) {
-      // Integer Literals
-      if (auto integerExpr =
-              dyn_cast_or_null<IntegerLiteralExpr>(originalInit)) {
-        std::string LiteralOutput;
-        llvm::raw_string_ostream OutputStream(LiteralOutput);
-        integerExpr->printConstExprValue(&OutputStream, nullptr);
-        OutputStream.flush();
+      std::string LiteralOutput;
+      llvm::raw_string_ostream OutputStream(LiteralOutput);
+      originalInit->printConstExprValue(&OutputStream, nullptr);
+      if (!LiteralOutput.empty())
         return std::make_shared<RawLiteralValue>(LiteralOutput);
-        // Float Literals
-      } else if (auto floatExpr =
-                     dyn_cast_or_null<FloatLiteralExpr>(originalInit)) {
-        std::string LiteralOutput;
-        llvm::raw_string_ostream OutputStream(LiteralOutput);
-        floatExpr->printConstExprValue(&OutputStream, nullptr);
-        OutputStream.flush();
-        return std::make_shared<RawLiteralValue>(LiteralOutput);
-        // String Literals
-      } else if (auto stringExpr =
-                     dyn_cast_or_null<StringLiteralExpr>(originalInit)) {
-        return std::make_shared<RawLiteralValue>(stringExpr->getValue().str());
-      }
     }
   }
 
