@@ -1,7 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -enable-experimental-feature TypeWrappers -parse-as-library -emit-library -emit-module-path %t/type_wrapper_defs.swiftmodule -module-name type_wrapper_defs %S/Inputs/type_wrapper_defs.swift -o %t/%target-library-name(type_wrapper_defs)
-// RUN: %target-build-swift -ltype_wrapper_defs -module-name main -I %t -L %t %s -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-build-swift -ltype_wrapper_defs -module-name main -I %t -L %t %s -o %t/main %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(type_wrapper_defs) | %FileCheck %s
+
+// REQUIRES: executable_test
 
 import type_wrapper_defs
 
