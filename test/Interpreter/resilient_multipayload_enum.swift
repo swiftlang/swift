@@ -14,6 +14,8 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(ResilientEnum) | %FileCheck %s
 
+// REQUIRES: executable_test
+
 import ResilientEnum
 
 @inline(never)
