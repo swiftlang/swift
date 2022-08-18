@@ -53,12 +53,12 @@ import _Concurrency
 ///
 /// ## Implementing a DistributedActorSystem
 ///
-/// The following section is dedicated to distributed actor system library authors, and generally can be skipped over
+/// This section is dedicated to distributed actor system library authors, and generally can be skipped over
 /// by library users, as it explains the interactions of synthesized code and specific distributed actor system methods
 /// and how they must be implemented.
 ///
 /// Methods discussed in this section are generally not intended to be called directly, but instead will have calls
-/// generated to them from distributed actor declarations in appropriate places (such as initializers, `distributed func` calls etc).
+/// generated to them from distributed actor declarations in appropriate places (such as initializers, `distributed func` calls, or `distributed` computed properties).
 ///
 /// ### Assigning and Resigning Actor Identifiers
 ///
@@ -91,7 +91,7 @@ import _Concurrency
 /// It can be as small as an integer based identifier, or as large as a series of key-value pairs identifying the actor.
 ///
 /// The actor system must retain a mapping from the ``ActorID`` to the specific actor _instance_ which it is given in
-/// ``actorReady(_)`` in order to implement the ``resolve(id:using:)`` method, which is how incoming and outgoing remote calls are made possible.
+/// ``actorReady(_:)`` in order to implement the ``resolve(id:using:)`` method, which is how incoming and outgoing remote calls are made possible.
 ///
 /// Users have no control over this assignment, nor are they allowed to set the `id` property explicitly.
 /// The ``DistributedActor/id`` is used to implement the distributed actor's ``Hashable``, ``Equatable``,
@@ -150,8 +150,8 @@ import _Concurrency
 ///
 /// ### Resolving (potentially remote) Distributed Actors
 ///
-/// An important functionality of any distributed actor system is being able to turn a ``DistributedActor`` type and ``ActorID``
-/// into a reference to such actor, regardless where the actor is located. The ID should have enough information stored
+/// An important aspect of any distributed actor system is being able to turn a ``DistributedActor`` type and ``ActorID``
+/// into a reference to an actor (instance), regardless where the actor is located. The ID should have enough information stored
 /// to be able to make the decision of _where_ the actor is located, without having to contact remote nodes. Specifically,
 /// the implementation of ``DistributedActorSystem/resolve(id:as:)`` is _not_ `async` and should _not_ perform long running
 /// or blocking operations in order to return.
@@ -159,7 +159,7 @@ import _Concurrency
 /// > Note: Currently only concrete distributed actors types can be resolved.
 ///
 /// The actor system's ``DistributedActorSystem/resolve(id:as:)`` method is called by the compiler whenever end-users
-/// call the ``DistributedActor``'s ``resolve(id:using:)`` method. The return types of those methods differ,
+/// call the ``DistributedActor``'s ``DistributedActor/resolve(id:using:)`` method. The return types of those methods differ,
 /// as the actor system's return type is `Act?` (and it may throw if unable to resolve the `ActorID`).
 ///
 /// The actor system's `resolve` returning `nil` means that the ``ActorID`` passed to it refers to a _remote_
@@ -171,10 +171,10 @@ import _Concurrency
 /// Finally, calls on a _remote_ distributed actor reference's distributed methods are turned into invocations of
 /// `remoteCall(on:target:invocation:returning:throwing:)` (or `remoteCallVoid(on:target:invocation:throwing:)` for Void returning methods).
 ///
-/// Implementing the remote calls correctly and efficiently is one of the most important tasks for a distributed actor system library.
-/// Since those methods are not currently expressible as protocol requirements in Swift due to their advanced use
-/// of generics, and therefore will not appear in the protocol's documentation as explicit requirements, we present
-/// their signatures that a conforming type has to implement here:
+/// Implementing the remote calls correctly and efficiently is the important task for a distributed actor system library.
+/// Since those methods are not currently expressible as protocol requirements due to advanced use of generics
+/// combined with type aliases, they will not appear in the protocol's documentation as explicit requirements.
+/// Instead, we present their signatures that a conforming type has to implement here:
 ///
 /// > Note: Although the `remoteCall` methods are not expressed as protocol requirements in source,
 /// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.

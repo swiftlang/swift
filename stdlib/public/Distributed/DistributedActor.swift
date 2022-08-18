@@ -15,23 +15,28 @@ import _Concurrency
 
 // ==== Distributed Actor -----------------------------------------------------
 
-
-
 /// Common protocol to which all distributed actors conform implicitly.
 ///
 /// The `DistributedActor` protocol generalizes over all distributed actor types.
 /// Distributed actor types implicitly conform to this protocol.
 ///
-/// It is not possible to conform to this protocol manually by any other type
-/// than a `distributed actor`.
+/// It is not possible to conform to this protocol by any other declaration other than a `distributed actor`.
 ///
 /// It is possible to require a type to conform to the
 /// ``DistributedActor`` protocol by refining it with another protocol,
 /// or by using a generic constraint.
 ///
+/// ## Synthesized properties
+/// For every concrete distributed actor declaration, the compiler synthesizes two properties: `actorSystem` and `id`.
+/// They witness the ``actorSystem`` and ``id`` protocol requirements of the ``DistributedActor`` protocol.
+///
+/// It is not possible to implement these properties explicitly in user code.
+/// These properties are `nonisolated` and accessible even if the instance is _remote_,
+/// because _all_ distributed actor references must store the actor system remote calls
+/// will be delivered through, as well as the id identifying the target of those calls.
 ///
 /// ## The ActorSystem associated type
-/// Every distributed actor must declare what type of distributed actor system
+/// Every distributed actor must declare what type of actor system
 /// it is part of by implementing the ``ActorSystem`` associated type requirement.
 ///
 /// This causes a number of other properties of the actor to be inferred:
@@ -98,12 +103,12 @@ import _Concurrency
 /// because distributed actors are always managed by a concrete
 /// distributed actor system and cannot exist on their own without one.
 ///
-/// It is possible to explicitly declare an parameter-free initializer (`init()`),
+/// It is possible to explicitly declare a parameter-free initializer (`init()`),
 /// however the `actorSystem` property still must be assigned a concrete actor
 /// system instance the actor shall be part of.
 ///
 /// In general it is recommended to always have an `actorSystem` parameter as
-/// the last non-defaulted non-closure parameter in every distributed actors
+/// the last non-defaulted non-closure parameter in every actor's
 /// initializer parameter list. This way it is simple to swap in a "test actor
 /// system" instance in unit tests, and avoid relying on global state which could
 /// make testing more difficult.
@@ -114,9 +119,10 @@ import _Concurrency
 ///
 /// ### Property: Actor System
 /// The ``actorSystem`` property is an important part of every distributed actor's lifecycle management.
-/// Both initialization as well as de-initialization require interactions with the actor system,
-/// and it is the actor system that delivers
 ///
+/// Both initialization as well as de-initialization require interactions with the actor system,
+/// and it is the actor system that handles all remote interactions of an actor, by both sending
+/// or receiving remote calls made on the actor.
 ///
 /// The ``actorSystem`` property must be assigned in every designated initializer
 /// of a distributed actor explicitly. It is highly recommended to make it a
@@ -130,11 +136,23 @@ import _Concurrency
 /// }
 /// ```
 ///
+/// Forgetting to initialize the actor system, will result in a compile time error:
+///
+/// ```swift
+/// // BAD
+/// init(name: String, actorSystem: Self.ActorSystem) {
+///   self.name = name
+///   // BAD, will cause compile-time error; the `actorSystem` was not initialized.
+/// }
+/// ```
+///
 /// ### Property: Distributed Actor Identity
 /// ``id`` is assigned by the actor system during the distributed actor's
 /// initialization, and cannot be set or mutated by the actor itself.
 ///
-/// ``id`` is the effective identity of the actor, and is used in equality checks.
+/// ``id`` is the effective identity of the actor, and is used in equality checks,
+/// as well as the actor's synthesized ``Codable`` conformance if the ``ID`` type
+/// conforms to ``Codable``.
 ///
 /// ## Automatic Conformances
 ///
@@ -153,22 +171,26 @@ import _Concurrency
 /// only `nonisolated` `id` and `actorSystem` properties are accessible for their
 /// implementations.
 ///
-/// ### Implicit `Codable` conformance
-/// If created with an actor system whose `ActorID` is `Codable`, the
+/// ### Implicit Codable conformance
+/// If created with an actor system whose ``DistributedActorSystem/ActorID`` is ``Codable``, the
 /// compiler will synthesize code for the concrete distributed actor to conform
-/// to `Codable` as well.
+/// to ``Codable`` as well.
 ///
 /// This is necessary to support distributed calls where the `SerializationRequirement`
-/// is `Codable` and thus users may want to pass actors as arguments to remote calls.
+/// is ``Codable`` and thus users may want to pass actors as arguments to remote calls.
 ///
-/// The synthesized implementations use a single `SingleValueContainer` to
-/// encode/decode the `self.id` property of the actor. The `Decoder` required
-/// `init(from:)` is implemented by retrieving an actor system from the
-/// decoders' `userInfo`, effectively like this:
-/// `decoder.userInfo[.actorSystemKey] as? ActorSystem`. The obtained actor
-/// system is then used to `resolve(id:using:)` the decoded ID.
+/// The synthesized implementations use a single ``SingleValueEncodingContainer`` to
+/// encode/decode the ``id`` property of the actor. The ``Decoder`` required
+/// ``Decoder/init(from:)`` is implemented by retrieving an actor system from the
+/// decoders' `userInfo`, effectively like as follows:
 ///
-/// Use the `CodingUserInfoKey.actorSystemKey` to provide the necessary
+/// ```swift
+/// decoder.userInfo[.actorSystemKey] as? ActorSystem
+// ```
+///
+/// The such obtained actor system is then used to ``resolve(id:using:)`` the decoded ``ID``.
+///
+/// Use the ``CodingUserInfoKey/actorSystemKey`` to provide the necessary
 /// actor system for the decoding initializer when decoding a distributed actor.
 ///
 /// - SeeAlso: ``DistributedActorSystem``
@@ -192,17 +214,32 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// to return the same exact resolved actor instance, however all the references would
   /// represent logically references to the same distributed actor, e.g. on a different node.
   ///
-  /// Conformance to this requirement is synthesized automatically for any
-  /// `distributed actor` declaration.
+  /// Depending on the capabilities of the actor system producing the identifiers,
+  /// the `ID` may also be used to store instance specific metadata.
+  ///
+  /// ## Synthesized property
+  ///
+  /// In concrete distributed actor declarations, a witness for this protocol requirement is synthesized by the compiler.
+  ///
+  /// It is not possible to assign a value to the `id` directly; instead, it is assigned during an actors `init` (or `resolve`),
+  /// by the managing actor system.
   nonisolated override var id: ID { get }
 
-  /// The `ActorSystem` that is managing this distributed actor.
+  /// The ``DistributedActorSystem`` that is managing this distributed actor.
   ///
-  /// It is immutable and equal to the system passed in the local/resolve
-  /// initializer.
+  /// It is immutable and equal to the system assigned during the distributed actor's local initializer
+  /// (or to the system passed to the ``resolve(id:using:)`` static function).
   ///
-  /// Conformance to this requirement is synthesized automatically for any
-  /// `distributed actor` declaration.
+  /// ## Synthesized property
+  ///
+  /// In concrete distributed actor declarations, a witness for this protocol requirement is synthesized by the compiler.
+  ///
+  /// It is required to assign an initial value to the `actorSystem` property inside a distributed actor's designated initializer.
+  /// Semantically, it can be treated as a `let` declaration, that must be assigned in order to fully-initialize the instance.
+  ///
+  /// If a distributed actor declares no initializer, its default initializer will take the shape of `init(actorSystem:)`,
+  /// and initialize this property using the passed ``DistributedActorSystem``. If any user-defined initializer exists,
+  /// the default initializer is not synthesized, and all the user-defined initializers must take care to initialize this property.
   nonisolated var actorSystem: ActorSystem { get }
 
   /// Resolves the passed in `id` against the `system`, returning
@@ -215,6 +252,8 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// the system, allowing it to take over the remote messaging with the
   /// remote actor instance.
   ///
+  /// - Postcondition: upon successful return, the returned actor's ``id`` and ``actorSystem`` properties
+  ///                  will be equal to the values passed as parameters to this method.
   /// - Parameter id: identity uniquely identifying a, potentially remote, actor in the system
   /// - Parameter system: `system` which should be used to resolve the `identity`, and be associated with the returned actor
   static func resolve(id: ID, using system: ActorSystem) throws -> Self
@@ -226,11 +265,15 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
 extension DistributedActor {
 
   /// A distributed actor's hash and equality is implemented by directly delegating to its ``id``.
+  ///
+  /// For more details see the "Hashable and Identifiable conformance" section of ``DistributedActor``.
   nonisolated public func hash(into hasher: inout Hasher) {
     self.id.hash(into: &hasher)
   }
 
   /// A distributed actor's hash and equality is implemented by directly delegating to its ``id``.
+  ///
+  /// For more details see the "Hashable and Identifiable conformance" section of ``DistributedActor``.
   nonisolated public static func ==(lhs: Self, rhs: Self) -> Bool {
     lhs.id == rhs.id
   }
@@ -245,7 +288,7 @@ extension CodingUserInfoKey {
   /// conform to ``DistributedActorSystem``.
   ///
   /// Forgetting to set this key will result in that initializer throwing, because
-  /// an actor system is required.
+  /// an actor system is required in order to call ``DistributedActor/resolve(id:using:)`` using it.
   @available(SwiftStdlib 5.7, *)
   public static let actorSystemKey = CodingUserInfoKey(rawValue: "$distributed_actor_system")!
 }
@@ -315,9 +358,17 @@ extension DistributedActor {
 
 // ==== isRemote / isLocal -----------------------------------------------------
 
+/// Verifies if the passed ``DistributedActor`` conforming type is a remote reference.
+/// Passing a type not conforming to ``DistributedActor`` may result in undefined behavior.
+///
+/// Official API to perform this task is `whenLocal`.
 @_silgen_name("swift_distributed_actor_is_remote")
 public func __isRemoteActor(_ actor: AnyObject) -> Bool
 
+/// Verifies if the passed ``DistributedActor`` conforming type is a local reference.
+/// Passing a type not conforming to ``DistributedActor`` may result in undefined behavior.
+///
+/// Official API to perform this task is `whenLocal`.
 public func __isLocalActor(_ actor: AnyObject) -> Bool {
   return !__isRemoteActor(actor)
 }
