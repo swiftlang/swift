@@ -774,7 +774,8 @@ public:
   }
 
   void emitEndBorrowOperation(SILLocation loc, SILValue v) {
-    if (!hasOwnership() || v->getOwnershipKind() == OwnershipKind::None)
+    if (!hasOwnership() || (!v->getType().isAddress() &&
+                            v->getOwnershipKind() == OwnershipKind::None))
       return;
     createEndBorrow(loc, v);
   }

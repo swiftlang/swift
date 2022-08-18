@@ -721,21 +721,23 @@ createValueMetatype(SILLocation loc, SILType metatype,
   return ManagedValue::forUnmanaged(v);
 }
 
-void SILGenBuilder::createStoreBorrow(SILLocation loc, ManagedValue value,
-                                      SILValue address) {
+ManagedValue SILGenBuilder::createStoreBorrow(SILLocation loc,
+                                              ManagedValue value,
+                                              SILValue address) {
   assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
-  createStoreBorrow(loc, value.getValue(), address);
+  auto *sbi = createStoreBorrow(loc, value.getValue(), address);
+  return ManagedValue(sbi, CleanupHandle::invalid());
 }
 
-void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
-                                               ManagedValue value,
-                                               SILValue address) {
+ManagedValue SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
+                                                       ManagedValue value,
+                                                       SILValue address) {
   if (value.getOwnershipKind() == OwnershipKind::None) {
     createStore(loc, value, address, StoreOwnershipQualifier::Trivial);
-    return;
+    return ManagedValue(address, CleanupHandle::invalid());
   }
 
-  createStoreBorrow(loc, value, address);
+  return createStoreBorrow(loc, value, address);
 }
 
 ManagedValue SILGenBuilder::createBridgeObjectToRef(SILLocation loc,

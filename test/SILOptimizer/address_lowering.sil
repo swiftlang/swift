@@ -262,7 +262,8 @@ bb0(%0 : @owned $T):
 // CHECK:   [[TMP:%.*]] = alloc_stack $C
 // CHECK:   [[B:%.*]] = begin_borrow [[LD]] : $C
 // CHECK:   [[SB:%.*]] = store_borrow [[B]] to [[TMP]] : $*C
-// CHECK:   apply %{{.*}}([[TMP]]) : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK:   apply %{{.*}}([[SB]]) : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK:   end_borrow [[SB]] : $*C
 // CHECK:   end_borrow [[B]] : $C
 // CHECK:   dealloc_stack [[TMP]] : $*C
 // CHECK:   destroy_value [[LD]] : $C

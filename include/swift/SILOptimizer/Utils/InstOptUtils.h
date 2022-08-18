@@ -247,7 +247,7 @@ void emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 /// Returns true, if there are no other users beside those collected in \p
 /// destroys, i.e. if \p inst can be considered as "dead".
 bool collectDestroys(SingleValueInstruction *inst,
-                     SmallVectorImpl<SILInstruction *> &destroys);
+                     SmallVectorImpl<Operand *> &destroys);
 
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:

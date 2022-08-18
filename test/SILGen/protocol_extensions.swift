@@ -103,9 +103,10 @@ func testD(_ m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2L:%[0-9]+]] = begin_borrow [lexical] [[D2]]
   // CHECK: [[RESULT:%.*]] = project_box [[D2L]]
   // CHECK: [[MATERIALIZED_BORROWED_D:%[0-9]+]] = alloc_stack $D
-  // CHECK: store_borrow [[D]] to [[MATERIALIZED_BORROWED_D]]
+  // CHECK: [[SB:%.*]] = store_borrow [[D]] to [[MATERIALIZED_BORROWED_D]]
   // CHECK: [[FN:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE11returnsSelf{{[_0-9a-zA-Z]*}}F
-  // CHECK: apply [[FN]]<D>([[RESULT]], [[MATERIALIZED_BORROWED_D]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK: apply [[FN]]<D>([[RESULT]], [[SB]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK: end_borrow
   // CHECK-NEXT: dealloc_stack [[MATERIALIZED_BORROWED_D]]
   var d2: D = d.returnsSelf()
 

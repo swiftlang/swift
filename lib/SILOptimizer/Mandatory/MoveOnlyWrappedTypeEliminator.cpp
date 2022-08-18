@@ -88,6 +88,14 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     SILBuilderWithScope b(si);
     b.emitStoreValueOperation(si->getLoc(), si->getSrc(), si->getDest(),
                               StoreOwnershipQualifier::Trivial);
+    SmallVector<EndBorrowInst *, 4> endBorrows;
+    for (auto *ebi : si->getUsersOfType<EndBorrowInst>()) {
+      endBorrows.push_back(ebi);
+    }
+    for (auto *ebi : endBorrows) {
+      ebi->eraseFromParent();
+    }
+    si->replaceAllUsesWith(si->getDest());
     return eraseFromParent(si);
   }
 

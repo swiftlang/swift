@@ -9,8 +9,9 @@ protocol Q: class, P {}
 func partialApply(_ q: Q) -> () -> () {
   // CHECK: [[OPENED:%.*]] = open_existential_ref [[ARG]]
   // CHECK: [[TMP:%.*]] = alloc_stack 
-  // CHECK: store_borrow [[OPENED]] to [[TMP:%.*]] :
-  // CHECK: apply {{%.*}}<{{.*}}>([[TMP]])
+  // CHECK: [[SB:%.*]] = store_borrow [[OPENED]] to [[TMP:%.*]] :
+  // CHECK: apply {{%.*}}<{{.*}}>([[SB]])
+  // CHECK: end_borrow
   // CHECK-NEXT: dealloc_stack [[TMP]]
   return q.foo
 }

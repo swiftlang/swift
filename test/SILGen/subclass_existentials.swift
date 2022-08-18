@@ -129,12 +129,13 @@ func methodCalls(
 
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}", Base<Int> & P) Self
   // CHECK: [[SELF_BOX:%.*]] = alloc_stack $@opened("{{.*}}", Base<Int> & P) Self
-  // CHECK: store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}", Base<Int> & P) Self
+  // CHECK: [[SB:%.*]] = store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}", Base<Int> & P) Self
   // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", Base<Int> & P) Self, #P.protocolSelfReturn : <Self where Self : P> (Self) -> () -> Self, [[PAYLOAD]] : $@opened("{{.*}}", Base<Int> & P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
   // CHECK: [[RESULT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[RESULT_BOX]]
   // CHECK: [[RESULT_BUF:%.*]] = project_box [[RESULT_LIFETIME]]
-  // CHECK: apply [[METHOD]]<@opened("{{.*}}", Base<Int> & P) Self>([[RESULT_BUF]], [[SELF_BOX]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK: apply [[METHOD]]<@opened("{{.*}}", Base<Int> & P) Self>([[RESULT_BUF]], [[SB]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // end_borrow [[SB]]
   // CHECK: dealloc_stack [[SELF_BOX]] : $*@opened("{{.*}}", Base<Int> & P) Self
   // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}", Base<Int> & P) Self
   // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}", Base<Int> & P) Self : $@opened("{{.*}}", Base<Int> & P) Self, $Base<Int> & P
