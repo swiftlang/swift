@@ -472,8 +472,8 @@ func test_let() {
   // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[BORROWED_VAL_3]]
   // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [lexical] [[VAL_COPY_3]]
   // CHECK:   function_ref @$s10switch_var4barsSSyF
-  // CHECK:   store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
-  // CHECK:   apply {{%.*}}<String>({{.*}}, [[IN_ARG]])
+  // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
+  // CHECK:   apply {{%.*}}<String>({{.*}}, [[SB]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   // ExprPatterns implicitly contain a 'let' binding.
   case bars():
@@ -548,8 +548,8 @@ func test_mixed_let_var() {
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [lexical] [[VAL_COPY]]
-  // CHECK:   store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
-  // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])
+  // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
+  // CHECK:   apply {{.*}}<String>({{.*}}, [[SB]])
   // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]
   case bars():
   // CHECK: [[CASE3]]:

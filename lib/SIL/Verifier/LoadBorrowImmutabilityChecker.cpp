@@ -108,6 +108,7 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::StoreInst:
+  case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
@@ -130,10 +131,6 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 #include "swift/AST/ReferenceStorage.def"
 
   // Ignored pointer uses...
-
-  // Allow store_borrow within the load_borrow scope.
-  // FIXME: explain why.
-  case SILInstructionKind::StoreBorrowInst:
   // Returns are never in scope.
   case SILInstructionKind::ReturnInst:
     return true;

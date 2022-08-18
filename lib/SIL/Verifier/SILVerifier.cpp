@@ -35,6 +35,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -42,6 +43,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -2291,6 +2293,29 @@ public:
     }
   }
 
+  bool checkScopedAddressUses(ScopedAddressValue scopedAddress,
+                              PrunedLiveness *scopedAddressLiveness,
+                              DeadEndBlocks *deadEndBlocks) {
+    SmallVector<Operand *, 4> uses;
+    findTransitiveUsesForAddress(scopedAddress.value, &uses);
+
+    // Check if the collected uses are well-scoped.
+    for (auto *use : uses) {
+      auto *user = use->getUser();
+      if (deadEndBlocks->isDeadEnd(user->getParent())) {
+        continue;
+      }
+      if (scopedAddress.isScopeEndingUse(use)) {
+        continue;
+      }
+      if (!scopedAddressLiveness->isWithinBoundary(user)) {
+        llvm::errs() << "User found outside scope: " << *user;
+        return false;
+      }
+    }
+    return true;
+  }
+
   void checkBeginAccessInst(BeginAccessInst *BAI) {
     requireSameType(BAI->getType(), BAI->getSource()->getType(),
                     "result must be same type as operand");
@@ -2443,6 +2468,8 @@ public:
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
+    require(isa<AllocStackInst>(SI->getDest()),
+            "store_borrow destination should be alloc_stack");
     requireSameType(SI->getDest()->getType().getObjectType(),
                     SI->getSrc()->getType(),
                     "Store operand type and dest type mismatch");
@@ -2450,6 +2477,27 @@ public:
     // Note: This is the current implementation and the design is not final.
     require(isa<AllocStackInst>(SI->getDest()),
             "store_borrow destination can only be an alloc_stack");
+
+    PrunedLiveness scopedAddressLiveness;
+    ScopedAddressValue scopedAddress(SI);
+    bool success = scopedAddress.computeLiveness(scopedAddressLiveness);
+
+    require(!success || checkScopedAddressUses(
+                            scopedAddress, &scopedAddressLiveness, &DEBlocks),
+            "Ill formed store_borrow scope");
+
+    require(!success || !hasOtherStoreBorrowsInLifetime(
+                            SI, &scopedAddressLiveness, &DEBlocks),
+            "A store_borrow cannot be nested within another "
+            "store_borrow to its destination");
+
+    for (auto *use : SI->getDest()->getUses()) {
+      auto *user = use->getUser();
+      require(
+          user == SI || isa<StoreBorrowInst>(user) ||
+              isa<DeallocStackInst>(user),
+          "A store_borrow destination can be used only via its return address");
+    }
   }
 
   void checkAssignInst(AssignInst *AI) {
@@ -5563,7 +5611,8 @@ public:
           }
           state.Stack.pop_back();
 
-        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i)) {
+        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i) ||
+                   isa<StoreBorrowInst>(i)) {
           bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
           require(notAlreadyPresent,
                   "operation was not ended before re-beginning it");
@@ -5573,6 +5622,13 @@ public:
           if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
             bool present = state.ActiveOps.erase(beginOp);
             require(present, "operation has already been ended");
+          }
+        } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {
+          if (isa<StoreBorrowInst>(endBorrow->getOperand())) {
+            if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
+              bool present = state.ActiveOps.erase(beginOp);
+              require(present, "operation has already been ended");
+            }
           }
         } else if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
           require(!state.GotAsyncContinuation,

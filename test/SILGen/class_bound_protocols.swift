@@ -189,10 +189,11 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // ** pass to an in_guaranteed method. PredictableMemOpts is able to handle this
   // ** type of temporary codegen successfully.
   // CHECK-NEXT: [[TEMPORARY_2:%.*]] = alloc_stack $@opened("{{.*}}", InheritsMutatingMethod) Self
-  // CHECK-NEXT: store_borrow [[X_PAYLOAD_RELOADED:%.*]] to [[TEMPORARY_2]]
+  // CHECK-NEXT: [[SB:%.*]] = store_borrow [[X_PAYLOAD_RELOADED:%.*]] to [[TEMPORARY_2]]
   // 
   // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", InheritsMutatingMethod) Self, #HasMutatingMethod.mutatingCounter!getter : <Self where Self : HasMutatingMethod> (Self) -> () -> Value, [[X_PAYLOAD]] : $@opened("{{.*}}", InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
-  // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}", InheritsMutatingMethod) Self>([[TEMPORARY_2]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
+  // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}", InheritsMutatingMethod) Self>([[SB]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
+  // CHECK-NEXT:  end_borrow [[SB]]
   // CHECK-NEXT: dealloc_stack  [[TEMPORARY_2]]
   // CHECK-NEXT: end_borrow
   // CHECK-NEXT: destroy_addr

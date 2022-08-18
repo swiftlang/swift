@@ -24,10 +24,11 @@ class Klass {}
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = alloc_stack $Klass
 // CHECK-NEXT: [[INPUT_ADDR:%.*]] = alloc_stack $Klass
-// CHECK-NEXT: store_borrow [[ARG]] to [[INPUT_ADDR]]
+// CHECK-NEXT: [[SB:%.*]] = store_borrow [[ARG]] to [[INPUT_ADDR]]
 // CHECK-NEXT: // function_ref _copy<A>(_:)
 // CHECK-NEXT: [[COPY:%.*]] = function_ref @$ss5_copyyxxlF :
-// CHECK-NEXT: [[APPLY_RESULT:%.*]] = apply [[COPY]]<Klass>([[RESULT_ADDR]], [[INPUT_ADDR]])
+// CHECK-NEXT: [[APPLY_RESULT:%.*]] = apply [[COPY]]<Klass>([[RESULT_ADDR]], [[SB]])
+// CHECK-NEXT: end_borrow
 // CHECK-NEXT: dealloc_stack [[INPUT_ADDR]]
 // CHECK-NEXT: [[RELOADED_VALUE:%.*]] = load [take] [[RESULT_ADDR]]
 // CHECK-NEXT: dealloc_stack [[RESULT_ADDR]]
@@ -65,10 +66,11 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = alloc_stack $T
 // CHECK-NEXT: [[INPUT_ADDR:%.*]] = alloc_stack $T
-// CHECK-NEXT: store_borrow [[ARG]] to [[INPUT_ADDR]]
+// CHECK-NEXT: [[SB:%.*]] = store_borrow [[ARG]] to [[INPUT_ADDR]]
 // CHECK-NEXT: // function_ref _copy<A>(_:)
 // CHECK-NEXT: [[COPY:%.*]] = function_ref @$ss5_copyyxxlF :
-// CHECK-NEXT: [[APPLY_RESULT:%.*]] = apply [[COPY]]<T>([[RESULT_ADDR]], [[INPUT_ADDR]])
+// CHECK-NEXT: [[APPLY_RESULT:%.*]] = apply [[COPY]]<T>([[RESULT_ADDR]], [[SB]])
+// CHECK-NEXT: end_borrow
 // CHECK-NEXT: dealloc_stack [[INPUT_ADDR]]
 // CHECK-NEXT: [[RELOADED_VALUE:%.*]] = load [take] [[RESULT_ADDR]]
 // CHECK-NEXT: dealloc_stack [[RESULT_ADDR]]
