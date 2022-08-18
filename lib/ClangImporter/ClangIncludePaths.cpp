@@ -171,11 +171,15 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
   return clangDriverArgs;
 }
 
+static bool shouldInjectGlibcModulemap(const llvm::Triple &triple) {
+  return triple.isOSGlibc() || triple.isOSOpenBSD() || triple.isOSFreeBSD() ||
+         triple.isAndroid();
+}
+
 static SmallVector<std::pair<std::string, std::string>, 2>
 getGlibcFileMapping(ASTContext &ctx) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
-  // We currently only need this when building for Linux.
-  if (!triple.isOSLinux())
+  if (!shouldInjectGlibcModulemap(triple))
     return {};
 
   // Extract the Glibc path from Clang driver.
