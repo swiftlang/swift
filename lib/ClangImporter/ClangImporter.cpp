@@ -1940,6 +1940,10 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
       }
     }
 
+    auto &codeGenOpts = Instance->getCodeGenOpts();
+    bool preservedDebugTypeExtRefs = codeGenOpts.DebugTypeExtRefs;
+    codeGenOpts.DebugTypeExtRefs = true;
+
     clang::SourceLocation clangImportLoc = getNextIncludeLoc();
 
     clang::ModuleLoadResult result =
@@ -1950,6 +1954,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
       // Restore the -index-store-path option.
       clangFEOpts.IndexStorePath = preservedIndexStorePathOption;
     }
+
+    codeGenOpts.DebugTypeExtRefs = preservedDebugTypeExtRefs;
 
     if (result && (visibility == clang::Module::AllVisible)) {
       getClangPreprocessor().makeModuleVisible(result, clangImportLoc);
