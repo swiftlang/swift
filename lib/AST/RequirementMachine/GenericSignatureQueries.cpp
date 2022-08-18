@@ -20,15 +20,15 @@
 // Each query is generally implemented in the same manner:
 //
 // - First, convert the subject type parameter into a Term.
-// - Simplify the Term to obtain a canonical Term.
+// - Simplify the Term to obtain a reduced Term.
 // - Perform a property map lookup on the Term.
 // - Return the appropriate piece of information from the property map.
 //
-// A few are slightly different; for example, getCanonicalTypeInContext() takes
-// an arbitrary type, not just a type parameter, and recursively transforms the
+// A few are slightly different; for example, getReducedType() takes an
+// arbitrary type, not just a type parameter, and recursively transfozms the
 // type parameters it contains, if any.
 //
-// Also, getConformanceAccessPath() is another one-off operation.
+// Also, getConformancePath() is another one-off operation.
 //
 //===----------------------------------------------------------------------===//
 
@@ -214,7 +214,7 @@ getConcreteType(Type depType,
   return props->getConcreteType(genericParams, term, Map);
 }
 
-bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
+bool RequirementMachine::areReducedTypeParametersEqual(Type depType1,
                                                        Type depType2) const {
   auto term1 = Context.getMutableTermForType(depType1->getCanonicalType(),
                                              /*proto=*/nullptr);
@@ -282,11 +282,10 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
 /// type parameter.
 ///
 /// Returns true if all structural components that are type parameters are
-/// in their canonical form, and are not concrete (in which case they're
-/// not considered canonical, since they can be replaced with their
-/// concrete type).
-bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
-  // Look for non-canonical type parameters.
+/// reduced, and in particular not concrete (in which case they're not
+/// considered reduced, since they can be replaced with their concrete type).
+bool RequirementMachine::isReducedType(Type type) const {
+  // Look for non-reduced type parameters.
   class Walker : public TypeWalker {
     const RequirementMachine &Self;
 
@@ -315,7 +314,7 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
       if (props && props->isConcreteType())
         return Action::Stop;
 
-      // The parent of a canonical type parameter might be non-canonical
+      // The parent of a reduced type parameter might be non-reduced
       // because it is concrete.
       return Action::SkipChildren;
     }
@@ -343,11 +342,11 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
 /// type parameter.
 ///
 /// Replaces all structural components that are type parameters with their
-/// most canonical form, which is either a (possibly different)
-/// type parameter, or a concrete type, in which case we recursively
-/// simplify any type parameters appearing in structural positions of
-/// that concrete type as well, and so on.
-Type RequirementMachine::getCanonicalTypeInContext(
+/// reduced form, which is either a (possibly different) type parameter,
+/// or a concrete type, in which case we recursively reduce any type
+/// parameters appearing in structural positions of that concrete type
+/// as well, and so on.
+Type RequirementMachine::getReducedType(
     Type type,
     TypeArrayView<GenericTypeParamType> genericParams) const {
 
@@ -364,21 +363,21 @@ Type RequirementMachine::getCanonicalTypeInContext(
     System.simplify(term);
 
     // We need to handle "purely concrete" member types, eg if I have a
-    // signature <T where T == Foo>, and we're asked to canonicalize the
+    // signature <T where T == Foo>, and we're asked to reduce the
     // type T.[P:A] where Foo : A.
     //
     // This comes up because we can derive the signature <T where T == Foo>
     // from a generic signature like <T where T : P>; adding the
     // concrete requirement 'T == Foo' renders 'T : P' redundant. We then
     // want to take interface types written against the original signature
-    // and canonicalize them with respect to the derived signature.
+    // and reduce them with respect to the derived signature.
     //
     // The problem is that T.[P:A] is not a valid term in the rewrite system
     // for <T where T == Foo>, since we do not have the requirement T : P.
     //
     // A more principled solution would build a substitution map when
     // building a derived generic signature that adds new requirements;
-    // interface types would first be substituted before being canonicalized
+    // interface types would first be substituted before being reduced
     // in the new signature.
     //
     // For now, we handle this with a two-step process; we split a term up
@@ -406,7 +405,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
             return concreteType;
 
           // FIXME: Recursion guard is needed here
-          return getCanonicalTypeInContext(concreteType, genericParams);
+          return getReducedType(concreteType, genericParams);
         }
 
         // Skip this part if the entire input term is valid, because in that
@@ -421,7 +420,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
             return superclass;
 
           // FIXME: Recursion guard is needed here
-          return getCanonicalTypeInContext(superclass, genericParams);
+          return getReducedType(superclass, genericParams);
         }
       }
 
@@ -438,7 +437,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
     // If U is not concrete, we have an invalid member type of a dependent
     // type, which is not valid in this generic signature. Give up.
     if (prefixType->isTypeParameter()) {
-      llvm::errs() << "Invalid type parameter in getCanonicalTypeInContext()\n";
+      llvm::errs() << "Invalid type parameter in getReducedType()\n";
       llvm::errs() << "Original type: " << type << "\n";
       llvm::errs() << "Simplified term: " << term << "\n";
       llvm::errs() << "Longest valid prefix: " << prefix << "\n";
@@ -453,13 +452,13 @@ Type RequirementMachine::getCanonicalTypeInContext(
                                      prefixType, Sig);
 
     // FIXME: Recursion guard is needed here
-    return getCanonicalTypeInContext(substType, genericParams);
+    return getReducedType(substType, genericParams);
   });
 }
 
 /// Determine if the given type parameter is valid with respect to this
 /// requirement machine's generic signature.
-bool RequirementMachine::isValidTypeInContext(Type type) const {
+bool RequirementMachine::isValidTypeParameter(Type type) const {
   assert(type->isTypeParameter());
 
   auto term = Context.getMutableTermForType(type->getCanonicalType(),
@@ -470,7 +469,7 @@ bool RequirementMachine::isValidTypeInContext(Type type) const {
   return (prefix == term);
 }
 
-/// Retrieve the conformance access path used to extract the conformance of
+/// Retrieve the conformance path used to extract the conformance of
 /// interface \c type to the given \c protocol.
 ///
 /// \param type The interface type whose conformance access path is to be
@@ -481,10 +480,10 @@ bool RequirementMachine::isValidTypeInContext(Type type) const {
 /// this generic signature and ends at the conformance that makes \c type
 /// conform to \c protocol.
 ///
-/// \seealso ConformanceAccessPath
-ConformanceAccessPath
-RequirementMachine::getConformanceAccessPath(Type type,
-                                             ProtocolDecl *protocol) {
+/// \seealso ConformancePath
+ConformancePath
+RequirementMachine::getConformancePath(Type type,
+                                       ProtocolDecl *protocol) {
   assert(type->isTypeParameter());
 
   auto mutTerm = Context.getMutableTermForType(type->getCanonicalType(),
@@ -506,9 +505,9 @@ RequirementMachine::getConformanceAccessPath(Type type,
   auto term = Term::get(mutTerm, Context);
 
   // Check if we've already cached the result before doing anything else.
-  auto found = ConformanceAccessPaths.find(
+  auto found = ConformancePaths.find(
       std::make_pair(term, protocol));
-  if (found != ConformanceAccessPaths.end()) {
+  if (found != ConformancePaths.end()) {
     return found->second;
   }
 
@@ -517,25 +516,25 @@ RequirementMachine::getConformanceAccessPath(Type type,
   FrontendStatsTracer tracer(Stats, "get-conformance-access-path");
 
   auto recordPath = [&](Term term, ProtocolDecl *proto,
-                        ConformanceAccessPath path) {
+                        ConformancePath path) {
     // Add the path to the buffer.
-    CurrentConformanceAccessPaths.emplace_back(term, path);
+    CurrentConformancePaths.emplace_back(term, path);
 
     // Add the path to the map.
     auto key = std::make_pair(term, proto);
-    auto inserted = ConformanceAccessPaths.insert(
+    auto inserted = ConformancePaths.insert(
         std::make_pair(key, path));
     assert(inserted.second);
     (void) inserted;
 
     if (Stats)
-      ++Stats->getFrontendCounters().NumConformanceAccessPathsRecorded;
+      ++Stats->getFrontendCounters().NumConformancePathsRecorded;
   };
 
   // If this is the first time we're asked to look up a conformance access path,
   // visit all of the root conformance requirements in our generic signature and
   // add them to the buffer.
-  if (ConformanceAccessPaths.empty()) {
+  if (ConformancePaths.empty()) {
     for (const auto &req : Sig.getRequirements()) {
       // We only care about conformance requirements.
       if (req.getKind() != RequirementKind::Conformance)
@@ -544,9 +543,9 @@ RequirementMachine::getConformanceAccessPath(Type type,
       auto rootType = CanType(req.getFirstType());
       auto *rootProto = req.getProtocolDecl();
 
-      ConformanceAccessPath::Entry root(rootType, rootProto);
-      ArrayRef<ConformanceAccessPath::Entry> path(root);
-      ConformanceAccessPath result(ctx.AllocateCopy(path));
+      ConformancePath::Entry root(rootType, rootProto);
+      ArrayRef<ConformancePath::Entry> path(root);
+      ConformancePath result(ctx.AllocateCopy(path));
 
       auto mutTerm = Context.getMutableTermForType(rootType, nullptr);
       System.simplify(mutTerm);
@@ -556,17 +555,17 @@ RequirementMachine::getConformanceAccessPath(Type type,
     }
   }
 
-  // We enumerate conformance access paths in shortlex order until we find the
-  // path whose corresponding type canonicalizes to the one we are looking for.
+  // We enumerate conformance paths in shortlex order until we find the
+  // path whose corresponding type reduces to the one we are looking for.
   while (true) {
-    auto found = ConformanceAccessPaths.find(
+    auto found = ConformancePaths.find(
         std::make_pair(term, protocol));
-    if (found != ConformanceAccessPaths.end()) {
+    if (found != ConformancePaths.end()) {
       return found->second;
     }
 
-    if (CurrentConformanceAccessPaths.empty()) {
-      llvm::errs() << "Failed to find conformance access path for ";
+    if (CurrentConformancePaths.empty()) {
+      llvm::errs() << "Failed to find conformance path for ";
       llvm::errs() << type << " (" << term << ")" << " : ";
       llvm::errs() << protocol->getName() << ":\n";
       type.dump(llvm::errs());
@@ -575,18 +574,18 @@ RequirementMachine::getConformanceAccessPath(Type type,
       abort();
     }
 
-    // The buffer consists of all conformance access paths of length N.
+    // The buffer consists of all conformance paths of length N.
     // Swap it out with an empty buffer, and fill it with all paths of
     // length N+1.
-    std::vector<std::pair<Term, ConformanceAccessPath>> oldPaths;
-    std::swap(CurrentConformanceAccessPaths, oldPaths);
+    std::vector<std::pair<Term, ConformancePath>> oldPaths;
+    std::swap(CurrentConformancePaths, oldPaths);
 
     for (const auto &pair : oldPaths) {
       const auto &lastElt = pair.second.back();
       auto *lastProto = lastElt.second;
 
       // A copy of the current path, populated as needed.
-      SmallVector<ConformanceAccessPath::Entry, 4> entries;
+      SmallVector<ConformancePath::Entry, 4> entries;
 
       auto reqs = lastProto->getRequirementSignature().getRequirements();
       for (const auto &req : reqs) {
@@ -608,7 +607,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
         // don't add it to the buffer. Note that because we iterate over
         // conformance access paths in shortlex order, the existing
         // conformance access path is shorter than the one we found just now.
-        if (ConformanceAccessPaths.count(
+        if (ConformancePaths.count(
                 std::make_pair(nextTerm, nextProto)))
           continue;
 
@@ -621,7 +620,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
 
         // Add the next entry.
         entries.emplace_back(nextSubjectType, nextProto);
-        ConformanceAccessPath result = ctx.AllocateCopy(entries);
+        ConformancePath result = ctx.AllocateCopy(entries);
         entries.pop_back();
 
         recordPath(nextTerm, nextProto, result);

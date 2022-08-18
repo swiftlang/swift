@@ -391,8 +391,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
              witnessConfig.derivativeGenericSignature.getRequirements()) {
           auto substReq = req.subst(result.WitnessSubstitutions);
           bool reqDiffGenSigSatisfies =
-              reqDiffGenSig && substReq &&
-              reqDiffGenSig->isRequirementSatisfied(*substReq);
+              reqDiffGenSig && !substReq.hasError() &&
+              reqDiffGenSig->isRequirementSatisfied(substReq);
           bool conformanceGenSigSatisfies =
               conformanceGenSig &&
               conformanceGenSig->isRequirementSatisfied(req);
@@ -874,7 +874,7 @@ swift::matchWitness(
 static const RequirementEnvironment &getOrCreateRequirementEnvironment(
     WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     DeclContext *dc, GenericSignature reqSig, ProtocolDecl *proto,
-    ClassDecl *covariantSelf, ProtocolConformance *conformance) {
+    ClassDecl *covariantSelf, RootProtocolConformance *conformance) {
   WitnessChecker::RequirementEnvironmentCacheKey cacheKey(reqSig.getPointer(),
                                                           covariantSelf);
   auto cacheIter = reqEnvCache.find(cacheKey);
@@ -992,7 +992,7 @@ static PossibleEffects getEffects(ValueDecl *value) {
 
 RequirementMatch
 swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
-                    ProtocolDecl *proto, ProtocolConformance *conformance,
+                    ProtocolDecl *proto, RootProtocolConformance *conformance,
                     DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
   using namespace constraints;
 
@@ -6834,7 +6834,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (accessorKind)
           witnessToMatch = cast<AccessorDecl>(witness)->getStorage();
 
-        if (matchWitness(reqEnvCache, proto, *conformance,
+        if (matchWitness(reqEnvCache, proto, normal,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .isWellFormed()) {

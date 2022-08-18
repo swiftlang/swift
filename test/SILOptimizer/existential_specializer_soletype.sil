@@ -73,7 +73,7 @@ bb0:
   return %10 : $Bool                              
 }
 
-// Note 1: The function_ref of "function_ref @$s6test0_2RCC8getThress5Int32VyF : $@convention(method) (@guaranteed RC) -> Int32" in the transformed code was originally a witness method "witness_method $@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP, #RP.getThres : <Self where Self : RP> (Self) -> () -> Int32, %4 : $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32" and has been devirtualized after existential specialization.
+// Note 1: The function_ref of "function_ref @$s6test0_2RCC8getThress5Int32VyF : $@convention(method) (@guaranteed RC) -> Int32" in the transformed code was originally a witness method "witness_method $@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0", RP) Self, #RP.getThres : <Self where Self : RP> (Self) -> () -> Int32, %4 : $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0", RP) Self : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32" and has been devirtualized after existential specialization.
 // Note 2: The function_ref of "function_ref @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptFTf4ne_n4main2RCC_Tg5 : $@convention(thin) (Int32, @guaranteed RC) -> Bool" in the transformed code was originally a "function_ref @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptF : $@convention(thin) (Int32, @in_guaranteed RP) -> Bool" taking an existential parameter and has been generic specialized after existential specialization.
 // CHECK-LABEL: sil shared [noinline] @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptFTf4ne_n4main2RCC_Tg5 : $@convention(thin) (Int32, @guaranteed RC) -> Bool {
 // CHECK: bb0
@@ -112,9 +112,9 @@ bb0:
 // CHECK-LABEL: } // end sil function '$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptFTf4ne_n4main2RCC_Tg5' 
 sil hidden [noinline] @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptF : $@convention(thin) (Int32, @in_guaranteed RP) -> Bool {
 bb0(%0 : $Int32, %1 : $*RP):
-  %4 = open_existential_addr immutable_access %1 : $*RP to $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP 
-  %5 = witness_method $@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP, #RP.getThres : <Self where Self : RP> (Self) -> () -> Int32, %4 : $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32 
-  %6 = apply %5<@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP>(%4) : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32 
+  %4 = open_existential_addr immutable_access %1 : $*RP to $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0", RP) Self 
+  %5 = witness_method $@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0", RP) Self, #RP.getThres : <Self where Self : RP> (Self) -> () -> Int32, %4 : $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0", RP) Self : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32 
+  %6 = apply %5<@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0", RP) Self>(%4) : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32 
   %7 = struct_extract %0 : $Int32, #Int32._value  
   %8 = struct_extract %6 : $Int32, #Int32._value  
   %9 = builtin "cmp_slt_Int32"(%7 : $Builtin.Int32, %8 : $Builtin.Int32) : $Builtin.Int1 
@@ -165,17 +165,17 @@ extension ClassImpl {
 sil @$s6testProtocolMethod : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
 
 // Verify that the optimization was not performance and that we don't hang as a result.
-// CHECK-LABEL: sil hidden @$s6test1_ConcreteInitExistential : $@convention(method) (@in SubProtocol) -> () {
-// CHECK: [[E:%.*]] = init_existential_addr %{{.*}} : $*SubProtocol, $@opened("{{.*}}") SubProtocol
-// CHECK: apply %{{.*}}<@opened("{{.*}}") SubProtocol>([[E]], %{{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK-LABEL: sil hidden @$s6test1_ConcreteInitExistential : $@convention(method) (@in any SubProtocol) -> () {
+// CHECK: [[E:%.*]] = init_existential_addr %{{.*}} : $*any SubProtocol, $@opened("{{.*}}", any SubProtocol) Self
+// CHECK: apply %{{.*}}<@opened("{{.*}}", any SubProtocol) Self>([[E]], %{{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK-LABEL: } // end sil function '$s6test1_ConcreteInitExistential'
 sil hidden @$s6test1_ConcreteInitExistential : $@convention(method) (@in SubProtocol) -> () {
 bb0(%0 : $*SubProtocol):
-  %10 = open_existential_addr immutable_access %0 : $*SubProtocol to $*@opened("CA90348E-5376-11E9-8C51-ACDE48001122") SubProtocol
+  %10 = open_existential_addr immutable_access %0 : $*SubProtocol to $*@opened("CA90348E-5376-11E9-8C51-ACDE48001122", SubProtocol) Self
   %11 = alloc_stack $SubProtocol
   %15 = function_ref @$s6testProtocolMethod : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  %16 = init_existential_addr %11 : $*SubProtocol, $@opened("CA90348E-5376-11E9-8C51-ACDE48001122") SubProtocol
-  %17 = apply %15<@opened("CA90348E-5376-11E9-8C51-ACDE48001122") SubProtocol>(%16, %10) : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %16 = init_existential_addr %11 : $*SubProtocol, $@opened("CA90348E-5376-11E9-8C51-ACDE48001122", SubProtocol) Self
+  %17 = apply %15<@opened("CA90348E-5376-11E9-8C51-ACDE48001122", SubProtocol) Self>(%16, %10) : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
   dealloc_stack %11 : $*SubProtocol
   %80 = tuple ()
   return %80 : $()
@@ -194,42 +194,42 @@ public struct S : P {
 }
 
 // Check the thunk.
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in P, @inout P) -> () {
-// CHECK: bb0(%0 : $*P, %1 : $*P):
-// CHECK: [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout P) -> ()
-// CHECK: [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*P to $*@opened([[TY:".*"]]) P
-// CHECK: [[ALLOC:%.*]] = alloc_stack $@opened([[TY]]) P
-// CHECK: copy_addr [[ADR]] to [initialization] [[ALLOC]] : $*@opened([[TY]]) P
-// CHECK: apply [[F]]<@opened("{{.*}}") P>([[ALLOC]], %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout P) -> ()
-// CHECK: destroy_addr %0 : $*P
-// CHECK: dealloc_stack [[ALLOC]] : $*@opened([[TY]]) P
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in any P, @inout any P) -> () {
+// CHECK: bb0(%0 : $*any P, %1 : $*any P):
+// CHECK: [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout any P) -> ()
+// CHECK: [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*any P to $*@opened([[TY:".*"]], any P) Self
+// CHECK: [[ALLOC:%.*]] = alloc_stack $@opened([[TY]], any P) Self
+// CHECK: copy_addr [[ADR]] to [initialization] [[ALLOC]] : $*@opened([[TY]], any P) Self
+// CHECK: apply [[F]]<@opened("{{.*}}", any P) Self>([[ALLOC]], %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout any P) -> ()
+// CHECK: destroy_addr %0 : $*any P
+// CHECK: dealloc_stack [[ALLOC]] : $*@opened([[TY]], any P) Self
 // CHECK: return
 // CHECK-LABEL: } // end sil function '$s6test2_6storePyyAA1P_p_AaC_pztF'
 
 
 // Check the existential to generic specialization.
-// CHECK-LABEL: sil shared [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout P) -> () {
-// CHECK: bb0(%0 : $*τ_0_0, %1 : $*P):
-// CHECK:   [[ALLOC:%.*]] = alloc_stack $P
-// CHECK:   [[IEA:%.*]] = init_existential_addr [[ALLOC]] : $*P, $τ_0_0
+// CHECK-LABEL: sil shared [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout any P) -> () {
+// CHECK: bb0(%0 : $*τ_0_0, %1 : $*any P):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $any P
+// CHECK:   [[IEA:%.*]] = init_existential_addr [[ALLOC]] : $*any P, $τ_0_0
 // CHECK:   copy_addr [take] %0 to [initialization] [[IEA]] : $*τ_0_0
 // CHECK-NOT: destroy
-// CHECK:   copy_addr [[ALLOC]] to [initialization] %1 : $*P
+// CHECK:   copy_addr [[ALLOC]] to [initialization] %1 : $*any P
 // CHECK-NOT: destroy
-// CHECK:   destroy_addr [[ALLOC]] : $*P
+// CHECK:   destroy_addr [[ALLOC]] : $*any P
 // CHECK-NOT: destroy
 // CHECK-LABEL: } // end sil function '$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n'
 
 // Check the generic to concrete specialization.
-// CHECK-LABEL: sil shared [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@owned S, @inout P) -> () {
-// CHECK: bb0(%0 : $S, %1 : $*P):
+// CHECK-LABEL: sil shared [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@owned S, @inout any P) -> () {
+// CHECK: bb0(%0 : $S, %1 : $*any P):
 // CHECK:   [[ALLOCS:%.*]] = alloc_stack $S
-// CHECK:   [[ALLOCP:%.*]] = alloc_stack $P
-// CHECK:   [[IEA:%.*]] = init_existential_addr [[ALLOCP]] : $*P, $S
+// CHECK:   [[ALLOCP:%.*]] = alloc_stack $any P
+// CHECK:   [[IEA:%.*]] = init_existential_addr [[ALLOCP]] : $*any P, $S
 // CHECK:   copy_addr [take] [[ALLOCS]] to [initialization] [[IEA]] : $*S
 // CHECK-NOT: destroy
-// CHECK:   copy_addr [[ALLOCP]] to [initialization] %1 : $*P
-// CHECK:   destroy_addr [[ALLOCP]] : $*P
+// CHECK:   copy_addr [[ALLOCP]] to [initialization] %1 : $*any P
+// CHECK:   destroy_addr [[ALLOCP]] : $*any P
 // CHECK:   dealloc_stack [[ALLOCP]]
 // CHECK:   dealloc_stack [[ALLOCS]]
 // CHECK-LABEL: } // end sil function '$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5'
@@ -241,15 +241,15 @@ bb0(%0 : $*P, %1 : $*P):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil @$s6test2_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
-// CHECK: bb0(%0 : $S, %1 : $*P):
+// CHECK-LABEL: sil @$s6test2_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout any P) -> () {
+// CHECK: bb0(%0 : $S, %1 : $*any P):
 // CHECK:   [[ALLOCS1:%.*]] = alloc_stack $S
 // CHECK:   store %0 to [[ALLOCS1]] : $*S
 // CHECK:   [[ALLOCS2:%.*]] = alloc_stack $S
 // CHECK:   copy_addr [[ALLOCS1]] to [initialization] [[ALLOCS2]] : $*S
-// CHECK:   [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@owned S, @inout P) -> ()
+// CHECK:   [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@owned S, @inout any P) -> ()
 // CHECK:   [[S:%.*]] = load [[ALLOCS2]] : $*S
-// CHECK:   apply [[F]]([[S]], %1) : $@convention(thin) (@owned S, @inout P) -> ()
+// CHECK:   apply [[F]]([[S]], %1) : $@convention(thin) (@owned S, @inout any P) -> ()
 // CHECK-NEXT: dealloc_stack [[ALLOCS2]] : $*S
 // CHECK-NEXT: destroy_addr [[ALLOCS1]] : $*S
 // CHECK-NEXT: dealloc_stack [[ALLOCS1]] : $*S
@@ -274,27 +274,27 @@ sil_witness_table S: P module test {}
 // Test an existential in_guaranteed argument.
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed P, @inout P) -> () {
-// CHECK: bb0(%0 : $*P, %1 : $*P):
-// CHECK: [[F:%.*]] = function_ref @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout P) -> ()
-// CHECK: [[ADR:%.*]] = open_existential_addr immutable_access %0 : $*P to $*@opened("{{.*}}") P
-// CHECK: apply [[F]]<@opened("{{.*}}") P>([[ADR]], %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout P) -> ()
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed any P, @inout any P) -> () {
+// CHECK: bb0(%0 : $*any P, %1 : $*any P):
+// CHECK: [[F:%.*]] = function_ref @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout any P) -> ()
+// CHECK: [[ADR:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*@opened("{{.*}}", any P) Self
+// CHECK: apply [[F]]<@opened("{{.*}}", any P) Self>([[ADR]], %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout any P) -> ()
 // CHECK-LABEL: } // end sil function '$s6test3_6storePyyAA1P_pz_AaC_pztF'
 
 // The guaranteed concrete argument cannot be consumed. The
 // existential created in the prolog must be destroyed before
 // returing.
 //
-// CHECK-LABEL: sil shared @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout P) -> () {
-// CHECK: bb0(%0 : $*τ_0_0, %1 : $*P):
-// CHECK:   [[ALLOCP1:%.*]] = alloc_stack $P
-// CHECK:   [[ADR:%.*]] = init_existential_addr [[ALLOCP1]] : $*P, $τ_0_0
+// CHECK-LABEL: sil shared @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout any P) -> () {
+// CHECK: bb0(%0 : $*τ_0_0, %1 : $*any P):
+// CHECK:   [[ALLOCP1:%.*]] = alloc_stack $any P
+// CHECK:   [[ADR:%.*]] = init_existential_addr [[ALLOCP1]] : $*any P, $τ_0_0
 // CHECK:   copy_addr %0 to [initialization] [[ADR]] : $*τ_0_0
-// CHECK:   [[ALLOCP2:%.*]] = alloc_stack $P
-// CHECK:   copy_addr [[ALLOCP1]] to [initialization] [[ALLOCP2]] : $*P
-// CHECK:   copy_addr [take] [[ALLOCP2]] to %1 : $*P
-// CHECK:   destroy_addr [[ALLOCP1]] : $*P
-// CHECK:   dealloc_stack [[ALLOCP1]] : $*P
+// CHECK:   [[ALLOCP2:%.*]] = alloc_stack $any P
+// CHECK:   copy_addr [[ALLOCP1]] to [initialization] [[ALLOCP2]] : $*any P
+// CHECK:   copy_addr [take] [[ALLOCP2]] to %1 : $*any P
+// CHECK:   destroy_addr [[ALLOCP1]] : $*any P
+// CHECK:   dealloc_stack [[ALLOCP1]] : $*any P
 // CHECK-LABEL: } // end sil function '$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n'
 sil hidden @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed P, @inout P) -> () {
 bb0(%0 : $*P, %1 : $*P):
@@ -306,19 +306,19 @@ bb0(%0 : $*P, %1 : $*P):
   return %12 : $()
 }
 
-// CHECK-LABEL: sil shared @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@guaranteed S, @inout P) -> () {
-// CHECK: bb0(%0 : $S, %1 : $*P):
+// CHECK-LABEL: sil shared @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@guaranteed S, @inout any P) -> () {
+// CHECK: bb0(%0 : $S, %1 : $*any P):
 // CHECK: [[ALLOC1:%.*]] = alloc_stack $S
 // CHECK: store %0 to [[ALLOC1]] : $*S
-// CHECK: [[ALLOC2:%.*]] = alloc_stack $P
-// CHECK: [[ADR:%.*]] = init_existential_addr [[ALLOC2]] : $*P, $S
+// CHECK: [[ALLOC2:%.*]] = alloc_stack $any P
+// CHECK: [[ADR:%.*]] = init_existential_addr [[ALLOC2]] : $*any P, $S
 // CHECK: copy_addr [[ALLOC1]] to [initialization] [[ADR]] : $*S
-// CHECK: [[ALLOC3:%.*]] = alloc_stack $P
-// CHECK: copy_addr [[ALLOC2]] to [initialization] [[ALLOC3]] : $*P
-// CHECK: copy_addr [take] [[ALLOC3]] to %1 : $*P
-// CHECK: dealloc_stack [[ALLOC3]] : $*P
-// CHECK: destroy_addr [[ALLOC2]] : $*P
-// CHECK: dealloc_stack %4 : $*P
+// CHECK: [[ALLOC3:%.*]] = alloc_stack $any P
+// CHECK: copy_addr [[ALLOC2]] to [initialization] [[ALLOC3]] : $*any P
+// CHECK: copy_addr [take] [[ALLOC3]] to %1 : $*any P
+// CHECK: dealloc_stack [[ALLOC3]] : $*any P
+// CHECK: destroy_addr [[ALLOC2]] : $*any P
+// CHECK: dealloc_stack %4 : $*any P
 // CHECK: dealloc_stack %2 : $*S
 // CHECK-LABEL: } // end sil function '$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n4main1SV_Tg5'
 sil hidden @$s6test3_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
@@ -339,12 +339,12 @@ bb0(%0 : $S, %1 : $*P):
 //===----------------------------------------------------------------------===//
 
 // The ExistentialSpecializer cannot specialize on an @inout argument
-// CHECK-LABEL: sil hidden @$s6test4_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@inout P, @inout P) -> () {
-// CHECK: bb0(%0 : $*P, %1 : $*P):
-// CHECK: [[ALLOC:%.*]] = alloc_stack $P
-// CHECK:   copy_addr %0 to [initialization] [[ALLOC]] : $*P
-// CHECK:   copy_addr [take] [[ALLOC]] to %1 : $*P
-// CHECK:   dealloc_stack [[ALLOC]] : $*P
+// CHECK-LABEL: sil hidden @$s6test4_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@inout any P, @inout any P) -> () {
+// CHECK: bb0(%0 : $*any P, %1 : $*any P):
+// CHECK: [[ALLOC:%.*]] = alloc_stack $any P
+// CHECK:   copy_addr %0 to [initialization] [[ALLOC]] : $*any P
+// CHECK:   copy_addr [take] [[ALLOC]] to %1 : $*any P
+// CHECK:   dealloc_stack [[ALLOC]] : $*any P
 // CHECK-LABEL: } // end sil function '$s6test4_6storePyyAA1P_pz_AaC_pztF'
 sil hidden @$s6test4_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@inout P, @inout P) -> () {
 bb0(%0 : $*P, %1 : $*P):
@@ -357,16 +357,16 @@ bb0(%0 : $*P, %1 : $*P):
 }
 
 // ...and there's currently no way to propagate the concrete value to the inout argument!
-// CHECK-LABEL: sil hidden @$s6test4_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
-// CHECK: bb0(%0 : $S, %1 : $*P):
-// CHECK:   [[ALLOC:%.*]] = alloc_stack $P, var, name "sp"
-// CHECK:   [[ADR1:%.*]] = init_existential_addr [[ALLOC]] : $*P, $S
+// CHECK-LABEL: sil hidden @$s6test4_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout any P) -> () {
+// CHECK: bb0(%0 : $S, %1 : $*any P):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $any P, var, name "sp"
+// CHECK:   [[ADR1:%.*]] = init_existential_addr [[ALLOC]] : $*any P, $S
 // CHECK:   store %0 to [[ADR1]] : $*S
-// CHECK:   [[ALLOC2:%.*]] = alloc_stack $P
-// CHECK:   copy_addr %2 to [initialization] %5 : $*P
-// CHECK:   copy_addr [take] %5 to %1 : $*P
-// CHECK:   destroy_addr [[ALLOC]] : $*P
-// CHECK:   dealloc_stack [[ALLOC]] : $*P
+// CHECK:   [[ALLOC2:%.*]] = alloc_stack $any P
+// CHECK:   copy_addr %2 to [initialization] %5 : $*any P
+// CHECK:   copy_addr [take] %5 to %1 : $*any P
+// CHECK:   destroy_addr [[ALLOC]] : $*any P
+// CHECK:   dealloc_stack [[ALLOC]] : $*any P
 // CHECK-LABEL: } // end sil function '$s6test4_6storeS1s1qyAA1SV_AA1P_pztF'
 sil hidden @$s6test4_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
 bb0(%0 : $S, %1 : $*P):
@@ -415,9 +415,9 @@ extension ClassB : ProtocolA {}
 // Pass an existential argument that happens to also have a generic constraint.
 //
 // CHECK-LABEL: sil @testExistentialGenericConstraint : $@convention(thin) <T> (@guaranteed ClassB<T>) -> Int {
-// CHECK:   [[E:%.*]] = init_existential_ref %0 : $ClassB<T> : $ClassB<T>, $ClassA<T> & ProtocolA
-// CHECK:   [[F:%.*]] = function_ref @testExistentialGenericConstraintHelper : $@convention(thin) <τ_0_0> (@guaranteed ClassA<τ_0_0> & ProtocolA) -> Int
-// CHECK:   apply [[F]]<T>([[E]]) : $@convention(thin) <τ_0_0> (@guaranteed ClassA<τ_0_0> & ProtocolA) -> Int
+// CHECK:   [[E:%.*]] = init_existential_ref %0 : $ClassB<T> : $ClassB<T>, $any ClassA<T> & ProtocolA
+// CHECK:   [[F:%.*]] = function_ref @testExistentialGenericConstraintHelper : $@convention(thin) <τ_0_0> (@guaranteed any ClassA<τ_0_0> & ProtocolA) -> Int
+// CHECK:   apply [[F]]<T>([[E]]) : $@convention(thin) <τ_0_0> (@guaranteed any ClassA<τ_0_0> & ProtocolA) -> Int
 // CHECK-LABEL: } // end sil function 'testExistentialGenericConstraint'
 sil @testExistentialGenericConstraint : $@convention(thin) <T> (@guaranteed ClassB<T>) -> Int {
 bb0(%0 : $ClassB<T>):
@@ -431,16 +431,16 @@ bb0(%0 : $ClassB<T>):
 
 // This generic function should not be "specialized" by ExistentialSpecializer, which would add more generic parameters.
 //
-// CHECK-LABEL: sil hidden @testExistentialGenericConstraintHelper : $@convention(thin) <T> (@guaranteed ClassA<T> & ProtocolA) -> Int {
-// CHECK: bb0(%0 : $ClassA<T> & ProtocolA):
+// CHECK-LABEL: sil hidden @testExistentialGenericConstraintHelper : $@convention(thin) <T> (@guaranteed any ClassA<T> & ProtocolA) -> Int {
+// CHECK: bb0(%0 : $any ClassA<T> & ProtocolA):
 // CHECK-LABEL: } // end sil function 'testExistentialGenericConstraintHelper'
 sil hidden @testExistentialGenericConstraintHelper : $@convention(thin) <T> (@guaranteed ClassA<T> & ProtocolA) -> Int {
 bb0(%0 : $ClassA<T> & ProtocolA):
-  %2 = open_existential_ref %0 : $ClassA<T> & ProtocolA to $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
-  %3 = alloc_stack $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
-  store %2 to %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
-  %5 = witness_method $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA, #ProtocolA.foo : <Self where Self : ProtocolA> (Self) -> () -> Int, %2 : $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
-  %6 = apply %5<@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA>(%3) : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
-  dealloc_stack %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
+  %2 = open_existential_ref %0 : $ClassA<T> & ProtocolA to $@opened("92C29DA8-5479-11EA-8668-ACDE48001122", ClassA<T> & ProtocolA) Self
+  %3 = alloc_stack $@opened("92C29DA8-5479-11EA-8668-ACDE48001122", ClassA<T> & ProtocolA) Self
+  store %2 to %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122", ClassA<T> & ProtocolA) Self
+  %5 = witness_method $@opened("92C29DA8-5479-11EA-8668-ACDE48001122", ClassA<T> & ProtocolA) Self, #ProtocolA.foo : <Self where Self : ProtocolA> (Self) -> () -> Int, %2 : $@opened("92C29DA8-5479-11EA-8668-ACDE48001122", ClassA<T> & ProtocolA) Self : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
+  %6 = apply %5<@opened("92C29DA8-5479-11EA-8668-ACDE48001122", ClassA<T> & ProtocolA) Self>(%3) : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
+  dealloc_stack %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122", ClassA<T> & ProtocolA) Self
   return %6 : $Int
 }

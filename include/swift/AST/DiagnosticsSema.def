@@ -1922,7 +1922,7 @@ NOTE(extension_stored_property_fixit,none,
      "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
-      (Identifier))
+      (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause",
       (Identifier))
@@ -1938,6 +1938,8 @@ ERROR(invalid_nominal_extension,none,
       (Type, Type))
 NOTE(invalid_nominal_extension_rewrite,none,
      "did you mean to extend %0 instead?", (Type))
+ERROR(synthesized_nominal_extension,none,
+      "cannot extend synthesized type %0", (Type))
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -2506,6 +2508,10 @@ ERROR(recursive_generic_signature,none,
       "%0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_generic_signature_extension,none,
       "extension of %0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
+ERROR(recursive_same_type_constraint,none,
+      "same-type constraint %0 == %1 is recursive", (Type, Type))
+ERROR(recursive_superclass_constraint,none,
+      "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
@@ -2971,6 +2977,13 @@ ERROR(implementation_only_override_without_attr,none,
 ERROR(implementation_only_override_import_without_attr,none,
       "override of %0 imported as implementation-only must be declared "
       "'@_implementationOnly'", (DescriptiveDeclKind))
+
+ERROR(import_attr_conflict,none,
+      "%0 inconsistently imported with %1",
+      (Identifier, DeclAttribute))
+NOTE(import_attr_conflict_here,none,
+     "imported with %0 here",
+     (DeclAttribute))
 
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
@@ -3766,7 +3779,11 @@ ERROR(should_use_empty_dictionary_literal,none,
 // Dictionary literals
 ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
-
+WARNING(duplicated_literal_keys_in_dictionary_literal, none,
+        "dictionary literal of type %0 has duplicate entries for %1 literal key%select{ %3|}2",
+        (Type, StringRef, bool, StringRef))
+NOTE(duplicated_key_declared_here, none, 
+     "duplicate key declared here", ())
 
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,none,
@@ -4786,6 +4803,9 @@ ERROR(nonisolated_local_var,none,
 ERROR(nonisolated_actor_sync_init,none,
       "'nonisolated' on an actor's synchronous initializer is invalid",
       ())
+ERROR(nonisolated_wrapped_property,none,
+      "'nonisolated' is not supported on properties with property wrappers",
+      ())
 
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
@@ -5087,8 +5107,10 @@ ERROR(differentiable_function_type_no_differentiability_parameters,
       (/*isLinear*/ bool))
 
 // SIL
-ERROR(opened_non_protocol,none,
-      "@opened cannot be applied to non-protocol type %0", (Type))
+ERROR(opened_bad_constraint_type,none,
+      "@opened constraint type %0 is not a protocol or protocol composition", (Type))
+ERROR(opened_bad_interface_type,none,
+      "@opened interface type %0 is not a type parameter", (Type))
 ERROR(sil_function_ellipsis,PointsToFirstBadToken,
       "SIL function types cannot be variadic", ())
 ERROR(sil_function_input_label,PointsToFirstBadToken,
@@ -6424,6 +6446,8 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
 
 ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' may only be applied to classes, structs, and enums", ())
+ERROR(move_expression_not_passed_lvalue,none,
+      "'move' can only be applied to lvalues", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

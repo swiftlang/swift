@@ -458,7 +458,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   // Local function to get the captured variable type within the capturing
   // context.
   auto getVarTypeInCaptureContext = [&]() -> Type {
-    auto interfaceType = VD->getInterfaceType()->getCanonicalType(
+    auto interfaceType = VD->getInterfaceType()->getReducedType(
         origGenericSig);
     return SGF.F.mapTypeIntoContext(interfaceType);
   };
@@ -1014,7 +1014,7 @@ uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
                                  Optional<AbstractionPattern> origClosureType) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
-  resultType = resultType->getCanonicalType(genericSig);
+  resultType = resultType->getReducedType(genericSig);
 
   AbstractionPattern origResultType = origClosureType
     ? origClosureType->getFunctionResultType()

@@ -53,6 +53,11 @@
 using namespace swift;
 using namespace constraints;
 
+bool Solution::hasFixedType(TypeVariableType *typeVar) const {
+  auto knownBinding = typeBindings.find(typeVar);
+  return knownBinding != typeBindings.end();
+}
+
 /// Retrieve the fixed type for the given type variable.
 Type Solution::getFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
@@ -587,8 +592,9 @@ namespace {
                                                    ctx);
                     cs.setType(base, MetatypeType::get(baseTy));
 
-                    refExpr = DotSyntaxCallExpr::create(ctx, declRefExpr,
-                                                        SourceLoc(), base);
+                    refExpr =
+                        DotSyntaxCallExpr::create(ctx, declRefExpr, SourceLoc(),
+                                                  Argument::unlabeled(base));
                     auto refType = adjustedFullType->castTo<FunctionType>()->getResult();
                     cs.setType(refExpr, refType);
                   } else {
@@ -1121,7 +1127,8 @@ namespace {
                                           fnTy->getExtInfo()));
         cs.cacheType(fnExpr);
 
-        fnExpr = DotSyntaxCallExpr::create(ctx, fnExpr, SourceLoc(), baseExpr);
+        fnExpr = DotSyntaxCallExpr::create(ctx, fnExpr, SourceLoc(),
+                                           Argument::unlabeled(baseExpr));
       }
       fnExpr->setType(newCalleeFnTy);
       cs.cacheType(fnExpr);
@@ -1833,7 +1840,7 @@ namespace {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
         ref = forceUnwrapIfExpected(ref, memberLocator);
-        apply = DotSyntaxCallExpr::create(context, ref, dotLoc, base);
+        apply = DotSyntaxCallExpr::create(context, ref, dotLoc, Argument::unlabeled(base));
         if (Implicit) {
           apply->setImplicit();
         }
@@ -3125,7 +3132,8 @@ namespace {
                                                base, nameLoc, ctorLocator,
                                                implicit);
       auto *call =
-          DotSyntaxCallExpr::create(cs.getASTContext(), ctorRef, dotLoc, base);
+          DotSyntaxCallExpr::create(cs.getASTContext(), ctorRef, dotLoc,
+                                    Argument::unlabeled(base));
 
       return finishApply(call, cs.getType(expr), locator, ctorLocator);
     }
@@ -6850,11 +6858,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // below is just an approximate check since the above would be expensive to
   // verify and still relies on the type checker ensuing `fromType` is
   // compatible with any opaque archetypes.
-  if (toType->hasOpaqueArchetype() &&
+  if (toType->getCanonicalType()->hasOpaqueArchetype() &&
       cs.getConstraintLocator(locator)->isForContextualType()) {
     // Find the opaque type declaration. We need its generic signature.
     OpaqueTypeDecl *opaqueDecl = nullptr;
-    bool found = toType.findIf([&](Type type) {
+    bool found = toType->getCanonicalType().findIf([&](Type type) {
       if (auto opaqueType = type->getAs<OpaqueTypeArchetypeType>()) {
         opaqueDecl = opaqueType->getDecl();
         return true;
@@ -8578,8 +8586,8 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
         wrappedVar, initType->mapTypeOutOfContext());
 
     // Record the semantic initializer on the outermost property wrapper.
-    wrappedVar->getAttachedPropertyWrappers().front()
-        ->setSemanticInit(initializer);
+    wrappedVar->getOutermostAttachedPropertyWrapper()->setSemanticInit(
+        initializer);
 
     // If this is a wrapped parameter, we're done.
     if (isa<ParamDecl>(wrappedVar))
@@ -8997,7 +9005,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     return target;
   } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
     // Get the outermost wrapper type from the solution
-    auto outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
+    auto outermostWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
     auto backingType = solution.simplifyType(
         solution.getType(outermostWrapper->getTypeExpr()));
 
@@ -9124,9 +9132,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       
       auto &log = llvm::errs();
       if (isPartial) {
-        log << "---Partially type-checked expression---\n";
+        log << "\n---Partially type-checked expression---\n";
       } else {
-        log << "---Type-checked expression---\n";
+        log << "\n---Type-checked expression---\n";
       }
       resultExpr->dump(log);
       log << "\n";
@@ -9204,7 +9212,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     auto node = target.getAsASTNode();
     if (node && needsPostProcessing) {
       auto &log = llvm::errs();
-      log << "---Fully type-checked target---\n";
+      log << "\n---Fully type-checked target---\n";
       node.dump(log);
       log << "\n";
     }

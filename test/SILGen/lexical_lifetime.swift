@@ -91,9 +91,9 @@ func lexical_borrow_let_class_in_enum() {
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
 // CHECK:         debug_value [[LIFETIME]] 
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
-// CHECK:         store_borrow [[LIFETIME]] to [[ADDR]] 
+// CHECK:         [[SB:%.*]] = store_borrow [[LIFETIME]] to [[ADDR]] 
 // CHECK:         [[USE_GENERIC:%[^,]+]] = function_ref @use_generic
-// CHECK:         [[REGISTER_6:%[^,]+]] = apply [[USE_GENERIC]]<C>([[ADDR]]) 
+// CHECK:         [[REGISTER_6:%[^,]+]] = apply [[USE_GENERIC]]<C>([[SB]]) 
 // CHECK:         dealloc_stack [[ADDR]] 
 // CHECK:         end_borrow [[LIFETIME]] 
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()

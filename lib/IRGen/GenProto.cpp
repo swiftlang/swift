@@ -2227,7 +2227,7 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     break;
   }
 
-  auto relptrSize = IGM.DataLayout.getTypeAllocSize(IGM.Int32Ty).getValue();
+  auto relptrSize = IGM.DataLayout.getTypeAllocSize(IGM.Int32Ty).getKnownMinValue();
   IGM.setVCallVisibility(global, vis,
                          std::make_pair(minOffset, maxOffset + relptrSize));
 }
@@ -3310,7 +3310,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);
   convention.enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
-    assert(generics->isCanonicalTypeInContext(reqt.TypeParameter));
+    assert(generics->isReducedType(reqt.TypeParameter));
     Requirements.push_back(reqt);
   });
 

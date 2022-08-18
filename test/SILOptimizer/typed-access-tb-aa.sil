@@ -625,7 +625,7 @@ sil @enum_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #82.
 // CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <any AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #83.
 // CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
@@ -670,7 +670,7 @@ sil @enum_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #102.
 // CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <any AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #103.
 // CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
@@ -711,7 +711,7 @@ sil @enum_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #121.
 // CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <any AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #122.
 // CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0

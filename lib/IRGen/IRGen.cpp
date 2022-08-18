@@ -85,6 +85,7 @@
 #include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
+#include "llvm/Transforms/Scalar.h"
 
 #include <thread>
 
@@ -484,21 +485,17 @@ performOptimizationsUsingNewPassManger(const IRGenOptions &Opts,
   if (Opts.Sanitizers & SanitizerKind::Address) {
     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
                                            OptimizationLevel Level) {
-      auto Recover = bool(Opts.SanitizersWithRecoveryInstrumentation &
-                          SanitizerKind::Address);
-      bool UseAfterScope = false;
-      bool ModuleUseAfterScope = true;
-      bool UseOdrIndicator = Opts.SanitizeAddressUseODRIndicator;
-      llvm::AsanDtorKind DestructorKind = llvm::AsanDtorKind::Global;
-      llvm::AsanDetectStackUseAfterReturnMode UseAfterReturn =
-          llvm::AsanDetectStackUseAfterReturnMode::Runtime;
+      AddressSanitizerOptions ASOpts;
+      ASOpts.CompileKernel = false;
+      ASOpts.Recover = bool(Opts.SanitizersWithRecoveryInstrumentation &
+                            SanitizerKind::Address);
+      ASOpts.UseAfterScope = false;
+      ASOpts.UseAfterReturn = llvm::AsanDetectStackUseAfterReturnMode::Runtime;
       MPM.addPass(
           RequireAnalysisPass<ASanGlobalsMetadataAnalysis, llvm::Module>());
-      MPM.addPass(ModuleAddressSanitizerPass(false, Recover,
-                                             ModuleUseAfterScope,
-                                             UseOdrIndicator, DestructorKind));
-      MPM.addPass(createModuleToFunctionPassAdaptor(AddressSanitizerPass(
-          {false, Recover, UseAfterScope, UseAfterReturn})));
+      MPM.addPass(ModuleAddressSanitizerPass(
+          ASOpts, /*UseGlobalGC=*/true, Opts.SanitizeAddressUseODRIndicator,
+          /*DestructorKind=*/llvm::AsanDtorKind::Global));
     });
   }
 
@@ -808,10 +805,29 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
     EmitPasses.add(createPrintModulePass(out));
     break;
   case IRGenOutputKind::LLVMBitcode: {
+    // Emit a module summary by default for Regular LTO except ld64-based ones
+    // (which use the legacy LTO API).
+    bool EmitRegularLTOSummary =
+        targetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
+
+    if (EmitRegularLTOSummary || opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
+      // Rename anon globals to be able to export them in the summary.
+      EmitPasses.add(createNameAnonGlobalPass());
+    }
+
     if (opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
       EmitPasses.add(createWriteThinLTOBitcodePass(out));
     } else {
-      EmitPasses.add(createBitcodeWriterPass(out));
+      if (EmitRegularLTOSummary) {
+        module->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
+        // Assume other sources are compiled with -fsplit-lto-unit (it's enabled
+        // by default when -flto is specified on platforms that support regular
+        // lto summary.)
+        module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
+                              uint32_t(1));
+      }
+      EmitPasses.add(createBitcodeWriterPass(
+          out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
     }
     break;
   }
@@ -1753,7 +1769,9 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                           Data, "__Swift_AST");
   std::string Section;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
   case llvm::Triple::XCOFF:

@@ -2265,9 +2265,11 @@ namespace {
               ->getUnderlyingType();
         }
 
-        auto underlyingType =
-            getTypeForPattern(paren->getSubPattern(), locator,
-                              externalPatternType, bindPatternVarsOneWay);
+        auto *subPattern = paren->getSubPattern();
+        auto underlyingType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            externalPatternType, bindPatternVarsOneWay);
 
         if (!underlyingType)
           return Type();
@@ -2286,11 +2288,34 @@ namespace {
         return setType(type);
       }
       case PatternKind::Any: {
-        return setType(
-            externalPatternType
-                ? externalPatternType
-                : CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        TVO_CanBindToNoEscape));
+        Type type;
+
+        // If this is a situation like `[let] _ = <expr>`, return
+        // initializer expression.
+        auto getInitializerExpr = [&locator]() -> Expr * {
+          auto last = locator.last();
+          if (!last)
+            return nullptr;
+
+          auto contextualTy = last->getAs<LocatorPathElt::ContextualType>();
+          return (contextualTy && contextualTy->isFor(CTP_Initialization))
+                     ? locator.trySimplifyToExpr()
+                     : nullptr;
+        };
+
+        // Always prefer a contextual type when it's available.
+        if (externalPatternType) {
+          type = externalPatternType;
+        } else if (auto *initializer = getInitializerExpr()) {
+          // For initialization always assume a type of initializer.
+          type = CS.getType(initializer)->getRValueType();
+        } else {
+          type = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      ConstraintLocator::AnyPatternDecl),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
+        }
+        return setType(type);
       }
 
       case PatternKind::Named: {
@@ -2671,7 +2696,9 @@ namespace {
           // and we're matching the type of that subpattern to the parameter
           // types.
           Type subPatternType = getTypeForPattern(
-              subPattern, locator, Type(), bindPatternVarsOneWay);
+              subPattern,
+              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+              Type(), bindPatternVarsOneWay);
 
           if (!subPatternType)
             return Type();

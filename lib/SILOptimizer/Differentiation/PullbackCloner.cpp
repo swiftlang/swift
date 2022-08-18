@@ -194,7 +194,7 @@ private:
     auto pbGenSig =
         getPullback().getLoweredFunctionType()->getSubstGenericSignature();
     Lowering::AbstractionPattern pattern(pbGenSig,
-                                         type->getCanonicalType(pbGenSig));
+                                         type->getReducedType(pbGenSig));
     return getPullback().getTypeLowering(pattern, type);
   }
 
@@ -202,7 +202,7 @@ private:
   SILType remapType(SILType ty) {
     if (ty.hasArchetype())
       ty = ty.mapTypeOutOfContext();
-    auto remappedType = ty.getASTType()->getCanonicalType(
+    auto remappedType = ty.getASTType()->getReducedType(
         getPullback().getLoweredFunctionType()->getSubstGenericSignature());
     auto remappedSILType =
         SILType::getPrimitiveType(remappedType, ty.getCategory());
@@ -212,7 +212,7 @@ private:
   Optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
     type =
-        getWitness()->getDerivativeGenericSignature().getCanonicalTypeInContext(
+        getWitness()->getDerivativeGenericSignature().getReducedType(
             type);
     return type->getAutoDiffTangentSpace(
         LookUpConformanceInModule(getModule().getSwiftModule()));

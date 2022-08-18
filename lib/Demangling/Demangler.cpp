@@ -561,9 +561,8 @@ Demangler::DemangleInitRAII::~DemangleInitRAII() {
 }
 
 NodePointer Demangler::demangleSymbol(StringRef MangledName,
-        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
-  DemangleInitRAII state(*this, MangledName,
-                         std::move(SymbolicReferenceResolver));
+        std::function<SymbolicReferenceResolver_t> Resolver) {
+  DemangleInitRAII state(*this, MangledName, std::move(Resolver));
 
 #if SWIFT_SUPPORT_OLD_MANGLING
   // Demangle old-style class and protocol names, which are still used in the
@@ -610,9 +609,8 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
 }
 
 NodePointer Demangler::demangleType(StringRef MangledName,
-        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
-  DemangleInitRAII state(*this, MangledName,
-                         std::move(SymbolicReferenceResolver));
+        std::function<SymbolicReferenceResolver_t> Resolver) {
+  DemangleInitRAII state(*this, MangledName, std::move(Resolver));
 
   parseAndPushNodes();
 

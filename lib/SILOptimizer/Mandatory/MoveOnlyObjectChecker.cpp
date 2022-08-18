@@ -540,6 +540,6 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
 
 } // anonymous namespace
 
-SILTransform *swift::createMoveOnlyChecker() {
+SILTransform *swift::createMoveOnlyObjectChecker() {
   return new MoveOnlyCheckerPass();
 }

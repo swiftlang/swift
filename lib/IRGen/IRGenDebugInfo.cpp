@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "debug-info"
-
 #include "IRGenDebugInfo.h"
 #include "GenOpaque.h"
 #include "GenStruct.h"
@@ -64,6 +62,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
+
+#define DEBUG_TYPE "debug-info"
 
 using namespace swift;
 using namespace irgen;
@@ -1735,12 +1735,6 @@ private:
 
   /// Determine if there exists a name mangling for the given type.
   static bool canMangle(TypeBase *Ty) {
-    // TODO: C++ types are not yet supported (SR-13223).
-    if (Ty->getStructOrBoundGenericStruct() &&
-        isa_and_nonnull<clang::CXXRecordDecl>(
-            Ty->getStructOrBoundGenericStruct()->getClangDecl()))
-      return false;
-
     switch (Ty->getKind()) {
     case TypeKind::GenericFunction: // Not yet supported.
     case TypeKind::SILBlockStorage: // Not supported at all.
@@ -2866,14 +2860,9 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  // TODO: fix demangling for C++ types (SR-13223).
   if (swift::TypeBase *ty = DbgTy.getType()) {
     if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
       ty = metaTy->getInstanceType().getPointer();
-    if (ty->getStructOrBoundGenericStruct() &&
-        isa_and_nonnull<clang::CXXRecordDecl>(
-            ty->getStructOrBoundGenericStruct()->getClangDecl()))
-      return;
   }
 
   llvm::DIType *DITy = getOrCreateType(DbgTy);

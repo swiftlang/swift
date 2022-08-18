@@ -18,12 +18,12 @@ struct ArrayElementStruct : ArrayElementProtocol {
 }
 
 // CHECK-LABEL: sil @testArrayStorageInitAfterFree : $@convention(thin) () -> () {
-// CHECK:   [[ARRAY:%.*]] = alloc_ref [stack] [tail_elems $ArrayElementProtocol * undef : $Builtin.Word] $_ContiguousArrayStorage<ArrayElementProtocol>
-// CHECK:   [[CAST:%.*]] = upcast [[ARRAY]] : $_ContiguousArrayStorage<ArrayElementProtocol> to $__ContiguousArrayStorageBase
-// CHECK:   [[TAIL:%.*]] = ref_tail_addr [[CAST]] : $__ContiguousArrayStorageBase, $ArrayElementProtocol
-// CHECK:   [[ADR:%.*]] = init_existential_addr [[TAIL]] : $*ArrayElementProtocol, $ArrayElementStruct
+// CHECK:   [[ARRAY:%.*]] = alloc_ref [stack] [tail_elems $any ArrayElementProtocol * undef : $Builtin.Word] $_ContiguousArrayStorage<any ArrayElementProtocol>
+// CHECK:   [[CAST:%.*]] = upcast [[ARRAY]] : $_ContiguousArrayStorage<any ArrayElementProtocol> to $__ContiguousArrayStorageBase
+// CHECK:   [[TAIL:%.*]] = ref_tail_addr [[CAST]] : $__ContiguousArrayStorageBase, $any ArrayElementProtocol
+// CHECK:   [[ADR:%.*]] = init_existential_addr [[TAIL]] : $*any ArrayElementProtocol, $ArrayElementStruct
 // CHECK:   store %{{.*}} to [[ADR]] : $*ArrayElementStruct
-// CHECK:   strong_release [[ARRAY]] : $_ContiguousArrayStorage<ArrayElementProtocol>
+// CHECK:   strong_release [[ARRAY]] : $_ContiguousArrayStorage<any ArrayElementProtocol>
 // CHECK-LABEL: } // end sil function 'testArrayStorageInitAfterFree'
 sil @testArrayStorageInitAfterFree : $@convention(thin) () -> () {
 bb0:

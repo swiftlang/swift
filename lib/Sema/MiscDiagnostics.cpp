@@ -19,13 +19,16 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -97,6 +100,7 @@ bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
 ///   - KeyPath expressions cannot refer to effectful properties / subscripts
+///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
@@ -105,13 +109,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
     bool IsExprStmt;
+    bool HasReachedSemanticsProvidingExpr;
 
-  public:
     ASTContext &Ctx;
     const DeclContext *DC;
 
+  public:
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
-      : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
+        : IsExprStmt(isExprStmt), HasReachedSemanticsProvidingExpr(false),
+          Ctx(DC->getASTContext()), DC(DC) {}
 
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
       return { false, P };
@@ -124,6 +130,17 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+
+      if (auto collection = dyn_cast<CollectionExpr>(E)) {
+        if (collection->isTypeDefaulted()) {
+          // Diagnose type defaulted collection literals in subexpressions as
+          // warnings to preserve source compatibility.
+          diagnoseTypeDefaultedCollectionExpr(
+              collection, Ctx,
+              /*downgradeToWarning=*/HasReachedSemanticsProvidingExpr);
+        }
+      }
+
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
       auto Base = E;
@@ -317,7 +334,18 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
         checkCheckedCastExpr(cast);
       }
-      
+
+      // Diagnose move expression uses where the sub expression is not a declref
+      // expr.
+      if (auto *moveExpr = dyn_cast<MoveExpr>(E)) {
+        checkMoveExpr(moveExpr);
+      }
+
+      if (!HasReachedSemanticsProvidingExpr &&
+          E == E->getSemanticsProvidingExpr()) {
+        HasReachedSemanticsProvidingExpr = true;
+      }
+
       return { true, E };
     }
 
@@ -354,6 +382,20 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
                              proto->getName());
         }
+      }
+    }
+
+    void checkMoveExpr(MoveExpr *moveExpr) {
+      // Make sure the MoveOnly feature is set. If not, error.
+      if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
+        auto error =
+          diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
+        Ctx.Diags.diagnose(moveExpr->getLoc(), error);
+      }
+
+      if (!isa<DeclRefExpr>(moveExpr->getSubExpr())) {
+        Ctx.Diags.diagnose(moveExpr->getLoc(),
+                           diag::move_expression_not_passed_lvalue);
       }
     }
 
@@ -420,23 +462,34 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return false;
     }
 
-    /// We have a collection literal with a defaulted type, e.g. of [Any].  Emit
-    /// an error if it was inferred to this type in an invalid context, which is
-    /// one in which the parent expression is not itself a collection literal.
-    void checkTypeDefaultedCollectionExpr(CollectionExpr *c) {
-      // If the parent is a non-expression, or is not itself a literal, then
-      // produce an error with a fixit to add the type as an explicit
-      // annotation.
-      if (c->getNumElements() == 0)
-        Ctx.Diags.diagnose(c->getLoc(), diag::collection_literal_empty)
-          .highlight(c->getSourceRange());
-      else {
+    /// Diagnose a collection literal with a defaulted type such as \c [Any].
+    static void diagnoseTypeDefaultedCollectionExpr(CollectionExpr *c,
+                                                    ASTContext &ctx,
+                                                    bool downgradeToWarning) {
+      // Produce a diagnostic with a fixit to add the defaulted type as an
+      // explicit annotation.
+      auto &diags = ctx.Diags;
+
+      if (c->getNumElements() == 0) {
+        InFlightDiagnostic inFlight =
+            diags.diagnose(c->getLoc(), diag::collection_literal_empty);
+        inFlight.highlight(c->getSourceRange());
+
+        if (downgradeToWarning) {
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+        }
+      } else {
         assert(c->getType()->hasTypeRepr() &&
                "a defaulted type should always be printable");
-        Ctx.Diags.diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
-                           c->getType())
-          .highlight(c->getSourceRange())
-          .fixItInsertAfter(c->getEndLoc(), " as " + c->getType()->getString());
+        InFlightDiagnostic inFlight = diags.diagnose(
+            c->getLoc(), diag::collection_literal_heterogeneous, c->getType());
+        inFlight.highlight(c->getSourceRange());
+        inFlight.fixItInsertAfter(c->getEndLoc(),
+                                  " as " + c->getType()->getString());
+
+        if (downgradeToWarning) {
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+        }
       }
     }
 
@@ -1310,16 +1363,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   DiagnoseWalker Walker(DC, isExprStmt);
   const_cast<Expr *>(E)->walk(Walker);
-
-  // Diagnose uses of collection literals with defaulted types at the top
-  // level.
-  if (auto collection
-        = dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (collection->isTypeDefaulted()) {
-      Walker.checkTypeDefaultedCollectionExpr(
-        const_cast<CollectionExpr *>(collection));
-    }
-  }
 }
 
 
@@ -4987,6 +5030,163 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void
+diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
+                                             const DeclContext *DC) {
+  class DiagnoseWalker : public ASTWalker {
+    ASTContext &Ctx;
+
+  private:
+    std::string getKeyStringValue(const LiteralExpr *keyExpr) {
+      if (isa<MagicIdentifierLiteralExpr>(keyExpr)) {
+        return keyExpr->getLiteralKindDescription().str();
+      }
+      std::string out;
+      llvm::raw_string_ostream OS(out);
+      keyExpr->printConstExprValue(&OS, /*additionalCheck=*/nullptr);
+      return out;
+    }
+
+    std::string getKeyStringValueForDiagnostic(const LiteralExpr *keyExpr) {
+      std::string out;
+      switch (keyExpr->getKind()) {
+      case ExprKind::NilLiteral:
+      case ExprKind::MagicIdentifierLiteral:
+        return out;
+      case ExprKind::StringLiteral: {
+        const auto *SL = cast<StringLiteralExpr>(keyExpr);
+        out = SL->getValue().str();
+        break;
+      }
+      default:
+        llvm::raw_string_ostream OS(out);
+        keyExpr->printConstExprValue(&OS, /*additionalCheck=*/nullptr);
+        break;
+      }
+      return "'" + out + "'";
+    }
+    
+    bool shouldDiagnoseLiteral(const LiteralExpr *LE) {
+      switch (LE->getKind()) {
+      case ExprKind::IntegerLiteral:
+      case ExprKind::FloatLiteral:
+      case ExprKind::BooleanLiteral:
+      case ExprKind::StringLiteral:
+      case ExprKind::MagicIdentifierLiteral:
+      case ExprKind::NilLiteral:
+        return true;
+      // Skip interpolated literals because they
+      // can contain expressions that although equal
+      // maybe be evaluated to different values. e.g.
+      // "\(a) \(a)" where 'a' is a computed variable.
+      case ExprKind::InterpolatedStringLiteral:
+      // Also skip object literals as most of them takes paramenters that can
+      // contain expressions that altough equal may evaluate to different
+      // values e.g. #fileLiteral(resourceName: a) where 'a' is a computed
+      // property is valid.
+      case ExprKind::ObjectLiteral:
+      // Literal expressions produce Regex<Out> type result,
+      // which cannot be keys due to not conforming to hashable.
+      case ExprKind::RegexLiteral:
+        return false;
+      // If a new literal is added in the future, the compiler
+      // will warn that a case is missing from this switch.
+      #define LITERAL_EXPR(Id, Parent)
+      #define EXPR(Id, Parent) case ExprKind::Id:
+      #include "swift/AST/ExprNodes.def"
+        llvm_unreachable("Not a literal expression");
+      }
+      llvm_unreachable("Unhandled literal");
+    }
+  public:
+    DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
+
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);
+      if (!DLE)
+        return {true, E};
+
+      auto type = DLE->getType();
+      // For other types conforming with `ExpressibleByDictionaryLiteral`
+      // protocol, duplicated keys may be allowed.
+      if (!(type && type->isDictionary())) {
+        return {true, E};
+      }
+
+      using LiteralKey = std::pair<std::string, ExprKind>;
+      using Element = std::pair<const TupleExpr *, size_t>;
+
+      std::map<LiteralKey, llvm::SmallVector<Element, 4>> groupedLiteralKeys;
+
+      for (size_t i = 0; i < DLE->getElements().size(); ++i) {
+        const auto *elt = DLE->getElement(i);
+        const auto *tupleElt = cast<TupleExpr>(elt);
+        const auto *keyExpr =
+            tupleElt->getElement(0)->getSemanticsProvidingExpr();
+        auto *LE = dyn_cast<LiteralExpr>(keyExpr);
+        if (!LE)
+          continue;
+        
+        if (!shouldDiagnoseLiteral(LE))
+          continue;
+
+        auto keyStringValue = getKeyStringValue(LE);
+        auto literalKey = std::make_pair(keyStringValue, keyExpr->getKind());
+        groupedLiteralKeys[literalKey].push_back({tupleElt, i});
+      }
+
+      // All keys are unique.
+      if (groupedLiteralKeys.size() == DLE->getNumElements()) {
+        return {true, E};
+      }
+
+      auto &DE = Ctx.Diags;
+      auto emitNoteWithFixit = [&](const Element &duplicated) {
+        auto note = DE.diagnose(duplicated.first->getLoc(),
+                                diag::duplicated_key_declared_here);
+        auto duplicatedEltIdx = duplicated.second;
+        const auto commanLocs = DLE->getCommaLocs();
+        note.fixItRemove(duplicated.first->getSourceRange());
+        if (duplicatedEltIdx < commanLocs.size()) {
+          note.fixItRemove(commanLocs[duplicatedEltIdx]);
+        } else {
+          // For the last element remove the previous comma.
+          note.fixItRemove(commanLocs[duplicatedEltIdx - 1]);
+        }
+      };
+
+      for (auto &entry : groupedLiteralKeys) {
+        auto &keyValuePairs = entry.second;
+        if (keyValuePairs.size() == 1) {
+          continue;
+        }
+
+        auto elt = keyValuePairs.front();
+        const auto keyValue = entry.first.first;
+        const auto keyExpr = cast<LiteralExpr>(
+            elt.first->getElement(0)->getSemanticsProvidingExpr());
+        const auto value = getKeyStringValueForDiagnostic(keyExpr);
+        DE.diagnose(elt.first->getLoc(),
+                    diag::duplicated_literal_keys_in_dictionary_literal, type,
+                    keyExpr->getLiteralKindDescription(), value.empty(), value);
+        for (auto &duplicated : keyValuePairs) {
+          emitNoteWithFixit(duplicated);
+        }
+      }
+      return {true, E};
+    }
+  };
+
+  DiagnoseWalker Walker(DC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 namespace {
 
 class CompletionHandlerUsageChecker final : public ASTWalker {
@@ -5074,6 +5274,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
+  diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

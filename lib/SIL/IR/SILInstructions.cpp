@@ -1172,6 +1172,15 @@ CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
       bool(isInitializationOfDest);
   }
 
+  ExplicitCopyAddrInst::ExplicitCopyAddrInst(
+      SILDebugLocation Loc, SILValue SrcLValue, SILValue DestLValue,
+      IsTake_t isTakeOfSrc, IsInitialization_t isInitializationOfDest)
+      : InstructionBase(Loc), Operands(this, SrcLValue, DestLValue) {
+    sharedUInt8().ExplicitCopyAddrInst.isTakeOfSrc = bool(isTakeOfSrc);
+    sharedUInt8().ExplicitCopyAddrInst.isInitializationOfDest =
+        bool(isInitializationOfDest);
+  }
+
 BindMemoryInst *
 BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
                        SILType BoundType, SILFunction &F) {

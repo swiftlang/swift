@@ -661,7 +661,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setPerfConstraints((PerformanceConstraints)perfConstr);
-    fn->setAlwaysWeakImported(isWeakImported);
+    fn->setIsWeakImported(isWeakImported
+                              ? IsWeakImported_t::IsAlwaysWeakImported
+                              : IsWeakImported_t::IsNotWeakImported);
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
 
@@ -2167,6 +2169,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool isInit = (Attr & 0x2) > 0;
     bool isTake = (Attr & 0x1) > 0;
     ResultInst = Builder.createCopyAddr(
+        Loc, getLocalValue(ValID, addrType), getLocalValue(ValID2, addrType),
+        IsTake_t(isTake), IsInitialization_t(isInit));
+    break;
+  }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
+    bool isInit = (Attr & 0x2) > 0;
+    bool isTake = (Attr & 0x1) > 0;
+    ResultInst = Builder.createExplicitCopyAddr(
         Loc, getLocalValue(ValID, addrType), getLocalValue(ValID2, addrType),
         IsTake_t(isTake), IsInitialization_t(isInit));
     break;

@@ -105,6 +105,7 @@ namespace swift {
   class NormalProtocolConformance;
   class OpaqueTypeDecl;
   class InheritedProtocolConformance;
+  class RootProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
   enum class BuiltinConformanceKind;
@@ -1245,7 +1246,7 @@ public:
   /// specialized conformance from the generic conformance.
   ProtocolConformance *
   getSpecializedConformance(Type type,
-                            ProtocolConformance *generic,
+                            RootProtocolConformance *generic,
                             SubstitutionMap substitutions);
 
   /// Produce an inherited conformance, for subclasses of a type
@@ -1324,6 +1325,10 @@ public:
   bool isRecursivelyConstructingRequirementMachine(
       const ProtocolDecl *proto);
 
+  /// Retrieve a generic parameter list with a single parameter named `Self`.
+  /// This is for parsing @opened archetypes in textual SIL.
+  GenericParamList *getSelfGenericParamList(DeclContext *dc) const;
+
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
@@ -1338,8 +1343,8 @@ public:
   /// particular, the opened archetype signature does not have requirements for
   /// conformances inherited from superclass constraints while existential
   /// values do.
-  CanGenericSignature getOpenedArchetypeSignature(Type type,
-                                                  GenericSignature parentSig);
+  CanGenericSignature getOpenedExistentialSignature(Type type,
+                                                    GenericSignature parentSig);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

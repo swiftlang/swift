@@ -40,6 +40,7 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalAlias.h"
@@ -935,6 +936,15 @@ static void markGlobalAsUsedBasedOnLinkage(IRGenModule &IGM, LinkInfo &link,
   // That mostly means we need to be good at not marking things external.
   if (link.isUsed())
     IGM.addUsedGlobal(global);
+  else if (!IGM.IRGen.Opts.shouldOptimize() &&
+           !IGM.IRGen.Opts.ConditionalRuntimeRecords &&
+           !IGM.IRGen.Opts.VirtualFunctionElimination &&
+           !IGM.IRGen.Opts.WitnessMethodElimination &&
+           !global->isDeclaration()) {
+    // llvm's pipeline has decide to run GlobalDCE as part of the O0 pipeline.
+    // Mark non public symbols as compiler used to counter act this.
+    IGM.addCompilerUsedGlobal(global);
+  }
 }
 
 bool LinkInfo::isUsed(IRLinkage IRL) {
@@ -1027,7 +1037,9 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
   assert(Section.substr(0, 2) == "__" && "expected the name to begin with __");
 
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("must know the object file format");
   case llvm::Triple::MachO:
@@ -1048,7 +1060,9 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
 void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
                                            ObjCLabelType Type) {
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("must know the object file format");
   case llvm::Triple::MachO:
@@ -1663,7 +1677,9 @@ void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
 static std::string getDynamicReplacementSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -1685,7 +1701,9 @@ static std::string getDynamicReplacementSection(IRGenModule &IGM) {
 static std::string getDynamicReplacementSomeSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -2056,7 +2074,9 @@ void IRGenModule::emitVTableStubs() {
 static std::string getEntryPointSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -2242,7 +2262,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
 }
 
 static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
-  return cast<llvm::PointerType>(ptrTy)->getElementType() == objTy;
+  return cast<llvm::PointerType>(ptrTy)->getPointerElementType() == objTy;
 }
 
 /// Get or create an LLVM function with these linkage rules.
@@ -2281,7 +2301,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
                   linkInfo.getDLLStorage()})
       .to(fn, linkInfo.isForDefinition());
 
-  llvm::AttrBuilder initialAttrs;
+  llvm::AttrBuilder initialAttrs(IGM.getLLVMContext());
   IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode, stackProtect);
   // Merge initialAttrs with attrs.
   auto updatedAttrs = signature.getAttributes().addFnAttributes(
@@ -2487,9 +2507,22 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forSILGlobalVariable(var, *this);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+
   if (auto clangDecl = var->getClangDecl()) {
     auto addr = getAddrOfClangGlobalDecl(cast<clang::VarDecl>(clangDecl),
                                          forDefinition);
+
+    // Override the linkage computed by Clang if the decl is from another
+    // module that imported @_weakLinked.
+    //
+    // FIXME: We should be able to set the linkage unconditionally here but
+    //        some fixes are needed for Cxx interop.
+    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr)) {
+      if (getSwiftModule()->isImportedAsWeakLinked(var->getDecl()))
+        globalVar->setLinkage(link.getLinkage());
+    }
 
     // If we're not emitting this to define it, make sure we cast it to the
     // right type.
@@ -2503,7 +2536,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     return Address(addr, alignment);
   }
 
-  LinkEntity entity = LinkEntity::forSILGlobalVariable(var, *this);
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
   llvm::Type *storageType;
@@ -2549,7 +2581,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   auto gvar = Module.getGlobalVariable(link.getName(), /*allowInternal*/ true);
   if (gvar) {
     if (forDefinition)
@@ -3131,7 +3162,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
 
   thunk->setCallingConv(llvm::CallingConv::C);
 
-  llvm::AttrBuilder attrBuilder;
+  llvm::AttrBuilder attrBuilder(IGM.getLLVMContext());
   IGM.constructInitialFnAttributes(attrBuilder);
   attrBuilder.addAttribute(llvm::Attribute::AlwaysInline);
   llvm::AttributeList attr = signature.getAttributes().addFnAttributes(
@@ -3222,6 +3253,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     }
   }
 
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   bool isDefinition = f->isDefinition();
   bool hasOrderNumber =
       isDefinition && !shouldCallPreviousImplementation;
@@ -3242,8 +3274,16 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   if (clangAddr) {
     fn = dyn_cast<llvm::Function>(clangAddr->stripPointerCasts());
 
-    // If we have a function, move it to the appropriate position.
     if (fn) {
+      // Override the linkage computed by Clang if the decl is from another
+      // module that imported @_weakLinked.
+      //
+      // FIXME: We should be able to set the linkage unconditionally here but
+      //        some fixes are needed for Cxx interop.
+      if (!forDefinition && f->isWeakImportedByModule())
+        fn->setLinkage(link.getLinkage());
+
+      // If we have a function, move it to the appropriate position.
       if (hasOrderNumber) {
         auto &fnList = Module.getFunctionList();
         fnList.remove(fn);
@@ -3263,8 +3303,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   Signature signature =
       getSignature(f->getLoweredFunctionType(), fpKind);
   addLLVMFunctionAttributes(f, signature);
-
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode(), shouldEmitStackProtector(f));
@@ -3379,7 +3417,7 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
 static llvm::Constant *getElementBitCast(llvm::Constant *ptr,
                                          llvm::Type *newEltType) {
   auto ptrType = cast<llvm::PointerType>(ptr->getType());
-  if (ptrType->getElementType() == newEltType) {
+  if (ptrType->getPointerElementType() == newEltType) {
     return ptr;
   } else {
     auto newPtrType = newEltType->getPointerTo(ptrType->getAddressSpace());
@@ -3900,7 +3938,9 @@ llvm::Constant *IRGenModule::emitSwiftProtocols(bool asContiguousArray) {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit protocols for "
                      "the selected object format.");
@@ -3998,7 +4038,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit protocol conformances for "
                      "the selected object format.");
@@ -4097,7 +4139,9 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
     break;
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit type metadata table for "
                      "the selected object format.");
@@ -4196,7 +4240,9 @@ void IRGenModule::emitAccessibleFunctions() {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");
@@ -4605,7 +4651,7 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   auto *ptrTy = cast<llvm::PointerType>(definition->getType());
   auto *alias = llvm::GlobalAlias::create(
-      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      ptrTy->getPointerElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
       link.getName(), definition, &Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
       .to(alias);

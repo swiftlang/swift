@@ -1447,7 +1447,8 @@ LookupConformanceInModuleRequest::evaluate(
       auto subMap = type->getContextSubstitutionMap(mod, explicitConformanceDC);
 
       // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type, conformance, subMap);
+      auto result = ctx.getSpecializedConformance(type,
+        cast<RootProtocolConformance>(conformance), subMap);
       return ProtocolConformanceRef(result);
     }
   }
@@ -2388,19 +2389,64 @@ void SourceFile::setImportUsedPreconcurrency(
   PreconcurrencyImportsUsed.insert(import);
 }
 
-bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
-                                                   SourceFile *SF) const {
-  return llvm::any_of(SF->getImports(),
-                      [](AttributedImport<ImportedModule> desc) {
-    return desc.options.contains(ImportFlags::ImplementationOnly);
-  });
+bool HasImportsMatchingFlagRequest::evaluate(Evaluator &evaluator,
+                                             SourceFile *SF,
+                                             ImportFlags flag) const {
+  for (auto desc : SF->getImports()) {
+    if (desc.options.contains(flag))
+      return true;
+  }
+  return false;
 }
 
-bool SourceFile::hasImplementationOnlyImports() const {
+Optional<bool> HasImportsMatchingFlagRequest::getCachedResult() const {
+  SourceFile *sourceFile = std::get<0>(getStorage());
+  ImportFlags flag = std::get<1>(getStorage());
+  if (sourceFile->validCachedImportOptions.contains(flag))
+    return sourceFile->cachedImportOptions.contains(flag);
+
+  return None;
+}
+
+void HasImportsMatchingFlagRequest::cacheResult(bool value) const {
+  SourceFile *sourceFile = std::get<0>(getStorage());
+  ImportFlags flag = std::get<1>(getStorage());
+
+  sourceFile->validCachedImportOptions |= flag;
+  if (value)
+    sourceFile->cachedImportOptions |= flag;
+}
+
+void swift::simple_display(llvm::raw_ostream &out, ImportOptions options) {
+  using Flag = std::pair<ImportFlags, StringRef>;
+  Flag possibleFlags[] = {
+#define FLAG(Name) {ImportFlags::Name, #Name},
+    FLAG(Exported)
+    FLAG(Testable)
+    FLAG(PrivateImport)
+    FLAG(ImplementationOnly)
+    FLAG(SPIAccessControl)
+    FLAG(Preconcurrency)
+    FLAG(WeakLinked)
+    FLAG(Reserved)
+#undef FLAG
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options & flag.first; });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
+
+bool SourceFile::hasImportsWithFlag(ImportFlags flag) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(
-      ctx.evaluator, HasImplementationOnlyImportsRequest{mutableThis}, false);
+      ctx.evaluator, HasImportsMatchingFlagRequest{mutableThis, flag}, false);
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
@@ -2573,6 +2619,25 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
+bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
+  for (auto &import : *Imports) {
+    if (!import.options.contains(ImportFlags::WeakLinked))
+      continue;
+
+    const ModuleDecl *importedModule = import.module.importedModule;
+    if (module == importedModule)
+      return true;
+
+    // Also check whether the target module is actually the underlyingClang
+    // module for this @_weakLinked import.
+    const ModuleDecl *clangModule =
+        importedModule->getUnderlyingModuleIfOverlay();
+    if (module == clangModule)
+      return true;
+  }
+  return false;
+}
+
 bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
@@ -2596,6 +2661,15 @@ bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
   if (importedSPIGroups.empty())
     return false;
   return importedSPIGroups.count(spiGroup);
+}
+
+bool ModuleDecl::isImportedAsWeakLinked(const Decl *targetDecl) const {
+  const auto *declaringModule = targetDecl->getModuleContext();
+  for (auto file : getFiles()) {
+    if (file->importsModuleAsWeakLinked(declaringModule))
+      return true;
+  }
+  return false;
 }
 
 bool Decl::isSPI() const {

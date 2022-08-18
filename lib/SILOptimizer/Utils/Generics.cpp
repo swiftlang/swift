@@ -812,7 +812,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   // First substitute concrete types into the existing function type.
   CanSILFunctionType FnTy =
-      cast<SILFunctionType>(CanSpecializedGenericSig.getCanonicalTypeInContext(
+      cast<SILFunctionType>(CanSpecializedGenericSig.getReducedType(
           OrigF->getLoweredFunctionType()
               ->substGenericArgs(M, SubstMap, getResilienceExpansion())
               ->getUnsubstitutedType(M)));
@@ -1449,7 +1449,7 @@ void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams() {
   for (auto GP : CalleeGenericSig.getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
-    auto CanTyInContext = CalleeGenericSig.getCanonicalTypeInContext(CanTy);
+    auto CanTyInContext = CalleeGenericSig.getReducedType(CanTy);
     auto Replacement = CanTyInContext.subst(CalleeInterfaceToCallerArchetypeMap);
     LLVM_DEBUG(llvm::dbgs() << "\n\nChecking callee generic parameter:\n";
                CanTy->dump(llvm::dbgs()));
@@ -1553,7 +1553,7 @@ void FunctionSignaturePartialSpecializer::addRequirements(
   for (auto &reqReq : Reqs) {
     LLVM_DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n";
                reqReq.dump(llvm::dbgs()));
-    AllRequirements.push_back(*reqReq.subst(SubsMap));
+    AllRequirements.push_back(reqReq.subst(SubsMap));
   }
 }
 

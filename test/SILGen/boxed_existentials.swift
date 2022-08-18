@@ -2,8 +2,8 @@
 // RUN: %target-swift-emit-silgen -module-name boxed_existentials -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(_ x: Error) { }
-// CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials18test_type_loweringyys5Error_pF : $@convention(thin) (@guaranteed Error) -> () {
-// CHECK-NOT:         destroy_value %0 : $Error
+// CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials18test_type_loweringyys5Error_pF : $@convention(thin) (@guaranteed any Error) -> () {
+// CHECK-NOT:         destroy_value %0 : $any Error
 
 class Document {}
 
@@ -20,13 +20,13 @@ func test_concrete_erasure(_ x: ClericalError) -> Error {
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials21test_concrete_erasureys5Error_pAA08ClericalF0OF
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $ClericalError):
 // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $Error, $ClericalError
-// CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $Error
+// CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $any Error, $ClericalError
+// CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $any Error
 // CHECK:         store [[EXISTENTIAL]] to [init] [[EXISTENTIAL_BUF:%.*]] :
 // CHECK:         store [[ARG_COPY]] to [init] [[ADDR]] : $*ClericalError
 // CHECK-NOT:         destroy_value [[ARG]]
 // CHECK:         [[EXISTENTIAL2:%.*]] = load [take] [[EXISTENTIAL_BUF]]
-// CHECK:         return [[EXISTENTIAL2]] : $Error
+// CHECK:         return [[EXISTENTIAL2]] : $any Error
 
 protocol HairType {}
 
@@ -34,9 +34,9 @@ func test_composition_erasure(_ x: HairType & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials24test_composition_erasureys5Error_psAC_AA8HairTypepF
-// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr immutable_access [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
-// CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
-// CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
+// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr immutable_access [[OLD_EXISTENTIAL:%.*]] : $*any Error & HairType to $*[[VALUE_TYPE:@opened\(.*, any Error & HairType\) Self]]
+// CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $any Error, $[[VALUE_TYPE]]
+// CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $any Error
 // CHECK:         store [[NEW_EXISTENTIAL]] to [init] [[NEW_EXISTENTIALBUF:%.*]] :
 // CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[ADDR]]
 // CHECK-NOT:         destroy_addr [[OLD_EXISTENTIAL]]
@@ -49,9 +49,9 @@ func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials30test_class_composition_erasureys5Error_psAC_AA9HairClasspF
-// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*\) Error & HairClass]]
-// CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
-// CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
+// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $any Error & HairClass to $[[VALUE_TYPE:@opened\(.*, any Error & HairClass\) Self]]
+// CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $any Error, $[[VALUE_TYPE]]
+// CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $any Error
 // CHECK:         store [[NEW_EXISTENTIAL]] to [init] [[NEW_EXISTENTIALBUF:%.*]] :
 // CHECK:         [[COPIED_VALUE:%.*]] = copy_value [[VALUE]]
 // CHECK:         store [[COPIED_VALUE]] to [init] [[ADDR]]
@@ -62,8 +62,8 @@ func test_property(_ x: Error) -> String {
   return x._domain
 }
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials13test_propertyySSs5Error_pF
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// CHECK:         [[VALUE:%.*]] = open_existential_box [[ARG]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
+// CHECK:         [[VALUE:%.*]] = open_existential_box [[ARG]] : $any Error to $*[[VALUE_TYPE:@opened\(.*, any Error\) Self]]
 // FIXME: Extraneous copy here
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]] : $*[[VALUE_TYPE]]
@@ -80,16 +80,16 @@ func test_property_of_lvalue(_ x: Error) -> String {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials23test_property_of_lvalueySSs5Error_pF :
-// CHECK:       bb0([[ARG:%.*]] : @guaranteed $Error):
-// CHECK:         [[VAR:%.*]] = alloc_box ${ var Error }
+// CHECK:       bb0([[ARG:%.*]] : @guaranteed $any Error):
+// CHECK:         [[VAR:%.*]] = alloc_box ${ var any Error }
 // CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VAR]]
 // CHECK:         [[PVAR:%.*]] = project_box [[VAR_LIFETIME]]
-// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Error
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]] : $any Error
 // CHECK:         store [[ARG_COPY]] to [init] [[PVAR]]
-// CHECK:         [[ACCESS:%.*]] = begin_access [read] [unknown] [[PVAR]] : $*Error
+// CHECK:         [[ACCESS:%.*]] = begin_access [read] [unknown] [[PVAR]] : $*any Error
 // CHECK:         [[VALUE_BOX:%.*]] = load [copy] [[ACCESS]]
 // CHECK:         [[BORROWED_VALUE_BOX:%.*]] = begin_borrow [[VALUE_BOX]]
-// CHECK:         [[VALUE:%.*]] = open_existential_box [[BORROWED_VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
+// CHECK:         [[VALUE:%.*]] = open_existential_box [[BORROWED_VALUE_BOX]] : $any Error to $*[[VALUE_TYPE:@opened\(.*, any Error\) Self]]
 // CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
 // CHECK:         destroy_value [[VALUE_BOX]]
@@ -110,7 +110,7 @@ extension Error {
 
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials21test_extension_methodyys5Error_pF
 func test_extension_method(_ error: Error) {
-  // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
   // CHECK: [[VALUE:%.*]] = open_existential_box [[ARG]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK-NOT: copy_addr
@@ -127,15 +127,15 @@ func plusOneError() -> Error { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials31test_open_existential_semanticsyys5Error_p_sAC_ptF
 // GUARANTEED-LABEL: sil hidden [ossa] @$s18boxed_existentials31test_open_existential_semanticsyys5Error_p_sAC_ptF
-// CHECK: bb0([[ARG0:%.*]]: @guaranteed $Error,
-// GUARANTEED: bb0([[ARG0:%.*]]: @guaranteed $Error,
+// CHECK: bb0([[ARG0:%.*]]: @guaranteed $any Error,
+// GUARANTEED: bb0([[ARG0:%.*]]: @guaranteed $any Error,
 func test_open_existential_semantics(_ guaranteed: Error,
                                      _ immediate: Error) {
   var immediate = immediate
-  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
+  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var any Error }
   // CHECK: [[IMMEDIATE_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[IMMEDIATE_BOX]]
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_LIFETIME]]
-  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
+  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var any Error }
   // GUARANTEED: [[IMMEDIATE_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[IMMEDIATE_BOX]]
   // GUARANTEED: [[PB:%.*]] = project_box [[IMMEDIATE_LIFETIME]]
 
@@ -154,7 +154,7 @@ func test_open_existential_semantics(_ guaranteed: Error,
   // GUARANTEED-NOT: destroy_value [[ARG0]]
   guaranteed.extensionMethod()
 
-  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB]] : $*Error
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB]] : $*any Error
   // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[ACCESS]]
   // -- need a copy_value to guarantee
   // CHECK: [[IMMEDIATE_BORROW:%.*]] = begin_borrow [[IMMEDIATE]]
@@ -167,7 +167,7 @@ func test_open_existential_semantics(_ guaranteed: Error,
   //    out.
   // CHECK: destroy_value [[IMMEDIATE]]
 
-  // GUARANTEED: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB]] : $*Error
+  // GUARANTEED: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB]] : $*any Error
   // GUARANTEED: [[IMMEDIATE:%.*]] = load [copy] [[ACCESS]]
   // -- need a copy_value to guarantee
   // GUARANTEED: [[BORROWED_IMMEDIATE:%.*]] = begin_borrow [[IMMEDIATE]]
@@ -200,10 +200,10 @@ func test_open_existential_semantics(_ guaranteed: Error,
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials14erasure_to_anyyyps5Error_p_sAC_ptF
-// CHECK:       bb0([[OUT:%.*]] : $*Any, [[GUAR:%.*]] : @guaranteed $Error,
+// CHECK:       bb0([[OUT:%.*]] : $*Any, [[GUAR:%.*]] : @guaranteed $any Error,
 func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   var immediate = immediate
-  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
+  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var any Error }
   // CHECK:       [[IMMEDIATE_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[IMMEDIATE_BOX]]
   // CHECK:       [[PB:%.*]] = project_box [[IMMEDIATE_LIFETIME]]
   if true {
@@ -243,10 +243,10 @@ extension Error {
 
 // Make sure we don't assert on this.
 // CHECK-LABEL: sil hidden [ossa] @$s18boxed_existentials4testyyF
-// CHECK:  [[ERROR_ADDR:%.*]] = alloc_stack $Error
+// CHECK:  [[ERROR_ADDR:%.*]] = alloc_stack $any Error
 // CHECK:  [[ARRAY_GET:%.*]] = function_ref @$sSayxSicig
-// CHECK:  apply [[ARRAY_GET]]<Error>([[ERROR_ADDR]]
-// CHECK:  [[ERROR:%.*]] = load [take] [[ERROR_ADDR]] : $*Error
+// CHECK:  apply [[ARRAY_GET]]<any Error>([[ERROR_ADDR]]
+// CHECK:  [[ERROR:%.*]] = load [take] [[ERROR_ADDR]] : $*any Error
 // CHECK:  [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
 // CHECK:  open_existential_box [[BORROWED_ERROR]]
 func test() {

@@ -20,14 +20,14 @@ extension P {
 }
 
 final class C: P {}
-// CHECK-LABEL: sil @$s32sil_combine_concrete_existential14testReturnSelfAA1P_pyF : $@convention(thin) () -> @owned P {
-// CHECK: [[E1:%.*]] = init_existential_ref %0 : $C : $C, $P
-// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $P to $@opened("{{.*}}") P
+// CHECK-LABEL: sil @$s32sil_combine_concrete_existential14testReturnSelfAA1P_pyF : $@convention(thin) () -> @owned any P {
+// CHECK: [[E1:%.*]] = init_existential_ref %0 : $C : $C, $any P
+// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any P to $@opened("{{.*}}", any P) Self
 // CHECK: [[F1:%.*]] = function_ref @$s32sil_combine_concrete_existential1PPAAE10returnSelfxyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: [[C1:%.*]] = apply [[F1]]<@opened("{{.*}}") P>([[O1]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: [[E2:%.*]] = init_existential_ref [[C1]] : $@opened("{{.*}}") P : $@opened("{{.*}}") P, $P
-// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $P to $@opened("{{.*}}") P
-// CHECK: apply [[F1]]<@opened("{{.*}}") P>([[O2]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[C1:%.*]] = apply [[F1]]<@opened("{{.*}}", any P) Self>([[O1]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[E2:%.*]] = init_existential_ref [[C1]] : $@opened("{{.*}}", any P) Self : $@opened("{{.*}}", any P) Self, $any P
+// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any P to $@opened("{{.*}}", any P) Self
+// CHECK: apply [[F1]]<@opened("{{.*}}", any P) Self>([[O2]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK-LABEL: } // end sil function '$s32sil_combine_concrete_existential14testReturnSelfAA1P_pyF'
 public func testReturnSelf() -> P {
   let p: P = C()
@@ -55,13 +55,13 @@ final class CC: PP {
 }
 
 // The first apply has been devirtualized and inlined. The second remains unspecialized.
-// CHECK-LABEL: sil @$s32sil_combine_concrete_existential29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<PP> {
-// CHECK: [[E1:%.*]] = init_existential_ref %0 : $CC : $CC, $PP
-// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $PP to $@opened("{{.*}}") PP
-// CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened("{{.*}}") PP : $@opened("{{.*}}") PP, $PP
-// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $PP to $@opened("{{.*}}") PP
-// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}") PP, #PP.returnOptionalSelf : <Self where Self : PP> (Self) -> () -> Self?, [[O1]] : $@opened("{{.*}}") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
-// CHECK: apply [[W]]<@opened("{{.*}}") PP>([[O2]]) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK-LABEL: sil @$s32sil_combine_concrete_existential29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<any PP> {
+// CHECK: [[E1:%.*]] = init_existential_ref %0 : $CC : $CC, $any PP
+// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any PP to $@opened("{{.*}}", any PP) Self
+// CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened("{{.*}}", any PP) Self : $@opened("{{.*}}", any PP) Self, $any PP
+// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any PP to $@opened("{{.*}}", any PP) Self
+// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}", any PP) Self, #PP.returnOptionalSelf : <Self where Self : PP> (Self) -> () -> Self?, [[O1]] : $@opened("{{.*}}", any PP) Self : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK: apply [[W]]<@opened("{{.*}}", any PP) Self>([[O2]]) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
 // CHECK-LABEL: } // end sil function '$s32sil_combine_concrete_existential29testWitnessReturnOptionalSelfAA2PP_pSgyF'
 public func testWitnessReturnOptionalSelf() -> PP? {
   let p: PP = CC()
@@ -95,11 +95,11 @@ struct SS: PPP {
 
 // The first apply has been devirtualized and inlined. The second remains unspecialized.
 // CHECK-LABEL: sil @$s32sil_combine_concrete_existential37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access %{{.*}} : $*PPP to $*@opened("{{.*}}") PPP
-// CHECK: switch_enum_addr %{{.*}} : $*Optional<@opened("{{.*}}") PPP>, case #Optional.some!enumelt: bb{{.*}}, case #Optional.none!enumelt: bb{{.*}}
-// CHECK: [[O2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*PPP to $*@opened("{{.*}}") PPP
-// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}") PPP, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, [[O1]] : $*@opened("{{.*}}") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-// CHECK: apply [[W]]<@opened("{{.*}}") PPP>(%{{.*}}, [[O2]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any PPP to $*@opened("{{.*}}", any PPP) Self
+// CHECK: switch_enum_addr %{{.*}} : $*Optional<@opened("{{.*}}", any PPP) Self>, case #Optional.some!enumelt: bb{{.*}}, case #Optional.none!enumelt: bb{{.*}}
+// CHECK: [[O2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any PPP to $*@opened("{{.*}}", any PPP) Self
+// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}", any PPP) Self, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, [[O1]] : $*@opened("{{.*}}", any PPP) Self : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: apply [[W]]<@opened("{{.*}}", any PPP) Self>(%{{.*}}, [[O2]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK-LABEL: } // end sil function '$s32sil_combine_concrete_existential37testWitnessReturnOptionalIndirectSelfyyF'
 public func testWitnessReturnOptionalIndirectSelf() {
   let p: PPP = S()

@@ -758,7 +758,7 @@ protected:
     // If needed, generate constraints for everything in the case statement.
     if (cs) {
       auto locator = cs->getConstraintLocator(
-          subjectExpr, LocatorPathElt::ContextualType(CTP_Initialization));
+          subjectExpr, LocatorPathElt::ContextualType(CTP_CaseStmt));
       Type subjectType = cs->getType(subjectExpr);
 
       if (cs->generateConstraints(caseStmt, dc, subjectType, locator)) {
@@ -919,8 +919,6 @@ class ResultBuilderTransform
 
   using UnsupportedElt = SkipUnhandledConstructInResultBuilder::UnhandledNode;
 
-  /// The constraint system this transform is associated with.
-  ConstraintSystem &CS;
   /// The result type of this result builder body.
   Type ResultType;
 
@@ -930,8 +928,7 @@ class ResultBuilderTransform
 public:
   ResultBuilderTransform(ConstraintSystem &cs, DeclContext *dc,
                          Type builderType, Type resultTy)
-      : BuilderTransformerBase(&cs, dc, builderType), CS(cs),
-        ResultType(resultTy) {}
+      : BuilderTransformerBase(&cs, dc, builderType), ResultType(resultTy) {}
 
   UnsupportedElt getUnsupportedElement() const { return FirstUnsupported; }
 
@@ -1179,10 +1176,6 @@ protected:
             builder.buildCall(resultLoc, ctx.Id_buildFinalResult,
                               {buildBlockResult}, {Identifier()});
       }
-
-      // Type erase return if the result type requires it.
-      buildBlockResult = CS.buildTypeErasedExpr(buildBlockResult, dc,
-                                                ResultType, CTP_ReturnStmt);
 
       elements.push_back(new (ctx) ReturnStmt(resultLoc, buildBlockResult,
                                               /*Implicit=*/true));
@@ -2535,7 +2528,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
     if (isDebugMode()) {
       auto &log = llvm::errs();
-      auto indent = solverState ? solverState->depth * 2 : 0;
+      auto indent = solverState ? solverState->getCurrentIndent() : 0;
       log.indent(indent) << "------- Transfomed Body -------\n";
       transformedBody->second->dump(log);
       log << '\n';

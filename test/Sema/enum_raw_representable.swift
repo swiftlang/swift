@@ -146,10 +146,10 @@ rdar32431165_2(42, E_32431165.bar)
 // or constructing raw representable type from second, both ways are valid.
 do {
   E_32431165.bar == "bar"
-  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'E_32431165' and 'String'}} expected-note@-1 {{partially matching parameter lists: (String, String)}}
+  // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{17-17=.rawValue}}
 
   "bar" == E_32431165.bar
-  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'String' and 'E_32431165'}} expected-note@-1 {{partially matching parameter lists: (String, String)}}
+  // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{26-26=.rawValue}}
 }
 
 func rdar32431165_overloaded() -> Int { 42 }     // expected-note {{'rdar32431165_overloaded()' produces 'Int', not the expected contextual result type 'E_32431165'}}

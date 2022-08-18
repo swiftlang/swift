@@ -392,12 +392,6 @@ sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@o
 // CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:  call swiftcc void @receive_closure(i8* bitcast (%T13partial_apply3SubC* (%swift.refcounted*)* @"$s26parametric_casting_closureTA.{{[0-9]+}}" to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
 
-// CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$s26parametric_casting_closureTA"(%T13partial_apply4BaseC* %0, %swift.refcounted* swiftself %1)
-// CHECK: [[RES:%.*]] = tail call swiftcc %T13partial_apply4BaseC* @parametric_casting_closure
-// CHECK: [[CASTED:%.*]] = bitcast %T13partial_apply4BaseC* [[RES]] to %T13partial_apply3SubC*
-// CHECK: ret %T13partial_apply3SubC* [[CASTED]]
-
-
 // CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$s26parametric_casting_closureTA.{{[0-9]+}}"(%swift.refcounted* swiftself %0)
 // CHECK:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s13partial_apply3SubCMa"(i64 0)
 // CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
@@ -457,19 +451,6 @@ bb0(%0 : $Int):
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 2
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
 // CHECK-NEXT: store i8** %T.Y.P2, i8*** [[T1]], align 8
-
-// CHECK-LABEL: define internal swiftcc void @"$s24complex_generic_functionTA"(%swift.refcounted* swiftself %0)
-// CHECK:      [[T0:%.*]] = bitcast %swift.refcounted* %0 to <{ %swift.refcounted, [24 x i8], %TSi }>*
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, <{ %swift.refcounted, [24 x i8], %TSi }>* [[T0]], i32 0, i32 1
-// CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T1]] to %swift.type**
-// CHECK-NEXT: %T = load %swift.type*, %swift.type** [[BUFFER]], align 8
-// CHECK-NEXT: store %swift.type* %T, %swift.type**
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 1
-// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
-// CHECK-NEXT: %T.P2 = load i8**, i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 2
-// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
-// CHECK-NEXT: %T.Y.P2 = load i8**, i8*** [[T1]], align 8
 
 struct ComplexBoundedType<T: P2> {}
 

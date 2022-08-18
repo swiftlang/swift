@@ -319,4 +319,12 @@ SENDABLE id StructWithSendableContentsGetSendableComputed(struct StructWithSenda
 + (void)getAsCustomer:(void(^_Nonnull)(NSObject *device))completion;
 @end
 
+
+// rdar://97646309
+UI_ACTOR
+@protocol CoffeeDelegate <NSObject>
+@optional
+- (void)icedMochaService:(NSObject *)mochaService generateMochaWithCompletion:(void (^)(NSObject *_Nullable ingredient1, NSObject *ingredient2, NSObject *ingredient3))completionHandler;
+@end
+
 #pragma clang assume_nonnull end

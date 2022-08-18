@@ -69,7 +69,7 @@ func optionalMethodUnboundRefGeneric<T : P1>(t: T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s17protocol_optional0B27MethodUnboundRefExistentialyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   [[BOX:%[0-9]+]] = alloc_box ${ var @callee_guaranteed (@guaranteed P1) -> @owned Optional<@callee_guaranteed () -> @owned P1> }
+// CHECK:   [[BOX:%[0-9]+]] = alloc_box ${ var @callee_guaranteed (@guaranteed any P1) -> @owned Optional<@callee_guaranteed () -> @owned any P1> }
 // CHECK:   [[BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[BOX]]
 // CHECK:   [[PBOX:%[0-9]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:   [[THUNK:%[0-9]+]] = function_ref @$[[THUNK_NAME:[_0-9a-zA-Z]+]]
@@ -78,15 +78,15 @@ func optionalMethodUnboundRefGeneric<T : P1>(t: T) {
 // CHECK:   end_borrow [[BOX_LIFETIME]]
 // CHECK: } // end sil function '$s17protocol_optional0B27MethodUnboundRefExistentialyyF'
 
-// CHECK: sil private [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed P1) -> @owned Optional<@callee_guaranteed () -> @owned P1> {
-// CHECK: bb0([[EXIST:%[0-9]+]] : @guaranteed $P1):
-// CHECK:   [[OPENED:%[0-9]+]] = open_existential_ref [[EXIST]] : $P1 to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) P1]]
+// CHECK: sil private [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed any P1) -> @owned Optional<@callee_guaranteed () -> @owned any P1> {
+// CHECK: bb0([[EXIST:%[0-9]+]] : @guaranteed $any P1):
+// CHECK:   [[OPENED:%[0-9]+]] = open_existential_ref [[EXIST]] : $any P1 to $[[OPENED_TY:@opened\("[-A-F0-9]+", any P1\) Self]]
 // CHECK:   [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]
 // CHECK:   alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : AnyObject> () -> @owned τ_0_0 for <[[OPENED_TY]]>>
 // CHECK:   dynamic_method_br [[OPENED_COPY]] : $[[OPENED_TY]], #P1.methodReturnsSelf!foreign, bb1, bb2
 //
 // CHECK: bb{{[0-9]+}}([[ARG:%[0-9]+]] : @owned $@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : AnyObject> () -> @owned τ_0_0 for <[[OPENED_TY]]>):
-// CHECK:   [[ERASED:%[0-9]+]] = convert_function [[ARG]] : {{.*}} to $@callee_guaranteed () -> @owned P1
+// CHECK:   [[ERASED:%[0-9]+]] = convert_function [[ARG]] : {{.*}} to $@callee_guaranteed () -> @owned any P1
 // CHECK: } // end sil function '$[[THUNK_NAME]]'
 func optionalMethodUnboundRefExistential() {
   // Test that we erase to existential bounds.

@@ -1184,7 +1184,7 @@ public:
       spareBits.append(TC.IGM.getWitnessTablePtrSpareBits()); \
     } \
     auto storageTy = buildReferenceStorageType(TC.IGM, \
-                              TC.IGM.Name##ReferencePtrTy->getElementType()); \
+                              TC.IGM.Name##ReferencePtrTy->getPointerElementType()); \
     return AddressOnly##Name##ClassExistentialTypeInfo::create( \
                                                  getStoredProtocols(), \
                                                  storageTy, \
@@ -1209,7 +1209,7 @@ public:
       spareBits.append(TC.IGM.getWitnessTablePtrSpareBits()); \
     } \
     auto storageTy = buildReferenceStorageType(TC.IGM, \
-                              TC.IGM.Name##ReferencePtrTy->getElementType()); \
+                              TC.IGM.Name##ReferencePtrTy->getPointerElementType()); \
     if (TC.IGM.isLoadableReferenceAddressOnly(Refcounting)) { \
       return AddressOnly##Name##ClassExistentialTypeInfo::create( \
                                                    getStoredProtocols(), \

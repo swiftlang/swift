@@ -8,6 +8,16 @@
 // RUN: %target-codesign %t/swift-class-execution
 // RUN: %target-run %t/swift-class-execution | %FileCheck %s
 
+// RUN: %empty-directory(%t-evo)
+
+// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-public-decls -enable-library-evolution -emit-clang-header-path %t-evo/class.h
+
+// RUN: %target-interop-build-clangxx -c %s -I %t-evo -o %t-evo/swift-class-execution.o
+// RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t-evo/swift-class-execution-evo -Xlinker %t-evo/swift-class-execution.o -module-name Class -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+
+// RUN: %target-codesign %t-evo/swift-class-execution-evo
+// RUN: %target-run %t-evo/swift-class-execution-evo | %FileCheck %s
+
 // REQUIRES: executable_test
 
 #include <assert.h>

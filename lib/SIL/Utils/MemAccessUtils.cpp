@@ -1935,6 +1935,11 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
       return true;
     }
   }
+  if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser())) {
+    if (use->get() == sbi->getDest()) {
+      pushUsers(sbi, dfs);
+    }
+  }
   if (isa<EndBorrowInst>(use->getUser())) {
     return true;
   }

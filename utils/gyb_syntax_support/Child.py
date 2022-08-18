@@ -84,5 +84,5 @@ class Child(object):
             return self.token_choices[0]
         return None
 
-    def is_garbage_nodes(self):
-        return self.syntax_kind == 'GarbageNodes'
+    def is_unexpected_nodes(self):
+        return self.syntax_kind == 'UnexpectedNodes'

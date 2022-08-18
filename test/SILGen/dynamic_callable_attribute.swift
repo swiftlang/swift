@@ -59,17 +59,17 @@ class C {
   func dynamicallyCall(withKeywordArguments x: [String: String]) -> Self { return self }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s26dynamic_callable_attribute05test_A10_callablesyyAA1SV_AA2P1_pAA2P2_pxtAA1CCRbzlF : $@convention(thin) <T where T : C> (S, @in_guaranteed P1, @in_guaranteed P2, @guaranteed T) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s26dynamic_callable_attribute05test_A10_callablesyyAA1SV_AA2P1_pAA2P2_pxtAA1CCRbzlF : $@convention(thin) <T where T : C> (S, @in_guaranteed any P1, @in_guaranteed any P2, @guaranteed T) -> ()
 func test_dynamic_callables<T : C>(_ s: S, _ p1: P1, _ p2: P2, _ t: T) {
   // SR-12615: Compiler crash on @dynamicCallable IUO.
   // CHECK: function_ref @$s26dynamic_callable_attribute1SV15dynamicallyCall13withArgumentsSiSgSaySiG_tF : $@convention(method) (@guaranteed Array<Int>, S) -> Optional<Int>
   // CHECK: switch_enum %{{.+}} : $Optional<Int>
   let _: Int = s(0)
 
-  // CHECK: witness_method $@opened({{.+}}) P1, #P1.dynamicallyCall : <Self where Self : P1> (Self) -> ([String : Any]) -> ()
+  // CHECK: witness_method $@opened({{.+}} any P1) Self, #P1.dynamicallyCall : <Self where Self : P1> (Self) -> ([String : Any]) -> ()
   p1(x: 5)
 
-  // CHECK: witness_method $@opened({{.+}}) P2, #P2.dynamicallyCall : <Self where Self : P2> (Self) -> ([Int]) -> Self
+  // CHECK: witness_method $@opened({{.+}} any P2) Self, #P2.dynamicallyCall : <Self where Self : P2> (Self) -> ([Int]) -> Self
   _ = p2()
 
   // CHECK: class_method %{{.+}} : $C, #C.dynamicallyCall : (C) -> ([String : String]) -> @dynamic_self C, $@convention(method) (@guaranteed Dictionary<String, String>, @guaranteed C) -> @owned C

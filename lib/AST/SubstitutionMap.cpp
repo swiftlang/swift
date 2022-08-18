@@ -299,9 +299,9 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
     return replacementType;
   }
 
-  // The generic parameter may not be canonical. Retrieve the canonical
+  // The generic parameter may not be reduced. Retrieve the reduced
   // type, which will be dependent.
-  CanType canonicalType = genericSig.getCanonicalTypeInContext(genericParam);
+  CanType canonicalType = genericSig.getReducedType(genericParam);
 
   // If nothing changed, we don't have a replacement.
   if (canonicalType == type) return Type();
@@ -367,11 +367,10 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     return ProtocolConformanceRef::forMissingOrInvalid(substType, proto);
   }
 
-  auto accessPath =
-    genericSig->getConformanceAccessPath(type, proto);
+  auto path = genericSig->getConformancePath(type, proto);
 
   ProtocolConformanceRef conformance;
-  for (const auto &step : accessPath) {
+  for (const auto &step : path) {
     // For the first step, grab the initial conformance.
     if (conformance.isInvalid()) {
       if (auto initialConformance = getSignatureConformance(

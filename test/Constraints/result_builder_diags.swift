@@ -855,3 +855,40 @@ func test_invalid_result_is_diagnosed() {
     S<Int>()
   }
 }
+
+func test_associated_values_dont_block_solver_when_unresolved() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ t: T) -> T { t }
+    static func buildEither<T>(first: T) -> T { first }
+    static func buildEither<T>(second: T) -> T { second }
+  }
+
+  struct Value {
+    enum Kind {
+      case a(String)
+      case b
+    }
+
+    var kind: Kind
+  }
+
+  struct Container {
+    var prop: Value? = nil
+  }
+
+  struct TestWithAny {
+    var container: Container
+
+    @Builder var body: String {
+      let v = container.prop.kind // expected-error {{value of optional type 'Value?' must be unwrapped to refer to member 'kind' of wrapped base type 'Value'}}
+      // expected-note@-1 {{chain the optional using '?' to access member 'kind' only for non-'nil' base values}}
+      // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
+      switch v.kind { // expected-error {{value of type 'Value.Kind' has no member 'kind'}}
+      case .a(_): "a"
+      case .b: "b"
+      }
+    }
+  }
+}

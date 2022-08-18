@@ -18,6 +18,13 @@ public struct FirstSmallStruct {
         print("x = \(x)")
 #endif
     }
+
+    public mutating func mutate() {
+        x = x * 2
+#if CHANGE_LAYOUT
+        y = ~y
+#endif
+    }
 }
 
 // CHECK: class FirstSmallStruct final {
@@ -30,11 +37,11 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #else
 // CHECK-NEXT:   auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
-// CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable);
+// CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable->size, vwTable->getAlignment());
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
-// CHECK-NEXT:  inline FirstSmallStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}
+// CHECK-NEXT:  inline FirstSmallStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable->size, vwTable->getAlignment()) {}
 // CHECK-NEXT:  static inline FirstSmallStruct _make() {
 // CHECK-NEXT:    auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
@@ -52,6 +59,36 @@ public struct FirstSmallStruct {
 // CHECK-NEXT:  friend class _impl::_impl_FirstSmallStruct;
 // CHECK-NEXT:};
 
+// CHECK: class _impl_FirstSmallStruct {
+// CHECK: };
+// CHECK-EMPTY:
+// CHECK-NEXT: }
+
+// CHECK-EMPTY:
+// CHECK-NEXT: } // end namespace
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<Structs::FirstSmallStruct>() {
+// CHECK-NEXT:   return Structs::_impl::$s7Structs16FirstSmallStructVMa(0)._0;
+// CHECK-NEXT: }
+// CHECK-NEXT: namespace _impl{
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isValueType<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isOpaqueLayout<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct implClassFor<Structs::FirstSmallStruct> { using type = Structs::_impl::_impl_FirstSmallStruct; };
+// CHECK-NEXT: } // namespace
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace Structs {
+
 // CHECK:      inline uint32_t FirstSmallStruct::getX() const {
 // CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvg(_getOpaquePointer());
 // CHECK-NEXT: }
@@ -60,6 +97,9 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: }
 // CHECK-NEXT: inline void FirstSmallStruct::dump() const {
 // CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
+// CHECK-NEXT: }
+// CHECK-NEXT: inline void FirstSmallStruct::mutate() {
+// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV6mutateyyF(_getOpaquePointer());
 // CHECK-NEXT: }
 
 @frozen public struct FrozenStruct {
@@ -93,11 +133,11 @@ public struct LargeStruct {
 // CHECK-NEXT: #else
 // CHECK-NEXT:   auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
-// CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable);
+// CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable->size, vwTable->getAlignment());
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
-// CHECK-NEXT:  inline LargeStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}
+// CHECK-NEXT:  inline LargeStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable->size, vwTable->getAlignment()) {}
 // CHECK-NEXT:  static inline LargeStruct _make() {
 // CHECK-NEXT:    auto metadata = _impl::$s7Structs11LargeStructVMa(0);
 // CHECK-NEXT:    auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
@@ -151,7 +191,7 @@ public struct StructWithRefCountStoredProp {
     }
 }
 
-// CHECK: inline StructWithRefCountStoredProp(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}
+// CHECK: inline StructWithRefCountStoredProp(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable->size, vwTable->getAlignment()) {}
 // CHECK:      inline void StructWithRefCountStoredProp::dump() const {
 // CHECK-NEXT:   return _impl::$s7Structs28StructWithRefCountStoredPropV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }

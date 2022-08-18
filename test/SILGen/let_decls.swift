@@ -285,7 +285,7 @@ protocol SimpleProtocol {
 // methods on protocol and archetypes calls.
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetProtocolBases
-// CHECK: bb0(%0 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $*any SimpleProtocol):
 func testLetProtocolBases(_ p : SimpleProtocol) {
   // CHECK-NEXT: debug_value {{.*}} expr op_deref
   // CHECK-NEXT: open_existential_addr
@@ -320,9 +320,9 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testDebugValue
-// CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $Int, %1 : $*any SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int, let, name "a"
-// CHECK-NEXT: debug_value %1 : $*SimpleProtocol, let, name "b", {{.*}} expr op_deref
+// CHECK-NEXT: debug_value %1 : $*any SimpleProtocol, let, name "b", {{.*}} expr op_deref
 func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
   // CHECK-NEXT: debug_value %0 : $Int, let, name "x"
@@ -340,14 +340,14 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
-// CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
-// CHECK-NEXT:    %2 = alloc_stack [lexical] $(start: SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
-// CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
-// CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*SimpleProtocol
-// CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
+// CHECK:       bb0(%0 : $*any SimpleProtocol, %1 : $Int):
+// CHECK-NEXT:    %2 = alloc_stack [lexical] $(start: any SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
+// CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 0
+// CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*any SimpleProtocol
+// CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    store %1 to [trivial] %5 : $*Int
-// CHECK-NEXT:    destroy_addr %2 : $*(start: SimpleProtocol, pastEnd: Int)
-// CHECK-NEXT:    dealloc_stack %2 : $*(start: SimpleProtocol, pastEnd: Int)
+// CHECK-NEXT:    destroy_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int)
+// CHECK-NEXT:    dealloc_stack %2 : $*(start: any SimpleProtocol, pastEnd: Int)
 }
 
 
@@ -484,10 +484,10 @@ func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
 var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
-// CHECK: bb0(%0 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $*any SimpleProtocol):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:  %1 = function_ref @$s9let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pvg
-// CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out SimpleProtocol
+// CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out any SimpleProtocol
 // CHECK-NEXT:  %3 = tuple ()
 // CHECK-NEXT:  return %3 : $()
 // CHECK-NEXT: }

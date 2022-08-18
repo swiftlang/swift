@@ -182,7 +182,7 @@ bb0(%0 : $Int64):
 protocol SomeProtocol {
 }
 
-// CHECK-LABEL: sil [transparent] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
+// CHECK-LABEL: sil [transparent] @test_existential_metatype : $@convention(thin) (@in any SomeProtocol) -> @thick any SomeProtocol.Type
 sil [transparent] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
   %1 = alloc_box ${ var SomeProtocol }
@@ -197,15 +197,15 @@ bb0(%0 : $*SomeProtocol):
   return %6 : $@thick SomeProtocol.Type
 }
 
-// CHECK-LABEL: sil @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
+// CHECK-LABEL: sil @inline_test_existential_metatype : $@convention(thin) (@in any SomeProtocol) -> @thick any SomeProtocol.Type
 sil @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
-// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $*SomeProtocol):
-  // CHECK: [[VAL1:%.*]] = alloc_box ${ var SomeProtocol }
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $*any SomeProtocol):
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var any SomeProtocol }
   // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
   // CHECK: copy_addr [take] %0 to [initialization] [[PB1]]
-  // CHECK: [[VAL4:%.*]] = alloc_stack $SomeProtocol
+  // CHECK: [[VAL4:%.*]] = alloc_stack $any SomeProtocol
   // CHECK: copy_addr [[PB1]] to [initialization] [[VAL4]]
-  // CHECK: [[VAL6:%.*]] = existential_metatype $@thick SomeProtocol.Type, [[VAL4]]
+  // CHECK: [[VAL6:%.*]] = existential_metatype $@thick any SomeProtocol.Type, [[VAL4]]
   // CHECK: destroy_addr [[VAL4]]
   // CHECK: dealloc_stack [[VAL4]]
   // CHECK: strong_release [[VAL1]]
@@ -716,7 +716,7 @@ bb0:
 sil [transparent] @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () {
 bb0(%0 : $CP):
   strong_retain %0 : $CP                          // id: %2
-  %3 = open_existential_ref %0 : $CP to $@opened("01234567-89ab-cdef-0123-000000000000") CP // user: %5
+  %3 = open_existential_ref %0 : $CP to $@opened("01234567-89ab-cdef-0123-000000000000", CP) Self // user: %5
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
 }
@@ -726,11 +726,11 @@ sil @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ : $@convention(thin
 bb0(%0 : $CP, %1 : $CP):
   %4 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () // user: %6
   strong_retain %0 : $CP                          // id: %5
-  // CHECK: open_existential_ref %0 : $CP to $@opened([[N1:".*"]]) CP
+  // CHECK: open_existential_ref %0 : $any CP to $@opened([[N1:".*"]], any CP) Self
   %6 = apply %4(%0) : $@convention(thin) (@owned CP) -> ()
   %7 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () // user: %9
   strong_retain %1 : $CP                          // id: %8
-  // CHECK: open_existential_ref %1 : $CP to $@opened([[N2:".*"]]) CP
+  // CHECK: open_existential_ref %1 : $any CP to $@opened([[N2:".*"]], any CP) Self
   %9 = apply %7(%1) : $@convention(thin) (@owned CP) -> ()
   strong_release %1 : $CP                         // id: %10
   strong_release %0 : $CP                         // id: %11
@@ -840,8 +840,8 @@ bb0(%0 : $Foo):
   %2 = function_ref @protocolConstrained : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
   strong_retain %0 : $Foo
   // CHECK-NOT: apply
-  // CHECK: [[METHOD:%[a-zA-Z0-9]+]] = objc_method %0 : $Foo, #Foo.foo!foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
-  // CHECK: apply [[METHOD]]<Foo>(%0) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  // CHECK: [[METHOD:%[a-zA-Z0-9]+]] = objc_method %0 : $any Foo, #Foo.foo!foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  // CHECK: apply [[METHOD]]<any Foo>(%0) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   %4 = apply %2<Foo>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
   strong_release %0 : $Foo
   %6 = tuple ()
@@ -988,7 +988,7 @@ bb0(%0 : $*Self):
 // Check that P2_s call can be properly inlined and the resulting witness_method instruction
 // uses the opened archetype from the caller.
 // CHECK-LABEL: sil hidden @L_start
-// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+"\) P2]]
+// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+", any P2\) Self]]
 // CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter : {{.*}}, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
 // CHECK: return
 sil hidden @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
@@ -996,9 +996,9 @@ bb0(%0 : $*L):
   %2 = struct_element_addr %0 : $*L, #L.o
   %3 = alloc_stack $P2
   copy_addr %2 to [initialization] %3 : $*P2
-  %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2
+  %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60", P2) Self
   %6 = function_ref @P2_s : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
-  %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60", P2) Self>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %3 : $*P2
   dealloc_stack %3 : $*P2
   return %7 : $Int32
@@ -1023,11 +1023,11 @@ bb0(%0 : $Optional<C>):
 // CHECK-LABEL: sil @testMandatoryConverted : $@convention(thin) (C) -> C {
 // CHECK: bb0(%0 : $C):
 // CHECK:   [[F1:%.*]] = function_ref @testMandatoryConvertedHelper : $@convention(thin) (C) -> C
-// CHECK:   [[CVT1:%.*]] = convert_function [[F1]] : $@convention(thin) (C) -> C to $@convention(thin) (C) -> (C, @error Error)
-// CHECK:   try_apply [[CVT1]](%0) : $@convention(thin) (C) -> (C, @error Error), normal bb1, error bb2
+// CHECK:   [[CVT1:%.*]] = convert_function [[F1]] : $@convention(thin) (C) -> C to $@convention(thin) (C) -> (C, @error any Error)
+// CHECK:   try_apply [[CVT1]](%0) : $@convention(thin) (C) -> (C, @error any Error), normal bb1, error bb2
 // CHECK: bb1(%{{.*}} : $C):
 // CHECK:   br bb3(%{{.*}} : $C)
-// CHECK: bb2(%{{.*}} : $Error):
+// CHECK: bb2(%{{.*}} : $any Error):
 // CHECK:   [[F2:%.*]] = function_ref @testMandatoryConvertedHelper2 : $@convention(thin) (Optional<C>) -> C
 // CHECK:   [[CVT2:%.*]] = convert_function [[F2]] : $@convention(thin) (Optional<C>) -> C to $@convention(thin) (C) -> C
 // CHECK:   %{{.*}} = apply [[CVT2]](%0) : $@convention(thin) (C) -> C

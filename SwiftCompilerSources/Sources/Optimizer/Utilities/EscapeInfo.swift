@@ -65,8 +65,7 @@ struct EscapeInfo<V: EscapeInfoVisitor> {
   /// The EscapePath is updated and maintained during the up-walk and down-walk.
   ///
   /// It's passed to the EscapeInfoVisitor's `visitUse` and `visitDef`.
-  struct EscapePath: WalkingPath {
-
+  struct EscapePath: SmallProjectionWalkingPath {
     /// During the walk, a projection path indicates where the initial value is
     /// contained in an aggregate.
     /// Example for a walk-down:
@@ -115,12 +114,16 @@ struct EscapeInfo<V: EscapeInfoVisitor> {
     /// \endcode
     let knownType: Type?
 
+    func with(projectionPath: SmallProjectionPath) -> Self {
+      return Self(projectionPath: projectionPath, followStores: self.followStores, knownType: self.knownType)
+    }
+
     func with(followStores: Bool) -> Self {
-      return Self(projectionPath: projectionPath, followStores: followStores, knownType: self.knownType)
+      return Self(projectionPath: self.projectionPath, followStores: followStores, knownType: self.knownType)
     }
     
     func with(knownType: Type?) -> Self {
-      return Self(projectionPath: projectionPath, followStores: self.followStores, knownType: knownType)
+      return Self(projectionPath: self.projectionPath, followStores: self.followStores, knownType: knownType)
     }
     
     func merge(with other: EscapePath) -> EscapePath {
@@ -138,25 +141,6 @@ struct EscapeInfo<V: EscapeInfoVisitor> {
       }
       return EscapePath(projectionPath: mergedPath, followStores: mergedFollowStores, knownType: mergedKnownType)
     }
-
-    // The following push and pop functions simply forward to the projectionPath.
-
-    func pop(kind: FieldKind) -> (index: Int, path: Self)? {
-      if let (idx, p) = projectionPath.pop(kind: kind) {
-        return (idx, EscapePath(projectionPath: p, followStores: followStores, knownType: knownType))
-      }
-      return nil
-    }
-    func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? {
-      if let p = projectionPath.popIfMatches(kind, index: index) {
-        return EscapePath(projectionPath: p, followStores: followStores, knownType: knownType)
-      }
-      return nil
-    }
-    func push(_ kind: FieldKind, index: Int) -> Self {
-      return EscapePath(projectionPath: projectionPath.push(kind, index:index), followStores: followStores, knownType: knownType)
-    }
-
   }
   
   enum DefVisitResult {

@@ -151,7 +151,7 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   auto genericSig =
       decl->getInnermostDeclContext()->getGenericSignatureOfContext();
 
-  auto canDeclTy = declTy->getCanonicalType(genericSig);
+  auto canDeclTy = declTy->getReducedType(genericSig);
 
   auto declIUOAttr = decl->isImplicitlyUnwrappedOptional();
   auto parentDeclIUOAttr = parentDecl->isImplicitlyUnwrappedOptional();
@@ -198,7 +198,7 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   if (parentDeclTy->hasError())
     return false;
 
-  auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
+  auto canParentDeclTy = parentDeclTy->getReducedType(genericSig);
 
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
@@ -1264,7 +1264,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     auto parentPropertyTy = getSuperMemberDeclType(baseDecl);
 
     CanType parentPropertyCanTy =
-      parentPropertyTy->getCanonicalType(
+      parentPropertyTy->getReducedType(
         decl->getInnermostDeclContext()->getGenericSignatureOfContext());
     if (!propertyTy->matches(parentPropertyCanTy,
                              TypeMatchFlags::AllowOverride)) {

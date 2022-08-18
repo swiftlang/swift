@@ -553,11 +553,11 @@ ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
   PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
   ++NumNormalProtocolConformancesLoaded;
 
-  assert(genericConformance.isConcrete() && "Abstract generic conformance?");
+  auto *rootConformance = cast<RootProtocolConformance>(
+      genericConformance.getConcrete());
+
   auto conformance =
-         ctx.getSpecializedConformance(conformingType,
-                                       genericConformance.getConcrete(),
-                                       subMap);
+         ctx.getSpecializedConformance(conformingType, rootConformance, subMap);
   return conformance;
 }
 
@@ -1186,6 +1186,53 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   auto signature = GenericSignature::get(paramTypes, requirements);
   sigOffset = signature;
   return signature;
+}
+
+Expected<GenericEnvironment *>
+ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID) {
+  using namespace decls_block;
+
+  assert(ID <= GenericEnvironments.size() &&
+         "invalid GenericEnvironment ID");
+  auto &envOffset = GenericEnvironments[ID-1];
+
+  // If we've already deserialized this generic environment, return it.
+  if (envOffset.isComplete())
+    return envOffset.get();
+
+  // Read the generic environment.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(envOffset));
+
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
+
+  StringRef blobData;
+  SmallVector<uint64_t, 8> scratch;
+  unsigned recordID = fatalIfUnexpected(
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+  if (recordID != GENERIC_ENVIRONMENT)
+    fatal();
+
+  GenericSignatureID parentSigID;
+  TypeID existentialID;
+  GenericEnvironmentLayout::readRecord(scratch, existentialID, parentSigID);
+
+  auto existentialTypeOrError = getTypeChecked(existentialID);
+  if (!existentialTypeOrError)
+    return existentialTypeOrError.takeError();
+
+  auto parentSigOrError = getGenericSignatureChecked(parentSigID);
+  if (!parentSigOrError)
+    return parentSigOrError.takeError();
+
+  auto *genericEnv = GenericEnvironment::forOpenedExistential(
+      existentialTypeOrError.get(), parentSigOrError.get(), UUID::fromTime());
+  envOffset = genericEnv;
+
+  return genericEnv;
 }
 
 SubstitutionMap ModuleFile::getSubstitutionMap(
@@ -5747,29 +5794,22 @@ Expected<Type> DESERIALIZE_TYPE(PRIMARY_ARCHETYPE_TYPE)(
 
 Expected<Type> DESERIALIZE_TYPE(OPENED_ARCHETYPE_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  TypeID existentialID;
   TypeID interfaceID;
-  GenericSignatureID sigID;
+  GenericEnvironmentID genericEnvID;
 
-  decls_block::OpenedArchetypeTypeLayout::readRecord(scratch, existentialID,
-                                                     interfaceID, sigID);
-
-  auto sigOrError = MF.getGenericSignatureChecked(sigID);
-  if (!sigOrError)
-    return sigOrError.takeError();
+  decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
+                                                     interfaceID,
+                                                     genericEnvID);
 
   auto interfaceTypeOrError = MF.getTypeChecked(interfaceID);
   if (!interfaceTypeOrError)
     return interfaceTypeOrError.takeError();
 
-  auto existentialTypeOrError = MF.getTypeChecked(existentialID);
-  if (!existentialTypeOrError)
-    return existentialTypeOrError.takeError();
+  auto envOrError = MF.getGenericEnvironmentChecked(genericEnvID);
+  if (!envOrError)
+    return envOrError.takeError();
 
-  auto env = GenericEnvironment::forOpenedArchetypeSignature(
-      existentialTypeOrError.get(), sigOrError.get(), UUID::fromTime());
-  return env->mapTypeIntoContext(interfaceTypeOrError.get())
-      ->castTo<OpenedArchetypeType>();
+  return envOrError.get()->mapTypeIntoContext(interfaceTypeOrError.get());
 }
 
 Expected<Type> DESERIALIZE_TYPE(OPAQUE_ARCHETYPE_TYPE)(

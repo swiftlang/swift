@@ -839,6 +839,10 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(GenericSignatures, scratch);
         break;
+      case index_block::GENERIC_ENVIRONMENT_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(GenericEnvironments, scratch);
+        break;
       case index_block::SUBSTITUTION_MAP_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(SubstitutionMaps, scratch);

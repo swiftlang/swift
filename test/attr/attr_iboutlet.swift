@@ -162,7 +162,8 @@ class NonObjC {}
   }
 }
 
-// https://bugs.swift.org/browse/SR-9889
+// https://github.com/apple/swift/issues/52295
+
 @objc class NonOptionalWeak {
   // expected-error@+3 {{@IBOutlet property has non-optional type 'OX'}}
   // expected-note @+2 {{add '?' to form the optional type 'OX?'}}

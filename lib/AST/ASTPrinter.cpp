@@ -26,6 +26,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
@@ -1678,6 +1679,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::interleave(
         genericParams,
         [&](GenericTypeParamType *param) {
+          if (param->isTypeSequence())
+            Printer.printAttrName("@_typeSequence ");
+
           if (!subMap.empty()) {
             printType(substParam(param));
           } else if (auto *GP = param->getDecl()) {
@@ -3009,6 +3013,10 @@ static bool usesFeatureConciseMagicFile(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureExistentialAny(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
   return false;
 }
@@ -3468,6 +3476,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl, [&] {
+    if (decl->isTypeSequence())
+      Printer.printAttrName("@_typeSequence ");
     Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
   });
 
@@ -4522,6 +4532,11 @@ void PrintAST::visitArrowExpr(ArrowExpr *expr) {
 
 void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
   Printer << "await ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitMoveExpr(MoveExpr *expr) {
+  Printer << "move ";
   visit(expr->getSubExpr());
 }
 
@@ -6307,14 +6322,25 @@ public:
   }
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
-    if (auto parent = T->getParent()) {
-      printArchetypeCommon(T);
-      return;
-    }
+    if (Options.PrintForSIL) {
+      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\", ";
+      visit(T->getGenericEnvironment()->getOpenedExistentialType());
+      Printer << ") ";
 
-    if (Options.PrintForSIL)
-      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
-    visit(T->getExistentialType());
+      llvm::DenseMap<CanType, Identifier> newAlternativeTypeNames;
+
+      auto interfaceTy = T->getInterfaceType();
+      auto selfTy = interfaceTy->getRootGenericParam();
+      auto &ctx = selfTy->getASTContext();
+      newAlternativeTypeNames[selfTy->getCanonicalType()] = ctx.Id_Self;
+
+      PrintOptions subOptions = Options;
+      subOptions.AlternativeTypeNames = &newAlternativeTypeNames;
+      TypePrinter sub(Printer, subOptions);
+      sub.visit(interfaceTy);
+    } else {
+      visit(T->getExistentialType());
+    }
   }
 
   void printDependentMember(DependentMemberType *T) {

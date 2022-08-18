@@ -391,11 +391,11 @@ namespace {
       llvm_unreachable("Invalid BuiltinType.");
     }
 
-    ImportResult VisitExtIntType(const clang::ExtIntType *type) {
+    ImportResult VisitBitIntType(const clang::BitIntType *type) {
       Impl.addImportDiagnostic(type, Diagnostic(diag::unsupported_builtin_type,
                                                 type->getTypeClassName()),
                                clang::SourceLocation());
-      // ExtInt is not supported in Swift.
+      // BitInt is not supported in Swift.
       return Type();
     }
 
@@ -935,6 +935,8 @@ namespace {
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(SubstTemplateTypeParm)
     SUGAR_TYPE(Elaborated)
+    SUGAR_TYPE(Using)
+    SUGAR_TYPE(BTFTagAttributed)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();

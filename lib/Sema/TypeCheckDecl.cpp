@@ -708,6 +708,10 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
 bool
 ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::ExistentialAny))
+    return true;
+
   // ObjC protocols do not require `any`.
   if (decl->isObjC())
     return false;
@@ -1822,6 +1826,8 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
+  if (typeAlias->preconcurrency())
+    options |= TypeResolutionFlags::Preconcurrency;
 
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
@@ -2087,8 +2093,11 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
             : ErrorType::get(ctx));
   }
 
-  const auto options =
+  auto options =
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
+  if (decl->preconcurrency())
+    options |= TypeResolutionFlags::Preconcurrency;
+
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
@@ -2187,6 +2196,13 @@ static Type validateParameterType(ParamDecl *decl) {
   } else {
     assert(isa<EnumElementDecl>(dc));
     options = TypeResolutionOptions(TypeResolverContext::EnumElementDecl);
+  }
+
+  // Set the "preconcurrency" flag if this is a parameter of a preconcurrency
+  // declaration.
+  if (auto decl = dc->getAsDecl()) {
+    if (decl->preconcurrency())
+      options |= TypeResolutionFlags::Preconcurrency;
   }
 
   // If the element is a variadic parameter, resolve the parameter type as if

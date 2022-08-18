@@ -14,6 +14,7 @@
 #include "ClangSyntaxPrinter.h"
 #include "PrintClangValueType.h"
 #include "swift/AST/Decl.h"
+#include "swift/IRGen/Linking.h"
 
 using namespace swift;
 
@@ -23,12 +24,20 @@ void ClangClassTypePrinter::printClassTypeDecl(
 
   ClangSyntaxPrinter printer(os);
 
+  auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
+      typeDecl->getDeclaredType()->getCanonicalType());
+  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
+
   // Print out a forward declaration of the "hidden" _impl class.
   printer.printNamespace(cxx_synthesis::getCxxImplNamespaceName(),
                          [&](raw_ostream &os) {
                            os << "class ";
                            printCxxImplClassName(os, typeDecl);
                            os << ";\n";
+                           // Print out special functions, like functions that
+                           // access type metadata.
+                           printer.printCTypeMetadataTypeFunction(
+                               typeDecl, typeMetadataFuncName);
                          });
 
   std::string baseClassName;
@@ -59,7 +68,7 @@ void ClangClassTypePrinter::printClassTypeDecl(
 
   os << "  using " << baseClassName << "::" << baseClassName << ";\n";
   os << "  using " << baseClassName << "::operator=;\n";
-
+  bodyPrinter();
   os << "protected:\n";
   os << "  inline ";
   printer.printBaseName(typeDecl);
@@ -84,6 +93,9 @@ void ClangClassTypePrinter::printClassTypeDecl(
         os << "(ptr); }\n";
         os << "};\n";
       });
+
+  ClangValueTypePrinter::printTypeGenericTraits(os, typeDecl,
+                                                typeMetadataFuncName);
 }
 
 void ClangClassTypePrinter::printClassTypeReturnScaffold(

@@ -32,70 +32,6 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
-static StringRef getScoreKindName(ScoreKind kind) {
-  switch (kind) {
-  case SK_Hole:
-    return "hole in the constraint system";
-
-  case SK_Unavailable:
-    return "use of an unavailable declaration";
-
-  case SK_AsyncInSyncMismatch:
-    return "async-in-synchronous mismatch";
-
-  case SK_SyncInAsync:
-    return "sync-in-asynchronous";
-
-  case SK_ForwardTrailingClosure:
-    return "forward scan when matching a trailing closure";
-
-  case SK_Fix:
-    return "attempting to fix the source";
-
-  case SK_DisfavoredOverload:
-    return "disfavored overload";
-
-  case SK_UnresolvedMemberViaOptional:
-    return "unwrapping optional at unresolved member base";
-
-  case SK_ForceUnchecked:
-    return "force of an implicitly unwrapped optional";
-
-  case SK_UserConversion:
-    return "user conversion";
-
-  case SK_FunctionConversion:
-    return "function conversion";
-
-  case SK_NonDefaultLiteral:
-    return "non-default literal";
-
-  case SK_CollectionUpcastConversion:
-    return "collection upcast conversion";
-
-  case SK_ValueToOptional:
-    return "value to optional";
-
-  case SK_EmptyExistentialConversion:
-    return "empty-existential conversion";
-
-  case SK_KeyPathSubscript:
-    return "key path subscript";
-
-  case SK_ValueToPointerConversion:
-    return "value-to-pointer conversion";
-
-  case SK_FunctionToAutoClosureConversion:
-    return "function to autoclosure parameter";
-
-  case SK_ImplicitValueConversion:
-    return "value-to-value conversion";
-
-  case SK_UnappliedFunction:
-    return "overloaded unapplied function";
-  }
-}
-
 void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   if (isForCodeCompletion()) {
     switch (kind) {
@@ -118,8 +54,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 
   if (isDebugMode() && value > 0) {
     if (solverState)
-      llvm::errs().indent(solverState->depth * 2);
-    llvm::errs() << "(increasing score due to " << getScoreKindName(kind) << ")\n";
+      llvm::errs().indent(solverState->getCurrentIndent());
+    llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "  << value 
+                 << ")\n";
   }
 
   unsigned index = static_cast<unsigned>(kind);
@@ -135,7 +72,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
     return false;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->depth * 2)
+    llvm::errs().indent(solverState->getCurrentIndent())
       << "(solution is worse than the best solution)\n";
   }
 
@@ -858,7 +795,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
   if (cs.isDebugMode()) {
-    llvm::errs().indent(cs.solverState->depth * 2)
+    llvm::errs().indent(cs.solverState->getCurrentIndent())
       << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
   }
 
@@ -1415,13 +1352,13 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return 0;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->depth * 2)
+    llvm::errs().indent(solverState->getCurrentIndent())
         << "Comparing " << viable.size() << " viable solutions\n";
 
     for (unsigned i = 0, n = viable.size(); i != n; ++i) {
-      llvm::errs().indent(solverState->depth * 2)
-          << "--- Solution #" << i << " ---\n";
-      viable[i].dump(llvm::errs().indent(solverState->depth * 2));
+      llvm::errs().indent(solverState->getCurrentIndent())
+          << "\n--- Solution #" << i << " ---\n";
+      viable[i].dump(llvm::errs().indent(solverState->getCurrentIndent()));
     }
   }
 

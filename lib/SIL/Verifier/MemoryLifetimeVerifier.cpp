@@ -274,11 +274,11 @@ void MemoryLifetimeVerifier::requireBitsSet(const Bits &bits, SILValue addr,
   }
 }
 
-void MemoryLifetimeVerifier::requireNoStoreBorrowLocation(SILValue addr,
-                                                  SILInstruction *where) {
-  if (isStoreBorrowLocation(addr)) {
+void MemoryLifetimeVerifier::requireNoStoreBorrowLocation(
+    SILValue addr, SILInstruction *where) {
+  if (isa<StoreBorrowInst>(addr)) {
     reportError("store-borrow location cannot be written",
-                locations.getLocation(addr)->selfAndParents.find_first(), where);
+                locations.getLocationIdx(addr), where);
   }
 }
 

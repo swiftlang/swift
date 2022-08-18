@@ -822,10 +822,10 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
         // to disambiguate whether a postfix expression is the condition of
         // #elseif or a postfix expression of the #else body.
         // To do this, push three empty syntax nodes onto the stack.
-        //  - First one for garbage nodes between the #else keyword and the
+        //  - First one for unexpected nodes between the #else keyword and the
         //    condition
         //  - One for the condition itself (whcih doesn't exist)
-        //  - And finally one for the garbage nodes between the condition and
+        //  - And finally one for the unexpected nodes between the condition and
         //    the elements
         SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
         SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());

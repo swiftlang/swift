@@ -732,7 +732,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-      ->getCanonicalType(genericSig));
+      ->getReducedType(genericSig));
 
   // Generic signatures where all parameters are concrete are lowered away
   // at the SILFunctionType level.

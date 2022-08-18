@@ -1029,7 +1029,7 @@ public func testCastAnyObjectProtocolToAnyObjectType() -> AnyObject.Type? {
 }
 
 // CHECK-LABEL: // testCastProtocolTypeProtocolToProtocolTypeType
-// CHECK: sil [noinline] @{{.*}}testCastProtocol{{.*}}$@convention(thin) () -> Optional<@thick P.Type.Type>
+// CHECK: sil [noinline] @{{.*}}testCastProtocol{{.*}}$@convention(thin) () -> Optional<@thick any P.Type.Type>
 // CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
 // CHECK-NEXT: return %0
 @inline(never)

@@ -115,7 +115,7 @@ bool BindingSet::isDelayed() const {
     // allows us to produce more specific errors because the type variable in
     // the expression that introduced the placeholder might be diagnosable using
     // fixForHole.
-    if (locator->isLastElement<LocatorPathElt::NamedPatternDecl>()) {
+    if (locator->isLastElement<LocatorPathElt::PatternDecl>()) {
       return true;
     }
 
@@ -808,7 +808,7 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
       continue;
 
     if (isDebugMode()) {
-      bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
+      bindings.dump(typeVar, llvm::errs(), solverState->getCurrentIndent());
     }
 
     // If these are the first bindings, or they are better than what
@@ -2061,16 +2061,16 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     return std::make_pair(fix, /*impact=*/(unsigned)10);
   }
 
-  if (auto pattern = getAsPattern<NamedPattern>(dstLocator->getAnchor())) {
+  if (auto pattern = getAsPattern(dstLocator->getAnchor())) {
     if (dstLocator->getPath().size() == 1 &&
-        dstLocator->isLastElement<LocatorPathElt::NamedPatternDecl>()) {
+        dstLocator->isLastElement<LocatorPathElt::PatternDecl>()) {
       // Not being able to infer the type of a variable in a pattern binding
       // decl is more dramatic than anything that could happen inside the
       // expression because we want to preferrably point the diagnostic to a
       // part of the expression that caused us to be unable to infer the
       // variable's type.
       ConstraintFix *fix =
-          IgnoreInvalidNamedPattern::create(cs, pattern, dstLocator);
+          IgnoreUnresolvedPatternVar::create(cs, pattern, dstLocator);
       return std::make_pair(fix, /*impact=*/(unsigned)100);
     }
   }

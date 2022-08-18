@@ -4,6 +4,11 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class.h)
 
+// RUN: %target-swift-frontend %s -typecheck -module-name Class -enable-library-evolution -clang-header-expose-public-decls -emit-clang-header-path %t/class-evo.h
+// RUN: %FileCheck %s < %t/class-evo.h
+
+// RUN: %check-interop-cxx-header-in-clang(%t/class-evo.h)
+
 public final class ClassWithIntField {
   var field: Int64
 
@@ -28,6 +33,9 @@ public final class ClassWithIntField {
 // CHECK: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: class _impl_ClassWithIntField;
+// CHECK-NEXT: // Type metadata accessor for ClassWithIntField
+// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $s5Class0A12WithIntFieldCMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
 // CHECK-EMPTY:
@@ -49,6 +57,26 @@ public final class ClassWithIntField {
 // CHECK-NEXT:};
 // CHECK-EMPTY:
 // CHECK-NEXT:} // namespace _impl
+// CHECK-EMPTY:
+// CHECK-NEXT: } // end namespace
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<Class::ClassWithIntField>() {
+// CHECK-NEXT:   return Class::_impl::$s5Class0A12WithIntFieldCMa(0)._0;
+// CHECK-NEXT: }
+// CHECK-NEXT: namespace _impl{
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct implClassFor<Class::ClassWithIntField> { using type = Class::_impl::_impl_ClassWithIntField; };
+// CHECK-NEXT: } // namespace
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace Class {
 
 // CHECK: inline ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));

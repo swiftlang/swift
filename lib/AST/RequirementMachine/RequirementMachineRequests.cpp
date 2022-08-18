@@ -482,7 +482,7 @@ RequirementMachine::computeMinimalGenericSignature(
   auto sig = GenericSignature::get(getGenericParams(), reqs);
 
   // Remember the signature for generic signature queries. In particular,
-  // getConformanceAccessPath() needs the current requirement machine's
+  // getConformancePath() needs the current requirement machine's
   // generic signature.
   Sig = sig.getCanonicalSignature();
 
@@ -596,7 +596,7 @@ AbstractGenericSignatureRequest::evaluate(
           },
           MakeAbstractConformanceForGenericType(),
           SubstFlags::AllowLoweredTypes);
-      resugaredRequirements.push_back(*resugaredReq);
+      resugaredRequirements.push_back(resugaredReq);
     }
 
     return GenericSignatureWithError(
@@ -920,14 +920,14 @@ InferredGenericSignatureRequest::evaluate(
 
     if (!allowConcreteGenericParams) {
       for (auto genericParam : result.getInnermostGenericParams()) {
-        auto canonical = result.getCanonicalTypeInContext(genericParam);
+        auto reduced = result.getReducedType(genericParam);
 
-        if (canonical->hasError() || canonical->isEqual(genericParam))
+        if (reduced->hasError() || reduced->isEqual(genericParam))
           continue;
 
-        if (canonical->isTypeParameter()) {
+        if (reduced->isTypeParameter()) {
           ctx.Diags.diagnose(loc, diag::requires_generic_params_made_equal,
-                             genericParam, result->getSugaredType(canonical))
+                             genericParam, result->getSugaredType(reduced))
             .warnUntilSwiftVersion(6);
         } else {
           ctx.Diags.diagnose(loc,

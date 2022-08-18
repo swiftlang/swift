@@ -145,9 +145,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
-  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
-  serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath.c_str();
+  serializationOpts.OutputPath = outs.ModuleOutputPath;
+  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath;
+  serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
   if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
@@ -211,10 +211,11 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 }
 
 bool CompilerInstance::setUpASTContextIfNeeded() {
-  if (Invocation.getFrontendOptions().RequestedAction ==
+  if ((Invocation.getFrontendOptions().RequestedAction ==
           FrontendOptions::ActionType::CompileModuleFromInterface ||
       Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::TypecheckModuleFromInterface) {
+          FrontendOptions::ActionType::TypecheckModuleFromInterface) &&
+      !Invocation.getFrontendOptions().ExplicitInterfaceBuild) {
     // Compiling a module interface from source uses its own CompilerInstance
     // with options read from the input file. Don't bother setting up an
     // ASTContext at this level.
@@ -861,6 +862,14 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   return getASTContext().canImportModule(modulePath);
 }
 
+bool CompilerInstance::canImportCxxShim() const {
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(CXX_SHIM_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath) &&
+         !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
+}
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
@@ -913,6 +922,10 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
         pushImport(SWIFT_STRING_PROCESSING_NAME);
       break;
     }
+  }
+
+  if (Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
+    pushImport(CXX_SHIM_NAME);
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;

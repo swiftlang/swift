@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "irgensil"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
@@ -51,6 +49,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
@@ -61,7 +60,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -93,6 +91,8 @@
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
+
+#define DEBUG_TYPE "irgensil"
 
 using namespace swift;
 using namespace irgen;
@@ -810,7 +810,7 @@ public:
                            SILDebugVariable VarInfo,
                            const SILDebugScope *Scope) {
     bool canStore =
-        cast<llvm::PointerType>(Alloca->getType())->getElementType() ==
+        cast<llvm::PointerType>(Alloca->getType())->getPointerElementType() ==
         Val->getType();
     if (canStore)
       return true;
@@ -910,7 +910,7 @@ public:
     auto *Address = Alloca.getAddress();
     if (WasMoved) {
       auto nonPtrAllocaType =
-          cast<llvm::PointerType>(Address->getType())->getElementType();
+          cast<llvm::PointerType>(Address->getType())->getPointerElementType();
       if (nonPtrAllocaType != Storage->getType())
         Address = Builder.CreateBitOrPointerCast(
             Address, llvm::PointerType::get(Storage->getType(), 0));
@@ -1087,14 +1087,9 @@ public:
       const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
       IndirectionKind Indirection,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
-    // TODO: fix demangling for C++ types (SR-13223).
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
         ty = metaTy->getRootClass().getPointer();
-      if (ty->getStructOrBoundGenericStruct() &&
-          isa_and_nonnull<clang::CXXRecordDecl>(
-              ty->getStructOrBoundGenericStruct()->getClangDecl()))
-        return;
     }
 
     assert(IGM.DebugInfo && "debug info not enabled");
@@ -1310,6 +1305,7 @@ public:
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
 
   void visitCopyAddrInst(CopyAddrInst *i);
+  void visitExplicitCopyAddrInst(ExplicitCopyAddrInst *i);
   void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *mai) {
     llvm_unreachable("Valid only when ownership is enabled");
   }
@@ -6862,6 +6858,30 @@ void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
 }
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
+  SILType addrTy = i->getSrc()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
+  Address src = getLoweredAddress(i->getSrc());
+  // See whether we have a deferred fixed-size buffer initialization.
+  auto &loweredDest = getLoweredValue(i->getDest());
+  assert(!loweredDest.isUnallocatedAddressInBuffer());
+  Address dest = loweredDest.getAnyAddress();
+  if (i->isInitializationOfDest()) {
+    if (i->isTakeOfSrc()) {
+      addrTI.initializeWithTake(*this, dest, src, addrTy, false);
+    } else {
+      addrTI.initializeWithCopy(*this, dest, src, addrTy, false);
+    }
+  } else {
+    if (i->isTakeOfSrc()) {
+      addrTI.assignWithTake(*this, dest, src, addrTy, false);
+    } else {
+      addrTI.assignWithCopy(*this, dest, src, addrTy, false);
+    }
+  }
+}
+
+void IRGenSILFunction::visitExplicitCopyAddrInst(
+    swift::ExplicitCopyAddrInst *i) {
   SILType addrTy = i->getSrc()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   Address src = getLoweredAddress(i->getSrc());

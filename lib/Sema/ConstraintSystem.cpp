@@ -1924,8 +1924,8 @@ typeEraseExistentialSelfReferences(
   }
 
   const auto existentialSig =
-      baseTy->getASTContext().getOpenedArchetypeSignature(baseTy,
-                                                          GenericSignature());
+      baseTy->getASTContext().getOpenedExistentialSignature(baseTy,
+                                                            GenericSignature());
 
   unsigned metatypeDepth = 0;
 
@@ -1988,7 +1988,7 @@ typeEraseExistentialSelfReferences(
 
       // If the type parameter is beyond the domain of the existential generic
       // signature, ignore it.
-      if (!existentialSig->isValidTypeInContext(t)) {
+      if (!existentialSig->isValidTypeParameter(t)) {
         return Type(t);
       }
 
@@ -3528,7 +3528,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   if (isDebugMode()) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    llvm::errs().indent(solverState ? solverState->depth * 2 : 2)
+    llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 2)
       << "(overload set choice binding "
       << boundType->getString(PO) << " := "
       << adjustedRefType->getString(PO) << ")\n";
@@ -4624,7 +4624,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         << " solutions with fixes ---\n";
     int i = 0;
     for (auto &solution : solutions) {
-      log << "--- Solution #" << i++ << "---\n";
+      log << "\n--- Solution #" << i++ << "---\n";
       solution.dump(log);
       log << "\n";
     }
@@ -5227,7 +5227,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::PlaceholderType:
     case ConstraintLocator::SequenceElementType:
     case ConstraintLocator::ConstructorMemberType:
-    case ConstraintLocator::ExistentialSuperclassType:
+    case ConstraintLocator::ExistentialConstraintType:
+    case ConstraintLocator::ProtocolCompositionSuperclassType:
       break;
 
     case ConstraintLocator::GenericArgument:
@@ -5273,6 +5274,15 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::NamedPatternDecl: {
       auto pattern = cast<NamedPattern>(anchor.get<Pattern *>());
       anchor = pattern->getDecl();
+      path = path.slice(1);
+      break;
+    }
+
+    case ConstraintLocator::AnyPatternDecl: {
+      // This element is just a marker for `_` pattern since it doesn't
+      // have a declaration. We need to make sure that it only appaears
+      // when anchored on `AnyPattern`.
+      assert(getAsPattern<AnyPattern>(anchor));
       path = path.slice(1);
       break;
     }
@@ -5672,9 +5682,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  return FunctionArgApplyInfo(argList, argExpr, argIdx,
-                              simplifyType(getType(argExpr)), paramIdx,
-                              fnInterfaceType, fnType, callee);
+  return FunctionArgApplyInfo::get(argList, argExpr, argIdx,
+                                   simplifyType(getType(argExpr)), paramIdx,
+                                   fnInterfaceType, fnType, callee);
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
@@ -6131,7 +6141,7 @@ void SolutionApplicationTargetsKey::dump(raw_ostream &OS) const {
 
   case Kind::functionRef:
     OS << "<function>\n";
-    storage.functionRef->dumpContext();
+    storage.functionRef->printContext(OS);
     return;
   }
   llvm_unreachable("invalid statement kind");
@@ -6433,9 +6443,9 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
         .highlight(expr->getSourceRange());
   } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-    auto *wrapper = wrappedVar->getAttachedPropertyWrappers().back();
+    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
     Type propertyType = wrappedVar->getInterfaceType();
-    Type wrapperType = wrapper->getType();
+    Type wrapperType = outerWrapper->getType();
 
     // Emit the property wrapper fallback diagnostic
     wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
@@ -6540,7 +6550,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
         return Action::SkipChildren;
       }
 
-      if (!Sig->isValidTypeInContext(ty)) {
+      if (!Sig->isValidTypeParameter(ty)) {
         return Action::SkipChildren;
       }
 
@@ -6551,7 +6561,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
 
       return Action::Stop;
     }
-  } isDependentOnSelfWalker(member->getASTContext().getOpenedArchetypeSignature(
+  } isDependentOnSelfWalker(member->getASTContext().getOpenedExistentialSignature(
       baseTy, GenericSignature()));
 
   for (const auto &req : sig.getRequirements()) {

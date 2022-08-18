@@ -1749,6 +1749,15 @@ public:
     *this << getIDAndType(CI->getDest());
   }
 
+  void visitExplicitCopyAddrInst(ExplicitCopyAddrInst *CI) {
+    if (CI->isTakeOfSrc())
+      *this << "[take] ";
+    *this << Ctx.getID(CI->getSrc()) << " to ";
+    if (CI->isInitializationOfDest())
+      *this << "[initialization] ";
+    *this << getIDAndType(CI->getDest());
+  }
+
   void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *CI) {
     *this << Ctx.getID(CI->getSrc()) << " to ";
     *this << getIDAndType(CI->getDest());
@@ -4058,6 +4067,7 @@ PrintOptions PrintOptions::printSIL(const SILPrintContext *ctx) {
   result.PrintInSILBody = true;
   result.PreferTypeRepr = false;
   result.PrintIfConfig = false;
+  result.PrintExplicitAny = true;
   result.OpaqueReturnTypePrinting =
      OpaqueReturnTypePrintingMode::StableReference;
   if (ctx && ctx->printFullConvention())

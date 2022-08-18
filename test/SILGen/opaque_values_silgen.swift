@@ -60,15 +60,15 @@ func forEachStmt() {
 
 // Tests that existential boxes can contain opaque types
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed Error) -> @owned String {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
-// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed any Error) -> @owned String {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $any Error to $@opened({{.*}}, any Error) Self
+// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, any Error) Self
 // CHECK:   [[COPY:%.*]] = copy_value [[OPAQUE_ARG]]
 // CHECK:   store [[COPY]] to [init] [[ALLOC_OPEN]]
 // CHECK:   destroy_addr [[ALLOC_OPEN]]
 // CHECK:   dealloc_stack [[ALLOC_OPEN]]
-// CHECK-NOT:   destroy_value [[ARG]] : $Error
+// CHECK-NOT:   destroy_value [[ARG]] : $any Error
 // CHECK:   return {{.*}} : $String
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen12openExistBoxySSs5Error_pF'
 func openExistBox(_ x: Error) -> String {
@@ -99,13 +99,13 @@ protocol EmptyP {}
 
 struct AddressOnlyStruct : EmptyP {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen10addrOnlyIf1xAA6EmptyP_pSb_tF : $@convention(thin) (Bool) -> @out EmptyP {
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen10addrOnlyIf1xAA6EmptyP_pSb_tF : $@convention(thin) (Bool) -> @out any EmptyP {
 // HECK: bb0([[ARG:%.*]] : $Bool):
-// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var EmptyP }, var
+// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any EmptyP }, var
 // HECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
 // HECK:   [[APPLY_FOR_BOX:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(method) (@thin AddressOnlyStruct.Type) -> AddressOnlyStruct
-// HECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $EmptyP
-// HECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*EmptyP
+// HECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $any EmptyP
+// HECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*any EmptyP
 // HECK:   [[APPLY_FOR_BRANCH:%.*]] = apply %{{.*}}([[ARG]]) : $@convention(method) (Bool) -> Builtin.Int1
 // HECK:   cond_br [[APPLY_FOR_BRANCH]], bb2, bb1
 // HECK: bb1:
@@ -128,19 +128,19 @@ func addrOnlyIf(x: Bool) -> EmptyP {
 
 // Tests LValue of error types / existential boxes
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12propOfLValueySSs5Error_pF : $@convention(thin) (@guaranteed Error) -> @owned String {
-// HECK: bb0([[ARG:%.*]] : $Error):
-// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var Error }
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12propOfLValueySSs5Error_pF : $@convention(thin) (@guaranteed any Error) -> @owned String {
+// HECK: bb0([[ARG:%.*]] : $any Error):
+// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any Error }
 // HECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
 // HECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // HECK:   store [[COPY_ARG]] to [init] [[PROJ_BOX]]
-// HECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*Error
+// HECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*any Error
 // HECK:   [[LOAD_BOX:%.*]] = load [copy] [[READ]]
-// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $Error to $*@opened({{.*}}) Error
+// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $any Error to $*@opened({{.*}}, any Error) Self
 // HECK:   [[LOAD_OPAQUE:%.*]] = load [copy] [[OPAQUE_ARG]]
-// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, any Error) Self
 // HECK:   store [[LOAD_OPAQUE]] to [init] [[ALLOC_OPEN]]
-// HECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}) Error>([[ALLOC_OPEN]])
+// HECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}, any Error) Self>([[ALLOC_OPEN]])
 // HECK:   return [[RET_VAL]] : $String
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen12propOfLValueySSs5Error_pF'
 func propOfLValue(_ x: Error) -> String {
@@ -282,7 +282,7 @@ public enum FloatingPointSign {
 // CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
 // CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX:   end_borrow [[BORROW2]] : $Any
-// CHECK-OSX:   [[RESULT:%.*]] = apply %{{.*}}<@opened("{{.*}}") Any>([[COPY2]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-OSX:   [[RESULT:%.*]] = apply %{{.*}}<@opened("{{.*}}", Any) Self>([[COPY2]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
 // CHECK-OSX:   destroy_value [[COPY2]] : $@opened
 // CHECK-OSX:   destroy_value [[COPY]] : $Any
 // CHECK-OSX-NOT:   destroy_value %0 : $Any
@@ -297,11 +297,11 @@ public func unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
 // Test open_existential_box_value in a conversion context.
 // ---
 // CHECK-OSX-LABEL: sil [ossa] @$s20opaque_values_silgen22testOpenExistentialBox1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
-// CHECK-OSX: [[BORROW:%.*]] = begin_borrow [lexical] %{{.*}} : $Error
-// CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
+// CHECK-OSX: [[BORROW:%.*]] = begin_borrow [lexical] %{{.*}} : $any Error
+// CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $any Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened
-// CHECK-OSX: end_borrow [[BORROW]] : $Error
+// CHECK-OSX: end_borrow [[BORROW]] : $any Error
 // CHECK-OSX-LABEL: } // end sil function '$s20opaque_values_silgen22testOpenExistentialBox1eys5Error_pSg_tF'
 public func testOpenExistentialBox(e: Error?) {
   if let u = e {
