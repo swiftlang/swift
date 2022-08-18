@@ -127,7 +127,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
                              os << typeDecl->getName().str() << '\n';
                              os << "extern \"C\" {\n";
                              for (const auto &pair : elementTagMapping) {
-                               os << "extern int "
+                               os << "extern unsigned "
                                   << pair.second.globalVariableName << ";\n";
                              }
                              os << "}\n";

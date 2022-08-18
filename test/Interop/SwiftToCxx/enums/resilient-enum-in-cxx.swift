@@ -34,8 +34,8 @@ public func printFoo(_ x: Foo) {
 
 // CHECK:         // Tags for resilient enum Foo
 // CHECK-NEXT:    extern "C" {
-// CHECK-NEXT:    extern int $s5Enums3FooO1ayACSdcACmFWC;
-// NEW_CASE-NEXT: extern int $s5Enums3FooO1byACSicACmFWC;
+// CHECK-NEXT:    extern unsigned $s5Enums3FooO1ayACSdcACmFWC;
+// NEW_CASE-NEXT: extern unsigned $s5Enums3FooO1byACSicACmFWC;
 // CHECK-NEXT:    }
 // CHECK-EMPTY:
 // CHECK-NEXT:    } // namespace _impl
