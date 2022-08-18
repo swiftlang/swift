@@ -2841,8 +2841,8 @@ struct T : Q {
 // CHECK: metatype $@thick T.Type
 // CHECK-NOT: checked_cast_addr_br
 // CHECK: checked_cast_br
-// CHECK: bb1(%[[ARG:[0-9]+]] : $@thick Q.Type)
-// CHECK: store %[[ARG]] to {{.*}} : $*@thick Q.Type
+// CHECK: bb1(%[[ARG:[0-9]+]] : $@thick any Q.Type)
+// CHECK: store %[[ARG]] to {{.*}} : $*@thick any Q.Type
 // CHECK: }
 sil @silcombine_checked_cast_addr_br_on_metatype_into_checked_cast_br_on_metatype : $@convention(thin) () -> Bool {
 bb0:
@@ -3019,7 +3019,7 @@ struct OtherError: Error {
 // CHECK-NOT: unconditional_checked_cast_addr
 // CHECK:      retain_value %0
 // CHECK-NOT: unconditional_checked_cast_addr
-// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $any Error
 // CHECK-NOT: unconditional_checked_cast_addr
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
 // CHECK-NEXT: destroy_addr [[E]]
@@ -3193,7 +3193,7 @@ bb0(%0 : $TestError):
 
 // CHECK-LABEL: sil @unconditional_existential_box_cast_not_dominating :
 // CHECK:      retain_value %0
-// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $any Error
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
 // CHECK-NEXT: destroy_addr [[E]]
 // CHECK-NEXT: store %0 to [[T]]
@@ -3231,7 +3231,7 @@ bb4:
 
 // CHECK-LABEL: sil @conditional_existential_box_cast
 // CHECK:      retain_value %0
-// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $any Error
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
 // CHECK-NEXT: store %0 to [[T]]
 // CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
@@ -3266,7 +3266,7 @@ bb2:
 
 // CHECK-LABEL: sil @taking_conditional_existential_box_cast
 // CHECK:      retain_value %0
-// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $any Error
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
 // CHECK-NEXT: destroy_addr [[E]]
 // CHECK-NEXT: store %0 to [[T]]
@@ -3504,7 +3504,7 @@ sil @minus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -
 
 // CHECK-LABEL: sil @silcombine_dont_change_allocstack_for_opened_archetypes
 // CHECK-NOT: alloc_stack{{.*}}opened
-// CHECK: open_existential_addr immutable_access {{%[0-9]+}} : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60", PM) Self
+// CHECK: open_existential_addr immutable_access {{%[0-9]+}} : $*any PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60", any PM) Self
 // CHECK: return
 sil @silcombine_dont_change_allocstack_for_opened_archetypes : $@convention(thin) (@owned VV) -> () {
 bb0(%0 : $VV):
@@ -3777,10 +3777,10 @@ sil @getMetaType : $@convention(thin) () -> @thick Prot2.Type
 
 // CHECK-LABEL: meta_existential
 // CHECK:bb0:
-// CHECK:  [[APPLY:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @thick Prot2.Type
-// CHECK:  [[OE:%.*]] = open_existential_metatype [[APPLY]] : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496", Prot1) Self).Type
-// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496", Prot1) Self, #Prot1.newWithConfig : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496", Prot1) Self).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
-// CHECK:  try_apply [[WM]]<@opened("690DA5F6-B5EA-11E7-B144-685B3593C496", Prot1) Self>([[OE]]) : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+// CHECK:  [[APPLY:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @thick any Prot2.Type
+// CHECK:  [[OE:%.*]] = open_existential_metatype [[APPLY]] : $@thick any Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496", any Prot1) Self).Type
+// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496", any Prot1) Self, #Prot1.newWithConfig : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496", any Prot1) Self).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+// CHECK:  try_apply [[WM]]<@opened("690DA5F6-B5EA-11E7-B144-685B3593C496", any Prot1) Self>([[OE]]) : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
 sil @meta_existential : $@convention(thin) () -> (Builtin.Int32, @error MyErrorType) {
 bb0:
   %fref = function_ref @getMetaType : $@convention(thin) () -> @thick Prot2.Type

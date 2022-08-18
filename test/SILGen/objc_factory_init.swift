@@ -68,11 +68,11 @@ extension Hive {
   // CHECK:   return [[HIVE_COPY]]
   // CHECK: bb2:
   // CHECK:   [[OPTIONAL_NSERROR:%.*]] = load [take] [[FOREIGN_ERROR_STACK]] : $*Optional<NSError>
-  // CHECK:   [[CONVERT_NSERROR_TO_ERROR_FUNC:%.*]] = function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned Error
-  // CHECK:   [[ERROR:%.*]] = apply [[CONVERT_NSERROR_TO_ERROR_FUNC]]([[OPTIONAL_NSERROR]]) : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned Error
-  // CHECK:   "willThrow"([[ERROR]] : $Error)
+  // CHECK:   [[CONVERT_NSERROR_TO_ERROR_FUNC:%.*]] = function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned any Error
+  // CHECK:   [[ERROR:%.*]] = apply [[CONVERT_NSERROR_TO_ERROR_FUNC]]([[OPTIONAL_NSERROR]]) : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned any Error
+  // CHECK:   "willThrow"([[ERROR]] : $any Error)
   // CHECK:   dealloc_stack [[FOREIGN_ERROR_STACK]]
-  // CHECK:   throw [[ERROR]] : $Error
+  // CHECK:   throw [[ERROR]] : $any Error
   // CHECK: } // end sil function '$sSo4HiveC17objc_factory_initE15otherFlakyQueenABSo3BeeC_tKcfC'
   convenience init(otherFlakyQueen other: Bee) throws {
     try self.init(flakyQueen: other)

@@ -273,11 +273,11 @@ extension Optional : ReabstractedP {
   func f() {}
 }
 
-// CHECK-LABEL: sil hidden [noinline] {{.*}}@$s34devirt_protocol_method_invocations23testReabstractedWitnessyyAA0F1P_pF : $@convention(thin) (@in_guaranteed ReabstractedP) -> () {
-// CHECK: bb0(%0 : $*ReabstractedP):
-// CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*ReabstractedP to $*@opened([[ID:.*]], ReabstractedP) Self
-// CHECK: [[WM:%.*]] = witness_method $@opened([[ID]], ReabstractedP) Self, #ReabstractedP.f : <Self where Self : ReabstractedP> (Self) -> () -> (), [[OPEN]] : $*@opened([[ID]], ReabstractedP) Self : $@convention(witness_method: ReabstractedP) <τ_0_0 where τ_0_0 : ReabstractedP> (@in_guaranteed τ_0_0) -> ()
-// CHECK: apply [[WM]]<@opened([[ID]], ReabstractedP) Self>([[OPEN]]) : $@convention(witness_method: ReabstractedP) <τ_0_0 where τ_0_0 : ReabstractedP> (@in_guaranteed τ_0_0) -> ()
+// CHECK-LABEL: sil hidden [noinline] {{.*}}@$s34devirt_protocol_method_invocations23testReabstractedWitnessyyAA0F1P_pF : $@convention(thin) (@in_guaranteed any ReabstractedP) -> () {
+// CHECK: bb0(%0 : $*any ReabstractedP):
+// CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any ReabstractedP to $*@opened([[ID:.*]], any ReabstractedP) Self
+// CHECK: [[WM:%.*]] = witness_method $@opened([[ID]], any ReabstractedP) Self, #ReabstractedP.f : <Self where Self : ReabstractedP> (Self) -> () -> (), [[OPEN]] : $*@opened([[ID]], any ReabstractedP) Self : $@convention(witness_method: ReabstractedP) <τ_0_0 where τ_0_0 : ReabstractedP> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[WM]]<@opened([[ID]], any ReabstractedP) Self>([[OPEN]]) : $@convention(witness_method: ReabstractedP) <τ_0_0 where τ_0_0 : ReabstractedP> (@in_guaranteed τ_0_0) -> ()
 // CHECK-LABEL: } // end sil function '$s34devirt_protocol_method_invocations23testReabstractedWitnessyyAA0F1P_pF'
 @inline(never)
 func testReabstractedWitness(_ f: ReabstractedP) {

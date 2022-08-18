@@ -665,7 +665,7 @@ bb3:
   br bb2
 }
 // CHECK-LABEL: sil [ossa] @open_existential_addr_blocks_optimization : $@convention(thin) () -> () {
-// CHECK: [[P:%.*]] = alloc_stack $P
+// CHECK: [[P:%.*]] = alloc_stack $any P
 // CHECK: copy_addr {{.*}} to [initialization] [[P]]
 // CHECK: }
 sil [ossa] @open_existential_addr_blocks_optimization : $@convention(thin) () -> () {
@@ -699,7 +699,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @witness_method_blocks_optimization : $@convention(thin) () -> () {
-// CHECK: [[P:%.*]] = alloc_stack $P
+// CHECK: [[P:%.*]] = alloc_stack $any P
 // CHECK: copy_addr {{.*}} to [initialization] [[P]]
 // CHECK: }
 sil [ossa] @witness_method_blocks_optimization : $@convention(thin) () -> () {

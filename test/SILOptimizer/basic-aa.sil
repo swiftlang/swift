@@ -646,19 +646,19 @@ struct S : P {
 
 // CHECK-LABEL: @init_existential_addr
 // CHECK:      PAIR #3.
-// CHECK-NEXT:   %0 = argument of bb0 : $P
-// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT:   %0 = argument of bb0 : $any P
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*any P, $S
 // CHECK-NEXT: NoAlias
 // CHECK:      PAIR #12.
-// CHECK-NEXT:   %2 = alloc_stack $P
-// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT:   %2 = alloc_stack $any P
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*any P, $S
 // CHECK-NEXT: MayAlias
 // CHECK:      PAIR #13.
-// CHECK-NEXT:   %2 = alloc_stack $P
+// CHECK-NEXT:   %2 = alloc_stack $any P
 // CHECK-NEXT:   %4 = struct_element_addr %3 : $*S, #S.i
 // CHECK-NEXT: MayAlias
 // CHECK:      PAIR #16.
-// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*any P, $S
 // CHECK-NEXT:   %4 = struct_element_addr %3 : $*S, #S.i
 // CHECK-NEXT: PartialAlias
 sil @init_existential_addr : $@convention(thin) (P) -> () {

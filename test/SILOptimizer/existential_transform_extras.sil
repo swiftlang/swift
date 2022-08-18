@@ -58,8 +58,8 @@ bb0:
   return %31 : $Int32
 } 
 
-// CHECK-LABEL: sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
-// CHECK: bb0(%0 : $*P):
+// CHECK-LABEL: sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout any P) -> Int32 {
+// CHECK: bb0(%0 : $*any P):
 // CHECK:  debug_value {{.*}} expr op_deref
 // CHECK:  alloc_stack
 // CHECK:  copy_addr
@@ -92,8 +92,8 @@ bb0:
 
 sil_global hidden [let] @$global_var : $P
 
-// CHECK-LABEL: sil hidden [noinline] @$helper : $@convention(thin) (@in P) -> Int32 {
-// CHECK: bb0(%0 : $*P):
+// CHECK-LABEL: sil hidden [noinline] @$helper : $@convention(thin) (@in any P) -> Int32 {
+// CHECK: bb0(%0 : $*any P):
 // CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
@@ -237,9 +237,9 @@ struct Container<T> {
 // requirements).  Relies on assertions during specialization and on
 // the SILVerifier to catch other inconsistencies.
 //
-// CHECK-LABEL: sil shared @$s40testExistentialSpecializeCompositeHelperTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : PlotLayer, τ_0_0 : InView> (@owned τ_0_0, @inout Container<PlotLayer & InView & Plotable>) -> () {
-// CHECK: bb0(%0 : $τ_0_0, %1 : $*Container<PlotLayer & InView & Plotable>):
-// CHECK:   init_existential_ref %0 : $τ_0_0 : $τ_0_0, $PlotLayer & InView & Plotable
+// CHECK-LABEL: sil shared @$s40testExistentialSpecializeCompositeHelperTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : PlotLayer, τ_0_0 : InView> (@owned τ_0_0, @inout Container<any PlotLayer & InView & Plotable>) -> () {
+// CHECK: bb0(%0 : $τ_0_0, %1 : $*Container<any PlotLayer & InView & Plotable>):
+// CHECK:   init_existential_ref %0 : $τ_0_0 : $τ_0_0, $any PlotLayer & InView & Plotable
 // CHECK-LABEL: } // end sil function '$s40testExistentialSpecializeCompositeHelperTf4en_n'
 sil shared @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> () {
 bb0(%0 : $PlotLayer & Plotable & InView, %1 : $*Container<PlotLayer & Plotable & InView>):

@@ -96,7 +96,7 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
 sil [transparent] [serialized] [ossa] @_TFs13_didEnterMainFTVs5Int324argvGVs20UnsafeMutablePointerGS0_Vs4Int8___T_ : $@convention(thin) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> ()
 
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply4Base3foofS0_FzT_GSqVs5Int32_ : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply4Base3foofS0_FzT_GSqVs5Int32_ : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error any Error) {
 bb0(%0 : @guaranteed $Base):
   debug_value %0 : $Base
   %2 = integer_literal $Builtin.Int32, 0
@@ -109,14 +109,14 @@ bb0(%0 : @guaranteed $Base):
 sil [transparent] [serialized] [ossa] @_TFVs5Int32CfMS_FT22_builtinIntegerLiteralBI__S_ : $@convention(thin) (Builtin.IntLiteral, @thin Int32.Type) -> Int32
 
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply4Base4boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply4Base4boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Base) -> (@owned Base, @error any Error) {
 bb0(%0 : @guaranteed $Base):
   %1 = copy_value %0 : $Base
   return %1 : $Base
 }
 
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply4Base4boo2fS0_FzT_GSqS0__ : $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply4Base4boo2fS0_FzT_GSqS0__ : $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error any Error) {
 bb0(%0 : @guaranteed $Base):
   %1 = copy_value %0 : $Base
   %2 = enum $Optional<Base>, #Optional.some!enumelt, %1 : $Base
@@ -157,7 +157,7 @@ bb0(%0 : $@thick Base.Type):
   return %3 : $Base
 }
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived13foofS0_FzT_GSqVs5Int32_ : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived13foofS0_FzT_GSqVs5Int32_ : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error any Error) {
 bb0(%0 : @guaranteed $Derived1):
   %2 = integer_literal $Builtin.Int32, 1
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -165,14 +165,14 @@ bb0(%0 : @guaranteed $Derived1):
   return %4 : $Optional<Int32>
 }
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived14boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived1) -> (@owned Derived1, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived14boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived1) -> (@owned Derived1, @error any Error) {
 bb0(%0 : @guaranteed $Derived1):
   %1 = copy_value %0 : $Derived1
   return %1 : $Derived1
 }
 
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived14boo2fS0_FzT_GSqS0__ : $@convention(method) (@guaranteed Derived1) -> (@owned Optional<Derived1>, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived14boo2fS0_FzT_GSqS0__ : $@convention(method) (@guaranteed Derived1) -> (@owned Optional<Derived1>, @error any Error) {
 bb0(%0 : @guaranteed $Derived1):
   %1 = copy_value %0 : $Derived1
   %2 = enum $Optional<Derived1>, #Optional.some!enumelt, %1 : $Derived1
@@ -226,10 +226,10 @@ bb0(%0 : $@thick Derived1.Type):
 }
 
 
-sil private [ossa] @_TTVFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Optional<Int32>, @error Error) {
+sil private [ossa] @_TTVFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Optional<Int32>, @error any Error) {
 bb0(%0 : @guaranteed $Derived2):
-  %1 = function_ref @_TFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Int32, @error Error)
-  try_apply %1(%0) : $@convention(method) (@guaranteed Derived2) -> (Int32, @error Error), normal bb1, error bb2
+  %1 = function_ref @_TFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Int32, @error any Error)
+  try_apply %1(%0) : $@convention(method) (@guaranteed Derived2) -> (Int32, @error any Error), normal bb1, error bb2
 
 bb1(%3 : $Int32):
   %4 = enum $Optional<Int32>, #Optional.some!enumelt, %3 : $Int32
@@ -241,7 +241,7 @@ bb2(%6 : @owned $Error):
 }
 
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Int32, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Int32, @error any Error) {
 bb0(%0 : @guaranteed $Derived2):
   %2 = integer_literal $Builtin.Int32, 2
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -249,14 +249,14 @@ bb0(%0 : @guaranteed $Derived2):
 }
 
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived24boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived2) -> (@owned Derived2, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived24boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived2) -> (@owned Derived2, @error any Error) {
 bb0(%0 : @guaranteed $Derived2):
   %1 = copy_value %0 : $Derived2
   return %1 : $Derived2
 }
 
 
-sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived24boo2fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived2) -> (@owned Derived2, @error Error) {
+sil hidden [noinline] [ossa] @_TFC16devirt_try_apply8Derived24boo2fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived2) -> (@owned Derived2, @error any Error) {
 bb0(%0 : @guaranteed $Derived2):
   %1 = copy_value %0 : $Derived2
   return %1 : $Derived2
@@ -301,7 +301,7 @@ bb0(%0 : @owned $Derived2):
 }
 
 
-sil [ossa] @_TFC16devirt_try_apply3CP13foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed CP1) -> (Int32, @error Error) {
+sil [ossa] @_TFC16devirt_try_apply3CP13foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed CP1) -> (Int32, @error any Error) {
 bb0(%0 : @guaranteed $CP1):
   %2 = integer_literal $Builtin.Int32, 1
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -344,11 +344,11 @@ bb0(%0 : $@thick CP1.Type):
 }
 
 
-sil [transparent] [thunk] [ossa] @_TTWC16devirt_try_apply3CP1S_1PS_FS1_3foouRq_S1__fq_FzT_Vs5Int32 : $@convention(witness_method: P) (@in_guaranteed CP1) -> (Int32, @error Error) {
+sil [transparent] [thunk] [ossa] @_TTWC16devirt_try_apply3CP1S_1PS_FS1_3foouRq_S1__fq_FzT_Vs5Int32 : $@convention(witness_method: P) (@in_guaranteed CP1) -> (Int32, @error any Error) {
 bb0(%0 : $*CP1):
   %1 = load [copy] %0 : $*CP1
-  %3 = class_method %1 : $CP1, #CP1.foo : (CP1) -> () throws -> Int32, $@convention(method) (@guaranteed CP1) -> (Int32, @error Error)
-  try_apply %3(%1) : $@convention(method) (@guaranteed CP1) -> (Int32, @error Error), normal bb1, error bb2
+  %3 = class_method %1 : $CP1, #CP1.foo : (CP1) -> () throws -> Int32, $@convention(method) (@guaranteed CP1) -> (Int32, @error any Error)
+  try_apply %3(%1) : $@convention(method) (@guaranteed CP1) -> (Int32, @error any Error), normal bb1, error bb2
 
 bb1(%5 : $Int32):
   destroy_value %1 : $CP1
@@ -361,7 +361,7 @@ bb2(%8 : @owned $Error):
 }
 
 
-sil [ossa] @_TFC16devirt_try_apply3CP23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed CP2) -> (Int32, @error Error) {
+sil [ossa] @_TFC16devirt_try_apply3CP23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed CP2) -> (Int32, @error any Error) {
 bb0(%0 : @guaranteed $CP2):
   %2 = integer_literal $Builtin.Int32, 2
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -431,8 +431,8 @@ bb0(%0 : @owned $Base):
   %6 = load [trivial] %3 : $*Optional<Int32>
   store %6 to [trivial] %1 : $*Optional<Int32>
   dealloc_stack %3 : $*Optional<Int32>
-  %9 = class_method %0 : $Base, #Base.foo : (Base) -> () throws -> Int32?, $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error)
-  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error), normal bb1, error bb4
+  %9 = class_method %0 : $Base, #Base.foo : (Base) -> () throws -> Int32?, $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error any Error)
+  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error any Error), normal bb1, error bb4
 
 bb1(%11 : $Optional<Int32>):
   store %11 to [trivial] %1 : $*Optional<Int32>
@@ -469,8 +469,8 @@ bb0(%0 : @owned $Base):
   %6 = load [take] %3 : $*Optional<Base>
   store %6 to [init] %1 : $*Optional<Base>
   dealloc_stack %3 : $*Optional<Base>
-  %9 = class_method %0 : $Base, #Base.boo1 : (Base) -> () throws -> Base, $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error)
-  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error), normal bb1, error bb4
+  %9 = class_method %0 : $Base, #Base.boo1 : (Base) -> () throws -> Base, $@convention(method) (@guaranteed Base) -> (@owned Base, @error any Error)
+  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Base, @error any Error), normal bb1, error bb4
 
 bb1(%11 : @owned $Base):
   %12 = enum $Optional<Base>, #Optional.some!enumelt, %11 : $Base
@@ -506,8 +506,8 @@ bb0(%0 : @owned $Base):
   %6 = load [take] %3 : $*Optional<Base>
   store %6 to [init] %1 : $*Optional<Base>
   dealloc_stack %3 : $*Optional<Base>
-  %9 = class_method %0 : $Base, #Base.boo2 : (Base) -> () throws -> Base?, $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error)
-  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error), normal bb1, error bb4
+  %9 = class_method %0 : $Base, #Base.boo2 : (Base) -> () throws -> Base?, $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error any Error)
+  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error any Error), normal bb1, error bb4
 
 bb1(%11 : @owned $Optional<Base>):
   store %11 to [assign] %1 : $*Optional<Base>
@@ -587,8 +587,8 @@ bb0:
   %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   store %6 to [trivial] %0 : $*Int32
-  %8 = class_method %3 : $CP2, #CP2.foo : (CP2) -> () throws -> Int32, $@convention(method) (@guaranteed CP2) -> (Int32, @error Error)
-  try_apply %8(%3) : $@convention(method) (@guaranteed CP2) -> (Int32, @error Error), normal bb1, error bb4
+  %8 = class_method %3 : $CP2, #CP2.foo : (CP2) -> () throws -> Int32, $@convention(method) (@guaranteed CP2) -> (Int32, @error any Error)
+  try_apply %8(%3) : $@convention(method) (@guaranteed CP2) -> (Int32, @error any Error), normal bb1, error bb4
 
 bb1(%10 : $Int32):
   store %10 to [trivial] %0 : $*Int32
@@ -628,8 +628,8 @@ bb0:
   %8 = struct $Int32 (%7 : $Builtin.Int32)
   store %8 to [trivial] %0 : $*Int32
   %10 = open_existential_addr immutable_access %1 : $*P to $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60", P) Self
-  %11 = witness_method $@opened("3F4928FC-364E-11E5-9488-B8E856428C60", P) Self, #P.foo, %10 : $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error)
-  try_apply %11<@opened("3F4928FC-364E-11E5-9488-B8E856428C60", P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error), normal bb1, error bb4
+  %11 = witness_method $@opened("3F4928FC-364E-11E5-9488-B8E856428C60", P) Self, #P.foo, %10 : $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error any Error)
+  try_apply %11<@opened("3F4928FC-364E-11E5-9488-B8E856428C60", P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error any Error), normal bb1, error bb4
 
 bb1(%13 : $Int32):
   store %13 to [trivial] %0 : $*Int32
@@ -671,8 +671,8 @@ bb0:
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %7 = enum $Optional<Int32>, #Optional.some!enumelt, %6 : $Int32
   store %7 to [trivial] %0 : $*Optional<Int32>
-  %9 = class_method %3 : $Derived1, #Derived1.foo : (Derived1) -> () throws -> Int32?, $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error)
-  try_apply %9(%3) : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error), normal bb1, error bb4
+  %9 = class_method %3 : $Derived1, #Derived1.foo : (Derived1) -> () throws -> Int32?, $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error any Error)
+  try_apply %9(%3) : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error any Error), normal bb1, error bb4
 
 bb1(%11 : $Optional<Int32>):
   store %11 to [trivial] %0 : $*Optional<Int32>
@@ -714,8 +714,8 @@ bb0:
   %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   store %6 to [trivial] %0 : $*Int32
-  %8 = class_method %1 : $CP2, #CP2.foo : (CP2) -> () throws -> Int32, $@convention(method) (@guaranteed CP2) -> (Int32, @error Error)
-  try_apply %8(%1) : $@convention(method) (@guaranteed CP2) -> (Int32, @error Error), normal bb1, error bb4
+  %8 = class_method %1 : $CP2, #CP2.foo : (CP2) -> () throws -> Int32, $@convention(method) (@guaranteed CP2) -> (Int32, @error any Error)
+  try_apply %8(%1) : $@convention(method) (@guaranteed CP2) -> (Int32, @error any Error), normal bb1, error bb4
 
 bb1(%10 : $Int32):
   store %10 to [trivial] %0 : $*Int32
@@ -757,12 +757,12 @@ class D3 : D1 {
 }
 
 // devirt_try_apply.D1.f1 () throws -> Swift.Optional<devirt_try_apply.A>
-sil [ossa] @_TFC16devirt_try_apply2D12f1fzT_GSqCS_1A_ : $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error)
+sil [ossa] @_TFC16devirt_try_apply2D12f1fzT_GSqCS_1A_ : $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error any Error)
 
 // devirt_try_apply.D3.f1 () throws -> devirt_try_apply.A
-sil [ossa] @_TFC16devirt_try_apply2D32f1fzT_CS_1A : $@convention(method) (@guaranteed D3) -> (@owned A, @error Error)
+sil [ossa] @_TFC16devirt_try_apply2D32f1fzT_CS_1A : $@convention(method) (@guaranteed D3) -> (@owned A, @error any Error)
 
-sil [ossa] @compute_something : $@convention(thin) () -> (@owned Optional<A>, @error Error)
+sil [ossa] @compute_something : $@convention(thin) () -> (@owned Optional<A>, @error any Error)
 
 // CHECK-MANDATORY-INLINING-LABEL: sil [ossa] @test_devirt_try_apply_at_Onone
 // CHECK-MANDATORY-INLINING: bb0:
@@ -774,17 +774,17 @@ sil [ossa] @compute_something : $@convention(thin) () -> (@owned Optional<A>, @e
 // CHECK-MANDATORY-INLINING: return
 // Check that error BB was reused, because it only had a single predecessor and thus
 // no critical edge would be created by this reuse.
-// CHECK-MANDATORY-INLINING: [[ERROR]]({{%[0-9]+}} : @owned $Error):
+// CHECK-MANDATORY-INLINING: [[ERROR]]({{%[0-9]+}} : @owned $any Error):
 // CHECK-MANDATORY-INLINING: destroy_value
 // CHECK-MANDATORY-INLINING: throw
 // CHECK-MANDATORY-INLINING-NOT: bb3
 // CHECK-MANDATORY-INLINING: }
-sil [ossa] @test_devirt_try_apply_at_Onone : $@convention(thin) () -> (@owned Optional<A>, @error Error) {
+sil [ossa] @test_devirt_try_apply_at_Onone : $@convention(thin) () -> (@owned Optional<A>, @error any Error) {
 bb0:
   %2 = alloc_ref $D3
   %3 = upcast %2 : $D3 to $D1
-  %4 = class_method %3 : $D1, #D1.f1 : (D1) -> () throws -> Optional<A>, $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error)
-  try_apply %4(%3) : $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error), normal bb1, error bb2
+  %4 = class_method %3 : $D1, #D1.f1 : (D1) -> () throws -> Optional<A>, $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error any Error)
+  try_apply %4(%3) : $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error any Error), normal bb1, error bb2
 
 bb1(%6 : @owned $Optional<A>):
   destroy_value %3 : $D1

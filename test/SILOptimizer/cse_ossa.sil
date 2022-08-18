@@ -951,7 +951,7 @@ bb0(%0 : $*Airplane):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @_TF2p28trytoflyFPS_7Flyable_T_ :
-// CHECK:           bb0(%0 : $*Flyable):
+// CHECK:           bb0(%0 : $*any Flyable):
 // CHECK-NEXT:      open_existential_addr
 // CHECK-NEXT:      witness_method
 // CHECK-NEXT:      apply
@@ -992,12 +992,12 @@ sil_witness_table hidden Airplane: Flyable module p2 {
 protocol Pingable { func ping() }
 
 // CHECK-LABEL: sil hidden [ossa] @CSE_Existential_Simple :
-// CHECK: open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable)
-// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self, #Pingable.ping : {{.*}}, %2
-// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self>(%2)
+// CHECK: open_existential_addr immutable_access %0 : $*any Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable)
+// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self, #Pingable.ping : {{.*}}, %2
+// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
 // CHECK: open_existential_addr immutable_access
 // CHECK: witness_method
-// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self>(%2)
+// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
 // CHECK-LABEL: } // end sil function 'CSE_Existential_Simple'
 sil hidden [ossa] @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
 bb0(%0 : $*Pingable):
@@ -1021,7 +1021,7 @@ bb0(%0 : $*Pingable, %1 : $Int):
   %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self
   %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4)
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
   %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   %7 = integer_literal $Builtin.Int64, 3
   %8 = integer_literal $Builtin.Int64, 3
@@ -1032,7 +1032,7 @@ bb1:
   %11 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self
   %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4)
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
   %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self>(%11) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   br bb3
 
@@ -1043,7 +1043,7 @@ bb3:
   %15 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self
   %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4)
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
   %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self>(%15) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Pingable
   %19 = tuple ()
@@ -1121,9 +1121,9 @@ protocol SomeP {}
 public enum SpecialEnum : SomeP {}
 
 // CHECK-LABEL: sil [ossa] @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
-// CHECK:   [[EMT:%.*]] = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK:   [[EMT:%.*]] = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick any Any.Type
 // CHECK-NOT: init_existential_metatype
-// CHECK:   builtin "is_same_metatype"([[EMT]] : $@thick Any.Type, [[EMT]] : $@thick Any.Type) : $Builtin.Int1
+// CHECK:   builtin "is_same_metatype"([[EMT]] : $@thick any Any.Type, [[EMT]] : $@thick any Any.Type) : $Builtin.Int1
 // CHECK-LABEL: }  // end sil function 'testCSEInitExistentialMetatype'
 sil [ossa] @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
 bb0(%0 : $@thick SpecialEnum.Type):

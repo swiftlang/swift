@@ -1399,10 +1399,10 @@ class infer_instanceVar1 {
   weak var var_Weak7: Protocol_ObjC1?
   weak var var_Weak8: (Protocol_ObjC1 & Protocol_ObjC2)?
 
-// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak1: @sil_weak Class_ObjC1
-// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak2: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak5: @sil_weak AnyObject
-// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak7: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak1: @sil_weak Class_ObjC1?
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak2: @sil_weak Protocol_ObjC1?
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak5: @sil_weak AnyObject?
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak7: @sil_weak Protocol_ObjC1?
 // CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak8: @sil_weak (Protocol_ObjC1 & Protocol_ObjC2)?
 
   weak var var_Weak_fail1: PlainClass?

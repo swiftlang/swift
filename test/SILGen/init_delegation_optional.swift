@@ -153,13 +153,13 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb7([[ERR:%[0-9]+]] : @owned $Error):
+    // CHECK: bb7([[ERR:%[0-9]+]] : @owned $any Error):
     // CHECK-NEXT: destroy_value [[ERR]]
     // CHECK-NEXT: inject_enum_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb2
     //
-    // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $Error):
-    // CHECK-NEXT: br bb7([[ERR]] : $Error)
+    // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
+    // CHECK-NEXT: br bb7([[ERR]] : $any Error)
     // CHECK-NEXT: }
   }
 
@@ -230,13 +230,13 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb10([[ERROR:%[0-9]+]] : @owned $Error):
+    // CHECK: bb10([[ERROR:%[0-9]+]] : @owned $any Error):
     // CHECK-NEXT: destroy_value [[ERROR]]
     // CHECK-NEXT: inject_enum_addr [[OPT_OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb2
     //
-    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $Error):
-    // CHECK-NEXT: br bb10([[ERROR]] : $Error)
+    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
+    // CHECK-NEXT: br bb10([[ERROR]] : $any Error)
     // CHECK-NEXT: }
   }
 
@@ -297,14 +297,14 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb9([[ERROR:%[0-9]+]] : @owned $Error):
+    // CHECK: bb9([[ERROR:%[0-9]+]] : @owned $any Error):
     // CHECK-NEXT: destroy_value [[ERROR]]
     // CHECK-NEXT: inject_enum_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb4
     //
-    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $Error):
+    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
     // CHECK-NEXT: dealloc_stack [[TMP_OPT_RESULT_ADDR]]
-    // CHECK-NEXT: br bb9([[ERROR]] : $Error)
+    // CHECK-NEXT: br bb9([[ERROR]] : $any Error)
     // CHECK-NEXT: }
   }
 
@@ -350,11 +350,11 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb6({{%[0-9]+}} : @owned $Error):
+    // CHECK: bb6({{%[0-9]+}} : @owned $any Error):
     // CHECK: unreachable
     //
-    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $Error):
-    // CHECK: br bb6([[ERROR]] : $Error)
+    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
+    // CHECK: br bb6([[ERROR]] : $any Error)
     // CHECK-NEXT: }
   }
 }
@@ -477,13 +477,13 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK: bb9([[RET:%[0-9]+]] : $Optional<Optional<Optional<Bool>>>):
     // CHECK-NEXT: return [[RET]]
     //
-    // CHECK: bb10([[ERROR:%[0-9]+]] : @owned $Error):
+    // CHECK: bb10([[ERROR:%[0-9]+]] : @owned $any Error):
     // CHECK-NEXT: destroy_value [[ERROR]]
     // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<Optional<Optional<Bool>>>>, #Optional.none!enumelt
     // CHECK-NEXT: br bb2([[NIL]] : $Optional<Optional<Optional<Optional<Bool>>>>)
     //
-    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $Error):
-    // CHECK-NEXT: br bb10([[ERROR]] : $Error)
+    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
+    // CHECK-NEXT: br bb10([[ERROR]] : $any Error)
     // CHECK-NEXT: }
     try? self.init(SpecFailableAndThrows: ())
   }

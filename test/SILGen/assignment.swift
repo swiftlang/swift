@@ -38,15 +38,15 @@ protocol P {
 
 // Verify that the access to the LHS does not begin until after the
 // RHS is formally evaluated.
-// CHECK-LABEL: sil hidden [ossa] @$s10assignment15copyRightToLeft1pyAA1P_pz_tF : $@convention(thin) (@inout P) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10assignment15copyRightToLeft1pyAA1P_pz_tF : $@convention(thin) (@inout any P) -> () {
 func copyRightToLeft(p: inout P) {
-  // CHECK: bb0(%0 : $*P):
-  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] %0 : $*P
+  // CHECK: bb0(%0 : $*any P):
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] %0 : $*any P
   // CHECK:   [[READ_OPEN:%.*]] = open_existential_addr immutable_access [[READ]]
-  // CHECK:   end_access [[READ]] : $*P
-  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*P
+  // CHECK:   end_access [[READ]] : $*any P
+  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*any P
   // CHECK:   [[WRITE_OPEN:%.*]] = open_existential_addr mutable_access [[WRITE]]
-  // CHECK:   end_access [[WRITE]] : $*P
+  // CHECK:   end_access [[WRITE]] : $*any P
   p.left = p.right
 }
 

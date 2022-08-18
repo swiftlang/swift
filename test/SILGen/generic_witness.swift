@@ -14,12 +14,12 @@ func foo<B : Runcible>(_ x: B) {
   x.runce(5)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s15generic_witness3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@in_guaranteed Runcible) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s15generic_witness3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@in_guaranteed any Runcible) -> ()
 func bar(_ x: Runcible) {
   var x = x
-  // CHECK: [[BOX:%.*]] = alloc_box ${ var Runcible }
-  // CHECK: [[TEMP:%.*]] = alloc_stack $Runcible
-  // CHECK: [[EXIST:%.*]] = open_existential_addr immutable_access [[TEMP]] : $*Runcible to $*[[OPENED:@opened\(.*, Runcible\) Self]]
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var any Runcible }
+  // CHECK: [[TEMP:%.*]] = alloc_stack $any Runcible
+  // CHECK: [[EXIST:%.*]] = open_existential_addr immutable_access [[TEMP]] : $*any Runcible to $*[[OPENED:@opened\(.*, any Runcible\) Self]]
   // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #Runcible.runce :
   // CHECK: apply [[METHOD]]<[[OPENED]], Int>
   x.runce(5)

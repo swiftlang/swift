@@ -137,9 +137,9 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'open_existential_box_interior_pointer_error'
 // CHECK-NEXT: Found outside of lifetime use?!
-// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Error                   // users: %3, %2
-// CHECK-NEXT: Consuming User:   end_borrow %1 : $Error                          // id: %3
-// CHECK-NEXT: Non Consuming User:   %6 = apply %5<@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self>(%2) : $@convention(witness_method: Error) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int // type-defs: %2; user: %7
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $any Error                   // users: %3, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $any Error                          // id: %3
+// CHECK-NEXT: Non Consuming User:   %6 = apply %5<@opened("01234567-89AB-CDEF-0123-000000000000", any Error) Self>(%2) : $@convention(witness_method: Error) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int // type-defs: %2; user: %7
 // CHECK-NEXT: Block: bb0
 // CHECK: Error#: 0. End Error in Function: 'open_existential_box_interior_pointer_error'
 sil [ossa] @open_existential_box_interior_pointer_error : $@convention(thin) (@owned Error) -> Int {

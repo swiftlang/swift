@@ -166,7 +166,7 @@ class S2 : Throw {
   override func mayThrow() throws
 }
 
-sil hidden [thunk] @$S4main4ThrowC8mayThrowyyKF : $@convention(method) (@guaranteed Throw) -> @error Error {
+sil hidden [thunk] @$S4main4ThrowC8mayThrowyyKF : $@convention(method) (@guaranteed Throw) -> @error any Error {
 bb0(%0 : $Throw):
   %1 = tuple ()
   return %1 : $()
@@ -178,7 +178,7 @@ bb0(%0 : $S1):
   return %1 : $()
 }
 
-sil hidden [thunk] [always_inline] @$S4main2S2C8mayThrowyyKF : $@convention(method) (@guaranteed S2) -> @error Error {
+sil hidden [thunk] [always_inline] @$S4main2S2C8mayThrowyyKF : $@convention(method) (@guaranteed S2) -> @error any Error {
 bb0(%0 : $S2):
   %1 = tuple ()
   return %1 : $()
@@ -190,8 +190,8 @@ bb0(%0 : $S2):
 
 sil hidden [noinline] @test_devirt_of_throw_without_error : $@convention(thin) (@owned Throw) -> () {
 bb0(%0 : $Throw):
-  %80 = class_method %0 : $Throw, #Throw.mayThrow : (Throw) -> () throws -> (), $@convention(method) (@guaranteed Throw) -> @error Error // user: %81
-  try_apply %80(%0) : $@convention(method) (@guaranteed Throw) -> @error Error, normal bb7, error bb6
+  %80 = class_method %0 : $Throw, #Throw.mayThrow : (Throw) -> () throws -> (), $@convention(method) (@guaranteed Throw) -> @error any Error // user: %81
+  try_apply %80(%0) : $@convention(method) (@guaranteed Throw) -> @error any Error, normal bb7, error bb6
 
 bb6(%82 : $Error):
   br bb1

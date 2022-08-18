@@ -158,7 +158,7 @@ func callPrintIntOwnedArg() {
     let _ = y
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error any Error {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy $Int):
 // CHECK:   [[ARG_WRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
 // CHECK:   [[LEXICAL_ARG:%.*]] = move_value [lexical] [[ARG_WRAPPED]]
@@ -171,7 +171,7 @@ func callPrintIntOwnedArg() {
 // CHECK:   apply [[FUNC]]([[GUARANTEED_ESCAPED_X_1]], [[GUARANTEED_ESCAPED_X_2]], {{.*}})
 // CHECK: } // end sil function '$s14noimplicitcopy17printIntArgThrowsyySiKF'
 //
-// SIL-LABEL: sil hidden @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error Error {
+// SIL-LABEL: sil hidden @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error any Error {
 // SIL-NOT: @moveOnly
 // SIL: } // end sil function '$s14noimplicitcopy17printIntArgThrowsyySiKF'
 func printIntArgThrows(@_noImplicitCopy _ x: Int) throws {
@@ -179,15 +179,15 @@ func printIntArgThrows(@_noImplicitCopy _ x: Int) throws {
     print("printIntArgThrows: \(x)")
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy21callPrintIntArgThrowsyyKF : $@convention(thin) () -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy21callPrintIntArgThrowsyyKF : $@convention(thin) () -> @error any Error {
 // CHECK: [[INT_LITERAL_FUNC:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [[VALUE:%.*]] = apply [[INT_LITERAL_FUNC]](
-// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error Error
+// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error any Error
 // CHECK: try_apply [[FUNC]]([[VALUE]])
 //
 // CHECK: [[INT_LITERAL_FUNC:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [[VALUE:%.*]] = apply [[INT_LITERAL_FUNC]](
-// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error Error
+// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error any Error
 // CHECK: try_apply [[FUNC]]([[VALUE]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
@@ -195,7 +195,7 @@ func printIntArgThrows(@_noImplicitCopy _ x: Int) throws {
 // CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX_BORROWED]]
 // CHECK: [[Y_BOX_PROJECT_ACCESS:%.*]] = begin_access [read] [unknown] [[Y_BOX_PROJECT]]
 // CHECK: [[Y_VALUE:%.*]] = load [trivial] [[Y_BOX_PROJECT_ACCESS]]
-// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error Error
+// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error any Error
 // CHECK: try_apply [[FUNC]]([[Y_VALUE]])
 // CHECK: } // end sil function '$s14noimplicitcopy21callPrintIntArgThrowsyyKF'
 func callPrintIntArgThrows() throws {
@@ -208,11 +208,11 @@ func callPrintIntArgThrows() throws {
     let _ = y
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error any Error {
 // CHECK: bb0(%0 : @noImplicitCopy $Int):
 // CHECK: } // end sil function '$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF'
 //
-// SIL-LABEL: sil hidden @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error Error {
+// SIL-LABEL: sil hidden @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error any Error {
 // SIL-NOT: @moveOnly
 // SIL: } // end sil function '$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF'
 func printIntOwnedArgThrows(@_noImplicitCopy _ x: __owned Int) throws {
@@ -220,15 +220,15 @@ func printIntOwnedArgThrows(@_noImplicitCopy _ x: __owned Int) throws {
     print("printIntOwnedArgThrows: \(x)")
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy26callPrintIntOwnedArgThrowsyyKF : $@convention(thin) () -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy26callPrintIntOwnedArgThrowsyyKF : $@convention(thin) () -> @error any Error {
 // CHECK: [[INT_LITERAL_FUNC:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [[VALUE:%.*]] = apply [[INT_LITERAL_FUNC]](
-// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error Error
+// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error any Error
 // CHECK: try_apply [[FUNC]]([[VALUE]])
 //
 // CHECK: [[INT_LITERAL_FUNC:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [[VALUE:%.*]] = apply [[INT_LITERAL_FUNC]](
-// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error Error
+// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error any Error
 // CHECK: try_apply [[FUNC]]([[VALUE]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
@@ -236,7 +236,7 @@ func printIntOwnedArgThrows(@_noImplicitCopy _ x: __owned Int) throws {
 // CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX_BORROWED]]
 // CHECK: [[Y_BOX_PROJECT_ACCESS:%.*]] = begin_access [read] [unknown] [[Y_BOX_PROJECT]]
 // CHECK: [[Y_VALUE:%.*]] = load [trivial] [[Y_BOX_PROJECT_ACCESS]]
-// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error Error
+// CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error any Error
 // CHECK: try_apply [[FUNC]]([[Y_VALUE]])
 // CHECK: } // end sil function '$s14noimplicitcopy26callPrintIntOwnedArgThrowsyyKF'
 func callPrintIntOwnedArgThrows() throws {
@@ -410,7 +410,7 @@ func callPrintKlassOwnedArg() {
     printKlassOwnedArg(y)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy19printKlassArgThrowsyyAA0C0CKF : $@convention(thin) (@guaranteed Klass) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy19printKlassArgThrowsyyAA0C0CKF : $@convention(thin) (@guaranteed Klass) -> @error any Error {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @guaranteed $Klass):
 // CHECK:   [[WRAPPED_ARG:%.*]] = copyable_to_moveonlywrapper [guaranteed] [[ARG]]
 // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[WRAPPED_ARG]]
@@ -420,7 +420,7 @@ func callPrintKlassOwnedArg() {
 // CHECK:   apply {{%.*}}([[UNWRAPPED_ARG]]) :
 // CHECK: } // end sil function '$s14noimplicitcopy19printKlassArgThrowsyyAA0C0CKF'
 //
-// SIL-LABEL: sil hidden @$s14noimplicitcopy19printKlassArgThrowsyyAA0C0CKF : $@convention(thin) (@guaranteed Klass) -> @error Error {
+// SIL-LABEL: sil hidden @$s14noimplicitcopy19printKlassArgThrowsyyAA0C0CKF : $@convention(thin) (@guaranteed Klass) -> @error any Error {
 // SIL-NOT: @moveOnly
 // SIL: } // end sil function '$s14noimplicitcopy19printKlassArgThrowsyyAA0C0CKF'
 func printKlassArgThrows(@_noImplicitCopy _ x: Klass) throws {
@@ -438,7 +438,7 @@ func callPrintKlassArgThrows() throws {
     try printKlassArgThrows(y)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy24printKlassOwnedArgThrowsyyAA0C0CnKF : $@convention(thin) (@owned Klass) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy24printKlassOwnedArgThrowsyyAA0C0CnKF : $@convention(thin) (@owned Klass) -> @error any Error {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @owned $Klass):
 // CHECK:   [[WRAPPED_ARG:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
 // CHECK:   [[MOVED_ARG:%.*]] = move_value [lexical] [[WRAPPED_ARG]]
@@ -448,7 +448,7 @@ func callPrintKlassArgThrows() throws {
 // CHECK:   apply {{%.*}}([[UNWRAPPED_ARG]]) :
 // CHECK: } // end sil function '$s14noimplicitcopy24printKlassOwnedArgThrowsyyAA0C0CnKF'
 //
-// SIL-LABEL: sil hidden @$s14noimplicitcopy24printKlassOwnedArgThrowsyyAA0C0CnKF : $@convention(thin) (@owned Klass) -> @error Error {
+// SIL-LABEL: sil hidden @$s14noimplicitcopy24printKlassOwnedArgThrowsyyAA0C0CnKF : $@convention(thin) (@owned Klass) -> @error any Error {
 // SIL-NOT: @moveOnly
 // SIL: } // end sil function '$s14noimplicitcopy24printKlassOwnedArgThrowsyyAA0C0CnKF'
 func printKlassOwnedArgThrows(@_noImplicitCopy _ x: __owned Klass) throws {
