@@ -15,7 +15,7 @@ import _Concurrency
 /// A distributed actor system underpins and implements all functionality of distributed actors.
 ///
 /// A ``DistributedActor`` is always initialized in association with some concrete actor system.
-/// And that actor system instance is then used to manage the identity of the actor, as well as
+/// That actor system instance is then used to manage the identity of the actor, as well as
 /// handle all remote interactions of the distributed actor.
 ///
 /// ## Using a DistributedActorSystem library
@@ -28,7 +28,7 @@ import _Concurrency
 /// `typealias DefaultDistributedActorSystem`. Refer to the ``DistributedActor`` documentation to learn more
 /// about the tradeoffs of these approaches.
 ///
-/// Once an actor has declared the system it is able to work with, such system instance must provided
+/// Once an actor has declared the system it is able to work with, an instance of the system must be provided
 /// at initialization time, in order for the system to be able to take over the actor's identity management.
 ///
 /// For example, a simple distributed actor may look like this:
@@ -45,11 +45,11 @@ import _Concurrency
 /// This property is later used for identity management and other remote interactions of the actor.
 /// For more details refer to ``DistributedActor`` which explains more about declaring distributed actors.
 ///
-/// For more details about how the specific actor system implementation deals with remote message transports,
+/// For more details about how the specific actor system implementation deals with remote message transports
 /// and serialization, please refer to the specific system's documentation.
 ///
 /// > Note: For example, you may refer to the [Swift Distributed Actors cluster library](https://github.com/apple/swift-distributed-actors/) documentation,
-/// > which is one example of such feature complete distributed actor system implementation:
+/// > which is one example of such feature complete distributed actor system implementation.
 ///
 /// ## Implementing a DistributedActorSystem
 ///
@@ -99,9 +99,9 @@ import _Concurrency
 ///
 /// > Tip: Take note that throwing or failable initializers complicate this somewhat. Thankfully, the compiler
 /// > will always emit the right code such that every ``assignID(_:)`` is balanced with a ``resignID(_:)`` call,
-/// > when the actor either failed to initialize, or deinitialized property.
+/// > when the actor either failed to initialize or deinitialize properly.
 /// >
-/// > It is also possible that a throwing initializer throws before assigning the actorSystem, and id properties.
+/// > It is also possible that a throwing initializer throws before assigning the `actorSystem` and `id` properties.
 /// > In such case, no `assignID` nor `resignID` calls are made. There is no risk of the compiler ever attempting
 /// > to call a `resignID(_:)` without first having assigned given ID.
 ///
@@ -141,18 +141,18 @@ import _Concurrency
 /// > Note: Generally actor systems should retain actors _weakly_ in order to allow them be deinitialized when no longer in use.
 /// >
 /// > Sometimes though, it can be quite useful to have the system retain certain "well known" actors, for example when it is expected
-/// > that other nodes in the distributed system will need to interact with them, even if end-user code does no longer hold
+/// > that other nodes in the distributed system will need to interact with them, even if end-user code no longer holds
 /// > strong references to them. An example of such "retain while actor system is active" distributed actors would be any kind
 /// > of actor which implements discovery or health check mechanisms between clustered nodes, sometimes called "system actors",
-/// i.e. actors that serve the actor system directly.
+/// > i.e. actors that serve the actor system directly.
 ///
-/// Next, we will discuss the the just mentioned resolve method, which is closely tied to readying actors.
+/// Next, we will discuss the just mentioned `resolve` method, which is closely tied to readying actors.
 ///
 /// ### Resolving (potentially remote) Distributed Actors
 ///
 /// An important functionality of any distributed actor system is being able to turn a ``DistributedActor`` type and ``ActorID``
-/// into an reference to such actor, regardless where the actor is located. The ID should have enough information stored
-/// to be able to make the decision _where_ the actor is located, without having to contact remote nodes. Specifically,
+/// into a reference to such actor, regardless where the actor is located. The ID should have enough information stored
+/// to be able to make the decision of _where_ the actor is located, without having to contact remote nodes. Specifically,
 /// the implementation of ``DistributedActorSystem/resolve(id:as:)`` is _not_ `async` and should _not_ perform long running
 /// or blocking operations in order to return.
 ///
@@ -172,11 +172,11 @@ import _Concurrency
 /// `remoteCall(on:target:invocation:returning:throwing:)` (or `remoteCallVoid(on:target:invocation:throwing:)` for Void returning methods).
 ///
 /// Implementing the remote calls correctly and efficiently is one of the most important tasks for a distributed actor system library.
-/// Since those methods are not currently expressible as protocol requirements Swift, and therefore will not appear in
-/// the protocol's documentation as explicit requirements, due to their advanced use of generics, we present their
-/// signatures that a conforming type one has to implement here:
+/// Since those methods are not currently expressible as protocol requirements in Swift due to their advanced use
+/// of generics, and therefore will not appear in the protocol's documentation as explicit requirements, we present
+/// their signatures that a conforming type has to implement here:
 ///
-/// > Note: Although the the `remoteCall` methods are not expressed as protocol requirements in source,
+/// > Note: Although the `remoteCall` methods are not expressed as protocol requirements in source,
 /// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.
 ///
 /// ```swift
@@ -225,19 +225,19 @@ import _Concurrency
 ///           Err: Error
 /// ```
 ///
-/// Implementations of remote calls generally will serialize the `actor.id`, `target` and `invocation`
+/// Implementations of remote calls generally will serialize `actor.id`, `target` and `invocation`
 /// into some form of wire envelope, and send it over the network (or process boundary) using some
-/// transport mechanism of their choice. As they do so, they need to suspend the remoteCall function,
-/// and resume it once a reply to the call arrives; Unless the transport layer is also async/await aware,
+/// transport mechanism of their choice. As they do so, they need to suspend the `remoteCall` function,
+/// and resume it once a reply to the call arrives. Unless the transport layer is also async/await aware,
 /// this will often require making use of a ``CheckedContinuation``.
 ///
 /// While implementing remote calls please keep in mind any potential failure scenarios that may occur,
-/// such as message loss, connection failures and similar issues. Such situations should all should be
-/// surfaced by resuming the remoteCall by throwing an error conforming to ``DistributedActorSystemError``.
+/// such as message loss, connection failures and similar issues. Such situations should all be
+/// surfaced by resuming the `remoteCall` by throwing an error conforming to ``DistributedActorSystemError``.
 ///
 /// While it is not _required_ to conform error thrown out of these methods to ``DistributedActorSystemError``,
 /// the general guideline about conforming errors to this protocol is that errors which are outside of the user's control,
-/// but are thrown because transport or actor system issues happening, should conform to it. This is to simplify
+/// but are thrown because transport or actor system issues, should conform to it. This is to simplify
 /// separating "business logic errors" from transport errors.
 ///
 ///
@@ -253,9 +253,9 @@ public protocol DistributedActorSystem: Sendable {
   /// The type ID that will be assigned to any distributed actor managed by this actor system.
   ///
   /// ### A note on Codable IDs
-  /// If this type is Codable, then any `distributed actor` using this `ActorID` as its ``DistributedActor/ID``,
+  /// If this type is ``Codable``, then any `distributed actor` using this `ActorID` as its ``DistributedActor/ID``
   /// will gain a synthesized ``Codable`` conformance which is implemented by encoding the `ID`.
-  /// The decoding counter part of the Codable conformance is implemented by decoding the `ID` and passing it to
+  /// The decoding counter part of the ``Codable`` conformance is implemented by decoding the `ID` and passing it to
   // the ``DistributedActor/resolve(id:using:)`` method.
   associatedtype ActorID: Sendable & Hashable
 
@@ -823,7 +823,7 @@ public struct ExecuteDistributedTargetError: DistributedActorSystemError {
 /// Error thrown by distributed actor systems while encountering encoding/decoding
 /// issues.
 ///
-/// Also thrown when attempt to decode ``DistributedActor`` is made,
+/// Also thrown when an attempt to decode ``DistributedActor`` is made,
 /// but no ``DistributedActorSystem`` is available in the `Decoder`'s
 /// `userInfo[.actorSystemKey]`, as it is required to perform the resolve call.
 @available(SwiftStdlib 5.7, *)
