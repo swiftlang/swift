@@ -169,6 +169,12 @@ enum IsInfiniteType_t : bool {
   IsInfiniteType = true,
 };
 
+/// Does this type contain at least one non-trivial, non-eager-move type?
+enum IsLexical_t : bool {
+  IsNotLexical = false,
+  IsLexical = true,
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -184,6 +190,7 @@ public:
       TypeExpansionSensitiveFlag = 1 << 4,
       InfiniteFlag               = 1 << 5,
       HasRawPointerFlag          = 1 << 6,
+      LexicalFlag                = 1 << 7,
     };
     // clang-format on
 
@@ -198,13 +205,15 @@ public:
         IsAddressOnly_t isAddressOnly, IsResilient_t isResilient,
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
             IsNotTypeExpansionSensitive,
-        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer)
+        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
+        IsLexical_t isLexical = IsNotLexical)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
                 (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
-                (hasRawPointer ? HasRawPointerFlag : 0U)) {}
+                (hasRawPointer ? HasRawPointerFlag : 0U) |
+                (isLexical ? LexicalFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -220,11 +229,13 @@ public:
     }
 
     static constexpr RecursiveProperties forReference() {
-      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
+      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
+              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
     }
 
     static constexpr RecursiveProperties forOpaque() {
-      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient};
+      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
+              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
     }
 
     static constexpr RecursiveProperties forResilient() {
@@ -257,6 +268,9 @@ public:
     IsInfiniteType_t isInfinite() const {
       return IsInfiniteType_t((Flags & InfiniteFlag) != 0);
     }
+    IsLexical_t isLexical() const {
+      return IsLexical_t((Flags & LexicalFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -267,6 +281,9 @@ public:
               (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0);
     }
     void setInfinite() { Flags |= InfiniteFlag; }
+    void setLexical(IsLexical_t isLexical) {
+      Flags = (Flags & ~LexicalFlag) | (isLexical ? LexicalFlag : 0);
+    }
   };
 
 private:
@@ -366,6 +383,11 @@ public:
   /// type is lowered if we could look through to the underlying type.
   bool isTypeExpansionSensitive() const {
     return Properties.isTypeExpansionSensitive();
+  }
+
+  /// Should a value of this type have its lifetime tied to its lexical scope?
+  bool isLexical() const {
+    return Properties.isLexical();
   }
 
   ResilienceExpansion getResilienceExpansion() const {
