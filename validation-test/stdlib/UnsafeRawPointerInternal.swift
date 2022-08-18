@@ -58,4 +58,76 @@ UnsafeRawPointerTestSuite.test("load.unaligned.largeAlignment.mutablePointer")
   }
 }
 
+UnsafeRawPointerTestSuite.test("alignedUp.for.overflow") {
+  let p = UnsafeRawPointer(bitPattern: 1-MemoryLayout<Int>.stride)!
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let up = p.alignedUp(for: Int.self)
+  expectEqual(Int(bitPattern: up), 0)
+}
+
+UnsafeRawPointerTestSuite.test("alignedUp.toMultiple.overflow") {
+  let p = UnsafeRawPointer(bitPattern: -7)!
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let up = p.alignedUp(toMultipleOf: 8)
+  expectEqual(Int(bitPattern: up), 0)
+}
+
+UnsafeRawPointerTestSuite.test("alignedUp.for.overflow") {
+  let p = UnsafeRawPointer(bitPattern: MemoryLayout<Int64>.stride-1)!
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let up = p.alignedDown(for: Int64.self)
+  expectEqual(Int(bitPattern: up), 0)
+}
+
+UnsafeRawPointerTestSuite.test("alignedUp.toMultiple.overflow") {
+  let p = UnsafeRawPointer(bitPattern: 13)!
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let up = p.alignedDown(toMultipleOf: 16)
+  expectEqual(Int(bitPattern: up), 0)
+}
+
+UnsafeRawPointerTestSuite.test("alignedUp.for.overflow.mutable") {
+  let p = UnsafeMutableRawPointer(bitPattern: 1-MemoryLayout<Int>.stride)!
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let up = p.alignedUp(for: Int.self)
+  expectEqual(Int(bitPattern: up), 0)
+}
+
+UnsafeRawPointerTestSuite.test("alignedUp.toMultiple.overflow.mutable") {
+  let p = UnsafeMutableRawPointer(bitPattern: -7)!
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let up = p.alignedUp(toMultipleOf: 8)
+  expectEqual(Int(bitPattern: up), 0)
+}
+
+UnsafeRawPointerTestSuite.test("alignedUp.for.overflow.mutable") {
+  let p = UnsafeMutableRawPointer(bitPattern: MemoryLayout<Int64>.stride-1)!
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let up = p.alignedDown(for: Int64.self)
+  expectEqual(Int(bitPattern: up), 0)
+}
+
+UnsafeRawPointerTestSuite.test("alignedUp.toMultiple.overflow.mutable") {
+  let p = UnsafeMutableRawPointer(bitPattern: 13)!
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let up = p.alignedDown(toMultipleOf: 16)
+  expectEqual(Int(bitPattern: up), 0)
+}
+
 runAllTests()
