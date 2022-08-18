@@ -57,10 +57,10 @@
 ///
 /// Example 2. Cross-block liveness.
 ///
-/// Initial State:
+/// Initial State after initializing a def block:
 ///
 ///  -----
-/// | Def | [LiveOut]
+/// | Def | [LiveWithin]
 ///  -----
 ///    |
 ///  -----
@@ -68,10 +68,10 @@
 ///  -----
 ///    |
 ///  -----
-/// |     | [Dead]
+/// | Use | [Dead]
 ///  -----
 ///
-/// State after updateForUse:
+/// Later state after updateForUse is applied to the use:
 ///
 ///  -----
 /// | Def | [LiveOut]
@@ -84,6 +84,10 @@
 ///  -----
 /// | Use | [LiveWithin]
 ///  -----
+///
+///
+/// An invariant is that for any liveness region, the post-dominating blocks of
+/// the region are the LiveWithin regions.
 ///
 //===----------------------------------------------------------------------===//
 
