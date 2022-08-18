@@ -636,8 +636,6 @@ void BindingSet::determineLiteralCoverage() {
   if (Literals.empty())
     return;
 
-  SmallVector<PotentialBinding, 4> adjustedBindings;
-
   bool allowsNil = canBeNil();
 
   for (auto &entry : Literals) {
@@ -648,7 +646,6 @@ void BindingSet::determineLiteralCoverage() {
 
     for (auto binding = Bindings.begin(); binding != Bindings.end();
          ++binding) {
-
       bool isCovered = false;
       Type adjustedTy;
 
