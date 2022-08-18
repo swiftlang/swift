@@ -52,11 +52,18 @@ PRESET_FILE_FLAGS=
 PRESET_PREFIX=
 NO_TEST=",no_test"
 USE_OS_RUNTIME=
+CROSS_COMPILE_HOSTS=
 
 case $(uname -s) in
   Darwin)
     SWIFT_PACKAGE=buildbot_osx_package
     OS_SUFFIX=osx
+
+    CROSS_COMPILE_HOSTS=macosx-arm64
+    if [ "$(arch)" = "arm64" ]
+    then
+      CROSS_COMPILE_HOSTS=macosx-x86_64
+    fi
   ;;
   Linux)
     SWIFT_PACKAGE=buildbot_linux
@@ -157,4 +164,5 @@ SCCACHE_FLAG="${SCCACHE_FLAG}"
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
         darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
         darwin_toolchain_alias="Local" \
-        darwin_toolchain_require_use_os_runtime="${REQUIRE_USE_OS_RUNTIME}"
+        darwin_toolchain_require_use_os_runtime="${REQUIRE_USE_OS_RUNTIME}" \
+        cross_compile_hosts="${CROSS_COMPILE_HOSTS}"
