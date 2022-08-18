@@ -66,11 +66,11 @@ func testClass() {
 func testError() {
   // CHECK-OUTPUT: PrivateError()
   // CHECK-SIL2: struct $PrivateError ()
-  // CHECK-SIL2: alloc_existential_box $Error, $PrivateError
+  // CHECK-SIL2: alloc_existential_box $any Error, $PrivateError
   print(returnPrivateError(27))
   // CHECK-OUTPUT: InternalError()
   // CHECK-SIL2: struct $InternalError ()
-  // CHECK-SIL2: alloc_existential_box $Error, $InternalError
+  // CHECK-SIL2: alloc_existential_box $any Error, $InternalError
   print(returnInternalError(27))
   // CHECK-SIL2: } // end sil function '$s4Main9testErroryyF'
 }

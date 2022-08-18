@@ -347,12 +347,12 @@ bb0(%0 : $K):
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform1KCAA1PA2aDP3foos5Int32VyFTW'
 
-// CHECK-LABEL: sil hidden [noinline] @$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF : $@convention(thin) (@guaranteed P) -> Int32 {
-// CHECK: bb0(%0 : $P):
-// CHECK:   debug_value %0 : $P, let, name "a", argno 1     
-// CHECK:   %2 = open_existential_ref %0 : $P to $@opened("{{.*}}", P) Self 
-// CHECK:   %3 = witness_method $@opened("{{.*}}", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("{{.*}}", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
-// CHECK:   %4 = apply %3<@opened("{{.*}}", P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
+// CHECK-LABEL: sil hidden [noinline] @$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF : $@convention(thin) (@guaranteed any P) -> Int32 {
+// CHECK: bb0(%0 : $any P):
+// CHECK:   debug_value %0 : $any P, let, name "a", argno 1
+// CHECK:   %2 = open_existential_ref %0 : $any P to $@opened("{{.*}}", any P) Self
+// CHECK:   %3 = witness_method $@opened("{{.*}}", any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("{{.*}}", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+// CHECK:   %4 = apply %3<@opened("{{.*}}", any P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
 // CHECK:   return %4 : $Int32                              
 // CHECK-LABEL: } // end sil function '$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF'
 sil hidden [noinline] @$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF : $@convention(thin) (@guaranteed P) -> Int32 {
@@ -393,16 +393,16 @@ bb0(%0 : $*PP):
 
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform24do_not_optimize_inout_cpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:  %0 = alloc_stack $PP, var, name "magic5"        
+// CHECK:  %0 = alloc_stack $any PP, var, name "magic5"
 // CHECK:  %1 = alloc_ref $KK                              
 // CHECK:  debug_value %1 : $KK, let, name "self", argno 1 
-// CHECK:  %3 = init_existential_ref %1 : $KK : $KK, $PP   
-// CHECK:  store %3 to %0 : $*PP                           
-// CHECK:  %5 = function_ref @$s21existential_transform13wrap_inout_cp1as5Int32VAA2PP_pz_tF : $@convention(thin) (@inout PP) -> Int32 
-// CHECK:  %6 = apply %5(%0) : $@convention(thin) (@inout PP) -> Int32
-// CHECK:  %7 = load %0 : $*PP                             
-// CHECK:  strong_release %7 : $PP                         
-// CHECK:  dealloc_stack %0 : $*PP                         
+// CHECK:  %3 = init_existential_ref %1 : $KK : $KK, $any PP
+// CHECK:  store %3 to %0 : $*any PP
+// CHECK:  %5 = function_ref @$s21existential_transform13wrap_inout_cp1as5Int32VAA2PP_pz_tF : $@convention(thin) (@inout any PP) -> Int32
+// CHECK:  %6 = apply %5(%0) : $@convention(thin) (@inout any PP) -> Int32
+// CHECK:  %7 = load %0 : $*any PP
+// CHECK:  strong_release %7 : $any PP
+// CHECK:  dealloc_stack %0 : $*any PP
 // CHECK:  %10 = tuple ()                                  
 // CHECK:  return %10 : $()                                
 // CHECK: } // end sil function '$s21existential_transform24do_not_optimize_inout_cpyyF'
@@ -449,13 +449,13 @@ bb0(%0 : $*PPP):
 //
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:  [[ALLOC:%.*]] = alloc_stack $PPP, var, name "magic6"
+// CHECK:  [[ALLOC:%.*]] = alloc_stack $any PPP, var, name "magic6"
 // CHECK:  alloc_ref $KKK
-// CHECK:  [[ADR:%.*]] = open_existential_addr mutable_access [[ALLOC]] : $*PPP to $*@opened("{{.*}}", PPP) Self
+// CHECK:  [[ADR:%.*]] = open_existential_addr mutable_access [[ALLOC]] : $*any PPP to $*@opened("{{.*}}", any PPP) Self
 // CHECK:  [[CAST:%.*]] = unchecked_addr_cast [[ADR]]
 // CHECK:  [[F:%.*]] = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n4main3KKKC_Tg5 : $@convention(thin) (@inout KKK) -> Int32
 // CHECK:  apply [[F]]([[CAST]])
-// CHECK:  dealloc_stack %0 : $*PPP
+// CHECK:  dealloc_stack %0 : $*any PPP
 // CHECK-LABEL: } // end sil function '$s21existential_transform9inout_ncpyyF'
 sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
 bb0:
@@ -499,13 +499,13 @@ bb0(%0 : $*PPPP):
 //
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   [[ALLOC:%.*]] = alloc_stack $PPPP, var, name "magic7"      
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $any PPPP, var, name "magic7"      
 // CHECK:   struct $SSSS ()                            
-// CHECK:   [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("{{.*}}", PPPP) Self
+// CHECK:   [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*any PPPP to $*@opened("{{.*}}", any PPPP) Self
 // CHECK:   [[CAST:%.*]] = unchecked_addr_cast [[ADR]]
 // CHECK:   [[F:%.*]] = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n4main4SSSSV_Tg5 : $@convention(thin) (@inout SSSS) -> Int32
 // CHECK:  apply [[F]]([[CAST]])
-// CHECK:   dealloc_stack [[ALLOC]] : $*PPPP
+// CHECK:   dealloc_stack [[ALLOC]] : $*any PPPP
 // CHECK-LABEL: } // end sil function '$s21existential_transform16struct_inout_ncpyyF'
 sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {
 bb0:

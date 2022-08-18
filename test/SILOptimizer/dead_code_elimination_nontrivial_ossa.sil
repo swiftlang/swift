@@ -23,7 +23,7 @@ case none
 case some(T)
 }
 
-sil [ossa] @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error Error)
+sil [ossa] @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error any Error)
 sil [ossa] @$use_klass1 : $@convention(thin) (@owned Klass) -> ()
 sil [ossa] @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @$use_nontrivialstruct1 : $@convention(thin) (@owned NonTrivialStruct) -> ()
@@ -96,10 +96,10 @@ bb1(%2 : @guaranteed $Klass):
 // CHECK-LABEL: sil [ossa] @dce_dontoptarg3 :
 // CHECK: destroy_value
 // CHECK-LABEL: } // end sil function 'dce_dontoptarg3'
-sil [ossa] @dce_dontoptarg3 : $@convention(thin) (@guaranteed Klass) -> @error Error {
+sil [ossa] @dce_dontoptarg3 : $@convention(thin) (@guaranteed Klass) -> @error any Error {
 bb0(%0 : @guaranteed $Klass):
-  %2 = function_ref @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error Error)
-  try_apply %2() : $@convention(thin) () -> (@owned Klass, @error Error), normal bb1, error bb2
+  %2 = function_ref @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error any Error)
+  try_apply %2() : $@convention(thin) () -> (@owned Klass, @error any Error), normal bb1, error bb2
 
 bb1(%3 : @owned $Klass):
   destroy_value %3 : $Klass
@@ -308,10 +308,10 @@ bb0(%0 : @owned $Klass):
 // CHECK-NEXT: destroy_value %3
 // CHECK-NEXT: br bb3
 // CHECK-LABEL: } // end sil function 'dce_insertdestroy2'
-sil [ossa] @dce_insertdestroy2 : $@convention(thin) (@guaranteed Klass) -> @error Error {
+sil [ossa] @dce_insertdestroy2 : $@convention(thin) (@guaranteed Klass) -> @error any Error {
 bb0(%0 : @guaranteed $Klass):
-  %2 = function_ref @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error Error)
-  try_apply %2() : $@convention(thin) () -> (@owned Klass, @error Error), normal bb1, error bb2
+  %2 = function_ref @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error any Error)
+  try_apply %2() : $@convention(thin) () -> (@owned Klass, @error any Error), normal bb1, error bb2
 
 bb1(%3 : @owned $Klass):
   br bb3(%3 : $Klass)

@@ -661,7 +661,7 @@ sil @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @erro
 //
 // CHECK-LABEL: sil [ossa] @testGenericClosureSpecialization
 // Call of the generic specialization of invokeGenericClosure<Never>
-// CHECK: function_ref @$s20invokeGenericClosures5NeverO_Tg5 : $@convention(thin) (@owned @callee_owned () -> (@out Never, @error Error)) -> (Never, @error Error)
+// CHECK: function_ref @$s20invokeGenericClosures5NeverO_Tg5 : $@convention(thin) (@owned @callee_owned () -> (@out Never, @error any Error)) -> (Never, @error any Error)
 // CHECK: apply [nothrow]
 // CHECK: unreachable
 // CHECK: end sil function 'testGenericClosureSpecialization'
@@ -955,8 +955,8 @@ bb2(%e : @owned $Error):
 // Just make sure we pass the verifiers.
 //
 // CHECK-LABEL: sil [ossa] @test_try_apply : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
-// CHECK: try_apply {{%.*}}({{%.*}}) : $@convention(thin) (Builtin.Int32) -> @error Error, normal bb1, error bb2
-// CHECK: try_apply {{%.*}}({{%.*}}) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb4, error bb5
+// CHECK: try_apply {{%.*}}({{%.*}}) : $@convention(thin) (Builtin.Int32) -> @error any Error, normal bb1, error bb2
+// CHECK: try_apply {{%.*}}({{%.*}}) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error, normal bb4, error bb5
 // CHECK: } // end sil function 'test_try_apply'
 sil [ossa] @test_try_apply : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):

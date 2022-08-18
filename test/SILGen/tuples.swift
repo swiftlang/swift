@@ -24,52 +24,52 @@ func make_xy() -> (x: Int, y: P) { return (make_int(), make_p()) }
 
 // CHECK-LABEL: sil hidden [ossa] @$s6tuples17testShuffleOpaqueyyF
 func testShuffleOpaque() {
-  // CHECK: [[X:%.*]] = alloc_box ${ var P }
+  // CHECK: [[X:%.*]] = alloc_box ${ var any P }
   // CHECK: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
   // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
   // CHECK: [[Y:%.*]] = alloc_box ${ var Int }
   // CHECK: [[Y_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[Y]]
   // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y_LIFETIME]]
-  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $P
+  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $any P
 
   // CHECK:      [[T0:%.*]] = function_ref @$s6tuples7make_xySi1x_AA1P_p1ytyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[TMP]])
-  // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PBX]] : $*P
+  // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PBX]] : $*any P
   // CHECK-NEXT: store [[T1]] to [trivial] [[PBY]]
   // CHECK-NEXT: dealloc_stack [[TMP]]
   var (x,y) : (y:P, x:Int) = make_xy()
 
-  // CHECK-NEXT: [[PAIR:%.*]] = alloc_box ${ var (y: P, x: Int) }
+  // CHECK-NEXT: [[PAIR:%.*]] = alloc_box ${ var (y: any P, x: Int) }
   // CHECK-NEXT: [[PAIR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[PAIR]]
   // CHECK-NEXT: [[PBPAIR:%.*]] = project_box [[PAIR_LIFETIME]]
-  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $P
+  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $any P
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples7make_xySi1x_AA1P_p1ytyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[TMP]])
-  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 0
-  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 1
-  // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PAIR_0]] : $*P
+  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 0
+  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 1
+  // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PAIR_0]] : $*any P
   // CHECK-NEXT: store [[T1]] to [trivial] [[PAIR_1]]
   // CHECK-NEXT: dealloc_stack [[TMP]]
   var pair : (y:P, x:Int) = make_xy()
 
-  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $P
+  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $any P
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples7make_xySi1x_AA1P_p1ytyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[TMP]])
-  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: P, x: Int)
-  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[WRITE]] : $*(y: P, x: Int), 0
+  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: any P, x: Int)
+  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[WRITE]] : $*(y: any P, x: Int), 0
   // CHECK-NEXT: copy_addr [take] [[TMP]] to [[PAIR_0]]
-  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[WRITE]] : $*(y: P, x: Int), 1
+  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[WRITE]] : $*(y: any P, x: Int), 1
   // CHECK-NEXT: assign [[T1]] to [[PAIR_1]]
-  // CHECK-NEXT: end_access [[WRITE]] : $*(y: P, x: Int)
+  // CHECK-NEXT: end_access [[WRITE]] : $*(y: any P, x: Int)
   // CHECK-NEXT: dealloc_stack [[TMP]]
   pair = make_xy()
 }
 
 // CHECK-LABEL: testShuffleTuple
 func testShuffleTuple() {
-  // CHECK: [[X:%.*]] = alloc_box ${ var P }
+  // CHECK: [[X:%.*]] = alloc_box ${ var any P }
   // CHECK: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
   // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
   // CHECK: [[Y:%.*]] = alloc_box ${ var Int }
@@ -78,7 +78,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples8make_intSiyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()
-  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $P
+  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $any P
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF 
   // CHECK-NEXT: apply [[T0]]([[TMP]])
@@ -87,18 +87,18 @@ func testShuffleTuple() {
   // CHECK-NEXT: dealloc_stack [[TMP]]
   var (x,y) : (y:P, x:Int) = (x: make_int(), y: make_p())
 
-  // CHECK-NEXT: [[PAIR:%.*]] = alloc_box ${ var (y: P, x: Int) }
+  // CHECK-NEXT: [[PAIR:%.*]] = alloc_box ${ var (y: any P, x: Int) }
   // CHECK-NEXT: [[PAIR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[PAIR]]
   // CHECK-NEXT: [[PBPAIR:%.*]] = project_box [[PAIR_LIFETIME]]
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples8make_intSiyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()
-  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $P
+  // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $any P
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF 
   // CHECK-NEXT: apply [[T0]]([[TMP]])
-  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 0
-  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 1
+  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 0
+  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 1
   // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PBX]]
   // CHECK-NEXT: store [[T1]] to [trivial] [[PAIR_1]]
   // CHECK-NEXT: dealloc_stack [[TMP]]
@@ -107,16 +107,16 @@ func testShuffleTuple() {
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples8make_intSiyF
   // CHECK-NEXT: [[INT:%.*]] = apply [[T0]]()
-  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $P
+  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $any P
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF 
   // CHECK-NEXT: apply [[T0]]([[TEMP]])
-  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: P, x: Int)
-  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[WRITE]] : $*(y: P, x: Int), 0
+  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: any P, x: Int)
+  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[WRITE]] : $*(y: any P, x: Int), 0
   // CHECK-NEXT: copy_addr [take] [[TEMP]] to [[PAIR_0]]
-  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[WRITE]] : $*(y: P, x: Int), 1
+  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[WRITE]] : $*(y: any P, x: Int), 1
   // CHECK-NEXT: assign [[INT]] to [[PAIR_1]]
-  // CHECK-NEXT: end_access [[WRITE]] : $*(y: P, x: Int)
+  // CHECK-NEXT: end_access [[WRITE]] : $*(y: any P, x: Int)
   // CHECK-NEXT: dealloc_stack [[TEMP]]
   pair = (x: make_int(), y: make_p())
 }

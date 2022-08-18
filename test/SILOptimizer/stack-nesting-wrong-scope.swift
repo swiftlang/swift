@@ -3,9 +3,9 @@
 // RUN:   -sil-print-functions=$s3red19ThrowAddrOnlyStructV016throwsOptionalToG0ACyxGSgSi_tcfC \
 // RUN:   -Xllvm -sil-print-debuginfo -o %t -module-name red 2>&1 | %FileCheck %s
 
-// CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : @owned $Error):
+// CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : @owned $any Error):
 // CHECK:   dealloc_stack %{{[0-9]+}} : $*ThrowAddrOnlyStruct<T>, loc {{.*}}:26:68, scope 2
-// CHECK:   br bb{{[0-9]+}}(%{{[0-9]+}} : $Error), loc {{.*}}:26:15, scope 2
+// CHECK:   br bb{{[0-9]+}}(%{{[0-9]+}} : $any Error), loc {{.*}}:26:15, scope 2
 
 protocol Patatino {
   init()

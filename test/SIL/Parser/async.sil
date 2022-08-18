@@ -71,7 +71,7 @@ bb1(%r : $Builtin.Int32):
   // CHECK-NEXT: br
   br bb3
   // CHECK-NEXT: {{^ *$}}
-  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $Error):
+  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $any Error):
 bb2(%e : $Error):
   // CHECK-NEXT: br
   br bb3
@@ -125,7 +125,7 @@ bb1:
   // CHECK-NEXT: br
   br bb3
   // CHECK-NEXT: {{^ *$}}
-  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $Error):
+  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $any Error):
 bb2(%e : $Error):
   dealloc_stack %a : $*Builtin.Int32
   br bb3

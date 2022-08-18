@@ -16,7 +16,7 @@ func guaranteed_captures() {
   // CHECK: [[MUTABLE_RETAINABLE_BOX:%.*]] = alloc_box ${ var C }
   // CHECK: [[MUTABLE_RETAINABLE_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MUTABLE_RETAINABLE_BOX]]
   var mutableRetainable = C()
-  // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX:%.*]] = alloc_box ${ var P }
+  // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX:%.*]] = alloc_box ${ var any P }
   // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MUTABLE_ADDRESS_ONLY_BOX]]
   var mutableAddressOnly: P = C()
 
@@ -25,7 +25,7 @@ func guaranteed_captures() {
   // CHECK: [[IMMUTABLE_RETAINABLE:%.*]] = apply {{.*}} -> @owned C
   // CHECK: [[B_IMMUTABLE_RETAINABLE:%.*]] = begin_borrow [lexical] [[IMMUTABLE_RETAINABLE]] : $C
   let immutableRetainable = C()
-  // CHECK: [[IMMUTABLE_ADDRESS_ONLY:%.*]] = alloc_stack [lexical] $P
+  // CHECK: [[IMMUTABLE_ADDRESS_ONLY:%.*]] = alloc_stack [lexical] $any P
   let immutableAddressOnly: P = C()
 
   func captureEverything() {
@@ -53,7 +53,7 @@ func guaranteed_captures() {
   // CHECK: [[MUTABLE_RETAINABLE_BOX_COPY:%.*]] = copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
   // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX_COPY:%.*]] = copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK: [[IMMUTABLE_RETAINABLE_COPY:%.*]] = copy_value [[B_IMMUTABLE_RETAINABLE]]
-  // CHECK: [[IMMUTABLE_ADDRESS:%.*]] = alloc_stack $P
+  // CHECK: [[IMMUTABLE_ADDRESS:%.*]] = alloc_stack $any P
   // CHECK: [[CLOSURE:%.*]] = partial_apply {{.*}}([[MUTABLE_TRIVIAL_BOX_COPY]], [[MUTABLE_RETAINABLE_BOX_COPY]], [[MUTABLE_ADDRESS_ONLY_BOX_COPY]], [[IMMUTABLE_TRIVIAL]], [[IMMUTABLE_RETAINABLE_COPY]], [[IMMUTABLE_ADDRESS]])
   // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
   // CHECK: apply {{.*}}[[CONVERT]]
@@ -66,4 +66,4 @@ func guaranteed_captures() {
   escape(captureEverything)
 }
 
-// CHECK: sil private [ossa] [[FN_NAME]] : $@convention(thin) (@guaranteed { var S }, @guaranteed { var C }, @guaranteed { var P }, S, @guaranteed C, @in_guaranteed P)
+// CHECK: sil private [ossa] [[FN_NAME]] : $@convention(thin) (@guaranteed { var S }, @guaranteed { var C }, @guaranteed { var any P }, S, @guaranteed C, @in_guaranteed any P)

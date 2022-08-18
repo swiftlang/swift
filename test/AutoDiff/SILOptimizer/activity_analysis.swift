@@ -141,7 +141,7 @@ func checked_cast_branch(_ x: Float) -> Float {
 // CHECK: [NONE]   %2 = metatype $@thin Int.Type
 // CHECK: [NONE]   %3 = metatype $@thick Int.Type
 // CHECK: bb1:
-// CHECK: [NONE] %5 = argument of bb1 : $@thick Any.Type
+// CHECK: [NONE] %5 = argument of bb1 : $@thick any Any.Type
 // CHECK: [NONE]   %6 = integer_literal $Builtin.Int1, -1
 // CHECK: bb2:
 // CHECK: [NONE] %8 = argument of bb2 : $@thick Int.Type
@@ -162,7 +162,7 @@ func checked_cast_branch(_ x: Float) -> Float {
 // CHECK: [ACTIVE]   %23 = apply %22(%0, %0, %21) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 
 // CHECK-LABEL: sil hidden [ossa] @${{.*}}checked_cast_branch{{.*}} : $@convention(thin) (Float) -> Float {
-// CHECK:   checked_cast_br %3 : $@thick Int.Type to Any.Type, bb1, bb2
+// CHECK:   checked_cast_br %3 : $@thick Int.Type to any Any.Type, bb1, bb2
 // CHECK: }
 
 @differentiable(reverse)
@@ -552,12 +552,12 @@ func testTryApply(_ x: Float) -> Float {
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [NONE]   // function_ref closure #1 in testTryApply(_:)
-// CHECK: [NONE]   %3 = thin_to_thick_function %2 : $@convention(thin) () -> @error Error to $@noescape @callee_guaranteed () -> @error Error
+// CHECK: [NONE]   %3 = thin_to_thick_function %2 : $@convention(thin) () -> @error any Error to $@noescape @callee_guaranteed () -> @error any Error
 // CHECK: [NONE]   // function_ref rethrowing(_:)
 // CHECK: bb1:
 // CHECK: [NONE] %6 = argument of bb1 : $()
 // CHECK: bb2:
-// CHECK: [NONE] %8 = argument of bb2 : $Error
+// CHECK: [NONE] %8 = argument of bb2 : $any Error
 
 //===----------------------------------------------------------------------===//
 // Coroutine differentiation (`begin_apply`)
