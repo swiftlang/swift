@@ -37,6 +37,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
   case ObjCReason::ExplicitlyCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyObjCMembers:
   case ObjCReason::ExplicitlyIBOutlet:
   case ObjCReason::ExplicitlyIBAction:
   case ObjCReason::ExplicitlyIBSegueAction:
@@ -71,6 +72,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::ExplicitlyCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyObjCMembers:
   case ObjCReason::ExplicitlyIBOutlet:
   case ObjCReason::ExplicitlyIBAction:
   case ObjCReason::ExplicitlyIBSegueAction:
@@ -128,6 +130,7 @@ void ObjCReason::describe(const Decl *D) const {
   case ObjCReason::ExplicitlyCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyObjCMembers:
   case ObjCReason::ExplicitlyIBOutlet:
   case ObjCReason::ExplicitlyIBAction:
   case ObjCReason::ExplicitlyIBSegueAction:
