@@ -718,6 +718,8 @@ def main():
 if __name__ == "__main__":
     try:
         exit_code = main()
+    except SystemExit as e:
+        os._exit(e.code)
     except KeyboardInterrupt:
         sys.exit(1)
     finally:
