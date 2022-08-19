@@ -4896,6 +4896,9 @@ hasInvariantSelfRequirement(const ProtocolDecl *proto,
 
   for (auto req : reqSig) {
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::SameType:
       if (req.getSecondType()->isTypeParameter()) {
         if (req.getFirstType()->isEqual(selfTy))
@@ -4927,6 +4930,9 @@ static void diagnoseInvariantSelfRequirement(
   unsigned kind = 0;
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::SameType:
   if (req.getSecondType()->isTypeParameter()) {
       // eg, 'Self == Self.A.B'

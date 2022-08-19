@@ -1132,6 +1132,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
       TypeResolutionStage::Interface,
       [proto](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
+        case RequirementKind::SameCount:
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:

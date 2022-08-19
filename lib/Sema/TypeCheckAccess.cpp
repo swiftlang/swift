@@ -41,6 +41,7 @@ static void forAllRequirementTypes(
   std::move(source).visitRequirements(TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
