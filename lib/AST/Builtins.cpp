@@ -2804,12 +2804,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::COWBufferForReading:
     return getCOWBufferForReading(Context, Id);
 
-  case BuiltinValueKind::UnsafeGuaranteed:
-    return getUnsafeGuaranteed(Context, Id);
-
-  case BuiltinValueKind::UnsafeGuaranteedEnd:
-    return getUnsafeGuaranteedEnd(Context, Id);
-
   case BuiltinValueKind::ApplyDerivative:
   case BuiltinValueKind::ApplyTranspose:
     llvm_unreachable("Handled above");

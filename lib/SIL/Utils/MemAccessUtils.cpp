@@ -2484,8 +2484,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::Unreachable:
     case BuiltinValueKind::CondUnreachable:
     case BuiltinValueKind::DestroyArray:
-    case BuiltinValueKind::UnsafeGuaranteed:
-    case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::IntInstrprofIncrement:
