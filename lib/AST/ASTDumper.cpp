@@ -4188,3 +4188,71 @@ void StableSerializationPath::dump(llvm::raw_ostream &os) const {
     os << "\n";
   }
 }
+
+void RequirementRepr::dump() const {
+  print(llvm::errs());
+  llvm::errs() << "\n";
+}
+
+void GenericParamList::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void LayoutConstraint::dump() const {
+  if (!*this) {
+    llvm::errs() << "(null)\n";
+    return;
+  }
+  getPointer()->print(llvm::errs());
+}
+
+void GenericSignature::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void Requirement::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << '\n';
+}
+void Requirement::dump(raw_ostream &out) const {
+  switch (getKind()) {
+  case RequirementKind::SameCount:
+    out << "same_count: ";
+    break;
+  case RequirementKind::Conformance:
+    out << "conforms_to: ";
+    break;
+  case RequirementKind::Layout:
+    out << "layout: ";
+    break;
+  case RequirementKind::Superclass:
+    out << "superclass: ";
+    break;
+  case RequirementKind::SameType:
+    out << "same_type: ";
+    break;
+  }
+
+  PrintOptions opts;
+  opts.ProtocolQualifiedDependentMemberTypes = true;
+
+  getFirstType().print(out, opts);
+  out << " ";
+
+  if (getKind() != RequirementKind::Layout && getSecondType())
+    getSecondType().print(out, opts);
+  else if (getLayoutConstraint())
+    out << getLayoutConstraint();
+}
+
+void SILParameterInfo::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void SILResultInfo::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
