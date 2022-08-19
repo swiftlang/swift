@@ -5552,9 +5552,8 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
-    Printer << "(";
     visit(T->getPatternType());
-    Printer << "..." << ")";
+    Printer << "...";
   }
 
   void visitTupleType(TupleType *T) {
@@ -5563,7 +5562,8 @@ public:
 
     // Single-element tuples can only appear in SIL mode.
     if (T->getNumElements() == 1 &&
-        !T->getElement(0).hasName()) {
+        !T->getElement(0).hasName() &&
+        !T->getElementType(0)->is<PackExpansionType>()) {
       Printer << "@tuple ";
     }
 
