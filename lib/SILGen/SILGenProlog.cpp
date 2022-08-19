@@ -843,6 +843,15 @@ SILValue SILGenFunction::emitLoadActorExecutor(SILLocation loc,
   else
     actorV = actor.borrow(*this, loc).getValue();
 
+  // Open an existential actor type.
+  CanType actorType = actor.getType().getASTType();
+  if (actorType->isExistentialType()) {
+    actorType = OpenedArchetypeType::get(
+        actorType, F.getGenericSignature())->getCanonicalType();
+    SILType loweredActorType = getLoweredType(actorType);
+    actorV = B.createOpenExistentialRef(loc, actorV, loweredActorType);
+  }
+
   // For now, we just want to emit a hop_to_executor directly to the
   // actor; LowerHopToActor will add the emission logic necessary later.
   return actorV;
