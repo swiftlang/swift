@@ -900,6 +900,11 @@ def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,
   HelpText<"Enable experimental support for SPI imports">;
 
+def disable_print_missing_imports_in_module_interface :
+  Flag<["-"], "disable-print-missing-imports-in-module-interface">,
+  HelpText<"Disable adding to the module interface imports used from API and "
+           "missing from the sources">;
+
 // [FIXME: Clang-type-plumbing] Make this a SIL-only option once we start
 // unconditionally emitting non-canonical Clang types in swiftinterfaces.
 def experimental_print_full_convention :

@@ -16,6 +16,14 @@
 /// In Swift 6, it's an error.
 // RUN: %target-swift-frontend -emit-module %t/clientFileA-Swift6.swift %t/clientFileB.swift -module-name client -o %t/client.swiftmodule -I %t -verify -swift-version 6
 
+/// The swiftinterface is broken by the missing import without the workaround.
+// RUN: %target-swift-emit-module-interface(%t/ClientBroken.swiftinterface)  %t/clientFileA-Swift5.swift %t/clientFileB.swift -I %t -disable-print-missing-imports-in-module-interface
+// RUN: not %target-swift-typecheck-module-from-interface(%t/ClientBroken.swiftinterface) -I %t
+
+/// The swiftinterface parses fine with the workaround adding the missing imports.
+// RUN: %target-swift-emit-module-interface(%t/ClientFixed.swiftinterface)  %t/clientFileA-Swift5.swift %t/clientFileB.swift -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/ClientFixed.swiftinterface) -I %t
+
 // REQUIRES: asserts
 
 // BEGIN empty.swift

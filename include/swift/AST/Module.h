@@ -713,6 +713,10 @@ public:
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                           ImportFilter filter = ImportFilterKind::Exported) const;
 
+  /// Lists modules that are not imported from a file and used in API.
+  void
+  getMissingImportedModules(SmallVectorImpl<ImportedModule> &imports) const;
+
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.
   ///
