@@ -65,6 +65,7 @@ import Swift
 /// use the `withThrowingTaskGroup(of:returning:body:)` method instead.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
+@_unsafeInheritExecutor
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -157,6 +158,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// or to let the group rethrow the error.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
+@_unsafeInheritExecutor
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
