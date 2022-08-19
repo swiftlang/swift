@@ -839,6 +839,7 @@ struct FixedSizeArray100<Element>: Sequence, IteratorProtocol {
   var element98: Element
   var element99: Element
 
+  @inline(never)
   static func getKeypathToElement(index: Int)
     -> WritableKeyPath<FixedSizeArray100<Element>, Element>
   {
@@ -1100,6 +1101,7 @@ struct FixedSizeArray10<Element>: Sequence, IteratorProtocol {
   var element8: Element
   var element9: Element
 
+  @inline(never)
   static func getKeypathToElement(index: Int)
     -> WritableKeyPath<FixedSizeArray10<Element>, Element>
   {
