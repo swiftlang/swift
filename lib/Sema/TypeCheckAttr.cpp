@@ -2733,6 +2733,10 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                SmallVectorImpl<ValueDecl *> &results) {
   auto *declCtxt = replacement->getDeclContext();
 
+  // Hop up to the FileUnit if we're in top-level code
+  if (auto *toplevel = dyn_cast<TopLevelCodeDecl>(declCtxt))
+    declCtxt = toplevel->getDeclContext();
+
   // Look at the accessors' storage's context.
   if (auto *accessor = dyn_cast<AccessorDecl>(replacement)) {
     auto *storage = accessor->getStorage();
