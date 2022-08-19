@@ -875,7 +875,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
         ctx.getInheritedConformance(type, inheritedConformance.getConcrete());
   } else {
     // Create or find the normal conformance.
-    Type conformingType = conformingDC->getDeclaredInterfaceType();
+    Type conformingType = conformingDC->getSelfInterfaceType();
     SourceLoc conformanceLoc
       = conformingNominal == conformingDC
           ? conformingNominal->getLoc()
