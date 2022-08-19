@@ -160,8 +160,8 @@ PackConformance *PackConformance::getAssociatedConformance(
   return PackConformance::get(conformingType, protocol, packConformances);
 }
 
-PackConformance *PackConformance::subst(SubstitutionMap subMap,
-                                        SubstOptions options) const {
+ProtocolConformanceRef PackConformance::subst(SubstitutionMap subMap,
+                                              SubstOptions options) const {
   return subst(QuerySubstitutionMap{subMap},
                LookUpConformanceInSubstitutionMap(subMap),
                options);
@@ -284,9 +284,9 @@ protected:
                                        ProtocolDecl *proto) -> ProtocolConformanceRef {
         auto substConformance = conformances(origType, substType, proto);
 
+        // If the substituted conformance is a pack, project the jth element.
         if (isRootedInTypeSequenceParameter(origType)) {
-          // FIXME: get the corresponding pack conformance
-          return ProtocolConformanceRef::forInvalid();
+          return substConformance.getPack()->getPatternConformances()[j];
         }
 
         return substConformance;
@@ -376,9 +376,9 @@ public:
 
 }
 
-PackConformance *PackConformance::subst(TypeSubstitutionFn subs,
-                                        LookupConformanceFn conformances,
-                                        SubstOptions options) const {
+ProtocolConformanceRef PackConformance::subst(TypeSubstitutionFn subs,
+                                              LookupConformanceFn conformances,
+                                              SubstOptions options) const {
   PackConformanceExpander expander(subs, conformances, options,
                                    getPatternConformances());
   expander.expand(ConformingType);
@@ -386,8 +386,9 @@ PackConformance *PackConformance::subst(TypeSubstitutionFn subs,
   auto &ctx = Protocol->getASTContext();
   auto *substConformingType = PackType::get(ctx, expander.substElements);
 
-  return PackConformance::get(substConformingType, Protocol,
-                              expander.substConformances);
+  auto substConformance = PackConformance::get(substConformingType, Protocol,
+                                               expander.substConformances);
+  return ProtocolConformanceRef(substConformance);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, PackConformance *conformance) {

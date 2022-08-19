@@ -20,6 +20,8 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 
@@ -44,6 +46,8 @@ ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
 
   if (isConcrete()) {
     return getConcrete()->getProtocol();
+  } else if (isPack()) {
+    return getPack()->getProtocol();
   } else {
     return getAbstract();
   }
@@ -67,11 +71,14 @@ ProtocolConformanceRef::subst(Type origType,
   if (isInvalid())
     return *this;
 
-  // If we have a concrete conformance, we need to substitute the
-  // conformance to apply to the new type.
   if (isConcrete())
     return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
                                                        options));
+  if (isPack())
+    return getPack()->subst(subs, conformances, options);
+
+  // Handle abstract conformances below:
+
   // If the type is an opaque archetype, the conformance will remain abstract,
   // unless we're specifically substituting opaque types.
   if (auto origArchetype = origType->getAs<ArchetypeType>()) {
@@ -102,17 +109,26 @@ ProtocolConformanceRef::subst(Type origType,
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
-  if (!isConcrete())
-    return *this;
+  if (isConcrete()) {
+    auto *concrete = getConcrete()->subst(
+        [](SubstitutableType *type) -> Type {
+          if (auto *archetypeType = type->getAs<ArchetypeType>())
+            return archetypeType->getInterfaceType();
+          return type;
+        },
+        MakeAbstractConformanceForGenericType());
+    return ProtocolConformanceRef(concrete);
+  } else if (isPack()) {
+    return getPack()->subst(
+        [](SubstitutableType *type) -> Type {
+          if (auto *archetypeType = type->getAs<ArchetypeType>())
+            return archetypeType->getInterfaceType();
+          return type;
+        },
+        MakeAbstractConformanceForGenericType());
+  }
 
-  auto *concrete = getConcrete()->subst(
-      [](SubstitutableType *type) -> Type {
-        if (auto *archetypeType = type->getAs<ArchetypeType>())
-          return archetypeType->getInterfaceType();
-        return type;
-      },
-      MakeAbstractConformanceForGenericType());
-  return ProtocolConformanceRef(concrete);
+  return *this;
 }
 
 Type
@@ -171,6 +187,12 @@ ProtocolConformanceRef::getConditionalRequirements() const {
 
 Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
                                                Type assocType) const {
+  if (isPack()) {
+    auto *pack = getPack();
+    assert(conformingType->isEqual(pack->getType()));
+    return pack->getAssociatedType(assocType);
+  }
+
   assert(!isConcrete() || getConcrete()->getType()->isEqual(conformingType));
 
   auto type = assocType->getCanonicalType();
@@ -200,6 +222,14 @@ ProtocolConformanceRef
 ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
                                                  Type assocType,
                                                  ProtocolDecl *protocol) const {
+  // If this is a pack conformance, project the associated conformances.
+  if (isPack()) {
+    auto *pack = getPack();
+    assert(conformingType->isEqual(pack->getType()));
+    return ProtocolConformanceRef(
+        pack->getAssociatedConformance(assocType, protocol));
+  }
+
   // If this is a concrete conformance, look up the associated conformance.
   if (isConcrete()) {
     auto conformance = getConcrete();
@@ -221,23 +251,33 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
 bool ProtocolConformanceRef::isCanonical() const {
   if (isAbstract() || isInvalid())
     return true;
+  if (isPack())
+    return getPack()->isCanonical();
   return getConcrete()->isCanonical();
+
 }
 
 ProtocolConformanceRef
 ProtocolConformanceRef::getCanonicalConformanceRef() const {
   if (isAbstract() || isInvalid())
     return *this;
+  if (isPack())
+    return ProtocolConformanceRef(getPack()->getCanonicalConformance());
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
 }
 
 bool ProtocolConformanceRef::hasUnavailableConformance() const {
-  if (isInvalid())
+  if (isInvalid() || isAbstract())
     return false;
 
-  // Abstract conformances are never unavailable.
-  if (!isConcrete())
+  if (isPack()) {
+    for (auto conformance : getPack()->getPatternConformances()) {
+      if (conformance.hasUnavailableConformance())
+        return true;
+    }
+
     return false;
+  }
 
   // Check whether this conformance is on an unavailable extension.
   auto concrete = getConcrete();
@@ -266,8 +306,17 @@ bool ProtocolConformanceRef::hasMissingConformance(ModuleDecl *module) const {
 bool ProtocolConformanceRef::forEachMissingConformance(
     ModuleDecl *module,
     llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const {
-  if (!isConcrete())
+  if (isInvalid() || isAbstract())
     return false;
+
+  if (isPack()) {
+    for (auto conformance : getPack()->getPatternConformances()) {
+      if (conformance.forEachMissingConformance(module, fn))
+        return true;
+    }
+
+    return false;
+  }
 
   // Is this a missing conformance?
   ProtocolConformance *concreteConf = getConcrete();
@@ -292,6 +341,8 @@ void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef confor
     simple_display(out, conformanceRef.getAbstract());
   } else if (conformanceRef.isConcrete()) {
     simple_display(out, conformanceRef.getConcrete());
+  } else if (conformanceRef.isPack()) {
+    simple_display(out, conformanceRef.getPack());
   }
 }
 

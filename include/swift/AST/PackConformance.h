@@ -77,12 +77,16 @@ public:
   PackConformance *
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol) const;
 
-  PackConformance *subst(SubstitutionMap subMap,
-                         SubstOptions options=None) const;
+  /// The ProtocolConformanceRef either stores a pack conformance, or
+  /// it is invalid in the case of substitution failure.
+  ProtocolConformanceRef subst(SubstitutionMap subMap,
+                               SubstOptions options=None) const;
 
-  PackConformance *subst(TypeSubstitutionFn subs,
-                         LookupConformanceFn conformances,
-                         SubstOptions options=None) const;
+  /// The ProtocolConformanceRef either stores a pack conformance, or
+  /// it is invalid in the case of substitution failure.
+  ProtocolConformanceRef subst(TypeSubstitutionFn subs,
+                               LookupConformanceFn conformances,
+                               SubstOptions options=None) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
