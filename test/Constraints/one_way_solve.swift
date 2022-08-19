@@ -28,16 +28,16 @@ func testTernaryOneWayOverload(b: Bool) {
   // CHECK: 0: $T2 $T3 $T4
 
   // CHECK: solving component #1
-  // CHECK: Initial bindings: $T11 := Int8, $T11 := Int16
+  // CHECK: (attempting type variable $T11 := Int8
 
   // CHECK: solving component #1
-  // CHECK: Initial bindings: $T11 := Int8, $T11 := Int16
+  // CHECK: (attempting type variable $T11 := Int8
 
   // CHECK: solving component #1
-  // CHECK: Initial bindings: $T11 := Int8, $T11 := Int16
+  // CHECK: (attempting type variable $T11 := Int8
 
   // CHECK: solving component #1
-  // CHECK: Initial bindings: $T11 := Int8
+  // CHECK: (attempting type variable $T11 := Int8 
   // CHECK: (found solution: [non-default literal(s) = 2] [use of overloaded unapplied function(s) = 2])
 
   // CHECK: (composed solution: [non-default literal(s) = 2] [use of overloaded unapplied function(s) = 2])
