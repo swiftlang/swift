@@ -58,6 +58,7 @@ class ArgumentList;
 class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
+class BuiltinTupleDecl;
 class ClassDecl;
 class ClangModuleLoader;
 class DependentMemberType;
@@ -5488,6 +5489,23 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialType, Type)
   static CanExistentialType get(CanType constraint);
   PROXY_CAN_TYPE_SIMPLE_GETTER(getConstraintType)
 END_CAN_TYPE_WRAPPER(ExistentialType, Type)
+
+
+/// BuiltinTupleType - A singleton nominal type which serves as the declared
+/// interface type of Builtin.TheTupleType.
+class BuiltinTupleType : public NominalType {
+public:
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinTuple;
+  }
+
+private:
+  friend class ASTContext;
+  BuiltinTupleType(BuiltinTupleDecl *TheDecl, const ASTContext &Ctx);
+};
+BEGIN_CAN_TYPE_WRAPPER(BuiltinTupleType, NominalType)
+END_CAN_TYPE_WRAPPER(BuiltinTupleType, NominalType)
 
 /// LValueType - An l-value is a handle to a physical object.  The
 /// type of that object uniquely determines the type of an l-value

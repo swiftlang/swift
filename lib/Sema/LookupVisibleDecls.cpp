@@ -342,6 +342,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Struct:
       case DeclKind::Protocol:
       case DeclKind::OpaqueType:
+      case DeclKind::BuiltinTuple:
         return;
 
       // Initializers cannot be found by dynamic lookup.

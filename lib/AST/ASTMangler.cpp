@@ -1324,6 +1324,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendType(ET->getConstraintType(), sig, forDecl);
     }
 
+    case TypeKind::BuiltinTuple:
+      llvm_unreachable("Not implemented");
+
     case TypeKind::UnboundGeneric:
     case TypeKind::Class:
     case TypeKind::Enum:
@@ -2554,6 +2557,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     case DeclKind::Struct:
       appendOperator("V");
       break;
+    case DeclKind::BuiltinTuple:
+      llvm_unreachable("Not implemented");
     }
   }
 

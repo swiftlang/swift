@@ -2830,6 +2830,19 @@ createOpaqueParameterGenericParams(
 
 GenericParamList *
 GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
+  if (auto *tupleDecl = dyn_cast<BuiltinTupleDecl>(value)) {
+    auto &ctx = value->getASTContext();
+
+    // Builtin.TheTupleType has a single pack generic parameter: <Elements...>
+    auto *genericParam = GenericTypeParamDecl::create(
+        tupleDecl->getDeclContext(), ctx.Id_Elements, SourceLoc(),
+        /*isTypeSequence=*/true, /*depth=*/0, /*depth=*/0,
+        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+
+    return GenericParamList::create(ctx, SourceLoc(), genericParam,
+                                    SourceLoc());
+  }
+
   if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
     // Create the generic parameter list for the extension by cloning the
     // generic parameter lists of the nominal and any of its parent types.
