@@ -274,6 +274,7 @@ BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
                                         BridgedFunction function);
 SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
                                           llvm::StringRef fieldName);
+llvm::StringRef SILType_getNominalFieldName(BridgedType type, SwiftInt index);
 SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
                                       llvm::StringRef caseName);
 
