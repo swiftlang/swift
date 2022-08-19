@@ -23,6 +23,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
@@ -3404,6 +3405,27 @@ static void dumpProtocolConformanceRec(
   PrintWithColorRAII(out, ParenthesisColor) << ')';
 }
 
+static void dumpPackConformanceRec(
+    const PackConformance *conformance, llvm::raw_ostream &out,
+    unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
+  out.indent(indent);
+  PrintWithColorRAII(out, ParenthesisColor) << '(';
+  out << "pack_conformance type=" << Type(conformance->getType())
+      << " protocol=" << conformance->getProtocol()->getName();
+
+  auto conformances = conformance->getPatternConformances();
+  if (!conformances.empty()) {
+    out << "\n";
+
+    for (auto conformanceRef : conformances) {
+      dumpProtocolConformanceRefRec(conformanceRef, out, indent, visited);
+    }
+  }
+
+  PrintWithColorRAII(out, ParenthesisColor) << ')';
+}
+
 static void dumpSubstitutionMapRec(
     SubstitutionMap map, llvm::raw_ostream &out,
     SubstitutionMap::DumpStyle style, unsigned indent,
@@ -3499,6 +3521,11 @@ void ProtocolConformance::dump() const {
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
   dumpProtocolConformanceRec(this, out, indent, visited);
+}
+
+void PackConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  dumpPackConformanceRec(this, out, indent, visited);
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out, DumpStyle style,

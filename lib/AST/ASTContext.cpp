@@ -37,6 +37,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -444,6 +445,9 @@ struct ASTContext::Implementation {
     /// The set of builtin protocol conformances.
     llvm::DenseMap<std::pair<Type, ProtocolDecl *>,
                    BuiltinProtocolConformance *> BuiltinConformances;
+
+    /// The set of pack conformances.
+    llvm::FoldingSet<PackConformance> PackConformances;
 
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
@@ -2470,6 +2474,48 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   // Build a new normal protocol conformance.
   auto result = new (*this, arena) InheritedProtocolConformance(type, inherited);
   inheritedConformances.InsertNode(result, insertPos);
+  return result;
+}
+
+PackConformance *PackConformance::get(PackType *conformingType,
+                                      ProtocolDecl *protocol,
+                                      ArrayRef<ProtocolConformanceRef> conformances) {
+  auto properties = conformingType->getRecursiveProperties();
+
+  for (auto conformance : conformances) {
+    if (conformance.isAbstract() || conformance.isInvalid())
+      continue;
+
+    auto *concrete = conformance.getConcrete();
+    properties |= concrete->getType()->getRecursiveProperties();
+  }
+
+  auto &ctx = protocol->getASTContext();
+
+  llvm::FoldingSetNodeID id;
+  PackConformance::Profile(id, conformingType, protocol, conformances);
+
+  // Figure out which arena this conformance should go into.
+  AllocationArena arena = getArena(properties);
+
+  // Did we already record the pack conformance?
+  void *insertPos;
+  auto &packConformances = ctx.getImpl().getArena(arena).PackConformances;
+  if (auto result = packConformances.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new pack conformance.
+  auto size = totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
+  auto mem = ctx.Allocate(size, alignof(PackConformance), arena);
+
+  auto result
+    = new (mem) PackConformance(conformingType, protocol,
+                                conformances);
+  auto node = packConformances.FindNodeOrInsertPos(id, insertPos);
+  (void)node;
+  assert(!node);
+  packConformances.InsertNode(result, insertPos);
+
   return result;
 }
 
