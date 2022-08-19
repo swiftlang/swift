@@ -23,6 +23,9 @@
     },
     {
       "name": "enable-bare-slash-regex-updated"
+    },
+    {
+      "name": "emit-const-value-sidecar"
     }
   ]
 }
