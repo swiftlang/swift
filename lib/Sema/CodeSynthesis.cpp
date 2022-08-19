@@ -847,15 +847,16 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
       for (auto idx : range(pbd->getNumPatternEntries())) {
         bool HasStorage = false;
         bool CheckDefaultInitializer = true;
-        pbd->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
-          // If one of the bound variables is @NSManaged, go ahead no matter
-          // what.
-          if (VD->getAttrs().hasAttribute<NSManagedAttr>())
-            CheckDefaultInitializer = false;
+        pbd->getPattern(idx)->forEachVariable(
+            [&HasStorage, &CheckDefaultInitializer](VarDecl *VD) {
+              // If one of the bound variables is @NSManaged, go ahead no matter
+              // what.
+              if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+                CheckDefaultInitializer = false;
 
-          if (VD->hasStorageOrWrapsStorage())
-            HasStorage = true;
-        });
+              if (VD->hasStorageOrWrapsStorage())
+                HasStorage = true;
+            });
 
         if (!HasStorage) continue;
 
