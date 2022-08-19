@@ -619,6 +619,9 @@ namespace {
       if (size > 4096)
         return Type();
       
+      if (size == 1)
+        return ParenType::get(elementType->getASTContext(), elementType);
+
       SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
       return TupleType::get(elts, elementType->getASTContext());
     }

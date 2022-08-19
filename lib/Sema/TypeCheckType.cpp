@@ -4096,6 +4096,9 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
 
+  if (elements.size() == 1 && !elements[0].hasName())
+    return ParenType::get(getASTContext(), elements[0].getType());
+
   return TupleType::get(elements, getASTContext());
 }
 

@@ -1037,13 +1037,13 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         && !isa<TuplePattern>(semantic)) {
       if (auto tupleType = type->getAs<TupleType>()) {
         if (tupleType->getNumElements() == 1) {
-          auto elementTy = tupleType->getElementType(0);
+          auto element = tupleType->getElement(0);
           sub = coercePatternToType(
-              pattern.forSubPattern(sub, /*retainTopLevel=*/true), elementTy,
+              pattern.forSubPattern(sub, /*retainTopLevel=*/true), element.getType(),
               subOptions);
           if (!sub)
             return nullptr;
-          TuplePatternElt elt(sub);
+          TuplePatternElt elt(element.getName(), SourceLoc(), sub);
           P = TuplePattern::create(Context, PP->getLParenLoc(), elt,
                                    PP->getRParenLoc());
           if (PP->isImplicit())

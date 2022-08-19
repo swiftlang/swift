@@ -2853,10 +2853,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
-Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
-  if (Fields.size() == 1 && !Fields[0].hasName())
-    return ParenType::get(C, Fields[0].getType());
-
+TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {
     auto eltTy = Elt.getType();
@@ -3608,6 +3605,8 @@ Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
     }
     elements.emplace_back(param.getParameterType(), param.getLabel());
   }
+  if (elements.size() == 1 && !elements[0].hasName())
+    return ParenType::get(ctx, elements[0].getType());
   return TupleType::get(elements, ctx);
 }
 

@@ -6255,7 +6255,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
           TangentSpace::getTuple(ctx.TheEmptyTupleType->castTo<TupleType>()));
     if (newElts.size() == 1)
       return cache(TangentSpace::getTangentVector(newElts.front().getType()));
-    auto *tupleType = TupleType::get(newElts, ctx)->castTo<TupleType>();
+    auto *tupleType = TupleType::get(newElts, ctx);
     return cache(TangentSpace::getTuple(tupleType));
   }
 

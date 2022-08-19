@@ -485,11 +485,17 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
   // TODO: SILBoxType is only implemented for a single field right now, and we
   // don't yet have a corresponding type for nonescaping captures, so
   // represent the captures as a tuple for now.
-  llvm::SmallVector<TupleTypeElt, 4> tupleElts;
-  for (auto field : boxFields) {
-    tupleElts.push_back(TupleTypeElt(field.getLoweredType()));
+  CanType tupleTy;
+
+  if (boxFields.size() == 1) {
+    tupleTy = boxFields[0].getLoweredType();
+  } else {
+    llvm::SmallVector<TupleTypeElt, 4> tupleElts;
+    for (auto field : boxFields) {
+      tupleElts.push_back(TupleTypeElt(field.getLoweredType()));
+    }
+    tupleTy = TupleType::get(tupleElts, C)->getCanonicalType();
   }
-  auto tupleTy = TupleType::get(tupleElts, C)->getCanonicalType();
   
   CanType contextTy;
   SILParameterInfo contextParam;

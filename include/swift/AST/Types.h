@@ -2270,10 +2270,11 @@ class TupleType final : public TypeBase, public llvm::FoldingSetNode,
   
 public:
   /// get - Return the uniqued tuple type with the specified elements.
-  /// Returns a ParenType instead if there is exactly one element which
-  /// is unlabeled and not varargs, so it doesn't accidentally construct
-  /// a tuple which is impossible to write.
-  static Type get(ArrayRef<TupleTypeElt> Elements, const ASTContext &C);
+  ///
+  /// This can construct one-element tuple types, which are impossible to
+  /// write in the source language. The caller should check for that case
+  /// first it a bona fide 'r-value' type is desired.
+  static TupleType *get(ArrayRef<TupleTypeElt> Elements, const ASTContext &C);
 
   /// getEmpty - Return the empty tuple type '()'.
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);

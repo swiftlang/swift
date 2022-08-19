@@ -662,6 +662,9 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
 static Type getUnlabeledType(Type type, ASTContext &ctx) {
   return type.transform([&](Type type) -> Type {
     if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+      if (tupleType->getNumElements() == 1)
+        return ParenType::get(ctx, tupleType->getElementType(0));
+
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {
         elts.push_back(elt.getWithoutName());
