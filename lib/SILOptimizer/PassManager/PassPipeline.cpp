@@ -171,7 +171,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // SSA based move function checking and no implicit copy checking.
   P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
                                          //   value.
-  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
+  P.addMoveOnlyObjectChecker();          // Check noImplicitCopy and move only
+                                         // types.
 
   // Now that we have run move only checking, eliminate SILMoveOnly wrapped
   // trivial types from the IR. We cannot introduce extra "copies" of trivial

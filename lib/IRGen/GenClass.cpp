@@ -596,7 +596,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     auto element = fieldInfo.second;
     Address memberAddr = element.project(IGF, baseAddr, None);
     // We may need to bitcast the address if the field is of a generic type.
-    if (memberAddr.getType()->getElementType() != fieldTI.getStorageType())
+    if (memberAddr.getType()->getPointerElementType() != fieldTI.getStorageType())
       memberAddr = IGF.Builder.CreateBitCast(memberAddr,
                                      fieldTI.getStorageType()->getPointerTo());
     return OwnedAddress(memberAddr, base);
@@ -2247,7 +2247,9 @@ namespace {
       case llvm::Triple::Wasm:
         var->setSection(".data");
         break;
+      case llvm::Triple::DXContainer:
       case llvm::Triple::GOFF:
+      case llvm::Triple::SPIRV:
       case llvm::Triple::UnknownObjectFormat:
         llvm_unreachable("Don't know how to emit private global constants for "
                          "the selected object format.");

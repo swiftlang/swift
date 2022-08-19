@@ -109,8 +109,8 @@ public protocol Apply {
     func apply(_ body: (Apply) -> ())
 }
 
-// CHECK-LABEL: sil private @$s28access_enforcement_selection20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF : $@convention(thin) (@in_guaranteed Apply, @inout_aliasable Int) -> () {
-// CHECK: bb0(%0 : $*Apply, %1 : $*Int):
+// CHECK-LABEL: sil private @$s28access_enforcement_selection20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF : $@convention(thin) (@in_guaranteed any Apply, @inout_aliasable Int) -> () {
+// CHECK: bb0(%0 : $*any Apply, %1 : $*Int):
 // CHECK:   begin_access [modify] [dynamic] %1 : $*Int
 // CHECK-LABEL: } // end sil function '$s28access_enforcement_selection20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
 public func testRecursiveClosure(a: Apply, x: inout Int) {

@@ -80,10 +80,6 @@ using llvm::BCBlockRAII;
 
 ASTContext &SerializerBase::getASTContext() const { return M->getASTContext(); }
 
-static StringRef withNullAsEmptyStringRef(const char *data) {
-  return StringRef(data ? data : "");
-}
-
 /// Used for static_assert.
 static constexpr bool declIDFitsIn32Bits() {
   using Int32Info = std::numeric_limits<uint32_t>;
@@ -594,6 +590,13 @@ Serializer::addGenericSignatureRef(GenericSignature sig) {
   return GenericSignaturesToSerialize.addRef(sig);
 }
 
+GenericEnvironmentID
+Serializer::addGenericEnvironmentRef(GenericEnvironment *env) {
+  if (!env)
+    return 0;
+  return GenericEnvironmentsToSerialize.addRef(env);
+}
+
 SubstitutionMapID
 Serializer::addSubstitutionMapRef(SubstitutionMap substitutions) {
   return SubstitutionMapsToSerialize.addRef(substitutions);
@@ -878,6 +881,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, ENTRY_POINT);
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_SIGNATURE_OFFSETS);
+  BLOCK_RECORD(index_block, GENERIC_ENVIRONMENT_OFFSETS);
   BLOCK_RECORD(index_block, SUBSTITUTION_MAP_OFFSETS);
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
@@ -1488,6 +1492,20 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
     SILGenericSignatureLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
                                           rawParamIDs);
   }
+}
+
+void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
+  using namespace decls_block;
+
+  assert(GenericEnvironmentsToSerialize.hasRef(genericEnv));
+
+  auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
+  auto parentSig = genericEnv->getOpenedExistentialParentSignature();
+  auto parentSigID = addGenericSignatureRef(parentSig);
+
+  auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
+  GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
+                                       existentialTypeID, parentSigID);
 }
 
 void Serializer::writeASTBlockEntity(const SubstitutionMap substitutions) {
@@ -4603,14 +4621,12 @@ public:
 
   void visitOpenedArchetypeType(const OpenedArchetypeType *archetypeTy) {
     using namespace decls_block;
-    auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
-    auto existentialTypeID = S.addTypeRef(archetypeTy->getExistentialType());
     auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
-    auto sigID = S.addGenericSignatureRef(sig);
+    auto genericEnvID = S.addGenericEnvironmentRef(
+        archetypeTy->getGenericEnvironment());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
     OpenedArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          existentialTypeID, interfaceTypeID,
-                                          sigID);
+                                          interfaceTypeID, genericEnvID);
   }
 
   void
@@ -5107,6 +5123,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<InlinableBodyTextLayout>();
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericSignatureLayout>();
+  registerDeclTypeAbbr<GenericEnvironmentLayout>();
   registerDeclTypeAbbr<RequirementSignatureLayout>();
   registerDeclTypeAbbr<SILGenericSignatureLayout>();
   registerDeclTypeAbbr<SubstitutionMapLayout>();
@@ -5161,6 +5178,8 @@ void Serializer::writeAllDeclsAndTypes() {
         writeASTBlockEntitiesIfNeeded(LocalDeclContextsToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(GenericSignaturesToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(GenericEnvironmentsToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(SubstitutionMapsToSerialize);
     wroteSomething |=
@@ -5764,6 +5783,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, ClangTypesToSerialize);
     writeOffsets(Offsets, LocalDeclContextsToSerialize);
     writeOffsets(Offsets, GenericSignaturesToSerialize);
+    writeOffsets(Offsets, GenericEnvironmentsToSerialize);
     writeOffsets(Offsets, SubstitutionMapsToSerialize);
     writeOffsets(Offsets, ConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
@@ -5913,7 +5933,7 @@ void swift::serializeToBuffers(
   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
   const SILModule *M) {
 
-  assert(!withNullAsEmptyStringRef(options.OutputPath).empty());
+  assert(!options.OutputPath.empty());
   {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftmodule, to buffer");
@@ -5932,10 +5952,11 @@ void swift::serializeToBuffers(
     emitABIDescriptor(DC, options);
     if (moduleBuffer)
       *moduleBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
-                        std::move(buf), options.OutputPath);
+          std::move(buf), options.OutputPath,
+          /*RequiresNullTerminator=*/false);
   }
 
-  if (!withNullAsEmptyStringRef(options.DocOutputPath).empty()) {
+  if (!options.DocOutputPath.empty()) {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
@@ -5949,10 +5970,11 @@ void swift::serializeToBuffers(
     });
     if (moduleDocBuffer)
       *moduleDocBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
-                           std::move(buf), options.DocOutputPath);
+          std::move(buf), options.DocOutputPath,
+          /*RequiresNullTerminator=*/false);
   }
 
-  if (!withNullAsEmptyStringRef(options.SourceInfoOutputPath).empty()) {
+  if (!options.SourceInfoOutputPath.empty()) {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftsourceinfo, to buffer");
     llvm::SmallString<1024> buf;
@@ -5966,7 +5988,8 @@ void swift::serializeToBuffers(
     });
     if (moduleSourceInfoBuffer)
       *moduleSourceInfoBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
-          std::move(buf), options.SourceInfoOutputPath);
+          std::move(buf), options.SourceInfoOutputPath,
+          /*RequiresNullTerminator=*/false);
   }
 }
 
@@ -5975,12 +5998,12 @@ void swift::serialize(ModuleOrSourceFile DC,
                       const symbolgraphgen::SymbolGraphOptions &symbolGraphOptions,
                       const SILModule *M,
                       const fine_grained_dependencies::SourceFileDepGraph *DG) {
-  assert(!withNullAsEmptyStringRef(options.OutputPath).empty());
+  assert(!options.OutputPath.empty());
 
-  if (StringRef(options.OutputPath) == "-") {
+  if (options.OutputPath == "-") {
     // Special-case writing to stdout.
     Serializer::writeToStream(llvm::outs(), DC, M, options, DG);
-    assert(withNullAsEmptyStringRef(options.DocOutputPath).empty());
+    assert(options.DocOutputPath.empty());
     return;
   }
 
@@ -5995,7 +6018,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (hadError)
     return;
 
-  if (!withNullAsEmptyStringRef(options.DocOutputPath).empty()) {
+  if (!options.DocOutputPath.empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {
@@ -6006,7 +6029,7 @@ void swift::serialize(ModuleOrSourceFile DC,
     });
   }
 
-  if (!withNullAsEmptyStringRef(options.SourceInfoOutputPath).empty()) {
+  if (!options.SourceInfoOutputPath.empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.SourceInfoOutputPath,
                          [&](raw_ostream &out) {

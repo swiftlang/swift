@@ -1236,7 +1236,7 @@ FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
-LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
 EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
 LIBXML2_SOURCE_DIR="${WORKSPACE}/libxml2"
 
@@ -1868,8 +1868,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             libcxx)
-                build_targets=()
+                build_targets=(cxx)
                 cmake_options=(
+                    -DLLVM_ENABLE_RUNTIMES="libcxx" -DLIBCXX_INSTALL_LIBRARY=OFF
                     "${cmake_options[@]}"
                     "${llvm_cmake_options[@]}"
                 )

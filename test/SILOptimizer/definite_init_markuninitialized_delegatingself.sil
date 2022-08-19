@@ -31,7 +31,7 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
   override init()
 }
 
-sil @getThrowingValue : $@convention(thin) () -> (Int, @error Error)
+sil @getThrowingValue : $@convention(thin) () -> (Int, @error any Error)
 
 // CHECK-LABEL: @self_init_assert_instruction
 // CHECK:  apply
@@ -343,8 +343,8 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   %2 = mark_uninitialized [delegatingselfallocated] %1 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to [init] %2 : $*DerivedClassWithNontrivialStoredProperties
   %6 = load [take] %2 : $*DerivedClassWithNontrivialStoredProperties
-  %7 = function_ref @getThrowingValue : $@convention(thin) () -> (Int, @error Error)
-  try_apply %7() : $@convention(thin) () -> (Int, @error Error), normal bb1, error bb5
+  %7 = function_ref @getThrowingValue : $@convention(thin) () -> (Int, @error any Error)
+  try_apply %7() : $@convention(thin) () -> (Int, @error any Error), normal bb1, error bb5
 
 bb1(%9 : $Int):
   %10 = function_ref @selfinit_derivedclass_peerconvenience_init : $@convention (thin) (@owned DerivedClassWithNontrivialStoredProperties) -> @owned DerivedClassWithNontrivialStoredProperties

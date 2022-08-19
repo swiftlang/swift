@@ -2285,3 +2285,23 @@ void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);
 }
+
+bool swift::hasAttribute(
+    const LangOptions &langOpts, llvm::StringRef attributeName) {
+  DeclAttrKind kind = DeclAttribute::getAttrKindFromString(attributeName);
+  if (kind == DAK_Count)
+    return false;
+
+  if (DeclAttribute::isUserInaccessible(kind))
+    return false;
+  if (DeclAttribute::isDeclModifier(kind))
+    return false;
+  if (DeclAttribute::shouldBeRejectedByParser(kind))
+    return false;
+  if (DeclAttribute::isSilOnly(kind))
+    return false;
+  if (DeclAttribute::isConcurrencyOnly(kind))
+    return false;
+
+  return true;
+}

@@ -3779,7 +3779,11 @@ ERROR(should_use_empty_dictionary_literal,none,
 // Dictionary literals
 ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
-
+WARNING(duplicated_literal_keys_in_dictionary_literal, none,
+        "dictionary literal of type %0 has duplicate entries for %1 literal key%select{ %3|}2",
+        (Type, StringRef, bool, StringRef))
+NOTE(duplicated_key_declared_here, none, 
+     "duplicate key declared here", ())
 
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,none,
@@ -5234,7 +5238,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "

@@ -44,11 +44,11 @@ jjj
 // CHECK-LABEL: 14:3
 // CHECK-NEXT:  (Token identifier
 // CHECK-NEXT:   (trivia newline 1)
-// CHECK-NEXT:   (trivia garbageText \302)
+// CHECK-NEXT:   (trivia unexpectedText \302)
 // CHECK-NEXT:   (trivia space 1)
 // CHECK-NEXT:   (text="bbb")
 // CHECK-NEXT:   (trivia space 1)
-// CHECK-NEXT:   (trivia garbageText \302))
+// CHECK-NEXT:   (trivia unexpectedText \302))
 
 // Checks around ccc
 // CHECK-LABEL: 16:5
@@ -82,8 +82,8 @@ jjj
 // CHECK-LABEL: 27:5
 // CHECK-NEXT:  (Token identifier
 // CHECK-NEXT:   (trivia newline 1)
-// CHECK-NEXT:   (trivia garbageText \341\232\200)
+// CHECK-NEXT:   (trivia unexpectedText \341\232\200)
 // CHECK-NEXT:   (trivia space 1)
 // CHECK-NEXT:   (text="iii")
 // CHECK-NEXT:   (trivia space 1)
-// CHECK-NEXT:   (trivia garbageText \341\232\200))
+// CHECK-NEXT:   (trivia unexpectedText \341\232\200))

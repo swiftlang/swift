@@ -180,7 +180,7 @@ bb0(%0 : $Int64):
 protocol SomeProtocol {
 }
 
-// CHECK-LABEL: sil [transparent] [ossa] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
+// CHECK-LABEL: sil [transparent] [ossa] @test_existential_metatype : $@convention(thin) (@in any SomeProtocol) -> @thick any SomeProtocol.Type
 sil [transparent] [ossa] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
   %1 = alloc_box ${ var SomeProtocol }
@@ -195,15 +195,15 @@ bb0(%0 : $*SomeProtocol):
   return %6 : $@thick SomeProtocol.Type
 }
 
-// CHECK-LABEL: sil [ossa] @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
+// CHECK-LABEL: sil [ossa] @inline_test_existential_metatype : $@convention(thin) (@in any SomeProtocol) -> @thick any SomeProtocol.Type
 sil [ossa] @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
-// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $*SomeProtocol):
-  // CHECK: [[VAL1:%.*]] = alloc_box ${ var SomeProtocol }
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $*any SomeProtocol):
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var any SomeProtocol }
   // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
   // CHECK: copy_addr [take] %0 to [initialization] [[PB1]]
-  // CHECK: [[VAL4:%.*]] = alloc_stack $SomeProtocol
+  // CHECK: [[VAL4:%.*]] = alloc_stack $any SomeProtocol
   // CHECK: copy_addr [[PB1]] to [initialization] [[VAL4]]
-  // CHECK: [[VAL6:%.*]] = existential_metatype $@thick SomeProtocol.Type, [[VAL4]]
+  // CHECK: [[VAL6:%.*]] = existential_metatype $@thick any SomeProtocol.Type, [[VAL4]]
   // CHECK: destroy_addr [[VAL4]]
   // CHECK: dealloc_stack [[VAL4]]
   // CHECK: destroy_value [[VAL1]]
@@ -723,14 +723,14 @@ bb0(%0 : @owned $CP):
 }
 
 // CHECK-LABEL: sil [ossa] @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ :
-// CHECK: bb0([[ARG0:%.*]] : @owned $CP, [[ARG1:%.*]] : @owned $CP):
+// CHECK: bb0([[ARG0:%.*]] : @owned $any CP, [[ARG1:%.*]] : @owned $any CP):
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[ARG0_COPY_COPY:%.*]] = copy_value [[ARG0_COPY]]
-// CHECK:   open_existential_ref [[ARG0_COPY_COPY]] : $CP to $@opened([[N1:".*"]], CP) Self
+// CHECK:   open_existential_ref [[ARG0_COPY_COPY]] : $any CP to $@opened([[N1:".*"]], any CP) Self
 //
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK:   [[ARG1_COPY_COPY:%.*]] = copy_value [[ARG1_COPY]]
-// CHECK:   open_existential_ref [[ARG1_COPY_COPY]] : $CP to $@opened([[N1:".*"]], CP) Self
+// CHECK:   open_existential_ref [[ARG1_COPY_COPY]] : $any CP to $@opened([[N1:".*"]], any CP) Self
 // CHECK: } // end sil function '_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_'
 sil [ossa] @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ : $@convention(thin) (@owned CP, @owned CP) -> () {
 bb0(%0 : @owned $CP, %1 : @owned $CP):
@@ -842,12 +842,12 @@ bb0(%0 : @owned $T):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @protocolTypedParam :
-// CHECK: bb0([[ARG:%.*]] : @owned $Foo):
+// CHECK: bb0([[ARG:%.*]] : @owned $any Foo):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
 // CHECK-NOT: apply
-// CHECK:   [[METHOD:%[a-zA-Z0-9]+]] = objc_method [[ARG_COPY]] : $Foo, #Foo.foo!foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
-// CHECK:   apply [[METHOD]]<Foo>([[ARG_COPY_2]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+// CHECK:   [[METHOD:%[a-zA-Z0-9]+]] = objc_method [[ARG_COPY]] : $any Foo, #Foo.foo!foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+// CHECK:   apply [[METHOD]]<any Foo>([[ARG_COPY_2]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
 // CHECK:   destroy_value [[ARG_COPY_2]]
 // CHECK:   destroy_value [[ARG_COPY]]
 // CHECK:   destroy_value [[ARG]]
@@ -1010,7 +1010,7 @@ bb0(%0 : $*Self):
 // Check that P2_s call can be properly inlined and the resulting witness_method instruction
 // uses the opened archetype from the caller.
 // CHECK-LABEL: sil hidden [ossa] @L_start
-// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+", P2\) Self]]
+// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+", any P2\) Self]]
 // CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter : {{.*}}, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
 // CHECK: return
 sil hidden [ossa] @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
@@ -1046,13 +1046,13 @@ bb0(%0 : @owned $Optional<C>):
 // CHECK: bb0([[ARG:%.*]] : @owned $C):
 // CHECK:   [[F1:%.*]] = function_ref @testMandatoryConvertedHelper : $@convention(thin) (@owned C) -> @owned C
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK:   [[CVT1:%.*]] = convert_function [[F1]] : $@convention(thin) (@owned C) -> @owned C to $@convention(thin) (@owned C) -> (@owned C, @error Error)
-// CHECK:   try_apply [[CVT1]]([[ARG_COPY]]) : $@convention(thin) (@owned C) -> (@owned C, @error Error), normal bb1, error bb2
+// CHECK:   [[CVT1:%.*]] = convert_function [[F1]] : $@convention(thin) (@owned C) -> @owned C to $@convention(thin) (@owned C) -> (@owned C, @error any Error)
+// CHECK:   try_apply [[CVT1]]([[ARG_COPY]]) : $@convention(thin) (@owned C) -> (@owned C, @error any Error), normal bb1, error bb2
 //
 // CHECK: bb1(%{{.*}} : @owned $C):
 // CHECK:   br bb3(%{{.*}} : $C)
 //
-// CHECK: bb2(%{{.*}} : @owned $Error):
+// CHECK: bb2(%{{.*}} : @owned $any Error):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[F2:%.*]] = function_ref @testMandatoryConvertedHelper2 : $@convention(thin) (@owned Optional<C>) -> @owned C
 // CHECK:   [[CVT2:%.*]] = convert_function [[F2]] : $@convention(thin) (@owned Optional<C>) -> @owned C to $@convention(thin) (@owned C) -> @owned C

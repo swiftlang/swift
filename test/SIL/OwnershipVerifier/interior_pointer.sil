@@ -119,8 +119,7 @@ bb0(%0 : @owned $Box<T>, %1 : $*Int):
 // CHECK-NEXT: Found outside of lifetime use?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %4, %3
 // CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject           // id: %4
-// CHECK-NEXT: Non Consuming User:   %7 = apply %6(%3) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
-// CHECK-NEXT: Block: bb0
+// CHECK-NEXT: Non Consuming User: end_borrow %3 : $*Builtin.NativeObject
 sil [ossa] @store_borrow_result_used_outside_of_borrow_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %0a = begin_borrow %0 : $Builtin.NativeObject
@@ -130,6 +129,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   %func = function_ref @use_builtinnativeobject_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   apply %func(%result) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  end_borrow %result : $*Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -137,9 +137,9 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'open_existential_box_interior_pointer_error'
 // CHECK-NEXT: Found outside of lifetime use?!
-// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Error                   // users: %3, %2
-// CHECK-NEXT: Consuming User:   end_borrow %1 : $Error                          // id: %3
-// CHECK-NEXT: Non Consuming User:   %6 = apply %5<@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self>(%2) : $@convention(witness_method: Error) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int // type-defs: %2; user: %7
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $any Error                   // users: %3, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $any Error                          // id: %3
+// CHECK-NEXT: Non Consuming User:   %6 = apply %5<@opened("01234567-89AB-CDEF-0123-000000000000", any Error) Self>(%2) : $@convention(witness_method: Error) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int // type-defs: %2; user: %7
 // CHECK-NEXT: Block: bb0
 // CHECK: Error#: 0. End Error in Function: 'open_existential_box_interior_pointer_error'
 sil [ossa] @open_existential_box_interior_pointer_error : $@convention(thin) (@owned Error) -> Int {

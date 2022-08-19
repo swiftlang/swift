@@ -128,10 +128,10 @@
             }
         },
         "main": {
-            "aliases": ["swift/main", "main", "stable/20211026"],
+            "aliases": ["swift/main", "main", "stable/20220421"],
             "repos": {
-                "llvm-project": "stable/20211026",
-                "swift-llvm-bindings": "stable/20211026",
+                "llvm-project": "stable/20220421",
+                "swift-llvm-bindings": "stable/20220421",
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -170,7 +170,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20220421"],
+            "aliases": ["rebranch"],
             "repos": {
                 "llvm-project": "stable/20220421",
                 "swift-llvm-bindings": "stable/20220421",

@@ -14,12 +14,12 @@ TupleExprElementSyntax getCannedArgument(const RC<SyntaxArena> &Arena) {
   auto Foo = Factory.makeIdentifier("foo", "", "");
   auto Colon = Factory.makeColonToken("", " ");
   auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
-      /*GarbageNodes=*/None, Foo, /*GarbageNodes=*/None, None);
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto Comma = Factory.makeCommaToken("", " ");
 
   return Factory.makeTupleExprElement(
-      /*GarbageNodes=*/None, X, /*GarbageNodes=*/None, Colon,
-      /*GarbageNodes=*/None, SymbolicRef, /*GarbageNodes=*/None, Comma);
+      /*UnexpectedNodes=*/None, X, /*UnexpectedNodes=*/None, Colon,
+      /*UnexpectedNodes=*/None, SymbolicRef, /*UnexpectedNodes=*/None, Comma);
 }
 
 TEST(SyntaxCollectionTests, empty) {

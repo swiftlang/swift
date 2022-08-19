@@ -636,8 +636,6 @@ void BindingSet::determineLiteralCoverage() {
   if (Literals.empty())
     return;
 
-  SmallVector<PotentialBinding, 4> adjustedBindings;
-
   bool allowsNil = canBeNil();
 
   for (auto &entry : Literals) {
@@ -648,7 +646,6 @@ void BindingSet::determineLiteralCoverage() {
 
     for (auto binding = Bindings.begin(); binding != Bindings.end();
          ++binding) {
-
       bool isCovered = false;
       Type adjustedTy;
 
@@ -1710,7 +1707,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     }
     case LiteralBindingKind::Float:
     case LiteralBindingKind::None:
-        out << getLiteralBindingKind(literalKind).str();
+      out << getLiteralBindingKind(literalKind).str();
       break;
     }
     if (attributes.empty()) {
@@ -1755,8 +1752,20 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
 
   out << "[with possible bindings: ";
   interleave(Bindings, printBinding, [&]() { out << "; "; });
-  if (Bindings.empty())
+  if (!Literals.empty()) {
+    std::vector<std::string> defaultLiterals;
+    for (const auto &literal : Literals) {
+      if (literal.second.viableAsBinding()) {
+        auto defaultWithType = "(default type of literal) " +
+                               literal.second.getDefaultType().getString(PO);
+        defaultLiterals.push_back(defaultWithType);
+      }
+    }
+    interleave(defaultLiterals, out, ", ");
+  }
+  if (Bindings.empty() && Literals.empty()) {
     out << "<empty>";
+  }
   out << "]";
 
   if (!Defaults.empty()) {

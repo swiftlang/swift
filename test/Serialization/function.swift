@@ -113,8 +113,8 @@ do {
   try throws1()
   _ = try throws2(1)
 } catch _ {}
-// SIL: sil @$s8def_func7throws1yyKF : $@convention(thin) () -> @error Error
-// SIL: sil @$s8def_func7throws2{{[_0-9a-zA-Z]*}}F : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error Error)
+// SIL: sil @$s8def_func7throws1yyKF : $@convention(thin) () -> @error any Error
+// SIL: sil @$s8def_func7throws2{{[_0-9a-zA-Z]*}}F : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error)
 
 // LLVM: }
 

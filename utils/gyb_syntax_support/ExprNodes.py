@@ -311,7 +311,21 @@ EXPR_NODES = [
                    ])
          ]),
 
+    # ? expr :
+    # Ternary expression without the condition and the second choice.
+    # NOTE: This appears only in SequenceExpr.
+    Node('UnresolvedTernaryExpr', kind='Expr',
+         children=[
+             Child("QuestionMark", kind='InfixQuestionMarkToken'),
+             Child("FirstChoice", kind='Expr'),
+             Child("ColonMark", kind='ColonToken'),
+         ]),
+
+
     # a ? 1 : 0
+    # NOTE: This won't come directly out of the parser. Rather, it is the
+    # result of "folding" a SequenceExpr based on knowing the precedence
+    # relationships amongst the different infix operators.
     Node('TernaryExpr', kind='Expr',
          children=[
              Child("ConditionExpression", kind='Expr'),

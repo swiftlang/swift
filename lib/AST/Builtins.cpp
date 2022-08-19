@@ -2103,6 +2103,8 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::VecOfBitcastsToInt:
   case IITDescriptor::Subdivide2Argument:
   case IITDescriptor::Subdivide4Argument:
+  case IITDescriptor::PPCQuad:
+  case IITDescriptor::AnyPtrToElt:
     // These types cannot be expressed in swift yet.
     return Type();
 

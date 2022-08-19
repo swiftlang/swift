@@ -14,8 +14,8 @@ public protocol DangerousEscaper {
   func malicious(_ mayActuallyEscape: () -> ())
 }
 
-// CHECK: sil @$s27closure_lifetime_fixup_objc19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
-// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> (), [[SELF:%.*]] : $DangerousEscaper):
+// CHECK: sil @$s27closure_lifetime_fixup_objc19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed any DangerousEscaper) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> (), [[SELF:%.*]] : $any DangerousEscaper):
 // CHECK:   [[OE:%.*]] = open_existential_ref [[SELF]]
 
 // Extend the lifetime to the end of this function (2).
@@ -43,8 +43,8 @@ public protocol DangerousEscaper {
 // CHECK:   destroy_addr [[CLOSURE_ADDR]] : $*@callee_guaranteed () -> ()
 // CHECK:   dealloc_stack [[BLOCK_STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
 
-// CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}", DangerousEscaper) Self, #DangerousEscaper.malicious!foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
-// CHECK:   apply [[METH]]<@opened("{{.*}}", DangerousEscaper) Self>([[BLOCK_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}", any DangerousEscaper) Self, #DangerousEscaper.malicious!foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:   apply [[METH]]<@opened("{{.*}}", any DangerousEscaper) Self>([[BLOCK_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 
 // Release sentinel closure copy (5).
 // CHECK:   strong_release [[BLOCK_COPY]] : $@convention(block) @noescape () -> ()
@@ -64,7 +64,7 @@ public func couldActuallyEscape(_ closure: @escaping () -> (), _ villian: Danger
 
 // Make sure that we respect the ownership verifier.
 //
-// CHECK-LABEL: sil @$s27closure_lifetime_fixup_objc27couldActuallyEscapeWithLoopyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
+// CHECK-LABEL: sil @$s27closure_lifetime_fixup_objc27couldActuallyEscapeWithLoopyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed any DangerousEscaper) -> () {
 public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
   for _ in 0..<2 {
     villian.malicious(closure)

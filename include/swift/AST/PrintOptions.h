@@ -679,6 +679,7 @@ struct PrintOptions {
   static PrintOptions printQualifiedSILType() {
     PrintOptions result = PrintOptions::printSIL();
     result.FullyQualifiedTypesIfAmbiguous = true;
+    result.PrintExplicitAny = true;
     return result;
   }
 

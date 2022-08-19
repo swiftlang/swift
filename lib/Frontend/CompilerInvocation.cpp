@@ -50,12 +50,12 @@ swift::CompilerInvocation::CompilerInvocation() {
 /// Converts a llvm::Triple to a llvm::VersionTuple.
 static llvm::VersionTuple
 getVersionTuple(const llvm::Triple &triple) {
-  unsigned major, minor, patch;
-  if (triple.isMacOSX())
-    triple.getMacOSXVersion(major, minor, patch);
-  else
-    triple.getOSVersion(major, minor, patch);
-  return llvm::VersionTuple(major, minor, patch);
+  if (triple.isMacOSX()) {
+    llvm::VersionTuple OSVersion;
+    triple.getMacOSXVersion(OSVersion);
+    return OSVersion;
+  }
+  return triple.getOSVersion();
 }
 
 void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
@@ -615,7 +615,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Determine whether string processing is enabled
   Opts.EnableExperimentalStringProcessing =
     Args.hasFlag(OPT_enable_experimental_string_processing,
-                 OPT_disable_experimental_string_processing);
+                 OPT_disable_experimental_string_processing, /*Default=*/true);
 
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
@@ -2391,9 +2391,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     // silently override "auto" to "never" when back-deploying. This approach
     // sacrifices async backtraces when back-deploying but prevents crashes in
     // older tools that cannot handle the async frame bit in the frame pointer.
-    unsigned major, minor, micro;
-    Triple.getWatchOSVersion(major, minor, micro);
-    if (major < 8)
+    llvm::VersionTuple OSVersion = Triple.getWatchOSVersion();
+    if (OSVersion.getMajor() < 8)
       Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
   }
 

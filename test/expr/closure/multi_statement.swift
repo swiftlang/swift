@@ -546,3 +546,23 @@ func test_conflicting_pattern_vars() {
     }
   }
 }
+
+// rdar://91452726 - crash in MissingMemberFailure::diagnoseInLiteralCollectionContext
+struct Test {
+  struct ID {
+  }
+
+  enum E : Hashable, Equatable {
+  case id
+  }
+
+  var arr: [(ID, E)]
+
+  func test() {
+    _ = arr.map { v in
+      switch v {
+      case .id: return true // expected-error {{value of tuple type '(Test.ID, Test.E)' has no member 'id'}}
+      }
+    }
+  }
+}

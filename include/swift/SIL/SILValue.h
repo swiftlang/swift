@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILVALUE_H
 #define SWIFT_SIL_SILVALUE_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/STLExtras.h"
@@ -668,16 +669,15 @@ public:
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ///
   /// FIXME: remove this redundant API from SILValue.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      ValueOwnershipKind getOwnershipKind()
-          const { return Value->getOwnershipKind(); },
-      "Please use ValueBase::getOwnershipKind()");
+  [[deprecated("Please use ValueBase::getOwnershipKind()")]] ValueOwnershipKind
+  getOwnershipKind() const {
+    return Value->getOwnershipKind();
+  };
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 inline SILNodePointer::SILNodePointer(SILValue value) : node(value) { }
@@ -1107,10 +1107,8 @@ public:
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "Dump the operand's state. Only for use in the debugger!");
   void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
 
 private:
   void removeFromCurrent() {

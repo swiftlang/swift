@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "irgensil"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
@@ -51,6 +49,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
@@ -61,7 +60,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -93,6 +91,8 @@
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
+
+#define DEBUG_TYPE "irgensil"
 
 using namespace swift;
 using namespace irgen;
@@ -810,7 +810,7 @@ public:
                            SILDebugVariable VarInfo,
                            const SILDebugScope *Scope) {
     bool canStore =
-        cast<llvm::PointerType>(Alloca->getType())->getElementType() ==
+        cast<llvm::PointerType>(Alloca->getType())->getPointerElementType() ==
         Val->getType();
     if (canStore)
       return true;
@@ -910,7 +910,7 @@ public:
     auto *Address = Alloca.getAddress();
     if (WasMoved) {
       auto nonPtrAllocaType =
-          cast<llvm::PointerType>(Address->getType())->getElementType();
+          cast<llvm::PointerType>(Address->getType())->getPointerElementType();
       if (nonPtrAllocaType != Storage->getType())
         Address = Builder.CreateBitOrPointerCast(
             Address, llvm::PointerType::get(Storage->getType(), 0));

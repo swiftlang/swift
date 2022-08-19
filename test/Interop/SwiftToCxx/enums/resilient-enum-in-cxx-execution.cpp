@@ -18,22 +18,37 @@
 #include <iostream>
 #include "enums.h"
 
+using namespace Enums;
+
+void useFooInSwitch(const Foo& f) {
+  switch (f) {
+    case Foo::a:
+      std::cout << "Foo::a\n";
+      break;;
+    case Foo::unknownDefault:
+      std::cout << "Foo::unknownDefault\n";
+      break;
+  }
+}
+
 int main() {
-  using namespace Enums;
   auto f1 = makeFoo(10);
   auto f2 = makeFoo(-10);
 
   printFoo(f1);
   printFoo(f2);
 
-  assert(!f2.inResilientUnknownCase());
-  if (f1.inResilientUnknownCase()) {
+  assert(!f2.isUnknownDefault());
+  if (f1.isUnknownDefault()) {
     std::cout << "f1.inResilientUnknownCase()\n";
     assert(!f1.isA());
   } else {
     assert(f1.isA());
     assert(f1.getA() == 10.0);
   }
+
+  useFooInSwitch(f1);
+  useFooInSwitch(f2);
 
   return 0;
 }
@@ -43,3 +58,7 @@ int main() {
 // CHECK-NEXT: a(-10.0)
 
 // NEW_CASE: f1.inResilientUnknownCase()
+
+// NEW_CASE: Foo::unknownDefault
+// OLD_CASE: Foo::a
+// CHECK-NEXT: Foo::a

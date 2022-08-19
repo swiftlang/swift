@@ -154,7 +154,7 @@ protocol P {
   func doIt()
 }
 
-// CHECK-LABEL: @existentials : $@convention(thin) (@in P) -> () {
+// CHECK-LABEL: @existentials : $@convention(thin) (@in any P) -> () {
 sil [transparent] [serialized] @existentials : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   %1 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000", P) Self // CHECK: open_existential_addr  mutable_access %0
@@ -165,12 +165,12 @@ bb0(%0 : $*P):
   // CHECK: witness_method ${{.*}}, #P.doIt
   %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", P) Self, #P.doIt, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000", P) Self : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   // Make sure we have the correct scope for generic parameters.
-  // CHECK: witness_method $@opened("{{.*}}", P) Self, #P.doIt
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.doIt
   %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", P) Self, #P.doIt, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000", P) Self : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   // CHECK: apply
   %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000", P) Self>(%1) : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
-  destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
+  destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*any P
   return %4 : $()                // CHECK: return
 }
 
@@ -243,17 +243,17 @@ protocol Runcible {
 
 protocol Bendable { }
 
-// CHECK-LABEL: $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
+// CHECK-LABEL: $@convention(thin) (@in any Bendable & Runcible) -> @out any Runcible
 sil [transparent] [serialized] @$s4todo18erasure_from_proto1xAA8Runcible_pAaD_AA8Bendablep_tF : $@convention(thin) (@in Bendable & Runcible) -> (@out Runcible) {
 bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   // CHECK: alloc_box
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Bendable & Runcible)>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Bendable & Runcible>, 0
-  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
+  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*any Bendable & Runcible
   copy_addr [take] %1 to [initialization] %2a : $*Bendable & Runcible
   // CHECK: alloc_stack
   %4 = alloc_stack $Bendable & Runcible
-  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
+  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*any Bendable & Runcible
   copy_addr %2a to [initialization] %4 : $*Bendable & Runcible
   %7 = tuple ()
   // CHECK: destroy_addr
@@ -269,7 +269,7 @@ protocol ClassBound : class {
   func classBoundMethod()
 }
 
-// CHECK-LABEL: @$s4todo18class_bound_method1xyAA10ClassBound_p_tF : $@convention(thin) (@owned ClassBound) -> ()
+// CHECK-LABEL: @$s4todo18class_bound_method1xyAA10ClassBound_p_tF : $@convention(thin) (@owned any ClassBound) -> ()
 sil [transparent] [serialized] @$s4todo18class_bound_method1xyAA10ClassBound_p_tF : $@convention(thin) (@owned ClassBound) -> () {
 bb0(%0 : $ClassBound):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ClassBound>
@@ -277,7 +277,7 @@ bb0(%0 : $ClassBound):
   store %0 to %1a : $*ClassBound
   %3 = load %1a : $*ClassBound
   strong_retain %3 : $ClassBound              // CHECK: strong_retain
-  // CHECK: open_existential_ref {{%.*}} : $ClassBound to $@opened({{.*}}, ClassBound) Self
+  // CHECK: open_existential_ref {{%.*}} : $any ClassBound to $@opened({{.*}}, any ClassBound) Self
   %5 = open_existential_ref %3 : $ClassBound to $@opened("01234567-89ab-cdef-0123-111111111111", ClassBound) Self
   // CHECK: witness_method
   %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111", ClassBound) Self, #ClassBound.classBoundMethod, %5 : $@opened("01234567-89ab-cdef-0123-111111111111", ClassBound) Self : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
@@ -367,7 +367,7 @@ bb0(%0 : $*Gimel):
   return %t : $()
 }
 
-// CHECK-LABEL: @test_union_addr_data_case : $@convention(thin) (@in Q) -> @out Gimel {
+// CHECK-LABEL: @test_union_addr_data_case : $@convention(thin) (@in any Q) -> @out Gimel {
 sil [transparent] [serialized] @test_union_addr_data_case : $@convention(thin) (@in Q) -> @out Gimel {
 bb0(%0 : $*Gimel, %1 : $*Q):
   // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt
@@ -555,18 +555,18 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   return %15 : $(@thick SomeClass.Type, @thick SomeClass.Type)
 }
 
-// CHECK-LABEL: @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
+// CHECK-LABEL: @test_existential_metatype : $@convention(thin) (@in any SomeProtocol) -> @thick any SomeProtocol.Type {
 sil [transparent] [serialized] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeProtocol>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <SomeProtocol>, 0
-  // CHECK: copy_addr [take] %0 to [initialization] %{{.*}} : $*SomeProtocol
+  // CHECK: copy_addr [take] %0 to [initialization] %{{.*}} : $*any SomeProtocol
   copy_addr [take] %0 to [initialization] %1a : $*SomeProtocol
   // CHECK: alloc_stack
   %4 = alloc_stack $SomeProtocol
-  // CHECK: copy_addr %{{.*}} to [initialization] %{{.*}} : $*SomeProtocol
+  // CHECK: copy_addr %{{.*}} to [initialization] %{{.*}} : $*any SomeProtocol
   copy_addr %1a to [initialization] %4 : $*SomeProtocol
-  // CHECK: existential_metatype $@thick SomeProtocol.Type, {{%.*}} : $*SomeProtocol
+  // CHECK: existential_metatype $@thick any SomeProtocol.Type, {{%.*}} : $*any SomeProtocol
   %6 = existential_metatype $@thick SomeProtocol.Type, %4 : $*SomeProtocol
   destroy_addr %4 : $*SomeProtocol
   dealloc_stack %4 : $*SomeProtocol
@@ -854,15 +854,15 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil public_external [transparent] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
+// CHECK-LABEL: sil public_external [transparent] @test_init_existential : $@convention(thin) (Spoon) -> @out any Bendable
 sil [transparent] [serialized] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Spoon>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Spoon>, 0
   store %1 to %2a : $*Spoon
-  // CHECK: init_existential_addr %{{.*}} : $*Bendable, $Spoon
+  // CHECK: init_existential_addr %{{.*}} : $*any Bendable, $Spoon
   %4 = init_existential_addr %0 : $*Bendable, $Spoon
-  // CHECK: deinit_existential_addr %{{.*}} : $*Bendable
+  // CHECK: deinit_existential_addr %{{.*}} : $*any Bendable
   deinit_existential_addr %0 : $*Bendable
   %5 = load %2a : $*Spoon
   store %5 to %4 : $*Spoon
@@ -871,7 +871,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil public_external [transparent] @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP
+// CHECK-LABEL: sil public_external [transparent] @test_existential_ref : $@convention(thin) (ConcreteClass) -> any ClassP
 sil [transparent] [serialized] @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ConcreteClass>
@@ -879,7 +879,7 @@ bb0(%0 : $ConcreteClass):
   store %0 to %1a : $*ConcreteClass
   %3 = load %1a : $*ConcreteClass
   strong_retain %3 : $ConcreteClass
-  // CHECK: init_existential_ref %{{.*}} : $ConcreteClass : $ConcreteClass, $ClassP
+  // CHECK: init_existential_ref %{{.*}} : $ConcreteClass : $ConcreteClass, $any ClassP
   %5 = init_existential_ref %3 : $ConcreteClass : $ConcreteClass, $ClassP
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <ConcreteClass>
   return %5 : $ClassP
@@ -1123,10 +1123,10 @@ sil [transparent] [serialized] @block_invoke : $@convention(c) (@inout_aliasable
 
 // Test try_apply and throws
 // rdar://20925014
-// CHECK-LABEL: sil public_external [transparent] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
+// CHECK-LABEL: sil public_external [transparent] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error any Error) -> @error any Error {
 sil [transparent] [serialized]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
 bb0(%0 : $@convention(thin) () -> @error Error):
-  // CHECK: try_apply %0() : $@convention(thin) () -> @error Error, normal bb2, error bb1
+  // CHECK: try_apply %0() : $@convention(thin) () -> @error any Error, normal bb2, error bb1
   try_apply %0() : $@convention(thin) () -> @error Error, normal bb1, error bb2
 
 bb1(%1 : $()):
@@ -1138,10 +1138,10 @@ bb2(%3 : $Error):
 }
 
 // Test apply with the nothrow attribute
-// CHECK-LABEL: sil public_external [transparent] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> () {
+// CHECK-LABEL: sil public_external [transparent] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error any Error) -> () {
 sil [transparent] [serialized]  @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> () {
 bb0(%0 : $@convention(thin) () -> @error Error):
-  // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error Error
+  // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error any Error
   apply [nothrow] %0() : $@convention(thin) () -> @error Error
   %2 = tuple ()
   return %2 : $()
@@ -1225,18 +1225,18 @@ struct SomeError: Error {
 // CHECK-LABEL: sil public_external [transparent] @existential_box : $@convention(thin) (SomeError) -> () {
 sil [transparent] [serialized] @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
-  // CHECK: %1 = alloc_existential_box $Error, $SomeError
+  // CHECK: %1 = alloc_existential_box $any Error, $SomeError
   %1 = alloc_existential_box $Error, $SomeError
-  // CHECK: %2 = project_existential_box $SomeError in %1 : $Error
+  // CHECK: %2 = project_existential_box $SomeError in %1 : $any Error
   %2 = project_existential_box $SomeError in %1 : $Error
   // CHECK: store %0 to %2 : $*SomeError
   store %0 to %2 : $*SomeError
-  // CHECK: %4 = open_existential_box %1 : $Error to $*[[OPENED:@opened\(".*", Error\) Self]]
-  %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  // CHECK: %4 = open_existential_box %1 : $any Error to $*[[OPENED:@opened\(".*", any Error\) Self]]
+  %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333", any Error) Self
   // CHECK: destroy_addr %4 : $*[[OPENED]]
-  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
-  // CHECK: dealloc_existential_box %1 : $Error, $SomeError
-  dealloc_existential_box %1 : $Error, $SomeError
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333", any Error) Self
+  // CHECK: dealloc_existential_box %1 : $any Error, $SomeError
+  dealloc_existential_box %1 : $any Error, $SomeError
   return undef : $()
 }
 

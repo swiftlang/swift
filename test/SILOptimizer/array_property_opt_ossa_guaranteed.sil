@@ -133,7 +133,7 @@ protocol AProtocol : class {
 
 // Make sure we can handle try_apply when splitting edges. This test used to crash.
 
-sil [ossa] @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
+sil [ossa] @throwing_fun : $@convention(thin) () -> (MyBool, @error any Error)
 
 // CHECK-LABEL: sil [ossa] @clone_try_apply_exit : 
 // CHECK: bb1:
@@ -146,7 +146,7 @@ sil [ossa] @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
 // CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
 // CHECK: apply [[FUNC2]]
 // CHECK_LABEL: } // end sil function 'clone_try_apply_exit'
-sil [ossa] @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error Error) {
+sil [ossa] @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error any Error) {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
   %3 = load [copy] %0 : $*MyArray<MyClass>
   br bb1
@@ -155,8 +155,8 @@ bb1:
   %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
   %4 = load [trivial] %1 : $*MyBool
   %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
-  %7 = function_ref @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
-  try_apply %7() : $@convention(thin) () -> (MyBool, @error Error), normal bb2, error bb5
+  %7 = function_ref @throwing_fun : $@convention(thin) () -> (MyBool, @error any Error)
+  try_apply %7() : $@convention(thin) () -> (MyBool, @error any Error), normal bb2, error bb5
 
 bb2(%8 : $MyBool):
  %6 = integer_literal $Builtin.Int1, -1

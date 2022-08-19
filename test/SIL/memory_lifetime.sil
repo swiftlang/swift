@@ -506,7 +506,8 @@ bb0(%0 :  $*T):
 sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed T) -> () {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
-  store_borrow %0 to %s : $*T
+  %sb = store_borrow %0 to %s : $*T
+  end_borrow %sb : $*T
   dealloc_stack %s : $*T
   %res = tuple ()
   return %res : $()

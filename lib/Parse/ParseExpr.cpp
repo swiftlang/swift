@@ -182,7 +182,6 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   ParserStatus SequenceStatus;
-  bool PendingTernary = false;
 
   while (true) {
     if (isForConditionalDirective && Tok.isAtStartOfLine())
@@ -204,12 +203,6 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       return nullptr;
     }
     SequencedExprs.push_back(Primary.get());
-
-    // We know we can make a syntax node for ternary expression.
-    if (PendingTernary) {
-      SyntaxContext->createNodeInPlace(SyntaxKind::TernaryExpr);
-      PendingTernary = false;
-    }
 
     if (SequenceStatus.isError() && !SequenceStatus.hasCodeCompletion())
       break;
@@ -245,6 +238,8 @@ parse_operator:
     }
     
     case tok::question_infix: {
+      SyntaxParsingContext TernaryCtx(SyntaxContext,
+                                      SyntaxKind::UnresolvedTernaryExpr);
       // Save the '?'.
       SourceLoc questionLoc = consumeToken();
       
@@ -280,10 +275,6 @@ parse_operator:
                                colonLoc);
       SequencedExprs.push_back(unresolvedIf);
       Message = diag::expected_expr_after_if_colon;
-
-      // Wait for the next expression to make a syntax node for ternary
-      // expression.
-      PendingTernary = true;
       break;
     }
         
@@ -1247,7 +1238,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         //   }
         // In this case, we want to consume the trailing closure because
         // otherwise it will get parsed as a get-set clause on a variable
-        // declared by `baseExpr.<complete>` which is complete garbage.
+        // declared by `baseExpr.<complete>` which is clearly wrong.
         bool hasBindOptional = false;
         parseExprPostfixSuffix(makeParserResult(CCExpr), isExprBasic,
                                periodHasKeyPathBehavior, hasBindOptional);
@@ -1702,11 +1693,11 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       if (SyntaxContext->isEnabled()) {
         ParsedPatternSyntax PatternNode =
             ParsedSyntaxRecorder::makeIdentifierPattern(
-                /*GarbageNodes=*/None,
+                /*UnexpectedNodes=*/None,
                 /*Identifier=*/SyntaxContext->popToken(), *SyntaxContext);
         ParsedExprSyntax ExprNode =
             ParsedSyntaxRecorder::makeUnresolvedPatternExpr(
-                /*GarbageNodes=*/None,
+                /*UnexpectedNodes=*/None,
                 /*Pattern=*/std::move(PatternNode), *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }

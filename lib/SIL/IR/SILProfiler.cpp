@@ -341,29 +341,63 @@ public:
   /// Returns true if this is a Zero node.
   bool isZero() const { return K == Kind::Zero; }
 
+  /// Returns true if the counter is semantically a Zero node. This considers
+  /// the simplified version of the counter that has eliminated redundant
+  /// operations.
+  bool isSemanticallyZero() const {
+    // Run the counter through the counter builder to simplify it, using a dummy
+    // mapping of unique counter indices for each node reference. The value of
+    // the indices doesn't matter, but we need to ensure that e.g subtraction
+    // of a node from itself cancels out.
+    llvm::coverage::CounterExpressionBuilder Builder;
+    llvm::DenseMap<ASTNode, unsigned> DummyIndices;
+    unsigned LastIdx = 0;
+    auto Counter = expand(Builder, [&](auto Node) {
+      if (!DummyIndices.count(Node)) {
+        DummyIndices[Node] = LastIdx;
+        LastIdx += 1;
+      }
+      return DummyIndices[Node];
+    });
+    return Counter.isZero();
+  }
+
   /// Expand this node into an llvm::coverage::Counter.
   ///
   /// Updates \c Builder with any expressions that are needed to represent this
   /// counter.
   llvm::coverage::Counter
   expand(llvm::coverage::CounterExpressionBuilder &Builder,
-         llvm::DenseMap<ASTNode, unsigned> &Counters) const {
+         llvm::function_ref<unsigned(ASTNode)> GetCounterIdx) const {
     switch (K) {
     case Kind::Zero:
       return llvm::coverage::Counter::getZero();
     case Kind::Node:
-      return llvm::coverage::Counter::getCounter(Counters[Node]);
+      return llvm::coverage::Counter::getCounter(GetCounterIdx(Node));
     case Kind::Add:
-      return Builder.add(LHS->expand(Builder, Counters),
-                         RHS->expand(Builder, Counters));
+      return Builder.add(LHS->expand(Builder, GetCounterIdx),
+                         RHS->expand(Builder, GetCounterIdx));
     case Kind::Sub:
-      return Builder.subtract(LHS->expand(Builder, Counters),
-                              RHS->expand(Builder, Counters));
+      return Builder.subtract(LHS->expand(Builder, GetCounterIdx),
+                              RHS->expand(Builder, GetCounterIdx));
     case Kind::Ref:
-      return LHS->expand(Builder, Counters);
+      return LHS->expand(Builder, GetCounterIdx);
     }
 
     llvm_unreachable("Unhandled Kind in switch.");
+  }
+
+  /// Expand this node into an llvm::coverage::Counter.
+  ///
+  /// Updates \c Builder with any expressions that are needed to represent this
+  /// counter.
+  llvm::coverage::Counter
+  expand(llvm::coverage::CounterExpressionBuilder &Builder,
+         const llvm::DenseMap<ASTNode, unsigned> &Counters) const {
+    return expand(Builder, [&](auto Node) {
+      // FIXME: We ought to assert that the node is present.
+      return Counters.lookup(Node);
+    });
   }
 
   void print(raw_ostream &OS) const {
@@ -463,21 +497,35 @@ public:
 };
 
 /// An ASTWalker that maps ASTNodes to profiling counters.
+///
+/// TODO: We ought to be able to leverage the CounterExprs from the
+/// CoverageMapping walker to recompute the correct counter information
+/// for this walker.
 struct PGOMapping : public ASTWalker {
-  /// The next counter value to assign.
-  unsigned NextCounter;
+  /// The counter indices for AST nodes.
+  const llvm::DenseMap<ASTNode, unsigned> &CounterMap;
 
-  /// The map of statements to counters.
+  /// The loaded counter data.
+  const llvm::InstrProfRecord &LoadedCounts;
+
+  /// The output map of statements to counters.
   llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap;
-  llvm::Expected<llvm::InstrProfRecord> &LoadedCounts;
   llvm::DenseMap<ASTNode, ASTNode> &CondToParentMap;
-  llvm::DenseMap<ASTNode, unsigned> CounterMap;
 
-  PGOMapping(llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap,
-             llvm::Expected<llvm::InstrProfRecord> &LoadedCounts,
+  PGOMapping(const llvm::DenseMap<ASTNode, unsigned> &CounterMap,
+             const llvm::InstrProfRecord &LoadedCounts,
+             llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap,
              llvm::DenseMap<ASTNode, ASTNode> &RegionCondToParentMap)
-      : NextCounter(0), LoadedCounterMap(LoadedCounterMap),
-        LoadedCounts(LoadedCounts), CondToParentMap(RegionCondToParentMap) {}
+      : CounterMap(CounterMap), LoadedCounts(LoadedCounts),
+        LoadedCounterMap(LoadedCounterMap),
+        CondToParentMap(RegionCondToParentMap) {}
+
+  /// Retrieve the counter index for a leaf node.
+  unsigned getCounterIndex(ASTNode Node) const {
+    auto result = CounterMap.find(Node);
+    assert(result != CounterMap.end() && "Unmapped node?");
+    return result->second;
+  }
 
   unsigned getParentCounter() const {
     if (Parent.isNull())
@@ -516,7 +564,17 @@ struct PGOMapping : public ASTWalker {
            "region does not have an associated counter");
 
     unsigned CounterIndexForFunc = CounterIt->second;
-    return LoadedCounts->Counts[CounterIndexForFunc];
+    return LoadedCounts.Counts[CounterIndexForFunc];
+  }
+
+  /// Record the execution count for a leaf node.
+  void setKnownExecutionCount(ASTNode Node) {
+    LoadedCounterMap[Node] = loadExecutionCount(Node);
+  }
+
+  /// Record a computed execution count for a node.
+  void setExecutionCount(ASTNode Node, ProfileCounter count) {
+    LoadedCounterMap[Node] = count;
   }
 
   bool walkToDeclPre(Decl *D) override {
@@ -524,42 +582,35 @@ struct PGOMapping : public ASTWalker {
       return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
-        auto node = AFD->getBody();
-        CounterMap[node] = NextCounter++;
-        auto count = loadExecutionCount(node);
-        LoadedCounterMap[node] = count;
+        setKnownExecutionCount(AFD->getBody());
       });
     }
-    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      auto node = TLCD->getBody();
-      CounterMap[node] = NextCounter++;
-      auto count = loadExecutionCount(node);
-      LoadedCounterMap[node] = count;
-    }
+    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+      setKnownExecutionCount(TLCD->getBody());
+
     return true;
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     unsigned parent = getParentCounter();
+    auto parentCount = LoadedCounts.Counts[parent];
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       auto thenStmt = IS->getThenStmt();
-      CounterMap[thenStmt] = NextCounter++;
       auto thenCount = loadExecutionCount(thenStmt);
-      LoadedCounterMap[thenStmt] = thenCount;
+      setExecutionCount(thenStmt, thenCount);
       if (auto elseStmt = IS->getElseStmt()) {
-        CounterMap[elseStmt] = parent;
-        auto count = loadExecutionCount(elseStmt);
+        auto count = parentCount;
         if (!parent) {
           auto thenVal = thenCount.getValue();
-          for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
-            auto cCount = LoadedCounts->Counts[pCount];
+          for (auto pCount = getCounterIndex(thenStmt); pCount > 0; --pCount) {
+            auto cCount = LoadedCounts.Counts[pCount];
             if (cCount > thenVal) {
               count = cCount;
               break;
             }
           }
         }
-        LoadedCounterMap[elseStmt] = subtract(count, thenCount);
+        setExecutionCount(elseStmt, subtract(count, thenCount));
         auto Cond = IS->getCond();
         for (const auto &elt : Cond) {
           if (elt.getKind() ==
@@ -568,47 +619,24 @@ struct PGOMapping : public ASTWalker {
           }
         }
       }
-    } else if (auto *US = dyn_cast<GuardStmt>(S)) {
-      auto guardBody = US->getBody();
-      CounterMap[guardBody] = NextCounter++;
+    } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
+      auto guardBody = GS->getBody();
       auto guardCount = loadExecutionCount(guardBody);
-      LoadedCounterMap[guardBody] = guardCount;
-      CounterMap[US] = parent;
-      auto count = loadExecutionCount(US);
-      LoadedCounterMap[US] = subtract(count, guardCount);
+      setExecutionCount(guardBody, guardCount);
+      setExecutionCount(GS, subtract(parentCount, guardCount));
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      auto whileBody = WS->getBody();
-      CounterMap[whileBody] = NextCounter++;
-      auto whileCount = loadExecutionCount(whileBody);
-      LoadedCounterMap[whileBody] = whileCount;
-      CounterMap[WS] = parent;
-      auto count = loadExecutionCount(WS);
-      LoadedCounterMap[WS] = count;
+      setKnownExecutionCount(WS->getBody());
+      setExecutionCount(WS, parentCount);
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
-      auto rwsBody = RWS->getBody();
-      CounterMap[rwsBody] = NextCounter++;
-      auto rwsBodyCount = loadExecutionCount(rwsBody);
-      LoadedCounterMap[rwsBody] = rwsBodyCount;
-      CounterMap[RWS] = parent;
-      auto count = loadExecutionCount(RWS);
-      LoadedCounterMap[RWS] = count;
+      setKnownExecutionCount(RWS->getBody());
+      setExecutionCount(RWS, parentCount);
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
-      auto fesBody = FES->getBody();
-      CounterMap[fesBody] = NextCounter++;
-      auto fesCount = loadExecutionCount(fesBody);
-      LoadedCounterMap[fesBody] = fesCount;
-      CounterMap[FES] = parent;
-      auto count = loadExecutionCount(FES);
-      LoadedCounterMap[FES] = count;
+      setKnownExecutionCount(FES->getBody());
+      setExecutionCount(FES, parentCount);
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
-      CounterMap[SS] = NextCounter++;
-      auto ssCount = loadExecutionCount(SS);
-      LoadedCounterMap[SS] = ssCount;
+      setKnownExecutionCount(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      auto stmt = getProfilerStmtForCase(CS);
-      CounterMap[stmt] = NextCounter++;
-      auto csCount = loadExecutionCount(stmt);
-      LoadedCounterMap[stmt] = csCount;
+      setKnownExecutionCount(getProfilerStmtForCase(CS));
     }
     return {true, S};
   }
@@ -624,32 +652,27 @@ struct PGOMapping : public ASTWalker {
 
     unsigned parent = getParentCounter();
 
-    if (Parent.isNull()) {
-      CounterMap[E] = NextCounter++;
-      auto eCount = loadExecutionCount(E);
-      LoadedCounterMap[E] = eCount;
-    }
+    if (Parent.isNull())
+      setKnownExecutionCount(E);
 
     if (auto *IE = dyn_cast<IfExpr>(E)) {
       auto thenExpr = IE->getThenExpr();
-      CounterMap[thenExpr] = NextCounter++;
       auto thenCount = loadExecutionCount(thenExpr);
-      LoadedCounterMap[thenExpr] = thenCount;
+      setExecutionCount(thenExpr, thenCount);
       auto elseExpr = IE->getElseExpr();
       assert(elseExpr && "An if-expr must have an else subexpression");
-      CounterMap[elseExpr] = parent;
-      auto count = loadExecutionCount(elseExpr);
+      auto count = LoadedCounts.Counts[parent];
       if (!parent) {
         auto thenVal = thenCount.getValue();
-        for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
-          auto cCount = LoadedCounts->Counts[pCount];
+        for (auto pCount = getCounterIndex(thenExpr); pCount > 0; --pCount) {
+          auto cCount = LoadedCounts.Counts[pCount];
           if (cCount > thenVal) {
             count = cCount;
             break;
           }
         }
       }
-      LoadedCounterMap[elseExpr] = subtract(count, thenCount);
+      setExecutionCount(elseExpr, subtract(count, thenCount));
     }
     return {true, E};
   }
@@ -780,7 +803,17 @@ private:
     if (ControlFlowAdjust)
       Count = &createCounter(CounterExpr::Sub(*Count, *ControlFlowAdjust));
 
-    RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
+    if (Count->isSemanticallyZero()) {
+      // If the counter is semantically zero, form an 'incomplete' region with
+      // no starting location. This prevents forming unreachable regions unless
+      // there is a following statement or expression to extend the region.
+      RegionStack.emplace_back(ASTNode(), *Count, None, None);
+    } else {
+      // Otherwise, we have a non-zero counter, so form a new region starting
+      // at the end of the previous scope. This ensures the user covers both
+      // branches of a condition.
+      RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
+    }
   }
 
   /// Push a region covering \c Node onto the stack.
@@ -1186,8 +1219,8 @@ void SILProfiler::assignRegionCounters() {
       llvm::dbgs() << PGOFuncName << "\n";
       return;
     }
-    PGOMapping pgoMapper(RegionLoadedCounterMap, LoadedCounts,
-                         RegionCondToParentMap);
+    PGOMapping pgoMapper(RegionCounterMap, LoadedCounts.get(),
+                         RegionLoadedCounterMap, RegionCondToParentMap);
     Root.walk(pgoMapper);
   }
 }

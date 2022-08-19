@@ -26,9 +26,10 @@ sil [ossa] @leak_loop_test : $@convention(thin) (@owned Builtin.NativeObject) ->
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
   %2 = begin_borrow %0 : $Builtin.NativeObject
-  store_borrow %2 to %1 : $*Builtin.NativeObject
+  %sbi = store_borrow %2 to %1 : $*Builtin.NativeObject
   %3 = function_ref @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
-  apply %3(%1) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %3(%sbi) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  end_borrow %sbi : $*Builtin.NativeObject
   end_borrow %2 : $Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
   br bb1

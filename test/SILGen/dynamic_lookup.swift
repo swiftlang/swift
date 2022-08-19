@@ -61,8 +61,8 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK: end_access [[READ]]
-  // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
-  // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]], AnyObject) Self).Type
+  // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick any AnyObject.Type, [[OBJCOPY]] : $AnyObject
+  // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick any AnyObject.Type to $@thick (@opened([[UUID:".*"]], AnyObject) Self).Type
   // CHECK-NEXT: [[METHOD:%[0-9]+]] = objc_method [[OPENMETA]] : $@thick (@opened([[UUID]], AnyObject) Self).Type, #X.staticF!foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]], AnyObject) Self).Type) -> ()
   // CHECK: apply [[METHOD]]([[OPENMETA]]) : $@convention(objc_method) (@thick (@opened([[UUID]], AnyObject) Self).Type) -> ()
   // CHECK: end_borrow [[OBJLIFETIME]]
@@ -122,7 +122,7 @@ func opt_to_class(_ obj: AnyObject) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup20opt_to_class_unboundyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   metatype $@thin AnyObject.Protocol
+// CHECK:   metatype $@thin (any AnyObject).Type
 // CHECK:   function_ref @$[[THUNK_NAME:[_a-zA-Z0-9]+]]
 // CHECK: } // end sil function '$s14dynamic_lookup20opt_to_class_unboundyyF'
 //
@@ -157,8 +157,8 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK:   [[PBO:%.*]] = project_box [[OPTLIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
-  // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
-  // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
+  // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick any AnyObject.Type, [[OBJCOPY]] : $AnyObject
+  // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick any AnyObject.Type to $@thick (@opened
   // CHECK:   [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> ()>
   // CHECK:   dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}, AnyObject) Self).Type, #X.staticF!foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
@@ -359,13 +359,13 @@ func downcast(_ obj: AnyObject) -> X {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup7consumeyyAA5Fruit_pF
-// CHECK: bb0(%0 : @guaranteed $Fruit):
+// CHECK: bb0(%0 : @guaranteed $any Fruit):
 // CHECK:        [[BOX:%.*]] = alloc_stack $Optional<Juice>
-// CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}", Fruit) Self, #Fruit.juice!getter.foreign, bb1, bb2
+// CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}", any Fruit) Self, #Fruit.juice!getter.foreign, bb1, bb2
 
-// CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}", Fruit) Self) -> @autoreleased Juice):
+// CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}", any Fruit) Self) -> @autoreleased Juice):
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
-// CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]([[SELF_COPY]]) : $@convention(objc_method) (@opened("{{.*}}", Fruit) Self) -> @autoreleased Juice
+// CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]([[SELF_COPY]]) : $@convention(objc_method) (@opened("{{.*}}", any Fruit) Self) -> @autoreleased Juice
 // CHECK:   [[B:%.*]] = begin_borrow [[METHOD]]
 // CHECK:   [[RESULT:%.*]] = apply [[B]]() : $@callee_guaranteed () -> @owned Juice
 // CHECK:   end_borrow [[B]]

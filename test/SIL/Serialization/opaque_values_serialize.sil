@@ -32,9 +32,9 @@ bb0(%0 : $T):
   return %t : $()
 }
 
-// CHECK-LABEL: sil [serialized] @openExistentialBoxValue : $@convention(thin) (@in Error) -> () {
-// CHECK: bb0([[ARG:%.*]] : $Error):
-// CHECK:  open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}, Error) Self
+// CHECK-LABEL: sil [serialized] @openExistentialBoxValue : $@convention(thin) (@in any Error) -> () {
+// CHECK: bb0([[ARG:%.*]] : $any Error):
+// CHECK:  open_existential_box_value [[ARG]] : $any Error to $@opened({{.*}}, any Error) Self
 // CHECK-LABEL: } // end sil function 'openExistentialBoxValue'
 sil [serialized] @openExistentialBoxValue : $@convention(thin) (@in Error) -> () {
 bb0(%0 : $Error):
@@ -43,9 +43,9 @@ bb0(%0 : $Error):
   return %t : $()
 }
 
-// CHECK-LABEL: sil [serialized] @openExistentialValue : $@convention(thin) (@in Foo) -> () {
-// CHECK: bb0([[ARG:%.*]] : $Foo):
-// CHECK:  open_existential_value [[ARG]] : $Foo to $@opened({{.*}}, Foo) Self
+// CHECK-LABEL: sil [serialized] @openExistentialValue : $@convention(thin) (@in any Foo) -> () {
+// CHECK: bb0([[ARG:%.*]] : $any Foo):
+// CHECK:  open_existential_value [[ARG]] : $any Foo to $@opened({{.*}}, any Foo) Self
 // CHECK-LABEL: } // end sil function 'openExistentialValue'
 sil [serialized] @openExistentialValue : $@convention(thin) (@in Foo) -> () {
 bb0(%0 : $Foo):

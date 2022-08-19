@@ -29,7 +29,7 @@ public func convert(strings: [String]) -> [Int] {
 // CHECK: [[CONVERTED:%.*]] = convert_function [[CURRY_RESULT]]
 // CHECK: [[NOESCAPE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CONVERTED]]
 // CHECK: // function_ref
-// CHECK-NEXT: [[THUNK:%.*]] = function_ref @$sSSSis5Error_pIggdzo_SSSisAA_pIegnrzo_TR : $@convention(thin) (@in_guaranteed String, @noescape @callee_guaranteed (@guaranteed String) -> (Int, @error Error)) -> (@out Int, @error Error)
+// CHECK-NEXT: [[THUNK:%.*]] = function_ref @$sSSSis5Error_pIggdzo_SSSisAA_pIegnrzo_TR : $@convention(thin) (@in_guaranteed String, @noescape @callee_guaranteed (@guaranteed String) -> (Int, @error any Error)) -> (@out Int, @error any Error)
 // CHECK-NEXT: [[REABSTRACTED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NOESCAPE]])
 
 // CHECK-LABEL: sil private [ossa] @$s22partial_apply_override7convert7stringsSaySiGSaySSG_tFSiSScAA18StringIntConverterCcfu_SiSScfu0_ : $@convention(thin) (@guaranteed String, @guaranteed StringIntConverter) -> Int

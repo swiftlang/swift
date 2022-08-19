@@ -388,11 +388,12 @@ public:
     if ((superclass = CD->getSuperclassDecl())) {
       allRequirementsSatisfied &= require(superclass);
     }
-    for (auto proto : CD->getLocalProtocols(
-                        ConformanceLookupKind::OnlyExplicit))
-      if (printer.shouldInclude(proto))
-        allRequirementsSatisfied &= require(proto);
-
+    if (outputLangMode != OutputLanguageMode::Cxx) {
+      for (auto proto :
+           CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit))
+        if (printer.shouldInclude(proto))
+          allRequirementsSatisfied &= require(proto);
+    }
     if (!allRequirementsSatisfied)
       return false;
 

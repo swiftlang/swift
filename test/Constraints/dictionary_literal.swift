@@ -139,6 +139,7 @@ func testDefaultExistentials() {
            "b": ["a", 2, 3.14159],
            "c": ["a": 2, "b": 3.5]]
   // expected-error@-3{{heterogeneous collection literal could only be inferred to '[String : Any]'; add explicit type annotation if this is intentional}}
+  // expected-warning@-3{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
 
   let d3 = ["b" : B(), "c" : C()]
   let _: Int = d3 // expected-error{{value of type '[String : A]'}}
