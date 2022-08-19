@@ -654,6 +654,11 @@ public:
   void getRootOpenedExistentials(
       SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
+  /// Retrieve the set of type sequence generic parameters that occur
+  /// within this type.
+  void getTypeSequenceParameters(
+      SmallVectorImpl<Type> &rootTypeSequenceParams) const;
+
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
   Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root,

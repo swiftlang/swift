@@ -580,6 +580,28 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
   return transformFn(type);
 }
 
+void TypeBase::getTypeSequenceParameters(
+    SmallVectorImpl<Type> &rootTypeSequenceParams) const {
+  llvm::SmallDenseSet<CanType, 2> visited;
+
+  auto recordType = [&](Type t) {
+    if (visited.insert(t->getCanonicalType()).second)
+      rootTypeSequenceParams.push_back(t);
+  };
+
+  Type(const_cast<TypeBase *>(this)).visit([&](Type t) {
+    if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
+      if (paramTy->isTypeSequence()) {
+        recordType(paramTy);
+      }
+    } else if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+      if (archetypeTy->isRoot()) {
+        recordType(t);
+      }
+    }
+  });
+}
+
 Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   if (!dc->isTypeContext())
     return this;
