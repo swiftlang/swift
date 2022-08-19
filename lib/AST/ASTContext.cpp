@@ -342,6 +342,11 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<CanType, const GenericSignatureImpl *>, CanGenericSignature>
       ExistentialSignatures;
 
+  /// The element signature for a generic signature, constructed by dropping
+  /// @_typeSequence attributes from generic parameters.
+  llvm::DenseMap<const GenericSignatureImpl *,
+                 CanGenericSignature> ElementSignatures;
+
   /// Overridden declarations.
   llvm::DenseMap<const ValueDecl *, ArrayRef<ValueDecl *>> Overrides;
 
@@ -5254,6 +5259,76 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
   (void) result;
 
   return canGenericSig;
+}
+
+CanGenericSignature
+ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
+  auto &sigs = getImpl().ElementSignatures;
+  auto found = sigs.find(baseGenericSig.getPointer());
+  if (found != sigs.end())
+    return found->second;
+
+  // This operation doesn't make sense if the input signature does not contain`
+  // any pack generic parameters.
+#ifndef NDEBUG
+  {
+    auto found = std::find_if(baseGenericSig.getGenericParams().begin(),
+                              baseGenericSig.getGenericParams().end(),
+                              [](GenericTypeParamType *paramType) {
+                                return paramType->isTypeSequence();
+                              });
+    assert(found != baseGenericSig.getGenericParams().end());
+  }
+#endif
+
+  SmallVector<GenericTypeParamType *, 2> genericParams;
+  SmallVector<Requirement, 2> requirements;
+
+  auto eraseTypeSequence = [&](GenericTypeParamType *paramType) {
+    return GenericTypeParamType::get(
+        paramType->getDepth(), paramType->getIndex(),
+        /*isTypeSequence=*/false, *this);
+  };
+
+  for (auto paramType : baseGenericSig.getGenericParams()) {
+    genericParams.push_back(eraseTypeSequence(paramType));
+  }
+
+  auto eraseTypeSequenceRec = [&](Type type) -> Type {
+    return type.transformRec([&](Type t) -> Optional<Type> {
+      if (auto *paramType = t->getAs<GenericTypeParamType>())
+        return Type(eraseTypeSequence(paramType));
+      return None;
+    });
+  };
+
+  for (auto requirement : baseGenericSig.getRequirements()) {
+    switch (requirement.getKind()) {
+    case RequirementKind::SameCount:
+      // Drop same-length requirements from the element signature.
+      break;
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      requirements.emplace_back(
+          requirement.getKind(),
+          eraseTypeSequenceRec(requirement.getFirstType()),
+          eraseTypeSequenceRec(requirement.getSecondType()));
+      break;
+    case RequirementKind::Layout:
+      requirements.emplace_back(
+          requirement.getKind(),
+          eraseTypeSequenceRec(requirement.getFirstType()),
+          requirement.getLayoutConstraint());
+      break;
+    }
+  }
+
+  auto elementSig = buildGenericSignature(
+      *this, GenericSignature(), genericParams, requirements)
+          .getCanonicalSignature();
+  sigs[baseGenericSig.getPointer()] = elementSig;
+  return elementSig;
 }
 
 GenericSignature 
