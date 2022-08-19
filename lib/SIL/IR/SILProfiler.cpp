@@ -196,6 +196,13 @@ static bool skipExpr(Expr *E) {
   return !E->getStartLoc().isValid() || !E->getEndLoc().isValid();
 }
 
+/// Whether the children of an unmapped decl should still be walked.
+static bool shouldWalkUnmappedDecl(const Decl *D) {
+  // We want to walk into the initializer for a pattern binding decl. This
+  // allows us to map LazyInitializerExprs.
+  return isa<PatternBindingDecl>(D);
+}
+
 /// An ASTWalker that maps ASTNodes to profiling counters.
 struct MapRegionCounters : public ASTWalker {
   /// The next counter value to assign.
@@ -206,6 +213,12 @@ struct MapRegionCounters : public ASTWalker {
 
   MapRegionCounters(llvm::DenseMap<ASTNode, unsigned> &CounterMap)
       : CounterMap(CounterMap) {}
+
+  LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+    // We want to walk lazy initializers present in the synthesized getter for
+    // a lazy variable.
+    return LazyInitializerWalking::InAccessor;
+  }
 
   void mapRegion(ASTNode N) {
     CounterMap[N] = NextCounter;
@@ -225,7 +238,7 @@ struct MapRegionCounters : public ASTWalker {
 
   bool walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
-      return false;
+      return shouldWalkUnmappedDecl(D);
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] { mapRegion(AFD->getBody()); });
@@ -274,14 +287,8 @@ struct MapRegionCounters : public ASTWalker {
       mapRegion(IE->getThenExpr());
     }
 
-    // rdar://42792053
-    // TODO: There's an outstanding issue here with LazyInitializerExpr. A LIE
-    // is copied into the body of a property getter after type-checking (before
-    // coverage). ASTWalker only visits this expression once via the property's
-    // VarDecl, and does not visit it again within the getter. This results in
-    // missing coverage. SILGen treats the init expr as part of the getter, but
-    // its SILProfiler has no information about the init because the LIE isn't
-    // visited here.
+    if (isa<LazyInitializerExpr>(E))
+      mapRegion(E);
 
     return {true, E};
   }
@@ -579,7 +586,7 @@ struct PGOMapping : public ASTWalker {
 
   bool walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
-      return false;
+      return shouldWalkUnmappedDecl(D);
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
         setKnownExecutionCount(AFD->getBody());
@@ -589,6 +596,12 @@ struct PGOMapping : public ASTWalker {
       setKnownExecutionCount(TLCD->getBody());
 
     return true;
+  }
+
+  LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+    // We want to walk lazy initializers present in the synthesized getter for
+    // a lazy variable.
+    return LazyInitializerWalking::InAccessor;
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -674,6 +687,9 @@ struct PGOMapping : public ASTWalker {
       }
       setExecutionCount(elseExpr, subtract(count, thenCount));
     }
+    if (isa<LazyInitializerExpr>(E))
+      setKnownExecutionCount(E);
+
     return {true, E};
   }
 };
@@ -903,6 +919,12 @@ private:
 public:
   CoverageMapping(const SourceManager &SM) : SM(SM) {}
 
+  LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+    // We want to walk lazy initializers present in the synthesized getter for
+    // a lazy variable.
+    return LazyInitializerWalking::InAccessor;
+  }
+
   /// Generate the coverage counter mapping regions from collected
   /// source regions.
   SILCoverageMap *emitSourceRegions(
@@ -930,7 +952,7 @@ public:
 
   bool walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
-      return false;
+      return shouldWalkUnmappedDecl(D);
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
@@ -1123,6 +1145,9 @@ public:
                       CounterExpr::Sub(getCurrentCounter(), ThenCounter));
       }
     }
+
+    if (isa<LazyInitializerExpr>(E))
+      assignCounter(E);
 
     if (hasCounter(E) && !Parent.isNull())
       pushRegion(E);
