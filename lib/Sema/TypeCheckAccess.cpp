@@ -109,7 +109,7 @@ public:
     const GenericContext *ownerCtx,
     const ValueDecl *ownerDecl);
 
-  void checkGlobalActorAccess(const ValueDecl *D);
+  void checkGlobalActorAccess(const Decl *D);
 };
 
 class TypeAccessScopeDiagnoser : private ASTWalker {
@@ -411,7 +411,11 @@ void AccessControlCheckerBase::checkGenericParamAccess(
                           ownerDecl->getFormalAccess());
 }
 
-void AccessControlCheckerBase::checkGlobalActorAccess(const ValueDecl *D) {
+void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return;
+
   auto globalActorAttr = D->getGlobalActorAttr();
   if (!globalActorAttr)
     return;
@@ -419,17 +423,24 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const ValueDecl *D) {
   auto customAttr = globalActorAttr->first;
   auto globalActorDecl = globalActorAttr->second;
   checkTypeAccess(
-      customAttr->getType(), customAttr->getTypeRepr(), D,
+      customAttr->getType(), customAttr->getTypeRepr(), VD,
       /*mayBeInferred*/ false,
       [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
           DowngradeToWarning downgradeToWarning) {
+        if (checkUsableFromInline) {
+          auto diag = D->diagnose(diag::global_actor_not_usable_from_inline,
+                                  D->getDescriptiveKind(), VD->getName());
+          highlightOffendingType(diag, complainRepr);
+          return;
+        }
+
         auto globalActorAccess = typeAccessScope.accessLevelForDiagnostics();
         bool isExplicit = D->getAttrs().hasAttribute<AccessControlAttr>();
         auto declAccess = isExplicit
-                              ? D->getFormalAccess()
+                              ? VD->getFormalAccess()
                               : typeAccessScope.requiredAccessForDiagnostics();
         auto diag = D->diagnose(diag::global_actor_access, declAccess,
-                                D->getDescriptiveKind(), D->getName(),
+                                D->getDescriptiveKind(), VD->getName(),
                                 globalActorAccess, globalActorDecl->getName());
         highlightOffendingType(diag, complainRepr);
       });
@@ -451,9 +462,7 @@ public:
       return;
 
     DeclVisitor<AccessControlChecker>::visit(D);
-
-    if (const auto *VD = dyn_cast<ValueDecl>(D))
-      checkGlobalActorAccess(VD);
+    checkGlobalActorAccess(D);
   }
 
   // Force all kinds to be handled at a lower level.
@@ -1076,6 +1085,7 @@ public:
         return;
 
     DeclVisitor<UsableFromInlineChecker>::visit(D);
+    checkGlobalActorAccess(D);
   }
 
   // Force all kinds to be handled at a lower level.

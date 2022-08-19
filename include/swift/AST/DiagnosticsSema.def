@@ -4887,6 +4887,9 @@ ERROR(global_actor_access,none,
       "cannot have %select{private|fileprivate|internal|%error|%error}3 "
       "global actor %4",
       (AccessLevel, DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(global_actor_not_usable_from_inline,none,
+      "global actor for %0 %1 must be '@usableFromInline' or public",
+      (DescriptiveDeclKind, DeclName))
 
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
