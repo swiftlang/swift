@@ -65,7 +65,7 @@ func bindPrefixAndSuffix() {
 
 func invalidPacks() {
   func monovariadic1() -> (String...) {} // expected-error {{cannot create expansion with non-variadic type 'String'}}
-  func monovariadic2<T>() -> (T...) {} // expected-error 2 {{cannot create expansion with non-variadic type 'T'}}
+  func monovariadic2<T>() -> (T...) {} // expected-error {{cannot create expansion with non-variadic type 'T'}}
   func monovariadic3<T, U>() -> (T, U...) {} // expected-error {{cannot create a variadic tuple}}
 }
 

@@ -4018,13 +4018,28 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       if (patternTy->hasError())
         complained = true;
 
+      // Find the first type sequence parameter and use that as the count type.
+      Type countTy;
+      (void) patternTy.get().findIf([&](Type t) -> bool {
+        if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
+          if (paramTy->isTypeSequence()) {
+            countTy = paramTy;
+            return true;
+          }
+        }
+
+        return false;
+      });
+
       // If there's no reference to a variadic generic parameter, complain
       // - the pack won't actually expand to anything meaningful.
-      if (!patternTy->hasTypeSequence())
+      if (!countTy) {
         diagnose(repr->getLoc(), diag::expansion_not_variadic, patternTy)
           .highlight(repr->getParens());
+        return ErrorType::get(getASTContext());
+      }
 
-      return PackExpansionType::get(patternTy);
+      return PackExpansionType::get(patternTy, countTy);
     } else {
       // Variadic tuples are not permitted.
       //

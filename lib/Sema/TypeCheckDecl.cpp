@@ -2227,10 +2227,22 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
+    // Find the first type sequence parameter and use that as the count type.
+    Type countTy;
+    (void) Ty.findIf([&](Type t) -> bool {
+      if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
+        if (paramTy->isTypeSequence()) {
+          countTy = paramTy;
+          return true;
+        }
+      }
+
+      return false;
+    });
     // Handle the monovariadic/polyvariadic interface type split.
-    if (Ty->hasTypeSequence()) {
+    if (countTy) {
       // Polyvariadic types (T...) for <T...> resolve to pack expansions.
-      Ty = PackExpansionType::get(Ty);
+      Ty = PackExpansionType::get(Ty, countTy);
     } else {
       // Monovariadic types (T...) for <T> resolve to [T].
       Ty = VariadicSequenceType::get(Ty);

@@ -2897,33 +2897,48 @@ TupleTypeElt::TupleTypeElt(Type ty, Identifier name)
   assert(!ty->is<InOutType>() && "Cannot have InOutType in a tuple");
 }
 
-PackExpansionType *PackExpansionType::get(Type patternTy) {
-  assert(patternTy && "Missing pattern type in expansion");
+PackExpansionType::PackExpansionType(Type patternType, Type countType,
+                                     RecursiveTypeProperties properties,
+                                     const ASTContext *canCtx)
+  : TypeBase(TypeKind::PackExpansion, canCtx, properties),
+    patternType(patternType), countType(countType) {
+  assert(countType->is<TypeVariableType>() ||
+         countType->is<SequenceArchetypeType>() ||
+         countType->castTo<GenericTypeParamType>()->isTypeSequence());
+}
 
-  auto properties = patternTy->getRecursiveProperties();
+PackExpansionType *PackExpansionType::get(Type patternType, Type countType) {
+  auto properties = patternType->getRecursiveProperties();
+  properties |= countType->getRecursiveProperties();
+
   auto arena = getArena(properties);
 
-  auto &context = patternTy->getASTContext();
+  auto &context = patternType->getASTContext();
   llvm::FoldingSetNodeID id;
-  PackExpansionType::Profile(id, patternTy);
+  PackExpansionType::Profile(id, patternType, countType);
 
   void *insertPos;
   if (PackExpansionType *expType =
-          context.getImpl()
-              .getArena(arena)
-              .PackExpansionTypes.FindNodeOrInsertPos(id, insertPos))
+        context.getImpl().getArena(arena)
+          .PackExpansionTypes.FindNodeOrInsertPos(id, insertPos))
     return expType;
 
-  const ASTContext *canCtx = patternTy->isCanonical() ? &context : nullptr;
-  PackExpansionType *expansionTy = new (context, AllocationArena::Permanent)
-      PackExpansionType(patternTy, canCtx);
-  context.getImpl().getArena(arena).PackExpansionTypes.InsertNode(expansionTy,
+  const ASTContext *canCtx =
+      (patternType->isCanonical() && countType->isCanonical())
+      ? &context : nullptr;
+  PackExpansionType *expansionType =
+      new (context, arena) PackExpansionType(patternType, countType, properties,
+                                             canCtx);
+  context.getImpl().getArena(arena).PackExpansionTypes.InsertNode(expansionType,
                                                                   insertPos);
-  return expansionTy;
+  return expansionType;
 }
 
-void PackExpansionType::Profile(llvm::FoldingSetNodeID &ID, Type patternType) {
+void PackExpansionType::Profile(llvm::FoldingSetNodeID &ID,
+                                Type patternType,
+                                Type countType) {
   ID.AddPointer(patternType.getPointer());
+  ID.AddPointer(countType.getPointer());
 }
 
 PackType *PackType::getEmpty(const ASTContext &C) {

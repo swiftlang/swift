@@ -1593,8 +1593,9 @@ CanType TypeBase::computeCanonicalType() {
 
   case TypeKind::PackExpansion: {
     auto *expansion = cast<PackExpansionType>(this);
-    auto pattern = expansion->getPatternType()->getCanonicalType();
-    Result = PackExpansionType::get(pattern);
+    auto patternType = expansion->getPatternType()->getCanonicalType();
+    auto countType = expansion->getCountType()->getCanonicalType();
+    Result = PackExpansionType::get(patternType, countType);
     break;
   }
 
@@ -5535,12 +5536,9 @@ case TypeKind::Id:
           return remap;
         }
 
-        if (input->is<TypeVariableType>()) {
-          if (auto *PT = (*remap)->getAs<PackType>()) {
-            maxArity = std::max(maxArity, PT->getNumElements());
-            cache.insert({input, PT});
-          }
-        } else if (input->isTypeSequenceParameter()) {
+        if (input->is<TypeVariableType>() ||
+            input->isTypeSequenceParameter() ||
+            input->is<SequenceArchetypeType>()) {
           if (auto *PT = (*remap)->getAs<PackType>()) {
             maxArity = std::max(maxArity, PT->getNumElements());
             cache.insert({input, PT});
@@ -5563,7 +5561,13 @@ case TypeKind::Id:
     if (!transformedPat)
       return Type();
 
-    if (transformedPat.getPointer() == expand->getPatternType().getPointer())
+    Type transformedCount =
+        expand->getCountType().transformWithPosition(pos, gather);
+    if (!transformedCount)
+      return Type();
+
+    if (transformedPat.getPointer() == expand->getPatternType().getPointer() &&
+        transformedCount.getPointer() == expand->getCountType().getPointer())
       return *this;
 
     llvm::DenseMap<TypeBase *, PackType *> expansions;
@@ -5573,7 +5577,7 @@ case TypeKind::Id:
       // If we didn't find any expansions, either the caller wasn't interested
       // in expanding this pack, or something has gone wrong. Leave off the
       // expansion and return the transformed type.
-      return PackExpansionType::get(transformedPat);
+      return PackExpansionType::get(transformedPat, transformedCount);
     }
 
     SmallVector<Type, 8> elts;
