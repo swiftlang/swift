@@ -4833,8 +4833,30 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   if (!genericSig)
     return substitutions;
 
-  // Find the superclass type with the context matching that of the member.
   auto *ownerNominal = dc->getSelfNominalTypeDecl();
+
+  // If the declaration context is Builtin.TheTupleType or an extension thereof,
+  // the base type must be a tuple type. Build a pack type from the tuple's
+  // elements and construct a substitution map replacing the generic parameter
+  // of Builtin.TheTupleType with the pack.
+  if (isa<BuiltinTupleDecl>(ownerNominal)) {
+    SmallVector<Type, 2> packElts;
+    for (auto type : castTo<TupleType>()->getElementTypes())
+      packElts.push_back(type);
+
+    auto *packType = PackType::get(dc->getASTContext(), packElts);
+
+    assert(genericSig.getGenericParams().size() == 1);
+    auto elementsParam = cast<SubstitutableType>(
+        genericSig.getGenericParams()[0]->getCanonicalType());
+    substitutions[elementsParam] = packType;
+    return substitutions;
+  }
+
+  // If the declaration context is a class or an extension thereof, the base
+  // type must be a class, class-constrained archetype, or self-conforming
+  // existential with a superclass bound. Get the base type's superclass type
+  // for the corresponding declaration context.
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal)) {
     baseTy = baseTy->getSuperclassForDecl(ownerClass,
                                       /*usesArchetypes=*/genericEnv != nullptr);
