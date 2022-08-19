@@ -805,7 +805,7 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
       continue;
 
     if (isDebugMode()) {
-      bindings.dump(typeVar, llvm::errs(), solverState->getCurrentIndent());
+      bindings.dump(llvm::errs(), solverState->getCurrentIndent());
     }
 
     // If these are the first bindings, or they are better than what
@@ -1652,21 +1652,15 @@ static std::string getCollectionLiteralAsString(KnownProtocolKind KPK) {
 #undef ENTRY
 }
 
-void BindingSet::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-                      unsigned indent) const {
-  out.indent(indent);
-  out << "(";
-  if (typeVar)
-    out << "$T" << typeVar->getImpl().getID();
-  dump(out, 1);
-  out << ")\n";
-}
-
 void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
 
   out.indent(indent);
+  out << "(";
+  if (auto typeVar = getTypeVariable())
+    out << "$T" << typeVar->getImpl().getID() << " ";
+  
   std::vector<std::string> attributes;
   if (isDirectHole())
     attributes.push_back("hole");
@@ -1778,6 +1772,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     }
     out << "] ";
   }
+  out << ")\n";
 }
 
 // Given a possibly-Optional type, return the direct superclass of the
