@@ -195,18 +195,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         PBD->setPattern(idx, Pat, PBD->getInitContext(idx));
       else
         return true;
-      if (PBD->getInit(idx) &&
-          !isPropertyWrapperBackingProperty &&
-          (!PBD->isInitializerSubsumed(idx) ||
-           Walker.shouldWalkIntoLazyInitializers())) {
-#ifndef NDEBUG
-        PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
-#endif
-        if (Expr *E2 = doIt(PBD->getInit(idx)))
-          PBD->setInit(idx, E2);
-        else
-          return true;
+
+      if (!PBD->getInit(idx) || isPropertyWrapperBackingProperty)
+        continue;
+
+      if (PBD->isInitializerSubsumed(idx) &&
+          Walker.getLazyInitializerWalkingBehavior() !=
+              LazyInitializerWalking::InPatternBinding) {
+        break;
       }
+
+#ifndef NDEBUG
+      PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
+#endif
+      if (Expr *E2 = doIt(PBD->getInit(idx)))
+        PBD->setInit(idx, E2);
+      else
+        return true;
     }
     return false;
   }
@@ -1073,7 +1078,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitLazyInitializerExpr(LazyInitializerExpr *E) {
-    // Initializer is totally opaque for most visitation purposes.
+    // The initializer is opaque unless we specifically want to visit it as part
+    // of the accessor body.
+    if (Walker.getLazyInitializerWalkingBehavior() !=
+        LazyInitializerWalking::InAccessor) {
+      return E;
+    }
+    auto *sub = doIt(E->getSubExpr());
+    if (!sub)
+      return nullptr;
+
+    E->setSubExpr(sub);
     return E;
   }
 
