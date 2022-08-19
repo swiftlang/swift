@@ -108,6 +108,8 @@ public:
   void checkGenericParamAccess(
     const GenericContext *ownerCtx,
     const ValueDecl *ownerDecl);
+
+  void checkGlobalActorAccess(const ValueDecl *D);
 };
 
 class TypeAccessScopeDiagnoser : private ASTWalker {
@@ -409,6 +411,30 @@ void AccessControlCheckerBase::checkGenericParamAccess(
                           ownerDecl->getFormalAccess());
 }
 
+void AccessControlCheckerBase::checkGlobalActorAccess(const ValueDecl *D) {
+  auto globalActorAttr = D->getGlobalActorAttr();
+  if (!globalActorAttr)
+    return;
+
+  auto customAttr = globalActorAttr->first;
+  auto globalActorDecl = globalActorAttr->second;
+  checkTypeAccess(
+      customAttr->getType(), customAttr->getTypeRepr(), D,
+      /*mayBeInferred*/ false,
+      [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+          DowngradeToWarning downgradeToWarning) {
+        auto globalActorAccess = typeAccessScope.accessLevelForDiagnostics();
+        bool isExplicit = D->getAttrs().hasAttribute<AccessControlAttr>();
+        auto declAccess = isExplicit
+                              ? D->getFormalAccess()
+                              : typeAccessScope.requiredAccessForDiagnostics();
+        auto diag = D->diagnose(diag::global_actor_access, declAccess,
+                                D->getDescriptiveKind(), D->getName(),
+                                globalActorAccess, globalActorDecl->getName());
+        highlightOffendingType(diag, complainRepr);
+      });
+}
+
 namespace {
 class AccessControlChecker : public AccessControlCheckerBase,
                              public DeclVisitor<AccessControlChecker> {
@@ -425,6 +451,9 @@ public:
       return;
 
     DeclVisitor<AccessControlChecker>::visit(D);
+
+    if (const auto *VD = dyn_cast<ValueDecl>(D))
+      checkGlobalActorAccess(VD);
   }
 
   // Force all kinds to be handled at a lower level.
