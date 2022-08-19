@@ -42,6 +42,7 @@ private:
   ModuleDecl &M;
   raw_ostream &os;
   raw_ostream &prologueOS;
+  raw_ostream &outOfLineDefinitionsOS;
   const DelayedMemberSet &delayedMembers;
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
@@ -57,11 +58,13 @@ private:
 
 public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
+                     raw_ostream &outOfLineDefinitionsOS,
                      DelayedMemberSet &delayed,
                      PrimitiveTypeMapping &typeMapping,
                      SwiftToClangInteropContext &interopContext,
                      AccessLevel access, OutputLanguageMode outputLang)
-      : M(mod), os(out), prologueOS(prologueOS), delayedMembers(delayed),
+      : M(mod), os(out), prologueOS(prologueOS),
+        outOfLineDefinitionsOS(outOfLineDefinitionsOS), delayedMembers(delayed),
         typeMapping(typeMapping), interopContext(interopContext),
         minRequiredAccess(access), outputLang(outputLang) {}
 
