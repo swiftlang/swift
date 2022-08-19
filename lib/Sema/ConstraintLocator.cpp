@@ -56,7 +56,8 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::MemberRefBase:
   case ConstraintLocator::UnresolvedMember:
   case ConstraintLocator::ParentType:
-  case ConstraintLocator::ExistentialSuperclassType:
+  case ConstraintLocator::ExistentialConstraintType:
+  case ConstraintLocator::ProtocolCompositionSuperclassType:
   case ConstraintLocator::LValueConversion:
   case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
@@ -391,8 +392,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "parent type";
       break;
 
-    case ExistentialSuperclassType:
-      out << "existential superclass type";
+    case ProtocolCompositionSuperclassType:
+      out << "protocol composition superclass type";
+      break;
+
+    case ExistentialConstraintType:
+      out << "existential constraint type";
       break;
 
     case LValueConversion:
