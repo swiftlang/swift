@@ -402,8 +402,9 @@ public:
   expand(llvm::coverage::CounterExpressionBuilder &Builder,
          const llvm::DenseMap<ASTNode, unsigned> &Counters) const {
     return expand(Builder, [&](auto Node) {
-      // FIXME: We ought to assert that the node is present.
-      return Counters.lookup(Node);
+      auto Result = Counters.find(Node);
+      assert(Result != Counters.end() && "Counter not found");
+      return Result->second;
     });
   }
 
@@ -799,7 +800,7 @@ private:
     CounterExpr *JumpsToLabel = nullptr;
     Stmt *ParentStmt = Parent.getAsStmt();
     if (ParentStmt) {
-      if (isa<DoStmt>(ParentStmt) || isa<DoCatchStmt>(ParentStmt))
+      if (isa<DoCatchStmt>(ParentStmt))
         return;
       auto caseStmt = dyn_cast_or_null<CaseStmt>(ParentStmt);
       if (caseStmt && caseStmt->getParentKind() == CaseParentKind::DoCatch)
@@ -1020,8 +1021,8 @@ public:
       if (caseStmt->getParentKind() == CaseParentKind::Switch)
         pushRegion(S);
     } else if (auto *DS = dyn_cast<DoStmt>(S)) {
+      assignCounter(DS, CounterExpr::Zero());
       assignCounter(DS->getBody(), CounterExpr::Ref(getCurrentCounter()));
-      assignCounter(DS);
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       // The do-catch body is visited the same number of times as its parent.
