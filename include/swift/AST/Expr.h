@@ -5314,6 +5314,7 @@ public:
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
 
   Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::LazyInitializer;
