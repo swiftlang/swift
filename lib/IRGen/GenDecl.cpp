@@ -3282,8 +3282,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
         //
         // FIXME: We should be able to set the linkage unconditionally here but
         //        some fixes are needed for Cxx interop.
-        if (auto *DC = f->getDeclContext())
-          if (getSwiftModule()->isImportedAsWeakLinked(DC->getParentModule()))
+        if (auto *parentModule = f->getParentModule())
+          if (getSwiftModule()->isImportedAsWeakLinked(parentModule))
             fn->setLinkage(link.getLinkage());
       }
 
