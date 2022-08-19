@@ -2338,11 +2338,11 @@ public:
       verifyCheckedBase(VD);
     }
 
-    bool shouldWalkIntoLazyInitializers() override {
+    LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
       // We don't want to walk into lazy initializers because they should
       // have been reparented to their synthesized getter, which will
       // invalidate various invariants.
-      return false;
+      return LazyInitializerWalking::None;
     }
 
     void verifyChecked(PatternBindingDecl *binding) {
