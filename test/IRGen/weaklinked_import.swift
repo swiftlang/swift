@@ -159,10 +159,7 @@ protocol RefinesP: BaseP {}
 extension S: RefinesP {}
 
 func testInlining() {
-  // FIXME: usableFromInlineFn() should be extern_weak but isn't because
-  //        inlining doesn't respect @_weakLinked import yet.
-
   // CHECK-DAG: define linkonce_odr hidden {{.+}} @"$s24weaklinked_import_helper22alwaysEmitIntoClientFnyyF"()
-  // CHECK-DAG: declare swiftcc {{.+}} @"$s24weaklinked_import_helper18usableFromInlineFnyyF"
+  // CHECK-DAG: declare extern_weak {{.+}} @"$s24weaklinked_import_helper18usableFromInlineFnyyF"
   alwaysEmitIntoClientFn()
 }

@@ -459,6 +459,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (F.hasClangNode())
     clangNodeOwnerID = S.addDeclRef(F.getClangNodeOwner());
 
+  ModuleID parentModuleID;
+  if (auto *parentModule = F.getParentModule())
+    parentModuleID = S.addModuleRef(parentModule);
+
   IdentifierID replacedFunctionID = 0;
   if (auto *fun = F.getDynamicallyReplacedFunction()) {
     addReferencedSILFunction(fun, true);
@@ -505,7 +509,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isExactSelfClass(),
       (unsigned)F.isDistributed(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangNodeOwnerID, SemanticsIDs);
+      genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
     [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
