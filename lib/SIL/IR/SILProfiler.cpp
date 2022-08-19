@@ -395,8 +395,9 @@ public:
   expand(llvm::coverage::CounterExpressionBuilder &Builder,
          const llvm::DenseMap<ASTNode, unsigned> &Counters) const {
     return expand(Builder, [&](auto Node) {
-      // FIXME: We ought to assert that the node is present.
-      return Counters.lookup(Node);
+      auto Result = Counters.find(Node);
+      assert(Result != Counters.end() && "Counter not found");
+      return Result->second;
     });
   }
 
