@@ -5549,6 +5549,12 @@ public:
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
+    // Single-element tuples can only appear in SIL mode.
+    if (T->getNumElements() == 1 &&
+        !T->getElement(0).hasName()) {
+      Printer << "@tuple ";
+    }
+
     Printer << "(";
 
     auto Fields = T->getElements();

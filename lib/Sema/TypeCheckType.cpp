@@ -2860,6 +2860,18 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
 
+  // In SIL mode only, build one-element tuples.
+  if (attrs.has(TAK_tuple)) {
+    SmallVector<TupleTypeElt, 1> elements;
+    if (auto *parenTy = dyn_cast<ParenType>(ty.getPointer()))
+      ty = parenTy->getUnderlyingType();
+
+    elements.emplace_back(ty);
+    ty = TupleType::get(elements, getASTContext());
+
+    attrs.clearAttribute(TAK_tuple);
+  }
+
   // Type aliases inside protocols are not yet resolved in the structural
   // stage of type resolution
   if (ty->is<DependentMemberType>() &&
