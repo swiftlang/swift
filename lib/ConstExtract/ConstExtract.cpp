@@ -48,6 +48,17 @@ public:
   }
 };
 
+std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
+  std::string TypeNameOutput;
+  llvm::raw_string_ostream OutputStream(TypeNameOutput);
+  swift::PrintOptions Options;
+  Options.FullyQualifiedTypes = true;
+  Options.PreferTypeRepr = true;
+  Type.print(OutputStream, Options);
+  OutputStream.flush();
+  return TypeNameOutput;
+}
+
 } // namespace
 
 namespace swift {
@@ -171,7 +182,7 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   return Result;
 }
 
-static std::string toString(const CompileTimeValue *Value) {
+std::string toString(const CompileTimeValue *Value) {
   switch (Value->getKind()) {
     case CompileTimeValue::RawLiteral:
       return cast<RawLiteralValue>(Value)->getValue();
@@ -193,7 +204,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
     for (const auto &TypeInfo : ConstValueInfos) {
       JSON.object([&] {
         const auto *TypeDecl = TypeInfo.TypeDecl;
-        JSON.attribute("typeName", TypeDecl->getName().str().str());
+        JSON.attribute("typeName", toFullyQualifiedTypeNameString(TypeDecl->getDeclaredInterfaceType()));
         JSON.attribute(
             "kind",
             TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
@@ -203,7 +214,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
             JSON.object([&] {
               const auto *PropertyDecl = PropertyInfo.VarDecl;
               JSON.attribute("label", PropertyDecl->getName().str().str());
-              JSON.attribute("type", PropertyDecl->getType().getString());
+              JSON.attribute("type", toFullyQualifiedTypeNameString(PropertyDecl->getType()));
               JSON.attribute("isStatic",
                              PropertyDecl->isStatic() ? "true" : "false");
               JSON.attribute("isComputed",
