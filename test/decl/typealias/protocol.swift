@@ -190,6 +190,9 @@ struct T5 : P5 {
   var v8 = P6.A.self
   var v9 = P6.B.self // expected-error {{cannot access type alias 'B' from 'P6'; use a concrete type or generic parameter base instead}}
 
+  var v10 = (any P6).A.self
+  var v11 = (any P6).B.self // expected-error {{cannot access type alias 'B' from 'any P6'; use a concrete type or generic parameter base instead}}
+
   struct Generic<T> {
     func okay(value: T.A) where T == any P6 {}
 
