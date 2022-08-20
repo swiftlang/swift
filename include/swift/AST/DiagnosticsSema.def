@@ -4467,10 +4467,6 @@ NOTE(unowned_assignment_requires_strong,none,
      "a strong reference is required to prevent the instance from being "
      "deallocated", ())
 
-ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
-      "collection downcast in cast pattern is not implemented; use an explicit "
-      "downcast to %0 instead", (Type))
-
 //------------------------------------------------------------------------------
 // MARK: Error-handling diagnostics
 //------------------------------------------------------------------------------
