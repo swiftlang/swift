@@ -82,7 +82,11 @@
         "swift-llvm-bindings": {
             "remote": { "id": "apple/swift-llvm-bindings" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project" } }
+            "remote": { "id": "apple/llvm-project" } },
+        "vcpkg": {
+            "remote": { "id": "microsoft/vcpkg" },
+            "platforms": [ "Windows" ]
+        }
     },
     "default-branch-scheme": "main",
     "branch-schemes": {
@@ -125,7 +129,8 @@
                 "swift-markdown": "main",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "swift/main"
+                "swift-experimental-string-processing": "swift/main",
+                "vcpkg": "2022.07.25"
             }
         },
         "rebranch": {
