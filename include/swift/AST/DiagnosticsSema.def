@@ -1972,10 +1972,12 @@ NOTE(objc_generic_extension_using_type_parameter_here,none,
      "generic parameter used here", ())
 NOTE(objc_generic_extension_using_type_parameter_try_objc,none,
      "add '@objc' to allow uses of 'self' within the function body", ())
+ERROR(unsupported_existential_extension,none,
+      "extension of existential type %0 is not supported", (Type))
 ERROR(invalid_nominal_extension,none,
       "extension of type %0 must be declared as an extension of %1",
       (Type, Type))
-NOTE(invalid_nominal_extension_rewrite,none,
+NOTE(invalid_extension_rewrite,none,
      "did you mean to extend %0 instead?", (Type))
 ERROR(synthesized_nominal_extension,none,
       "cannot extend synthesized type %0", (Type))
