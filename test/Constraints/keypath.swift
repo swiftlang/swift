@@ -20,7 +20,8 @@ func test() {
   let _ = C()[keyPath: \.i] // no warning for a read
 }
 
-// SR-7339
+// https://github.com/apple/swift/issues/49887
+
 class Some<T, V> { // expected-note {{'V' declared as parameter to type 'Some'}}
   init(keyPath: KeyPath<T, ((V) -> Void)?>) {
   }
@@ -49,15 +50,16 @@ func testFunc() {
   let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
 
-struct SR_12432 {
-  static func takesKeyPath(_: KeyPath<SR_12432.S, String>) -> String { "" }
+// https://github.com/apple/swift/issues/54871
+struct S_54871 {
+  static func takesKeyPath(_: KeyPath<S_54871.S, String>) -> String { "" }
 
   struct S {
     let text: String = takesKeyPath(\.text) // okay
   }
 }
 
-// SR-11234
+// https://github.com/apple/swift/issues/53635
 public extension Array {
     func sorted<C: Comparable, K: KeyPath<Element, C>>(by keyPath: K) -> Array<Element> {
         let sortedA = self.sorted(by: { $0[keyPath: keyPath] < $1[keyPath: keyPath] })
@@ -138,19 +140,17 @@ func test_mismatch_with_contextual_optional_result() {
   // expected-error@-1 {{key path value type '[Int]' cannot be converted to contextual type '[Int]?'}}
 }
 
-// SR-11184
-class SR11184 {}
-
-func fSR11184(_ c: SR11184!, _ kp: ReferenceWritableKeyPath<SR11184, String?>, _ str: String) {
+// https://github.com/apple/swift/issues/53581
+class C_53581 {}
+func f_53581(_ c: C_53581!, _ kp: ReferenceWritableKeyPath<C_53581, String?>,
+             _ str: String, _ o_str: String?) {
   c[keyPath: kp] = str // OK
   c![keyPath: kp] = str // OK
   c?[keyPath: kp] = str // OK
-}
 
-func fSR11184_O(_ c: SR11184!, _ kp: ReferenceWritableKeyPath<SR11184, String?>, _ str: String?) {
-  c[keyPath: kp] = str // OK
-  c![keyPath: kp] = str // OK
-  c?[keyPath: kp] = str // OK
+  c[keyPath: kp] = o_str // OK
+  c![keyPath: kp] = o_str // OK
+  c?[keyPath: kp] = o_str // OK
 }
 
 class KeyPathBase {}
@@ -180,12 +180,12 @@ func key_path_root_mismatch<T>(_ base: KeyPathBase?, subBase: KeyPathBaseSubtype
 
 }
 
-// SR-13442
-func SR13442<T>(_ x: KeyPath<String?, T>) -> T { "1"[keyPath: x] }
+// https://github.com/apple/swift/issues/55884
+func f_55884() {
+  func f<T>(_ x: KeyPath<String?, T>) -> T { "1"[keyPath: x] }
 
-func testSR13442() {
-  _ = SR13442(\.!.count) // OK
-  _ = SR13442(\String?.!.count) // OK
+  _ = f(\.!.count) // OK
+  _ = f(\String?.!.count) // OK
   let _: KeyPath<Int?, Int> = \Optional.!
 }
 
