@@ -1656,12 +1656,12 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
     case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfExistential:
       diags.diagnose(comp->getNameLoc(), diag::typealias_outside_of_protocol,
-                     comp->getNameRef());
+                     comp->getNameRef(), parentTy);
       return ErrorType::get(ctx);
 
     case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential:
       diags.diagnose(comp->getNameLoc(), diag::assoc_type_outside_of_protocol,
-                     comp->getNameRef());
+                     comp->getNameRef(), parentTy);
       return ErrorType::get(ctx);
     }
 

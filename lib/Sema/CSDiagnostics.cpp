@@ -4405,10 +4405,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // static members doesn't make a whole lot of sense
         if (isa<TypeAliasDecl>(Member)) {
           Diag.emplace(
-              emitDiagnostic(diag::typealias_outside_of_protocol, Name));
+              emitDiagnostic(diag::typealias_outside_of_protocol, Name, instanceTy));
         } else if (isa<AssociatedTypeDecl>(Member)) {
           Diag.emplace(
-              emitDiagnostic(diag::assoc_type_outside_of_protocol, Name));
+              emitDiagnostic(diag::assoc_type_outside_of_protocol, Name, instanceTy));
         } else if (isa<ConstructorDecl>(Member)) {
           Diag.emplace(
               emitDiagnostic(diag::construct_protocol_by_name, instanceTy));

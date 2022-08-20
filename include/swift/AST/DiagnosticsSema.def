@@ -2465,11 +2465,13 @@ WARNING(append_interpolation_access_control,none,
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
-      "associated type %0 can only be used with a concrete type or "
-      "generic parameter base", (DeclNameRef))
+      "cannot access associated type %0 from %1; use a concrete type or "
+      "generic parameter base instead",
+      (DeclNameRef, Type))
 ERROR(typealias_outside_of_protocol,none,
-      "type alias %0 can only be used with a concrete type or "
-      "generic parameter base", (DeclNameRef))
+      "cannot access type alias %0 from %1; use a concrete type or "
+      "generic parameter base instead",
+      (DeclNameRef, Type))
 
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
