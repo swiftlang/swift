@@ -2930,6 +2930,13 @@ void swift::printResultBuilderBuildFunction(
             << ") -> <#Result#>";
     printedResult = true;
     break;
+  case ResultBuilderBuildFunction::BuildPartialBlockFirst:
+    printer << "buildPartialBlock(first: " << componentTypeString << ")";
+    break;
+  case ResultBuilderBuildFunction::BuildPartialBlockAccumulated:
+    printer << "buildPartialBlock(accumulated: " << componentTypeString
+            << ", next: " << componentTypeString << ")";
+    break;
   }
 
   if (!printedResult)
