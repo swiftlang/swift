@@ -71,113 +71,6 @@ cmake ^
 cmake --build "%BuildRoot%\icu" || (exit /b)
 cmake --build "%BuildRoot%\icu" --target install || (exit /b)
 
-:: FIXME(compnerd) is there a way to build the sources without downloading the amalgamation?
-curl.exe -sOL "https://sqlite.org/2021/sqlite-amalgamation-3360000.zip" || (exit /b)
-"%SystemDrive%\Program Files\Git\usr\bin\unzip.exe" -o sqlite-amalgamation-3360000.zip -d %SourceRoot%
-
-:: TODO(compnerd) use CMakeLists.txt from compnerd/swift-build
-md %BuildRoot%\sqlite
-cl /nologo /DWIN32 /D_WINDOWS /W3 /MD /O2 /Ob2 /DNDEBUG /Fo%BuildRoot%\sqlite\sqlite3.c.obj /Fd%BuildRoot%\sqlite\SQLite3.pdb /FS -c %SourceRoot%\sqlite-amalgamation-3360000\sqlite3.c
-lib /nologo /machine:x64 /out:%BuildRoot%\sqlite\SQLite3.lib %BuildRoot%\sqlite\sqlite3.c.obj
-md %BuildRoot%\Library\sqlite-3.36.0\usr\lib
-md %BuildRoot%\Library\sqlite-3.36.0\usr\include
-copy %BuildRoot%\sqlite\SQLite3.lib %BuildRoot%\Library\sqlite-3.36.0\usr\lib
-copy %SourceRoot%\sqlite-amalgamation-3360000\sqlite3.h %BuildRoot%\Library\sqlite-3.36.0\usr\include
-copy %SourceRoot%\sqlite-amalgamation-3360000\sqlite3ext.h %BuildRoot%\Library\sqlite-3.36.0\usr\include
-
-:: build zlib
-cmake ^
-  -B %BuildRoot%\zlib ^
-
-  -D BUILD_SHARED_LIBS=NO ^
-  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
-  -D CMAKE_C_COMPILER=cl ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\zlib-1.2.11\usr ^
-
-  -D SKIP_INSTALL_FILES=YES ^
-
-  -G Ninja ^
-  -S %SourceRoot%\zlib || (exit /b)
-cmake --build "%BUildRoot%\zlib" || (exit /b)
-cmake --build "%BUildRoot%\zlib" --target install || (exit /b)
-
-:: build libxml2
-cmake ^
-  -B %BuildRoot%\libxml2 ^
-
-  -D BUILD_SHARED_LIBS=OFF ^
-  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
-  -D CMAKE_C_COMPILER=cl ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\libxml2-2.9.12\usr ^
-
-  -D LIBXML2_WITH_ICONV=NO ^
-  -D LIBXML2_WITH_ICU=NO ^
-  -D LIBXML2_WITH_LZMA=NO ^
-  -D LIBXML2_WITH_PYTHON=NO ^
-  -D LIBXML2_WITH_TESTS=NO ^
-  -D LIBXML2_WITH_THREADS=YES ^
-  -D LIBXML2_WITH_ZLIB=NO ^
-
-  -G Ninja ^
-  -S %SourceRoot%\libxml2 || (exit /b)
-cmake --build "%BUildRoot%\libxml2" || (exit /b)
-cmake --build "%BUildRoot%\libxml2" --target install || (exit /b)
-
-:: build curl
-cmake ^
-  -B %BuildRoot%\curl ^
-
-  -D BUILD_SHARED_LIBS=NO ^
-  -D BUILD_TESTING=NO ^
-  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
-  -D CMAKE_C_COMPILER=cl ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\curl-7.77.0\usr ^
-
-  -D BUILD_CURL_EXE=NO ^
-  -D CMAKE_USE_OPENSSL=NO ^
-  -D CURL_CA_PATH=none ^
-  -D CMAKE_USE_SCHANNEL=YES ^
-  -D CMAKE_USE_LIBSSH2=NO ^
-  -D HAVE_POLL_FINE=NO ^
-  -D CURL_DISABLE_LDAP=YES ^
-  -D CURL_DISABLE_LDAPS=YES ^
-  -D CURL_DISABLE_TELNET=YES ^
-  -D CURL_DISABLE_DICT=YES ^
-  -D CURL_DISABLE_FILE=YES ^
-  -D CURL_DISABLE_TFTP=YES ^
-  -D CURL_DISABLE_RTSP=YES ^
-  -D CURL_DISABLE_PROXY=YES ^
-  -D CURL_DISABLE_POP3=YES ^
-  -D CURL_DISABLE_IMAP=YES ^
-  -D CURL_DISABLE_SMTP=YES ^
-  -D CURL_DISABLE_GOPHER=YES ^
-  -D CURL_ZLIB=YES ^
-  -D ENABLE_UNIX_SOCKETS=NO ^
-  -D ENABLE_THREADED_RESOLVER=NO ^
-
-  -D ZLIB_ROOT=%BuildRoot%\Library\zlib-1.2.11\usr ^
-  -D ZLIB_LIBRARY=%BuildRoot%\Library\zlib-1.2.11\usr\lib\zlibstatic.lib ^
-
-  -G Ninja ^
-  -S %SourceRoot%\curl || (exit /b)
-cmake --build "%BuildRoot%\curl" || (exit /b)
-cmake --build "%BuildRoot%\curl" --target install || (exit /b)
-
 :: Prepare system modules
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\ucrt.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" || (exit /b)
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\winsdk.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" || (exit /b)
@@ -297,16 +190,13 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
-  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
+  -D CMAKE_TOOLCHAIN_FILE=%SourceRoot%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+  -D VCPKG_TARGET_TRIPLET=x64-windows-static-md ^
+  -D VCPKG_MANIFEST_DIR=%SourceRoot%\swift-installer-scripts\shared\Foundation ^
   -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
   -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
   -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
   -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
-  -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
-  -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
-  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
-  -D ZLIB_LIBRARY=%BuildRoot%\Library\zlib-1.2.11\usr\lib\zlibstatic.lib ^
-  -D ZLIB_INCLUDE_DIR=%BuildRoot%\Library\zlib-1.2.11\usr\include ^
   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
 
   -D ENABLE_TESTING=NO ^
@@ -380,11 +270,12 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
 
+  -D CMAKE_TOOLCHAIN_FILE=%SourceRoot%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+  -D VCPKG_TARGET_TRIPLET=x64-windows-static-md ^
+  -D VCPKG_MANIFEST_DIR=%SourceRoot%\swift-installer-scripts\shared\TSC ^
   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
   -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
   -D SwiftSystem_DIR=%BuildRoot%\6\cmake\modules ^
-  -D SQLite3_INCLUDE_DIR=%BuildRoot%\Library\sqlite-3.36.0\usr\include ^
-  -D SQLite3_LIBRARY=%BuildRoot%\Library\sqlite-3.36.0\usr\lib\SQLite3.lib ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-tools-support-core || (exit /b)
@@ -409,10 +300,11 @@ cmake ^
 
   -D LLBUILD_SUPPORT_BINDINGS=Swift ^
 
+  -D CMAKE_TOOLCHAIN_FILE=%SourceRoot%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+  -D VCPKG_TARGET_TRIPLET=x64-windows-static-md ^
+  -D VCPKG_MANIFEST_DIR=%SourceRoot%\swift-installer-scripts\shared\LLBuild ^
   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
   -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
-  -D SQLite3_INCLUDE_DIR=%BuildRoot%\Library\sqlite-3.36.0\usr\include ^
-  -D SQLite3_LIBRARY=%BuildRoot%\Library\sqlite-3.36.0\usr\lib\SQLite3.lib ^
 
   -G Ninja ^
   -S %SourceRoot%\llbuild || (exit /b)
@@ -756,16 +648,13 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
-  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
+  -D CMAKE_TOOLCHAIN_FILE=%SourceRoot%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+  -D VCPKG_TARGET_TRIPLET=x64-windows-static-md ^
+  -D VCPKG_MANIFEST_DIR=%SourceRoot%\swift-installer-scripts\shared\Foundation ^
   -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
   -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
   -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
   -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
-  -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
-  -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
-  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
-  -D ZLIB_LIBRARY=%BuildRoot%\Library\zlib-1.2.11\usr\lib\zlibstatic.lib ^
-  -D ZLIB_INCLUDE_DIR=%BuildRoot%\Library\zlib-1.2.11\usr\include ^
   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
   -D XCTest_DIR=%BuildRoot%\5\cmake\modules ^
 
