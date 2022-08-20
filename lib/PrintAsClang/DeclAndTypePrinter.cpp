@@ -114,8 +114,6 @@ class DeclAndTypePrinter::Implementation
 
   SmallVector<const FunctionType *, 4> openFunctionTypes;
 
-  std::string outOfLineDefinitions;
-
   ASTContext &getASTContext() const {
     return owningPrinter.M.getASTContext();
   }
@@ -218,7 +216,6 @@ private:
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
     bool protocolMembersOptional = false;
-    assert(outOfLineDefinitions.empty());
     for (const Decl *member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
@@ -302,8 +299,6 @@ private:
       // FIXME: Print availability.
       ClangClassTypePrinter(os).printClassTypeDecl(
           CD, [&]() { printMembers(CD->getMembers()); });
-      os << outOfLineDefinitions;
-      outOfLineDefinitions.clear();
       return;
     }
 
@@ -356,8 +351,6 @@ private:
                                   owningPrinter.interopContext);
     printer.printValueTypeDecl(
         SD, /*bodyPrinter=*/[&]() { printMembers(SD->getMembers()); });
-    os << outOfLineDefinitions;
-    outOfLineDefinitions.clear();
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -580,8 +573,6 @@ private:
       os << "  }\n"; // operator cases()'s closing bracket
       os << "\n";
     });
-    os << outOfLineDefinitions;
-    outOfLineDefinitions.clear();
   }
 
   void visitEnumDecl(EnumDecl *ED) {
@@ -767,10 +758,9 @@ private:
                                    /*isDefinition=*/false);
       }
 
-      llvm::raw_string_ostream defOS(outOfLineDefinitions);
       DeclAndTypeClangFunctionPrinter defPrinter(
-          defOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
-          owningPrinter.interopContext);
+          owningPrinter.outOfLineDefinitionsOS, owningPrinter.prologueOS,
+          owningPrinter.typeMapping, owningPrinter.interopContext);
 
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
 

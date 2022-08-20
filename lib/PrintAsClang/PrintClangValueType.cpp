@@ -80,6 +80,13 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
   os << "};\n\n";
 }
 
+void ClangValueTypePrinter::forwardDeclType(raw_ostream &os,
+                                            const NominalTypeDecl *typeDecl) {
+  os << "class ";
+  ClangSyntaxPrinter(os).printBaseName(typeDecl);
+  os << ";\n";
+}
+
 void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl,
     llvm::function_ref<void(void)> bodyPrinter) {

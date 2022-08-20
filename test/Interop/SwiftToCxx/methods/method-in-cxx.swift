@@ -84,6 +84,27 @@ public final class PassStructInClassMethod {
 // CHECK-NEXT:   inline void mutate();
 // CHECK-NEXT:   inline ClassWithMethods deepCopy(swift::Int x);
 
+// CHECK: class LargeStruct final {
+// CHECK: inline LargeStruct(LargeStruct &&) = default;
+// CHECK-NEXT: inline LargeStruct doubled() const;
+// CHECK-NEXT: inline void dump() const;
+// CHECK-NEXT: inline LargeStruct scaled(swift::Int x, swift::Int y) const;
+// CHECK-NEXT: inline LargeStruct added(const LargeStruct& x) const;
+// CHECK-NEXT: private
+
+public func createClassWithMethods(_ x: Int) -> ClassWithMethods {
+    return ClassWithMethods(x)
+}
+
+public func createLargeStruct() -> LargeStruct {
+    return LargeStruct(x1: -1, x2: 2, x3: -100, x4: 42, x5: 67, x6: -10101)
+}
+
+public func createPassStructInClassMethod() -> PassStructInClassMethod {
+    return PassStructInClassMethod()
+}
+
+
 // CHECK: inline void ClassWithMethods::dump() {
 // CHECK-NEXT: return _impl::$s7Methods09ClassWithA0C4dumpyyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
@@ -96,14 +117,6 @@ public final class PassStructInClassMethod {
 // CHECK-NEXT: inline ClassWithMethods ClassWithMethods::deepCopy(swift::Int x) {
 // CHECK-NEXT: return _impl::_impl_ClassWithMethods::makeRetained(_impl::$s7Methods09ClassWithA0C8deepCopyyACSiF(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT: }
-
-// CHECK: class LargeStruct final {
-// CHECK: inline LargeStruct(LargeStruct &&) = default;
-// CHECK-NEXT: inline LargeStruct doubled() const;
-// CHECK-NEXT: inline void dump() const;
-// CHECK-NEXT: inline LargeStruct scaled(swift::Int x, swift::Int y) const;
-// CHECK-NEXT: inline LargeStruct added(const LargeStruct& x) const;
-// CHECK-NEXT: private
 
 // CHECK:      inline LargeStruct LargeStruct::doubled() const {
 // CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
@@ -132,15 +145,3 @@ public final class PassStructInClassMethod {
 // CHECK-NEXT: inline void PassStructInClassMethod::updateStruct(swift::Int x, const LargeStruct& y) {
 // CHECK-NEXT: return _impl::$s7Methods23PassStructInClassMethodC06updateC0yySi_AA05LargeC0VtF(x, _impl::_impl_LargeStruct::getOpaquePointer(y), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
-
-public func createClassWithMethods(_ x: Int) -> ClassWithMethods {
-    return ClassWithMethods(x)
-}
-
-public func createLargeStruct() -> LargeStruct {
-    return LargeStruct(x1: -1, x2: 2, x3: -100, x4: 42, x5: 67, x6: -10101)
-}
-
-public func createPassStructInClassMethod() -> PassStructInClassMethod {
-    return PassStructInClassMethod()
-}
