@@ -43,7 +43,9 @@ let e1fix = ns1 as FooError // expected-error {{'NSError' is not convertible to 
 let esub = ns1 as Error
 let esub2 = ns1 as? Error // expected-warning{{conditional cast from 'NSError' to 'any Error' always succeeds}}
 
-// SR-1562 / rdar://problem/26370984
+// rdar://problem/26370984
+// https://github.com/apple/swift/issues/44171
+
 enum MyError : Error {
   case failed
 }

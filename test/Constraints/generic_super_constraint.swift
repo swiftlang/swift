@@ -14,7 +14,7 @@ func bar<T, U>(_ x: U, y: T) -> (Derived, Int) where U: Base<T>, U: Derived {
   return (x, y)
 }
 
-// SR-7551 captures a crash on this code.
+// https://github.com/apple/swift/issues/50093 captures a crash on this code.
 class IntegerClass : ExpressibleByIntegerLiteral, Equatable {
   required init(integerLiteral value: Int) { }
   static func ==(lhs: IntegerClass, rhs: IntegerClass) -> Bool { return true }

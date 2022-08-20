@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-13992
+// https://github.com/apple/swift/issues/56387
 
 protocol V {}
 

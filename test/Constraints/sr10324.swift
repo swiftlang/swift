@@ -2,6 +2,8 @@
 
 // REQUIRES: rdar65007946
 
+// https://github.com/apple/swift/issues/52724
+
 struct A {
     static func * (lhs: A, rhs: A) -> B { return B() }
     static func * (lhs: B, rhs: A) -> B { return B() }

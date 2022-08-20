@@ -200,9 +200,9 @@ func testImmutableUnsafePointer(_ p: UnsafePointer<Int>) {
   p[0] = 1 // expected-error {{cannot assign through subscript: subscript is get-only}}
 }
 
-// <https://bugs.swift.org/browse/SR-7> Inferring closure param type to 
-// inout crashes compiler
-let g = { x in f0(x) } // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{19-19=&}}
+/// https://github.com/apple/swift/issues/42633
+/// Inferring closure param type to `inout` crashes compiler
+let _ = { x in f0(x) } // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{19-19=&}}
 
 // <rdar://problem/17245353> Crash with optional closure taking inout
 func rdar17245353() {
@@ -242,7 +242,8 @@ func wump<T>(to: T, _ body: (G<T>) -> ()) {}
 wump(to: 0, { $0[] = 0 })
 // expected-error@-1 {{missing argument for parameter #1 in call}}
 
-// SR-13732
+// https://github.com/apple/swift/issues/56129
+
 extension MutableCollection {
   public mutating func writePrefix<I: IteratorProtocol>(from source: inout I)
     -> (writtenCount: Int, afterLastWritten: Index)

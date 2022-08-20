@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/50410
+
 protocol Proto {}
 class Base {}
 class Test : Base, Proto {}
