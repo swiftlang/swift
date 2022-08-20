@@ -42,8 +42,11 @@ set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
-call :CloneDependencies || (exit /b)
+:: Always enable symbolic links
+git config --global core.symlinks true
+
 call :CloneRepositories || (exit /b)
+call :CloneICU || (exit /b)
 
 md "%BuildRoot%\Library"
 
@@ -565,9 +568,6 @@ if defined SKIP_UPDATE_CHECKOUT goto :eof
 
 if defined REPO_SCHEME set "args=--scheme %REPO_SCHEME%"
 
-:: Always enable symbolic links
-git config --global core.symlink true
-
 :: Ensure that we have the files in the original line endings, the swift tests
 :: depend on this being the case.
 git -C "%SourceRoot%\swift" config --local core.autocrlf input
@@ -575,7 +575,6 @@ git -C "%SourceRoot%\swift" checkout-index --force --all
 
 set "args=%args% --skip-repository swift"
 set "args=%args% --skip-repository ninja"
-set "args=%args% --skip-repository icu"
 set "args=%args% --skip-repository swift-integration-tests"
 set "args=%args% --skip-repository swift-stress-tester"
 set "args=%args% --skip-repository swift-xcode-playground-support"
@@ -585,20 +584,13 @@ call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-histor
 goto :eof
 endlocal
 
-:CloneDependencies
+:CloneICU
+:: TODO(stevapple) move ICU to update-checkout
 setlocal enableextensions enabledelayedexpansion
 
-:: Always enable symbolic links
-git config --global core.symlinks true
-
 :: FIXME(compnerd) avoid the fresh clone
-rd /s /q zlib libxml2 sqlite icu curl
-
-git clone --quiet --no-tags --depth 1 --branch v1.2.11 https://github.com/madler/zlib
-git clone --quiet --no-tags --depth 1 --branch v2.9.12 https://github.com/gnome/libxml2
-git clone --quiet --no-tags --depth 1 --branch version-3.36.0 https://github.com/sqlite/sqlite
+rd /s /q icu
 git clone --quiet --no-tags --depth 1 --branch maint/maint-69 https://github.com/unicode-org/icu
-git clone --quiet --no-tags --depth 1 --branch curl-7_77_0 https://github.com/curl/curl
 
 goto :eof
 endlocal
