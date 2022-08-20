@@ -1677,6 +1677,15 @@ public:
   explicit DeclAvailabilityChecker(ExportContext where)
     : Where(where) {}
 
+  void visit(Decl *D) {
+    DeclVisitor<DeclAvailabilityChecker>::visit(D);
+    
+    if (auto globalActor = D->getGlobalActorAttr()) {
+      auto customAttr = globalActor->first;
+      checkType(customAttr->getType(), customAttr->getTypeRepr(), D);
+    }
+  }
+  
   // Force all kinds to be handled at a lower level.
   void visitDecl(Decl *D) = delete;
   void visitValueDecl(ValueDecl *D) = delete;

@@ -30,6 +30,7 @@ actor CheckDeinitFromActor {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
 @MainActor class X {
   var ns: NonSendableType = NonSendableType()
 
