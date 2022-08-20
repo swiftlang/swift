@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/43735
 // Test constraint simplification of chains of binary operators.
-// <https://bugs.swift.org/browse/SR-1122>
 do {
   let a: String? = "a"
   let b: String? = "b"
@@ -11,13 +11,15 @@ do {
   let x: Double = 1
   _ = x + x + x
 
-  let sr3483: Double? = 1
-  _ = sr3483! + sr3483! + sr3483!
+  // https://github.com/apple/swift/issues/46071
+  let y1: Double? = 1
+  _ = y1! + y1! + y1!
 
-  let sr2636: [String: Double] = ["pizza": 10.99, "ice cream": 4.99, "salad": 7.99]
-  _ = sr2636["pizza"]!
-  _ = sr2636["pizza"]! + sr2636["salad"]!
-  _ = sr2636["pizza"]! + sr2636["salad"]! + sr2636["ice cream"]!
+  // https://github.com/apple/swift/issues/45241
+  let y2: [String: Double] = ["pizza": 10.99, "ice cream": 4.99, "salad": 7.99]
+  _ = y2["pizza"]!
+  _ = y2["pizza"]! + y2["salad"]!
+  _ = y2["pizza"]! + y2["salad"]! + y2["ice cream"]!
 }
 
 // Use operators defined within a type.
@@ -202,7 +204,7 @@ func rdar37290898(_ arr: inout [P_37290898], _ element: S_37290898?) {
   arr += [element].compactMap { $0 } // Ok
 }
 
-// SR-8221
+// https://github.com/apple/swift/issues/50753
 infix operator ??=
 func ??= <T>(lhs: inout T?, rhs: T?) {}
 var c: Int = 0 // expected-note {{change variable type to 'Int?' if it doesn't need to be declared as 'Int'}}
@@ -223,21 +225,24 @@ func rdar46459603() {
   // expected-error@-2 {{cannot convert value of type 'Dictionary<String, E>.Values' to expected element type '[E]'}}
 }
 
-// SR-10843
+// https://github.com/apple/swift/issues/53233
+
 infix operator ^^^
 func ^^^ (lhs: String, rhs: String) {}
 
-struct SR10843 {
-  static func ^^^ (lhs: SR10843, rhs: SR10843) {}
+// FIXME: Operator lookup does not reach local types so this must be a
+// top-level struct (https://github.com/apple/swift/issues/51378).
+struct S_53233 {
+  static func ^^^ (lhs: S_53233, rhs: S_53233) {}
 }
-
-func sr10843() {
-  let s = SR10843()
+do {
+  let s = S_53233()
   (^^^)(s, s)
   _ = (==)(0, 0)
 }
 
-// SR-10970
+// https://github.com/apple/swift/issues/53359
+
 precedencegroup PowerPrecedence {
   lowerThan: BitwiseShiftPrecedence
   higherThan: AdditionPrecedence
@@ -273,8 +278,9 @@ func rdar60727310() {
   myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two '(any Error)?' operands}}
 }
 
-// FIXME(SR-12438): Bad diagnostic.
-func sr12438(_ e: Error) {
+// https://github.com/apple/swift/issues/54877
+// FIXME: Bad diagnostic.
+func f_54877(_ e: Error) {
   func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {}
   foo(e, ==) // expected-error {{type of expression is ambiguous without more context}}
 }
@@ -291,7 +297,9 @@ func rdar_62054241() {
   }
 }
 
-// SR-11399 - Operator returning IUO doesn't implicitly unwrap
+// https://github.com/apple/swift/issues/53800
+// Operator returning IUO doesn't implicitly unwrap
+
 postfix operator ^^^
 postfix func ^^^ (lhs: Int) -> Int! { 0 }
 

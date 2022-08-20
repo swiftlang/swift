@@ -42,7 +42,8 @@ func rdar29907555(_ value: Any!) -> String {
   // expected-note@-2 {{provide a default value to avoid this warning}}
 }
 
-struct SR3715 {
+// https://github.com/apple/swift/issues/46300
+struct S_46300 {
   var overloaded: Int! // expected-note {{implicitly unwrapped property 'overloaded' declared here}}
 
   func overloaded(_ x: Int) {}
@@ -73,8 +74,9 @@ class MoviesViewController {
   }
 }
 
-// SR-15053
-func SR15053<T : Numeric>(_ a: T, _ b: T) -> T {
+// https://github.com/apple/swift/issues/57380
+
+func f1_57380<T : Numeric>(_ a: T, _ b: T) -> T {
   (a + b) / 2 // expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int)}}
   // expected-error@-1 {{binary operator '/' cannot be applied to operands of type 'T' and 'Int'}}
 }
@@ -89,7 +91,7 @@ func %% (_ lhs: Float, _ rhs: Float) -> Float {
   lhs / rhs
 }
 
-func SR15053<T : Numeric>(_ a: T, _ b: T) {
+func f2_57380<T : Numeric>(_ a: T, _ b: T) {
   (a + b) %% 2 // expected-error {{cannot convert value of type 'T' to expected argument type 'Int'}}
 }
 

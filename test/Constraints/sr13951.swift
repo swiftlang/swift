@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/56348
+
 protocol TheProtocol {}
 struct TheType1: TheProtocol {}
 

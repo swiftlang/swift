@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/54820
+
 protocol Protocol {
   associatedtype Index: Comparable
   subscript(bounds: Range<Index>) -> Int { get }

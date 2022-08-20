@@ -2520,7 +2520,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // FIXME: We should be able to set the linkage unconditionally here but
     //        some fixes are needed for Cxx interop.
     if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr)) {
-      if (getSwiftModule()->isImportedAsWeakLinked(var->getDecl()))
+      auto varModule = var->getDecl()->getModuleContext();
+      if (getSwiftModule()->isImportedAsWeakLinked(varModule))
         globalVar->setLinkage(link.getLinkage());
     }
 
@@ -3275,13 +3276,16 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     fn = dyn_cast<llvm::Function>(clangAddr->stripPointerCasts());
 
     if (fn) {
-      // Override the linkage computed by Clang if the decl is from another
-      // module that imported @_weakLinked.
-      //
-      // FIXME: We should be able to set the linkage unconditionally here but
-      //        some fixes are needed for Cxx interop.
-      if (!forDefinition && f->isWeakImportedByModule())
-        fn->setLinkage(link.getLinkage());
+      if (!forDefinition) {
+        // Override the linkage computed by Clang if the decl is from another
+        // module that imported @_weakLinked.
+        //
+        // FIXME: We should be able to set the linkage unconditionally here but
+        //        some fixes are needed for Cxx interop.
+        if (auto *parentModule = f->getParentModule())
+          if (getSwiftModule()->isImportedAsWeakLinked(parentModule))
+            fn->setLinkage(link.getLinkage());
+      }
 
       // If we have a function, move it to the appropriate position.
       if (hasOrderNumber) {
