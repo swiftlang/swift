@@ -10,8 +10,9 @@ import Newtype
 // CHECK-CANONICAL-LABEL: sil hidden @$s7newtype17createErrorDomain{{[_0-9a-zA-Z]*}}F
 // CHECK-CANONICAL: bb0([[STR:%[0-9]+]] : $String)
 func createErrorDomain(str: String) -> ErrorDomain {
+  // CHECK-CANONICAL: [[MOVED_STR:%[^,]+]] = move_value [lexical] [[STR]]
   // CHECK-CANONICAL: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
-  // CHECK-CANONICAL-NEXT: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[STR]])
+  // CHECK-CANONICAL-NEXT: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[MOVED_STR]])
   // CHECK-CANONICAL: struct $ErrorDomain ([[BRIDGED]] : $NSString)
   return ErrorDomain(rawValue: str)
 }
@@ -22,7 +23,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
 // CHECK-RAW: [[SELF_BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
 // CHECK-RAW: [[PB_BOX:%[0-9]+]] = project_box [[SELF_BOX_LIFETIME]]
-// CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [lexical] [[STR]]
+// CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-RAW: [[COPIED_STR:%.*]] = copy_value [[BORROWED_STR]]
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK-RAW: [[BORROWED_COPIED_STR:%.*]] = begin_borrow [[COPIED_STR]]

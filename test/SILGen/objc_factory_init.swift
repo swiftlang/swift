@@ -27,8 +27,8 @@ extension Hive {
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var Hive }, 0
-  // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [lexical] [[QUEEN]]
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+  // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
   // CHECK:   [[OPT_COPIED_BORROWED_QUEEN:%.*]] = enum $Optional<Bee>, #Optional.some!enumelt, [[COPIED_BORROWED_QUEEN]]
   // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.foreign : (Hive.Type) -> (Bee?) -> Hive?, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
@@ -49,9 +49,9 @@ extension Hive {
   // CHECK-NEXT:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK-NEXT:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
   // CHECK-NEXT:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var Hive }, 0
-  // CHECK-NEXT:   [[BORROWED_QUEEN:%.*]] = begin_borrow [lexical] [[QUEEN]]
   // CHECK:   [[FOREIGN_ERROR_STACK:%.*]] = alloc_stack [dynamic_lifetime] $Optional<NSError>
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+  // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
   // CHECK:   [[OPT_COPIED_BORROWED_QUEEN:%.*]] = enum $Optional<Bee>, #Optional.some!enumelt, [[COPIED_BORROWED_QUEEN]]
   // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.foreign : (Hive.Type) -> (Bee?) throws -> Hive, $@convention(objc_method) (Optional<Bee>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
