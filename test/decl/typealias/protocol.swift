@@ -189,6 +189,16 @@ struct T5 : P5 {
 
   var v8 = P6.A.self
   var v9 = P6.B.self // expected-error {{cannot access type alias 'B' from 'P6'; use a concrete type or generic parameter base instead}}
+
+  struct Generic<T> {
+    func okay(value: T.A) where T == any P6 {}
+
+    func invalid1(value: T.B) where T == any P6 {}
+    // expected-error@-1 {{cannot access type alias 'B' from 'any P6'; use a concrete type or generic parameter base instead}}
+
+    func invalid2(value: T.A) where T == any P5 {}
+    // expected-error@-1 {{cannot access associated type 'A' from 'any P5'; use a concrete type or generic parameter base instead}}
+  }
 }
 
 // Unqualified lookup finds typealiases in protocol extensions
