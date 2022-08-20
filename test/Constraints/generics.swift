@@ -205,11 +205,9 @@ struct R24267414<T> {  // expected-note {{'T' declared as parameter to type 'R24
 var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{24-24=<Any>}}
 
 
-// https://bugs.swift.org/browse/SR-599
-func SR599<T: FixedWidthInteger>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599()'}}
-_ = SR599()         // expected-error {{generic parameter 'T' could not be inferred}}
-
-
+// https://github.com/apple/swift/issues/43216
+func f_43216<T: FixedWidthInteger>() -> T.Type { return T.self } // expected-note {{in call to function 'f_43216()'}}
+_ = f_43216() // expected-error {{generic parameter 'T' could not be inferred}}
 
 
 // <rdar://problem/19215114> QoI: Poor diagnostic when we are unable to infer type
@@ -456,17 +454,20 @@ func genericFunc<T>(t: T) {
   // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
 }
 
-struct SR_3525<T> {}
-func sr3525_arg_int(_: inout SR_3525<Int>) {}
-func sr3525_arg_gen<T>(_: inout SR_3525<T>) {}
-func sr3525_1(t: SR_3525<Int>) {
-  let _ = sr3525_arg_int(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
-}
-func sr3525_2(t: SR_3525<Int>) {
-  let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
-}
-func sr3525_3<T>(t: SR_3525<T>) {
-  let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+// https://github.com/apple/swift/issues/46113
+do {
+  struct S<T> {}
+
+  func arg_int(_: inout S<Int>) {}
+  func arg_gen<T>(_: inout S<T>) {}
+
+  func f1(t: S<Int>) {
+    let _ = arg_int(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+    let _ = arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+  }
+  func f2<T>(t: S<T>) {
+    let _ = arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+  }
 }
 
 class testStdlibType {
@@ -566,7 +567,9 @@ func rdar35541153() {
   bar(y, "ultimate question", 42) // Ok
 }
 
-// rdar://problem/38159133 - [SR-7125]: Swift 4.1 Xcode 9.3b4 regression
+// rdar://problem/38159133
+// https://github.com/apple/swift/issues/49673
+// Swift 4.1 Xcode 9.3b4 regression
 
 protocol P_38159133 {}
 
@@ -601,9 +604,8 @@ func rdar39616039() {
   c += 1 // ok
 }
 
-// https://bugs.swift.org/browse/SR-8075
-
-func sr8075() {
+// https://github.com/apple/swift/issues/50608
+do {
   struct UIFont {
     init(ofSize: Float) {}
   }
@@ -640,7 +642,7 @@ func rdar40537858() {
   let _: E = .bar([s]) // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
 }
 
-// https://bugs.swift.org/browse/SR-8934
+// https://github.com/apple/swift/issues/51439
 struct BottleLayout {
     let count : Int
 }
@@ -650,40 +652,38 @@ let ix = arr.firstIndex(of:layout) // expected-error {{referencing instance meth
 
 let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{missing argument label 'ascii:' in call}}
 
-// https://bugs.swift.org/browse/SR-9068
+// https://github.com/apple/swift/issues/51569
 func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
   -> Bool where C.Element == (key: Key, value: Value)
 {
   _ = Dictionary(uniqueKeysWithValues: Array(c))
 }
 
-// https://bugs.swift.org/browse/SR-7984
-struct SR_7984<Bar> {
+// https://github.com/apple/swift/issues/50517
+
+struct S1_50517<Bar> {
   func doSomething() {}
 }
+extension S1_50517 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{29-30= ==}}
 
-extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= ==}}
-
-protocol SR_7984_Proto {
+protocol P1_50517 {
   associatedtype Bar
 }
+extension P1_50517 where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{29-30= ==}}
 
-extension SR_7984_Proto where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{34-35= ==}}
-
-protocol SR_7984_HasFoo {
+protocol P2_50517 {
   associatedtype Foo
 }
-protocol SR_7984_HasAssoc {
-  associatedtype Assoc: SR_7984_HasFoo
+protocol P3_50517 {
+  associatedtype Assoc: P2_50517
 }
+struct S2_50517<T: P3_50517> {}
+extension S2_50517 where T.Assoc.Foo: String {} // expected-error {{type 'T.Assoc.Foo' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Assoc.Foo == String' to require 'T.Assoc.Foo' to be 'String'}} {{37-38= ==}}
 
-struct SR_7984_X<T: SR_7984_HasAssoc> {}
-extension SR_7984_X where T.Assoc.Foo: String {} // expected-error {{type 'T.Assoc.Foo' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Assoc.Foo == String' to require 'T.Assoc.Foo' to be 'String'}} {{38-39= ==}}
+struct S3_50517<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{45-46= ==}}
+func f_50517<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{50-51= ==}}
 
-struct SR_7984_S<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{46-47= ==}}
-func SR_7984_F<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{52-53= ==}}
-
-protocol SR_7984_P {
+protocol P4_50517 {
   func S<T : Sequence>(bar: T) where T.Element: String // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{47-48= ==}}
 }
 
@@ -710,10 +710,11 @@ protocol Q {
   init<T : P>(_ x: T) // expected-note 2{{where 'T' = 'T'}}
 }
 
-struct SR10694 {
+// https://github.com/apple/swift/issues/53091
+struct S_53091 {
   init<T : P>(_ x: T) {} // expected-note 3{{where 'T' = 'T'}}
-  func bar<T>(_ x: T, _ s: SR10694, _ q: Q) {
-    SR10694.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+  func bar<T>(_ x: T, _ s: S_53091, _ q: Q) {
+    S_53091.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
 
     type(of: s)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
@@ -724,14 +725,17 @@ struct SR10694 {
     type(of: q)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
 
-    var srTy = SR10694.self
-    srTy(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    var ty = S_53091.self
+    ty(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
   }
 }
 
-// SR-7003 (rdar://problem/51203824) - Poor diagnostics when attempting to access members on unfulfilled generic type
-func sr_7003() {
+// rdar://problem/51203824
+// https://github.com/apple/swift/issues/49551
+// Poor diagnostics when attempting to access members on unfulfilled
+// generic type
+func f_49551() {
   struct E<T> { // expected-note 4 {{'T' declared as parameter to type 'E'}}
     static var foo: String { return "" }
     var bar: String { return "" }
@@ -817,20 +821,22 @@ func test_correct_identification_of_requirement_source() {
   // expected-error@-1 {{initializer 'init(_:_:)' requires that 'Int' conform to 'P'}}
 }
 
-struct SR11435<T> {
+// https://github.com/apple/swift/issues/53836
+
+struct S_53836<T> {
   subscript<U : P & Hashable>(x x: U) -> U { x } // expected-note {{where 'U' = 'Int'}}
 }
-
-extension SR11435 where T : P { // expected-note {{where 'T' = 'Int'}}
+extension S_53836 where T : P { // expected-note {{where 'T' = 'Int'}}
   var foo: Int { 0 }
 }
 
 func test_identification_of_key_path_component_callees() {
-  _ = \SR11435<Int>.foo // expected-error {{property 'foo' requires that 'Int' conform to 'P'}}
-  _ = \SR11435<Int>.[x: 5] // expected-error {{subscript 'subscript(x:)' requires that 'Int' conform to 'P'}}
+  _ = \S_53836<Int>.foo // expected-error {{property 'foo' requires that 'Int' conform to 'P'}}
+  _ = \S_53836<Int>.[x: 5] // expected-error {{subscript 'subscript(x:)' requires that 'Int' conform to 'P'}}
 }
 
-func sr_11491(_ value: [String]) {
+// https://github.com/apple/swift/issues/53891
+func f_53891(_ value: [String]) {
   var arr: Set<String> = []
   arr.insert(value)
   // expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'String'}}
