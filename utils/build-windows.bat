@@ -68,9 +68,10 @@ set RunTest=1
 if "%1"=="-notest" set RunTest=0
 
 call :clone_repositories %exitOnError%
-call :download_icu %exitOnError%
+:: TODO: Disabled until we need Foundation in this build script.
+:: call :download_icu %exitOnError%
 :: TODO: Disabled until we need LLBuild/SwiftPM in this build script.
-:: call :download_sqlite3
+:: call :download_sqlite3 %exitOnError%
 
 call :build_llvm %exitOnError%
 path %PATH%;%install_directory%\bin
@@ -85,7 +86,7 @@ call :build_lldb %exitOnError%
 path %PATH%;C:\Program Files\Git\usr\bin
 call :build_libdispatch %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
+path %install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
 
 if %RunTest%==1 (
   call :test_swift %exitOnError%
@@ -134,8 +135,7 @@ endlocal
 
 
 :download_icu
-:: Downloads ICU, which will be used as a dependency for the Swift Standard
-:: Library and Foundation.
+:: Downloads ICU, which will be used as a dependency for Foundation.
 setlocal enableextensions enabledelayedexpansion
 
 set file_name=icu4c-%icu_version%-Win64-MSVC2017.zip
