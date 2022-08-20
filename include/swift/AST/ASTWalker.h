@@ -21,14 +21,17 @@
 namespace swift {
 
 class ArgumentList;
+class ASTContext;
 class Decl;
 class Expr;
 class ClosureExpr;
 class ModuleDecl;
+class DeclContext;
 class Stmt;
 class Pattern;
 class TypeRepr;
 class ParameterList;
+class Evaluator;
 enum class AccessKind: unsigned char;
 
 enum class SemaReferenceKind : uint8_t {
@@ -471,6 +474,8 @@ public:
   virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) {
     return Action::Continue();
   }
+
+  virtual bool walkToTypeReprPre(Evaluator &evaluator, TypeRepr *T, ASTContext &ctx, DeclContext *dc) { return true; }
 
   /// This method is called after visiting the children of a TypeRepr.
   ///

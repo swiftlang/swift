@@ -17,6 +17,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -2796,11 +2797,53 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
+CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r) {
+  class Walker : public ASTWalker {
+    CollectedOpaqueReprs &Reprs;
+
+  public:
+    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
+
+    bool walkToTypeReprPre(TypeRepr *repr) override {
+      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
+        Reprs.push_back(opaqueRepr);
+      return true;
+    }
+  };
+
+  CollectedOpaqueReprs reprs;
+  r->walk(Walker(reprs));
+  return reprs;
+}
+
+CollectedOpaqueReprs swift::collectTypeReprs(TypeRepr *r) {
+  class Walker : public ASTWalker {
+    CollectedOpaqueReprs &Reprs;
+
+  public:
+    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
+
+    bool walkToTypeReprPre(TypeRepr *repr) override {
+      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)){
+          Reprs.push_back(opaqueRepr);
+      } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)){
+          Reprs.push_back(compositionRepr);
+      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)){
+          Reprs.push_back(identRepr);
+      }
+    return true;
+    }
+  };
+
+  CollectedOpaqueReprs reprs;
+  r->walk(Walker(reprs));
+  return reprs;
+}
+
 /// If there are opaque parameters in the given declaration, create the
 /// generic parameters associated with them.
 static SmallVector<GenericTypeParamDecl *, 2>
-createOpaqueParameterGenericParams(
-    GenericContext *genericContext, GenericParamList *parsedGenericParams) {
+createOpaqueParameterGenericParams(Evaluator &evaluator,GenericContext *genericContext, GenericParamList *parsedGenericParams) {
   ASTContext &ctx = genericContext->getASTContext();
     
   auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
@@ -2828,14 +2871,14 @@ createOpaqueParameterGenericParams(
     // Plain protocols should imply 'some' with experimetal feature
     CollectedOpaqueReprs typeReprs;
     if (ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-        typeReprs = typeRepr->collectTypeReprs();
-    } else {  typeReprs = typeRepr->collectOpaqueReturnTypeReprs(); }
+        typeReprs = collectTypeReprs(typeRepr);
+    } else {  typeReprs = collectOpaqueReturnTypeReprs(typeRepr); }
 
       for (auto repr : typeReprs) {
+   
         if (isa<IdentTypeRepr>(repr)){
-              DirectlyReferencedTypeDecls d = directReferencesForTypeRepr(ctx.evaluator, ctx, repr, dc, true);
-              if(!declsAreProtocols(d))
-                  continue;
+            if(!isProtocol(evaluator,repr, ctx, dc))
+              continue;
         }
       // Allocate a new generic parameter to represent this opaque type.
         auto gp = GenericTypeParamDecl::create(
@@ -2857,6 +2900,14 @@ createOpaqueParameterGenericParams(
   }
 
   return implicitGenericParams;
+}
+
+
+bool swift::isProtocol( Evaluator &evaluator, TypeRepr *r, ASTContext &ctx, DeclContext *dc) {
+    DirectlyReferencedTypeDecls d = directReferencesForTypeRepr(evaluator, ctx, r, dc);
+    if(declsAreProtocols(d)){
+        return true;
+    } else { return false; }
 }
 
 GenericParamList *
@@ -2929,7 +2980,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
   // Create implicit generic parameters due to opaque parameters, if we need
   // them.
   auto implicitGenericParams =
-      createOpaqueParameterGenericParams(value, parsedGenericParams);
+      createOpaqueParameterGenericParams(evaluator, value, parsedGenericParams);
   if (implicitGenericParams.empty())
     return parsedGenericParams;
 

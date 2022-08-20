@@ -16,6 +16,7 @@
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -29,6 +30,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
+using namespace swift::namelookup;
 
 //
 // Generic functions
@@ -135,14 +137,19 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     }
   } else {
       if (ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-          opaqueReprs = repr->collectTypeReprs();
+          opaqueReprs = collectTypeReprs(repr);
       } else {
-          opaqueReprs = repr->collectOpaqueReturnTypeReprs();
+          opaqueReprs = collectOpaqueReturnTypeReprs(repr);
       }
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> requirements;
       for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
           auto *currentRepr = opaqueReprs[i];
+
+          if (isa<IdentTypeRepr>(currentRepr)){
+              if(!isProtocol(evaluator, currentRepr, ctx, dc))
+                continue;
+          }
 
           if( auto opaqueReturnRepr = dyn_cast<OpaqueReturnTypeRepr>(currentRepr) ) {
               // Usually, we resolve the opaque constraint and bail if it isn't a class

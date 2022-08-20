@@ -27,20 +27,37 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/AST/TypeRepr.h"
 
 namespace swift {
 class ASTContext;
+class ASTWalker;
 class DeclName;
 class Type;
 class TypeDecl;
 class ValueDecl;
 struct SelfBounds;
 class NominalTypeDecl;
+class Evaluator;
 
 namespace ast_scope {
 class ASTSourceFileScope;
 class ASTScopeImpl;
 } // namespace ast_scope
+
+using CollectedOpaqueReprs = SmallVector<TypeRepr *, 2>;
+
+/// Walk the type representation recursively, collecting any
+/// `OpaqueReturnTypeRepr`s.
+CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *);
+
+/// Walk the type representation recursively, collecting any
+/// `CompositionTypeRepr`s and `IdentTypeRepr`s.
+CollectedOpaqueReprs collectTypeReprs(TypeRepr *);
+
+/// Given a Type Representation, decide if it is a protocol
+bool isProtocol(Evaluator &evaluator, TypeRepr *r, ASTContext &ctx, DeclContext *dc);
+
 
 /// LookupResultEntry - One result of unqualified lookup.
 struct LookupResultEntry {
@@ -520,6 +537,7 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 
 } // end namespace namelookup
 
+
 /// Describes an inherited nominal entry.
 struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   /// The location of the "unchecked" attribute, if present.
@@ -638,7 +656,7 @@ private:
   
 };
   
-  
+
 /// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
 class AbstractASTScopeDeclConsumer {

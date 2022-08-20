@@ -167,14 +167,6 @@ public:
   /// opaque return type reprs.
   bool hasOpaque();
 
-  /// Walk the type representation recursively, collecting any
-  /// `OpaqueReturnTypeRepr`s.
-  CollectedOpaqueReprs collectOpaqueReturnTypeReprs();
-
-  /// Walk the type representation recursively, collecting any
-  /// `CompositionTypeRepr`s and `IdentTypeRepr`s.
-  CollectedOpaqueReprs collectTypeReprs();
-
   /// Retrieve the type repr without any parentheses around it.
   ///
   /// The use of this function must be restricted to contexts where
