@@ -21,6 +21,14 @@ public struct UsesEnumsLargeEnum {
     public let x: LargeEnum
 }
 
+public func inoutLargeEnum(_ s: inout LargeEnum) {
+    return s = LargeEnum.B
+}
+
+// CHECK: inline void inoutLargeEnum(Enums::LargeEnum& s) noexcept {
+// CHECK-NEXT: return _impl::$s9UsesEnums14inoutLargeEnumyy0B00dE0OzF(Enums::_impl::_impl_LargeEnum::getOpaquePointer(s));
+// CHECK-NEXT: }
+
 // CHECK: inline Enums::LargeEnum UsesEnumsLargeEnum::passThroughStructSeveralI64(const Enums::LargeEnum& y) const {
 // CHECK-NEXT: return Enums::_impl::_impl_LargeEnum::returnNewValue([&](void * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s9UsesEnums0aB9LargeEnumV27passThroughStructSeveralI64y0B00cD0OAGF(result, Enums::_impl::_impl_LargeEnum::getOpaquePointer(y), _getOpaquePointer());
@@ -30,13 +38,4 @@ public struct UsesEnumsLargeEnum {
 // CHECK-NEXT: return Enums::_impl::_impl_LargeEnum::returnNewValue([&](void * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s9UsesEnums0aB9LargeEnumV1x0B00cD0Ovg(result, _getOpaquePointer());
 // CHECK-NEXT: });
-// CHECK-NEXT: }
-
-
-public func inoutLargeEnum(_ s: inout LargeEnum) {
-    return s = LargeEnum.B
-}
-
-// CHECK: inline void inoutLargeEnum(Enums::LargeEnum& s) noexcept {
-// CHECK-NEXT: return _impl::$s9UsesEnums14inoutLargeEnumyy0B00dE0OzF(Enums::_impl::_impl_LargeEnum::getOpaquePointer(s));
 // CHECK-NEXT: }
