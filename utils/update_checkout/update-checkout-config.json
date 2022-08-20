@@ -111,7 +111,7 @@
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "yams": "5.0.0",
+                "yams": "5.0.1",
                 "cmake": "v3.19.6",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
