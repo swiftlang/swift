@@ -2458,6 +2458,12 @@ That the first three have constrained lifetimes is encoded in
 ValueBase::isLexical, which should be checked before changing the lifetime of a
 value.
 
+When a function is inlined into its caller, a lexical borrow scope is added for
+each of its @guaranteed arguments, and a lexical move is added for each of its
+@owned arguments, (unless the values being passed are already lexical
+themselves) ensuring that the lifetimes of the corresponding source-level
+values are not shortened in a way that doesn't respect deinit barriers.
+
 Unlike the other sorts, `alloc_stack [lexical]` isn't a SILValue.  Instead, it
 constrains the lifetime of an addressable variable.  Since the constraint is
 applied to the in-memory representation, no additional lexical SILValue is

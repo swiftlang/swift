@@ -306,6 +306,7 @@ public:
 
 protected:
   SILValue borrowFunctionArgument(SILValue callArg, unsigned index);
+  SILValue moveFunctionArgument(SILValue callArg, unsigned index);
 
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitHopToExecutorInst(HopToExecutorInst *Inst);
@@ -489,6 +490,10 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
             callArg = newValue;
             borrowedArgs[idx] = true;
           }
+        } else if (paramInfo.isConsumed()) {
+          if (SILValue newValue = moveFunctionArgument(callArg, idx)) {
+            callArg = newValue;
+          }
         }
       }
     }
@@ -652,6 +657,7 @@ Scope scopeForArgument(Scope nonlexicalScope, SILValue callArg, unsigned index,
   if (!enableLexicalLifetimes) {
     // Lexical lifetimes are disabled.  Use the non-lexical scope:
     // - for borrows, do an ownership conversion.
+    // - for moves, do nothing.
     return nonlexicalScope;
   }
   if (!argument->getLifetime().isLexical()) {
@@ -701,6 +707,26 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
   return beginBuilder.createBeginBorrow(Apply.getLoc(), callArg, isLexical);
+}
+
+SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
+                                               unsigned index) {
+  auto scope = scopeForArgument(Scope::None, callArg, index,
+                                Apply.getFunction(), getCalleeFunction());
+  bool isLexical;
+  switch (scope) {
+  case Scope::None:
+    return SILValue();
+  case Scope::Bare:
+    assert(false && "Non-lexical move produced during inlining!?");
+    isLexical = false;
+    break;
+  case Scope::Lexical:
+    isLexical = true;
+    break;
+  }
+  SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
+  return beginBuilder.createMoveValue(Apply.getLoc(), callArg, isLexical);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
