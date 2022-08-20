@@ -80,6 +80,9 @@ copy /y "%SourceRoot%\swift\stdlib\public\Platform\winsdk.modulemap" "%Universal
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.modulemap" "%VCToolsInstallDir%\include\module.modulemap" || (exit /b)
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.apinotes" "%VCToolsInstallDir%\include\vcruntime.apinotes" || (exit /b)
 
+:: Unset SDKROOT
+set SDKROOT=
+
 :: Build Toolchain
 cmake ^
   -B "%BuildRoot%\1" ^
