@@ -99,6 +99,7 @@ cmake ^
   -D PACKAGE_VENDOR="swift.org" ^
   -D CLANG_VENDOR="swift.org" ^
   -D CLANG_VENDOR_UTI="org.swift" ^
+  -D SWIFT_VENDOR="swift.org" ^
   -D LLVM_APPEND_VC_REV=NO ^
   -D LLVM_VERSION_SUFFIX="" ^
 
@@ -386,8 +387,6 @@ cmake ^
   -D LLBuild_DIR=%BuildRoot%\8\cmake\modules ^
   -D ArgumentParser_DIR=%BuildRoot%\9\cmake\modules ^
   -D Yams_DIR=%BuildRoot%\10\cmake\modules ^
-  -D SQLite3_INCLUDE_DIR=%BuildRoot%\Library\sqlite-3.36.0\usr\include ^
-  -D SQLite3_LIBRARY=%BuildRoot%\Library\sqlite-3.36.0\usr\lib\SQLite3.lib ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-driver || (exit /b)
@@ -461,7 +460,6 @@ cmake ^
   -D TSC_DIR=%BuildRoot%\7\cmake\modules ^
   -D LLBuild_DIR=%BuildRoot%\8\cmake\modules ^
   -D ArgumentParser_DIR=%BuildRoot%\9\cmake\modules ^
-  -D Yams_DIR=%BuildRoot%\10\cmake\modules ^
   -D SwiftDriver_DIR=%BuildRoot%\11\cmake\modules ^
   -D SwiftCrypto_DIR=%BuildRoot%\12\cmake\modules ^
   -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
@@ -591,7 +589,7 @@ endlocal
 setlocal enableextensions enabledelayedexpansion
 
 :: Always enable symbolic links
-git config --global core.symlink true
+git config --global core.symlinks true
 
 :: FIXME(compnerd) avoid the fresh clone
 rd /s /q zlib libxml2 sqlite icu curl
