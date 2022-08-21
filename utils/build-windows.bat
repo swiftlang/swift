@@ -28,8 +28,8 @@ setlocal enableextensions enabledelayedexpansion
 
 PATH=%PATH%;%PYTHON_HOME%
 
-set icu_version_major=64
-set icu_version_minor=2
+set icu_version_major=69
+set icu_version_minor=1
 set icu_version=%icu_version_major%_%icu_version_minor%
 set icu_version_dashed=%icu_version_major%-%icu_version_minor%
 
@@ -138,7 +138,7 @@ endlocal
 :: Downloads ICU, which will be used as a dependency for Foundation.
 setlocal enableextensions enabledelayedexpansion
 
-set file_name=icu4c-%icu_version%-Win64-MSVC2017.zip
+set file_name=icu4c-%icu_version%-Win64-MSVC2019.zip
 curl -L -O "https://github.com/unicode-org/icu/releases/download/release-%icu_version_dashed%/%file_name%" %exitOnError%
 :: unzip warns about the paths in the zip using slashes, which raises the
 :: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
@@ -154,8 +154,8 @@ endlocal
 :: Swift Package Manager.
 setlocal enableextensions enabledelayedexpansion
 
-set file_name=sqlite-amalgamation-3270200.zip
-curl -L -O "https://www.sqlite.org/2019/%file_name%" %exitOnError%
+set file_name=sqlite-amalgamation-3360000.zip
+curl -L -O "https://www.sqlite.org/2021/%file_name%" %exitOnError%
 "%SystemDrive%\Program Files\Git\usr\bin\unzip.exe" -o %file_name% %exitOnError%
 
 goto :eof
