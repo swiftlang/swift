@@ -692,7 +692,7 @@ class BuildScriptInvocation(object):
             if is_impl:
                 self._execute_impl(pipeline, all_hosts, perform_epilogue_opts)
             else:
-                assert(index != last_impl_index)
+                assert index != last_impl_index
                 if index > last_impl_index:
                     non_darwin_cross_compile_hostnames = [
                         target for target in self.args.cross_compile_hosts if not
