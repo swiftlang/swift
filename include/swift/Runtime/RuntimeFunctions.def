@@ -1492,7 +1492,7 @@ FUNCTION(ConformsToProtocol,
 
 // bool swift_isClassType(type*);
 FUNCTION(IsClassType,
-         swift_isClassType, SwiftCC, AlwaysAvailable,
+         swift_isClassType, C_CC, AlwaysAvailable,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
          ATTRS(ZExt, NoUnwind, ReadNone, WillReturn),
