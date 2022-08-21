@@ -6,8 +6,8 @@ import Swift
 
 sil_scope 2 { loc "simple.swift":1:2 parent @test_debug_value : $@convention(thin) (Int) -> () }
 
-// SR-14868: Incorrect source location on `llvm.dbg.declare` when the input
-// is SIL file.
+// https://github.com/apple/swift/issues/57215
+// Incorrect source location on 'llvm.dbg.declare' when the input is a SIL file
 
 // CHECK: @test_debug_value
 // CHECK-SAME: !dbg ![[FUNC_DI:[0-9]+]]
