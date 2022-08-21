@@ -105,7 +105,7 @@ setlocal enableextensions enabledelayedexpansion
 if defined REPO_SCHEME SET "scheme_arg=--scheme %REPO_SCHEME%"
 
 git -C "%source_root%\swift" config --local core.autocrlf input
-git -C "%source_root%\swift" config --local core.symlink true
+git -C "%source_root%\swift" config --local core.symlinks true
 git -C "%source_root%\swift" checkout-index --force --all
 
 :: Always skip Swift, since it is checked out by Jenkins
