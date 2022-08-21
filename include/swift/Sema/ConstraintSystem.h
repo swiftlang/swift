@@ -1108,15 +1108,14 @@ struct Score {
     bool hasNonDefault = false;
     for (unsigned int i = 0; i < NumScoreKinds; ++i) {
       if (Data[i] != 0) {
-        out << " [";
+        out << " [component: ";
         out << getNameFor(ScoreKind(i));
-        out << "(s) = ";
+        out << "(s), value: ";
         out << std::to_string(Data[i]);
         out << "]";
         hasNonDefault = true;
       }
     }
-
     if (!hasNonDefault) {
       out << " <default ";
       out << *this;
