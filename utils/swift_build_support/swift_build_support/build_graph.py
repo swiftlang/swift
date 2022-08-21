@@ -52,7 +52,7 @@ def _get_po_ordered_nodes(root, invertedDepMap):
 
         # Then grab the dependents of our node.
         deps = invertedDepMap.get(node, set([]))
-        assert(isinstance(deps, set))
+        assert isinstance(deps, set)
 
         # Then visit those and see if we have not visited any of them. Push
         # any such nodes onto the worklist and continue. If we have already
@@ -92,13 +92,13 @@ class BuildDAG(object):
 
     def set_root(self, root):
         # Assert that we always only have one root.
-        assert(self.root is None)
+        assert self.root is None
         self.root = root
 
     def produce_schedule(self):
         # Grab the root and make sure it is not None
         root = self.root
-        assert(root is not None)
+        assert root is not None
 
         # Then perform a post order traversal from root using our inverted
         # dependency map to compute a list of our nodes in post order.
