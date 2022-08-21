@@ -737,58 +737,6 @@ func refcast_any_punknown(_ o: AnyObject) -> PUnknown {
   return Builtin.castReference(o)
 }
 
-// => SEMANTIC ARC TODO: This function is missing a borrow + extract + copy.
-//
-// CHECK-LABEL: sil hidden [ossa] @$s8builtins22unsafeGuaranteed_class{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @guaranteed $A):
-// CHECK:   [[P_COPY:%.*]] = copy_value  [[P]]
-// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<A>([[P_COPY]] : $A)
-// CHECK:   ([[R:%.*]], [[K:%.*]]) = destructure_tuple [[T]]
-// CHECK:   destroy_value [[R]]
-// CHECK:   [[P_COPY:%.*]] = copy_value [[P]]
-// CHECK:   return [[P_COPY]] : $A
-// CHECK: }
-func unsafeGuaranteed_class(_ a: A) -> A {
-  Builtin.unsafeGuaranteed(a)
-  return a
-}
-
-// CHECK-LABEL: $s8builtins24unsafeGuaranteed_generic{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @guaranteed $T):
-// CHECK:   [[P_COPY:%.*]] = copy_value  [[P]]
-// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
-// CHECK:   ([[R:%.*]], [[K:%.*]]) = destructure_tuple [[T]]
-// CHECK:   destroy_value [[R]]
-// CHECK:   [[P_RETURN:%.*]] = copy_value [[P]]
-// CHECK:   return [[P_RETURN]] : $T
-// CHECK: }
-func unsafeGuaranteed_generic<T: AnyObject> (_ a: T) -> T {
-  Builtin.unsafeGuaranteed(a)
-  return a
-}
-
-// CHECK_LABEL: sil hidden [ossa] @$s8builtins31unsafeGuaranteed_generic_return{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @guaranteed $T):
-// CHECK:   [[P_COPY:%.*]] = copy_value [[P]]
-// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
-// CHECK:   ([[R:%.*]], [[K:%.*]]) = destructure_tuple [[T]]
-// CHECK:   [[S:%.*]] = tuple ([[R]] : $T, [[K]] : $Builtin.Int8)
-// CHECK:   return [[S]] : $(T, Builtin.Int8)
-// CHECK: }
-func unsafeGuaranteed_generic_return<T: AnyObject> (_ a: T) -> (T, Builtin.Int8) {
-  return Builtin.unsafeGuaranteed(a)
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s8builtins19unsafeGuaranteedEnd{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : $Builtin.Int8):
-// CHECK:   builtin "unsafeGuaranteedEnd"([[P]] : $Builtin.Int8)
-// CHECK:   [[S:%.*]] = tuple ()
-// CHECK:   return [[S]] : $()
-// CHECK: }
-func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
-  Builtin.unsafeGuaranteedEnd(t)
-}
-
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins10bindMemory{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
 // CHECK: %{{.*}} = bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T

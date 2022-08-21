@@ -723,12 +723,6 @@ BUILTIN_MISC_OPERATION(AssignTakeArray, "assignTakeArray", "", Special)
 /// This builtin indicates to the optimizer that the buffer is not mutable.
 BUILTIN_MISC_OPERATION(COWBufferForReading, "COWBufferForReading", "n", Special)
 
-// unsafeGuaranteed has type <T: AnyObject> T -> (T, Builtin.Int8)
-BUILTIN_MISC_OPERATION(UnsafeGuaranteed, "unsafeGuaranteed", "", Special)
-
-// unsafeGuaranteedEnd has type (Builtin.Int8) -> ()
-BUILTIN_MISC_OPERATION(UnsafeGuaranteedEnd, "unsafeGuaranteedEnd", "", Special)
-
 // getObjCTypeEncoding has type <T> T.Type -> RawPointer
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
