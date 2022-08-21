@@ -729,3 +729,19 @@ func reinitInPieces1(_ k: KlassPair) {
     k2.lhs = Klass()
     k2.rhs = Klass()
 }
+
+////////////////////////
+// InOut and Use Test //
+////////////////////////
+
+func useValueAndInOut(_ x: Klass, _ y: inout Klass) {}
+func useValueAndInOut(_ x: inout Klass, _ y: Klass) {}
+
+func inoutAndUseTest(_ x: Klass) {
+    var y = x // expected-error {{'y' used after being moved}}
+              // expected-error @-1 {{'y' used after being moved}}
+    useValueAndInOut(_move y, &y) // expected-note {{use here}}
+                                  // expected-note @-1 {{move here}}
+    useValueAndInOut(&y, _move y) // expected-note {{use here}}
+                                  // expected-note @-1 {{move here}}
+}
