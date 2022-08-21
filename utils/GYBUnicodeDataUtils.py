@@ -339,7 +339,7 @@ class UnicodeTrieGenerator(object):
         for cp in range(0, 0x110000):
             expected_value = unicode_property.get_value(cp)
             actual_value = self.get_value(cp)
-            assert(expected_value == actual_value)
+            assert expected_value == actual_value
 
     def freeze(self):
         """Compress internal trie representation.
@@ -405,12 +405,12 @@ class UnicodeTrieGenerator(object):
 
     def _int_to_le_bytes(self, data, width):
         if width == 1:
-            assert(data & ~0xff == 0)
+            assert data & ~0xff == 0
             return [data]
         if width == 2:
-            assert(data & ~0xffff == 0)
+            assert data & ~0xffff == 0
             return [data & 0xff, data & 0xff00]
-        assert(False)
+        assert False
 
     def _int_list_to_le_bytes(self, ints, width):
         return [
@@ -512,7 +512,7 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_table):
                 rules_matrix[first][second] = action
 
     # Make sure we can pack one row of the matrix into a 'uint16_t'.
-    assert(len(any_value) <= 16)
+    assert len(any_value) <= 16
 
     result = []
     for first in any_value:
@@ -572,9 +572,9 @@ def get_grapheme_cluster_break_tests_as_utf8(grapheme_break_test_file_name):
         return (test, boundaries)
 
     # Self-test.
-    assert(_convert_line(u'÷ 0903 × 0308 ÷ AC01 ÷ # abc') == (
-        '\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [0, 5, 8]))
-    assert(_convert_line(u'÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [0, 3]))
+    assert (_convert_line(u'÷ 0903 × 0308 ÷ AC01 ÷ # abc') ==
+            ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [0, 5, 8]))
+    assert _convert_line(u'÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [0, 3])
 
     result = []
 
@@ -627,9 +627,9 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(
         return (test, boundaries)
 
     # Self-test.
-    assert(_convert_line('÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ([
-        0x0903, 0x0308, 0xac01], [0, 2, 3]))
-    assert(_convert_line('÷ D800 ÷ # abc') == ([0x200b], [0, 1]))
+    assert (_convert_line('÷ 0903 × 0308 ÷ AC01 ÷ # abc') ==
+            ([0x0903, 0x0308, 0xac01], [0, 2, 3]))
+    assert _convert_line('÷ D800 ÷ # abc') == ([0x200b], [0, 1])
 
     result = []
 

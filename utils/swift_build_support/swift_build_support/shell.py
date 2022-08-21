@@ -213,7 +213,7 @@ def run(*args, **kwargs):
     prefix = kwargs.pop('prefix', '')
     if dry_run:
         _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
-        return(None, 0, args)
+        return (None, 0, args)
 
     my_pipe = subprocess.Popen(
         *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

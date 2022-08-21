@@ -66,17 +66,17 @@ class JobStats(JobData):
 
     def driver_jobs_ran(self):
         """Return the count of a driver job's ran sub-jobs"""
-        assert(self.is_driver_job())
+        assert self.is_driver_job()
         return self.stats.get("Driver.NumDriverJobsRun", 0)
 
     def driver_jobs_skipped(self):
         """Return the count of a driver job's skipped sub-jobs"""
-        assert(self.is_driver_job())
+        assert self.is_driver_job()
         return self.stats.get("Driver.NumDriverJobsSkipped", 0)
 
     def driver_jobs_total(self):
         """Return the total count of a driver job's ran + skipped sub-jobs"""
-        assert(self.is_driver_job())
+        assert self.is_driver_job()
         return self.driver_jobs_ran() + self.driver_jobs_skipped()
 
     def merged_with(self, other, merge_by="sum"):
@@ -126,7 +126,7 @@ class JobStats(JobData):
     def incrementality_percentage(self):
         """Assuming the job is a driver job, return the amount of
         jobs that actually ran, as a percentage of the total number."""
-        assert(self.is_driver_job())
+        assert self.is_driver_job()
         ran = self.driver_jobs_ran()
         total = self.driver_jobs_total()
         return round((float(ran) / float(total)) * 100.0, 2)
