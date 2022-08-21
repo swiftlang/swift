@@ -392,35 +392,6 @@ private:
 /// Match a call to a trap BB with no ARC relevant side effects.
 bool isARCInertTrapBB(const SILBasicBlock *BB);
 
-/// Get the two result values of the builtin "unsafeGuaranteed" instruction.
-///
-/// Gets the (GuaranteedValue, Token) tuple from a call to "unsafeGuaranteed"
-/// if the tuple elements are identified by a single tuple_extract use.
-/// Otherwise, returns a (nullptr, nullptr) tuple.
-std::pair<SingleValueInstruction *, SingleValueInstruction *>
-getSingleUnsafeGuaranteedValueResult(BuiltinInst *UnsafeGuaranteedInst);
-
-/// Get the single builtin "unsafeGuaranteedEnd" user of a builtin
-/// "unsafeGuaranteed"'s token.
-BuiltinInst *getUnsafeGuaranteedEndUser(SILValue UnsafeGuaranteedToken);
-
-/// Walk forwards from an unsafeGuaranteedEnd builtin instruction looking for a
-/// release on the reference returned by the matching unsafeGuaranteed builtin
-/// ignoring releases on the way.
-/// Return nullptr if no release is found.
-///
-///    %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
-///    %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
-///    %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-///    %12 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
-///    strong_release %5 : $Foo // <-- Matching release.
-///
-/// Alternatively, look for the release before the unsafeGuaranteedEnd.
-SILInstruction *findReleaseToMatchUnsafeGuaranteedValue(
-    SILInstruction *UnsafeGuaranteedEndI, SILInstruction *UnsafeGuaranteedI,
-    SILValue UnsafeGuaranteedValue, SILBasicBlock &BB,
-    RCIdentityFunctionInfo &RCFI);
-
 } // end namespace swift
 
 #endif

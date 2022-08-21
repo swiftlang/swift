@@ -312,18 +312,6 @@ bb0:
   return %9999 : $()
 }
 
-sil [ossa] @unsafeGuaranteedTest : $@convention(thin) (@owned Ref) -> () {
-bb0(%0 : @owned $Ref):
-  %1 = builtin "unsafeGuaranteed"(%0 : $Ref) : $(Ref, Builtin.Int8)
-  %2 = begin_borrow %1 : $(Ref, Builtin.Int8)
-  %3 = tuple_extract %2 : $(Ref, Builtin.Int8), 1
-  end_borrow %2 : $(Ref, Builtin.Int8)
-  builtin "unsafeGuaranteedEnd"(%3 : $Builtin.Int8) : $()
-  destroy_value %1 : $(Ref, Builtin.Int8)
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 sil [ossa] @unchecked_enum_data_propagates_ownership : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   %1 = begin_borrow %0 : $Optional<Builtin.NativeObject>
