@@ -1894,6 +1894,11 @@ void namelookup::extractDirectlyReferencedNominalTypes(
     return;
   }
 
+  if (type->is<TupleType>()) {
+    decls.push_back(type->getASTContext().getBuiltinTupleDecl());
+    return;
+  }
+
   llvm_unreachable("Not a type containing nominal types?");
 }
 
