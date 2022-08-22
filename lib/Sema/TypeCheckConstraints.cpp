@@ -1299,9 +1299,9 @@ void Solution::dump(raw_ostream &out) const {
   if (!overloadChoices.empty()) {
     out << "\nOverload choices:";
     for (auto ovl : overloadChoices) {
-      out.indent(2);
       if (ovl.first) {
         out << "\n";
+        out.indent(2);
         ovl.first->dump(sm, out);
       }
 
