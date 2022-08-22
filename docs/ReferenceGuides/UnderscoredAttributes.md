@@ -358,6 +358,22 @@ func g() {
 }
 ```
 
+## `@_expose(<language>)`
+
+Indicates that a particular declaration should be included
+in the emitted specified foreign language binding.
+
+When applied to a nominal type declaration, all of the
+public declarations inside this type become exposed as well.
+
+### `_expose(Cxx[, <"cxxName">])`
+
+Indicates that a particular declaration should be included
+in the generated C++ binding header.
+
+The optional "cxxName" string will be used as the name of
+the generated C++ declaration.
+
 ## `@_fixed_layout`
 
 Same as `@frozen` but also works for classes.

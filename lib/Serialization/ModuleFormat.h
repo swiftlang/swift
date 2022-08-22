@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 705; // same-length requirements
+const uint16_t SWIFTMODULE_VERSION_MINOR = 706; // @_expose attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2104,6 +2104,11 @@ namespace decls_block {
     BC_AVAIL_TUPLE, // OS version
     BCVBR<5>        // platform
   >;
+
+  using ExposeDeclAttrLayout = BCRecordLayout<Expose_DECL_ATTR,
+                                              BCFixed<1>, // implicit flag
+                                              BCBlob      // declaration name
+                                              >;
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
 #undef TYPE_LAYOUT
