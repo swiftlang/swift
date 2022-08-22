@@ -20,6 +20,7 @@ func takesMutableRawPointer(_ x: UnsafeMutableRawPointer) {}
 func takesConstRawPointer(_ x: UnsafeRawPointer) {}
 func takesOptConstRawPointer(_ x: UnsafeRawPointer?, and: Int) {}
 func takesOptOptConstRawPointer(_ x: UnsafeRawPointer??, and: Int) {}
+func takesMutableFunctionPointer(_ x: UnsafeMutablePointer<() -> Void>) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion0A9ToPointeryySpySiG_SPySiGSvtF
 // CHECK: bb0([[MP:%.*]] : $UnsafeMutablePointer<Int>, [[CP:%.*]] : $UnsafePointer<Int>, [[MRP:%.*]] : $UnsafeMutableRawPointer):
@@ -272,7 +273,7 @@ func functionInoutToPointer() {
 
   // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
   // CHECK: address_to_pointer [[REABSTRACT_BUF]]
-  takesMutableVoidPointer(&f)
+  takesMutableFunctionPointer(&f)
 }
 
 // rdar://problem/31781386
