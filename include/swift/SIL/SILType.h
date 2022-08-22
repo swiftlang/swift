@@ -753,6 +753,25 @@ public:
   void dump() const;
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions::printSIL()) const;
+
+#ifndef NDEBUG
+  /// Visit the distinct types of the fields out of which a type is aggregated.
+  ///
+  /// As we walk into the field types, if an aggregate is encountered, it may
+  /// still be a leaf.  It is a leaf if the \p isLeafAggregate predicate
+  /// returns true.
+  ///
+  /// Returns false if the leaves cannot be visited or if any invocation of the
+  /// visitor returns false.
+  ///
+  /// NOTE: This function is meant for use in verification.  For real use-cases,
+  ///       recursive walks of type leaves should be done via
+  ///       TypeLowering::RecursiveProperties.
+  bool visitAggregateLeaves(
+      Lowering::TypeConverter &TC, TypeExpansionContext context,
+      std::function<bool(SILType, SILType, VarDecl *)> isLeafAggregate,
+      std::function<bool(SILType, SILType, VarDecl *)> visit) const;
+#endif
 };
 
 // Statically prevent SILTypes from being directly cast to a type

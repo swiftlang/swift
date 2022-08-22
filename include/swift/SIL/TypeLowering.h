@@ -1245,6 +1245,12 @@ private:
                                CanType result,
                                Bridgeability bridging,
                                bool suppressOptional);
+#ifndef NDEBUG
+  /// Check the result of
+  /// getTypeLowering(AbstractionPattern,Type,TypeExpansionContext).
+  void verifyLowering(const TypeLowering &, AbstractionPattern origType,
+                      Type origSubstType, TypeExpansionContext forExpansion);
+#endif
 };
 
 } // namespace Lowering
