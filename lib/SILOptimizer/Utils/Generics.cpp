@@ -309,18 +309,18 @@ public:
 
 class SpecializedFunction {
 private:
-  SILFunction *function;
+  SILFunction *fn;
   TypeReplacements typeReplacements;
 
 public:
-  SpecializedFunction() : function(nullptr) {}
-  SpecializedFunction(SILFunction *fn) : function(fn) {}
+  SpecializedFunction() : fn(nullptr) {}
+  SpecializedFunction(SILFunction *fn) : fn(fn) {}
 
-  SILFunction *getFunction() { return function; }
+  SILFunction *getFunction() { return fn; }
 
-  void setFunction(SILFunction *fn) { function = fn; }
+  void setFunction(SILFunction *newFn) { fn = newFn; }
 
-  bool hasFunction() { return function != nullptr; }
+  bool hasFunction() { return fn != nullptr; }
 
   TypeReplacements &getTypeReplacements() { return typeReplacements; }
 
@@ -348,12 +348,69 @@ public:
     return typeReplacements.hasTypeReplacements();
   }
 
-  SILFunction *operator->() { return function; }
+  SILFunction *operator->() { return fn; }
 
-  operator bool() { return function != nullptr; }
+  void computeTypeReplacements(const ApplySite &apply);
+
+  operator bool() { return fn != nullptr; }
 };
 
 } // anonymous namespace
+
+void SpecializedFunction::computeTypeReplacements(const ApplySite &apply) {
+  auto fnType = fn->getLoweredFunctionType();
+  if (fnType != apply.getSubstCalleeType()) {
+    auto &M = fn->getModule();
+    auto expansion = fn->getTypeExpansionContext();
+    auto calleeTy = apply.getSubstCalleeType();
+    auto substConv = apply.getSubstCalleeConv();
+    auto resultType =
+        fn->getConventions().getSILResultType(fn->getTypeExpansionContext());
+    SmallVector<SILResultInfo, 4> indirectResults(substConv.getIndirectSILResults());
+
+    for (auto pair : llvm::enumerate(apply.getArgumentOperands())) {
+      if (pair.index() < substConv.getSILArgIndexOfFirstParam()) {
+        auto formalIndex = substConv.getIndirectFormalResultIndexForSILArg(pair.index());
+        auto fnResult = indirectResults[formalIndex];
+        if (fnResult.isFormalIndirect()) {
+          // FIXME: properly get the type
+          auto indirectResultTy = M.getASTContext().getAnyObjectType();  //fnResult.getReturnValueType(M, fnType, expansion);
+          addIndirectResultType(formalIndex, indirectResultTy);
+        }
+
+        continue;
+      }
+
+      unsigned paramIdx =
+          pair.index() - substConv.getSILArgIndexOfFirstParam();
+
+      auto newParamType = fnType->getParameters()[paramIdx].getArgumentType(
+          M, fnType, expansion);
+      auto oldParamType = calleeTy->getParameters()[paramIdx].getArgumentType(
+          M, fnType, expansion);
+      if (newParamType != oldParamType) {
+        addParameterTypeReplacement(paramIdx, newParamType);
+      }
+    }
+
+    auto newConv = fn->getConventions();
+    for (auto pair : llvm::enumerate(substConv.getYields())) {
+      auto index = pair.index();
+      auto newType =
+          newConv.getYields()[index].getYieldValueType(M, fnType, expansion);
+      auto oldType = pair.value().getYieldValueType(
+          M, calleeTy, apply.getCalleeFunction()->getTypeExpansionContext());
+
+      if (oldType != newType) {
+        addYieldTypeReplacement(index, oldType);
+      }
+    }
+
+    if (resultType != apply.getType().getObjectType()) {
+      setResultType(apply.getType().getObjectType());
+    }
+  }
+}
 
 /// Checks if a second substitution map is an expanded version of
 /// the first substitution map.
@@ -2877,59 +2934,8 @@ bool usePrespecialized(
       fn->setAvailabilityForLinkage(specializationAvail);
 
     result.setFunction(fn);
+    result.computeTypeReplacements(apply);
 
-    auto fnType = fn->getLoweredFunctionType();
-    if (fnType != apply.getSubstCalleeType()) {
-      auto &M = fn->getModule();
-      auto expansion = fn->getTypeExpansionContext();
-      auto calleeTy = apply.getSubstCalleeType();
-      auto substConv = apply.getSubstCalleeConv();
-      auto resultType =
-          fn->getConventions().getSILResultType(fn->getTypeExpansionContext());
-      SmallVector<SILResultInfo, 4> indirectResults(substConv.getIndirectSILResults());
-
-      for (auto pair : llvm::enumerate(apply.getArgumentOperands())) {
-        if (pair.index() < substConv.getSILArgIndexOfFirstParam()) {
-          auto formalIndex = substConv.getIndirectFormalResultIndexForSILArg(pair.index());
-          auto fnResult = indirectResults[formalIndex];
-          if (fnResult.isFormalIndirect()) {
-            // FIXME: properly get the type
-            auto indirectResultTy = refF->getASTContext().getAnyObjectType();  //fnResult.getReturnValueType(M, fnType, expansion);
-            result.addIndirectResultType(formalIndex, indirectResultTy);
-          }
-
-          continue;
-        }
-
-        unsigned paramIdx =
-            pair.index() - substConv.getSILArgIndexOfFirstParam();
-
-        auto newParamType = fnType->getParameters()[paramIdx].getArgumentType(
-            M, fnType, expansion);
-        auto oldParamType = calleeTy->getParameters()[paramIdx].getArgumentType(
-            M, fnType, expansion);
-        if (newParamType != oldParamType) {
-          result.addParameterTypeReplacement(paramIdx, newParamType);
-        }
-      }
-
-      auto newConv = fn->getConventions();
-      for (auto pair : llvm::enumerate(substConv.getYields())) {
-        auto index = pair.index();
-        auto newType =
-            newConv.getYields()[index].getYieldValueType(M, fnType, expansion);
-        auto oldType = pair.value().getYieldValueType(
-            M, calleeTy, apply.getCalleeFunction()->getTypeExpansionContext());
-
-        if (oldType != newType) {
-          result.addYieldTypeReplacement(index, oldType);
-        }
-      }
-
-      if (resultType != apply.getType().getObjectType()) {
-        result.setResultType(apply.getType().getObjectType());
-      }
-    }
     return true;
   }
 
