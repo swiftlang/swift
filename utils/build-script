@@ -181,6 +181,19 @@ def tar(source, destination):
     # raise.
     shell.call(args + [source], stderr=shell.DEVNULL)
 
+# \param[in] exception SystemExit object
+#
+# Read the error code/error message stored
+# in SystemExit.code and exit the application.
+def handle_system_exit_exception(exception):
+    sys_err = e.code
+    exit_code = 1
+    if isinstance(sys_err, str):
+        print(sys_err)
+    elif isinstance(sys_err, int):
+        exit_code = sys_err
+    
+    os._exit(exit_code)
 
 # -----------------------------------------------------------------------------
 # Argument Validation
@@ -719,7 +732,7 @@ if __name__ == "__main__":
     try:
         exit_code = main()
     except SystemExit as e:
-        os._exit(e.code)
+        handle_system_exit_exception(e)
     except KeyboardInterrupt:
         sys.exit(1)
     finally:
