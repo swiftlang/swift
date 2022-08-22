@@ -64,6 +64,20 @@ public:
   void convert(llvm::raw_ostream &out);
 };
 
+class DefToStringsConverter {
+  llvm::ArrayRef<const char *> IDs;
+  llvm::ArrayRef<const char *> Messages;
+
+public:
+  DefToStringsConverter(llvm::ArrayRef<const char *> ids,
+                        llvm::ArrayRef<const char *> messages)
+    : IDs(ids), Messages(messages) {
+    assert(IDs.size() == Messages.size());
+  }
+
+  void convert(llvm::raw_ostream &out);
+};
+
 class LocalizationWriterInfo {
 public:
   using key_type = uint32_t;
@@ -223,6 +237,31 @@ public:
 protected:
   bool initializeImpl() override;
   llvm::StringRef getMessage(swift::DiagID id) const override;
+};
+
+class StringsLocalizationProducer final : public LocalizationProducer {
+  std::string filePath;
+
+  std::vector<std::string> diagnostics;
+
+public:
+  explicit StringsLocalizationProducer(llvm::StringRef filePath,
+                                       bool printDiagnosticNames = false)
+      : LocalizationProducer(printDiagnosticNames), filePath(filePath) {}
+
+  /// Iterate over all of the available (non-empty) translations
+  /// maintained by this producer, callback gets each translation
+  /// with its unique identifier.
+  void forEachAvailable(
+      llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback);
+
+protected:
+  bool initializeImpl() override;
+  llvm::StringRef getMessage(swift::DiagID id) const override;
+
+private:
+  static void readStringsFile(llvm::MemoryBuffer *in,
+                              std::vector<std::string> &diagnostics);
 };
 
 class SerializedLocalizationProducer final : public LocalizationProducer {

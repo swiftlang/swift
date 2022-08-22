@@ -184,7 +184,6 @@ void YAMLLocalizationProducer::forEachAvailable(
 std::unique_ptr<LocalizationProducer>
 LocalizationProducer::producerFor(llvm::StringRef locale, llvm::StringRef path,
                                   bool printDiagnosticNames) {
-  std::unique_ptr<LocalizationProducer> producer;
   llvm::SmallString<128> filePath(path);
   llvm::sys::path::append(filePath, locale);
   llvm::sys::path::replace_extension(filePath, ".db");
@@ -193,7 +192,7 @@ LocalizationProducer::producerFor(llvm::StringRef locale, llvm::StringRef path,
   // fallback to the `YAML` file.
   if (llvm::sys::fs::exists(filePath)) {
     if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
-      producer = std::make_unique<diag::SerializedLocalizationProducer>(
+      return std::make_unique<diag::SerializedLocalizationProducer>(
           std::move(file.get()), printDiagnosticNames);
     }
   } else {
@@ -201,12 +200,18 @@ LocalizationProducer::producerFor(llvm::StringRef locale, llvm::StringRef path,
     // In case of missing localization files, we should fallback to messages
     // from `.def` files.
     if (llvm::sys::fs::exists(filePath)) {
-      producer = std::make_unique<diag::YAMLLocalizationProducer>(
+      return std::make_unique<diag::YAMLLocalizationProducer>(
+          filePath.str(), printDiagnosticNames);
+    }
+
+    llvm::sys::path::replace_extension(filePath, ".strings");
+    if (llvm::sys::fs::exists(filePath)) {
+      return std::make_unique<diag::StringsLocalizationProducer>(
           filePath.str(), printDiagnosticNames);
     }
   }
 
-  return producer;
+  return std::unique_ptr<LocalizationProducer>();
 }
 
 llvm::Optional<uint32_t> LocalizationInput::readID(llvm::yaml::IO &io) {
@@ -286,6 +291,162 @@ void DefToYAMLConverter::convert(llvm::raw_ostream &out) {
       }
     }
     out << "\"\r\n";
+  }
+}
+
+void DefToStringsConverter::convert(llvm::raw_ostream &out) {
+  // "<id>" = "<msg>";
+  for (auto i : swift::indices(IDs)) {
+    out << "\"" << IDs[i] << "\"";
+    out << " = ";
+
+    const std::string &msg = Messages[i];
+
+    out << "\"";
+    for (unsigned j = 0; j < msg.length(); ++j) {
+      // Escape '"' found in the message.
+      if (msg[j] == '"')
+        out << '\\';
+
+      out << msg[j];
+    }
+
+    out << "\";\r\n";
+  }
+}
+
+bool StringsLocalizationProducer::initializeImpl() {
+  auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(filePath);
+  llvm::MemoryBuffer *document = FileBufOrErr->get();
+  readStringsFile(document, diagnostics);
+  return true;
+}
+
+llvm::StringRef
+StringsLocalizationProducer::getMessage(swift::DiagID id) const {
+  return diagnostics[(unsigned)id];
+}
+
+void StringsLocalizationProducer::forEachAvailable(
+    llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback) {
+  initializeIfNeeded();
+  if (getState() == FailedInitialization) {
+    return;
+  }
+
+  for (uint32_t i = 0, n = diagnostics.size(); i != n; ++i) {
+    auto translation = diagnostics[i];
+    if (!translation.empty())
+      callback(static_cast<swift::DiagID>(i), translation);
+  }
+}
+
+void StringsLocalizationProducer::readStringsFile(
+    llvm::MemoryBuffer *in, std::vector<std::string> &diagnostics) {
+  std::map<std::string, unsigned> diagLocs;
+#define DIAG(KIND, ID, Options, Text, Signature)                               \
+  diagLocs[#ID] = static_cast<unsigned>(LocalDiagID::ID);
+#include "swift/AST/DiagnosticsAll.def"
+#undef DIAG
+
+  // Allocate enough slots to fit all the possible diagnostics
+  // this helps to identify which diagnostics are missing.
+  diagnostics.resize(LocalDiagID::NumDiags);
+
+  // The format is as follows:
+  //
+  // - comment: /* ... */
+  // - translation: "<id>" = "<message>";
+  auto buffer = in->getBuffer();
+  while (!buffer.empty()) {
+    // consume comment.
+    if (buffer.startswith("/*")) {
+      auto endOfComment = buffer.find("*/");
+      assert(endOfComment != std::string::npos);
+      // Consume the comment and trailing `*/`
+      buffer = buffer.drop_front(endOfComment + 2).ltrim();
+      continue;
+    }
+
+    assert(buffer.startswith("\"") && "malformed diagnostics file");
+
+    // Consume leading `"`
+    buffer = buffer.drop_front();
+
+    // Valid diagnostic id cannot have any `"` in it.
+    auto idSize = buffer.find_first_of('\"');
+    assert(idSize != std::string::npos);
+
+    std::string id(buffer.data(), idSize);
+
+    // consume id and `" = "`. There could be a variable number of
+    // spaces on each side of `=`.
+    {
+      // Consume id, trailing `"`, and all spaces before `=`
+      buffer = buffer.drop_front(idSize + 1).ltrim(' ');
+
+      // Consume `=` and all trailing spaces until `"`
+      {
+        assert(!buffer.empty() && buffer.front() == '=');
+        buffer = buffer.drop_front().ltrim(' ');
+      }
+
+      // Consume `"` at the beginning of the diagnostic message.
+      {
+        assert(!buffer.empty() && buffer.front() == '\"');
+        buffer = buffer.drop_front();
+      }
+    }
+
+    llvm::SmallString<64> msg;
+    {
+      bool isValid = false;
+      // Look for `";` which denotes the end of message
+      for (unsigned i = 0, n = buffer.size(); i != n; ++i) {
+        if (buffer[i] != '\"') {
+          msg.push_back(buffer[i]);
+          continue;
+        }
+
+        // Leading `"` has been comsumed.
+        assert(i > 0);
+
+        // Let's check whether this `"` is escaped, and if so - continue
+        // because `"` is part of the message.
+        if (buffer[i - 1] == '\\') {
+          // Drop `\` added for escaping.
+          msg.pop_back();
+          msg.push_back(buffer[i]);
+          continue;
+        }
+
+        // If current `"` was not escaped and it's followed by `;` -
+        // we have reached the end of the message, otherwise
+        // the input is malformed.
+        if (i + 1 < n && buffer[i + 1] == ';') {
+          // Consume the message and its trailing info.
+          buffer = buffer.drop_front(i + 2).ltrim();
+          // Mark message as valid.
+          isValid = true;
+          break;
+        } else {
+          llvm_unreachable("malformed diagnostics file");
+        }
+      }
+
+      assert(isValid && "malformed diagnostic message");
+    }
+
+    // Check whether extracted diagnostic still exists in the
+    // system and if not - record as unknown.
+    {
+      auto existing = diagLocs.find(id);
+      if (existing != diagLocs.end()) {
+        diagnostics[existing->second] = std::string(msg);
+      } else {
+        llvm::errs() << "[!] Unknown diagnostic: " << id << '\n';
+      }
+    }
   }
 }
 
