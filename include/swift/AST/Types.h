@@ -900,20 +900,24 @@ public:
   bool satisfiesClassConstraint();
 
   /// Determine whether this type can be used as a base type for AST
-  /// name lookup, which is the case for nominal types, protocol compositions
-  /// and archetypes.
+  /// name lookup, which is the case for nominal types, existential types,
+  /// archetypes, and tuples.
   ///
   /// Generally, the static vs instance and mutating vs nonmutating distinction
   /// is handled elsewhere, so metatypes, lvalue types and inout types are not
   /// allowed here.
   ///
-  /// Similarly, tuples formally have members, but this does not go through
-  /// name lookup.
+  /// Tuples have formal members to project elements by index or by label; these
+  /// are handled directly by Sema and do not go through name lookup.
+  ///
+  /// Bona fide members on tuples are defined on extensions of
+  /// Builtin.TheTupleType.
   bool mayHaveMembers() {
     return (is<ArchetypeType>() ||
             is<ModuleType>() ||
             isExistentialType() ||
-            getAnyNominal());
+            getAnyNominal() ||
+            is<TupleType>());
   }
 
   /// Checks whether this type may potentially be callable. This returns true
