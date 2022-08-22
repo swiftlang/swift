@@ -1195,23 +1195,6 @@ static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getUnsafeGuaranteed(ASTContext &C, Identifier Id) {
-  // <T : AnyObject> T -> (T, Int8Ty)
-  //
-  BuiltinFunctionBuilder builder(C);
-  auto T = makeGenericParam();
-  builder.addParameter(T);
-  Type Int8Ty = BuiltinIntegerType::get(8, C);
-  builder.setResult(makeTuple(T, makeConcrete(Int8Ty)));
-  return builder.build(Id);
-}
-
-static ValueDecl *getUnsafeGuaranteedEnd(ASTContext &C, Identifier Id) {
-  // Int8Ty -> ()
-  Type Int8Ty = BuiltinIntegerType::get(8, C);
-  return getBuiltinFunction(Id, { Int8Ty }, TupleType::getEmpty(C));
-}
-
 static ValueDecl *getIntInstrprofIncrement(ASTContext &C, Identifier Id) {
   // (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ()
   Type Int64Ty = BuiltinIntegerType::get(64, C);
