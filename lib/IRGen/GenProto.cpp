@@ -871,7 +871,7 @@ bool IRGenModule::isResilientConformance(
   // across module boundaries.
   if (conformanceModule == getSwiftModule() &&
       conformanceModule->getName().str() ==
-        conformance->getProtocol()->getAlternateModuleName())
+      conformance->getProtocol()->getAlternateModuleName())
     return false;
 
   // If the protocol and the conformance are in the same module and the
@@ -946,8 +946,9 @@ static bool isDependentConformance(
   if (!visited.insert(conformance).second)
     return false;
 
-  // If the conformance is resilient, this is always true.
-  if (IGM.isResilientConformance(conformance))
+  // If the conformance is resilient or synthesized, this is always true.
+  if (IGM.isResilientConformance(conformance)
+      || isSynthesizedNonUnique(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -967,15 +968,11 @@ static bool isDependentConformance(
     if (assocConformance.isInvalid())
       return false;
 
-    if (assocConformance.isAbstract())
-      return true;
-
-    auto rootConformance = assocConformance.getConcrete()->getRootConformance();
-
-    // [*] This condition must be true if getConformanceInfo() would return
-    //     an AccessorConformanceInfo().
-    if (isSynthesizedNonUnique(rootConformance) ||
-        isDependentConformance(IGM, rootConformance, visited))
+    if (assocConformance.isAbstract() ||
+        isDependentConformance(IGM,
+                               assocConformance.getConcrete()
+                                 ->getRootConformance(),
+                               visited))
       return true;
   }
 
@@ -985,7 +982,7 @@ static bool isDependentConformance(
   // Check if there are any conditional conformances. Other forms of conditional
   // requirements don't exist in the witness table.
   return SILWitnessTable::enumerateWitnessTableConditionalConformances(
-      conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
+    conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
 }
 
 /// Is there anything about the given conformance that requires witness
@@ -2146,9 +2143,6 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   // so in theory we could allocate them on a BumpPtrAllocator. But there's not
   // a good one for us to use. (The ASTContext's outlives the IRGenModule in
   // batch mode.)
-  //
-  // N.B. If you change this condition, you may need to update the condition
-  //      marked [*] in isDependentConformance().
   if (isDependentConformance(rootConformance) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
