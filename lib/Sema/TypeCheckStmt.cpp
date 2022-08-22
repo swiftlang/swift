@@ -2114,7 +2114,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   TypeChecker::computeCaptures(AFD);
   if (!AFD->getDeclContext()->isLocalContext()) {
     checkFunctionActorIsolation(AFD);
-    checkFunctionAsyncUsage(AFD);
     TypeChecker::checkFunctionEffects(AFD);
   }
 

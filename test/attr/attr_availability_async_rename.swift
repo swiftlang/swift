@@ -1,8 +1,8 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-ignore-unknown -I %S/Inputs/custom-modules
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-ignore-unknown -parse-as-library -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -parse-as-library -I %S/Inputs/custom-modules
 
 import ObjcAsync
 
@@ -12,62 +12,74 @@ import ObjcAsync
 func goodFunc1(value: String, completionHandler: @escaping (Int) -> Void) {}
 @available(*, renamed: "asyncFunc(_:)")
 func goodFunc2(value: String, completionHandler: @escaping (Int) -> Void) {}
-// expected-note@+1 4 {{'asyncFunc' declared here}}
+// expected-note@+2 4 {{'asyncFunc' declared here}}
+@available(SwiftStdlib 5.5, *)
 func asyncFunc(_ text: String) async -> Int { }
 
 // Ambiguous but only one is async
 @available(*, renamed: "overloaded()")
 func asyncOnlyOverload(completionHandler: @escaping () -> Void) { }
 func overloaded() { }
-// expected-note@+1 {{'overloaded()' declared here}}
+// expected-note@+2 {{'overloaded()' declared here}}
+@available(SwiftStdlib 5.5, *)
 func overloaded() async { }
 
 // Renamed decl is ambiguous but the params only match a single case
 @available(*, renamed: "overloadedAsyncFunc(value:)")
 func nonAmbiguousFunc(value: Int, handler: @escaping () -> Void) {}
-// expected-note@+1 {{'overloadedAsyncFunc(value:)' declared here}}
+// expected-note@+2 {{'overloadedAsyncFunc(value:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func overloadedAsyncFunc(value: Int) async {}
+@available(SwiftStdlib 5.5, *)
 func overloadedAsyncFunc(value: String) async {}
 
 // More parameters in async but they have defaults and different labels
 @available(*, renamed: "defaultedParamsStart(newArg:arg:)")
 func defaultedParamsStart(arg: Int, completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'defaultedParamsStart(newArg:arg:)' declared here}}
+// expected-note@+2 {{'defaultedParamsStart(newArg:arg:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsStart(newArg: String = "", arg: Int) async { }
 
 @available(*, renamed: "defaultedParamsStart2(newArg:arg:)")
 func defaultedParamsStart2(arg: Int, completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'defaultedParamsStart2(newArg:arg:)' declared here}}
+// expected-note@+2 {{'defaultedParamsStart2(newArg:arg:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsStart2(newArg: Int = 0, arg: Int) async { }
 
 @available(*, renamed: "defaultedParamsMiddle(arg1:newArg:arg2:)")
 func defaultedParamsMiddle(arg1: Int, arg2: Int, completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'defaultedParamsMiddle(arg1:newArg:arg2:)' declared here}}
+// expected-note@+2 {{'defaultedParamsMiddle(arg1:newArg:arg2:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsMiddle(arg1: Int, newArg: String = "", arg2: Int) async { }
 
 @available(*, renamed: "defaultedParamsMiddle2(arg1:newArg:arg2:)")
 func defaultedParamsMiddle2(arg1: Int, arg2: Int, completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'defaultedParamsMiddle2(arg1:newArg:arg2:)' declared here}}
+// expected-note@+2 {{'defaultedParamsMiddle2(arg1:newArg:arg2:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsMiddle2(arg1: Int, newArg: Int = 0, arg2: Int) async { }
 
 @available(*, renamed: "defaultedParamsEnd(arg:newArg:)")
 func defaultedParamsEnd(arg: Int, completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'defaultedParamsEnd(arg:newArg:)' declared here}}
+// expected-note@+2 {{'defaultedParamsEnd(arg:newArg:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsEnd(arg: Int, newArg: String = "") async { }
 
 @available(*, renamed: "defaultedParamsEnd2(arg:newArg:)")
 func defaultedParamsEnd2(arg: Int, completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'defaultedParamsEnd2(arg:newArg:)' declared here}}
+// expected-note@+2 {{'defaultedParamsEnd2(arg:newArg:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsEnd2(arg: Int, newArg: Int = 0) async { }
 
 @available(*, renamed: "defaultedParamsEnd3(newArg:arg:)")
 func defaultedParamsEnd3(arg: Int, completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'defaultedParamsEnd3(newArg:arg:)' declared here}}
+// expected-note@+2 {{'defaultedParamsEnd3(newArg:arg:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsEnd3(newArg: Int, arg: String = "") async { }
 
 @available(*, renamed: "defaultedParamsEnd4(newArg:arg:)")
 func defaultedParamsEnd4(arg: Int, completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'defaultedParamsEnd4(newArg:arg:)' declared here}}
+// expected-note@+2 {{'defaultedParamsEnd4(newArg:arg:)' declared here}}
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsEnd4(newArg: Int, arg: Int = 0) async { }
 
 @available(*, deprecated)
@@ -77,18 +89,22 @@ func defaultedParamsEnd4(newArg: Int, arg: Int = 0) async { }
 @available(macOS, deprecated: 12, renamed: "manyAttrsOld()")
 @available(*, deprecated)
 func manyAttrs(completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'manyAttrsNew()' declared here}}
+// expected-note@+2 {{'manyAttrsNew()' declared here}}
+@available(SwiftStdlib 5.5, *)
 func manyAttrsNew() async { }
 
 @available(macOS, introduced: 12, renamed: "platformOnlyNew()")
 func platformOnly(completionHandler: @escaping () -> Void) { }
-// expected-note@+1 {{'platformOnlyNew()' declared here}}
+// expected-note@+2 {{'platformOnlyNew()' declared here}}
+@available(SwiftStdlib 5.5, *)
 func platformOnlyNew() async { }
 
+@available(SwiftStdlib 5.5, *)
 struct AnotherStruct {
   var otherInstanceProp: Int { get async { 1 } }
 }
 
+@available(SwiftStdlib 5.5, *)
 struct SomeStruct {
   @available(*, renamed: "structFunc")
   func structFunc(continuation: @escaping () -> Void) { }
@@ -138,6 +154,7 @@ func badFunc(value: String, completionHandler: @escaping (Int) -> Void) {}
 // Not a completion handler
 @available(*, renamed: "notCompletionRenamed()")
 func notCompletion() {}
+@available(SwiftStdlib 5.5, *)
 func notCompletionRenamed() async {}
 
 // Corresponding function isn't async
@@ -148,22 +165,27 @@ func completionNotAsyncRenamed() {}
 // Renamed decl is ambiguous and there's multiple matches
 @available(*, renamed: "asyncFuncDifferentParamNames")
 func ambiguousFunc(value: Int, handler: @escaping () -> Void) {}
+@available(SwiftStdlib 5.5, *)
 func asyncFuncDifferentParamNames(value: Int) async {}
+@available(SwiftStdlib 5.5, *)
 func asyncFuncDifferentParamNames(value2: Int) async {}
 
 // Renamed decl doesn't have enough params
 @available(*, renamed: "fewerParamsFunc()")
 func fewerParamsFunc(value: Int, handler: @escaping () -> Void) {}
+@available(SwiftStdlib 5.5, *)
 func fewerParamsFunc() async {}
 
 // Renamed decl has more params
 @available(*, renamed: "moreParamsFunc()")
 func moreParamsFunc(handler: @escaping () -> Void) {}
+@available(SwiftStdlib 5.5, *)
 func moreParamsFunc(value: Int) async {}
 
 // Renamed decl params types don't match
 @available(*, renamed: "noMatchingParamsIntFunc(value:)")
 func noMatchingParamsFunc(value: Character, handler: @escaping () -> Void) {}
+@available(SwiftStdlib 5.5, *)
 func noMatchingParamsIntFunc(value: Int) async {}
 
 // Matching function isn't async
@@ -173,33 +195,40 @@ func noMatchingSyncFunc(value: Int) {}
 
 @available(*, renamed: "sameLabelsDifferentOrder(arg2:arg:)")
 func sameLabelsDifferentOrder(arg: Int, arg2: String, completionHandler: @escaping () -> Void) { }
+@available(SwiftStdlib 5.5, *)
 func sameLabelsDifferentOrder(arg2: String, arg: Int) async { }
 
 @available(*, renamed: "handlerNotRemoved(newArg:completionHandler:)")
 func handlerNotRemoved(arg: Int, completionHandler: @escaping () -> Void) {}
+@available(SwiftStdlib 5.5, *)
 func handlerNotRemoved(newArg: Int, completionHandler: @escaping () -> Void) async {}
 
 // Extra arguments. Even though there's defaults, they match the previous
 // labels so they shouldn't be skipped. Thus the functions do not match.
 @available(*, renamed: "defaultedParamsStartBad(arg:newArg:)")
 func defaultedParamsStartBad(arg: Int, completionHandler: @escaping () -> Void) { }
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsStartBad(arg: String = "", newArg: Int) async { }
 
 @available(*, renamed: "defaultedParamsStartBad2(arg:newArg:)")
 func defaultedParamsStartBad2(arg: Int, completionHandler: @escaping () -> Void) { }
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsStartBad2(arg: Int = 0, newArg: Int) async { }
 
 @available(*, renamed: "defaultedParamsMiddleBad(arg1:arg2:newArg:)")
 func defaultedParamsMiddleBad(arg1: Int, arg2: Int, completionHandler: @escaping () -> Void) { }
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsMiddleBad(arg1: Int, arg2: String = "", newArg: Int) async { }
 
 @available(*, renamed: "defaultedParamsMiddleBad2(arg1:arg2:newArg:)")
 func defaultedParamsMiddleBad2(arg1: Int, arg2: Int, completionHandler: @escaping () -> Void) { }
+@available(SwiftStdlib 5.5, *)
 func defaultedParamsMiddleBad2(arg1: Int, arg2: Int = 0, newArg: Int) async { }
 
 
 // Suggest using async alternative function in async context
 
+@available(SwiftStdlib 5.5, *)
 func asyncContext(t: HandlerTest) async {
   // expected-warning@+1{{consider using asynchronous alternative function}}
   goodFunc1(value: "Hello") { _ in }
@@ -216,6 +245,14 @@ func asyncContext(t: HandlerTest) async {
   }
 
   let _ = await asyncFunc("World")
+
+  defer {
+    goodFunc1(value: "Hello") { _ in }
+  }
+
+  func syncFunc() {
+    goodFunc1(value: "Hello") { _ in }
+  }
 
   // expected-warning@+1{{consider using asynchronous alternative function}}
   asyncOnlyOverload() { }
@@ -237,7 +274,8 @@ func asyncContext(t: HandlerTest) async {
   defaultedParamsEnd3(arg: 1) { }
   // expected-warning@+1{{consider using asynchronous alternative function}}
   defaultedParamsEnd4(arg: 1) { }
-  // expected-warning@+1{{consider using asynchronous alternative function}}
+  // expected-warning@+2{{consider using asynchronous alternative function}}
+  // expected-warning@+1{{'manyAttrs(completionHandler:)' is deprecated}}
   manyAttrs() { }
   // expected-warning@+1{{consider using asynchronous alternative function}}
   platformOnly() { }
@@ -287,6 +325,7 @@ func asyncContext(t: HandlerTest) async {
   t.asyncImportSame(1, replyTo: { _ in })
 }
 
+@available(SwiftStdlib 5.5, *)
 func syncContext(t: HandlerTest) {
   goodFunc1(value: "Hello") { _ in }
   t.simple { _ in }
@@ -303,6 +342,7 @@ let asyncGlobalClosure = { () async -> () in
   goodFunc1(value: "neat") { _ in }
 }
 
+@available(SwiftStdlib 5.5, *)
 class ClassCallingAsyncStuff {
   struct NestedStruct {
     @available(*, renamed: "structFunc()")
