@@ -2663,10 +2663,9 @@ bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
   return importedSPIGroups.count(spiGroup);
 }
 
-bool ModuleDecl::isImportedAsWeakLinked(const Decl *targetDecl) const {
-  const auto *declaringModule = targetDecl->getModuleContext();
+bool ModuleDecl::isImportedAsWeakLinked(const ModuleDecl *module) const {
   for (auto file : getFiles()) {
-    if (file->importsModuleAsWeakLinked(declaringModule))
+    if (file->importsModuleAsWeakLinked(module))
       return true;
   }
   return false;

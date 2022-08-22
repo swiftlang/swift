@@ -12,8 +12,9 @@
 import intermediate
 import weaklinked_import_helper
 
-// Symbols from weaklinked_import_helper should be strong, despite intermediate
-// importining the module @_weakLinked.
+// The `@_weakLinked` attribute on the import of `weaklinked_import_helper` in
+// the module `intermediate` should not apply transitively to the import from
+// this module.
 
 // CHECK-DAG: declare swiftcc {{.+}} @"$s24weaklinked_import_helper2fnyyF"()
 fn()

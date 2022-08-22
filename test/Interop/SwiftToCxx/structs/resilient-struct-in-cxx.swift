@@ -89,19 +89,6 @@ public struct FirstSmallStruct {
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace Structs {
 
-// CHECK:      inline uint32_t FirstSmallStruct::getX() const {
-// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvg(_getOpaquePointer());
-// CHECK-NEXT: }
-// CHECK:      inline void FirstSmallStruct::setX(uint32_t value) {
-// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvs(value, _getOpaquePointer());
-// CHECK-NEXT: }
-// CHECK-NEXT: inline void FirstSmallStruct::dump() const {
-// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
-// CHECK-NEXT: }
-// CHECK-NEXT: inline void FirstSmallStruct::mutate() {
-// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV6mutateyyF(_getOpaquePointer());
-// CHECK-NEXT: }
-
 @frozen public struct FrozenStruct {
     private let storedInt: Int32
 }
@@ -155,18 +142,6 @@ public struct LargeStruct {
 // CHECK-NEXT:  friend class _impl::_impl_LargeStruct;
 // CHECK-NEXT: };
 
-// CHECK:      inline swift::Int LargeStruct::getX1() const {
-// CHECK-NEXT: return _impl::$s7Structs11LargeStructV2x1Sivg(_getOpaquePointer());
-// CHECK-NEXT: }
-// CHECK-NEXT: inline FirstSmallStruct LargeStruct::getFirstSmallStruct() const {
-// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](void * _Nonnull result) {
-// CHECK-NEXT:   _impl::$s7Structs11LargeStructV010firstSmallC0AA05FirsteC0Vvg(result, _getOpaquePointer());
-// CHECK-NEXT: });
-// CHECK-NEXT: }
-// CHECK-NEXT: inline void LargeStruct::dump() const {
-// CHECK-NEXT: return _impl::$s7Structs11LargeStructV4dumpyyF(_getOpaquePointer());
-// CHECK-NEXT: }
-
 private class RefCountedClass {
     let x: Int
 
@@ -192,9 +167,6 @@ public struct StructWithRefCountStoredProp {
 }
 
 // CHECK: inline StructWithRefCountStoredProp(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable->size, vwTable->getAlignment()) {}
-// CHECK:      inline void StructWithRefCountStoredProp::dump() const {
-// CHECK-NEXT:   return _impl::$s7Structs28StructWithRefCountStoredPropV4dumpyyF(_getOpaquePointer());
-// CHECK-NEXT: }
 
 public func createLargeStruct(_ x: Int) -> LargeStruct {
     return LargeStruct(x1: x, x2: -x, x3: x * 2, x4: x - 4, x5: 0, x6: 21)
@@ -237,4 +209,33 @@ public func mutateSmall(_ x: inout FirstSmallStruct) {
 
 // CHECK:      inline void printSmallAndLarge(const FirstSmallStruct& x, const LargeStruct& y) noexcept {
 // CHECK-NEXT:   return _impl::$s7Structs18printSmallAndLargeyyAA05FirstC6StructV_AA0eG0VtF(_impl::_impl_FirstSmallStruct::getOpaquePointer(x), _impl::_impl_LargeStruct::getOpaquePointer(y));
+// CHECK-NEXT: }
+
+// CHECK:      inline uint32_t FirstSmallStruct::getX() const {
+// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvg(_getOpaquePointer());
+// CHECK-NEXT: }
+// CHECK:      inline void FirstSmallStruct::setX(uint32_t value) {
+// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvs(value, _getOpaquePointer());
+// CHECK-NEXT: }
+// CHECK-NEXT: inline void FirstSmallStruct::dump() const {
+// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
+// CHECK-NEXT: }
+// CHECK-NEXT: inline void FirstSmallStruct::mutate() {
+// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV6mutateyyF(_getOpaquePointer());
+// CHECK-NEXT: }
+
+// CHECK:      inline swift::Int LargeStruct::getX1() const {
+// CHECK-NEXT: return _impl::$s7Structs11LargeStructV2x1Sivg(_getOpaquePointer());
+// CHECK-NEXT: }
+// CHECK-NEXT: inline FirstSmallStruct LargeStruct::getFirstSmallStruct() const {
+// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:   _impl::$s7Structs11LargeStructV010firstSmallC0AA05FirsteC0Vvg(result, _getOpaquePointer());
+// CHECK-NEXT: });
+// CHECK-NEXT: }
+// CHECK-NEXT: inline void LargeStruct::dump() const {
+// CHECK-NEXT: return _impl::$s7Structs11LargeStructV4dumpyyF(_getOpaquePointer());
+// CHECK-NEXT: }
+
+// CHECK:      inline void StructWithRefCountStoredProp::dump() const {
+// CHECK-NEXT:   return _impl::$s7Structs28StructWithRefCountStoredPropV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }

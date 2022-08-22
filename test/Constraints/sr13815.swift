@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-13815
+// https://github.com/apple/swift/issues/56212
 
 enum E {
 case foo(String)

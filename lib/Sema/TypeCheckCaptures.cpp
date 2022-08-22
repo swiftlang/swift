@@ -210,11 +210,11 @@ public:
       checkType(VD->getInterfaceType(), VD->getLoc());
   }
 
-  bool shouldWalkIntoLazyInitializers() override {
+  LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
     // We don't want to walk into lazy initializers because they're not
     // really present at this level.  We'll catch them when processing
     // the getter.
-    return false;
+    return LazyInitializerWalking::None;
   }
 
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {

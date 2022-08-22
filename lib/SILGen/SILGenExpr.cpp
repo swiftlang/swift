@@ -415,7 +415,9 @@ namespace {
       return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(),
                                                     std::move(lv)));
     }
-    
+
+    RValue visitLazyInitializerExpr(LazyInitializerExpr *E, SGFContext C);
+
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
     
     RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C) {
@@ -706,6 +708,15 @@ tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
   }
 
   return SGF.emitConvertedRValue(subExpr, conversion, C);
+}
+
+RValue RValueEmitter::visitLazyInitializerExpr(LazyInitializerExpr *E,
+                                               SGFContext C) {
+  // We need to emit a profiler count increment specifically for the lazy
+  // initialization, as we don't want to record an increment for every call to
+  // the getter.
+  SGF.emitProfilerIncrement(E);
+  return visit(E->getSubExpr(), C);
 }
 
 RValue RValueEmitter::visitApplyExpr(ApplyExpr *E, SGFContext C) {

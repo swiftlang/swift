@@ -525,8 +525,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   P.addSimplifyCFG();
   if (OpLevel == OptimizationLevelKind::LowLevel) {
-    // Remove retain/releases based on Builtin.unsafeGuaranteed
-    P.addUnsafeGuaranteedPeephole();
     // Only hoist releases very late.
     P.addLateCodeMotion();
   } else

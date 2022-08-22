@@ -63,6 +63,22 @@ public struct SmallStruct {
 // CHECK-NEXT:   inline LargeStruct scale(swift::Int x, swift::Int y);
 // CHECK-NEXT: private
 
+// CHECK: class SmallStruct final {
+// CHECK:   inline SmallStruct(SmallStruct &&) = default;
+// CHECK-NEXT:   inline void dump() const;
+// CHECK-NEXT:   inline SmallStruct scale(float y);
+// CHECK-NEXT:   inline void invert();
+// CHECK-NEXT: private:
+
+
+public func createLargeStruct() -> LargeStruct {
+    return LargeStruct(x1: 1, x2: -5, x3: 9, x4: 11, x5: 0xbeef, x6: -77)
+}
+
+public func createSmallStruct(x: Float) -> SmallStruct {
+    return SmallStruct(x: x)
+}
+
 // CHECK:        inline void LargeStruct::dump() const {
 // CHECK-NEXT:   return _impl::$s7Methods11LargeStructV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT:   }
@@ -75,13 +91,6 @@ public struct SmallStruct {
 // CHECK-NEXT:   });
 // CHECK-NEXT:   }
 
-// CHECK: class SmallStruct final {
-// CHECK:   inline SmallStruct(SmallStruct &&) = default;
-// CHECK-NEXT:   inline void dump() const;
-// CHECK-NEXT:   inline SmallStruct scale(float y);
-// CHECK-NEXT:   inline void invert();
-// CHECK-NEXT: private:
-
 // CHECK:        inline void SmallStruct::dump() const {
 // CHECK-NEXT:   return _impl::$s7Methods11SmallStructV4dumpyyF(_impl::swift_interop_passDirect_Methods_SmallStruct(_getOpaquePointer()));
 // CHECK-NEXT:   }
@@ -93,12 +102,3 @@ public struct SmallStruct {
 // CHECK-NEXT:   inline void SmallStruct::invert() {
 // CHECK-NEXT:   return _impl::$s7Methods11SmallStructV6invertyyF(_getOpaquePointer());
 // CHECK-NEXT:   }
-
-
-public func createLargeStruct() -> LargeStruct {
-    return LargeStruct(x1: 1, x2: -5, x3: 9, x4: 11, x5: 0xbeef, x6: -77)
-}
-
-public func createSmallStruct(x: Float) -> SmallStruct {
-    return SmallStruct(x: x)
-}

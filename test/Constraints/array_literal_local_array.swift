@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-9611: Array type locally interferes with array literals.
+/// https://github.com/apple/swift/issues/52057
+/// `Array` type locally interferes with array literals
+
 struct Array { }
 
 func foo() {
