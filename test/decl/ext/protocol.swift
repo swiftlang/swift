@@ -288,7 +288,9 @@ extension ExtendedProtocol where Self : DerivedWithAlias {
   func f4(x: NestedNominal) {}
 }
 
-// rdar://problem/21991470 & https://bugs.swift.org/browse/SR-5022
+// rdar://problem/21991470
+// https://github.com/apple/swift/issues/47598
+
 class NonPolymorphicInit {
   init() { } // expected-note {{selected non-required initializer 'init()'}}
 }
