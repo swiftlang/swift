@@ -176,8 +176,8 @@ struct T5 : P5 {
   var a: P5.T1 // OK
 
   // Invalid -- cannot represent associated type of existential
-  var v2: P5.T2 // expected-error {{type alias 'T2' can only be used with a concrete type or generic parameter base}}
-  var v3: P5.X // expected-error {{type alias 'X' can only be used with a concrete type or generic parameter base}}
+  var v2: P5.T2 // expected-error {{cannot access type alias 'T2' from 'P5'; use a concrete type or generic parameter base instead}}
+  var v3: P5.X // expected-error {{cannot access type alias 'X' from 'P5'; use a concrete type or generic parameter base instead}}
 
   // Unqualified reference to typealias from a protocol conformance
   var v4: T1 // OK
@@ -188,7 +188,20 @@ struct T5 : P5 {
   var v7: T5.T2 // OK
 
   var v8 = P6.A.self
-  var v9 = P6.B.self // expected-error {{type alias 'B' can only be used with a concrete type or generic parameter base}}
+  var v9 = P6.B.self // expected-error {{cannot access type alias 'B' from 'P6'; use a concrete type or generic parameter base instead}}
+
+  var v10 = (any P6).A.self
+  var v11 = (any P6).B.self // expected-error {{cannot access type alias 'B' from 'any P6'; use a concrete type or generic parameter base instead}}
+
+  struct Generic<T> {
+    func okay(value: T.A) where T == any P6 {}
+
+    func invalid1(value: T.B) where T == any P6 {}
+    // expected-error@-1 {{cannot access type alias 'B' from 'any P6'; use a concrete type or generic parameter base instead}}
+
+    func invalid2(value: T.A) where T == any P5 {}
+    // expected-error@-1 {{cannot access associated type 'A' from 'any P5'; use a concrete type or generic parameter base instead}}
+  }
 }
 
 // Unqualified lookup finds typealiases in protocol extensions

@@ -126,6 +126,7 @@ Type TypeResolution::resolveDependentMemberType(
   // FIXME(ModQual): Reject qualified names immediately; they cannot be
   // dependent member types.
   Identifier refIdentifier = ref->getNameRef().getBaseIdentifier();
+  ASTContext &ctx = DC->getASTContext();
 
   switch (stage) {
   case TypeResolutionStage::Structural:
@@ -146,8 +147,6 @@ Type TypeResolution::resolveDependentMemberType(
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {
-    ASTContext &ctx = DC->getASTContext();
-
     // Resolve the base to a potential archetype.
     // Perform typo correction.
     TypoCorrectionResults corrections(ref->getNameRef(), ref->getNameLoc());
@@ -187,6 +186,25 @@ Type TypeResolution::resolveDependentMemberType(
   }
 
   auto *concrete = ref->getBoundDecl();
+
+  if (auto concreteBase = genericSig->getConcreteType(baseTy)) {
+    bool hasUnboundOpener = !!getUnboundTypeOpener();
+    switch (TypeChecker::isUnsupportedMemberTypeAccess(concreteBase, concrete,
+                                                       hasUnboundOpener)) {
+    case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfExistential:
+      ctx.Diags.diagnose(ref->getNameLoc(),
+                         diag::typealias_outside_of_protocol,
+                         ref->getNameRef(), concreteBase);
+      break;
+    case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential:
+      ctx.Diags.diagnose(ref->getNameLoc(),
+                         diag::assoc_type_outside_of_protocol,
+                         ref->getNameRef(), concreteBase);
+      break;
+    default:
+      break;
+    };
+  }
 
   // If the nested type has been resolved to an associated type, use it.
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(concrete)) {
@@ -1656,12 +1674,12 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
     case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfExistential:
       diags.diagnose(comp->getNameLoc(), diag::typealias_outside_of_protocol,
-                     comp->getNameRef());
+                     comp->getNameRef(), parentTy);
       return ErrorType::get(ctx);
 
     case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential:
       diags.diagnose(comp->getNameLoc(), diag::assoc_type_outside_of_protocol,
-                     comp->getNameRef());
+                     comp->getNameRef(), parentTy);
       return ErrorType::get(ctx);
     }
 
