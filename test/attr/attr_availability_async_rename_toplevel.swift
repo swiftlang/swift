@@ -2,7 +2,7 @@
 
 // RUN: %target-typecheck-verify-swift
 
-if #available(macOS 12.0, *) {
+if #available(SwiftStdlib 5.5, *) {
   @available(*, renamed: "process(data:)")
   func process(data: [Int], completion: @escaping ([Int]) -> Void) { completion(data) }
   // expected-note@+1{{'process(data:)' declared here}}
