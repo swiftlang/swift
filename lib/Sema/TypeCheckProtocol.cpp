@@ -6762,7 +6762,9 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
 
   auto dc = witness->getDeclContext();
   auto nominal = dc->getSelfNominalTypeDecl();
+
   if (!nominal) return result;
+  if (isa<ProtocolDecl>(nominal)) return result;
 
   DeclName name = witness->getName();
   Optional<AccessorKind> accessorKind;
