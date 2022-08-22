@@ -27,8 +27,6 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/StringSaver.h"
-#include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdint>
 #include <memory>
@@ -48,20 +46,6 @@ enum LocalizationProducerState : uint8_t {
   NotInitialized,
   Initialized,
   FailedInitialization
-};
-
-class DefToYAMLConverter {
-  llvm::ArrayRef<const char *> IDs;
-  llvm::ArrayRef<const char *> Messages;
-
-public:
-  DefToYAMLConverter(llvm::ArrayRef<const char *> ids,
-                     llvm::ArrayRef<const char *> messages)
-      : IDs(ids), Messages(messages) {
-    assert(IDs.size() == Messages.size());
-  }
-
-  void convert(llvm::raw_ostream &out);
 };
 
 class DefToStringsConverter {
@@ -195,9 +179,9 @@ public:
                                        llvm::StringRef defaultMessage);
 
   /// \returns a `SerializedLocalizationProducer` pointer if the serialized
-  /// diagnostics file available, otherwise returns a `YAMLLocalizationProducer`
-  /// if the `YAML` file is available. If both files aren't available returns a
-  /// `nullptr`.
+  /// diagnostics file available, otherwise returns a
+  /// `StringsLocalizationProducer` if the `.strings` file is available. If both
+  /// files aren't available returns a `nullptr`.
   static std::unique_ptr<LocalizationProducer>
   producerFor(llvm::StringRef locale, llvm::StringRef path,
               bool printDiagnosticNames);
@@ -216,27 +200,6 @@ protected:
   /// Retrieve a message for the given diagnostic id.
   /// \returns empty string if message couldn't be found.
   virtual llvm::StringRef getMessage(swift::DiagID id) const = 0;
-};
-
-class YAMLLocalizationProducer final : public LocalizationProducer {
-  std::vector<std::string> diagnostics;
-  std::string filePath;
-
-public:
-  /// The diagnostics IDs that are no longer available in `.def`
-  std::vector<std::string> unknownIDs;
-  explicit YAMLLocalizationProducer(llvm::StringRef filePath,
-                                    bool printDiagnosticNames = false);
-
-  /// Iterate over all of the available (non-empty) translations
-  /// maintained by this producer, callback gets each translation
-  /// with its unique identifier.
-  void forEachAvailable(
-      llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback);
-
-protected:
-  bool initializeImpl() override;
-  llvm::StringRef getMessage(swift::DiagID id) const override;
 };
 
 class StringsLocalizationProducer final : public LocalizationProducer {
@@ -279,32 +242,6 @@ public:
 protected:
   bool initializeImpl() override;
   llvm::StringRef getMessage(swift::DiagID id) const override;
-};
-
-class LocalizationInput : public llvm::yaml::Input {
-  using Input::Input;
-
-  /// Read diagnostics in the YAML file iteratively
-  template <typename T, typename Context>
-  friend typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value,
-                                 void>::type
-  readYAML(llvm::yaml::IO &io, T &Seq, T &unknownIDs, bool, Context &Ctx);
-
-  template <typename T>
-  friend typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value,
-                                 LocalizationInput &>::type
-  operator>>(LocalizationInput &yin, T &diagnostics);
-
-public:
-  /// A vector that keeps track of the diagnostics IDs that are available in
-  /// YAML and not available in `.def` files.
-  std::vector<std::string> unknownIDs;
-  
-  /// A diagnostic ID might be present in YAML and not in `.def` file, if that's
-  /// the case the `id` won't have a `DiagID` value.
-  /// If the `id` is available in `.def` file this method will return the `id`'s
-  /// value, otherwise this method won't return a value.
-  static llvm::Optional<uint32_t> readID(llvm::yaml::IO &io);
 };
 
 } // namespace diag

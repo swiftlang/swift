@@ -42,7 +42,7 @@ static llvm::cl::OptionCategory Category("swift-serialize-diagnostics Options");
 
 static llvm::cl::opt<std::string>
     InputFilePath("input-file-path",
-                  llvm::cl::desc("Path to the YAML or `.strings` input file"),
+                  llvm::cl::desc("Path to the `.strings` input file"),
                   llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
@@ -71,24 +71,7 @@ int main(int argc, char *argv[]) {
 
   SerializedLocalizationWriter Serializer;
 
-  if (llvm::sys::path::extension(options::InputFilePath) == ".yaml") {
-    YAMLLocalizationProducer yaml(options::InputFilePath);
-
-    yaml.forEachAvailable(
-        [&Serializer](swift::DiagID id, llvm::StringRef translation) {
-          Serializer.insert(id, translation);
-        });
-
-    // Print out the diagnostics IDs that are available in YAML but not
-    // available in `.def`
-    if (!yaml.unknownIDs.empty()) {
-      llvm::errs() << "These diagnostic IDs are no longer available: '";
-      llvm::interleave(
-          yaml.unknownIDs, [&](std::string id) { llvm::errs() << id; },
-          [&] { llvm::errs() << ", "; });
-      llvm::errs() << "'\n";
-    }
-  } else {
+  {
     assert(llvm::sys::path::extension(options::InputFilePath) == ".strings");
 
     StringsLocalizationProducer strings(options::InputFilePath);
