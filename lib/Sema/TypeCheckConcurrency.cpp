@@ -1489,6 +1489,7 @@ static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
 }
 
 /// Note when the enclosing context could be put on a global actor.
+// FIXME: This should handle closures too.
 static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
   // If we are in a synchronous function on the global actor,
   // suggest annotating with the global actor itself.
@@ -3755,14 +3756,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If this is a local function, inherit the actor isolation from its
   // context if it global or was captured.
   if (auto func = dyn_cast<FuncDecl>(value)) {
-    // If this is a defer body, inherit unconditionally; we don't
-    // care if the enclosing function captures the isolated parameter.
-    if (func->isDeferBody()) {
-      auto enclosingIsolation =
-                        getActorIsolationOfContext(func->getDeclContext());
-      return inferredIsolation(enclosingIsolation);
-    }
-
     if (func->isLocalCapture() && !func->isSendable()) {
       switch (auto enclosingIsolation =
                   getActorIsolationOfContext(func->getDeclContext())) {

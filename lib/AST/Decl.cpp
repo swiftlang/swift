@@ -9140,14 +9140,20 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
 }
 
 ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
-  if (auto *vd = dyn_cast_or_null<ValueDecl>(dc->getAsDecl()))
+  auto dcToUse = dc;
+  // Defer bodies share actor isolation of their enclosing context.
+  if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
+    if (FD->isDeferBody()) {
+      dcToUse = FD->getDeclContext();
+    }
+  }
+  if (auto *vd = dyn_cast_or_null<ValueDecl>(dcToUse->getAsDecl()))
     return getActorIsolation(vd);
 
-  if (auto *var = dc->getNonLocalVarDecl())
-     return getActorIsolation(var);
+  if (auto *var = dcToUse->getNonLocalVarDecl())
+    return getActorIsolation(var);
 
-
-  if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+  if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
     switch (auto isolation = closure->getActorIsolation()) {
     case ClosureActorIsolation::Independent:
       return ActorIsolation::forIndependent()
@@ -9170,14 +9176,14 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     }
   }
 
-  if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
-    if (dc->isAsyncContext() ||
-        dc->getASTContext().LangOpts.StrictConcurrencyLevel
-            >= StrictConcurrency::Complete) {
-      if (Type mainActor = dc->getASTContext().getMainActorType())
+  if (auto *tld = dyn_cast<TopLevelCodeDecl>(dcToUse)) {
+    if (dcToUse->isAsyncContext() ||
+        dcToUse->getASTContext().LangOpts.StrictConcurrencyLevel >=
+            StrictConcurrency::Complete) {
+      if (Type mainActor = dcToUse->getASTContext().getMainActorType())
         return ActorIsolation::forGlobalActor(
             mainActor,
-            /*unsafe=*/!dc->getASTContext().isSwiftVersionAtLeast(6));
+            /*unsafe=*/!dcToUse->getASTContext().isSwiftVersionAtLeast(6));
     }
   }
 
