@@ -389,6 +389,21 @@ def apply_default_arguments(toolchain, args):
             '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
                 args.swift_darwin_module_archs))
 
+    if (args.infer_cross_compile_hosts_on_darwin and
+            platform.system() == "Darwin"):
+        args.cross_compile_hosts = _infer_cross_compile_hosts_on_darwin()
+        print("Inferred the following hosts for cross compilations: "
+              f"{args.cross_compile_hosts}")
+        sys.stdout.flush()
+
+
+def _infer_cross_compile_hosts_on_darwin():
+    if platform.machine() == "x86_64":
+        return ["macosx-arm64"]
+    else:
+        return ["macosx-x86_64"]
+
+
 # -----------------------------------------------------------------------------
 # Main (preset)
 

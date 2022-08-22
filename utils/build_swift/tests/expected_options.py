@@ -133,6 +133,7 @@ EXPECTED_DEFAULTS = {
     'cross_compile_append_host_target_to_destdir': True,
     'cross_compile_deps_path': None,
     'cross_compile_hosts': [],
+    'infer_cross_compile_hosts_on_darwin': False,
     'darwin_deployment_version_ios':
         defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
     'darwin_deployment_version_osx':
@@ -732,6 +733,7 @@ EXPECTED_OPTIONS = [
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 
     AppendOption('--cross-compile-hosts'),
+    SetTrueOption('--infer-cross-compile-hosts-on-darwin'),
     AppendOption('--extra-cmake-options'),
     AppendOption('--extra-swift-args'),
     AppendOption('--test-paths'),
