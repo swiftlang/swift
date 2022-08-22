@@ -345,22 +345,49 @@ bool ConstraintSystem::simplify() {
     auto *constraint = &ActiveConstraints.front();
     deactivateConstraint(constraint);
 
+    if (isDebugMode()) {
+      auto &log = llvm::errs();
+      log.indent(solverState->getCurrentIndent());
+      log << "(considering -> ";
+      constraint->print(log, &getASTContext().SourceMgr);
+      log << "\n";
+    }
+
     // Simplify this constraint.
     switch (simplifyConstraint(*constraint)) {
     case SolutionKind::Error:
       retireFailedConstraint(constraint);
+      if (isDebugMode()) {
+        auto &log = llvm::errs();
+        log.indent(solverState->getCurrentIndent() + 2) << "(outcome: error)\n";
+      }
       break;
 
     case SolutionKind::Solved:
       if (solverState)
         ++solverState->NumSimplifiedConstraints;
       retireConstraint(constraint);
+      if (isDebugMode()) {
+        auto &log = llvm::errs();
+        log.indent(solverState->getCurrentIndent() + 2)
+            << "(outcome: simplified)\n";
+      }
       break;
 
     case SolutionKind::Unsolved:
       if (solverState)
         ++solverState->NumUnsimplifiedConstraints;
+      if (isDebugMode()) {
+        auto &log = llvm::errs();
+        log.indent(solverState->getCurrentIndent() + 2)
+            << "(outcome: unsolved)\n";
+      }
       break;
+    }
+
+    if (isDebugMode()) {
+      auto &log = llvm::errs();
+      log.indent(solverState->getCurrentIndent()) << ")\n";
     }
 
     // Check whether a constraint failed. If so, we're done.
