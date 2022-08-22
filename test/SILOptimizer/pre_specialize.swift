@@ -140,14 +140,14 @@ public func usePrespecializedEntryPoints() {
   useInternalThing(SomeClass())
 }
 
-// OPT: sil @$s14pre_specialize34usePrespecializedThrowsEntryPointsyyKF : $@convention(thin) () -> @error Error {
-// OPT:   [[F1:%.*]] = function_ref @$s22pre_specialized_module26publicPrespecializedThrowsyxxKlFSi_Ts5 : $@convention(thin) (Int) -> (Int, @error Error)
-// OPT:   try_apply [[F1]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error)
-// OPT-macosx:   [[F2:%.*]] = function_ref @$s22pre_specialized_module26publicPrespecializedThrowsyxxKlFAA8SomeDataV_Tg5 : $@convention(thin) (SomeData) -> (SomeData, @error Error)
-// OPT-macosx:   try_apply [[F2]]({{%.*}}) : $@convention(thin) (SomeData) -> (SomeData, @error Error)
-// OPT:   [[F3:%.*]] = function_ref @$s22pre_specialized_module26publicPrespecializedThrowsyxxKlFyXl_Ts5 : $@convention(thin) (@guaranteed AnyObject) -> (@owned AnyObject, @error Error)
+// OPT: sil @$s14pre_specialize34usePrespecializedThrowsEntryPointsyyKF : $@convention(thin) () -> @error any Error {
+// OPT:   [[F1:%.*]] = function_ref @$s22pre_specialized_module26publicPrespecializedThrowsyxxKlFSi_Ts5 : $@convention(thin) (Int) -> (Int, @error any Error)
+// OPT:   try_apply [[F1]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error)
+// OPT-macosx:   [[F2:%.*]] = function_ref @$s22pre_specialized_module26publicPrespecializedThrowsyxxKlFAA8SomeDataV_Tg5 : $@convention(thin) (SomeData) -> (SomeData, @error any Error)
+// OPT-macosx:   try_apply [[F2]]({{%.*}}) : $@convention(thin) (SomeData) -> (SomeData, @error any Error)
+// OPT:   [[F3:%.*]] = function_ref @$s22pre_specialized_module26publicPrespecializedThrowsyxxKlFyXl_Ts5 : $@convention(thin) (@guaranteed AnyObject) -> (@owned AnyObject, @error any Error)
 // OPT:   [[A1:%.*]] = unchecked_ref_cast {{%.*}} : $SomeClass to $AnyObject
-// OPT:   try_apply [[F3]]([[A1]]) : $@convention(thin) (@guaranteed AnyObject) -> (@owned AnyObject, @error Error), normal [[BB1:bb.*]], error
+// OPT:   try_apply [[F3]]([[A1]]) : $@convention(thin) (@guaranteed AnyObject) -> (@owned AnyObject, @error any Error), normal [[BB1:bb.*]], error
 // OPT: [[BB1]]([[A2:%.*]] : $AnyObject):
 // OPT:   [[R1:%.*]] = unchecked_addr_cast {{%.*}} : $*SomeClass to $*AnyObject
 // OPT:   store [[A2]] to [[R1]] : $*AnyObject
