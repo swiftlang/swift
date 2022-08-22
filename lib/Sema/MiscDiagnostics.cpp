@@ -5187,67 +5187,6 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
-namespace {
-
-class CompletionHandlerUsageChecker final : public ASTWalker {
-  ASTContext &ctx;
-
-public:
-  CompletionHandlerUsageChecker(ASTContext &ctx) : ctx(ctx) {}
-
-  bool walkToDeclPre(Decl *D) override { return !isa<PatternBindingDecl>(D); }
-
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-    if (expr->getType().isNull())
-      return {false, expr}; // Something failed to typecheck, bail out
-
-    if (auto *closure = dyn_cast<ClosureExpr>(expr))
-      return {closure->isBodyAsync(), closure};
-
-    if (auto *call = dyn_cast<ApplyExpr>(expr)) {
-      if (auto *fn = dyn_cast<DeclRefExpr>(call->getFn())) {
-        if (auto *afd = dyn_cast<AbstractFunctionDecl>(fn->getDecl())) {
-          auto *asyncFunc = afd->getAsyncAlternative();
-          if (!asyncFunc)
-            return {false, call};
-          ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
-
-          if (auto *accessor = dyn_cast<AccessorDecl>(asyncFunc)) {
-            SmallString<32> name;
-            llvm::raw_svector_ostream os(name);
-            accessor->printUserFacingName(os);
-            ctx.Diags.diagnose(asyncFunc->getLoc(),
-                               diag::descriptive_decl_declared_here, name);
-          } else {
-            ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
-                               asyncFunc->getName());
-          }
-        }
-      }
-    }
-    return {true, expr};
-  }
-};
-
-} // namespace
-
-void swift::checkFunctionAsyncUsage(AbstractFunctionDecl *decl) {
-  if (!decl->isAsyncContext())
-    return;
-  CompletionHandlerUsageChecker checker(decl->getASTContext());
-  BraceStmt *body = decl->getBody();
-  if (body)
-    body->walk(checker);
-}
-
-void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
-  CompletionHandlerUsageChecker checker(decl->getASTContext());
-  for (Expr *init : decl->initializers()) {
-    if (auto closure = dyn_cast_or_null<ClosureExpr>(init))
-      closure->walk(checker);
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
