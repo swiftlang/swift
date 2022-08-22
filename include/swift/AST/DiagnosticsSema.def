@@ -5849,6 +5849,10 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "%4 was not imported by this file}5",
       (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 
+NOTE(missing_import_inserted,
+     none, "The missing import of module %0 will be added implicitly",
+     (Identifier))
+
 ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
       (unsigned))
