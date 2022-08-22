@@ -163,6 +163,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMoveFunctionCanonicalization();
   P.addMoveKillsCopyableAddressesChecker();
 
+  // Now perform move object checking. We again do this before predictable
+  // memory access opts to ensure that we do not get any non-source related
+  // diagnostics due to value promotion.
+  P.addMoveOnlyObjectChecker(); // Check noImplicitCopy and move only
+                                // types.
+
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
   P.addPredictableMemoryAccessOptimizations();
@@ -171,8 +177,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // SSA based move function checking and no implicit copy checking.
   P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
                                          //   value.
-  P.addMoveOnlyObjectChecker();          // Check noImplicitCopy and move only
-                                         // types.
 
   // Now that we have run move only checking, eliminate SILMoveOnly wrapped
   // trivial types from the IR. We cannot introduce extra "copies" of trivial

@@ -2841,6 +2841,11 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
   if (getMemoryType(alloc).aggregateHasUnreferenceableStorage())
     return nullptr;
 
+  // Do not perform this on move only values since we introduce copies to
+  // promote things.
+  if (getMemoryType(alloc).isMoveOnly())
+    return nullptr;
+
   // Otherwise we are good to go. Lets try to optimize this memory!
   return alloc;
 }
