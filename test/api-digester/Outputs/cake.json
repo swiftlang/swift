@@ -100,17 +100,17 @@
         "conformances": [
           {
             "kind": "Conformance",
-            "name": "P2",
-            "printedName": "P2",
-            "usr": "s:4cake2P2P",
-            "mangledName": "$s4cake2P2P"
-          },
-          {
-            "kind": "Conformance",
             "name": "P1",
             "printedName": "P1",
             "usr": "s:4cake2P1P",
             "mangledName": "$s4cake2P1P"
+          },
+          {
+            "kind": "Conformance",
+            "name": "P2",
+            "printedName": "P2",
+            "usr": "s:4cake2P2P",
+            "mangledName": "$s4cake2P2P"
           }
         ]
       },
