@@ -874,13 +874,18 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     entry->Conformance =
         ctx.getInheritedConformance(type, inheritedConformance.getConcrete());
   } else {
-    // Create or find the normal conformance.
+    // Protocols don't have conformance lookup tables. Self-conformance is
+    // handled directly in lookupConformance().
+    assert(!isa<ProtocolDecl>(conformingNominal));
+    assert(!isa<ProtocolDecl>(conformingDC->getSelfNominalTypeDecl()));
     Type conformingType = conformingDC->getSelfInterfaceType();
+
     SourceLoc conformanceLoc
       = conformingNominal == conformingDC
           ? conformingNominal->getLoc()
           : cast<ExtensionDecl>(conformingDC)->getLoc();
 
+    // Create or find the normal conformance.
     auto normalConf =
         ctx.getConformance(conformingType, protocol, conformanceLoc,
                            conformingDC, ProtocolConformanceState::Incomplete,

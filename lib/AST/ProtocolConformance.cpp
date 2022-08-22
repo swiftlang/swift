@@ -1224,6 +1224,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
 
 #pragma mark Protocol conformance lookup
 void NominalTypeDecl::prepareConformanceTable() const {
+  assert(!isa<ProtocolDecl>(this) &&
+         "Protocols don't have a conformance table");
+
   if (ConformanceTable)
     return;
 
@@ -1292,6 +1295,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
 bool NominalTypeDecl::lookupConformance(
        ProtocolDecl *protocol,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
+  assert(!isa<ProtocolDecl>(this) &&
+         "Self-conformances are only found by the higher-level "
+         "ModuleDecl::lookupConformance() entry point");
+
   prepareConformanceTable();
   return ConformanceTable->lookupConformance(
            const_cast<NominalTypeDecl *>(this),
@@ -1301,6 +1308,10 @@ bool NominalTypeDecl::lookupConformance(
 
 SmallVector<ProtocolDecl *, 2>
 NominalTypeDecl::getAllProtocols(bool sorted) const {
+  assert(!isa<ProtocolDecl>(this) &&
+         "For inherited protocols, use ProtocolDecl::inheritsFrom() or "
+         "ProtocolDecl::getInheritedProtocols()");
+
   prepareConformanceTable();
   SmallVector<ProtocolDecl *, 2> result;
   ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this), result,
