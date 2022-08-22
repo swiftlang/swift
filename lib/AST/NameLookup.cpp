@@ -3121,10 +3121,17 @@ static bool checkForDynamicAttribute(Evaluator &eval, NominalTypeDecl *decl) {
     return evaluateOrDefault(eval, Req{decl}, false);
   };
 
-  // Check the protocols the type conforms to.
-  for (auto *proto : decl->getAllProtocols()) {
-    if (hasAttribute(proto))
-      return true;
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    // Check inherited protocols of a protocol.
+    for (auto *otherProto : proto->getInheritedProtocols())
+      if (hasAttribute(otherProto))
+        return true;
+  } else {
+    // Check the protocols the type conforms to.
+    for (auto *otherProto : decl->getAllProtocols()) {
+      if (hasAttribute(otherProto))
+        return true;
+    }
   }
 
   // Check the superclass if present.
