@@ -136,7 +136,7 @@ bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
       return true;
 
     // construct an isolation corresponding to the type.
-    auto actorTypeIso = ActorIsolation::forActorInstance(nominal);
+    auto actorTypeIso = ActorIsolation::forActorInstanceSelf(nominal);
 
     return requiresFlowIsolation(actorTypeIso, cast<ConstructorDecl>(fn));
   }
@@ -2521,7 +2521,6 @@ namespace {
         return false;
 
       // Check for isolated parameters.
-      Optional<unsigned> isolatedParamIdx;
       for (unsigned paramIdx : range(fnType->getNumParams())) {
         // We only care about isolated parameters.
         if (!fnType->getParams()[paramIdx].isIsolated())
@@ -2545,8 +2544,8 @@ namespace {
               KnownProtocolKind::Actor);
         }
 
-        unsatisfiedIsolation = ActorIsolation::forActorInstance(nominal);
-        isolatedParamIdx = paramIdx;
+        unsatisfiedIsolation =
+            ActorIsolation::forActorInstanceParameter(nominal, paramIdx);
         break;
       }
 
@@ -2595,7 +2594,8 @@ namespace {
 
         case ActorIsolation::ActorInstance:
           apply->setImplicitlyAsync(
-            ImplicitActorHopTarget::forIsolatedParameter(*isolatedParamIdx));
+            ImplicitActorHopTarget::forIsolatedParameter(
+                unsatisfiedIsolation->getActorInstanceParameter() - 1));
           break;
 
         case ActorIsolation::Unspecified:
@@ -2847,8 +2847,12 @@ namespace {
       if (partialApply && result.isolation.isGlobalActor())
         return false;
 
-      // A call to a global-actor-isolated function is diagnosed elsewhere.
-      if (!partialApply && result.isolation.isGlobalActor() &&
+      // A call to a global-actor-isolated function, or a function with an
+      // isolated parameter, is diagnosed elsewhere.
+      if (!partialApply &&
+          (result.isolation.isGlobalActor() ||
+           (result.isolation == ActorIsolation::ActorInstance &&
+            result.isolation.getActorInstanceParameter() > 0)) &&
           isa<AbstractFunctionDecl>(decl))
         return false;
 
@@ -3654,6 +3658,22 @@ static OverrideIsolationResult validOverrideIsolation(
   }
 }
 
+/// Retrieve the index of the first isolated parameter of the given
+/// declaration, if there is one.
+static Optional<unsigned> getIsolatedParamIndex(ValueDecl *value) {
+  auto params = getParameterList(value);
+  if (!params)
+    return None;
+
+  for (unsigned paramIdx : range(params->size())) {
+    auto param = params->get(paramIdx);
+    if (param->isIsolated())
+      return paramIdx;
+  }
+
+  return None;
+}
+
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
   // If this declaration has actor-isolated "self", it's isolated to that
@@ -3661,7 +3681,22 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
     auto actor = value->getDeclContext()->getSelfNominalTypeDecl();
     assert(actor && "could not find the actor that 'self' is isolated to");
-    return ActorIsolation::forActorInstance(actor);
+    return ActorIsolation::forActorInstanceSelf(actor);
+  }
+
+  // If this declaration has an isolated parameter, it's isolated to that
+  // parameter.
+  if (auto paramIdx = getIsolatedParamIndex(value)) {
+    // FIXME: This doesn't allow us to find an Actor or DistributedActor
+    // bound on the parameter type effectively.
+    auto param = getParameterList(value)->get(*paramIdx);
+    Type paramType = param->getInterfaceType();
+    if (paramType->isTypeParameter()) {
+      paramType = param->getDeclContext()->mapTypeIntoContext(paramType);
+    }
+
+    if (auto actor = paramType->getAnyActor())
+      return ActorIsolation::forActorInstanceParameter(actor, *paramIdx);
   }
 
   auto isolationFromAttr = getIsolationFromAttributes(value);
@@ -3946,6 +3981,10 @@ bool HasIsolatedSelfRequest::evaluate(
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
     value = accessor->getStorage();
   }
+
+  // If there is an isolated parameter, then "self" is not isolated.
+  if (getIsolatedParamIndex(value))
+    return false;
 
   // Check whether this member can be isolated to an actor at all.
   auto memberIsolation = getMemberIsolationPropagation(value);
@@ -4950,7 +4989,7 @@ static ActorIsolation getActorIsolationForReference(
     // as needing to enter the actor.
     if (auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl()) {
       if (nominal->isAnyActor())
-        return ActorIsolation::forActorInstance(nominal);
+        return ActorIsolation::forActorInstanceSelf(nominal);
     }
 
     // Fall through to treat initializers like any other declaration.
@@ -4966,7 +5005,7 @@ static ActorIsolation getActorIsolationForReference(
         declIsolation.isIndependent()) {
       if (auto nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
         if (nominal->isAnyActor())
-          return ActorIsolation::forActorInstance(nominal);
+          return ActorIsolation::forActorInstanceSelf(nominal);
 
         auto nominalIsolation = getActorIsolation(nominal);
         if (nominalIsolation.isGlobalActor())
@@ -5137,7 +5176,8 @@ ActorReferenceResult ActorReferenceResult::forReference(
 
   // The declaration we are accessing is actor-isolated. First, check whether
   // we are on the same actor already.
-  if (actorInstance && declIsolation == ActorIsolation::ActorInstance) {
+  if (actorInstance && declIsolation == ActorIsolation::ActorInstance &&
+      declIsolation.getActorInstanceParameter() == 0) {
     // If this instance is isolated, we're in the same concurrency domain.
     if (actorInstance->isIsolated())
       return forSameConcurrencyDomain(declIsolation);
