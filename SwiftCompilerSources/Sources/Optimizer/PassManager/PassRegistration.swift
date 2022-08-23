@@ -38,20 +38,25 @@ private func registerPass<InstType: Instruction>(
 }
 
 private func registerSwiftPasses() {
-  registerPass(silPrinterPass, { silPrinterPass.run($0) })
+  // Function passes
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
-  registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
-  registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
-  registerPass(accessDumper, { accessDumper.run($0) })
   registerPass(computeEffects, { computeEffects.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(stackPromotion, { stackPromotion.run($0) })
+  registerPass(assumeSingleThreadedPass, { assumeSingleThreadedPass.run($0) })
+  registerPass(releaseDevirtualizerPass, { releaseDevirtualizerPass.run($0) })
+
+  // Instruction passes
   registerPass(simplifyBeginCOWMutationPass, { simplifyBeginCOWMutationPass.run($0) })
   registerPass(simplifyGlobalValuePass, { simplifyGlobalValuePass.run($0) })
   registerPass(simplifyStrongRetainPass, { simplifyStrongRetainPass.run($0) })
   registerPass(simplifyStrongReleasePass, { simplifyStrongReleasePass.run($0) })
-  registerPass(assumeSingleThreadedPass, { assumeSingleThreadedPass.run($0) })
+
+  // Test passes
+  registerPass(silPrinterPass, { silPrinterPass.run($0) })
+  registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
+  registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
+  registerPass(accessDumper, { accessDumper.run($0) })
   registerPass(rangeDumper, { rangeDumper.run($0) })
   registerPass(runUnitTests, { runUnitTests.run($0) })
-  registerPass(releaseDevirtualizerPass, { releaseDevirtualizerPass.run($0) })
 }
