@@ -1,0 +1,18 @@
+# REQUIRES: standalone_build
+# REQUIRES: OS=macosx
+
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --infer-cross-compile-hosts-on-darwin --cmake %cmake  2>&1 | %FileCheck --check-prefix=INFER-CROSS-COMPILE-HOSTS-ON-DARWIN-%target-cpu %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --infer-cross-compile-hosts-on-darwin=1 --cmake %cmake  2>&1 | %FileCheck --check-prefix=INFER-CROSS-COMPILE-HOSTS-ON-DARWIN-%target-cpu %s
+
+# INFER-CROSS-COMPILE-HOSTS-ON-DARWIN-x86_64: Inferred the following hosts for cross compilations: ['macosx-arm64']
+# INFER-CROSS-COMPILE-HOSTS-ON-DARWIN-arm64: Inferred the following hosts for cross compilations: ['macosx-x86_64']
+
+
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake  2>&1 | %FileCheck --check-prefix=NO-INFER-CROSS-COMPILE-HOSTS-ON-DARWIN %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --infer-cross-compile-hosts-on-darwin=0 --cmake %cmake  2>&1 | %FileCheck --check-prefix=NO-INFER-CROSS-COMPILE-HOSTS-ON-DARWIN %s
+
+# NO-INFER-CROSS-COMPILE-HOSTS-ON-DARWIN-NOT: Inferred the following hosts for cross compilations:

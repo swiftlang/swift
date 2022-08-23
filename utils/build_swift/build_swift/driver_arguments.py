@@ -580,6 +580,11 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
+    option('--infer-cross-compile-hosts-on-darwin', toggle_true,
+           help="When building on Darwin, automatically populate cross-compile-hosts "
+                "based on the architecture build-script is running on. "
+                "Has precedence over cross-compile-hosts")
+
     option('--cross-compile-deps-path', store_path,
            help='The path to a directory that contains prebuilt cross-compiled '
                 'library dependencies of the corelibs and other Swift repos, '
