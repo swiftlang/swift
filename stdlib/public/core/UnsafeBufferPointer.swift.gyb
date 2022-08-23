@@ -671,8 +671,10 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and an index to the next uninitialized element in the buffer.
   @inlinable // unsafe-performance
-  public func initialize<S: Sequence>(from source: S) -> (S.Iterator, Index)
-    where S.Element == Element {
+  @_silgen_name("$sSr10initialize4from8IteratorQyd___Sitqd___t7ElementQyd__RszSTRd__lF")
+  public func initialize<S: Sequence>(
+    from source: S
+  ) -> (unwritten: S.Iterator, index: Index) where S.Element == Element {
     return source._copyContents(initializing: self)
   }
 
