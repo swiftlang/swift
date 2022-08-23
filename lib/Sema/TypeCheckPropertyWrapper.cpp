@@ -58,7 +58,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
       auto fixitLocation = nominal->getBraces().Start;
       nominal->diagnose(diag::property_wrapper_no_value_property,
                         nominal->getDeclaredType(), name)
-        .fixItInsertAfter(fixitLocation, fixIt);
+        .fixItInsertAfter(fixitLocation, "\n"+fixIt);
     }
 
     return nullptr;
