@@ -21,6 +21,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 
 #include <set>
 #include <sstream>

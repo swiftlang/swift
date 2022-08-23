@@ -1452,7 +1452,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       // for the specified locale code.
       llvm::SmallString<128> localizationPath(A->getValue());
       llvm::sys::path::append(localizationPath, Opts.LocalizationCode);
-      llvm::sys::path::replace_extension(localizationPath, ".yaml");
+      llvm::sys::path::replace_extension(localizationPath, ".strings");
       if (!llvm::sys::fs::exists(localizationPath)) {
         Diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
                        Opts.LocalizationCode, localizationPath);
