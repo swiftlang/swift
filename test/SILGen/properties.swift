@@ -13,8 +13,7 @@ func physical_tuple_lvalue(_ c: Int) {
   var x : (Int, Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var (Int, Int) }
   // CHECK: [[MARKED_BOX:%[0-9]+]] = mark_uninitialized [var] [[BOX]]
-  // CHECK: [[LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_BOX]]
-  // CHECK: [[XADDR:%.*]] = project_box [[LIFETIME]]
+  // CHECK: [[XADDR:%.*]] = project_box [[MARKED_BOX]]
   x.1 = c
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[XADDR]]
   // CHECK: [[X_1:%[0-9]+]] = tuple_element_addr [[WRITE]] : {{.*}}, 1
@@ -344,8 +343,7 @@ func inout_arg(_ x: inout Int) {}
 func physical_inout(_ x: Int) {
   var x = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XADDR]]
-  // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
+  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
   inout_arg(&x)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @$s10properties9inout_arg{{[_0-9a-zA-Z]*}}F
@@ -781,8 +779,7 @@ struct MutatingGetterStruct {
 
   // CHECK-LABEL: sil hidden [ossa] @$s10properties20MutatingGetterStructV4test
   // CHECK: [[X:%.*]] = alloc_box ${ var MutatingGetterStruct }, var, name "x"
-  // CHECK: [[LIFETIME:%.*]] = begin_borrow [lexical] [[X]]
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[LIFETIME]]
+  // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
   // CHECK: store {{.*}} to [trivial] [[PB]] : $*MutatingGetterStruct
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: apply {{%.*}}([[WRITE]]) : $@convention(method) (@inout MutatingGetterStruct) -> Int

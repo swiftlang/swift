@@ -972,14 +972,12 @@ struct SR_15940_C {
 // CHECK: bb0(%0 : $SR_15940_C):
 // CHECK-NEXT:  debug_value %0 : $SR_15940_C, let, name "self", argno 1, implicit
 // CHECK-NEXT:  [[BOX:%.*]] = alloc_box ${ var SR_15940Foo }, var, name "_b"
-// CHECK-NEXT:  [[LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]] : ${ var SR_15940Foo }
-// CHECK-NEXT:  [[BOXADDR:%.*]] = project_box [[LIFETIME]] : ${ var SR_15940Foo }, 0
+// CHECK-NEXT:  [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var SR_15940Foo }, 0
 // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin SR_15940Foo.Type
 // CHECK-NEXT:  // function_ref SR_15940Foo.init()
 // CHECK-NEXT:  [[DEFAULTVALUE_FN:%.*]] = function_ref @$s17property_wrappers11SR_15940FooVACycfC : $@convention(method) (@thin SR_15940Foo.Type) -> SR_15940Foo
 // CHECK-NEXT:  [[DEFAULTRESULT:%.*]] = apply [[DEFAULTVALUE_FN]]([[METATYPE]]) : $@convention(method) (@thin SR_15940Foo.Type) -> SR_15940Foo
 // CHECK-NEXT:  store [[DEFAULTRESULT]] to [trivial] [[BOXADDR]] : $*SR_15940Foo
-// CHECK-NEXT:  end_borrow [[LIFETIME]] : ${ var SR_15940Foo }
 // CHECK-NEXT:  destroy_value [[BOX]] : ${ var SR_15940Foo }
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()

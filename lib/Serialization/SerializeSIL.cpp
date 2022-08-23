@@ -624,8 +624,11 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     unsigned packedMetadata = 0;
     packedMetadata |= unsigned(SA->getType().getCategory());  // 8 bits
     packedMetadata |= unsigned(SA->getOwnershipKind()) << 8;  // 8 bits
-    packedMetadata |= unsigned(SA->isNoImplicitCopy()) << 16; // 1 bit
-    // Used: 17 bits. Free: 15.
+    if (auto *SFA = dyn_cast<SILFunctionArgument>(SA)) {
+      packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 16; // 1 bit
+      packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 17; // 2 bits
+    }
+    // Used: 19 bits. Free: 13.
     //
     // TODO: We should be able to shrink the packed metadata of the first two.
     Args.push_back(packedMetadata);

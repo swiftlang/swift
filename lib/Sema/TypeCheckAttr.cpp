@@ -318,6 +318,9 @@ public:
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
 
+  void visitEagerMoveAttr(EagerMoveAttr *attr);
+  void visitLexicalAttr(LexicalAttr *attr);
+
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
@@ -6218,6 +6221,16 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   auto fn = cast<FuncDecl>(D);
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  }
+}
+
+void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {}
+
+void AttributeChecker::visitLexicalAttr(LexicalAttr *attr) {
+  // @_lexical and @_eagerMove are opposites and can't be combined.
+  if (D->getAttrs().hasAttribute<EagerMoveAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::eagermove_and_lexical_combined);
+    return;
   }
 }
 

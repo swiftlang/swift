@@ -662,7 +662,12 @@ SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
   116)
 
-// 117 was 'spawn' and is now unused
+SIMPLE_DECL_ATTR(_eagerMove, EagerMove,
+  UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIStableToRemove |
+  OnParam | OnVar | OnNominalType,
+  117)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   DeclModifier | OnClass | OnFunc | OnAccessor | OnVar |
@@ -670,7 +675,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   APIBreakingToAdd | APIBreakingToRemove,
   118)
 
-// 119 is unused
+SIMPLE_DECL_ATTR(_lexical, Lexical,
+  UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIStableToRemove |
+  OnParam | OnVar | OnNominalType,
+  119)
 
 SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
   OnFunc | UserInaccessible | NotSerialized | OnNominalType |

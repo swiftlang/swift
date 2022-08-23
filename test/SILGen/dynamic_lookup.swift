@@ -175,8 +175,7 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[INT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INT_BOX]]
-  // CHECK:   project_box [[INT_LIFETIME]]
+  // CHECK:   project_box [[INT_BOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -206,8 +205,7 @@ func opt_to_property(_ obj: AnyObject) {
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // GUARANTEED:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // GUARANTEED:   [[INT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INT_BOX]]
-  // GUARANTEED:   project_box [[INT_LIFETIME]]
+  // GUARANTEED:   project_box [[INT_BOX]]
   // GUARANTEED:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // GUARANTEED:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // GUARANTEED:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -237,8 +235,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[I_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[I_BOX]]
-  // CHECK:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
+  // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   alloc_box ${ var Int }
   // CHECK:   project_box
@@ -273,8 +270,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // GUARANTEED:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // GUARANTEED:   [[I_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[I_BOX]]
-  // GUARANTEED:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
+  // GUARANTEED:   [[PBI:%.*]] = project_box [[I_BOX]]
   // GUARANTEED:   store [[I]] to [trivial] [[PBI]] : $*Int
   // GUARANTEED:   alloc_box ${ var Int }
   // GUARANTEED:   project_box
@@ -309,8 +305,7 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[I_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[I_BOX]]
-  // CHECK:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
+  // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject

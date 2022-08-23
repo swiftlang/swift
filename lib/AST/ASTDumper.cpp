@@ -690,6 +690,16 @@ namespace {
         OS << attr->getReplacedFunctionName();
         OS << "\")";
       }
+      switch (VD->getLifetimeAnnotation()) {
+      case LifetimeAnnotation::EagerMove:
+        OS << " _eagerMove";
+        break;
+      case LifetimeAnnotation::Lexical:
+        OS << " _lexical";
+        break;
+      case LifetimeAnnotation::None:
+        break;
+      }
     }
 
     void printCommon(NominalTypeDecl *NTD, const char *Name,
@@ -957,6 +967,17 @@ namespace {
 
       if (P->getAttrs().hasAttribute<NonEphemeralAttr>())
         OS << " nonEphemeral";
+
+      switch (P->getLifetimeAnnotation()) {
+      case LifetimeAnnotation::EagerMove:
+        OS << " _eagerMove";
+        break;
+      case LifetimeAnnotation::Lexical:
+        OS << " _lexical";
+        break;
+      case LifetimeAnnotation::None:
+        break;
+      }
 
       if (P->getAttrs().hasAttribute<NoImplicitCopyAttr>())
         OS << " noImplicitCopy";
