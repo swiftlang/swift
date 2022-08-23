@@ -356,7 +356,6 @@ StepResult ComponentStep::take(bool prevFailed) {
   });
 
   auto *disjunction = CS.selectDisjunction();
-  auto *conjunction = CS.selectConjunction();
 
   if (CS.isDebugMode()) {
     PrintOptions PO;
@@ -369,19 +368,29 @@ StepResult ComponentStep::take(bool prevFailed) {
     }
     log.indent(CS.solverState->getCurrentIndent());
 
-    if (disjunction) {
+    SmallVector<Constraint *, 4> disjunctions;
+    CS.collectDisjunctions(disjunctions);
+    std::vector<std::string> overloadDisjunctions;
+    for (const auto &disjunction : disjunctions) {
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+
+      auto constraints = disjunction->getNestedConstraints();
+      if (constraints[0]->getKind() == ConstraintKind::BindOverload)
+        overloadDisjunctions.push_back(
+            constraints[0]->getFirstType()->getString(PO));
+    }
+    if (!overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
       log.indent(2);
       log << "Disjunction(s) = [";
-      auto constraints = disjunction->getNestedConstraints();
-      log << constraints[0]->getFirstType()->getString(PO);
-      log << "]";
-    }
-    if (conjunction) {
-      log.indent(2);
-      log << "Conjunction(s) = [";
-      auto constraints = conjunction->getNestedConstraints();
-      log << constraints[0]->getFirstType()->getString(PO);
-      log << "]";
+      interleave(overloadDisjunctions, log, ", ");
+      log << "]\n";
+
+      if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+        auto &log = getDebugLogger();
+        log << ")\n";
+      }
     }
     log << ")\n";
   }
