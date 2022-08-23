@@ -135,7 +135,6 @@ let _: (Float) -> @noDerivative Float
 // expected-error @+1 {{'@noDerivative' may only be used on parameters of '@differentiable' function types}}
 let _: @differentiable(reverse) (Float) -> @noDerivative Float
 
-// expected-error @+2 {{'@noDerivative' may only be used on parameters of '@differentiable' function types}}
 // expected-error @+1 {{'@noDerivative' must not be used on variadic parameters}}
 let _: (Float, @noDerivative Float...) -> Float
 

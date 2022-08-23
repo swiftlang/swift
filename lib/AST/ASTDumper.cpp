@@ -960,8 +960,9 @@ namespace {
         }
       }
 
-      if (P->isVariadic())
-        OS << " variadic";
+      if (P->hasInterfaceType())
+        if (P->isVariadic())
+          OS << " variadic";
 
       if (P->isAutoClosure())
         OS << " autoclosure";

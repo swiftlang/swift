@@ -1712,7 +1712,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       ++EltNo;
     }
     auto *NewTypeRepr = TupleTypeRepr::create(
-        getASTContext(), Elts, TE->getSourceRange(), SourceLoc(), Elts.size());
+        getASTContext(), Elts, TE->getSourceRange());
     return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
   
@@ -1755,10 +1755,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       if (!TE) return nullptr;
       
       auto *TRE = dyn_cast_or_null<TupleTypeRepr>(TE->getTypeRepr());
-      if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
       while (TRE->isParenType()) {
         TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElementType(0));
-        if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
       }
 
       assert(TRE->getElements().size() == 2);

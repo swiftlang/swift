@@ -3051,6 +3051,8 @@ SmallVector<AnyFunctionType::Param, 8>
 TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                            TypeResolutionOptions options,
                                            DifferentiabilityKind diffKind) {
+  SourceLoc ellipsisLoc;
+
   SmallVector<AnyFunctionType::Param, 8> elements;
   elements.reserve(inputRepr->getNumElements());
 
@@ -3059,33 +3061,11 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
   for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
     auto *eltTypeRepr = inputRepr->getElementType(i);
 
-    // If the element is a variadic parameter, resolve the parameter type as if
-    // it were in non-parameter position, since we want functions to be
-    // @escaping in this case.
-    auto thisElementOptions = elementOptions;
-    bool variadic = false;
-    if (inputRepr->hasEllipsis() &&
-        elements.size() == inputRepr->getEllipsisIndex()) {
-      thisElementOptions = elementOptions.withoutContext();
-      thisElementOptions.setContext(TypeResolverContext::VariadicFunctionInput);
-      variadic = true;
-    }
-
-    auto ty = resolveType(eltTypeRepr, thisElementOptions);
-    if (ty->hasError()) {
-      elements.emplace_back(ErrorType::get(getASTContext()));
-      continue;
-    }
-
-    bool autoclosure = false;
-    if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
-      autoclosure = ATR->getAttrs().has(TAK_autoclosure);
-
-    ValueOwnership ownership = ValueOwnership::Default;
-
     // Look through parens here; other than parens, specifiers
     // must appear at the top level of a parameter type.
     auto *nestedRepr = eltTypeRepr->getWithoutParens();
+
+    ValueOwnership ownership = ValueOwnership::Default;
 
     bool isolated = false;
     bool compileTimeConst = false;
@@ -3119,9 +3099,13 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       break;
     }
 
+    bool autoclosure = false;
     bool noDerivative = false;
-    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
-      if (attrTypeRepr->getAttrs().has(TAK_noDerivative)) {
+
+    if (auto *ATR = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
+      autoclosure = ATR->getAttrs().has(TAK_autoclosure);
+
+      if (ATR->getAttrs().has(TAK_noDerivative)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
             isDifferentiableProgrammingEnabled(
                 *getDeclContext()->getParentSourceFile()))
@@ -3131,6 +3115,55 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
               .highlight(nestedRepr->getSourceRange());
         else
           noDerivative = true;
+      }
+
+      nestedRepr = ATR->getTypeRepr();
+    }
+
+    Type ty;
+
+    // Do we have an old-style variadic parameter?
+    bool variadic = false;
+
+    // If the element is a variadic parameter, resolve the parameter type as if
+    // it were in non-parameter position, since we want functions to be
+    // @escaping in this case.
+    if (auto *packExpansionTypeRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
+      if (ellipsisLoc) {
+        diagnose(packExpansionTypeRepr->getLoc(),
+                 diag::multiple_ellipsis_in_tuple)
+          .highlight(ellipsisLoc)
+          .fixItRemove(packExpansionTypeRepr->getEllipsisLoc());
+      }
+
+      ellipsisLoc = packExpansionTypeRepr->getEllipsisLoc();
+
+      // FIXME: Bona fide variadic pack expansions don't need this; we want
+      // the pattern type of (() -> ())... to be a non-escaping function
+      // type.
+      auto thisElementOptions = elementOptions.withoutContext();
+      thisElementOptions.setContext(TypeResolverContext::VariadicFunctionInput);
+
+      auto pair = maybeResolvePackExpansionType(packExpansionTypeRepr,
+                                                thisElementOptions);
+      if (pair.first->hasError()) {
+        elements.emplace_back(ErrorType::get(getASTContext()));
+        continue;
+      }
+
+      if (pair.second) {
+        // We have a variadic pack expansion.
+        ty = PackExpansionType::get(pair.first, pair.second);
+      } else {
+        // We have an old-style variadic parameter.
+        ty = pair.first;
+        variadic = true;
+      }
+    } else {
+      ty = resolveType(eltTypeRepr, elementOptions);
+      if (ty->hasError()) {
+        elements.emplace_back(ErrorType::get(getASTContext()));
+        continue;
       }
     }
 
@@ -3366,10 +3399,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(
 
   {
     auto argsTuple = repr->getArgsTypeRepr();
-    // SIL functions cannot be variadic.
-    if (argsTuple->hasEllipsis()) {
-      diagnose(argsTuple->getEllipsisLoc(), diag::sil_function_ellipsis);
-    }
+
     // SIL functions cannot have parameter names.
     for (auto &element : argsTuple->getElements()) {
       if (element.UnderscoreLoc.isValid())
@@ -4062,40 +4092,6 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     elementOptions = elementOptions.withoutContext(true);
   }
 
-  bool complained = false;
-  if (repr->hasEllipsis()) {
-    if (getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        repr->getNumElements() == 1 && !repr->hasElementNames()) {
-      // This is probably a pack expansion. Try to resolve the pattern type.
-      auto patternTy = resolveType(repr->getElementType(0), elementOptions);
-      if (patternTy->hasError())
-        complained = true;
-
-      // Find the first type sequence parameter and use that as the count type.
-      SmallVector<Type, 1> rootTypeSequenceParams;
-      patternTy->getTypeSequenceParameters(rootTypeSequenceParams);
-
-      // If there's no reference to a variadic generic parameter, complain
-      // - the pack won't actually expand to anything meaningful.
-      if (rootTypeSequenceParams.empty()) {
-        diagnose(repr->getLoc(), diag::expansion_not_variadic, patternTy)
-          .highlight(repr->getParens());
-        return ErrorType::get(getASTContext());
-      }
-
-      return PackExpansionType::get(patternTy, rootTypeSequenceParams[0]);
-    } else {
-      // Variadic tuples are not permitted.
-      //
-      // FIXME: We could probably make this work.
-      // (T, U, V...) is a reasonable pack expansion to support with a kind of
-      // "guaranteed bound" of at least two elements.
-      diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
-      repr->removeEllipsis();
-      complained = true;
-    }
-  }
-
   bool hadError = false;
   bool foundDupLabel = false;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
@@ -4126,11 +4122,9 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   // or SIL, either.
   if (elements.size() == 1 && elements[0].hasName()
       && !(options & TypeResolutionFlags::SILType)) {
-    if (!complained) {
-      diagnose(repr->getElementNameLoc(0), diag::tuple_single_element)
-        .fixItRemoveChars(repr->getElementNameLoc(0),
-                          repr->getElementType(0)->getStartLoc());
-    }
+    diagnose(repr->getElementNameLoc(0), diag::tuple_single_element)
+      .fixItRemoveChars(repr->getElementNameLoc(0),
+                        repr->getElementType(0)->getStartLoc());
 
     elements[0] = TupleTypeElt(elements[0].getType());
   }
@@ -4140,6 +4134,8 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
 
+  // FIXME: One-element pack expansions should retain the tuple type
+  // wrapper
   if (elements.size() == 1 && !elements[0].hasName())
     return ParenType::get(getASTContext(), elements[0].getType());
 

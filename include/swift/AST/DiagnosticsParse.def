@@ -852,8 +852,6 @@ NOTE(subscript_array_element_fix_it_remove_space, none,
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
       "expected ')' at end of tuple list", ())
-ERROR(multiple_ellipsis_in_tuple,none,
-      "only a single element can be variadic", ())
 ERROR(tuple_type_init,none,
       "default argument not permitted in a tuple type", ())
 ERROR(protocol_method_argument_init,none,
@@ -959,8 +957,6 @@ ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
 ERROR(expected_assignment_instead_of_comparison_operator,none,
       "expected '=' instead of '==' to assign default value for parameter", ())
-ERROR(parameter_vararg_default,none,
-      "variadic parameter cannot have a default value", ())
 ERROR(parameter_specifier_as_attr_disallowed,none,
       "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
@@ -994,11 +990,6 @@ ERROR(false_available_is_called_unavailable,none,
 
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
-
-ERROR(unlabeled_parameter_following_variadic_parameter,none,
-      "a parameter following a variadic parameter requires a label", ())
-ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
-      "no parameters may follow a variadic parameter in a closure", ())
 
 ERROR(enum_element_empty_arglist,none,
       "enum element with associated values must have at least one "
