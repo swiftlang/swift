@@ -2547,7 +2547,8 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
     return RestrictedImportKind::None;
 
   if (importKind == RestrictedImportKind::Implicit &&
-      module->getLibraryLevel() == LibraryLevel::API) {
+      (module->getLibraryLevel() == LibraryLevel::API ||
+       getParentModule()->getLibraryLevel() != LibraryLevel::API)) {
     // Hack to fix swiftinterfaces in case of missing imports.
     // We can get rid of this logic when we don't leak the use of non-locally
     // imported things in API.
