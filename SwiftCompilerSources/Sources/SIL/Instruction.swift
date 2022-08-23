@@ -534,7 +534,7 @@ extension BeginAccessInst : ScopedInstruction {
   public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndAccessInst?>>, EndAccessInst>
 
   public var endInstructions: EndInstructions {
-    uses.lazy.compactMap({ $0.value.definingInstruction as? EndAccessInst })
+    uses.lazy.compactMap({ $0.instruction as? EndAccessInst })
   }
 }
 
