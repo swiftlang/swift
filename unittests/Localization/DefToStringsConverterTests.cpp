@@ -1,8 +1,8 @@
-//===--- DefToYAMLConverterTests.cpp -------------------------------------===//
+//===--- DefToStringsConverterTests.cpp -----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -49,22 +49,22 @@ TEST_F(LocalizationTest, MissingLocalizationFiles) {
   ASSERT_TRUE(llvm::sys::fs::exists(getDefaultLocalizationPath()));
   llvm::SmallString<128> EnglishLocalization(getDefaultLocalizationPath());
   llvm::sys::path::append(EnglishLocalization, "en");
-  llvm::sys::path::replace_extension(EnglishLocalization, ".yaml");
+  llvm::sys::path::replace_extension(EnglishLocalization, ".strings");
   ASSERT_TRUE(llvm::sys::fs::exists(EnglishLocalization));
   llvm::sys::path::replace_extension(EnglishLocalization, ".db");
   ASSERT_TRUE(llvm::sys::fs::exists(EnglishLocalization));
 }
 
 TEST_F(LocalizationTest, ConverterTestMatchDiagnosticMessagesSequentially) {
-  YAMLLocalizationProducer yaml(YAMLPath);
-  yaml.forEachAvailable([](swift::DiagID id, llvm::StringRef translation) {
+  StringsLocalizationProducer strings(DiagsPath);
+  strings.forEachAvailable([](swift::DiagID id, llvm::StringRef translation) {
     llvm::StringRef msg = diagnosticMessages[static_cast<uint32_t>(id)];
     ASSERT_EQ(msg, translation);
   });
 }
 
 TEST_F(LocalizationTest, ConverterTestMatchDiagnosticMessagesRandomly) {
-  YAMLLocalizationProducer yaml(YAMLPath);
+  StringsLocalizationProducer strings(DiagsPath);
 
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -74,7 +74,7 @@ TEST_F(LocalizationTest, ConverterTestMatchDiagnosticMessagesRandomly) {
     unsigned randomNum = RandNumber(LocalDiagID::NumDiags);
     DiagID randomId = static_cast<DiagID>(randomNum);
     llvm::StringRef msg = diagnosticMessages[randomNum];
-    llvm::StringRef translation = yaml.getMessageOr(randomId, "");
+    llvm::StringRef translation = strings.getMessageOr(randomId, "");
     ASSERT_EQ(msg, translation);
   }
 }
