@@ -448,11 +448,24 @@ void
 SymbolGraph::recordConformanceRelationships(Symbol S) {
   const auto VD = S.getSymbolDecl();
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    for (const auto *Conformance : NTD->getAllConformances()) {
-      recordEdge(Symbol(this, VD, nullptr),
-        Symbol(this, Conformance->getProtocol(), nullptr),
-        RelationshipKind::ConformsTo(),
-        dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext()));
+    if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+      PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+        if (inherited != PD) {
+          recordEdge(Symbol(this, VD, nullptr),
+            Symbol(this, inherited, nullptr),
+            RelationshipKind::ConformsTo(),
+            nullptr);
+        }
+
+        return TypeWalker::Action::Continue;
+      });
+    } else {
+      for (const auto *Conformance : NTD->getAllConformances()) {
+        recordEdge(Symbol(this, VD, nullptr),
+          Symbol(this, Conformance->getProtocol(), nullptr),
+          RelationshipKind::ConformsTo(),
+          dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext()));
+      }
     }
   }
 }

@@ -6947,15 +6947,10 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
     // produce an optional of that type as a potential binding. We
     // overwrite the binding in place because the non-optional type
     // will fail to type-check against the nil-literal conformance.
-    bool conformsToExprByNilLiteral = false;
-    if (auto *nominalBindingDecl = type->getAnyNominal()) {
-      SmallVector<ProtocolConformance *, 2> conformances;
-      conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
-          CS.getASTContext().getProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral),
-          conformances);
-    }
-    return !conformsToExprByNilLiteral;
+    auto *proto = CS.getASTContext().getProtocol(
+         KnownProtocolKind::ExpressibleByNilLiteral);
+
+    return !proto->getParentModule()->lookupConformance(type, proto);
   } else if (binding.isDefaultableBinding() && binding.BindingType->isAny()) {
     return true;
   }
