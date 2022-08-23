@@ -37,8 +37,8 @@ extension Sequence where Element: Comparable {
   ///     print(descendingStudents)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
-  /// The sorting algorithm is not guaranteed to be stable. A stable sort
-  /// preserves the relative order of elements that compare equal.
+  /// The sorting algorithm is guaranteed to be stable. A stable sort
+  /// preserves the relative order of elements that compare as equal.
   ///
   /// - Returns: A sorted array of the sequence's elements.
   ///
@@ -117,7 +117,7 @@ extension Sequence {
   ///   and `c` are incomparable, then `a` and `c` are also incomparable.
   ///   (Transitive incomparability)
   ///
-  /// The sorting algorithm is not guaranteed to be stable. A stable sort
+  /// The sorting algorithm is guaranteed to be stable. A stable sort
   /// preserves the relative order of elements for which
   /// `areInIncreasingOrder` does not establish an order.
   ///
@@ -162,8 +162,8 @@ where Self: RandomAccessCollection, Element: Comparable {
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
-  /// The sorting algorithm is not guaranteed to be stable. A stable sort
-  /// preserves the relative order of elements that compare equal.
+  /// The sorting algorithm is guaranteed to be stable. A stable sort
+  /// preserves the relative order of elements that compare as equal.
   ///
   /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
   @inlinable
@@ -231,7 +231,7 @@ extension MutableCollection where Self: RandomAccessCollection {
   ///   and `c` are incomparable, then `a` and `c` are also incomparable.
   ///   (Transitive incomparability)
   ///
-  /// The sorting algorithm is not guaranteed to be stable. A stable sort
+  /// The sorting algorithm is guaranteed to be stable. A stable sort
   /// preserves the relative order of elements for which
   /// `areInIncreasingOrder` does not establish an order.
   ///
