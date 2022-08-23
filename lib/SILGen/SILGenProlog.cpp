@@ -58,12 +58,15 @@ public:
   CanSILFunctionType fnTy;
   ArrayRef<SILParameterInfo> &parameters;
   bool isNoImplicitCopy;
+  LifetimeAnnotation lifetimeAnnotation;
 
   EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
                   CanSILFunctionType fnTy,
-                  ArrayRef<SILParameterInfo> &parameters, bool isNoImplicitCopy)
+                  ArrayRef<SILParameterInfo> &parameters, bool isNoImplicitCopy,
+                  LifetimeAnnotation lifetimeAnnotation)
       : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters),
-        isNoImplicitCopy(isNoImplicitCopy) {}
+        isNoImplicitCopy(isNoImplicitCopy),
+        lifetimeAnnotation(lifetimeAnnotation) {}
 
   ManagedValue visitType(CanType t, AbstractionPattern orig) {
     return visitType(t, orig, /*isInOut=*/false);
@@ -90,7 +93,8 @@ public:
     auto paramType =
         SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
-        paramType, loc.getAsASTNode<ValueDecl>(), isNoImplicitCopy);
+        paramType, loc.getAsASTNode<ValueDecl>(), isNoImplicitCopy,
+        lifetimeAnnotation);
 
     // This is a hack to deal with the fact that Self.Type comes in as a static
     // metatype, but we have to downcast it to a dynamic Self metatype to get
@@ -239,13 +243,14 @@ struct ArgumentInitHelper {
   unsigned getNumArgs() const { return ArgNo; }
 
   ManagedValue makeArgument(Type ty, bool isInOut, bool isNoImplicitCopy,
-                            SILBasicBlock *parent, SILLocation l) {
+                            LifetimeAnnotation lifetime, SILBasicBlock *parent,
+                            SILLocation l) {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
     EmitBBArguments argEmitter(SGF, parent, l, f.getLoweredFunctionType(),
-                               parameters, isNoImplicitCopy);
+                               parameters, isNoImplicitCopy, lifetime);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
     AbstractionPattern origTy = OrigFnType
@@ -264,19 +269,26 @@ struct ArgumentInitHelper {
     if (!SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
       return value;
 
-    bool isNoImplicitCopy = false;
-    if (auto *arg = dyn_cast<SILFunctionArgument>(value))
-      isNoImplicitCopy = arg->isNoImplicitCopy();
+    // Look for the following annotations on the function argument:
+    // - @noImplicitCopy
+    // - @_eagerMove
+    // - @_lexical
+    auto isNoImplicitCopy = pd->isNoImplicitCopy();
+    auto lifetime = SGF.F.getLifetime(pd, value->getType());
 
     // If we have a no implicit copy argument and the argument is trivial,
     // we need to use copyable to move only to convert it to its move only
     // form.
     if (!isNoImplicitCopy) {
       if (!value->getType().isMoveOnly()) {
+        // Follow the "normal path": perform a lexical borrow if the lifetime is
+        // lexical.
         if (value->getOwnershipKind() == OwnershipKind::Owned) {
-          value =
-              SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-          SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+          if (lifetime.isLexical()) {
+            value = SILValue(
+                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+          }
         }
         return value;
       }
@@ -301,7 +313,7 @@ struct ArgumentInitHelper {
 
     if (value->getType().isTrivial(SGF.F)) {
       value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, value);
-      value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
+      value = SGF.B.createMoveValue(loc, value, /*isLexical=*/true);
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
@@ -343,8 +355,8 @@ struct ArgumentInitHelper {
     SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv =
-        makeArgument(ty, pd->isInOut(), pd->isNoImplicitCopy(), parent, loc);
+    ManagedValue argrv = makeArgument(ty, pd->isInOut(), pd->isNoImplicitCopy(),
+                                      pd->getLifetimeAnnotation(), parent, loc);
 
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
@@ -362,7 +374,10 @@ struct ArgumentInitHelper {
     } else {
       if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
         allocStack->setArgNo(ArgNo);
-        allocStack->setIsLexical();
+        if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
+                SGF.getModule()) &&
+            SGF.F.getLifetime(pd, value->getType()).isLexical())
+          allocStack->setIsLexical();
       } else {
         SGF.B.createDebugValueAddr(loc, value, varinfo);
       }
@@ -397,8 +412,9 @@ struct ArgumentInitHelper {
     Scope discardScope(SGF.Cleanups, CleanupLocation(PD));
 
     // Manage the parameter.
-    auto argrv = makeArgument(type, PD->isInOut(), PD->isNoImplicitCopy(),
-                              &*f.begin(), paramLoc);
+    auto argrv =
+        makeArgument(type, PD->isInOut(), PD->isNoImplicitCopy(),
+                     PD->getLifetimeAnnotation(), &*f.begin(), paramLoc);
 
     // Emit debug information for the argument.
     SILLocation loc(PD);

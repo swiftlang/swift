@@ -517,6 +517,9 @@ ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
       "SILFunction and SILArgument have mismatching ValueOwnershipKinds. "
       "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
       (StringRef, StringRef))
+ERROR(sil_arg_both_lexical_and_eagerMove,none,
+      "Function argument is annotated both @_eagerMove and @_lexical, "
+      "but these are incompatible alternatives", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,

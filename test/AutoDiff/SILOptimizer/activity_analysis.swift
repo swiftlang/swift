@@ -18,7 +18,7 @@ func testNoDerivativeStructProjection(_ s: HasNoDerivativeProperty) -> Float {
 
 // CHECK-LABEL: [AD] Activity info for ${{.*}}testNoDerivativeStructProjection{{.*}} at parameter indices (0) and result indices (0):
 // CHECK: [ACTIVE] %0 = argument of bb0 : $HasNoDerivativeProperty
-// CHECK: [ACTIVE]   %2 = alloc_stack [lexical] $HasNoDerivativeProperty, var, name "tmp"
+// CHECK: [ACTIVE]   %2 = alloc_stack $HasNoDerivativeProperty, var, name "tmp"
 // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*HasNoDerivativeProperty
 // CHECK: [ACTIVE]   %5 = struct_element_addr %4 : $*HasNoDerivativeProperty, #HasNoDerivativeProperty.x
 // CHECK: [VARIED]   %6 = load [trivial] %5 : $*Float
@@ -76,7 +76,7 @@ func TF_781(_ x: Float, _ y: Float) -> Float {
 // CHECK-LABEL: [AD] Activity info for ${{.*}}TF_781{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [USEFUL] %1 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %4 = alloc_stack [lexical] $Float, var, name "result"
+// CHECK: [ACTIVE]   %4 = alloc_stack $Float, var, name "result"
 // CHECK: [ACTIVE]   %19 = begin_access [read] [static] %4 : $*Float
 // CHECK: [ACTIVE]   %20 = load [trivial] %19 : $*Float
 // CHECK: [ACTIVE]   %23 = apply %22(%20, %0, %18) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
@@ -103,9 +103,9 @@ func TF_954(_ x: Float) -> Float {
 // CHECK-LABEL: [AD] Activity info for ${{.*}}TF_954{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %2 = alloc_stack [lexical] $Float, var, name "outer"
+// CHECK: [ACTIVE]   %2 = alloc_stack $Float, var, name "outer"
 // CHECK: bb1:
-// CHECK: [ACTIVE]   %10 = alloc_stack [lexical] $Float, var, name "inner"
+// CHECK: [ACTIVE]   %10 = alloc_stack $Float, var, name "inner"
 // CHECK: [ACTIVE]   %11 = begin_access [read] [static] %2 : $*Float
 // CHECK: [USEFUL]   %14 = metatype $@thin Float.Type
 // CHECK: [ACTIVE]   %15 = begin_access [read] [static] %10 : $*Float
@@ -286,7 +286,7 @@ func testArrayUninitializedIntrinsicAddress(_ x: Float, _ y: Float) -> [Float] {
 // CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicAddress{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %4 = alloc_stack [lexical] $Float, var, name "result"
+// CHECK: [ACTIVE]   %4 = alloc_stack $Float, var, name "result"
 // CHECK: [ACTIVE]   %7 = begin_access [read] [static] %4 : $*Float
 // CHECK: [ACTIVE]   %8 = load [trivial] %7 : $*Float
 // CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
@@ -440,7 +440,7 @@ func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
 
 // CHECK-LABEL: [AD] Activity info for ${{.*}}28activeInoutArgMutatingMethodyAA3MutVADF at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Mut
-// CHECK: [ACTIVE]   %2 = alloc_stack [lexical] $Mut, var, name "result"
+// CHECK: [ACTIVE]   %2 = alloc_stack $Mut, var, name "result"
 // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*Mut
 // CHECK: [ACTIVE]   %5 = load [trivial] %4 : $*Mut
 // CHECK: [ACTIVE]   %7 = begin_access [modify] [static] %2 : $*Mut
@@ -459,7 +459,7 @@ func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
 // CHECK_LABEL: [AD] Activity info for ${{.*}}31activeInoutArgMutatingMethodVaryyAA3MutVz_ADtF at (parameters=(1) results=(0))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
-// CHECK: [ACTIVE]   %4 = alloc_stack [lexical] $Mut, var, name "result"
+// CHECK: [ACTIVE]   %4 = alloc_stack $Mut, var, name "result"
 // CHECK: [ACTIVE]   %5 = begin_access [read] [static] %0 : $*Mut
 // CHECK: [ACTIVE]   %8 = begin_access [modify] [static] %4 : $*Mut
 // CHECK: [NONE]   // function_ref Mut.mutatingMethod(_:)
@@ -480,7 +480,7 @@ func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
 // CHECK-LABEL: [AD] Activity info for ${{.*}}33activeInoutArgMutatingMethodTupleyyAA3MutVz_ADtF at parameter indices (1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
-// CHECK: [ACTIVE]   %4 = alloc_stack [lexical] $(Mut, Mut), var, name "result"
+// CHECK: [ACTIVE]   %4 = alloc_stack $(Mut, Mut), var, name "result"
 // CHECK: [ACTIVE]   %5 = tuple_element_addr %4 : $*(Mut, Mut), 0
 // CHECK: [ACTIVE]   %6 = tuple_element_addr %4 : $*(Mut, Mut), 1
 // CHECK: [ACTIVE]   %7 = begin_access [read] [static] %0 : $*Mut
@@ -507,7 +507,7 @@ func activeInoutArg(_ x: Float) -> Float {
 
 // CHECK-LABEL: [AD] Activity info for ${{.*}}activeInoutArg{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %2 = alloc_stack [lexical] $Float, var, name "result"
+// CHECK: [ACTIVE]   %2 = alloc_stack $Float, var, name "result"
 // CHECK: [ACTIVE]   %5 = begin_access [modify] [static] %2 : $*Float
 // CHECK: [NONE]   // function_ref static Float.+= infix(_:_:)
 // CHECK: [NONE]   %7 = apply %6(%5, %0, %4) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
@@ -523,7 +523,7 @@ func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
 
 // CHECK-LABEL: [AD] Activity info for ${{.*}}activeInoutArgNonactiveInitialResult{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %2 = alloc_stack [lexical] $Float, var, name "result"
+// CHECK: [ACTIVE]   %2 = alloc_stack $Float, var, name "result"
 // CHECK: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)
 // CHECK: [USEFUL]   %6 = apply %5(%3, %4) : $@convention(method) (Builtin.IntLiteral, @thin Float.Type) -> Float
 // CHECK: [USEFUL]   %8 = metatype $@thin Float.Type
@@ -584,7 +584,7 @@ func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors
 
 // CHECK-LABEL: [AD] Activity info for ${{.*}}testAccessorCoroutines{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $HasCoroutineAccessors
-// CHECK: [ACTIVE]   %2 = alloc_stack [lexical] $HasCoroutineAccessors, var, name "x"
+// CHECK: [ACTIVE]   %2 = alloc_stack $HasCoroutineAccessors, var, name "x"
 // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*HasCoroutineAccessors
 // CHECK: [ACTIVE]   %5 = load [trivial] %4 : $*HasCoroutineAccessors
 // CHECK: [NONE]   // function_ref HasCoroutineAccessors.computed.read
@@ -754,7 +754,7 @@ func testActiveOptional(_ x: Float) -> Float {
 // CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveOptional{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %2 = alloc_stack [lexical] $Optional<Float>, var, name "maybe"
+// CHECK: [ACTIVE]   %2 = alloc_stack $Optional<Float>, var, name "maybe"
 // CHECK: [USEFUL]   %3 = integer_literal $Builtin.IntLiteral, 10
 // CHECK: [USEFUL]   %4 = metatype $@thin Float.Type
 // CHECK: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)

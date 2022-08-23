@@ -1614,6 +1614,9 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
     UNINTERESTING_ATTR(CompilerInitialized)
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
+
+    UNINTERESTING_ATTR(EagerMove)
+    UNINTERESTING_ATTR(Lexical)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

@@ -1415,6 +1415,10 @@ void swift::visitProductLeafAccessPathNodes(
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
+      if (decl->isCxxNonTrivial()) {
+        visitor(AccessPath::PathNode(node), silType);
+        continue;
+      }
       unsigned index = 0;
       for (auto *field : decl->getStoredProperties()) {
         auto *fieldNode = node->getChild(index);

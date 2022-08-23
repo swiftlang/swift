@@ -68,9 +68,10 @@ public:
     assert(box && "buffer never emitted before activating cleanup?!");
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      auto *bbi = cast<BeginBorrowInst>(theBox);
-      SGF.B.createEndBorrow(loc, bbi);
-      theBox = bbi->getOperand();
+      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+        SGF.B.createEndBorrow(loc, bbi);
+        theBox = bbi->getOperand();
+      }
     }
     SGF.B.createDeallocBox(loc, theBox);
   }

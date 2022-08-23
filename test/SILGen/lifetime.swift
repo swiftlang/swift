@@ -18,8 +18,6 @@ func local_valtype() {
     var b: Val
     // CHECK: [[B:%[0-9]+]] = alloc_box ${ var Val }
     // CHECK: [[MARKED_B:%.*]] = mark_uninitialized [var] [[B]]
-    // CHECK: [[MARKED_B_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_B]]
-    // CHECK: end_borrow [[MARKED_B_LIFETIME]]
     // CHECK: destroy_value [[MARKED_B]]
     // CHECK: return
 }
@@ -37,7 +35,6 @@ func local_valtype_branch(_ a: Bool) {
     var x:Int
     // CHECK: [[X:%[0-9]+]] = alloc_box ${ var Int }
     // CHECK: [[MARKED_X:%.*]] = mark_uninitialized [var] [[X]]
-    // CHECK: [[MARKED_X_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_B]]
 
     if a { return }
     // CHECK: cond_br
@@ -62,12 +59,10 @@ func local_valtype_branch(_ a: Bool) {
         var y:Int
         // CHECK: [[Y:%[0-9]+]] = alloc_box ${ var Int }
         // CHECK: [[MARKED_Y:%.*]] = mark_uninitialized [var] [[Y]]
-        // CHECK: [[MARKED_Y_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_Y]]
 
         if a { break }
         // CHECK: cond_br
         // CHECK: {{bb.*:}}
-        // CHECK: end_borrow [[MARKED_Y_LIFETIME]]
         // CHECK: destroy_value [[MARKED_Y]]
         // CHECK-NOT: destroy_value [[MARKED_X]]
         // CHECK-NOT: destroy_value [[A]]
@@ -84,7 +79,6 @@ func local_valtype_branch(_ a: Bool) {
             var z:Int
             // CHECK: [[Z:%[0-9]+]] = alloc_box ${ var Int }
             // CHECK: [[MARKED_Z:%.*]] = mark_uninitialized [var] [[Z]]
-            // CHECK: [[MARKED_Z_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_Z]]
 
             if a { break }
             // CHECK: cond_br
@@ -361,12 +355,10 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: [[R_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[RADDR]]
   // CHECK: [[PR:%[0-9]+]] = project_box [[R_LIFETIME]]
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[I_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[IADDR]]
-  // CHECK: [[PI:%[0-9]+]] = project_box [[I_LIFETIME]]
+  // CHECK: [[PI:%[0-9]+]] = project_box [[IADDR]]
   // CHECK: store %1 to [trivial] [[PI]]
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
-  // CHECK: [[V_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[VADDR]]
-  // CHECK: [[PV:%[0-9]+]] = project_box [[V_LIFETIME]]
+  // CHECK: [[PV:%[0-9]+]] = project_box [[VADDR]]
 
   // -- Reference types need to be copy_valued as property method args.
   r.int_prop = i
@@ -480,8 +472,7 @@ class Foo<T> {
 
     // -- Then we create a box that we will use to perform a copy_addr into #Foo.x a bit later.
     // CHECK:   [[CHIADDR:%[0-9]+]] = alloc_box ${ var Int }, var, name "chi"
-    // CHECK:   [[CHI_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[CHIADDR]]
-    // CHECK:   [[PCHI:%[0-9]+]] = project_box [[CHI_LIFETIME]]
+    // CHECK:   [[PCHI:%[0-9]+]] = project_box [[CHIADDR]]
     // CHECK:   store [[CHI]] to [trivial] [[PCHI]]
 
     // -- Then we initialize #Foo.z
@@ -666,8 +657,7 @@ struct Bar {
     // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thin Bar.Type):
     // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Bar }
     // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
-    // CHECK: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
-    // CHECK: [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
+    // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
 
     x = bar()
     // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
@@ -732,12 +722,10 @@ class D : B {
     // CHECK: [[PB_BOX:%[0-9]+]] = project_box [[SELF_LIFETIME]]
     // CHECK: store [[SELF]] to [init] [[PB_BOX]]
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
-    // CHECK: [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XADDR]]
-    // CHECK: [[PX:%[0-9]+]] = project_box [[XLIFETIME]]
+    // CHECK: [[PX:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: store [[X]] to [trivial] [[PX]]
     // CHECK: [[YADDR:%[0-9]+]] = alloc_box ${ var Int }
-    // CHECK: [[Y_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[YADDR]]
-    // CHECK: [[PY:%[0-9]+]] = project_box [[Y_LIFETIME]]
+    // CHECK: [[PY:%[0-9]+]] = project_box [[YADDR]]
     // CHECK: store [[Y]] to [trivial] [[PY]]
 
     super.init(y: y)

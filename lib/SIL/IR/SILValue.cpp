@@ -106,8 +106,11 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 bool ValueBase::isLexical() const {
-  if (auto *argument = dyn_cast<SILFunctionArgument>(this))
-    return argument->getOwnershipKind() == OwnershipKind::Owned;
+  if (auto *argument = dyn_cast<SILFunctionArgument>(this)) {
+    // TODO: Recognize guaranteed arguments as lexical too.
+    return argument->getOwnershipKind() == OwnershipKind::Owned &&
+           argument->getLifetime().isLexical();
+  }
   if (auto *bbi = dyn_cast<BeginBorrowInst>(this))
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))

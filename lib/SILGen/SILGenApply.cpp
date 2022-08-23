@@ -3656,9 +3656,10 @@ public:
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      auto *bbi = cast<BeginBorrowInst>(theBox);
-      SGF.B.createEndBorrow(l, bbi);
-      theBox = bbi->getOperand();
+      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+        SGF.B.createEndBorrow(l, bbi);
+        theBox = bbi->getOperand();
+      }
     }
     SGF.B.createDeallocBox(l, theBox);
   }

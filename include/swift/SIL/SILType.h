@@ -20,9 +20,10 @@
 
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/Lifetime.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/ADT/Hashing.h"
 
 namespace swift {
 
@@ -231,6 +232,13 @@ public:
     return value.getPointer()->isVoid();
   }
 
+  /// Whether the type is an enum, struct, or tuple.
+  bool isAggregate() {
+    return is<TupleType>() || is<StructType>() ||
+           is<BoundGenericStructType>() || is<EnumType>() ||
+           is<BoundGenericEnumType>();
+  }
+
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
   ClassDecl *getClassOrBoundGenericClass() const {
@@ -350,6 +358,15 @@ public:
   bool hasReferenceSemantics() const {
     return getASTType().hasReferenceSemantics();
   }
+
+  /// The lifetime of values of this type (which are not otherwise annotated).
+  ///
+  /// Trivial types are ::None.
+  /// Non-trivial types are ::Lexical by default.
+  /// Non-trivial types which are annotated @_eagerMove are ::EagerMove.
+  /// Aggregates which consist entirely of ::EagerMove fields are ::EagerMove.
+  /// All other types are ::Lexical.
+  Lifetime getLifetime(const SILFunction &F) const;
 
   /// Returns true if the referenced type is any sort of class-reference type,
   /// meaning anything with reference semantics that is not a function type.
@@ -736,6 +753,25 @@ public:
   void dump() const;
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions::printSIL()) const;
+
+#ifndef NDEBUG
+  /// Visit the distinct types of the fields out of which a type is aggregated.
+  ///
+  /// As we walk into the field types, if an aggregate is encountered, it may
+  /// still be a leaf.  It is a leaf if the \p isLeafAggregate predicate
+  /// returns true.
+  ///
+  /// Returns false if the leaves cannot be visited or if any invocation of the
+  /// visitor returns false.
+  ///
+  /// NOTE: This function is meant for use in verification.  For real use-cases,
+  ///       recursive walks of type leaves should be done via
+  ///       TypeLowering::RecursiveProperties.
+  bool visitAggregateLeaves(
+      Lowering::TypeConverter &TC, TypeExpansionContext context,
+      std::function<bool(SILType, SILType, VarDecl *)> isLeafAggregate,
+      std::function<bool(SILType, SILType, VarDecl *)> visit) const;
+#endif
 };
 
 // Statically prevent SILTypes from being directly cast to a type
