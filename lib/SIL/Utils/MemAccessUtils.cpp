@@ -2112,6 +2112,7 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
   case SILInstructionKind::InjectEnumAddrInst:
     return visitor.visitStore(use);
 
+  case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::CopyAddrInst:
     if (operIdx == CopyLikeInstruction::Dest) {
       return visitor.visitStore(use);
@@ -2148,6 +2149,10 @@ bool swift::memInstMustInitialize(Operand *memOper) {
 
   case SILInstructionKind::CopyAddrInst: {
     auto *CAI = cast<CopyAddrInst>(memInst);
+    return CAI->getDest() == address && CAI->isInitializationOfDest();
+  }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return CAI->getDest() == address && CAI->isInitializationOfDest();
   }
   case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
@@ -2596,6 +2601,11 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::CopyAddrInst:
     visitor(&I->getAllOperands()[CopyAddrInst::Src]);
     visitor(&I->getAllOperands()[CopyAddrInst::Dest]);
+    return;
+
+  case SILInstructionKind::ExplicitCopyAddrInst:
+    visitor(&I->getAllOperands()[ExplicitCopyAddrInst::Src]);
+    visitor(&I->getAllOperands()[ExplicitCopyAddrInst::Dest]);
     return;
 
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
