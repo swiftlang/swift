@@ -351,16 +351,46 @@ EXPR_NODES = [
                    is_optional=True),
          ]),
 
-    # is TypeName
+    # 'is'
+    # "is" type casting ooperator without operands.
+    # NOTE: This appears only in SequenceExpr.
+    Node('UnresolvedIsExpr', kind='Expr',
+         children=[
+             Child("IsTok", kind='IsToken'),
+         ]),
+
+    # expression is TypeName
+    # NOTE: This won't come directly out of the parser. Rather, it is the
+    # result of "folding" a SequenceExpr based on knowing the precedence
+    # relationships amongst the different infix operators.
     Node('IsExpr', kind='Expr',
          children=[
+             Child("Expression", kind="Expr"),
              Child("IsTok", kind='IsToken'),
              Child("TypeName", kind='Type')
          ]),
 
-    # as TypeName
+    # 'as' ('?'|'!')
+    # "as" type casting ooperator without operands.
+    # NOTE: This appears only in SequenceExpr.
+    Node('UnresolvedAsExpr', kind='Expr',
+         children=[
+             Child("AsTok", kind='AsToken'),
+             Child("QuestionOrExclamationMark", kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'PostfixQuestionMarkToken',
+                       'ExclamationMarkToken',
+                   ]),
+         ]),
+
+    # expression as TypeName
+    # NOTE: This won't come directly out of the parser. Rather, it is the
+    # result of "folding" a SequenceExpr based on knowing the precedence
+    # relationships amongst the different infix operators.
     Node('AsExpr', kind='Expr',
          children=[
+             Child("Expression", kind="Expr"),
              Child("AsTok", kind='AsToken'),
              Child("QuestionOrExclamationMark", kind='Token',
                    is_optional=True,
