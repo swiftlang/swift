@@ -159,6 +159,18 @@ class FixedSizeArrayHolder {
   var kp60: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
   var kp50: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
 
+  // Same order as in KeyPathSmallStruct.
+  var kp0: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp1: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp2: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp3: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp4: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp5: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp6: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp7: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp8: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+  var kp9: WritableKeyPath<FixedSizeArray10<ElementType>, ElementType>
+
   static let shared = FixedSizeArrayHolder()
   init() {
     fixedSizeArray100 = initializeFixedSizeArray100()
@@ -170,57 +182,68 @@ class FixedSizeArrayHolder {
     arrayForNestedClasses = [C1]()
     arrayForNonMutatingGetset = [M]()
 
-    kp46 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 46)
-    kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
-    kp81 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 81)
-    kp31 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 31)
-    kp35 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 35)
-    kp14 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 14)
-    kp51 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 51)
-    kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
-    kp90 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 90)
-    kp80 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 80)
-    kp47 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 47)
-    kp92 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 92)
-    kp78 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 78)
-    kp79 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 79)
-    kp48 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 48)
-    kp64 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 64)
-    kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
-    kp19 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 19)
-    kp66 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 66)
-    kp10 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 10)
-    kp89 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 89)
-    kp16 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 16)
-    kp06 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 06)
-    kp26 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 26)
-    kp83 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 83)
+    kp46 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 46))
+    kp43 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 43))
+    kp81 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 81))
+    kp31 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 31))
+    kp35 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 35))
+    kp14 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 14))
+    kp51 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 51))
+    kp24 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 24))
+    kp90 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 90))
+    kp80 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 80))
+    kp47 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 47))
+    kp92 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 92))
+    kp78 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 78))
+    kp79 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 79))
+    kp48 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 48))
+    kp64 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 64))
+    kp65 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 65))
+    kp19 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 19))
+    kp66 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 66))
+    kp10 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 10))
+    kp89 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 89))
+    kp16 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 16))
+    kp06 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 06))
+    kp26 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 26))
+    kp83 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 83))
 
-    kp99 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 99)
-    kp27 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 27)
-    kp09 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 09)
-    kp84 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 84)
-    kp22 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 22)
-    kp82 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 82)
-    kp86 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 86)
-    kp49 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 49)
-    kp18 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 18)
-    kp97 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 97)
-    kp69 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 69)
-    kp76 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 76)
-    kp32 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 32)
-    kp52 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 52)
-    kp24 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 24)
-    kp87 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 87)
-    kp67 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 67)
-    kp65 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 65)
-    kp43 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 43)
-    kp12 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 12)
-    kp21 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 21)
-    kp77 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 77)
-    kp40 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 40)
-    kp60 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 60)
-    kp50 = FixedSizeArray100<ElementType>.getKeypathToElement(index: 50)
+    kp99 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 99))
+    kp27 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 27))
+    kp09 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 09))
+    kp84 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 84))
+    kp22 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 22))
+    kp82 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 82))
+    kp86 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 86))
+    kp49 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 49))
+    kp18 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 18))
+    kp97 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 97))
+    kp69 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 69))
+    kp76 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 76))
+    kp32 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 32))
+    kp52 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 52))
+    kp24 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 24))
+    kp87 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 87))
+    kp67 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 67))
+    kp65 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 65))
+    kp43 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 43))
+    kp12 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 12))
+    kp21 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 21))
+    kp77 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 77))
+    kp40 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 40))
+    kp60 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 60))
+    kp50 = identity(FixedSizeArray100<ElementType>.getKeypathToElement(index: 50))
+
+    kp0 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 0))
+    kp1 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 1))
+    kp2 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 2))
+    kp3 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 3))
+    kp4 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 4))
+    kp5 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 5))
+    kp6 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 6))
+    kp7 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 7))
+    kp8 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 8))
+    kp9 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 9))
 
     keypathForMutatingGetSet = identity(\MutatingGetsetNested1.nestedItem.nestedItem.nestedItem
       .nestedItem.storage)
@@ -1348,31 +1371,31 @@ public func run_testKeyPathReadPerformance(n: Int) {
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
   let iterationMultipier = 25
 
-  let kp99 = identity(FixedSizeArrayHolder.shared.kp99)
-  let kp27 = identity(FixedSizeArrayHolder.shared.kp27)
-  let kp09 = identity(FixedSizeArrayHolder.shared.kp09)
-  let kp84 = identity(FixedSizeArrayHolder.shared.kp84)
-  let kp22 = identity(FixedSizeArrayHolder.shared.kp22)
-  let kp82 = identity(FixedSizeArrayHolder.shared.kp82)
-  let kp86 = identity(FixedSizeArrayHolder.shared.kp86)
-  let kp49 = identity(FixedSizeArrayHolder.shared.kp49)
-  let kp18 = identity(FixedSizeArrayHolder.shared.kp18)
-  let kp97 = identity(FixedSizeArrayHolder.shared.kp97)
-  let kp69 = identity(FixedSizeArrayHolder.shared.kp69)
-  let kp76 = identity(FixedSizeArrayHolder.shared.kp76)
-  let kp32 = identity(FixedSizeArrayHolder.shared.kp32)
-  let kp52 = identity(FixedSizeArrayHolder.shared.kp52)
-  let kp24 = identity(FixedSizeArrayHolder.shared.kp24)
-  let kp87 = identity(FixedSizeArrayHolder.shared.kp87)
-  let kp67 = identity(FixedSizeArrayHolder.shared.kp67)
-  let kp65 = identity(FixedSizeArrayHolder.shared.kp65)
-  let kp43 = identity(FixedSizeArrayHolder.shared.kp43)
-  let kp12 = identity(FixedSizeArrayHolder.shared.kp12)
-  let kp21 = identity(FixedSizeArrayHolder.shared.kp21)
-  let kp77 = identity(FixedSizeArrayHolder.shared.kp77)
-  let kp40 = identity(FixedSizeArrayHolder.shared.kp40)
-  let kp60 = identity(FixedSizeArrayHolder.shared.kp60)
-  let kp50 = identity(FixedSizeArrayHolder.shared.kp50)
+  let kp99 = FixedSizeArrayHolder.shared.kp99
+  let kp27 = FixedSizeArrayHolder.shared.kp27
+  let kp09 = FixedSizeArrayHolder.shared.kp09
+  let kp84 = FixedSizeArrayHolder.shared.kp84
+  let kp22 = FixedSizeArrayHolder.shared.kp22
+  let kp82 = FixedSizeArrayHolder.shared.kp82
+  let kp86 = FixedSizeArrayHolder.shared.kp86
+  let kp49 = FixedSizeArrayHolder.shared.kp49
+  let kp18 = FixedSizeArrayHolder.shared.kp18
+  let kp97 = FixedSizeArrayHolder.shared.kp97
+  let kp69 = FixedSizeArrayHolder.shared.kp69
+  let kp76 = FixedSizeArrayHolder.shared.kp76
+  let kp32 = FixedSizeArrayHolder.shared.kp32
+  let kp52 = FixedSizeArrayHolder.shared.kp52
+  let kp24 = FixedSizeArrayHolder.shared.kp24
+  let kp87 = FixedSizeArrayHolder.shared.kp87
+  let kp67 = FixedSizeArrayHolder.shared.kp67
+  let kp65 = FixedSizeArrayHolder.shared.kp65
+  let kp43 = FixedSizeArrayHolder.shared.kp43
+  let kp12 = FixedSizeArrayHolder.shared.kp12
+  let kp21 = FixedSizeArrayHolder.shared.kp21
+  let kp77 = FixedSizeArrayHolder.shared.kp77
+  let kp40 = FixedSizeArrayHolder.shared.kp40
+  let kp60 = FixedSizeArrayHolder.shared.kp60
+  let kp50 = FixedSizeArrayHolder.shared.kp50
 
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
@@ -1437,31 +1460,31 @@ public func run_testKeyPathWritePerformance(n: Int) {
   var fixedSizeArray100 = FixedSizeArrayHolder.shared.fixedSizeArray100
   let iterationMultipier = 150
 
-  let kp46 = identity(FixedSizeArrayHolder.shared.kp46)
-  let kp43 = identity(FixedSizeArrayHolder.shared.kp43)
-  let kp81 = identity(FixedSizeArrayHolder.shared.kp81)
-  let kp31 = identity(FixedSizeArrayHolder.shared.kp31)
-  let kp35 = identity(FixedSizeArrayHolder.shared.kp35)
-  let kp14 = identity(FixedSizeArrayHolder.shared.kp14)
-  let kp51 = identity(FixedSizeArrayHolder.shared.kp51)
-  let kp24 = identity(FixedSizeArrayHolder.shared.kp24)
-  let kp90 = identity(FixedSizeArrayHolder.shared.kp90)
-  let kp80 = identity(FixedSizeArrayHolder.shared.kp80)
-  let kp47 = identity(FixedSizeArrayHolder.shared.kp47)
-  let kp92 = identity(FixedSizeArrayHolder.shared.kp92)
-  let kp78 = identity(FixedSizeArrayHolder.shared.kp78)
-  let kp79 = identity(FixedSizeArrayHolder.shared.kp79)
-  let kp48 = identity(FixedSizeArrayHolder.shared.kp48)
-  let kp64 = identity(FixedSizeArrayHolder.shared.kp64)
-  let kp65 = identity(FixedSizeArrayHolder.shared.kp65)
-  let kp19 = identity(FixedSizeArrayHolder.shared.kp19)
-  let kp66 = identity(FixedSizeArrayHolder.shared.kp66)
-  let kp10 = identity(FixedSizeArrayHolder.shared.kp10)
-  let kp89 = identity(FixedSizeArrayHolder.shared.kp89)
-  let kp16 = identity(FixedSizeArrayHolder.shared.kp16)
-  let kp06 = identity(FixedSizeArrayHolder.shared.kp06)
-  let kp26 = identity(FixedSizeArrayHolder.shared.kp26)
-  let kp83 = identity(FixedSizeArrayHolder.shared.kp83)
+  let kp46 = FixedSizeArrayHolder.shared.kp46
+  let kp43 = FixedSizeArrayHolder.shared.kp43
+  let kp81 = FixedSizeArrayHolder.shared.kp81
+  let kp31 = FixedSizeArrayHolder.shared.kp31
+  let kp35 = FixedSizeArrayHolder.shared.kp35
+  let kp14 = FixedSizeArrayHolder.shared.kp14
+  let kp51 = FixedSizeArrayHolder.shared.kp51
+  let kp24 = FixedSizeArrayHolder.shared.kp24
+  let kp90 = FixedSizeArrayHolder.shared.kp90
+  let kp80 = FixedSizeArrayHolder.shared.kp80
+  let kp47 = FixedSizeArrayHolder.shared.kp47
+  let kp92 = FixedSizeArrayHolder.shared.kp92
+  let kp78 = FixedSizeArrayHolder.shared.kp78
+  let kp79 = FixedSizeArrayHolder.shared.kp79
+  let kp48 = FixedSizeArrayHolder.shared.kp48
+  let kp64 = FixedSizeArrayHolder.shared.kp64
+  let kp65 = FixedSizeArrayHolder.shared.kp65
+  let kp19 = FixedSizeArrayHolder.shared.kp19
+  let kp66 = FixedSizeArrayHolder.shared.kp66
+  let kp10 = FixedSizeArrayHolder.shared.kp10
+  let kp89 = FixedSizeArrayHolder.shared.kp89
+  let kp16 = FixedSizeArrayHolder.shared.kp16
+  let kp06 = FixedSizeArrayHolder.shared.kp06
+  let kp26 = FixedSizeArrayHolder.shared.kp26
+  let kp83 = FixedSizeArrayHolder.shared.kp83
 
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray100.element50 += fixedSizeArray100.element1 + ElementType(t)
@@ -1526,16 +1549,16 @@ public func run_testKeyPathSmallStruct(n: Int) {
   var fixedSizeArray10 = FixedSizeArrayHolder.shared.fixedSizeArray10
   let iterationMultipier = 25
 
-  let kp0 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 0))
-  let kp1 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 1))
-  let kp2 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 2))
-  let kp3 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 3))
-  let kp4 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 4))
-  let kp5 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 5))
-  let kp6 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 6))
-  let kp7 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 7))
-  let kp8 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 8))
-  let kp9 = identity(FixedSizeArray10<ElementType>.getKeypathToElement(index: 9))
+  let kp0 = FixedSizeArrayHolder.shared.kp0
+  let kp1 = FixedSizeArrayHolder.shared.kp1
+  let kp2 = FixedSizeArrayHolder.shared.kp2
+  let kp3 = FixedSizeArrayHolder.shared.kp3
+  let kp4 = FixedSizeArrayHolder.shared.kp4
+  let kp5 = FixedSizeArrayHolder.shared.kp5
+  let kp6 = FixedSizeArrayHolder.shared.kp6
+  let kp7 = FixedSizeArrayHolder.shared.kp7
+  let kp8 = FixedSizeArrayHolder.shared.kp8
+  let kp9 = FixedSizeArrayHolder.shared.kp9
 
   for t in 1 ... iterationMultipier * n {
     fixedSizeArray10.element0 += fixedSizeArray10.element1 + ElementType(t)
