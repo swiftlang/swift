@@ -1683,6 +1683,11 @@ public:
       return;
 
     checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar);
+
+    for (auto attr : theVar->getAttachedPropertyWrappers()) {
+      checkType(attr->getType(), attr->getTypeRepr(), theVar,
+                ExportabilityReason::PropertyWrapper);
+    }
   }
 
   /// \see visitPatternBindingDecl
