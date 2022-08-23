@@ -3,7 +3,7 @@
 // RUN: %target-interop-build-clangxx -c %s -I %t -S -emit-llvm -o %t/ir.ll
 // RUN: %FileCheck %s < %t/ir.ll
 
-// UNSUPPORTED: OS=windows-msvc
+// REQUIRES: OS=windows-msvc
 
 unsigned char getEnumTagi8(void *p);
 unsigned getEnumTagi32(void *p);
@@ -13,5 +13,5 @@ void test(void *p) {
   getEnumTagi32(p);
 }
 
-// CHECK: declare noundef zeroext i8 @_Z12getEnumTagi8Pv(i8* noundef) #1
-// CHECK: declare noundef i32 @_Z13getEnumTagi32Pv(i8* noundef) #1
+// CHECK: declare dso_local noundef i8 @"?getEnumTagi8@@YAEPEAX@Z"(i8* noundef) #1
+// CHECK: declare dso_local noundef i32 @"?getEnumTagi32@@YAIPEAX@Z"(i8* noundef) #1
