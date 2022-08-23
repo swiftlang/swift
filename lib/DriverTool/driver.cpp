@@ -32,6 +32,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/DriverTool/DriverTool.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Errno.h"
@@ -168,12 +169,13 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
     return true;
   }
 
-  llvm::sys::path::append(buffer, "swift-driver");
+  StringRef execSuffix(llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ? ".exe" : "");
+  llvm::sys::path::append(buffer, "swift-driver" + execSuffix);
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
   llvm::sys::path::remove_filename(buffer);
-  llvm::sys::path::append(buffer, "swift-driver-new");
+  llvm::sys::path::append(buffer, "swift-driver-new" + execSuffix);
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
@@ -379,15 +381,16 @@ int swift::mainEntry(int argc_, const char **argv_) {
     subCommandArgs.erase(&subCommandArgs[1]);
     // We are running as a subcommand, try to find the subcommand adjacent to
     // the executable we are running as.
-    SmallString<256> SubcommandPath(
-      llvm::sys::path::parent_path(getExecutablePath(argv[0])));
-    llvm::sys::path::append(SubcommandPath, SubcommandName);
-
-    // If we didn't find the tool there, let the OS search for it.
-    if (!llvm::sys::fs::exists(SubcommandPath)) {
+    SmallString<256> SubcommandPath(SubcommandName);
+    auto result = llvm::sys::findProgramByName(SubcommandName,
+      { llvm::sys::path::parent_path(getExecutablePath(argv[0])) });
+    if (!result.getError()) {
+      SubcommandPath = *result;
+    } else {
+      // If we didn't find the tool there, let the OS search for it.
+      result = llvm::sys::findProgramByName(SubcommandName);
       // Search for the program and use the path if found. If there was an
       // error, ignore it and just let the exec fail.
-      auto result = llvm::sys::findProgramByName(SubcommandName);
       if (!result.getError())
         SubcommandPath = *result;
     }
