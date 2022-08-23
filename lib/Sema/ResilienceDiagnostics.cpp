@@ -241,8 +241,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      static_cast<unsigned>(*reason),
                      M->getName(),
                      static_cast<unsigned>(originKind))
-      .warnUntilSwiftVersionIf(useConformanceAvailabilityErrorsOption &&
-                               !ctx.LangOpts.EnableConformanceAvailabilityErrors,
+      .warnUntilSwiftVersionIf((useConformanceAvailabilityErrorsOption &&
+                                !ctx.LangOpts.EnableConformanceAvailabilityErrors) ||
+                               originKind == DisallowedOriginKind::ImplicitlyImported,
                                6);
   return true;
 }
