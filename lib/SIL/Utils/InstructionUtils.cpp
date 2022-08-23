@@ -256,6 +256,7 @@ SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MoveValueInst:
     return cast<SingleValueInstruction>(I);
   }
 }
