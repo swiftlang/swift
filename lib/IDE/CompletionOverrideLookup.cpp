@@ -411,6 +411,9 @@ void CompletionOverrideLookup::addAssociatedTypes(NominalTypeDecl *NTD) {
        hasOverride || hasOverridabilityModifier || hasStaticOrClass))
     return;
 
+  if (isa<ProtocolDecl>(NTD))
+    return;
+
   for (auto Conformance : NTD->getAllConformances()) {
     auto Proto = Conformance->getProtocol();
     if (!Proto->isAccessibleFrom(CurrDeclContext))

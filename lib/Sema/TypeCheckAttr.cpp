@@ -3306,14 +3306,22 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     // Check that the decl we're decorating is a member of a type that actually
     // conforms to the specified protocol.
     NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
-    SmallVector<ProtocolConformance *, 2> conformances;
-    if (!NTD->lookupConformance(PD, conformances)) {
-      diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_not_conformed_to,
-               NTD->getName(), PD->getName())
-        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
+      if (!OtherPD->inheritsFrom(PD)) {
+        diagnose(attr->getLocation(),
+                 diag::implements_attr_protocol_not_conformed_to,
+                 NTD->getName(), PD->getName())
+          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+      }
+    } else {
+      SmallVector<ProtocolConformance *, 2> conformances;
+      if (!NTD->lookupConformance(PD, conformances)) {
+        diagnose(attr->getLocation(),
+                 diag::implements_attr_protocol_not_conformed_to,
+                 NTD->getName(), PD->getName())
+          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+      }
     }
-
   } else {
     diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
       .highlight(attr->getProtocolTypeRepr()->getSourceRange());

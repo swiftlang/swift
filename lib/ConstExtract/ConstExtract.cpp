@@ -26,24 +26,27 @@
 #include <sstream>
 #include <string>
 
+using namespace swift;
+
 namespace {
 /// A helper class to collect all nominal type declarations that conform to
 /// specific protocols provided as input.
-class NominalTypeConformanceCollector : public swift::ASTWalker {
+class NominalTypeConformanceCollector : public ASTWalker {
   const std::unordered_set<std::string> &Protocols;
-  std::vector<swift::NominalTypeDecl *> &ConformanceTypeDecls;
+  std::vector<NominalTypeDecl *> &ConformanceTypeDecls;
 
 public:
   NominalTypeConformanceCollector(
       const std::unordered_set<std::string> &Protocols,
-      std::vector<swift::NominalTypeDecl *> &ConformanceDecls)
+      std::vector<NominalTypeDecl *> &ConformanceDecls)
       : Protocols(Protocols), ConformanceTypeDecls(ConformanceDecls) {}
 
-  bool walkToDeclPre(swift::Decl *D) override {
-    if (auto *NTD = llvm::dyn_cast<swift::NominalTypeDecl>(D))
-      for (auto &Protocol : NTD->getAllProtocols())
-        if (Protocols.count(Protocol->getName().str().str()) != 0)
-          ConformanceTypeDecls.push_back(NTD);
+  bool walkToDeclPre(Decl *D) override {
+    if (auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D))
+      if (!isa<ProtocolDecl>(NTD))
+        for (auto &Protocol : NTD->getAllProtocols())
+          if (Protocols.count(Protocol->getName().str().str()) != 0)
+            ConformanceTypeDecls.push_back(NTD);
     return true;
   }
 };

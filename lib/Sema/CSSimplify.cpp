@@ -8093,16 +8093,12 @@ allFromConditionalConformances(DeclContext *DC, Type baseTy,
     }
 
     if (auto *protocol = candidateDC->getSelfProtocolDecl()) {
-      SmallVector<ProtocolConformance *, 4> conformances;
-      if (!NTD->lookupConformance(protocol, conformances))
+      auto conformance = DC->getParentModule()->lookupConformance(
+          baseTy, protocol);
+      if (!conformance.isConcrete())
         return false;
 
-      // This is opportunistic, there should be a way to narrow the
-      // list down to a particular declaration member comes from.
-      return llvm::any_of(
-          conformances, [](const ProtocolConformance *conformance) {
-            return !conformance->getConditionalRequirements().empty();
-          });
+      return !conformance.getConcrete()->getConditionalRequirements().empty();
     }
 
     return false;
