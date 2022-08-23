@@ -3179,6 +3179,14 @@ PackType *PackType::get(const ASTContext &C, ArrayRef<Type> elements) {
   RecursiveTypeProperties properties;
   bool isCanonical = true;
   for (Type eltTy : elements) {
+    assert(!eltTy->isTypeParameter() ||
+           !eltTy->getRootGenericParam()->isTypeSequence() &&
+           "Pack type parameter outside of a pack expansion");
+    assert(!eltTy->is<SequenceArchetypeType>() &&
+           "Pack type archetype outside of a pack expansion");
+    assert(!eltTy->is<PackType>() &&
+           "Cannot have pack directly inside another pack");
+
     properties |= eltTy->getRecursiveProperties();
     if (!eltTy->isCanonical())
       isCanonical = false;
