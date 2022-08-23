@@ -866,7 +866,8 @@ extension Unsafe${Mutable}RawBufferPointer {
       return try body(.init(start: nil, count: 0))
     }
     _debugPrecondition(
-      Int(bitPattern: s) & (MemoryLayout<T>.alignment-1) == 0
+      Int(bitPattern: s) & (MemoryLayout<T>.alignment-1) == 0,
+      "baseAddress must be a properly aligned pointer for type T"
     )
     // initializer ensures _end is nil only when _position is nil.
     _internalInvariant(_end != nil)
