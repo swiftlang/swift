@@ -471,6 +471,10 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       # Add the SDK directory for the host platform.
       target_link_directories(${target} PRIVATE "${sdk_dir}")
 
+      # A backup in case the toolchain doesn't have one of the compatibility libraries.
+      target_link_directories(${target} PRIVATE
+        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+
       # Include the abi stable system stdlib in our rpath.
       set(swift_runtime_rpath "/usr/lib/swift")
 
