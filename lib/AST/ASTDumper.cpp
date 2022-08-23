@@ -3088,6 +3088,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
+    printCommon("pack_expansion") << '\n';
+    printRec(T->getPatternType());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitTupleTypeRepr(TupleTypeRepr *T) {
     printCommon("type_tuple");
 

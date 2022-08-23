@@ -708,6 +708,45 @@ struct TupleTypeReprElement {
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
+/// A pack expansion 'T...' with a pattern 'T'.
+///
+/// Can appear in the following positions:
+/// - The type of a parameter declaration in a function declaration
+/// - The type of a parameter in a function type
+/// - The element of a tuple
+///
+/// In the first two cases, it also spells an old-style variadic parameter
+/// desugaring to an array type. The two meanings are distinguished by the
+/// presence of at least one pack type parameter in the pack expansion
+/// pattern.
+///
+/// In the third case, tuples cannot contain an old-style variadic element,
+/// so the pack expansion must be a real variadic pack expansion.
+class PackExpansionTypeRepr final : public TypeRepr {
+  TypeRepr *Pattern;
+  SourceLoc EllipsisLoc;
+
+public:
+  PackExpansionTypeRepr(TypeRepr *Pattern, SourceLoc EllipsisLoc)
+    : TypeRepr(TypeReprKind::PackExpansion), Pattern(Pattern),
+      EllipsisLoc(EllipsisLoc) {}
+
+  TypeRepr *getPatternType() const { return Pattern; }
+  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::PackExpansion;
+  }
+  static bool classof(const PackExpansionTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Pattern->getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return EllipsisLoc; }
+  SourceLoc getLocImpl() const { return EllipsisLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A tuple type.
 /// \code
 ///   (Foo, Bar)
@@ -1339,6 +1378,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
+  case TypeReprKind::PackExpansion:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:

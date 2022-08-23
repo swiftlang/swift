@@ -2047,6 +2047,11 @@ namespace {
     NeverNullType resolveImplicitlyUnwrappedOptionalType(
         ImplicitlyUnwrappedOptionalTypeRepr *repr,
         TypeResolutionOptions options, bool isDirect);
+    std::pair<Type, Type>
+    maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
+                                  TypeResolutionOptions options);
+    NeverNullType resolvePackExpansionType(PackExpansionTypeRepr *repr,
+                                           TypeResolutionOptions options);
     NeverNullType resolveTupleType(TupleTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
@@ -2214,6 +2219,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     auto iuoRepr = cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr);
     return resolveImplicitlyUnwrappedOptionalType(iuoRepr, options, isDirect);
   }
+
+  case TypeReprKind::PackExpansion:
+    return resolvePackExpansionType(cast<PackExpansionTypeRepr>(repr), options);
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -4008,6 +4016,39 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   return uncheckedOptionalTy;
 }
 
+std::pair<Type, Type>
+TypeResolver::maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
+                                            TypeResolutionOptions options) {
+  auto elementOptions = options;
+  auto patternTy = resolveType(repr->getPatternType(), elementOptions);
+  if (patternTy->hasError())
+    return std::make_pair(ErrorType::get(getASTContext()), Type());
+
+  // Find the first type sequence parameter and use that as the count type.
+  SmallVector<Type, 1> rootTypeSequenceParams;
+  patternTy->getTypeSequenceParameters(rootTypeSequenceParams);
+
+  if (rootTypeSequenceParams.empty())
+    return std::make_pair(patternTy, Type());
+
+  return std::make_pair(patternTy, rootTypeSequenceParams[0]);
+}
+
+NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr,
+                                                     TypeResolutionOptions options) {
+  auto pair = maybeResolvePackExpansionType(repr, options);
+
+  // If there's no reference to a variadic generic parameter, complain
+  // - the pack won't actually expand to anything meaningful.
+  if (!pair.first->hasError() && !pair.second) {
+    diagnose(repr->getLoc(), diag::expansion_not_variadic, pair.first)
+      .highlight(repr->getSourceRange());
+    return ErrorType::get(getASTContext());
+  }
+
+  return PackExpansionType::get(pair.first, pair.second);
+}
+
 NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                              TypeResolutionOptions options) {
   SmallVector<TupleTypeElt, 8> elements;
@@ -4530,6 +4571,7 @@ public:
     case TypeReprKind::Isolated:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
+    case TypeReprKind::PackExpansion:
       return false;
     }
   }

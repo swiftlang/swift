@@ -439,6 +439,12 @@ SourceLoc SILBoxTypeRepr::getLocImpl() const {
   return LBraceLoc;
 }
 
+void PackExpansionTypeRepr::printImpl(ASTPrinter &Printer,
+                                      const PrintOptions &Opts) const {
+  printTypeRepr(Pattern, Printer, Opts);
+  Printer << "...";
+}
+
 void TupleTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   Printer.callPrintStructurePre(PrintStructureKind::TupleType);

@@ -2532,6 +2532,13 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return { };
   }
 
+  case TypeReprKind::PackExpansion: {
+    auto packExpansionRepr = cast<PackExpansionTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packExpansionRepr->getPatternType(), dc,
+                                       allowUsableFromInline);
+  }
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:

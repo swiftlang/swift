@@ -277,6 +277,7 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
   case SyntaxKind::TernaryExpr:
   case SyntaxKind::AvailabilityLabeledArgument:
   case SyntaxKind::MetatypeType:
+  case SyntaxKind::PackExpansionType:
   case SyntaxKind::OptionalType:
   case SyntaxKind::ImplicitlyUnwrappedOptionalType:
   case SyntaxKind::TypeExpr: {
