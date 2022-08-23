@@ -695,7 +695,7 @@ public:
                      tok::pound_else, tok::pound_elseif,
                      tok::code_complete) &&
            !isStartOfStmt() &&
-           !isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false)) {
+           !isStartOfSwiftDecl(/*allowPoundIfAttributes=*/true)) {
       skipSingle();
     }
   }
