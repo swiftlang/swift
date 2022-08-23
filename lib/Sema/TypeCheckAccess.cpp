@@ -1819,6 +1819,9 @@ public:
         checkType(wrapperType, wrapperAttrs[index]->getTypeRepr(), fn);
       }
 
+      if (auto attr = P->getAttachedResultBuilder())
+        checkType(P->getResultBuilderType(), attr->getTypeRepr(), fn);
+
       checkType(P->getInterfaceType(), P->getTypeRepr(), fn);
     }
   }
