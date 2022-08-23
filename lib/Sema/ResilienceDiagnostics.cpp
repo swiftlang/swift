@@ -144,6 +144,11 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
+  if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+      !ctx.LangOpts.isSwiftVersionAtLeast(6))
+    ctx.Diags.diagnose(loc, diag::missing_import_inserted,
+                       definingModule->getName());
+
   return true;
 }
 
@@ -190,7 +195,13 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        D->getDescriptiveKind(), D->getName(),
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind));
+
+    if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+        downgradeToWarning == DowngradeToWarning::Yes)
+      ctx.Diags.diagnose(loc, diag::missing_import_inserted,
+                         definingModule->getName());
   }
+
   return true;
 }
 
@@ -245,5 +256,10 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                                 !ctx.LangOpts.EnableConformanceAvailabilityErrors) ||
                                originKind == DisallowedOriginKind::ImplicitlyImported,
                                6);
+
+    if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+        !ctx.LangOpts.isSwiftVersionAtLeast(6))
+      ctx.Diags.diagnose(loc, diag::missing_import_inserted,
+                         M->getName());
   return true;
 }
