@@ -58,13 +58,13 @@ struct WrapperAcceptingAutoclosure<T> {
 
 @propertyWrapper
 struct MissingValue<T> { }
-// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}{{25-25=var wrappedValue: <#Value#>}}
+// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}{{25-25=\nvar wrappedValue: <#Value#>}}
 
 @propertyWrapper
 struct StaticValue {
   static var wrappedValue: Int = 17
 }
-// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}{{21-21=var wrappedValue: <#Value#>}}
+// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}{{21-21=\nvar wrappedValue: <#Value#>}}
 
 
 // expected-error@+1{{'@propertyWrapper' attribute cannot be applied to this declaration}}

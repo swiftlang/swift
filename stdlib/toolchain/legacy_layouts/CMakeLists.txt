@@ -56,8 +56,15 @@ foreach(sdk ${SWIFT_SDKS})
 endforeach()
 
 if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
-  # Bootstrapping - level 0
-  add_layout_copying( ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH} "0")
+  # The resource dir for bootstrapping0 may be used explicitly
+  # to cross compile for other architectures, so we would need
+  # to have all the legacy layouts in there
+  foreach(arch
+          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCHITECTURES}
+          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_MODULE_ARCHITECTURES})
+    # Bootstrapping - level 0
+    add_layout_copying( ${SWIFT_HOST_VARIANT_SDK} ${arch} "0")
+  endforeach()
 
   # Bootstrapping - level 1
   add_layout_copying( ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH} "1")
