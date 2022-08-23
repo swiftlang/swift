@@ -34,8 +34,7 @@ struct BasicBlockWorklist : CustomStringConvertible, CustomReflectable {
 
   /// Pushes \p block onto the worklist if \p block has never been pushed before.
   mutating func pushIfNotVisited(_ block: BasicBlock) {
-    if !pushedBlocks.contains(block) {
-      pushedBlocks.insert(block);
+    if pushedBlocks.insert(block) {
       worklist.append(block)
     }
   }

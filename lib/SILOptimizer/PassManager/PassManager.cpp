@@ -1469,8 +1469,8 @@ SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock bloc
   return castToBlockSet(set)->contains(castToBasicBlock(block)) ? 1 : 0;
 }
 
-void BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  castToBlockSet(set)->insert(castToBasicBlock(block));
+SwiftInt BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
+  return castToBlockSet(set)->insert(castToBasicBlock(block)) ? 1 : 0;
 }
 
 void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
@@ -1494,8 +1494,8 @@ SwiftInt NodeSet_containsValue(BridgedNodeSet set, BridgedValue value) {
   return castToNodeSet(set)->contains(castToSILValue(value)) ? 1 : 0;
 }
 
-void NodeSet_insertValue(BridgedNodeSet set, BridgedValue value) {
-  castToNodeSet(set)->insert(castToSILValue(value));
+SwiftInt NodeSet_insertValue(BridgedNodeSet set, BridgedValue value) {
+  return castToNodeSet(set)->insert(castToSILValue(value)) ? 1 : 0;
 }
 
 void NodeSet_eraseValue(BridgedNodeSet set, BridgedValue value) {
@@ -1506,8 +1506,8 @@ SwiftInt NodeSet_containsInstruction(BridgedNodeSet set, BridgedInstruction inst
   return castToNodeSet(set)->contains(castToInst(inst)->asSILNode()) ? 1 : 0;
 }
 
-void NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  castToNodeSet(set)->insert(castToInst(inst)->asSILNode());
+SwiftInt NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst) {
+  return castToNodeSet(set)->insert(castToInst(inst)->asSILNode()) ? 1 : 0;
 }
 
 void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst) {
