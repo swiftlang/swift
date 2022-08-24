@@ -3165,12 +3165,12 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
 static void
 getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
-                              SILLocation loc,
-                              GenericEnvironment *genericEnv,
-                              ResilienceExpansion expansion,
-                              ArrayRef<KeyPathPatternComponent::Index> indexes,
-                              SILFunction *&equals,
-                              SILFunction *&hash) {
+                                SILLocation loc,
+                                GenericEnvironment *genericEnv,
+                                ResilienceExpansion expansion,
+                                ArrayRef<KeyPathPatternComponent::Index> indexes,
+                                SILFunction *&equals,
+                                SILFunction *&hash) {
   if (indexes.empty()) {
     equals = nullptr;
     hash = nullptr;
@@ -3198,14 +3198,21 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   for (auto &index : indexes)
     indexTypes.push_back(index.FormalType);
 
-  SmallVector<TupleTypeElt, 2> indexElts;
-  for (auto &elt : indexes) {
-    indexElts.push_back(GenericEnvironment::mapTypeIntoContext(genericEnv,
-                                                               elt.FormalType));
+  CanType indexTupleTy;
+  if (indexes.size() == 1) {
+    indexTupleTy = GenericEnvironment::mapTypeIntoContext(
+        genericEnv, indexes[0].FormalType)->getCanonicalType();
+  } else {
+    SmallVector<TupleTypeElt, 2> indexElts;
+    for (auto &elt : indexes) {
+      indexElts.push_back(GenericEnvironment::mapTypeIntoContext(
+          genericEnv, elt.FormalType));
+    }
+
+    indexTupleTy = TupleType::get(indexElts, SGM.getASTContext())
+                          ->getCanonicalType();
   }
 
-  auto indexTupleTy = TupleType::get(indexElts, SGM.getASTContext())
-                        ->getCanonicalType();
   RValue indexValue(indexTupleTy);
 
   auto indexLoweredTy =

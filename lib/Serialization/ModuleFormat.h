@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 704; // _eagerMove/_lexical function argument attributes
+const uint16_t SWIFTMODULE_VERSION_MINOR = 705; // same-length requirements
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -435,12 +435,13 @@ static inline OperatorFixity getASTOperatorFixity(OperatorKind fixity) {
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum GenericRequirementKind : uint8_t {
-  Conformance = 0,
-  SameType    = 1,
-  Superclass  = 2,
-  Layout = 3,
+  SameCount = 0,
+  Conformance = 1,
+  SameType    = 2,
+  Superclass  = 3,
+  Layout = 4,
 };
-using GenericRequirementKindField = BCFixed<2>;
+using GenericRequirementKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.

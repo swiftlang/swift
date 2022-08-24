@@ -580,6 +580,28 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
   return transformFn(type);
 }
 
+void TypeBase::getTypeSequenceParameters(
+    SmallVectorImpl<Type> &rootTypeSequenceParams) const {
+  llvm::SmallDenseSet<CanType, 2> visited;
+
+  auto recordType = [&](Type t) {
+    if (visited.insert(t->getCanonicalType()).second)
+      rootTypeSequenceParams.push_back(t);
+  };
+
+  Type(const_cast<TypeBase *>(this)).visit([&](Type t) {
+    if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
+      if (paramTy->isTypeSequence()) {
+        recordType(paramTy);
+      }
+    } else if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+      if (archetypeTy->isRoot()) {
+        recordType(t);
+      }
+    }
+  });
+}
+
 Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   if (!dc->isTypeContext())
     return this;
@@ -1593,8 +1615,9 @@ CanType TypeBase::computeCanonicalType() {
 
   case TypeKind::PackExpansion: {
     auto *expansion = cast<PackExpansionType>(this);
-    auto pattern = expansion->getPatternType()->getCanonicalType();
-    Result = PackExpansionType::get(pattern);
+    auto patternType = expansion->getPatternType()->getCanonicalType();
+    auto countType = expansion->getCountType()->getCanonicalType();
+    Result = PackExpansionType::get(patternType, countType);
     break;
   }
 
@@ -4178,6 +4201,8 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
     }
 
     switch (Req.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
     case RequirementKind::Superclass:
     case RequirementKind::Conformance:
       MinimalMembers.push_back(Req.getSecondType());
@@ -5535,12 +5560,9 @@ case TypeKind::Id:
           return remap;
         }
 
-        if (input->is<TypeVariableType>()) {
-          if (auto *PT = (*remap)->getAs<PackType>()) {
-            maxArity = std::max(maxArity, PT->getNumElements());
-            cache.insert({input, PT});
-          }
-        } else if (input->isTypeSequenceParameter()) {
+        if (input->is<TypeVariableType>() ||
+            input->isTypeSequenceParameter() ||
+            input->is<SequenceArchetypeType>()) {
           if (auto *PT = (*remap)->getAs<PackType>()) {
             maxArity = std::max(maxArity, PT->getNumElements());
             cache.insert({input, PT});
@@ -5563,7 +5585,13 @@ case TypeKind::Id:
     if (!transformedPat)
       return Type();
 
-    if (transformedPat.getPointer() == expand->getPatternType().getPointer())
+    Type transformedCount =
+        expand->getCountType().transformWithPosition(pos, gather);
+    if (!transformedCount)
+      return Type();
+
+    if (transformedPat.getPointer() == expand->getPatternType().getPointer() &&
+        transformedCount.getPointer() == expand->getCountType().getPointer())
       return *this;
 
     llvm::DenseMap<TypeBase *, PackType *> expansions;
@@ -5573,7 +5601,7 @@ case TypeKind::Id:
       // If we didn't find any expansions, either the caller wasn't interested
       // in expanding this pack, or something has gone wrong. Leave off the
       // expansion and return the transformed type.
-      return PackExpansionType::get(transformedPat);
+      return PackExpansionType::get(transformedPat, transformedCount);
     }
 
     SmallVector<Type, 8> elts;
@@ -6251,7 +6279,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
           TangentSpace::getTuple(ctx.TheEmptyTupleType->castTo<TupleType>()));
     if (newElts.size() == 1)
       return cache(TangentSpace::getTangentVector(newElts.front().getType()));
-    auto *tupleType = TupleType::get(newElts, ctx)->castTo<TupleType>();
+    auto *tupleType = TupleType::get(newElts, ctx);
     return cache(TangentSpace::getTuple(tupleType));
   }
 

@@ -227,6 +227,9 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       }
     }
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     // Check layout requirements.
     case RequirementKind::Layout: {
       auto layout = req.getLayoutConstraint();

@@ -257,6 +257,9 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@async") << " ";
   if (hasAttr(TAK_opened))
     Printer.printSimpleAttr("@opened") << " ";
+
+  if (hasAttr(TAK_tuple))
+    Printer.printSimpleAttr("@tuple") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,

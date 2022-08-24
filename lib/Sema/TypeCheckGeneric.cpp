@@ -356,6 +356,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
     Type second;
 
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
       second = req.getSecondType();
@@ -786,6 +787,9 @@ void TypeChecker::diagnoseRequirementFailure(
 
   const auto reqKind = req.getKind();
   switch (reqKind) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Conformance: {
     diagnoseConformanceFailure(substReq.getFirstType(),
                                substReq.getProtocolDecl(), module, errorLoc);

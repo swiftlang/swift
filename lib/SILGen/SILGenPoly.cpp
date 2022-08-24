@@ -934,9 +934,8 @@ namespace {
           assert(!param.isInOut());
           elts.emplace_back(param.getParameterType());
         }
-        auto outputSubstType = cast<TupleType>(
-          TupleType::get(elts, SGF.getASTContext())
-            ->getCanonicalType());
+        auto outputSubstType = CanTupleType(
+          TupleType::get(elts, SGF.getASTContext()));
 
         // Translate the input tuple value into the output tuple value. Note
         // that the output abstraction pattern is a tuple, and we explode tuples

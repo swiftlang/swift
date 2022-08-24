@@ -267,6 +267,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
   for (auto &reqt : signature.getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
+      case RequirementKind::SameCount:
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
       case RequirementKind::Layout:

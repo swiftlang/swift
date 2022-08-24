@@ -3798,6 +3798,15 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
     Attributes.setOpaqueReturnTypeOf(mangling, index);
     break;
   }
+
+  case TAK_tuple: {
+    if (!isInSILMode()) {
+      diagnose(AtLoc, diag::only_allowed_in_sil, "tuple");
+      return makeParserSuccess();
+    }
+
+    Attributes.IsTuple = true;
+  }
   }
 
   Attributes.setAttr(attr, AtLoc);

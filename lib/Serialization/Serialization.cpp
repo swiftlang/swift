@@ -1,4 +1,4 @@
-//===--- Serialization.cpp - Read and write Swift modules -----------------===//
+  //===--- Serialization.cpp - Read and write Swift modules -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -1337,6 +1337,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
     return GenericRequirementKind::KIND;
 
   switch (kind) {
+  CASE(SameCount)
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)
