@@ -412,6 +412,11 @@ BridgedInstruction SILBuilder_createCondFail(BridgedBuilder builder,
           BridgedValue condition, llvm::StringRef message);
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder builder,
           BridgedType type, SwiftInt value);
+BridgedInstruction SILBuilder_createAllocStack(BridgedBuilder builder,
+          BridgedType type, SwiftInt hasDynamicLifetime, SwiftInt isLexical,
+          SwiftInt wasMoved);
+BridgedInstruction SILBuilder_createDeallocStack(BridgedBuilder builder,
+          BridgedValue operand);
 BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder builder,
           BridgedValue operand);
 BridgedInstruction SILBuilder_createUncheckedRefCast(BridgedBuilder builder,
@@ -422,6 +427,9 @@ BridgedInstruction SILBuilder_createFunctionRef(BridgedBuilder builder,
           BridgedFunction function);
 BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder builder,
           BridgedValue op);
+BridgedInstruction SILBuilder_createCopyAddr(BridgedBuilder builder,
+          BridgedValue from, BridgedValue to,
+          SwiftInt takeSource, SwiftInt initializeDest);
 BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder builder,
           BridgedValue op);
 BridgedInstruction SILBuilder_createApply(BridgedBuilder builder,

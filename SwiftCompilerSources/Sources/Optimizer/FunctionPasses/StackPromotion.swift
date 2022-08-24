@@ -175,13 +175,13 @@ func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   for exitInst in innerRange.exits {
     if !deadEndBlocks.isDeadEnd(exitInst.block) {
       let builder = Builder(at: exitInst, context)
-      _ = builder.createDeallocStackRef(allocRef)
+      builder.createDeallocStackRef(allocRef)
     }
   }
 
   for endInst in innerRange.ends {
     Builder.insert(after: endInst, location: allocRef.location, context) {
-      (builder) in _ = builder.createDeallocStackRef(allocRef)
+      (builder) in builder.createDeallocStackRef(allocRef)
     }
   }
 

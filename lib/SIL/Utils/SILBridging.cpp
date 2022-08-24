@@ -960,6 +960,23 @@ BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder b,
                                        getSILType(type), value)};
 }
 
+BridgedInstruction SILBuilder_createAllocStack(BridgedBuilder b,
+          BridgedType type, SwiftInt hasDynamicLifetime, SwiftInt isLexical,
+          SwiftInt wasMoved) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createAllocStack(getRegularLocation(b.loc), getSILType(type),
+            None, hasDynamicLifetime != 0, isLexical != 0, wasMoved != 0)};
+}
+
+BridgedInstruction SILBuilder_createDeallocStack(BridgedBuilder b,
+          BridgedValue operand) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createDeallocStack(getRegularLocation(b.loc),
+                                     castToSILValue(operand))};
+}
+
 BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder b,
           BridgedValue operand) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
@@ -1003,6 +1020,16 @@ BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder b,
                      getSILDebugScope(b.loc));
   return {builder.createCopyValue(getRegularLocation(b.loc),
                                   castToSILValue(op))};
+}
+
+BridgedInstruction SILBuilder_createCopyAddr(BridgedBuilder b,
+          BridgedValue from, BridgedValue to,
+          SwiftInt takeSource, SwiftInt initializeDest) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createCopyAddr(getRegularLocation(b.loc), castToSILValue(from),
+            castToSILValue(to), IsTake_t(takeSource != 0),
+                                IsInitialization_t(initializeDest != 0))};
 }
 
 BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder b,
