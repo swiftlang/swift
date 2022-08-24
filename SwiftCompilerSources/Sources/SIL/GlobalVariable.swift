@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-final public class GlobalVariable : CustomStringConvertible, HasShortDescription {
+final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
   public var name: StringRef {
     return StringRef(bridged: SILGlobalVariable_getName(bridged))
   }
@@ -29,15 +29,15 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
 
   // TODO: initializer instructions
 
+  public static func ==(lhs: GlobalVariable, rhs: GlobalVariable) -> Bool {
+    lhs === rhs
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
+
   var bridged: BridgedGlobalVar { BridgedGlobalVar(obj: SwiftObject(self)) }
-}
-
-public func ==(_ lhs: GlobalVariable, _ rhs: GlobalVariable) -> Bool {
-  return lhs === rhs
-}
-
-public func !=(_ lhs: GlobalVariable, _ rhs: GlobalVariable) -> Bool {
-  return (lhs !== rhs)
 }
 
 // Bridging utilities
