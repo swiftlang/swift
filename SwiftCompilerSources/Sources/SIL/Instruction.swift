@@ -689,21 +689,26 @@ public class TermInst : Instruction {
   final public var successors: SuccessorArray {
     SuccessorArray(succArray: TermInst_getSuccessors(bridged))
   }
+  
+  public var isFunctionExiting: Bool { false }
 }
 
 final public class UnreachableInst : TermInst {
 }
 
 final public class ReturnInst : TermInst, UnaryInstruction {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class ThrowInst : TermInst, UnaryInstruction {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class YieldInst : TermInst {
 }
 
 final public class UnwindInst : TermInst {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class TryApplyInst : TermInst, FullApplySite {
