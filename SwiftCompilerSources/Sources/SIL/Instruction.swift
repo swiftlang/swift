@@ -139,6 +139,10 @@ public class SingleValueInstruction : Instruction, Value {
 
   fileprivate final override var resultCount: Int { 1 }
   fileprivate final override func getResult(index: Int) -> Value { self }
+
+  public static func ==(lhs: SingleValueInstruction, rhs: SingleValueInstruction) -> Bool {
+    lhs === rhs
+  }
 }
 
 public final class MultipleValueInstructionResult : Value {

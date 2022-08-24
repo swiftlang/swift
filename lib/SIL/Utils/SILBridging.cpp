@@ -461,6 +461,14 @@ BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
   return {fieldType.getOpaqueValue()};
 }
 
+StringRef SILType_getNominalFieldName(BridgedType type, SwiftInt index) {
+  SILType silType = castToSILType(type);
+
+  NominalTypeDecl *decl = silType.getNominalOrBoundGenericNominal();
+  VarDecl *field = getIndexedField(decl, (unsigned)index);
+  return field->getName().str();
+}
+
 SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
                                           StringRef fieldName) {
   SILType ty = castToSILType(type);

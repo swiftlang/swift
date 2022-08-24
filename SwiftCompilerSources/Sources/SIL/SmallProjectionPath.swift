@@ -373,7 +373,37 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
     }
     return Self(.anything)
   }
+
+  /// Returns true if this path may overlap with `rhs`.
+  ///
+  /// "Overlapping" means that both paths may project the same field.
+  /// For example:
+  ///    `s0.s1`  and `s0.s1` overlap (the paths are identical)
+  ///    `s0.s1`  and `s0.s2` don't overlap
+  ///    `s0.s1`  and `s0`    overlap (the second path is a sub-path of the first one)
+  ///    `s0.v**` and `s0.s1` overlap
+  public func mayOverlap(with rhs: SmallProjectionPath) -> Bool {
+    if isEmpty || rhs.isEmpty {
+      return true
+    }
   
+    let (lhsKind, lhsIdx, lhsBits) = top
+    let (rhsKind, rhsIdx, rhsBits) = rhs.top
+    
+    if lhsKind == .anything || rhsKind == .anything {
+      return true
+    }
+    if lhsKind == .anyValueFields || rhsKind == .anyValueFields {
+      return popAllValueFields().mayOverlap(with: rhs.popAllValueFields())
+    }
+    if (lhsKind == rhsKind && lhsIdx == rhsIdx) ||
+       (lhsKind == .anyClassField && rhsKind.isClassField) ||
+       (lhsKind.isClassField && rhsKind == .anyClassField) {
+      return pop(numBits: lhsBits).mayOverlap(with: rhs.pop(numBits: rhsBits))
+    }
+    return false
+  }
+
   public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
@@ -505,6 +535,7 @@ extension SmallProjectionPath {
     parsing()
     merging()
     matching()
+    overlapping()
     predicates()
     path2path()
   
@@ -615,6 +646,38 @@ extension SmallProjectionPath {
       let rhs = try! rhsParser.parseProjectionPathFromSIL()
       let result = lhs.matches(pattern: rhs)
       precondition(result == expect)
+    }
+
+    func overlapping() {
+      testOverlap("s0.s1.s2", "s0.s1.s2",     expect: true)
+      testOverlap("s0.s1.s2", "s0.s2.s2",     expect: false)
+      testOverlap("s0.s1.s2", "s0.e1.s2",     expect: false)
+      testOverlap("s0.s1.s2", "s0.s1",        expect: true)
+      testOverlap("s0.s1.s2", "s1.s2",        expect: false)
+
+      testOverlap("s0.c*.s2", "s0.ct.s2",     expect: true)
+      testOverlap("s0.c*.s2", "s0.c1.s2",     expect: true)
+      testOverlap("s0.c*.s2", "s0.c1.c2.s2",  expect: false)
+      testOverlap("s0.c*.s2", "s0.s2",        expect: false)
+
+      testOverlap("s0.v**.s2", "s0.s3",       expect: true)
+      testOverlap("s0.v**.s2.c2", "s0.s3.c1", expect: false)
+      testOverlap("s0.v**.s2", "s1.s3",       expect: false)
+      testOverlap("s0.v**.s2", "s0.v**.s3",   expect: true)
+
+      testOverlap("s0.**", "s0.s3.c1",        expect: true)
+      testOverlap("**", "s0.s3.c1",           expect: true)
+    }
+
+    func testOverlap(_ lhsStr: String, _ rhsStr: String, expect: Bool) {
+      var lhsParser = StringParser(lhsStr)
+      let lhs = try! lhsParser.parseProjectionPathFromSIL()
+      var rhsParser = StringParser(rhsStr)
+      let rhs = try! rhsParser.parseProjectionPathFromSIL()
+      let result = lhs.mayOverlap(with: rhs)
+      precondition(result == expect)
+      let reversedResult = rhs.mayOverlap(with: lhs)
+      precondition(reversedResult == expect)
     }
 
     func predicates() {

@@ -80,6 +80,10 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
     }
     return idx >= 0 ? idx : nil
   }
+
+  public func getNameOfField(withIndex idx: Int) -> StringRef {
+    StringRef(bridged: SILType_getNominalFieldName(type.bridged, idx))
+  }
 }
 
 public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
