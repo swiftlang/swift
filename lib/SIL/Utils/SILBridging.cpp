@@ -730,8 +730,8 @@ BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst) {
   return {castToInst<GlobalAccessInst>(globalInst)->getReferencedGlobal()};
 }
 
-BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri) {
-  return {castToInst<FunctionRefInst>(fri)->getReferencedFunction()};
+BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri) {
+  return {castToInst<FunctionRefBaseInst>(fri)->getInitiallyReferencedFunction()};
 }
 
 llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli) {
@@ -875,6 +875,21 @@ bool RefCountingInst_getIsAtomic(BridgedInstruction rc) {
 
 SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr) {
   return castToInst<CondBranchInst>(cbr)->getNumTrueArgs();
+}
+
+SwiftInt KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
+                                            KeyPathFunctionResults * _Nonnull results) {
+  KeyPathPattern *pattern = castToInst<KeyPathInst>(kpi)->getPattern();
+  const KeyPathPatternComponent &comp = pattern->getComponents()[componentIdx];
+  results->numFunctions = 0;
+
+  comp.visitReferencedFunctionsAndMethods([results](SILFunction *func) {
+      assert(results->numFunctions < KeyPathFunctionResults::maxFunctions);
+      results->functions[results->numFunctions++] = {func};
+    }, [](SILDeclRef) {});
+
+  ++componentIdx;
+  return componentIdx < (int)pattern->getComponents().size() ? componentIdx : -1;
 }
 
 BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst) {

@@ -357,7 +357,7 @@ BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
 llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi);
 BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
-BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri);
+BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri);
 llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli);
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
@@ -390,6 +390,14 @@ SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr);
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);
 bool RefCountingInst_getIsAtomic(BridgedInstruction rc);
 SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr);
+
+struct KeyPathFunctionResults {
+  enum { maxFunctions = 5 };
+  BridgedFunction functions[maxFunctions];
+  SwiftInt numFunctions;
+};
+SwiftInt KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
+                                            KeyPathFunctionResults * _Nonnull results);
 
 BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);
 BridgedArgumentConvention
