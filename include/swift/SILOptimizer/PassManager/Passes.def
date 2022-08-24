@@ -399,6 +399,8 @@ SWIFT_FUNCTION_PASS(RunUnitTests, "run-unit-tests",
      "Runs the compiler internal unit tests")
 SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
      "Test pass which prints the SIL of a function")
+SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
+     "Dump the results of FunctionUses")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",

@@ -61,6 +61,7 @@ private func registerSwiftPasses() {
   registerPass(simplifyStrongReleasePass, { simplifyStrongReleasePass.run($0) })
 
   // Test passes
+  registerPass(functionUsesDumper, { functionUsesDumper.run($0) })
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
   registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
   registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
