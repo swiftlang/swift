@@ -770,6 +770,16 @@ if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
   endif()
 endif()
 
+set(SWIFT_PATH_TO_LLVM_BINDINGS_SOURCE "${SWIFT_SOURCE_DIR}/../swift-llvm-bindings")
+if(NOT EXISTS "${SWIFT_PATH_TO_LLVM_BINDINGS_SOURCE}")
+  if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF")
+    message(SEND_ERROR
+        "Building SwiftCompilerSources requires Swift LLVM Bindings. "
+        "Please specify SWIFT_PATH_TO_LLVM_BINDINGS_SOURCE.")
+  endif()
+endif()
+set(SWIFT_LLVM_BINDINGS_MODULES LLVM_Utils)
+
 # This setting causes all CMakeLists.txt to automatically have
 # ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CURRENT_SOURCE_DIR} as an
 # include_directories path. This is done for developer

@@ -96,6 +96,10 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         get_target_property(module_file "SwiftModule${module}" "module_file")
         string(APPEND swift_ast_path_flags ",-add_ast_path,${module_file}")
       endforeach()
+      foreach(module ${SWIFT_LLVM_BINDINGS_MODULES})
+        get_property(module_file GLOBAL PROPERTY "${module}_module_file")
+        string(APPEND swift_ast_path_flags ",-add_ast_path,${module_file}")
+      endforeach()
 
       set_property(TARGET ${target} APPEND_STRING PROPERTY
                    LINK_FLAGS " ${swift_ast_path_flags} ")

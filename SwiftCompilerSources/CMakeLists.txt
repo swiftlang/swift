@@ -9,6 +9,12 @@
 # Following function are needed as a workaround until it's possible to compile
 # swift code with cmake's builtin swift support.
 
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(host_deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
+endif()
+get_versioned_target_triple(host_target ${SWIFT_HOST_VARIANT_SDK}
+    ${SWIFT_HOST_VARIANT_ARCH} "${host_deployment_version}")
+
 # Add a swift compiler module
 #
 # Creates a target to compile a swift module.
@@ -96,7 +102,6 @@ function(add_swift_compiler_modules_library name)
   set(sdk_option "")
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
     set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
     set(sdk_option "-sdk" "${sdk_path}")
     if(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
@@ -123,8 +128,6 @@ function(add_swift_compiler_modules_library name)
     get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
     set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../lib/swift")
   endif()
-  get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
-      ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
 
   set(all_obj_files)
   set(all_module_targets)
@@ -168,7 +171,7 @@ function(add_swift_compiler_modules_library name)
         importedHeaderDependencies
       COMMAND ${ALS_SWIFT_EXEC} "-c" "-o" ${module_obj_file}
               ${sdk_option}
-              "-target" ${target}
+              "-target" ${host_target}
               "-module-name" ${module} "-emit-module"
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
@@ -201,6 +204,7 @@ function(add_swift_compiler_modules_library name)
   endif()
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
+  target_link_directories(${name} PUBLIC ${build_dir}/swift-llvm-bindings/lib)
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
 
@@ -209,6 +213,7 @@ function(add_swift_compiler_modules_library name)
   endif()
   add_library("${name}_SwiftSyntax" STATIC ${syntaxparse_obj_files})
   add_dependencies("${name}_SwiftSyntax" ${syntaxparse_module_targets})
+  target_link_directories("${name}_SwiftSyntax" PUBLIC ${build_dir}/swift-llvm-bindings/lib)
   set_target_properties("${name}_SwiftSyntax" PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS "${name}_SwiftSyntax")
 
@@ -227,6 +232,8 @@ else()
   # Note: "Swift" is not added intentionally here, because it would break
   # the bootstrapping build in case no swift toolchain is installed on the host.
   project(SwiftInTheCompiler LANGUAGES C CXX)
+
+  include(ExternalProject)
 
   add_subdirectory(Sources)
 
@@ -258,6 +265,33 @@ else()
   add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
   target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
 
+  message(STATUS "Using Swift LLVM Bindings (${SWIFT_PATH_TO_LLVM_BINDINGS_SOURCE})")
+  set(bindings_cmake_args
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      # Tell CMake to not try to compile a sample Swift program with this
+      # compiler. Doing that will sometimes fail because the bootstrapped
+      # compiler might not have backdeployment libraries present.
+      -DCMAKE_Swift_COMPILER_WORKS=YES
+      -DCMAKE_Swift_COMPILER_TARGET=${host_target}
+      # Tell CMake to use the same C and C++ compilers as used for building
+      # Swift itself. This is especially important on Linux where the default
+      # compiler is usually gcc.
+      -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+      -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+      -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+      -DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}
+      -DCMAKE_SHARED_LINKER_FLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+      -DCMAKE_LINKER=${CMAKE_LINKER}
+      -DCMAKE_MT=${CMAKE_MT}
+      -DCMAKE_RANLIB=${CMAKE_RANLIB}
+      -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+      # Make sure `find_package(LLVM)` discovers the correct LLVM checkout.
+      -DLLVM_DIR=${LLVM_DIR}
+      -DClang_DIR=${Clang_DIR}
+      )
+
   if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
     if (NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
@@ -277,8 +311,20 @@ else()
       endif()
     endif()
 
+    get_bootstrapping_path(bindings_build_dir ${CMAKE_CURRENT_BINARY_DIR} "")
+    ExternalProject_Add(swift-llvm-bindings
+        SOURCE_DIR ${SWIFT_PATH_TO_LLVM_BINDINGS_SOURCE}
+        CMAKE_ARGS
+        ${bindings_cmake_args}
+        -DCMAKE_Swift_COMPILER=${CMAKE_Swift_COMPILER}
+        -DCMAKE_INSTALL_PREFIX=${bindings_build_dir}/../
+        -DCMAKE_Swift_MODULE_DIRECTORY=${bindings_build_dir}
+        STEP_TARGETS configure build install
+        BUILD_ALWAYS YES)
+
     add_swift_compiler_modules_library(swiftCompilerModules
-      SWIFT_EXEC "${SWIFT_EXEC_FOR_SWIFT_MODULES}")
+      SWIFT_EXEC "${SWIFT_EXEC_FOR_SWIFT_MODULES}"
+      DEPENDS swift-llvm-bindings-install)
 
   elseif(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
 
@@ -315,16 +361,43 @@ else()
 
     # Bootstrapping - stage 1, using the compiler from level 0
 
+    get_bootstrapping_path(build_dir0 ${CMAKE_CURRENT_BINARY_DIR} "1")
+    ExternalProject_Add(swift-llvm-bindings-bootstrapping0
+        SOURCE_DIR ${SWIFT_PATH_TO_LLVM_BINDINGS_SOURCE}
+        CMAKE_ARGS
+        ${bindings_cmake_args}
+        -DCMAKE_Swift_COMPILER=$<TARGET_FILE_DIR:swift-frontend-bootstrapping0>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
+        -DCMAKE_INSTALL_PREFIX=${build_dir0}/swift-llvm-bindings
+        -DCMAKE_Swift_MODULE_DIRECTORY=${build_dir0}
+        STEP_TARGETS configure build install
+        BUILD_ALWAYS YES)
+    add_dependencies(swift-llvm-bindings-bootstrapping0-configure ${b0_deps})
+
     add_swift_compiler_modules_library(swiftCompilerModules-bootstrapping1
       SWIFT_EXEC $<TARGET_FILE_DIR:swift-frontend-bootstrapping0>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
-      DEPENDS ${b0_deps}
+      DEPENDS ${b0_deps} swift-llvm-bindings-bootstrapping0-install
       BOOTSTRAPPING 1)
 
     # The final build, using the compiler from stage 1
 
+    get_bootstrapping_path(build_dir1 ${CMAKE_CURRENT_BINARY_DIR} "")
+    ExternalProject_Add(swift-llvm-bindings-bootstrapping1
+        SOURCE_DIR ${SWIFT_PATH_TO_LLVM_BINDINGS_SOURCE}
+        CMAKE_ARGS
+        ${bindings_cmake_args}
+        -DCMAKE_Swift_COMPILER=$<TARGET_FILE_DIR:swift-frontend-bootstrapping1>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
+        -DCMAKE_INSTALL_PREFIX=${build_dir1}/swift-llvm-bindings
+        -DCMAKE_Swift_MODULE_DIRECTORY=${build_dir1}
+        STEP_TARGETS configure build install
+        BUILD_ALWAYS YES)
+    add_dependencies(swift-llvm-bindings-bootstrapping1-configure ${b1_deps})
+    foreach(module ${SWIFT_LLVM_BINDINGS_MODULES})
+      set_property(GLOBAL PROPERTY ${module}_module_file "${build_dir1}/${module}.swiftmodule")
+    endforeach()
+
     add_swift_compiler_modules_library(swiftCompilerModules
         SWIFT_EXEC $<TARGET_FILE_DIR:swift-frontend-bootstrapping1>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
-        DEPENDS ${b1_deps})
+        DEPENDS ${b1_deps} swift-llvm-bindings-bootstrapping1-install)
 
     if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
       file(GLOB module_dirs "${CMAKE_BINARY_DIR}/bootstrapping*/lib/swift/macosx/*.swiftmodule")
