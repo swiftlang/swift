@@ -4793,6 +4793,9 @@ void PrintAST::visitConstructorRefCallExpr(ConstructorRefCallExpr *expr) {
   }
 }
 
+void PrintAST::visitABISafeConversionExpr(ABISafeConversionExpr *expr) {
+}
+
 void PrintAST::visitFunctionConversionExpr(FunctionConversionExpr *expr) {
 }
 

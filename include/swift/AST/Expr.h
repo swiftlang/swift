@@ -3157,6 +3157,19 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Load; }
 };
 
+/// ABISafeConversion - models a type conversion on an l-value that has no
+/// material affect on the ABI of the type, while *preserving* the l-valueness
+/// of the type.
+class ABISafeConversionExpr : public ImplicitConversionExpr {
+public:
+  ABISafeConversionExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::ABISafeConversion, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ABISafeConversion;
+  }
+};
+
 /// This is a conversion from an expression of UnresolvedType to an arbitrary
 /// other type, and from an arbitrary type to UnresolvedType.  This node does
 /// not appear in valid code, only in code involving diagnostics.
