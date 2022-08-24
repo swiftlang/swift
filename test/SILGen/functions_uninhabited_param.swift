@@ -25,6 +25,7 @@ enum E {
   static func f(_: E) {}
 }
 
+@available(SwiftStdlib 5.1, *)
 @MainActor
 class Bar {
   var foo: (E) -> Void = { _ in }
