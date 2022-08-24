@@ -994,6 +994,10 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
                         Discrimination::Constant,
                         SpecialPointerAuthDiscriminators
                           ::NonUniqueExtendedExistentialTypeShape);
+
+  opts.ClangTypeTaskContinuationFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::ClangTypeTaskContinuationFunction);
 }
 
 std::unique_ptr<llvm::TargetMachine>
