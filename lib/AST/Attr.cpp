@@ -1046,6 +1046,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
     break;
 
+  case DAK_Expose:
+    Printer.printAttrName("@_expose");
+    Printer << "(Cxx";
+    if (!cast<ExposeAttr>(this)->Name.empty())
+      Printer << ", \"" << cast<ExposeAttr>(this)->Name << "\"";
+    Printer << ")";
+    break;
+
   case DAK_ObjC: {
     Printer.printAttrName("@objc");
     llvm::SmallString<32> scratch;
@@ -1440,6 +1448,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_unavailableFromAsync";
   case DAK_BackDeploy:
     return "_backDeploy";
+  case DAK_Expose:
+    return "_expose";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

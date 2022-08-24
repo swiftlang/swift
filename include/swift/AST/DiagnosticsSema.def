@@ -1481,6 +1481,11 @@ ERROR(cdecl_empty_name,none,
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
 
+ERROR(expose_only_non_other_attr,none,
+      "@_expose attribute cannot be applied to an '%0' declaration", (StringRef))
+ERROR(expose_inside_unexposed_decl,none,
+      "@_expose attribute cannot be applied inside of unexposed declaration %0", (DeclName))
+
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
 ERROR(attr_decl_async,none,

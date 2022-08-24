@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -701,8 +702,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   modifiers.isConst =
       !isa<ClassDecl>(typeDeclContext) && !isMutating && !isConstructor;
   printFunctionSignature(
-      FD, isConstructor ? "init" : FD->getName().getBaseIdentifier().get(),
-      resultTy, FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
+      FD, isConstructor ? "init" : cxx_translation::getNameForCxx(FD), resultTy,
+      FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -734,7 +735,8 @@ static bool canRemapBoolPropertyNameDirectly(StringRef name) {
 static std::string remapPropertyName(const AccessorDecl *accessor,
                                      Type resultTy) {
   // For a getter or setter, go through the variable or subscript decl.
-  StringRef propertyName = accessor->getStorage()->getBaseIdentifier().str();
+  StringRef propertyName =
+      cxx_translation::getNameForCxx(accessor->getStorage());
 
   // Boolean property getters can be remapped directly in certain cases.
   if (accessor->isGetter() && resultTy->isBool() &&

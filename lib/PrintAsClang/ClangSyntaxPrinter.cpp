@@ -14,6 +14,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SwiftNameTranslation.h"
 
 using namespace swift;
 using namespace cxx_synthesis;
@@ -52,7 +53,7 @@ void ClangSyntaxPrinter::printIdentifier(StringRef name) {
 
 void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) {
   assert(decl->getName().isSimpleName());
-  printIdentifier(decl->getBaseIdentifier().str());
+  printIdentifier(cxx_translation::getNameForCxx(decl));
 }
 
 void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
