@@ -319,7 +319,10 @@ public struct UnsafePointer<Pointee>: _Pointer {
         ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
           ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
           : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
-    )))
+        )
+      ),
+      "self must be a properly aligned pointer for types Pointee and T"
+    )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
@@ -1026,7 +1029,10 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
         ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
           ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
           : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
-    )))
+        )
+      ),
+      "self must be a properly aligned pointer for types Pointee and T"
+    )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
