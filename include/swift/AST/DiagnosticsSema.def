@@ -4892,6 +4892,14 @@ ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
 ERROR(global_actor_top_level_var,none,
       "top-level code variables cannot have a global actor", ())
+ERROR(global_actor_access,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 "
+      "cannot have %select{private|fileprivate|internal|%error|%error}3 "
+      "global actor %4",
+      (AccessLevel, DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(global_actor_not_usable_from_inline,none,
+      "global actor for %0 %1 must be '@usableFromInline' or public",
+      (DescriptiveDeclKind, DeclName))
 
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
