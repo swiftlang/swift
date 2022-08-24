@@ -69,8 +69,40 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
   llvm::DenseSet<SILInstruction *> invariants;
   int cost = 0;
   for (auto &instRef : *bb) {
-    OwnershipForwardingMixin *ofm = nullptr;
     auto *inst = &instRef;
+    if (!inst->isTriviallyDuplicatable()) {
+      return false;
+    }
+    // It wouldn't make sense to rotate dealloc_stack without also rotating the
+    // alloc_stack, which is covered by isTriviallyDuplicatable.
+    if (isa<DeallocStackInst>(inst)) {
+      return false;
+    }
+    OwnershipForwardingMixin *ofm = nullptr;
+    if ((ofm = OwnershipForwardingMixin::get(inst)) &&
+        ofm->getForwardingOwnershipKind() == OwnershipKind::Guaranteed) {
+      return false;
+    }
+    if (isa<FunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<DynamicFunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<PreviousDynamicFunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<IntegerLiteralInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
     if (auto *MI = dyn_cast<MethodInst>(inst)) {
       if (MI->getMember().isForeign)
         return false;
@@ -78,36 +110,18 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
         continue;
       moves.push_back(inst);
       invariants.insert(inst);
-    } else if (!inst->isTriviallyDuplicatable())
-      return false;
-    // It wouldn't make sense to rotate dealloc_stack without also rotating the
-    // alloc_stack, which is covered by isTriviallyDuplicatable.
-    else if (isa<DeallocStackInst>(inst))
-      return false;
-    else if (isa<FunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<DynamicFunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<PreviousDynamicFunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<IntegerLiteralInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if ((ofm = OwnershipForwardingMixin::get(inst)) &&
-               ofm->getForwardingOwnershipKind() == OwnershipKind::Guaranteed) {
-      return false;
-    } else if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory()
-               && !isa<TermInst>(inst) && !isa<AllocationInst>(inst)
-               && /* not marked mayhavesideffects */
-               hasLoopInvariantOperands(inst, loop, invariants)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else {
-      cost += (int)instructionInlineCost(instRef);
+      continue;
     }
+    if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory() &&
+        !isa<TermInst>(inst) &&
+        !isa<AllocationInst>(inst) && /* not marked mayhavesideffects */
+        hasLoopInvariantOperands(inst, loop, invariants)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+
+    cost += (int)instructionInlineCost(instRef);
   }
 
   return cost < LoopRotateSizeLimit;
@@ -425,6 +439,7 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // The other instructions are just cloned to the preheader.
   TermInst *preheaderBranch = preheader->getTerminator();
+
   for (auto &inst : *header) {
     if (SILInstruction *cloned = inst.clone(preheaderBranch)) {
       mapOperands(cloned, valueMap);
@@ -488,16 +503,10 @@ namespace {
 class LoopRotation : public SILFunctionTransform {
 
   void run() override {
-    SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
-    assert(loopAnalysis);
-    DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();
-    assert(domAnalysis);
-
     SILFunction *f = getFunction();
-    assert(f);
-
+    SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
+    DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();
     SILLoopInfo *loopInfo = loopAnalysis->get(f);
-    assert(loopInfo);
     DominanceInfo *domInfo = domAnalysis->get(f);
 
     if (loopInfo->empty()) {
