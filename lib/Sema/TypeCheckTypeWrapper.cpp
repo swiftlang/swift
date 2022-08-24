@@ -319,7 +319,8 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
     return false;
 
   // `lazy` properties are not wrapped.
-  if (property->getAttrs().hasAttribute<LazyAttr>())
+  if (property->getAttrs().hasAttribute<LazyAttr>() ||
+      property->isLazyStorageProperty())
     return false;
 
   // Properties with attached property wrappers are not considered
@@ -386,10 +387,41 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
                             /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
       typeWrapperVar->getName());
 
-  SmallVector<Argument, 4> arguments;
+  // Check whether given parameter requires a direct assignment to
+  // intialize the property.
+  //
+  // If `$Storage` doesn't have a member that corresponds
+  // to the current parameter it means that this is a property
+  // that not managed by the type wrapper which has to be
+  // initialized by direct assignment: `self.<name> = <arg>`
+  auto useDirectAssignment = [&](ParamDecl *param) {
+    // Properties with property wrappers are always managed by the type wrapper
+    if (param->hasAttachedPropertyWrapper())
+      return false;
+    return storageType->lookupDirect(param->getName()).empty();
+  };
+
+  SmallVector<ASTNode, 2> body;
+
+  SmallVector<Argument, 4> initArgs;
   {
     for (auto *param : *ctor->getParameters()) {
       VarDecl *arg = param;
+
+      if (useDirectAssignment(param)) {
+        auto *propRef = UnresolvedDotExpr::createImplicit(
+            ctx,
+            new (ctx) DeclRefExpr({ctor->getImplicitSelfDecl()},
+                                  /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
+            arg->getName());
+
+        body.push_back(new (ctx) AssignExpr(
+            propRef, /*EqualLoc=*/SourceLoc(),
+            new (ctx) DeclRefExpr({arg}, /*DeclNameLoc=*/DeclNameLoc(),
+                                  /*Implicit=*/true),
+            /*Implicit=*/true));
+        continue;
+      }
 
       // type wrappers wrap only backing storage of a wrapped
       // property, so in this case we need to pass `_<name>` to
@@ -399,9 +431,9 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
         (void)param->getPropertyWrapperBackingPropertyType();
       }
 
-      arguments.push_back({/*labelLoc=*/SourceLoc(), arg->getName(),
-                           new (ctx) DeclRefExpr(arg, /*Loc=*/DeclNameLoc(),
-                                                 /*Implicit=*/true)});
+      initArgs.push_back({/*labelLoc=*/SourceLoc(), arg->getName(),
+                          new (ctx) DeclRefExpr(arg, /*Loc=*/DeclNameLoc(),
+                                                /*Implicit=*/true)});
     }
   }
 
@@ -410,7 +442,7 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
       TypeExpr::createImplicitForDecl(
           /*Loc=*/DeclNameLoc(), storageType, ctor,
           ctor->mapTypeIntoContext(storageType->getInterfaceType())),
-      ArgumentList::createImplicit(ctx, arguments));
+      ArgumentList::createImplicit(ctx, initArgs));
 
   auto *initRef = new (ctx) UnresolvedMemberExpr(
       /*dotLoc=*/SourceLoc(), /*declNameLoc=*/DeclNameLoc(),
@@ -422,11 +454,10 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
       ctx, initRef,
       ArgumentList::forImplicitSingle(ctx, ctx.Id_memberwise, storageInit));
 
-  auto *assignment = new (ctx)
-      AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(), typeWrapperInit,
-                 /*Implicit=*/true);
+  body.push_back(new (ctx) AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(),
+                                      typeWrapperInit,
+                                      /*Implicit=*/true));
 
-  return BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(),
-                           /*body=*/{assignment},
+  return BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(), body,
                            /*rbloc=*/ctor->getLoc(), /*implicit=*/true);
 }

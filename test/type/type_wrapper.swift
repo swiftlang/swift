@@ -332,3 +332,49 @@ func propertyWrapperTests() {
     // expected-error@-2 {{cannot convert value of type 'String' to expected argument type 'Float'}}
   }
 }
+
+func testDeclarationsWithUnmanagedProperties() {
+  @NoopWrapper
+  struct WithLet { // expected-note {{'init(name:age:)' declared here}}
+    let name: String
+    var age: Int
+  }
+  _ = WithLet(age: 0) // expected-error {{missing argument for parameter 'name' in call}}
+  _ = WithLet(name: "", age: 0) // Ok
+
+  @NoopWrapper
+  struct WithDefaultedLet {
+    let name: String = "Arthur Dent"
+    var age: Int
+  }
+
+  _ = WithDefaultedLet(age: 32) // Ok
+  _ = WithDefaultedLet(name: "", age: 0) // expected-error {{extra argument 'name' in call}}
+
+  @NoopWrapper
+  struct WithLazy {
+    lazy var name: String = {
+      "Arthur Dent"
+    }()
+
+    var age: Int = 30
+  }
+
+  _ = WithLazy() // Ok
+  _ = WithLazy(name: "") // expected-error {{extra argument 'name' in call}}
+  _ = WithLazy(name: "", age: 0) // expected-error {{extra argument 'name' in call}}
+  _ = WithLazy(age: 0) // Ok
+
+  @NoopWrapper
+  struct OnlyLazyLetAndComputed {
+    let name: String
+    lazy var age: Int = {
+      30
+    }()
+    var planet: String {
+      get { "Earth" }
+    }
+  }
+
+  _ = OnlyLazyLetAndComputed(name: "Arthur Dent") // Ok
+}

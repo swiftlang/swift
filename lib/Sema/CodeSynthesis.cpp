@@ -377,8 +377,26 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
     for (auto *member : decl->getMembers()) {
       auto *var = dyn_cast<VarDecl>(member);
-      if (!(var && var->isAccessedViaTypeWrapper()))
+      if (!var)
         continue;
+
+      if (!var->isAccessedViaTypeWrapper()) {
+        // $_storage itself.
+        if (var->getName() == ctx.Id_TypeWrapperProperty)
+          continue;
+
+        // Computed properties are not included.
+        if (!var->hasStorage())
+          continue;
+
+        // If this is a memberwise initializeable property include
+        // it into the type wrapper initializer otherwise the instance
+        // of type wrapped type wouldn't be completely initialized.
+        if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+          params.push_back(createMemberwiseInitParameter(decl, Loc, var));
+
+        continue;
+      }
 
       Identifier argName = var->getName();
       Identifier paramName = argName;

@@ -349,3 +349,29 @@ func testPropertyWrappers() {
 }
 
 testPropertyWrappers()
+
+do {
+  var person = PersonWithUnmanagedTest(name: "Arthur Dent")
+  // CHECK: Wrapper.init($Storage(_favoredColor: type_wrapper_defs.PropWrapper<Swift.String>(value: "red")))
+
+  print(person.name)
+  // CHECK: Arthur Dent
+
+  print(person.age)
+  // CHECK: 30
+
+  print(person.placeOfBirth)
+  // CHECK: Earth
+
+  print(person.favoredColor)
+  // CHECK: in getter
+  // CHECK-NEXT: red
+
+  person.favoredColor = "yellow"
+  // CHECK: in getter
+  // CHECK-NEXT: in setter => PropWrapper<String>(value: "yellow")
+
+  print(person.favoredColor)
+  // CHECK: in getter
+  // CHECK-NEXT: yellow
+}

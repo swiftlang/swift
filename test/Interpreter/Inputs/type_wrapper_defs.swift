@@ -121,3 +121,18 @@ public struct ComplexPropWrapperTest {
   @PropWrapper public var a: [String] = ["a"]
   @PropWrapperWithoutInit(value: PropWrapper(wrappedValue: [1, 2, 3])) @PropWrapper public var b: [Int]
 }
+
+@Wrapper
+public struct PersonWithUnmanagedTest {
+  public let name: String
+
+  public lazy var age: Int = {
+    30
+  }()
+
+  public var placeOfBirth: String {
+    get { "Earth" }
+  }
+
+  @PropWrapper public var favoredColor: String = "red"
+}
