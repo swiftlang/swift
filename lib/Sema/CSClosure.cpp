@@ -85,6 +85,34 @@ public:
         }
 
         inferVariables(type);
+        return {true, expr};
+      }
+
+      auto var = dyn_cast<VarDecl>(decl);
+      if (!var)
+        return {true, expr};
+
+      if (auto *wrappedVar = var->getOriginalWrappedProperty()) {
+        auto outermostWrapperAttr =
+            wrappedVar->getOutermostAttachedPropertyWrapper();
+
+        // If the attribute doesn't have a type it could only mean
+        // that the declaration was incorrect.
+        if (!CS.hasType(outermostWrapperAttr->getTypeExpr()))
+          return {true, expr};
+
+        auto wrapperType =
+            CS.simplifyType(CS.getType(outermostWrapperAttr->getTypeExpr()));
+
+        if (var->getName().hasDollarPrefix()) {
+          // $<name> is the projected value var
+          CS.setType(var, computeProjectedValueType(wrappedVar, wrapperType));
+        } else {
+          // _<name> is the wrapper var
+          CS.setType(var, computeWrappedValueType(wrappedVar, wrapperType));
+        }
+
+        return {true, expr};
       }
     }
 
@@ -1655,6 +1683,9 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
       if (param->getDeclContext() == closure)
         param->setIsolated(true);
     }
+
+    if (llvm::is_contained(solution.preconcurrencyClosures, closure))
+      closure->setIsolatedByPreconcurrency();
 
     // Coerce the result type, if it was written explicitly.
     if (closure->hasExplicitResultType()) {

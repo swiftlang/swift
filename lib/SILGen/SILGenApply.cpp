@@ -29,6 +29,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
@@ -627,6 +628,16 @@ public:
       return fn;
     }
     case Kind::WitnessMethod: {
+      if (auto func = constant->getFuncDecl()) {
+        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
+          // If we're calling cross-actor, we must always use a distributed thunk
+          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
+            // We must adjust the constant to use a distributed thunk.
+            constant = constant->asDistributed();
+          }
+        }
+      }
+
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
 
@@ -700,6 +711,16 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::WitnessMethod: {
+      if (auto func = constant->getFuncDecl()) {
+        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
+          // If we're calling cross-actor, we must always use a distributed thunk
+          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
+            /// We must adjust the constant to use a distributed thunk.
+            constant = constant->asDistributed();
+          }
+        }
+      }
+
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -1279,7 +1300,10 @@ public:
     CanType superFormalType = arg->getType()->getCanonicalType();
 
     // The callee for a super call has to be either a method or constructor.
+    // There might be one level of conversion in between.
     Expr *fn = apply->getFn();
+    if (auto fnConv = dyn_cast<FunctionConversionExpr>(fn))
+      fn = fnConv->getSubExpr();
     SubstitutionMap substitutions;
     SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
@@ -1568,6 +1592,39 @@ public:
     return std::move(*applyCallee);
   }
 
+  /// \returns true if the conversion is from an async function to
+  /// the same type but with a global actor added. For example this:
+  ///     () async -> ()  ==>  @MainActor () async -> ()
+  /// will return true. In all other cases, returns false.
+  static bool addsGlobalActorToAsyncFn(FunctionConversionExpr *fce) {
+    CanType oldTy = fce->getSubExpr()->getType()->getCanonicalType();
+    CanType newTy = fce->getType()->getCanonicalType();
+
+    if (auto oldFnTy = dyn_cast<AnyFunctionType>(oldTy)) {
+      if (auto newFnTy = dyn_cast<AnyFunctionType>(newTy)) {
+        // old type MUST be async
+        if (!oldFnTy->hasEffect(EffectKind::Async))
+          return false;
+
+        // old type MUST NOT have a global actor
+        if (oldFnTy->hasGlobalActor())
+          return false;
+
+        // new type MUST have a global actor
+        if (!newFnTy->hasGlobalActor())
+          return false;
+
+        // see if adding the global actor to the old type yields the new type.
+        auto globalActor = newFnTy->getGlobalActor();
+        auto addedActor = oldFnTy->getExtInfo().withGlobalActor(globalActor);
+
+        return oldFnTy->withExtInfo(addedActor) == newFnTy;
+      }
+    }
+
+    return false;
+  }
+
   /// Ignore parentheses and implicit conversions.
   static Expr *ignoreParensAndImpConversions(Expr *expr) {
     while (true) {
@@ -1581,7 +1638,16 @@ public:
       // works given that we check the result for certain forms.
       if (auto eval = dyn_cast<OptionalEvaluationExpr>(expr)) {
         if (auto inject = dyn_cast<InjectIntoOptionalExpr>(eval->getSubExpr())) {
-          if (auto bind = dyn_cast<BindOptionalExpr>(inject->getSubExpr())) {
+
+          auto nextSubExpr = inject->getSubExpr();
+
+          // skip over a specific, known no-op function conversion, if it exists
+          if (auto funcConv = dyn_cast<FunctionConversionExpr>(nextSubExpr)) {
+            if (addsGlobalActorToAsyncFn(funcConv))
+              nextSubExpr = funcConv->getSubExpr();
+          }
+
+          if (auto bind = dyn_cast<BindOptionalExpr>(nextSubExpr)) {
             if (bind->getDepth() == 0)
               return bind->getSubExpr();
           }
@@ -5759,13 +5825,15 @@ SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
 }
 
 /// Emit a call to a getter.
-RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
-                                       SubstitutionMap substitutions,
-                                       ArgumentSource &&selfValue, bool isSuper,
-                                       bool isDirectUse,
-                                       PreparedArguments &&subscriptIndices,
-                                       SGFContext c,
-                                       bool isOnSelfParameter) {
+RValue SILGenFunction::emitGetAccessor(
+    SILLocation loc, SILDeclRef get,
+    SubstitutionMap substitutions,
+    ArgumentSource &&selfValue, bool isSuper,
+    bool isDirectUse,
+    PreparedArguments &&subscriptIndices,
+    SGFContext c,
+    bool isOnSelfParameter,
+    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5776,6 +5844,9 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
+  if (implicitActorHopTarget)
+    emission.setImplicitlyAsync(implicitActorHopTarget);
+
   // Self ->
   if (hasSelf) {
     emission.addSelfParam(loc, std::move(selfValue),

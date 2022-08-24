@@ -7,6 +7,8 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(resilient)) %S/Inputs/resilient-class.swift -module-name resilient -emit-module -emit-module-path %t/resilient.swiftmodule -enable-library-evolution -enable-testing
 // RUN: %target-build-swift -I %t -L %t -lresilient %s -o %t/main %target-rpath(%t)
 // RUN: %target-build-swift -O -I %t -L %t -lresilient %s -o %t/main %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-codesign %t/%target-library-name(resilient)
 // RUN: %target-run %t/main %t/%target-library-name(resilient) | %FileCheck --check-prefix=EXEC-CHECK %s
 
 // REQUIRES: executable_test

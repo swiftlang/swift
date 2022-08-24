@@ -27,6 +27,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/FixBehavior.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <tuple>
@@ -42,19 +43,17 @@ class FunctionArgApplyInfo;
 class FailureDiagnostic {
   const Solution &S;
   ConstraintLocator *Locator;
-  DiagnosticBehavior behaviorLimit;
+  FixBehavior fixBehavior;
 
 public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator,
-                    DiagnosticBehavior behaviorLimit =
-                        DiagnosticBehavior::Unspecified)
-      : S(solution), Locator(locator), behaviorLimit(behaviorLimit) {}
+                    FixBehavior fixBehavior = FixBehavior::Error)
+      : S(solution), Locator(locator), fixBehavior(fixBehavior) {}
 
   FailureDiagnostic(const Solution &solution, ASTNode anchor,
-                    DiagnosticBehavior behaviorLimit =
-                        DiagnosticBehavior::Unspecified)
+                    FixBehavior fixBehavior = FixBehavior::Error)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor),
-                          behaviorLimit) { }
+                          fixBehavior) { }
 
   virtual ~FailureDiagnostic();
 
@@ -608,8 +607,7 @@ class ContextualFailure : public FailureDiagnostic {
 public:
   ContextualFailure(const Solution &solution, Type lhs, Type rhs,
                     ConstraintLocator *locator,
-                    DiagnosticBehavior behaviorLimit =
-                        DiagnosticBehavior::Unspecified)
+                    FixBehavior fixBehavior = FixBehavior::Error)
       : ContextualFailure(
             solution,
             locator->isForContextualType()
@@ -617,13 +615,12 @@ public:
                       .getPurpose()
                 : solution.getConstraintSystem().getContextualTypePurpose(
                       locator->getAnchor()),
-            lhs, rhs, locator, behaviorLimit) {}
+            lhs, rhs, locator, fixBehavior) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
                     Type lhs, Type rhs, ConstraintLocator *locator,
-                    DiagnosticBehavior behaviorLimit =
-                        DiagnosticBehavior::Unspecified)
-      : FailureDiagnostic(solution, locator, behaviorLimit), CTP(purpose),
+                    FixBehavior fixBehavior = FixBehavior::Error)
+      : FailureDiagnostic(solution, locator, fixBehavior), CTP(purpose),
         RawFromType(lhs), RawToType(rhs) {
     assert(lhs && "Expected a valid 'from' type");
     assert(rhs && "Expected a valid 'to' type");
@@ -764,9 +761,9 @@ public:
   AttributedFuncToTypeConversionFailure(const Solution &solution, Type fromType,
                                         Type toType, ConstraintLocator *locator,
                                         AttributeKind attributeKind,
-                                        DiagnosticBehavior behaviorLimit =
-                                            DiagnosticBehavior::Unspecified)
-      : ContextualFailure(solution, fromType, toType, locator, behaviorLimit),
+                                        FixBehavior fixBehavior =
+                                            FixBehavior::Error)
+      : ContextualFailure(solution, fromType, toType, locator, fixBehavior),
         attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
@@ -790,8 +787,8 @@ class DroppedGlobalActorFunctionAttr final : public ContextualFailure {
 public:
   DroppedGlobalActorFunctionAttr(const Solution &solution, Type fromType,
                                  Type toType, ConstraintLocator *locator,
-                                 DiagnosticBehavior behaviorLimit)
-    : ContextualFailure(solution, fromType, toType, locator, behaviorLimit) { }
+                                 FixBehavior fixBehavior)
+    : ContextualFailure(solution, fromType, toType, locator, fixBehavior) { }
 
   bool diagnoseAsError() override;
 };
@@ -1961,9 +1958,9 @@ class ArgumentMismatchFailure : public ContextualFailure {
 public:
   ArgumentMismatchFailure(const Solution &solution, Type argType,
                           Type paramType, ConstraintLocator *locator,
-                          DiagnosticBehavior behaviorLimit =
-                              DiagnosticBehavior::Unspecified)
-      : ContextualFailure(solution, argType, paramType, locator, behaviorLimit),
+                          FixBehavior fixBehavior =
+                              FixBehavior::Error)
+      : ContextualFailure(solution, argType, paramType, locator, fixBehavior),
         Info(*getFunctionArgApplyInfo(getLocator())) {}
 
   bool diagnoseAsError() override;
@@ -2142,9 +2139,9 @@ public:
                                 ConstraintLocator *locator, Type fromType,
                                 Type toType,
                                 ConversionRestrictionKind conversionKind,
-                                DiagnosticBehavior behaviorLimit)
+                                FixBehavior fixBehavior)
       : ArgumentMismatchFailure(
-            solution, fromType, toType, locator, behaviorLimit),
+            solution, fromType, toType, locator, fixBehavior),
         ConversionKind(conversionKind) {
   }
 
@@ -2728,8 +2725,9 @@ class MissingExplicitExistentialCoercion final : public FailureDiagnostic {
 public:
   MissingExplicitExistentialCoercion(const Solution &solution,
                                      Type erasedResultTy,
-                                     ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
+                                     ConstraintLocator *locator,
+                                     FixBehavior fixBehavior)
+      : FailureDiagnostic(solution, locator, fixBehavior),
         ErasedResultType(resolveType(erasedResultTy)) {}
 
   SourceRange getSourceRange() const override {

@@ -13,8 +13,6 @@ default actions provided by the standard argparse.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
 import argparse
 import copy
 

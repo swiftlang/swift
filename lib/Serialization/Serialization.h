@@ -219,6 +219,10 @@ class Serializer : public SerializerBase {
                        index_block::GENERIC_SIGNATURE_OFFSETS>
   GenericSignaturesToSerialize;
 
+  ASTBlockRecordKeeper<const GenericEnvironment *, GenericEnvironmentID,
+                       index_block::GENERIC_ENVIRONMENT_OFFSETS>
+  GenericEnvironmentsToSerialize;
+
   ASTBlockRecordKeeper<SubstitutionMap, SubstitutionMapID,
                        index_block::SUBSTITUTION_MAP_OFFSETS>
   SubstitutionMapsToSerialize;
@@ -353,6 +357,9 @@ private:
   /// Writes a generic signature.
   void writeASTBlockEntity(GenericSignature sig);
 
+  /// Writes a generic environment.
+  void writeASTBlockEntity(const GenericEnvironment *env);
+
   /// Writes a substitution map.
   void writeASTBlockEntity(const SubstitutionMap substitutions);
 
@@ -482,6 +489,9 @@ public:
   ///
   /// The GenericSignature will be scheduled for serialization if necessary.
   GenericSignatureID addGenericSignatureRef(GenericSignature sig);
+
+  /// Records the use of the given opened generic environment.
+  GenericEnvironmentID addGenericEnvironmentRef(GenericEnvironment *env);
 
   /// Records the use of the given substitution map.
   ///

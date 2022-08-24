@@ -424,43 +424,21 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, newPath);
 }
 
-ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
-    ConstraintLocatorBuilder root, ConversionRestrictionKind restriction) {
-  SmallVector<LocatorPathElt, 4> path;
-  auto anchor = root.getLocatorParts(path);
-  {
-    // Drop any value-to-optional conversions that were applied along the
-    // way to reach this one.
-    while (!path.empty()) {
-      if (path.back().is<LocatorPathElt::OptionalPayload>()) {
-        path.pop_back();
-        continue;
-      }
-      break;
-    }
-
-    // If the conversion is associated with a contextual type e.g.
-    // `_: Double = CGFloat(1)` then drop `ContextualType` so that
-    // it's easy to find when the underlying expression has been
-    // rewritten.
-    if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
-      anchor = ASTNode();
-      path.clear();
-    }
-  }
-
-  return getConstraintLocator(/*base=*/getConstraintLocator(anchor, path),
-                              LocatorPathElt::ImplicitConversion(restriction));
-}
-
 ConstraintLocator *ConstraintSystem::getCalleeLocator(
     ConstraintLocator *locator, bool lookThroughApply,
     llvm::function_ref<Type(Expr *)> getType,
     llvm::function_ref<Type(Type)> simplifyType,
     llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
         getOverloadFor) {
-  if (locator->findLast<LocatorPathElt::ImplicitConversion>())
-    return locator;
+  if (auto conversion =
+          locator->findLast<LocatorPathElt::ImplicitConversion>()) {
+    if (conversion->is(ConversionRestrictionKind::DoubleToCGFloat) ||
+        conversion->is(ConversionRestrictionKind::CGFloatToDouble)) {
+      return getConstraintLocator(
+          ASTNode(), {*conversion, ConstraintLocator::ApplyFunction,
+                      ConstraintLocator::ConstructorMember});
+    }
+  }
 
   auto anchor = locator->getAnchor();
   auto path = locator->getPath();
@@ -1224,6 +1202,12 @@ Type GetClosureType::operator()(const AbstractClosureExpr *expr) const {
   return Type();
 }
 
+bool
+ClosureIsolatedByPreconcurrency::operator()(const ClosureExpr *expr) const {
+  return expr->isIsolatedByPreconcurrency() ||
+      cs.preconcurrencyClosures.count(expr);
+}
+
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     ConstraintLocator *memberLocator, bool wantInterfaceType) {
@@ -1239,20 +1223,22 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      memberLocator, wantInterfaceType, GetClosureType{*this});
+      memberLocator, wantInterfaceType, GetClosureType{*this},
+      ClosureIsolatedByPreconcurrency{*this});
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType,
     ConstraintLocator *memberLocator, bool wantInterfaceType,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType) {
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // Adjust the type for concurrency.
   requestedType = adjustVarTypeForConcurrency(
-      requestedType, value, UseDC, getClosureType);
+      requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1431,7 +1417,8 @@ AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     unsigned numApplies, bool isMainDispatchQueue,
     OpenedTypeMap &replacements) {
   return swift::adjustFunctionTypeForConcurrency(
-      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this},
+      fnType, decl, dc, numApplies, isMainDispatchQueue,
+      GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this},
       [&](Type type) {
         if (replacements.empty())
           return type;
@@ -2522,7 +2509,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
         type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
       }
       type = adjustVarTypeForConcurrency(
-          type, var, useDC, GetClosureType{*this});
+          type, var, useDC, GetClosureType{*this},
+          ClosureIsolatedByPreconcurrency{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
@@ -4231,27 +4219,31 @@ static bool diagnoseAmbiguityWithContextualType(
 
   auto anchor = locator->getAnchor();
   auto name = result->choices.front().getName();
-  DE.diagnose(getLoc(anchor), diag::no_candidates_match_result_type,
-              name.getBaseName().userFacingName(),
-              cs.getContextualType(anchor, /*forConstraint=*/false));
+  auto contextualTy = solution.getContextualType(anchor);
+
+  assert(contextualTy);
+
+  DE.diagnose(getLoc(anchor),
+              contextualTy->is<ProtocolType>()
+                  ? diag::no_overloads_have_result_type_conformance
+                  : diag::no_candidates_match_result_type,
+              name.getBaseName().userFacingName(), contextualTy);
 
   for (const auto &solution : solutions) {
     auto overload = solution.getOverloadChoice(calleeLocator);
     if (auto *decl = overload.choice.getDeclOrNull()) {
-      auto loc = decl->getLoc();
-      if (loc.isInvalid())
-        continue;
-
       auto type = solution.simplifyType(overload.boundType);
 
       if (isExpr<ApplyExpr>(anchor) || isExpr<SubscriptExpr>(anchor)) {
         auto fnType = type->castTo<FunctionType>();
         DE.diagnose(
-            loc, diag::cannot_convert_candidate_result_to_contextual_type,
-            decl->getName(), fnType->getResult(),
-            cs.getContextualType(anchor, /*forConstraint=*/false));
+            decl,
+            contextualTy->is<ProtocolType>()
+                ? diag::overload_result_type_does_not_conform
+                : diag::cannot_convert_candidate_result_to_contextual_type,
+            decl->getName(), fnType->getResult(), contextualTy);
       } else {
-        DE.diagnose(loc, diag::found_candidate_type, type);
+        DE.diagnose(decl, diag::found_candidate_type, type);
       }
     }
   }
@@ -4606,7 +4598,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // let's diagnose this as regular ambiguity.
   if (llvm::all_of(solutions, [](const Solution &solution) {
         return llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
-          return fix->isWarning();
+          return fix->canApplySolution();
         });
       })) {
     return diagnoseAmbiguity(solutions);
@@ -4624,9 +4616,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   llvm::SmallSetVector<FixInContext, 4> fixes;
   for (auto &solution : solutions) {
     for (auto *fix : solution.Fixes) {
+      // If the fix doesn't affect the solution score, it is not the
+      // source of ambiguity or failures.
       // Ignore warnings in favor of actual error fixes,
       // because they are not the source of ambiguity/failures.
-      if (fix->isWarning())
+      if (!fix->affectsSolutionScore())
         continue;
 
       fixes.insert({&solution, fix});
@@ -5197,7 +5191,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::PlaceholderType:
     case ConstraintLocator::SequenceElementType:
     case ConstraintLocator::ConstructorMemberType:
-    case ConstraintLocator::ExistentialSuperclassType:
+    case ConstraintLocator::ExistentialConstraintType:
+    case ConstraintLocator::ProtocolCompositionSuperclassType:
       break;
 
     case ConstraintLocator::GenericArgument:
@@ -5391,9 +5386,6 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   if (anchor.isNull() && locator->getPath().empty())
     return nullptr;
 
-  if (locator->findLast<LocatorPathElt::ImplicitConversion>())
-    return locator;
-
   // Applies and unresolved member exprs can have callee locators that are
   // dependent on the type of their function, which may not have been resolved
   // yet. Therefore we need to handle them specially.
@@ -5523,7 +5515,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // to figure out exactly where it was used.
   if (auto *argExpr = getAsExpr<InOutExpr>(locator->getAnchor())) {
     auto *argLoc = getConstraintSystem().getArgumentLocator(argExpr);
-    assert(argLoc && "Incorrect use of `inout` expression");
+    if (!argLoc)
+      return None;
+
     locator = argLoc;
   }
 
@@ -5626,9 +5620,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  return FunctionArgApplyInfo(argList, argExpr, argIdx,
-                              simplifyType(getType(argExpr)), paramIdx,
-                              fnInterfaceType, fnType, callee);
+  return FunctionArgApplyInfo::get(argList, argExpr, argIdx,
+                                   simplifyType(getType(argExpr)), paramIdx,
+                                   fnInterfaceType, fnType, callee);
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
@@ -6338,9 +6332,9 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
         .highlight(expr->getSourceRange());
   } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-    auto *wrapper = wrappedVar->getAttachedPropertyWrappers().back();
+    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
     Type propertyType = wrappedVar->getInterfaceType();
-    Type wrapperType = wrapper->getType();
+    Type wrapperType = outerWrapper->getType();
 
     // Emit the property wrapper fallback diagnostic
     wrappedVar->diagnose(diag::property_wrapper_incompatible_property,

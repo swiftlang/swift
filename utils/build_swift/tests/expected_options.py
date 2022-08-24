@@ -7,8 +7,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from __future__ import absolute_import, unicode_literals
-
 import multiprocessing
 
 from build_swift import argparse
@@ -239,7 +237,6 @@ EXPECTED_DEFAULTS = {
     'test_cygwin': False,
     'test_freebsd': False,
     'test_ios': False,
-    'test_ios_32bit_simulator': False,
     'test_watchos_32bit_simulator': False,
     'test_ios_host': False,
     'test_ios_simulator': False,
@@ -629,8 +626,6 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-cygwin', dest='test_cygwin'),
     DisableOption('--skip-test-freebsd', dest='test_freebsd'),
     DisableOption('--skip-test-ios', dest='test_ios'),
-    DisableOption('--skip-test-ios-32bit-simulator',
-                  dest='test_ios_32bit_simulator'),
     DisableOption('--skip-test-watchos-32bit-simulator',
                   dest='test_watchos_32bit_simulator'),
     DisableOption('--skip-test-ios-host', dest='test_ios_host'),

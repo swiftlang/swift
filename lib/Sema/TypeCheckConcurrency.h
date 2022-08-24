@@ -102,7 +102,8 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// code where strict checking has been enabled.
 bool contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency);
 
 /// Describes a referenced actor variable and whether it is isolated.
 struct ReferencedActor {
@@ -209,6 +210,9 @@ struct ActorReferenceResult {
     /// The declaration is being accessed from outside the actor and
     /// potentially from a different node, so it must be marked 'distributed'.
     Distributed = 1 << 2,
+
+    /// The declaration is being accessed from a @preconcurrency context.
+    Preconcurrency = 1 << 3,
   };
 
   using Options = OptionSet<Flags>;
@@ -417,7 +421,8 @@ Type getExplicitGlobalActor(ClosureExpr *closure);
 /// Adjust the type of the variable for concurrency.
 Type adjustVarTypeForConcurrency(
     Type type, VarDecl *var, DeclContext *dc,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency);
 
 /// Adjust the given function type to account for concurrency-specific
 /// attributes whose affect on the type might differ based on context.
@@ -428,6 +433,7 @@ AnyFunctionType *adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency,
     llvm::function_ref<Type(Type)> openType);
 
 /// Determine whether the given name is that of a DispatchQueue operation that

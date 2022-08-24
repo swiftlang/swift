@@ -645,13 +645,29 @@ class FunctionArgApplyInfo {
   FunctionType *FnType;
   const ValueDecl *Callee;
 
-public:
   FunctionArgApplyInfo(ArgumentList *argList, Expr *argExpr, unsigned argIdx,
                        Type argType, unsigned paramIdx, Type fnInterfaceType,
                        FunctionType *fnType, const ValueDecl *callee)
       : ArgList(argList), ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType),
         ParamIdx(paramIdx), FnInterfaceType(fnInterfaceType), FnType(fnType),
         Callee(callee) {}
+
+public:
+  static Optional<FunctionArgApplyInfo>
+  get(ArgumentList *argList, Expr *argExpr, unsigned argIdx, Type argType,
+      unsigned paramIdx, Type fnInterfaceType, FunctionType *fnType,
+      const ValueDecl *callee) {
+    assert(fnType);
+
+    if (argIdx >= argList->size())
+      return None;
+
+    if (paramIdx >= fnType->getNumParams())
+      return None;
+
+    return FunctionArgApplyInfo(argList, argExpr, argIdx, argType, paramIdx,
+                                fnInterfaceType, fnType, callee);
+  }
 
   /// \returns The list of the arguments used for this application.
   ArgumentList *getArgList() const { return ArgList; }
@@ -775,7 +791,7 @@ public:
 
 /// Describes an aspect of a solution that affects its overall score, i.e., a
 /// user-defined conversions.
-enum ScoreKind {
+enum ScoreKind: unsigned int {
   // These values are used as indices into a Score value.
 
   /// A fix needs to be applied to the source.
@@ -1276,6 +1292,10 @@ public:
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallVector<ParamDecl *, 2> isolatedParams;
 
+  /// The set of closures that have been inferred to be "isolated by
+  /// preconcurrency".
+  llvm::SmallVector<const ClosureExpr *, 2> preconcurrencyClosures;
+
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
@@ -1417,6 +1437,15 @@ public:
   /// Resolve type variables present in the raw type, using generic parameter
   /// types where possible.
   Type resolveInterfaceType(Type type) const;
+
+  Type getContextualType(ASTNode anchor) const {
+    for (const auto &entry : contextualTypes) {
+      if (entry.first == anchor) {
+        return simplifyType(entry.second.getType());
+      }
+    }
+    return Type();
+  }
 
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
@@ -2479,6 +2508,13 @@ struct GetClosureType {
   Type operator()(const AbstractClosureExpr *expr) const;
 };
 
+/// Retrieve the closure type from the constraint system.
+struct ClosureIsolatedByPreconcurrency {
+  ConstraintSystem &cs;
+
+  bool operator()(const ClosureExpr *expr) const;
+};
+
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -2533,6 +2569,7 @@ public:
   friend class ConjunctionElement;
   friend class RequirementFailure;
   friend class MissingMemberFailure;
+  friend struct ClosureIsolatedByPreconcurrency;
 
   class SolverScope;
 
@@ -2662,6 +2699,10 @@ private:
 
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
+
+  /// The set of closures that have been inferred to be "isolated by
+  /// preconcurrency".
+  llvm::SmallSetVector<const ClosureExpr *, 2> preconcurrencyClosures;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -3233,6 +3274,9 @@ public:
     /// The length of \c isolatedParams.
     unsigned numIsolatedParams;
 
+    /// The length of \c PreconcurrencyClosures.
+    unsigned numPreconcurrencyClosures;
+
     /// The length of \c ImplicitValueConversions.
     unsigned numImplicitValueConversions;
 
@@ -3690,12 +3734,6 @@ public:
   /// builder.
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
-
-  /// Compute a constraint locator for an implicit value-to-value
-  /// conversion rooted at the given location.
-  ConstraintLocator *
-  getImplicitValueConversionLocator(ConstraintLocatorBuilder root,
-                                    ConversionRestrictionKind restriction);
 
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) {
@@ -4517,6 +4555,10 @@ public:
       llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
         [](const AbstractClosureExpr *) {
           return Type();
+        },
+      llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
+        [](const ClosureExpr *closure) {
+          return closure->isIsolatedByPreconcurrency();
         });
 
   /// Given the opened type and a pile of information about a member reference,

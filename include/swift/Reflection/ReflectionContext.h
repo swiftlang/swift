@@ -227,7 +227,10 @@ public:
     return sizeof(StoredPointer) * 2;
   }
 
-  template <typename T> bool readMachOSections(RemoteAddress ImageStart) {
+  template <typename T>
+  bool readMachOSections(
+      RemoteAddress ImageStart,
+      llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
     if (!Buf)
@@ -337,15 +340,15 @@ public:
         MPEnumMdSec.first == nullptr)
       return false;
 
-    ReflectionInfo info = {
-        {FieldMdSec.first, FieldMdSec.second},
-        {AssocTySec.first, AssocTySec.second},
-        {BuiltinTySec.first, BuiltinTySec.second},
-        {CaptureSec.first, CaptureSec.second},
-        {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second},
-        {MPEnumMdSec.first, MPEnumMdSec.second}};
+    ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
+                           {AssocTySec.first, AssocTySec.second},
+                           {BuiltinTySec.first, BuiltinTySec.second},
+                           {CaptureSec.first, CaptureSec.second},
+                           {TypeRefMdSec.first, TypeRefMdSec.second},
+                           {ReflStrMdSec.first, ReflStrMdSec.second},
+                           {ConformMdSec.first, ConformMdSec.second},
+                           {MPEnumMdSec.first, MPEnumMdSec.second},
+                           PotentialModuleNames};
 
     this->addReflectionInfo(info);
 
@@ -374,7 +377,9 @@ public:
     return true;
   }
 
-  bool readPECOFFSections(RemoteAddress ImageStart) {
+  bool readPECOFFSections(
+      RemoteAddress ImageStart,
+      llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto DOSHdrBuf = this->getReader().readBytes(
         ImageStart, sizeof(llvm::object::dos_header));
     if (!DOSHdrBuf)
@@ -463,20 +468,21 @@ public:
         MPEnumMdSec.first == nullptr)
       return false;
 
-    ReflectionInfo Info = {
-        {FieldMdSec.first, FieldMdSec.second},
-        {AssocTySec.first, AssocTySec.second},
-        {BuiltinTySec.first, BuiltinTySec.second},
-        {CaptureSec.first, CaptureSec.second},
-        {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second},
-        {MPEnumMdSec.first, MPEnumMdSec.second}};
+    ReflectionInfo Info = {{FieldMdSec.first, FieldMdSec.second},
+                           {AssocTySec.first, AssocTySec.second},
+                           {BuiltinTySec.first, BuiltinTySec.second},
+                           {CaptureSec.first, CaptureSec.second},
+                           {TypeRefMdSec.first, TypeRefMdSec.second},
+                           {ReflStrMdSec.first, ReflStrMdSec.second},
+                           {ConformMdSec.first, ConformMdSec.second},
+                           {MPEnumMdSec.first, MPEnumMdSec.second},
+                           PotentialModuleNames};
     this->addReflectionInfo(Info);
     return true;
   }
 
-  bool readPECOFF(RemoteAddress ImageStart) {
+  bool readPECOFF(RemoteAddress ImageStart,
+                  llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf = this->getReader().readBytes(ImageStart,
                                            sizeof(llvm::object::dos_header));
     if (!Buf)
@@ -495,12 +501,14 @@ public:
     if (memcmp(Buf.get(), llvm::COFF::PEMagic, sizeof(llvm::COFF::PEMagic)))
       return false;
 
-    return readPECOFFSections(ImageStart);
+    return readPECOFFSections(ImageStart, PotentialModuleNames);
   }
 
   template <typename T>
-  bool readELFSections(RemoteAddress ImageStart,
-                       llvm::Optional<llvm::sys::MemoryBlock> FileBuffer) {
+  bool readELFSections(
+      RemoteAddress ImageStart,
+      llvm::Optional<llvm::sys::MemoryBlock> FileBuffer,
+      llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     // When reading from the FileBuffer we can simply return a pointer to
     // the underlying data.
     // When reading from the process, we need to keep the memory around
@@ -655,15 +663,15 @@ public:
         MPEnumMdSec.first == nullptr)
       return false;
 
-    ReflectionInfo info = {
-        {FieldMdSec.first, FieldMdSec.second},
-        {AssocTySec.first, AssocTySec.second},
-        {BuiltinTySec.first, BuiltinTySec.second},
-        {CaptureSec.first, CaptureSec.second},
-        {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second},
-        {MPEnumMdSec.first, MPEnumMdSec.second}};
+    ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
+                           {AssocTySec.first, AssocTySec.second},
+                           {BuiltinTySec.first, BuiltinTySec.second},
+                           {CaptureSec.first, CaptureSec.second},
+                           {TypeRefMdSec.first, TypeRefMdSec.second},
+                           {ReflStrMdSec.first, ReflStrMdSec.second},
+                           {ConformMdSec.first, ConformMdSec.second},
+                           {MPEnumMdSec.first, MPEnumMdSec.second},
+                           PotentialModuleNames};
 
     this->addReflectionInfo(info);
     return true;
@@ -687,7 +695,10 @@ public:
   /// \return
   ///     /b True if the metadata information was parsed successfully,
   ///     /b false otherwise.
-  bool readELF(RemoteAddress ImageStart, llvm::Optional<llvm::sys::MemoryBlock> FileBuffer) {
+  bool
+  readELF(RemoteAddress ImageStart,
+          llvm::Optional<llvm::sys::MemoryBlock> FileBuffer,
+          llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
     if (!Buf)
@@ -703,16 +714,18 @@ public:
     unsigned char FileClass = Hdr->getFileClass();
     if (FileClass == llvm::ELF::ELFCLASS64) {
       return readELFSections<ELFTraits<llvm::ELF::ELFCLASS64>>(
-          ImageStart, FileBuffer);
+          ImageStart, FileBuffer, PotentialModuleNames);
     } else if (FileClass == llvm::ELF::ELFCLASS32) {
       return readELFSections<ELFTraits<llvm::ELF::ELFCLASS32>>(
-          ImageStart, FileBuffer);
+          ImageStart, FileBuffer, PotentialModuleNames);
     } else {
       return false;
     }
   }
 
-  bool addImage(RemoteAddress ImageStart) {
+  bool
+  addImage(RemoteAddress ImageStart,
+           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     // Read the first few bytes to look for a magic header.
     auto Magic = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
     if (!Magic)
@@ -723,18 +736,18 @@ public:
 
     // 32- and 64-bit Mach-O.
     if (MagicWord == llvm::MachO::MH_MAGIC) {
-      return readMachOSections<MachOTraits<4>>(ImageStart);
+      return readMachOSections<MachOTraits<4>>(ImageStart, PotentialModuleNames);
     }
 
     if (MagicWord == llvm::MachO::MH_MAGIC_64) {
-      return readMachOSections<MachOTraits<8>>(ImageStart);
+      return readMachOSections<MachOTraits<8>>(ImageStart, PotentialModuleNames);
     }
 
     // PE. (This just checks for the DOS header; `readPECOFF` will further
     // validate the existence of the PE header.)
     auto MagicBytes = (const char*)Magic.get();
     if (MagicBytes[0] == 'M' && MagicBytes[1] == 'Z') {
-      return readPECOFF(ImageStart);
+      return readPECOFF(ImageStart, PotentialModuleNames);
     }
 
 
@@ -743,7 +756,8 @@ public:
         && MagicBytes[1] == llvm::ELF::ElfMagic[1]
         && MagicBytes[2] == llvm::ELF::ElfMagic[2]
         && MagicBytes[3] == llvm::ELF::ElfMagic[3]) {
-      return readELF(ImageStart, llvm::Optional<llvm::sys::MemoryBlock>());
+      return readELF(ImageStart, llvm::Optional<llvm::sys::MemoryBlock>(),
+                     PotentialModuleNames);
     }
 
     // We don't recognize the format.
@@ -758,9 +772,11 @@ public:
   /// \return
   ///     \b True if any of the reflection sections were registered,
   ///     \b false otherwise.
-  bool addImage(llvm::function_ref<
-                std::pair<RemoteRef<void>, uint64_t>(ReflectionSectionKind)>
-                    FindSection) {
+  bool
+  addImage(llvm::function_ref<
+               std::pair<RemoteRef<void>, uint64_t>(ReflectionSectionKind)>
+               FindSection,
+           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Sections = {
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
@@ -784,11 +800,15 @@ public:
     if (llvm::all_of(Pairs, [](const auto &Pair) { return !Pair.first; }))
       return false;
 
-    ReflectionInfo Info = {
-        {Pairs[0].first, Pairs[0].second}, {Pairs[1].first, Pairs[1].second},
-        {Pairs[2].first, Pairs[2].second}, {Pairs[3].first, Pairs[3].second},
-        {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second},
-        {Pairs[6].first, Pairs[6].second}, {Pairs[7].first, Pairs[7].second}};
+    ReflectionInfo Info = {{Pairs[0].first, Pairs[0].second},
+                           {Pairs[1].first, Pairs[1].second},
+                           {Pairs[2].first, Pairs[2].second},
+                           {Pairs[3].first, Pairs[3].second},
+                           {Pairs[4].first, Pairs[4].second},
+                           {Pairs[5].first, Pairs[5].second},
+                           {Pairs[6].first, Pairs[6].second},
+                           {Pairs[7].first, Pairs[7].second},
+                           PotentialModuleNames};
     this->addReflectionInfo(Info);
     return true;
   }

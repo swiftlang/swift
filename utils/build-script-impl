@@ -337,7 +337,7 @@ function with_pushd() {
 }
 
 function quoted_print() {
-    python -c 'import pipes; import sys; print(" ".join(pipes.quote(arg) for arg in sys.argv[1:]))' "$@"
+    python3 -c 'import pipes; import sys; print(" ".join(pipes.quote(arg) for arg in sys.argv[1:]))' "$@"
 }
 
 function toupper() {
@@ -470,11 +470,8 @@ function verify_host_is_supported() {
       | macosx-x86_64           \
       | macosx-arm64            \
       | macosx-arm64e           \
-      | iphonesimulator-i386    \
       | iphonesimulator-x86_64  \
       | iphonesimulator-arm64   \
-      | iphoneos-armv7          \
-      | iphoneos-armv7s         \
       | iphoneos-arm64          \
       | iphoneos-arm64e         \
       | appletvsimulator-x86_64 \
@@ -602,13 +599,6 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_ARCH="arm64e"
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
-                iphonesimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
-                    llvm_target_arch="X86"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
-                    cmake_osx_deployment_target=""
-                    ;;
                 iphonesimulator-x86_64)
                     SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
                     llvm_target_arch="X86"
@@ -630,20 +620,6 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
-                    ;;
-                iphoneos-armv7)
-                    SWIFT_HOST_TRIPLE="armv7-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    llvm_target_arch="ARM"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS"
-                    cmake_osx_deployment_target=""
-                    ;;
-                iphoneos-armv7s)
-                    SWIFT_HOST_TRIPLE="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    llvm_target_arch="ARM"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS"
-                    cmake_osx_deployment_target=""
                     ;;
                 iphoneos-arm64)
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"

@@ -16,5 +16,5 @@ extension Redecl2 {
 }
 
 extension Redecl1 {
-  @objc(method2) func method2_alias() { } // expected-error{{method 'method2_alias()' with Objective-C selector 'method2' conflicts with method 'method2()' with the same Objective-C selector}}
+  @objc(method2) func method2_alias() { } // expected-note{{method 'method2_alias()' declared here}}
 }

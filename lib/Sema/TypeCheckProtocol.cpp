@@ -391,8 +391,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
              witnessConfig.derivativeGenericSignature.getRequirements()) {
           auto substReq = req.subst(result.WitnessSubstitutions);
           bool reqDiffGenSigSatisfies =
-              reqDiffGenSig && substReq &&
-              reqDiffGenSig->isRequirementSatisfied(*substReq);
+              reqDiffGenSig && !substReq.hasError() &&
+              reqDiffGenSig->isRequirementSatisfied(substReq);
           bool conformanceGenSigSatisfies =
               conformanceGenSig &&
               conformanceGenSig->isRequirementSatisfied(req);
@@ -6504,7 +6504,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     if (existingModule != dc->getParentModule() &&
         (existingModule->getName() ==
            extendedNominal->getParentModule()->getName() ||
-         existingModule == diag.Protocol->getParentModule())) {
+         existingModule == diag.Protocol->getParentModule() ||
+         existingModule->getName().is("CoreGraphics"))) {
       // Warn about the conformance.
       auto diagID = differentlyConditional
                         ? diag::redundant_conformance_adhoc_conditional

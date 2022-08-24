@@ -13,8 +13,6 @@ Centralized command line and file system interface for the build script.
 """
 # ----------------------------------------------------------------------------
 
-from __future__ import print_function
-
 import os
 import pipes
 import platform

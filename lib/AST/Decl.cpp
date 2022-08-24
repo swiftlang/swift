@@ -6532,7 +6532,7 @@ bool VarDecl::hasExternalPropertyWrapper() const {
     return true;
 
   // Wrappers with attribute arguments are always implementation-detail.
-  if (getAttachedPropertyWrappers().front()->hasArgs())
+  if (getOutermostAttachedPropertyWrapper()->hasArgs())
     return false;
 
   auto wrapperInfo = getAttachedPropertyWrapperTypeInfo(0);
@@ -9182,6 +9182,13 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   }
 
   return ActorIsolation::forUnspecified();
+}
+
+bool swift::isSameActorIsolated(ValueDecl *value, DeclContext *dc) {
+    auto valueIsolation = getActorIsolation(value);
+    auto dcIsolation = getActorIsolationOfContext(dc);
+    return valueIsolation.isActorIsolated() && dcIsolation.isActorIsolated() &&
+           valueIsolation.getActor() == dcIsolation.getActor();
 }
 
 ClangNode Decl::getClangNodeImpl() const {

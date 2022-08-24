@@ -465,8 +465,7 @@ struct InferRequirementsWalker : public TypeWalker {
       auto decl = typeAlias->getDecl();
       auto subMap = typeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
-        if (auto req = rawReq.subst(subMap))
-          desugarRequirement(*req, SourceLoc(), reqs, errors);
+        desugarRequirement(rawReq.subst(subMap), SourceLoc(), reqs, errors);
       }
 
       return Action::Continue;
@@ -532,8 +531,8 @@ struct InferRequirementsWalker : public TypeWalker {
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
-      if (auto req = rawReq.subst(subMap))
-        desugarRequirement(*req, SourceLoc(), reqs, errors);
+      auto req = rawReq.subst(subMap);
+      desugarRequirement(req, SourceLoc(), reqs, errors);
     }
 
     return Action::Continue;
@@ -987,7 +986,12 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
         // to the associated type would have to be conditional, which we cannot
         // model.
         if (auto ext = dyn_cast<ExtensionDecl>(type->getDeclContext())) {
-          if (ext->isConstrainedExtension()) continue;
+          // FIXME: isConstrainedExtension() can cause request cycles because it
+          // computes a generic signature. getTrailingWhereClause() should be good
+          // enough for protocol extensions, which cannot specify constraints in
+          // any other way right now (eg, via requirement inference or by
+          // extending a bound generic type).
+          if (ext->getTrailingWhereClause()) continue;
         }
 
         // We found something.

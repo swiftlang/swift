@@ -19,7 +19,7 @@ public func usesType(_ x: Type) {}
 // CHECK: public func genericProtocol<T>(_ x: T) where T : MyModule.`Protocol`
 public func genericProtocol<T: Protocol>(_ x: T) {}
 
-// CHECK: public func existentialProtocol(_ x: any MyModule.`Protocol`)
+// CHECK: public func existentialProtocol(_ x: MyModule.`Protocol`)
 public func existentialProtocol(_ x: Protocol) {}
 
 // CHECK: public struct Parent {

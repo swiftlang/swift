@@ -286,6 +286,37 @@ static Type getIdentityOpaqueTypeArchetypeType(
   return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
+/// Adjust the underlying type of a typealias within the given context to
+/// account for @preconcurrency.
+static Type adjustTypeAliasTypeInContext(
+    Type type, TypeAliasDecl *aliasDecl, DeclContext *fromDC,
+    TypeResolutionOptions options) {
+  // If we are in a @preconcurrency declaration, don't adjust the types of
+  // type aliases.
+  if (options.contains(TypeResolutionFlags::Preconcurrency))
+    return type;
+
+  // If the type alias itself isn't marked with @preconcurrency, don't
+  // adjust the type.
+  if (!aliasDecl->preconcurrency())
+    return type;
+
+  // Only adjust the type within a strict concurrency context, so we don't
+  // change the types as seen by code that hasn't adopted concurrency.
+  if (contextRequiresStrictConcurrencyChecking(
+          fromDC,
+          [](const AbstractClosureExpr *closure) {
+            return closure->getType();
+          },
+          [](const ClosureExpr *closure) {
+            return closure->isIsolatedByPreconcurrency();
+          }))
+    return type;
+
+  return type->stripConcurrency(
+      /*recurse=*/true, /*dropGlobalActor=*/true);
+}
+
 Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
                                           DeclContext *foundDC,
                                           bool isSpecialized) const {
@@ -306,6 +337,13 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
     return genericParam->getDeclaredInterfaceType();
   }
+
+  /// Call this function before returning the underlying type of a typealias,
+  /// to adjust its type for concurrency.
+  auto adjustAliasType = [&](Type type) -> Type {
+    return adjustTypeAliasTypeInContext(
+        type, cast<TypeAliasDecl>(typeDecl), fromDC, options);
+  };
 
   if (!isSpecialized) {
     // If we are referring to a type within its own context, and we have either
@@ -342,9 +380,9 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
               if (ugAliasDecl == aliasDecl) {
                 if (getStage() == TypeResolutionStage::Structural &&
                     aliasDecl->getUnderlyingTypeRepr() != nullptr) {
-                  return aliasDecl->getStructuralType();
+                  return adjustAliasType(aliasDecl->getStructuralType());
                 }
-                return aliasDecl->getDeclaredInterfaceType();
+                return adjustAliasType(aliasDecl->getDeclaredInterfaceType());
               }
 
               extendedType = unboundGeneric->getParent();
@@ -356,9 +394,9 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
             if (aliasType->getDecl() == aliasDecl) {
               if (getStage() == TypeResolutionStage::Structural &&
                   aliasDecl->getUnderlyingTypeRepr() != nullptr) {
-                return aliasDecl->getStructuralType();
+                return adjustAliasType(aliasDecl->getStructuralType());
               }
-              return aliasDecl->getDeclaredInterfaceType();
+              return adjustAliasType(aliasDecl->getDeclaredInterfaceType());
             }
             extendedType = aliasType->getParent();
             continue;
@@ -381,9 +419,9 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       // Otherwise, return the appropriate type.
       if (getStage() == TypeResolutionStage::Structural &&
           aliasDecl->getUnderlyingTypeRepr() != nullptr) {
-        return aliasDecl->getStructuralType();
+        return adjustAliasType(aliasDecl->getStructuralType());
       }
-      return aliasDecl->getDeclaredInterfaceType();
+      return adjustAliasType(aliasDecl->getDeclaredInterfaceType());
     }
 
     // When a nominal type used outside its context, return the unbound
@@ -1570,6 +1608,13 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
     bool hasUnboundOpener = !!resolution.getUnboundTypeOpener();
+
+    // Type aliases might require adjustment due to @preconcurrency.
+    if (auto aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+      memberType = adjustTypeAliasTypeInContext(
+          memberType, aliasDecl, resolution.getDeclContext(),
+          resolution.getOptions());
+    }
 
     if (options.contains(TypeResolutionFlags::SilenceErrors)) {
       if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member,
@@ -4401,6 +4446,7 @@ public:
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
+
       // If this is a type alias to a constraint type, the type
       // alias name must be prefixed with 'any' to be used as an
       // existential type.

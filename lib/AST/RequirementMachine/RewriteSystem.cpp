@@ -556,7 +556,8 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      if (index != 0 && index != lhs.size() - 1) {
+      if (!rule.isLHSSimplified() &&
+          index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
@@ -591,7 +592,8 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      if (index != 0 && !rule.isRHSSimplified()) {
+      if (!rule.isRHSSimplified() &&
+          index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }

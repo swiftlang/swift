@@ -1,5 +1,8 @@
-// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking  %s | %FileCheck %s --check-prefix=GUARANTEED
+
+// REQUIRES: objc_interop
+// REQUIRES: concurrency
 
 class X {
   @objc func f() { }
@@ -404,4 +407,26 @@ func testAnyObjectWithDefault(_ x: AnyObject) {
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENEDX:%[0-9]+]] : $@opened("{{.*}}") AnyObject, #X.hasDefaultParam!foreign : (X) -> (Int) -> (), $@convention(objc_method) (Int, @opened("{{.*}}") AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[DEFARG]], [[OPENEDX]])
   x.hasDefaultParam()
+}
+
+
+// rdar://97646309 -- lookup and direct call of an optional global-actor constrained method would crash in SILGen
+@MainActor
+@objc protocol OptionalMemberLookups {
+  @objc optional func generateMaybe() async
+}
+
+extension OptionalMemberLookups {
+  // CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF
+  // CHECK:         [[SELF:%[0-9]+]] = copy_value {{.*}} : $Self
+  // CHECK:         [[METH:%[0-9]+]] = objc_method {{.*}} : $Self, #OptionalMemberLookups.generateMaybe!foreign : <Self where Self : OptionalMemberLookups> (Self) -> () async -> (), $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
+  // CHECK:         = function_ref @$sIeyB_yt14dynamic_lookup21OptionalMemberLookupsRzlTz_ : $@convention(c) @pseudogeneric <τ_0_0 where τ_0_0 : OptionalMemberLookups> (@inout_aliasable @block_storage UnsafeContinuation<(), Never>) -> ()
+  // CHECK:         [[BLOCK:%[0-9]+]] = init_block_storage_header {{.*}} : $*@block_storage UnsafeContinuation<(), Never>
+  // CHECK:         = apply [[METH]]([[BLOCK]], [[SELF]]) : $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
+  // CHECK:         await_async_continuation {{.*}} : $Builtin.RawUnsafeContinuation, resume bb1
+  // CHECK:         hop_to_executor {{.*}} : $MainActor
+  // CHECK:        } // end sil function '$s14dynamic_lookup21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF'
+  func testForceDirectCall() async -> Void {
+    await self.generateMaybe!()
+  }
 }

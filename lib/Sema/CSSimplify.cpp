@@ -1468,6 +1468,7 @@ namespace {
   enum class OpenedExistentialAdjustmentFlags {
     /// The argument should be made inout after opening.
     InOut = 0x01,
+    LValue = 0x02,
   };
 
   using OpenedExistentialAdjustments =
@@ -1540,6 +1541,12 @@ shouldOpenExistentialCallArgument(
   }
 
   OpenedExistentialAdjustments adjustments;
+
+  // The argument may be a "var" instead of a "let".
+  if (auto lv = argTy->getAs<LValueType>()) {
+    argTy = lv->getObjectType();
+    adjustments |= OpenedExistentialAdjustmentFlags::LValue;
+  }
 
   // If the argument is inout, strip it off and we can add it back.
   if (auto inOutArg = argTy->getAs<InOutType>()) {
@@ -1945,6 +1952,9 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         OpenedArchetypeType *opened;
         std::tie(argTy, opened) = cs.openExistentialType(
             existentialType, cs.getConstraintLocator(loc));
+
+        if (adjustments.contains(OpenedExistentialAdjustmentFlags::LValue))
+          argTy = LValueType::get(argTy);
 
         if (adjustments.contains(OpenedExistentialAdjustmentFlags::InOut))
           argTy = InOutType::get(argTy);
@@ -2719,42 +2729,47 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   /// The behavior limit to apply to a concurrency check.
-  auto getConcurrencyDiagnosticBehavior = [&](bool forSendable) {
-    // We can only handle the downgrade for conversions.
-    switch (kind) {
-    case ConstraintKind::Conversion:
-    case ConstraintKind::ArgumentConversion:
-      break;
+  auto getConcurrencyFixBehavior = [&](
+        bool forSendable
+      ) -> Optional<FixBehavior> {
+        // We can only handle the downgrade for conversions.
+        switch (kind) {
+        case ConstraintKind::Conversion:
+        case ConstraintKind::ArgumentConversion:
+          break;
 
-    default:
-      return DiagnosticBehavior::Unspecified;
-    }
+        default:
+          if (!shouldAttemptFixes())
+            return None;
 
-    // For a @preconcurrency callee outside of a strict concurrency context,
-    // ignore.
-    if (hasPreconcurrencyCallee(this, locator) &&
-        !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
-      return DiagnosticBehavior::Ignore;
+          return FixBehavior::Error;
+        }
 
-    // Otherwise, warn until Swift 6.
-    if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
-      return DiagnosticBehavior::Warning;
+        // For a @preconcurrency callee outside of a strict concurrency
+        // context, ignore.
+        if (hasPreconcurrencyCallee(this, locator) &&
+            !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this}))
+          return FixBehavior::Suppress;
 
-    return DiagnosticBehavior::Unspecified;
+        // Otherwise, warn until Swift 6.
+        if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+          return FixBehavior::DowngradeToWarning;
+
+        return FixBehavior::Error;
   };
 
   // A @Sendable function can be a subtype of a non-@Sendable function.
   if (func1->isSendable() != func2->isSendable()) {
     // Cannot add '@Sendable'.
     if (func2->isSendable() || kind < ConstraintKind::Subtype) {
-      if (!shouldAttemptFixes())
+      if (auto fixBehavior = getConcurrencyFixBehavior(true)) {
+        auto *fix = AddSendableAttribute::create(
+            *this, func1, func2, getConstraintLocator(locator), *fixBehavior);
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+      } else {
         return getTypeMatchFailure(locator);
-
-      auto *fix = AddSendableAttribute::create(
-          *this, func1, func2, getConstraintLocator(locator),
-          getConcurrencyDiagnosticBehavior(true));
-      if (recordFix(fix))
-        return getTypeMatchFailure(locator);
+      }
     }
   }
 
@@ -2782,15 +2797,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
     } else if (func1->getGlobalActor() && !func2->isAsync()) {
       // Cannot remove a global actor from a synchronous function.
-      if (!shouldAttemptFixes())
-        return getTypeMatchFailure(locator);
+      if (auto fixBehavior = getConcurrencyFixBehavior(false)) {
+        auto *fix = MarkGlobalActorFunction::create(
+            *this, func1, func2, getConstraintLocator(locator),
+            *fixBehavior);
 
-      auto *fix = MarkGlobalActorFunction::create(
-          *this, func1, func2, getConstraintLocator(locator),
-          getConcurrencyDiagnosticBehavior(false));
-
-      if (recordFix(fix))
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+      } else {
         return getTypeMatchFailure(locator);
+      }
     } else if (kind < ConstraintKind::Subtype) {
       return getTypeMatchFailure(locator);
     }
@@ -3312,7 +3328,41 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   }
 
   // Handle existential types.
-  if (type1->isExistentialType() && type2->isExistentialType()) {
+  if (auto *existential1 = type1->getAs<ExistentialType>()) {
+    auto existential2 = type2->castTo<ExistentialType>();
+
+    auto result = matchTypes(existential1->getConstraintType(),
+                             existential2->getConstraintType(),
+                             ConstraintKind::Bind, subflags,
+                             locator.withPathElement(
+                               ConstraintLocator::ExistentialConstraintType));
+
+    if (result.isFailure())
+      return result;
+
+    return getTypeMatchSuccess();
+  }
+
+  // Arguments of parameterized protocol types have to match on the nose.
+  if (auto ppt1 = type1->getAs<ParameterizedProtocolType>()) {
+    auto ppt2 = type2->castTo<ParameterizedProtocolType>();
+
+    auto result = matchTypes(ppt1->getBaseType(),
+                             ppt2->getBaseType(),
+                             ConstraintKind::Bind, subflags,
+                             locator.withPathElement(
+                               ConstraintLocator::ParentType));
+
+    if (result.isFailure())
+      return result;
+
+    return matchDeepTypeArguments(*this, subflags,
+                                  ppt1->getArgs(),
+                                  ppt2->getArgs(),
+                                  locator);
+  }
+
+  if (type1->isExistentialType()) {
     auto layout1 = type1->getExistentialLayout();
     auto layout2 = type2->getExistentialLayout();
 
@@ -3335,22 +3385,14 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
         return getTypeMatchFailure(locator);
 
+      auto subLocator = locator.withPathElement(
+                          ConstraintLocator::ProtocolCompositionSuperclassType);
       auto result = matchTypes(layout1.explicitSuperclass,
                                layout2.explicitSuperclass,
                                ConstraintKind::Bind, subflags,
-                               locator.withPathElement(
-                                 ConstraintLocator::ExistentialSuperclassType));
+                               subLocator);
       if (result.isFailure())
         return result;
-    }
-
-    // Arguments of parameterized protocol types have to match on the nose.
-    if (auto ppt1 = type1->getAs<ParameterizedProtocolType>()) {
-      auto ppt2 = type2->castTo<ParameterizedProtocolType>();
-      return matchDeepTypeArguments(*this, subflags,
-                                    ppt1->getArgs(),
-                                    ppt2->getArgs(),
-                                    locator);
     }
 
     return getTypeMatchSuccess();
@@ -4563,8 +4605,18 @@ bool ConstraintSystem::repairFailures(
         if (lhs->isPlaceholder())
           return true;
 
-        conversionsOrFixes.push_back(
-            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+        auto *loc = getConstraintLocator(locator);
+        // If this `inout` is in incorrect position, it should be diagnosed
+        // by other fixes.
+        if (loc->directlyAt<InOutExpr>()) {
+          if (!getArgumentLocator(castToExpr(anchor))) {
+            conversionsOrFixes.push_back(
+                RemoveAddressOf::create(*this, lhs, rhs, loc));
+            return true;
+          }
+        }
+
+        conversionsOrFixes.push_back(TreatRValueAsLValue::create(*this, loc));
         return true;
       }
     }
@@ -4763,10 +4815,14 @@ bool ConstraintSystem::repairFailures(
       if (repairByInsertingExplicitCall(lhs, rhs))
         return true;
 
-      if (isa<InOutExpr>(AE->getSrc())) {
+      if (auto *inoutExpr = dyn_cast<InOutExpr>(AE->getSrc())) {
+        auto *loc = getConstraintLocator(inoutExpr);
+
+        if (hasFixFor(loc, FixKind::RemoveAddressOf))
+          return true;
+
         conversionsOrFixes.push_back(
-            RemoveAddressOf::create(*this, lhs, rhs,
-                                    getConstraintLocator(locator)));
+            RemoveAddressOf::create(*this, lhs, rhs, loc));
         return true;
       }
 
@@ -6393,7 +6449,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // If we are matching types for equality, we might still have
         // type variables inside the protocol composition's superclass
         // constraint.
-        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+        if (desugar1->getKind() == desugar2->getKind())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
         break;
 
       default:
@@ -7389,6 +7446,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Solved;
         }
       }
+    }
+
+    if (loc->isLastElement<LocatorPathElt::MemberRefBase>()) {
+      auto *fix = ContextualMismatch::create(*this, protocolTy, type, loc);
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
     }
 
     // If this is an implicit Hashable conformance check generated for each
@@ -9772,7 +9835,7 @@ ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
       return SolutionKind::Solved;
 
     auto *memberRef = findResolvedMemberRef(memberLoc);
-    if (memberRef && memberRef->isStatic()) {
+    if (memberRef && (memberRef->isStatic() || isa<TypeAliasDecl>(memberRef))) {
       return simplifyConformsToConstraint(
           resultTy, baseTy, ConstraintKind::ConformsTo,
           getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase),
@@ -9834,6 +9897,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closureLocator = typeVar->getImpl().getLocator();
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
+
+  // Note if this closure is isolated by preconcurrency.
+  if (hasPreconcurrencyCallee(this, locator))
+    preconcurrencyClosures.insert(closure);
 
   // Let's look through all optionals associated with contextual
   // type to make it possible to infer parameter/result type of
@@ -9949,7 +10016,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         wrappedValueType = createTypeVariable(getConstraintLocator(paramDecl),
                                               TVO_CanBindToHole | TVO_CanBindToLValue);
       } else {
-        auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
+        auto *wrapperAttr = paramDecl->getOutermostAttachedPropertyWrapper();
         auto wrapperType = paramDecl->getAttachedPropertyWrapperType(0);
         backingType = replaceInferableTypesWithTypeVars(
             wrapperType, getConstraintLocator(wrapperAttr->getTypeRepr()));
@@ -12455,8 +12522,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (worseThanBestSolution())
       return SolutionKind::Error;
 
-    auto *conversionLoc =
-        getImplicitValueConversionLocator(locator, restriction);
+    auto *conversionLoc = getConstraintLocator(
+        /*anchor=*/ASTNode(), LocatorPathElt::ImplicitConversion(restriction));
 
     auto *applicationLoc =
         getConstraintLocator(conversionLoc, ConstraintLocator::ApplyFunction);
@@ -12464,17 +12531,19 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto *memberLoc = getConstraintLocator(
         applicationLoc, ConstraintLocator::ConstructorMember);
 
+    // Conversion has been already attempted for this direction
+    // and constructor choice has been recorded.
+    if (findSelectedOverloadFor(memberLoc))
+      return SolutionKind::Solved;
+
     // Allocate a single argument info to cover all possible
     // Double <-> CGFloat conversion locations.
-    auto *argumentsLoc =
-        getConstraintLocator(conversionLoc, ConstraintLocator::ApplyArgument);
-
-    if (!ArgumentLists.count(argumentsLoc)) {
+    if (!ArgumentLists.count(memberLoc)) {
       auto *argList = ArgumentList::createImplicit(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
           /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
-      ArgumentLists.insert({argumentsLoc, argList});
+      ArgumentLists.insert({memberLoc, argList});
     }
 
     auto *memberTypeLoc = getConstraintLocator(
@@ -12703,10 +12772,9 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   // Record the fix.
 
-  // If this is just a warning, it shouldn't affect the solver. Otherwise,
-  // increase the score.
-  if (!fix->isWarning())
-    increaseScore(SK_Fix, impact);
+  // If this should affect the solution score, do so.
+  if (auto scoreKind = fix->affectsSolutionScore())
+    increaseScore(*scoreKind, impact);
 
   // If we've made the current solution worse than the best solution we've seen
   // already, stop now.
@@ -12726,10 +12794,10 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // its sub-expressions.
   llvm::SmallDenseSet<ASTNode> anchors;
   for (const auto *fix : Fixes) {
-    // Warning fixes shouldn't be considered because even if
-    // such fix is recorded at that anchor this should not
+    // Fixes that don't affect the score shouldn't be considered because even
+    // if such a fix is recorded at that anchor this should not
     // have any affect in the recording of any other fix.
-    if (fix->isWarning())
+    if (!fix->affectsSolutionScore())
       continue;
 
     anchors.insert(fix->getAnchor());

@@ -104,6 +104,12 @@ UUID GenericEnvironment::getOpenedExistentialUUID() const {
   return getTrailingObjects<OpenedGenericEnvironmentData>()->uuid;
 }
 
+GenericSignature
+GenericEnvironment::getOpenedExistentialParentSignature() const {
+  assert(getKind() == Kind::OpenedExistential);
+  return getTrailingObjects<OpenedGenericEnvironmentData>()->parentSig;
+}
+
 GenericEnvironment::GenericEnvironment(GenericSignature signature)
   : SignatureAndKind(signature, Kind::Normal)
 {
@@ -113,11 +119,12 @@ GenericEnvironment::GenericEnvironment(GenericSignature signature)
 }
 
 GenericEnvironment::GenericEnvironment(
-    GenericSignature signature, Type existential, UUID uuid)
+    GenericSignature signature,
+    Type existential, GenericSignature parentSig, UUID uuid)
   : SignatureAndKind(signature, Kind::OpenedExistential)
 {
   new (getTrailingObjects<OpenedGenericEnvironmentData>())
-    OpenedGenericEnvironmentData{ existential, uuid };
+    OpenedGenericEnvironmentData{ existential, parentSig, uuid };
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),

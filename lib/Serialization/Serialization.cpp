@@ -594,6 +594,13 @@ Serializer::addGenericSignatureRef(GenericSignature sig) {
   return GenericSignaturesToSerialize.addRef(sig);
 }
 
+GenericEnvironmentID
+Serializer::addGenericEnvironmentRef(GenericEnvironment *env) {
+  if (!env)
+    return 0;
+  return GenericEnvironmentsToSerialize.addRef(env);
+}
+
 SubstitutionMapID
 Serializer::addSubstitutionMapRef(SubstitutionMap substitutions) {
   return SubstitutionMapsToSerialize.addRef(substitutions);
@@ -878,6 +885,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, ENTRY_POINT);
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_SIGNATURE_OFFSETS);
+  BLOCK_RECORD(index_block, GENERIC_ENVIRONMENT_OFFSETS);
   BLOCK_RECORD(index_block, SUBSTITUTION_MAP_OFFSETS);
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
@@ -1488,6 +1496,20 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
     SILGenericSignatureLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
                                           rawParamIDs);
   }
+}
+
+void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
+  using namespace decls_block;
+
+  assert(GenericEnvironmentsToSerialize.hasRef(genericEnv));
+
+  auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
+  auto parentSig = genericEnv->getOpenedExistentialParentSignature();
+  auto parentSigID = addGenericSignatureRef(parentSig);
+
+  auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
+  GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
+                                       existentialTypeID, parentSigID);
 }
 
 void Serializer::writeASTBlockEntity(const SubstitutionMap substitutions) {
@@ -4592,14 +4614,12 @@ public:
 
   void visitOpenedArchetypeType(const OpenedArchetypeType *archetypeTy) {
     using namespace decls_block;
-    auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
-    auto existentialTypeID = S.addTypeRef(archetypeTy->getExistentialType());
     auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
-    auto sigID = S.addGenericSignatureRef(sig);
+    auto genericEnvID = S.addGenericEnvironmentRef(
+        archetypeTy->getGenericEnvironment());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
     OpenedArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          existentialTypeID, interfaceTypeID,
-                                          sigID);
+                                          interfaceTypeID, genericEnvID);
   }
 
   void
@@ -5090,6 +5110,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<InlinableBodyTextLayout>();
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericSignatureLayout>();
+  registerDeclTypeAbbr<GenericEnvironmentLayout>();
   registerDeclTypeAbbr<RequirementSignatureLayout>();
   registerDeclTypeAbbr<SILGenericSignatureLayout>();
   registerDeclTypeAbbr<SubstitutionMapLayout>();
@@ -5143,6 +5164,8 @@ void Serializer::writeAllDeclsAndTypes() {
         writeASTBlockEntitiesIfNeeded(LocalDeclContextsToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(GenericSignaturesToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(GenericEnvironmentsToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(SubstitutionMapsToSerialize);
     wroteSomething |=
@@ -5533,10 +5556,10 @@ static void collectInterestingNestedDeclarations(
       if (isLocal)
         return;
 
-      if (auto owningType = func->getDeclContext()->getSelfNominalTypeDecl()) {
+      if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
         if (func->isObjC()) {
           Mangle::ASTMangler mangler;
-          std::string ownerName = mangler.mangleNominalType(owningType);
+          std::string ownerName = mangler.mangleNominalType(owningClass);
           assert(!ownerName.empty() && "Mangled type came back empty!");
 
           objcMethods[func->getObjCSelector()].push_back(
@@ -5746,6 +5769,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, ClangTypesToSerialize);
     writeOffsets(Offsets, LocalDeclContextsToSerialize);
     writeOffsets(Offsets, GenericSignaturesToSerialize);
+    writeOffsets(Offsets, GenericEnvironmentsToSerialize);
     writeOffsets(Offsets, SubstitutionMapsToSerialize);
     writeOffsets(Offsets, ConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);

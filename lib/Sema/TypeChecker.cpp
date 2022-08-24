@@ -279,6 +279,10 @@ static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
   }
 
   ASTContext &ctx = sf.getASTContext();
+
+  if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
+    return;
+
   for (const auto &import : sf.getImports()) {
     if (import.options.contains(ImportFlags::Preconcurrency) &&
         import.importLoc.isValid() &&

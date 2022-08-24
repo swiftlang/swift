@@ -6,11 +6,11 @@
 import Foundation
 
 @objc protocol P {
-  func foo(_ i: Int) -> Double // expected-note {{'foo' previously declared here}}
-  func foo(_ d: Double) -> Double // expected-warning {{method 'foo' with Objective-C selector 'foo:' conflicts with previous declaration with the same Objective-C selector; this is an error in Swift 6}}
+  func foo(_ i: Int) -> Double
+  func foo(_ d: Double) -> Double
 
-  @objc optional func opt(_ i: Int) -> Int // expected-note {{'opt' previously declared here}}
-  @objc optional func opt(_ d: Double) -> Int // expected-warning {{method 'opt' with Objective-C selector 'opt:' conflicts with previous declaration with the same Objective-C selector; this is an error in Swift 6}}
+  @objc optional func opt(_ i: Int) -> Int
+  @objc optional func opt(_ d: Double) -> Int
 }
 
 func testOptional(obj: P) {

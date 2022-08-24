@@ -109,6 +109,10 @@ static void ::swift_distributed_execute_target_resume(
   return resumeInParent(parentCtx, error);
 }
 
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError(
+    const char *targetNameStart, size_t targetNameLength);
+
 SWIFT_CC(swiftasync)
 void ::swift_distributed_execute_target(
     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
@@ -124,9 +128,12 @@ void ::swift_distributed_execute_target(
     void **decoderWitnessTable) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
-    fprintf(stderr, "[%s:%d] (%s) FAILED TO ACCESS: %s\n", __FILE__, __LINE__, __FUNCTION__, llvm::StringRef(targetNameStart, targetNameLength));
-    assert(false && "no distributed accessor");
-    return; // FIXME(distributed): return -1 here so the lib can fail the call
+    SwiftError *error =
+        swift_distributed_makeDistributedTargetAccessorNotFoundError(targetNameStart, targetNameLength);
+    auto resumeInParent =
+        reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
+            callerContext->ResumeParent);
+    return resumeInParent(callerContext, error);
   }
 
   auto *asyncFnPtr = reinterpret_cast<

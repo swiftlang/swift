@@ -704,6 +704,13 @@ SILFunction::isPossiblyUsedExternally() const {
   if (isDistributed() && isThunk())
     return true;
 
+  // Declaration marked as `@_alwaysEmitIntoClient` that
+  // returns opaque result type with availability conditions
+  // has to be kept alive to emit opaque type metadata descriptor.
+  if (markedAsAlwaysEmitIntoClient() &&
+      hasOpaqueResultTypeWithAvailabilityConditions())
+    return true;
+
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 

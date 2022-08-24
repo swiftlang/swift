@@ -30,7 +30,7 @@ import Swift
 ///     for await i in Counter(howHigh: 10) {
 ///         print(i, terminator: " ")
 ///     }
-///     // Prints: 1 2 3 4 5 6 7 8 9 10
+///     // Prints "1 2 3 4 5 6 7 8 9 10"
 ///
 /// An `AsyncSequence` doesn't generate or contain the values; it just defines
 /// how you access them. Along with defining the type of values as an associated
@@ -69,7 +69,7 @@ import Swift
 ///     for await s in stream {
 ///         print(s, terminator: " ")
 ///     }
-///     // Prints: Odd Even Odd Even Odd Even Odd Even Odd Even
+///     // Prints "Odd Even Odd Even Odd Even Odd Even Odd Even"
 ///
 @available(SwiftStdlib 5.1, *)
 @rethrows
@@ -108,7 +108,7 @@ extension AsyncSequence {
   ///             $0 + $1
   ///         }
   ///     print(sum)
-  ///     // Prints: 10
+  ///     // Prints "10"
   ///
   ///
   /// - Parameters:
@@ -204,7 +204,7 @@ extension AsyncSequence {
   ///     let containsDivisibleByThree = await Counter(howHigh: 10)
   ///         .contains { $0 % 3 == 0 }
   ///     print(containsDivisibleByThree)
-  ///     // Prints: true
+  ///     // Prints "true"
   ///
   /// The predicate executes each time the asynchronous sequence produces an
   /// element, until either the predicate finds a match or the sequence ends.
@@ -231,7 +231,7 @@ extension AsyncSequence {
   ///     let allLessThanTen = await Counter(howHigh: 10)
   ///         .allSatisfy { $0 < 10 }
   ///     print(allLessThanTen)
-  ///     // Prints: false
+  ///     // Prints "false"
   ///
   /// The predicate executes each time the asynchronous sequence produces an
   /// element, until either the predicate returns `false` or the sequence ends.
@@ -263,7 +263,7 @@ extension AsyncSequence where Element: Equatable {
   ///     let containsFive = await Counter(howHigh: 10)
   ///         .contains(5)
   ///     print(containsFive)
-  ///     // Prints: true
+  ///     // Prints "true"
   ///
   /// - Parameter search: The element to find in the asynchronous sequence.
   /// - Returns: `true` if the method found the element in the asynchronous
@@ -306,7 +306,7 @@ extension AsyncSequence {
   ///     let divisibleBy2And3 = await Counter(howHigh: 10)
   ///         .first { $0 % 2 == 0 && $0 % 3 == 0 }
   ///     print(divisibleBy2And3 ?? "none")
-  ///     // Prints: 6
+  ///     // Prints "6"
   ///
   /// The predicate executes each time the asynchronous sequence produces an
   /// element, until either the predicate finds a match or the sequence ends.
@@ -357,7 +357,7 @@ extension AsyncSequence {
   ///     let min = await RankCounter()
   ///         .min { $0.rawValue < $1.rawValue }
   ///     print(min ?? "none")
-  ///     // Prints: ace
+  ///     // Prints "ace"
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument; otherwise,
@@ -412,7 +412,7 @@ extension AsyncSequence {
   ///     let max = await RankCounter()
   ///         .max { $0.rawValue < $1.rawValue }
   ///     print(max ?? "none")
-  ///     // Prints: king
+  ///     // Prints "king"
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument; otherwise,
@@ -449,7 +449,7 @@ extension AsyncSequence where Element: Comparable {
   ///     let min = await Counter(howHigh: 10)
   ///         .min()
   ///     print(min ?? "none")
-  ///     // Prints: 1
+  ///     // Prints "1"
   ///
   /// - Returns: The sequence’s minimum element. If the sequence has no
   ///   elements, returns `nil`.
@@ -469,7 +469,7 @@ extension AsyncSequence where Element: Comparable {
   ///     let max = await Counter(howHigh: 10)
   ///         .max()
   ///     print(max ?? "none")
-  ///     // Prints: 10
+  ///     // Prints "10"
   ///
   /// - Returns: The sequence’s maximum element. If the sequence has no
   ///   elements, returns `nil`.

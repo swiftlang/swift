@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # ===--- compare_perf_tests.py -------------------------------------------===//
@@ -26,8 +26,6 @@ class `TestComparator` analyzes changes betweeen the old and new test results.
 class `ReportFormatter` creates the test comparison report in specified format.
 
 """
-
-from __future__ import print_function
 
 import argparse
 import functools

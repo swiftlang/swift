@@ -476,6 +476,75 @@ void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
 }
 
+/// Replaces asynchronous IBActionAttr/IBSegueActionAttr function declarations
+/// with a synchronous function. The body of the original function is moved
+/// inside of a task executed on the MainActor
+static void emitFixItIBActionRemoveAsync(ASTContext &ctx, const FuncDecl &FD) {
+  // If we don't have an async loc for some reason, things will explode
+  if (!FD.getAsyncLoc())
+    return;
+
+  std::string replacement = "";
+
+  // attributes, function name and everything up to `async` (exclusive)
+  replacement +=
+      CharSourceRange(ctx.SourceMgr, FD.getSourceRangeIncludingAttrs().Start,
+                      FD.getAsyncLoc())
+          .str();
+
+  CharSourceRange returnType = Lexer::getCharSourceRangeFromSourceRange(
+      ctx.SourceMgr, FD.getResultTypeSourceRange());
+
+  // If we have a return type, include that here
+  if (returnType.isValid()) {
+    replacement +=
+        (llvm::Twine("-> ") + Lexer::getCharSourceRangeFromSourceRange(
+                                  ctx.SourceMgr, FD.getResultTypeSourceRange())
+                                  .str())
+            .str();
+  }
+
+  if (!FD.hasBody()) {
+    // If we don't have any body, the sourcelocs won't work and will result in
+    // crashes, so just swap out what we can
+
+    SourceLoc endLoc =
+        returnType.isValid() ? returnType.getEnd() : FD.getAsyncLoc();
+    ctx.Diags
+        .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, FD.getName())
+        .fixItReplace(
+            SourceRange(FD.getSourceRangeIncludingAttrs().Start, endLoc),
+            replacement);
+    return;
+  }
+
+  if (returnType.isValid())
+    replacement += " "; // insert space between type name and lbrace
+
+  replacement += "{\nTask { @MainActor in";
+
+  // If the body of the function is just "{}", there isn't anything to wrap.
+  // stepping over the braces to grab just the body will result in the `Start`
+  // location of the source range to come after the `End` of the range, and we
+  // will overflow. Dance around this by just appending the end of the fix to
+  // the replacement.
+  if (FD.getBody()->getLBraceLoc() !=
+      FD.getBody()->getRBraceLoc().getAdvancedLocOrInvalid(-1)) {
+    // We actually have a body, so add that to the string
+    CharSourceRange functionBody(
+        ctx.SourceMgr, FD.getBody()->getLBraceLoc().getAdvancedLocOrInvalid(1),
+        FD.getBody()->getRBraceLoc().getAdvancedLocOrInvalid(-1));
+    replacement += functionBody.str();
+  }
+  replacement += " }\n}";
+
+  ctx.Diags
+      .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, FD.getName())
+      .fixItReplace(SourceRange(FD.getSourceRangeIncludingAttrs().Start,
+                                FD.getBody()->getRBraceLoc()),
+                    replacement);
+}
+
 static bool
 validateIBActionSignature(ASTContext &ctx, DeclAttribute *attr,
                           const FuncDecl *FD, unsigned minParameters,
@@ -499,6 +568,13 @@ validateIBActionSignature(ASTContext &ctx, DeclAttribute *attr,
   if (resultType->isVoid() != hasVoidResult) {
     ctx.Diags.diagnose(FD, diag::invalid_ibaction_result, attr->getAttrName(),
                        hasVoidResult);
+    valid = false;
+  }
+
+  if (FD->isAsyncContext()) {
+    ctx.Diags.diagnose(FD->getAsyncLoc(), diag::attr_decl_async,
+                       attr->getAttrName(), FD->getDescriptiveKind());
+    emitFixItIBActionRemoveAsync(ctx, *FD);
     valid = false;
   }
 
@@ -5793,24 +5869,6 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       }
       return;
     }
-
-    // Diagnose for the limitation that we currently have to require distributed
-    // actor constrained protocols to declare the distributed requirements as
-    // 'async throws'
-    // FIXME: rdar://95949498 allow requirements to not declare explicit async/throws in protocols; those effects are implicit in any case
-    if (isa<ProtocolDecl>(dc)) {
-      if (!funcDecl->hasAsync() || !funcDecl->hasThrows()) {
-        auto diag = funcDecl->diagnose(diag::distributed_method_requirement_must_be_async_throws,
-                           funcDecl->getName());
-        if (!funcDecl->hasAsync()) {
-          diag.fixItInsertAfter(funcDecl->getThrowsLoc(), " async");
-        }
-        if (!funcDecl->hasThrows()) {
-          diag.fixItInsertAfter(funcDecl->getThrowsLoc(), " throws");
-        }
-        return;
-      }
-    }
   }
 }
 
@@ -5878,6 +5936,14 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
           return;
         }
       }
+    }
+
+    // Using 'nonisolated' with wrapped properties is unsupported, because
+    // backing storage is a stored 'var' that is part of the internal state
+    // of the actor which could only be accessed in actor's isolation context.
+    if (var->hasAttachedPropertyWrapper()) {
+      diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property);
+      return;
     }
 
     // nonisolated can not be applied to local properties.

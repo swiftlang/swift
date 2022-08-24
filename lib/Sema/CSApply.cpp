@@ -5638,25 +5638,22 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(
-      Expr *expr, bool implicitSelfCapture, bool inheritActorContext,
-      bool isolatedByPreconcurrency) {
+      Expr *expr, bool implicitSelfCapture, bool inheritActorContext) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
-    closure->setIsolatedByPreconcurrency(isolatedByPreconcurrency);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(
         captureList->getClosureBody(), implicitSelfCapture,
-        inheritActorContext, isolatedByPreconcurrency);
+        inheritActorContext);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(
-        identity->getSubExpr(), implicitSelfCapture, inheritActorContext,
-        isolatedByPreconcurrency);
+        identity->getSubExpr(), implicitSelfCapture, inheritActorContext);
   }
 }
 
@@ -5683,8 +5680,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Determine the parameter bindings.
   ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
 
-  bool preconcurrency = callee && callee.getDecl()->preconcurrency();
-
   // If this application is an init(wrappedValue:) call that needs an injected
   // wrapped value placeholder, the first non-defaulted argument must be
   // wrapped in an OpaqueValueExpr.
@@ -5707,14 +5702,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   auto matches = args->matches(params, [&](Expr *E) { return cs.getType(E); });
   if (matches && !shouldInjectWrappedValuePlaceholder &&
       !paramInfo.anyContextualInfo()) {
-    // Propagate preconcurrency to any closure arguments.
-    if (preconcurrency) {
-      for (const auto &arg : *args) {
-        Expr *argExpr = arg.getExpr();
-        applyContextualClosureFlags(argExpr, false, false, preconcurrency);
-      }
-    }
-
     return args;
   }
 
@@ -5865,7 +5852,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     applyContextualClosureFlags(
-        argExpr, isImplicitSelfCapture, inheritsActorContext, preconcurrency);
+        argExpr, isImplicitSelfCapture, inheritsActorContext);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
@@ -5942,7 +5929,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
     // If the argument is an existential type that has been opened, perform
     // the open operation.
-    if (argType->getInOutObjectType()->isAnyExistentialType() &&
+    if (argType->getWithoutSpecifierType()->isAnyExistentialType() &&
         paramType->hasOpenedExistential()) {
       // FIXME: Look for an opened existential and use it. We need to
       // know how far out we need to go to close the existentials. Huh.
@@ -6855,13 +6842,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             callLocator, {ConstraintLocator::ApplyFunction,
                           ConstraintLocator::ConstructorMember});
 
-        ConstraintLocator *baseLoc =
-            cs.getImplicitValueConversionLocator(locator, conversionKind);
-
-        auto overload =
-            solution.getOverloadChoice(solution.getConstraintLocator(
-                baseLoc, {ConstraintLocator::ApplyFunction,
-                          ConstraintLocator::ConstructorMember}));
+        auto overload = solution.getOverloadChoice(cs.getConstraintLocator(
+            ASTNode(), {LocatorPathElt::ImplicitConversion(conversionKind),
+                        ConstraintLocator::ApplyFunction,
+                        ConstraintLocator::ConstructorMember}));
 
         solution.overloadChoices.insert({memberLoc, overload});
       }
@@ -8483,7 +8467,7 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
         auto diagnosed =
             primaryFix->coalesceAndDiagnose(solution, secondaryFixes);
-        if (primaryFix->isWarning()) {
+        if (primaryFix->canApplySolution()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;
         } else {
@@ -8580,8 +8564,8 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
         wrappedVar, initType->mapTypeOutOfContext());
 
     // Record the semantic initializer on the outermost property wrapper.
-    wrappedVar->getAttachedPropertyWrappers().front()
-        ->setSemanticInit(initializer);
+    wrappedVar->getOutermostAttachedPropertyWrapper()->setSemanticInit(
+        initializer);
 
     // If this is a wrapped parameter, we're done.
     if (isa<ParamDecl>(wrappedVar))
@@ -8999,7 +8983,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     return target;
   } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
     // Get the outermost wrapper type from the solution
-    auto outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
+    auto outermostWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
     auto backingType = solution.simplifyType(
         solution.getType(outermostWrapper->getTypeExpr()));
 
@@ -9066,19 +9050,15 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
-      resultExpr = Rewriter.coerceToType(
-          resultExpr, solution.simplifyType(convertType),
-          cs.getConstraintLocator(resultExpr,
-                                  LocatorPathElt::ContextualType(
-                                      target.getExprContextualTypePurpose())));
+      resultExpr =
+          Rewriter.coerceToType(resultExpr, solution.simplifyType(convertType),
+                                cs.getConstraintLocator(resultExpr));
     } else if (cs.getType(resultExpr)->hasLValueType() &&
                !target.isDiscardedExpr()) {
       // We referenced an lvalue. Load it.
       resultExpr = Rewriter.coerceToType(
           resultExpr, cs.getType(resultExpr)->getRValueType(),
-          cs.getConstraintLocator(resultExpr,
-                                  LocatorPathElt::ContextualType(
-                                      target.getExprContextualTypePurpose())));
+          cs.getConstraintLocator(resultExpr));
     }
 
     if (!resultExpr)
@@ -9112,16 +9092,23 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     Solution &solution, SolutionApplicationTarget target) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
+  unsigned numResolvableFixes = 0;
   if (!solution.Fixes.empty()) {
     if (shouldSuppressDiagnostics())
       return None;
 
     bool diagnosedErrorsViaFixes = applySolutionFixes(solution);
+    bool canApplySolution = true;
+    for (const auto fix : solution.Fixes) {
+      if (!fix->canApplySolution())
+        canApplySolution = false;
+      if (fix->affectsSolutionScore() == SK_Fix && fix->canApplySolution())
+        ++numResolvableFixes;
+    }
+
     // If all of the available fixes would result in a warning,
     // we can go ahead and apply this solution to AST.
-    if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
-          return fix->isWarning();
-        })) {
+    if (!canApplySolution) {
       // If we already diagnosed any errors via fixes, that's it.
       if (diagnosedErrorsViaFixes)
         return None;
@@ -9138,7 +9125,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   // produce a fallback diagnostic to highlight the problem.
   {
     const auto &score = solution.getFixedScore();
-    if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0) {
+    if (score.Data[SK_Fix] > numResolvableFixes || score.Data[SK_Hole] > 0) {
       maybeProduceFallbackDiagnostic(target);
       return None;
     }

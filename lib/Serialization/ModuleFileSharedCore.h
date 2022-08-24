@@ -218,6 +218,9 @@ private:
   /// Generic signatures referenced by this module.
   ArrayRef<RawBitOffset> GenericSignatures;
 
+  /// Generic environments referenced by this module.
+  ArrayRef<RawBitOffset> GenericEnvironments;
+
   /// Substitution maps referenced by this module.
   ArrayRef<RawBitOffset> SubstitutionMaps;
 

@@ -28,6 +28,8 @@ import objc_generics
 @objc protocol B : A, Sendable {}
 
 // CHECK-LABEL: @protocol CompletionAndAsync
+// FIXME: We should detect this duplication.
+// CHECK-NEXT: - (void)helloWithCompletion:(void (^ _Nonnull)(BOOL))completionHandler SWIFT_AVAILABILITY
 // CHECK-NEXT: - (void)helloWithCompletion:(void (^ _Nonnull)(BOOL))completion;
 // CHECK-NEXT: @end
 @objc protocol CompletionAndAsync {

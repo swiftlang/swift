@@ -179,6 +179,41 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
   }
 }
 
+/// Find concrete type or superclass rules where the right hand side occurs as a
+/// proper prefix of one of its substitutions.
+///
+/// eg, (T.[concrete: G<T.[P:A]>] => T).
+void RewriteSystem::computeRecursiveRules() {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
+    auto &rule = getRule(ruleID);
+
+    if (rule.isPermanent() ||
+        rule.isRedundant())
+      continue;
+
+    auto optSymbol = rule.isPropertyRule();
+    if (!optSymbol)
+      continue;
+
+    auto kind = optSymbol->getKind();
+    if (kind != Symbol::Kind::ConcreteType &&
+        kind != Symbol::Kind::Superclass) {
+      continue;
+    }
+
+    auto rhs = rule.getRHS();
+    for (auto term : optSymbol->getSubstitutions()) {
+      if (term.size() > rhs.size() &&
+          std::equal(rhs.begin(), rhs.end(), term.begin())) {
+        RecursiveRules.push_back(ruleID);
+        rule.markRecursive();
+        break;
+      }
+    }
+  }
+}
+
 /// Find a rule to delete by looking through all loops for rewrite rules appearing
 /// once in empty context. Returns a pair consisting of a loop ID and a rule ID,
 /// otherwise returns None.
@@ -579,6 +614,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   });
 
   propagateRedundantRequirementIDs();
+  computeRecursiveRules();
 
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();
@@ -628,7 +664,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
         rule.containsUnresolvedSymbols())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
-    if (rule.isConflicting())
+    if (rule.isConflicting() || rule.isRecursive())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
     if (!rule.isRedundant())

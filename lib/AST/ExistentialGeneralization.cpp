@@ -212,10 +212,7 @@ private:
         if (origReq.getKind() != RequirementKind::Conformance) continue;
         auto origConformance = origConformances[i++];
 
-        auto optNewReq = origReq.subst(newSubs);
-        assert(optNewReq && "generalization substitution failed");
-        auto &newReq = *optNewReq;
-
+        auto newReq = origReq.subst(newSubs);
         addedRequirements.push_back(newReq);
 
         substConformances.insert({{newReq.getFirstType()->getCanonicalType(),
@@ -267,10 +264,14 @@ private:
 ExistentialTypeGeneralization
 ExistentialTypeGeneralization::get(Type rawType) {
   assert(rawType->isAnyExistentialType());
-  assert(!rawType->hasTypeParameter());
 
   // Canonicalize.  We need to generalize the canonical shape of the
   // type or else generalization parameters won't match up.
+  //
+  // TODO: in full generality, do we need to do *contextual*
+  // canonicalization in order to avoid introducing non-canonical
+  // parameters?  (That is, do we need a contextual generic
+  // signature if given an interface type?)
   CanType type = rawType->getCanonicalType();
 
   Generalizer generalizer(type->getASTContext());

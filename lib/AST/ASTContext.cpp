@@ -1925,12 +1925,24 @@ void ASTContext::loadObjCMethods(
   PrettyStackTraceSelector stackTraceSelector("looking for", selector);
   PrettyStackTraceDecl stackTraceDecl("...in", tyDecl);
 
+  // @objc protocols cannot have @objc extension members, so if we've recorded
+  // everything in the protocol definition, we've recorded everything. And we
+  // only ever use the ObjCSelector version of `NominalTypeDecl::lookupDirect()`
+  // on protocols in primary file typechecking, so we don't care about protocols
+  // that need to be loaded from files.
+  // TODO: Rework `ModuleLoader::loadObjCMethods()` to support protocols too if
+  //       selector-based `NominalTypeDecl::lookupDirect()` ever needs to work
+  //       in more situations.
+  ClassDecl *classDecl = dyn_cast<ClassDecl>(tyDecl);
+  if (!classDecl)
+    return;
+
   for (auto &loader : getImpl().ModuleLoaders) {
     // Ignore the Clang importer if we've been asked for Swift-only results.
     if (swiftOnly && loader.get() == getClangModuleLoader())
       continue;
 
-    loader->loadObjCMethods(tyDecl, selector, isInstanceMethod,
+    loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
                             previousGeneration, methods);
   }
 }
@@ -4667,19 +4679,14 @@ GenericEnvironment::forOpenedExistential(
     Type existential, GenericSignature parentSig, UUID uuid) {
   auto &ctx = existential->getASTContext();
   auto signature = ctx.getOpenedArchetypeSignature(existential, parentSig);
-  return GenericEnvironment::forOpenedArchetypeSignature(existential, signature, uuid);
-}
 
-GenericEnvironment *GenericEnvironment::forOpenedArchetypeSignature(
-    Type existential, GenericSignature signature, UUID uuid) {
   // Allocate and construct the new environment.
-  auto &ctx = existential->getASTContext();
   unsigned numGenericParams = signature.getGenericParams().size();
   size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap,
                                   OpenedGenericEnvironmentData, Type>(
       0, 0, 1, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  return new (mem) GenericEnvironment(signature, existential, uuid);
+  return new (mem) GenericEnvironment(signature, existential, parentSig, uuid);
 }
 
 /// Create a new generic environment for an opaque type with the given set of
@@ -5328,9 +5335,8 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     };
 
     for (auto reqt : baseGenericSig.getRequirements()) {
-      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
-        addedRequirements.push_back(*substReqt);
-      }
+      auto substReqt = reqt.subst(substFn, lookupConformanceFn);
+      addedRequirements.push_back(substReqt);
     }
   }
 

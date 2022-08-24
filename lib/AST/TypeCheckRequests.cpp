@@ -1230,10 +1230,7 @@ Optional<Type> DefaultArgumentTypeRequest::getCachedResult() const {
   if (!defaultInfo)
     return None;
 
-  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
-    return None;
-
-  return defaultInfo->ExprType;
+  return defaultInfo->ExprType ? defaultInfo->ExprType : Optional<Type>();
 }
 
 void DefaultArgumentTypeRequest::cacheResult(Type type) const {
@@ -1575,7 +1572,11 @@ void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
   switch (state) {
     case ActorIsolation::ActorInstance:
-      out << "actor-isolated to instance of " << state.getActor()->getName();
+      out << "actor-isolated to instance of ";
+      if (state.isDistributedActor()) {
+        out << "distributed ";
+      }
+      out << "actor " << state.getActor()->getName();
       break;
 
     case ActorIsolation::Independent:

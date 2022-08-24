@@ -88,7 +88,7 @@ public class OldSchool2: MP {
 // CHECK: public struct UsesRP {
 public struct UsesRP {
   // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
-  // CHECK-NEXT:  public var value: (any FeatureTest.RP)? {
+  // CHECK-NEXT:  public var value: FeatureTest.RP? {
   // CHECK-NOT: #if compiler(>=5.3) && $RethrowsProtocol
   // CHECK: get
   public var value: RP? {

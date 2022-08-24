@@ -103,6 +103,22 @@ template <typename... ArgTypes>
 InFlightDiagnostic
 FailureDiagnostic::emitDiagnosticAt(ArgTypes &&... Args) const {
   auto &DE = getASTContext().Diags;
+  DiagnosticBehavior behaviorLimit;
+  switch (fixBehavior) {
+  case FixBehavior::Error:
+  case FixBehavior::AlwaysWarning:
+    behaviorLimit = DiagnosticBehavior::Unspecified;
+    break;
+
+  case FixBehavior::DowngradeToWarning:
+    behaviorLimit = DiagnosticBehavior::Warning;
+    break;
+
+  case FixBehavior::Suppress:
+    behaviorLimit = DiagnosticBehavior::Ignore;
+    break;
+  }
+
   return std::move(DE.diagnose(std::forward<ArgTypes>(Args)...)
                      .limitBehavior(behaviorLimit));
 }
@@ -3552,7 +3568,7 @@ bool InvalidProjectedValueArgument::diagnoseAsError() {
   if (!param->hasAttachedPropertyWrapper()) {
     param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
   } else if (!param->hasImplicitPropertyWrapper() &&
-             param->getAttachedPropertyWrappers().front()->hasArgs()) {
+             param->getOutermostAttachedPropertyWrapper()->hasArgs()) {
     param->diagnose(diag::property_wrapper_param_attr_arg);
   } else {
     Type backingType;
@@ -3869,16 +3885,13 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   if (!parentExpr)
     return false;
 
-  auto parentType = getType(parentExpr);
-
-  if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
-    return false;
-
-  if (isa<TupleExpr>(parentExpr)) {
+  // This could happen if collection is a dictionary literal i.e.
+  // ["a": .test] - the element is a tuple - ("a", .test).
+  if (isExpr<TupleExpr>(parentExpr))
     parentExpr = findParentExpr(parentExpr);
-    if (!parentExpr)
-      return false;
-  }
+
+  if (!isExpr<CollectionExpr>(parentExpr))
+    return false;
 
   if (auto *defaultableVar =
           getRawType(parentExpr)->getAs<TypeVariableType>()) {

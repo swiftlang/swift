@@ -1310,24 +1310,7 @@ class swift::ObjCMethodLookupTable
         : public llvm::DenseMap<std::pair<ObjCSelector, char>,
                                 StoredObjCMethods>,
           public ASTAllocated<ObjCMethodLookupTable>
-{
-  SWIFT_DEBUG_DUMP {
-    llvm::errs() << "ObjCMethodLookupTable:\n";
-    for (auto pair : *this) {
-      auto selector = pair.getFirst().first;
-      auto isInstanceMethod = pair.getFirst().second;
-      auto &methods = pair.getSecond();
-
-      llvm::errs() << "  \"" << (isInstanceMethod ? "-" : "+") << selector
-                   << "\":\n";
-      for (auto method : methods.Methods) {
-        llvm::errs() << "  - \"";
-        method->dumpRef(llvm::errs());
-        llvm::errs() << "\"\n";
-      }
-    }
-  }
-};
+{};
 
 MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
   // Register a cleanup with the ASTContext to call the lookup table
@@ -1685,7 +1668,7 @@ bool NominalTypeDecl::createObjCMethodLookup() {
   assert(!ObjCMethodLookup && "Already have an Objective-C member table");
 
   // Most types cannot have ObjC methods.
-  if (!(isa<ClassDecl>(this) || isa<ProtocolDecl>(this)))
+  if (!(isa<ClassDecl>(this)))
     return false;
 
   auto &ctx = getASTContext();
@@ -1716,16 +1699,6 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
-/// Is the new method an async alternative of any existing method, or vice
-/// versa?
-static bool isAnAsyncAlternative(AbstractFunctionDecl *newDecl,
-                                 llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
-  return llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    return newDecl->getAsyncAlternative(/*isKnownObjC=*/true) == oldDecl
-              || oldDecl->getAsyncAlternative(/*isKnownObjC=*/true) == newDecl;
-  });
-}
-
 void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
                                        ObjCSelector selector) {
   if (!ObjCMethodLookup && !createObjCMethodLookup())
@@ -1741,11 +1714,12 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
     return;
 
   if (auto *sf = method->getParentSourceFile()) {
-    if (vec.empty()) {
-      sf->ObjCMethodList.push_back(method);
-    } else if (!isa<ProtocolDecl>(this) || !isAnAsyncAlternative(method, vec)) {
+    if (vec.size() == 1) {
       // We have a conflict.
-      sf->ObjCMethodConflicts.insert({ this, selector, isInstanceMethod });
+      sf->ObjCMethodConflicts.push_back(std::make_tuple(this, selector,
+                                                        isInstanceMethod));
+    } if (vec.empty()) {
+      sf->ObjCMethodList.push_back(method);
     }
   }
 

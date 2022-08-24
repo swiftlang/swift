@@ -29,9 +29,9 @@ extension AsyncSequence {
   ///     let stream = Counter(howHigh: 10)
   ///         .prefix { $0 % 2 != 0 || $0 % 3 != 0 }
   ///     for try await number in stream {
-  ///         print("\(number) ", terminator: " ")
+  ///         print(number, terminator: " ")
   ///     }
-  ///     // prints "1  2  3  4  5"
+  ///     // Prints "1 2 3 4 5"
   ///     
   /// - Parameter predicate: A closure that takes an element as a parameter and
   ///   returns a Boolean value indicating whether the element should be

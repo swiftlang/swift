@@ -1789,3 +1789,11 @@ func rdar93922410(_ completion: (Int?) -> Void) { // expected-note {{'completion
     return completion() // expected-error {{missing argument for parameter #1 in call}}
   }
 }
+
+// https://github.com/apple/swift/issues/60436
+func test_extraneous_argument_with_inout() {
+  func test(_: Int) {}
+
+  var x: Int = 0
+  test(42, &x) // expected-error {{extra argument in call}}
+}

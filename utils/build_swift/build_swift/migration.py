@@ -12,8 +12,6 @@ Temporary module with functionality used to migrate away from build-script-impl.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
 import itertools
 import subprocess
 

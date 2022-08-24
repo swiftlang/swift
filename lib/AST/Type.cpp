@@ -4527,26 +4527,16 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   for (const auto &req : genericFnType->getRequirements()) {
     // Substitute into the requirement.
     auto substReqt = req.subst(substitutions, lookupConformances, options);
-    if (!substReqt) {
-      anySemanticChanges = true;
-      continue;
-    }
 
     // Did anything change?
     if (!anySemanticChanges &&
-        (!req.getFirstType()->isEqual(substReqt->getFirstType()) ||
+        (!req.getFirstType()->isEqual(substReqt.getFirstType()) ||
          (req.getKind() != RequirementKind::Layout &&
-          !req.getSecondType()->isEqual(substReqt->getSecondType())))) {
+          !req.getSecondType()->isEqual(substReqt.getSecondType())))) {
       anySemanticChanges = true;
     }
 
-    // Skip any erroneous requirements.
-    if (substReqt->getFirstType()->hasError() ||
-        (substReqt->getKind() != RequirementKind::Layout &&
-         substReqt->getSecondType()->hasError()))
-      continue;
-
-    requirements.push_back(*substReqt);
+    requirements.push_back(substReqt);
   }
 
   GenericSignature genericSig;

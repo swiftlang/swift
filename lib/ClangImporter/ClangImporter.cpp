@@ -3435,16 +3435,11 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void ClangImporter::loadObjCMethods(
-       NominalTypeDecl *typeDecl,
+       ClassDecl *classDecl,
        ObjCSelector selector,
        bool isInstanceMethod,
        unsigned previousGeneration,
        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
-  // TODO: We don't currently need to load methods from imported ObjC protocols.
-  auto classDecl = dyn_cast<ClassDecl>(typeDecl);
-  if (!classDecl)
-    return;
-
   const auto *objcClass =
       dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
   if (!objcClass)
