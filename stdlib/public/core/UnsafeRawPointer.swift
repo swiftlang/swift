@@ -378,7 +378,8 @@ public struct UnsafeRawPointer: _Pointer {
     _ body: (_ pointer: UnsafePointer<T>) throws -> Result
   ) rethrows -> Result {
     _debugPrecondition(
-      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0
+      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
+      "self must be a properly aligned pointer for type T"
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
@@ -934,7 +935,8 @@ public struct UnsafeMutableRawPointer: _Pointer {
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
   ) rethrows -> Result {
     _debugPrecondition(
-      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0
+      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
+      "self must be a properly aligned pointer for type T"
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
