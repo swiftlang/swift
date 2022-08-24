@@ -180,7 +180,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   // TODO: Find a quicker way to see if this is a tuple.
   internal func isTuple(_ item: Any) -> Bool {
     // Unwraps type information if possible.
-    // Otherwise, everything the Mirror sees would be "Optional<Any.Type>".
+    // Otherwise, everything the Mirror handling "item" sees would be "Optional<Any.Type>".
     func unwrapType<T>(_ any: T) -> Any {
       let mirror = Mirror(reflecting: any)
       guard mirror.displayStyle == .optional, let first = mirror.children.first else {
