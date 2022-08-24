@@ -24,3 +24,14 @@ public func takeClosureWithIsolatedParam(body: (isolated A) async -> Void) { }
 public func testClosureWithIsolatedParam() {
   takeClosureWithIsolatedParam { _ in }
 }
+
+// CHECK-LABEL: sil{{.*}} [ossa] @$s4test0A19IsolatedExistentialyyScA_pYiYaF
+// CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Actor)
+@available(SwiftStdlib 5.1, *)
+public func testIsolatedExistential(_ a: isolated Actor) async {
+  // CHECK: [[ACTOR_COPY:%.*]] = copy_value [[ACTOR]] : $Actor
+  // CHECK: [[ACTOR_BORROW:%.*]] = begin_borrow [[ACTOR_COPY]] : $Actor
+  // CHECK: [[ACTOR_OPENED:%.*]] = open_existential_ref [[ACTOR_BORROW]] : $Actor to $@opened("{{.*}}") Actor
+  // CHECK: hop_to_executor [[ACTOR_OPENED]] : $@opened("{{.*}}") Actor
+  // CHECK: return
+}
