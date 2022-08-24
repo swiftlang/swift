@@ -1783,7 +1783,7 @@ namespace {
     ///
     /// and we reach up to mark the CallExpr.
     void markNearestCallAsImplicitly(
-        Optional<ImplicitActorHopTarget> setAsync,
+        Optional<ActorIsolation> setAsync,
         bool setThrows = false,
         bool setDistributedThunk = false) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
@@ -2369,7 +2369,7 @@ namespace {
     AsyncMarkingResult tryMarkImplicitlyAsync(SourceLoc declLoc,
                                               ConcreteDeclRef concDeclRef,
                                               Expr* context,
-                                              ImplicitActorHopTarget target,
+                                              ActorIsolation target,
                                               bool isDistributed) {
       ValueDecl *decl = concDeclRef.getDecl();
       AsyncMarkingResult result = AsyncMarkingResult::NotFound;
@@ -2583,25 +2583,8 @@ namespace {
       }
 
       // Mark as implicitly async.
-      if (!fnType->getExtInfo().isAsync()) {
-        switch (*unsatisfiedIsolation) {
-        case ActorIsolation::GlobalActor:
-        case ActorIsolation::GlobalActorUnsafe:
-          apply->setImplicitlyAsync(
-              ImplicitActorHopTarget::forGlobalActor(
-                unsatisfiedIsolation->getGlobalActor()));
-          break;
-
-        case ActorIsolation::ActorInstance:
-          apply->setImplicitlyAsync(
-            ImplicitActorHopTarget::forIsolatedParameter(
-                unsatisfiedIsolation->getActorInstanceParameter() - 1));
-          break;
-
-        case ActorIsolation::Unspecified:
-        case ActorIsolation::Independent:
-          llvm_unreachable("Not actor-isolated");
-        }
+      if (!fnType->getExtInfo().isAsync() && unsatisfiedIsolation) {
+        apply->setImplicitlyAsync(*unsatisfiedIsolation);
       }
 
       // Check for sendability of the parameter types.
@@ -2879,12 +2862,8 @@ namespace {
           ActorReferenceResult::Flags::Distributed);
 
       // Determine the actor hop.
-      ImplicitActorHopTarget target = result.isolation.isGlobalActor()
-          ? ImplicitActorHopTarget::forGlobalActor(
-              result.isolation.getGlobalActor())
-          : ImplicitActorHopTarget::forInstanceSelf();
       auto implicitAsyncResult = tryMarkImplicitlyAsync(
-          loc, declRef, context, target, isDistributed);
+          loc, declRef, context, result.isolation, isDistributed);
       switch (implicitAsyncResult) {
       case AsyncMarkingResult::FoundAsync:
         // Success! We're done.

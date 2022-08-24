@@ -1451,7 +1451,7 @@ public:
       bool isDirectAccessorUse,
       PreparedArguments &&optionalSubscripts, SGFContext C,
       bool isOnSelfParameter,
-      Optional<ImplicitActorHopTarget> implicitActorHopTarget = None);
+      Optional<ActorIsolation> implicitActorHopTarget = None);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
@@ -1684,7 +1684,7 @@ public:
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext, 
-                   Optional<ImplicitActorHopTarget> implicitActorHopTarget);
+                   Optional<ActorIsolation> implicitActorHopTarget);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
