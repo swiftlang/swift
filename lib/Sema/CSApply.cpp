@@ -720,6 +720,8 @@ namespace {
         return inout->getSubExpr();
       } else if (auto force = dyn_cast<ForceValueExpr>(expr)) {
         return force->getSubExpr();
+      } else if (auto rebind = dyn_cast<RebindSelfInConstructorExpr>(expr)) {
+        return rebind->getSubExpr();
       } else {
         return nullptr;
       }
@@ -810,11 +812,6 @@ namespace {
       // we can close this existential, and record it.
       unsigned maxArgCount = member->getNumCurryLevels();
       unsigned depth = ExprStack.size() - getArgCount(maxArgCount);
-
-      // Invalid case -- direct call of a metatype. Has one less argument
-      // application because there's no ".init".
-      if (isa<ApplyExpr>(ExprStack.back()))
-        depth++;
 
       // Create the opaque opened value. If we started with a
       // metatype, it's a metatype.
@@ -3737,7 +3734,12 @@ namespace {
         expr->setSubExpr(newSub);
       }
 
-      return expr;
+      // We might have opened existentials in the argument list of the
+      // constructor call.
+      Expr *result = expr;
+      closeExistentials(result, cs.getConstraintLocator(expr));
+
+      return result;
     }
 
     Expr *visitIfExpr(IfExpr *expr) {

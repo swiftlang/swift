@@ -109,13 +109,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
     bool IsExprStmt;
+    unsigned ExprNestingDepth;
 
   public:
     ASTContext &Ctx;
     const DeclContext *DC;
 
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
-      : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
+        : IsExprStmt(isExprStmt), ExprNestingDepth(0),
+          Ctx(DC->getASTContext()), DC(DC) {}
 
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
       return { false, P };
@@ -128,6 +130,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<OpenExistentialExpr>(E)) {
+        // Don't increase ExprNestingDepth.
+        return { true, E };
+      }
+
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
       auto Base = E;
@@ -262,9 +269,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       // Diagnose 'self.init' or 'super.init' nested in another expression
-      // or closure.
+      // or closure. The ExprNestingDepth thing is to allow this to be nested
+      // inside of an OpenExistentialExpr that is at the top level.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        if (!Parent.isNull() || !IsExprStmt || DC->getParent()->isLocalContext()) {
+        if (ExprNestingDepth > 0 || !IsExprStmt ||
+            DC->getParent()->isLocalContext()) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           Ctx.Diags.diagnose(E->getLoc(), diag::init_delegation_nested,
@@ -325,7 +334,16 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return { true, E };
     }
 
-    /// Visit each component of the keypath and emit a diganostic if they
+    Expr *walkToExprPost(Expr *E) override {
+      if (isa<OpenExistentialExpr>(E))
+        return E;
+
+      assert(ExprNestingDepth != 0);
+      --ExprNestingDepth;
+      return E;
+    }
+
+    /// Visit each component of the keypath and emit a diagnostic if they
     /// refer to a member that has effects.
     void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
       for (const auto &component : keyPath->getComponents()) {
@@ -1461,6 +1479,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   };
 
   DiagnoseWalker walker(var, fn);
+
   const_cast<Expr *>(E)->walk(walker);
 }
 
