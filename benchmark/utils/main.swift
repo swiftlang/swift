@@ -97,6 +97,7 @@ import IntegerParsing
 import Integrate
 import IterateData
 import Join
+import KeyPathPerformanceTests
 import LazyFilter
 import LinkedList
 import LuhnAlgoEager
@@ -279,6 +280,7 @@ register(Integrate.benchmarks)
 register(IterateData.benchmarks)
 register(Join.benchmarks)
 register(LazyFilter.benchmarks)
+register(KeyPathPerformanceTests.benchmarks)
 register(LinkedList.benchmarks)
 register(LuhnAlgoEager.benchmarks)
 register(LuhnAlgoLazy.benchmarks)
