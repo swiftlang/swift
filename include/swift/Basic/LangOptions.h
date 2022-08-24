@@ -215,6 +215,9 @@ namespace swift {
 
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
+    
+    /// Emit a remark on early exit in explicit interface build
+    bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
     ///
     /// Support for alternate usage modes
@@ -535,15 +538,16 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      unsigned major = 0, minor = 0, revision = 0;
       if (Target.isMacOSX()) {
-        Target.getMacOSXVersion(major, minor, revision);
+        llvm::VersionTuple OSVersion;
+        Target.getMacOSXVersion(OSVersion);
+        return OSVersion;
       } else if (Target.isiOS()) {
-        Target.getiOSVersion(major, minor, revision);
+        return Target.getiOSVersion();
       } else if (Target.isWatchOS()) {
-        Target.getOSVersion(major, minor, revision);
+        return Target.getOSVersion();
       }
-      return llvm::VersionTuple(major, minor, revision);
+      return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
     }
 
     /// Sets an implicit platform condition.

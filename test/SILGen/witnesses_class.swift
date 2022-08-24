@@ -37,9 +37,9 @@ func gen<T: Fooable>(_ foo: T) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s15witnesses_class2exyyAA7Fooable_pF
-// CHECK: bb0([[SELF:%[0-0]+]] : @guaranteed $Fooable):
+// CHECK: bb0([[SELF:%[0-0]+]] : @guaranteed $any Fooable):
 // CHECK:         [[SELF_PROJ:%.*]] = open_existential_ref [[SELF]]
-// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Fooable]],
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened\(.*, any Fooable\) Self]],
 // CHECK-NOT:     copy_value [[SELF_PROJ]] : $
 // CHECK:         apply [[METHOD]]<[[OPENED]]>([[SELF_PROJ]])
 // CHECK-NOT:     destroy_value [[SELF]]

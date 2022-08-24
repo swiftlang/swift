@@ -126,5 +126,85 @@ int main() {
     double x = -19.75;
     assert(genericRet(x) == -19.75);
   }
+
+  {
+    auto tc = createTestClass();
+    genericPrintFunction(tc);
+  }
+// CHECK-NEXT: TestClass value=Functions.TestClass
+// CHECK-NEXT: deinit TestClass
+
+  {
+    auto tc = createTestClass();
+    auto tc2 = genericRet(tc);
+    assert(swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc) ==
+           swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc2));
+    genericPrintFunction(tc2);
+  }
+// CHECK-NEXT: TestClass value=Functions.TestClass
+// CHECK-NEXT: deinit TestClass
+
+  {
+    auto tc = createTestClass();
+    auto tc2 = createTestClass();
+    const auto p1 = swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc);
+    const auto p2 = swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc2);
+    assert(p1 != p2);
+    genericSwap(tc, tc2);
+    assert(p2 == swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc));
+    assert(p1 == swift::_impl::_impl_RefCountedClass::getOpaquePointer(tc2));
+  }
+// CHECK-NEXT: deinit TestClass
+// CHECK-NEXT: deinit TestClass
+
+  {
+    auto x = createTestLargeStruct(0);
+    genericPrintFunction(x);
+  }
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: 0, x2: 1, x3: -1, x4: 0, x5: 2, x6: -2)
+
+  {
+    auto x = createTestLargeStruct(11);
+    auto y = createTestLargeStruct(-9);
+    genericPrintFunction(x);
+    genericPrintFunction(y);
+    genericSwap(x, y);
+    genericPrintFunction(x);
+    genericPrintFunction(y);
+    auto xy = genericRet(x);
+    genericPrintFunction(xy);
+    xy.mut();
+    genericPrintFunction(xy);
+    genericPrintFunction(x);
+  }
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: 11, x2: 12, x3: 10, x4: 11, x5: 13, x6: 9)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: -9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -11)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: -9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -11)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: 11, x2: 12, x3: 10, x4: 11, x5: 13, x6: 9)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: -9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -11)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: 9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -7)
+// CHECK-NEXT: TestLargeStruct value=TestLargeStruct(x1: -9, x2: -8, x3: -10, x4: -9, x5: -7, x6: -11)
+
+  {
+    auto x = createTestSmallStruct(45);
+    auto y = createTestSmallStruct(0xFed1);
+    genericPrintFunction(x);
+    genericPrintFunction(y);
+    genericSwap(y, x);
+    genericPrintFunction(x);
+    genericPrintFunction(y);
+    auto xy = genericRet(x);
+    genericPrintFunction(xy);
+    xy.mut();
+    genericPrintFunction(xy);
+    genericPrintFunction(x);
+  }
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 45)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 45)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 4294902062)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
   return 0;
 }

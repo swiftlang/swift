@@ -335,8 +335,9 @@ internal enum _KnownCocoaString {
 #if !(arch(i386) || arch(arm) || arch(arm64_32))
 
 // Resiliently write a tagged _CocoaString's contents into a buffer.
-// TODO: move this to the Foundation overlay and reimplement it with
-// _NSTaggedPointerStringGetBytes
+// The Foundation overlay takes care of bridging tagged pointer strings before
+// they reach us, but this may still be called by older code, or by strings
+// entering our domain via the arguments to -isEqual:, etc...
 @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
   _ cocoa: _CocoaString,
@@ -370,8 +371,11 @@ private func _withCocoaASCIIPointer<R>(
     if requireStableAddress {
       return nil // tagged pointer strings don't support _fastCStringContents
     }
-    let tmp = _StringGuts(_SmallString(taggedCocoa: str))
-    return tmp.withFastUTF8 { work($0.baseAddress._unsafelyUnwrappedUnchecked) }
+    if let smol = _SmallString(taggedCocoa: str) {
+      return _StringGuts(smol).withFastUTF8 {
+        work($0.baseAddress._unsafelyUnwrappedUnchecked)
+      }
+    }
   }
   #endif
   defer { _fixLifetime(str) }
@@ -503,7 +507,11 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
       cocoaString, to: __SharedStringStorage.self).asString._guts
 #if !(arch(i386) || arch(arm) || arch(arm64_32))
   case .tagged:
-    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
+    // Foundation should be taking care of tagged pointer strings before they
+    // reach here, so the only ones reaching this point should be back deployed,
+    // which will never have tagged pointer strings that aren't small, hence
+    // the force unwrap here.
+    return _StringGuts(_SmallString(taggedCocoa: cocoaString)!)
 #if arch(arm64)
   case .constantTagged:
     let taggedContents = getConstantTaggedCocoaContents(cocoaString)!
@@ -530,7 +538,11 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
 
 #if !(arch(i386) || arch(arm) || arch(arm64_32))
     if _isObjCTaggedPointer(immutableCopy) {
-      return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
+      // Copying a tagged pointer can produce a tagged pointer, but only if it's
+      // small enough to definitely fit in a _SmallString
+      return _StringGuts(
+        _SmallString(taggedCocoa: immutableCopy).unsafelyUnwrapped
+      )
     }
 #endif
 

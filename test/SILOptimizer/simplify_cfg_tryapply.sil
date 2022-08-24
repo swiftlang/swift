@@ -44,7 +44,7 @@ sil [ossa] @rethrowGuaranteed : $@convention(thin) (@guaranteed (Optional<B>, B)
 sil [ossa] @rethrowOwned : $@convention(thin) (@owned (Optional<B>, B)) -> Int
 
 // CHECK-LABEL: sil [ossa] @replace_try_apply_with_apply
-// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error any Error)) -> (Int, @error any Error)
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return [[R]] : $Int
 sil [ossa] @replace_try_apply_with_apply : $@convention(thin) () -> Int {
@@ -71,7 +71,7 @@ bb2(%8 : @owned $Error):
 // CHECK: [[COPY:%.*]] = copy_value [[INIT]] : $@callee_owned (@owned EE) -> @owned CC
 // CHECK: [[CVT:%.*]] = convert_function [[INIT]]
 // CHECK-NOT: try_apply
-// CHECK: destroy_value [[CVT]] : $@callee_owned (@owned EE) -> (@owned Optional<BB>, @error Error)
+// CHECK: destroy_value [[CVT]] : $@callee_owned (@owned EE) -> (@owned Optional<BB>, @error any Error)
 // CHECK: apply [[COPY]]
 // Check that return value is properly casted
 // CHECK-NEXT: enum $Optional<CC>, #Optional.some!enumelt, %{{.*}} : $CC
@@ -266,15 +266,15 @@ bb2(%16 : @owned $Error):
 // CHECK-LABEL: sil [ossa] @test_owned_callee : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 // CHECK:   [[PA:%.*]] = partial_apply %2(%0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
 // CHECK:   [[COPY:%.*]] = copy_value [[PA]] : $@callee_owned (Builtin.Int32) -> Builtin.Int32
-// CHECK:   [[CVT:%.*]] = convert_function [[PA]] : $@callee_owned (Builtin.Int32) -> Builtin.Int32 to $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error)
+// CHECK:   [[CVT:%.*]] = convert_function [[PA]] : $@callee_owned (Builtin.Int32) -> Builtin.Int32 to $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error any Error)
 // CHECK:   cond_br undef, bb1, bb2
 // CHECK: bb1:
-// CHECK:   destroy_value %5 : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error)
+// CHECK:   destroy_value %5 : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error any Error)
 // CHECK:   [[CALL:%.*]] = apply [[COPY]]
 // CHECK:   br bb3([[CALL]] : $Builtin.Int32)
 // CHECK: bb2:                                              // Preds: bb0
 // CHECK:   destroy_value [[COPY]] : $@callee_owned (Builtin.Int32) -> Builtin.Int32
-// CHECK:   destroy_value [[CVT]] : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error Error)
+// CHECK:   destroy_value [[CVT]] : $@callee_owned (Builtin.Int32) -> (Builtin.Int32, @error any Error)
 // CHECK:   br bb3(
 // CHECK: bb3(
 // CHECK-NEXT: return

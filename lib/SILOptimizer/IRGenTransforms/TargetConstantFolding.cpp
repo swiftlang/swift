@@ -26,6 +26,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

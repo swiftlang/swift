@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the protocol conformance data structures.
+// This file implements the ProtocolConformance class hierarchy.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,13 +25,9 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -77,128 +73,6 @@ void Witness::dump(llvm::raw_ostream &out) const {
   } else {
     out << "<no decl>\n";
   }
-}
-
-ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
-                                               ProtocolConformance *conf) {
-  assert(protocol != nullptr &&
-         "cannot construct ProtocolConformanceRef with null protocol");
-  if (conf) {
-    assert(protocol == conf->getProtocol() && "protocol conformance mismatch");
-    Union = conf;
-  } else {
-    Union = protocol;
-  }
-}
-
-ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
-  assert(!isInvalid());
-
-  if (isConcrete()) {
-    return getConcrete()->getProtocol();
-  } else {
-    return getAbstract();
-  }
-}
-
-ProtocolConformanceRef
-ProtocolConformanceRef::subst(Type origType,
-                              SubstitutionMap subMap,
-                              SubstOptions options) const {
-  return subst(origType,
-               QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap),
-               options);
-}
-
-ProtocolConformanceRef
-ProtocolConformanceRef::subst(Type origType,
-                              TypeSubstitutionFn subs,
-                              LookupConformanceFn conformances,
-                              SubstOptions options) const {
-  if (isInvalid())
-    return *this;
-
-  // If we have a concrete conformance, we need to substitute the
-  // conformance to apply to the new type.
-  if (isConcrete())
-    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
-                                                       options));
-  // If the type is an opaque archetype, the conformance will remain abstract,
-  // unless we're specifically substituting opaque types.
-  if (auto origArchetype = origType->getAs<ArchetypeType>()) {
-    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
-        && isa<OpaqueTypeArchetypeType>(origArchetype)) {
-      return *this;
-    }
-  }
-
-  // Otherwise, compute the substituted type.
-  auto substType = origType.subst(subs, conformances, options);
-
-  auto *proto = getRequirement();
-
-  // If the type is an existential, it must be self-conforming.
-  if (substType->isExistentialType()) {
-    auto optConformance =
-        proto->getModuleContext()->lookupExistentialConformance(substType,
-                                                                proto);
-    if (optConformance)
-      return optConformance;
-
-    return ProtocolConformanceRef::forInvalid();
-  }
-
-  // Check the conformance map.
-  return conformances(origType->getCanonicalType(), substType, proto);
-}
-
-ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
-  if (!isConcrete())
-    return *this;
-
-  auto *concrete = getConcrete()->subst(
-      [](SubstitutableType *type) -> Type {
-        if (auto *archetypeType = type->getAs<ArchetypeType>())
-          return archetypeType->getInterfaceType();
-        return type;
-      },
-      MakeAbstractConformanceForGenericType());
-  return ProtocolConformanceRef(concrete);
-}
-
-Type
-ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
-  assert(!isInvalid());
-
-  // Find the named requirement.
-  ProtocolDecl *proto = getRequirement();
-  auto *assocType = proto->getAssociatedType(name);
-
-  // FIXME: Shouldn't this be a hard error?
-  if (!assocType)
-    return ErrorType::get(proto->getASTContext());
-
-  return assocType->getDeclaredInterfaceType().subst(
-    SubstitutionMap::getProtocolSubstitutions(proto, type, *this));
-}
-
-ConcreteDeclRef
-ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
-  // Find the named requirement.
-  auto *proto = getRequirement();
-  auto *requirement = proto->getSingleRequirement(name);
-  if (requirement == nullptr)
-    return ConcreteDeclRef();
-
-  // For a type with dependent conformance, just return the requirement from
-  // the protocol. There are no protocol conformance tables.
-  if (!isConcrete()) {
-    auto subs = SubstitutionMap::getProtocolSubstitutions(proto, type, *this);
-    return ConcreteDeclRef(requirement, subs);
-  }
-
-  return getConcrete()->getWitnessDeclRef(requirement);
 }
 
 #define CONFORMANCE_SUBCLASS_DISPATCH(Method, Args)                          \
@@ -347,46 +221,19 @@ GenericSignature ProtocolConformance::getGenericSignature() const {
 }
 
 SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
-  // Walk down to the base NormalProtocolConformance.
-  SubstitutionMap subMap;
-  const ProtocolConformance *parent = this;
-  while (!isa<RootProtocolConformance>(parent)) {
-    switch (parent->getKind()) {
-    case ProtocolConformanceKind::Normal:
-    case ProtocolConformanceKind::Self:
-    case ProtocolConformanceKind::Builtin:
-      llvm_unreachable("should have exited the loop?!");
-    case ProtocolConformanceKind::Inherited:
-      parent =
-          cast<InheritedProtocolConformance>(parent)->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized: {
-      auto SC = cast<SpecializedProtocolConformance>(parent);
-      parent = SC->getGenericConformance();
-      assert(subMap.empty() && "multiple conformance specializations?!");
-      subMap = SC->getSubstitutionMap();
-      break;
-    }
-    }
-  }
+  const ProtocolConformance *conformance = this;
 
-  // Found something; we're done!
-  if (!subMap.empty())
-    return subMap;
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance))
+    conformance = inheritedC->getInheritedConformance();
 
-  // If the normal conformance is for a generic type, and we didn't hit a
-  // specialized conformance, collect the substitutions from the generic type.
-  // FIXME: The AST should do this for us.
-  const NormalProtocolConformance *normalC =
-      dyn_cast<NormalProtocolConformance>(parent);
-  if (!normalC)
-    return SubstitutionMap();
+  if (auto *specializedC = dyn_cast<SpecializedProtocolConformance>(conformance))
+    return specializedC->getSubstitutionMap();
 
-  if (!normalC->getType()->isSpecialized())
-    return SubstitutionMap();
+  auto *rootC = cast<RootProtocolConformance>(conformance);
+  if (auto genericSig = rootC->getGenericSignature())
+    return genericSig->getIdentitySubstitutionMap();
 
-  auto *DC = normalC->getDeclContext();
-  return normalC->getType()->getContextSubstitutionMap(M, DC);
+  return SubstitutionMap();
 }
 
 bool RootProtocolConformance::isInvalid() const {
@@ -480,26 +327,6 @@ ProtocolConformance::getConditionalRequirementsIfAvailable() const {
 
 ArrayRef<Requirement> ProtocolConformance::getConditionalRequirements() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirements, ());
-}
-
-Optional<ArrayRef<Requirement>>
-ProtocolConformanceRef::getConditionalRequirementsIfAvailable() const {
-  if (isConcrete())
-    return getConcrete()->getConditionalRequirementsIfAvailable();
-  else
-    // An abstract conformance is never conditional: any conditionality in the
-    // concrete types that will eventually pass through this at runtime is
-    // completely pre-checked and packaged up.
-    return ArrayRef<Requirement>();
-}
-
-ArrayRef<Requirement>
-ProtocolConformanceRef::getConditionalRequirements() const {
-  if (isConcrete())
-    return getConcrete()->getConditionalRequirements();
-  else
-    // An abstract conformance is never conditional, as above.
-    return {};
 }
 
 Optional<ArrayRef<Requirement>>
@@ -709,54 +536,6 @@ Type ProtocolConformance::getAssociatedType(Type assocType) const {
   return ref.getAssociatedType(getType(), assocType);
 }
 
-Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
-                                               Type assocType) const {
-  assert(!isConcrete() || getConcrete()->getType()->isEqual(conformingType));
-
-  auto type = assocType->getCanonicalType();
-  auto proto = getRequirement();
-
-  // Fast path for generic parameters.
-  if (isa<GenericTypeParamType>(type)) {
-    assert(type->isEqual(proto->getSelfInterfaceType()) &&
-           "type parameter in protocol was not Self");
-    return conformingType;
-  }
-
-  // Fast path for dependent member types on 'Self' of our associated types.
-  auto memberType = cast<DependentMemberType>(type);
-  if (memberType.getBase()->isEqual(proto->getSelfInterfaceType()) &&
-      memberType->getAssocType()->getProtocol() == proto &&
-      isConcrete())
-    return getConcrete()->getTypeWitness(memberType->getAssocType());
-
-  // General case: consult the substitution map.
-  auto substMap =
-    SubstitutionMap::getProtocolSubstitutions(proto, conformingType, *this);
-  return type.subst(substMap);
-}
-
-ProtocolConformanceRef
-ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
-                                                 Type assocType,
-                                                 ProtocolDecl *protocol) const {
-  // If this is a concrete conformance, look up the associated conformance.
-  if (isConcrete()) {
-    auto conformance = getConcrete();
-    assert(conformance->getType()->isEqual(conformingType));
-    return conformance->getAssociatedConformance(assocType, protocol);
-  }
-
-  // Otherwise, apply the substitution {self -> conformingType}
-  // to the abstract conformance requirement laid upon the dependent type
-  // by the protocol.
-  auto subMap =
-    SubstitutionMap::getProtocolSubstitutions(getRequirement(),
-                                              conformingType, *this);
-  auto abstractConf = ProtocolConformanceRef(protocol);
-  return abstractConf.subst(assocType, subMap);
-}
-
 ProtocolConformanceRef
 ProtocolConformance::getAssociatedConformance(Type assocType,
                                                ProtocolDecl *protocol) const {
@@ -957,14 +736,11 @@ void NormalProtocolConformance::overrideWitness(ValueDecl *requirement,
 
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
-    ProtocolConformance *genericConformance,
+    RootProtocolConformance *genericConformance,
     SubstitutionMap substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
     GenericConformance(genericConformance),
-    GenericSubstitutions(substitutions)
-{
-  assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
-}
+    GenericSubstitutions(substitutions) {}
 
 void SpecializedProtocolConformance::computeConditionalRequirements() const {
   // already computed?
@@ -992,9 +768,9 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
 
     SmallVector<Requirement, 4> newReqs;
     for (auto oldReq : *parentCondReqs) {
-      if (auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
-                                     LookUpConformanceInModule(module)))
-        newReqs.push_back(*newReq);
+      auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
+                                 LookUpConformanceInModule(module));
+      newReqs.push_back(newReq);
     }
     auto &ctxt = getProtocol()->getASTContext();
     ConditionalRequirements = ctxt.AllocateCopy(newReqs);
@@ -1133,22 +909,12 @@ ProtocolConformance::getRootNormalConformance() const {
 const RootProtocolConformance *
 ProtocolConformance::getRootConformance() const {
   const ProtocolConformance *C = this;
-  while (true) {
-    switch (C->getKind()) {
-    case ProtocolConformanceKind::Normal:
-    case ProtocolConformanceKind::Self:
-    case ProtocolConformanceKind::Builtin:
-      return cast<RootProtocolConformance>(C);
-    case ProtocolConformanceKind::Inherited:
-      C = cast<InheritedProtocolConformance>(C)
-          ->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized:
-      C = cast<SpecializedProtocolConformance>(C)
-        ->getGenericConformance();
-      break;
-    }
-  }
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(C))
+    C = inheritedC->getInheritedConformance();
+  if (auto *specializedC = dyn_cast<SpecializedProtocolConformance>(C))
+    return specializedC->getGenericConformance();
+
+  return cast<RootProtocolConformance>(C);
 }
 
 bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
@@ -1181,9 +947,11 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto subMap = SubstitutionMap::get(getGenericSignature(),
                                        subs, conformances);
+
+    auto *mutableThis = const_cast<ProtocolConformance *>(this);
     return substType->getASTContext()
         .getSpecializedConformance(substType,
-                                   const_cast<ProtocolConformance *>(this),
+                                   cast<NormalProtocolConformance>(mutableThis),
                                    subMap);
   }
   case ProtocolConformanceKind::Builtin: {
@@ -1201,7 +969,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     SmallVector<Requirement, 2> requirements;
     for (auto req : getConditionalRequirements()) {
-      requirements.push_back(*req.subst(subs, conformances, options));
+      requirements.push_back(req.subst(subs, conformances, options));
     }
 
     auto kind = cast<BuiltinProtocolConformance>(this)
@@ -1262,6 +1030,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
 
 #pragma mark Protocol conformance lookup
 void NominalTypeDecl::prepareConformanceTable() const {
+  assert(!isa<ProtocolDecl>(this) &&
+         "Protocols don't have a conformance table");
+
   if (ConformanceTable)
     return;
 
@@ -1330,6 +1101,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
 bool NominalTypeDecl::lookupConformance(
        ProtocolDecl *protocol,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
+  assert(!isa<ProtocolDecl>(this) &&
+         "Self-conformances are only found by the higher-level "
+         "ModuleDecl::lookupConformance() entry point");
+
   prepareConformanceTable();
   return ConformanceTable->lookupConformance(
            const_cast<NominalTypeDecl *>(this),
@@ -1339,6 +1114,10 @@ bool NominalTypeDecl::lookupConformance(
 
 SmallVector<ProtocolDecl *, 2>
 NominalTypeDecl::getAllProtocols(bool sorted) const {
+  assert(!isa<ProtocolDecl>(this) &&
+         "For inherited protocols, use ProtocolDecl::inheritsFrom() or "
+         "ProtocolDecl::getInheritedProtocols()");
+
   prepareConformanceTable();
   SmallVector<ProtocolDecl *, 2> result;
   ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this), result,
@@ -1608,8 +1387,22 @@ bool ProtocolConformance::isCanonical() const {
 
   switch (getKind()) {
   case ProtocolConformanceKind::Self:
-  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Normal: {
+    return true;
+  }
   case ProtocolConformanceKind::Builtin: {
+    // Check that the generic signature of the conformance is canonical.
+    auto builtinConformance = cast<BuiltinProtocolConformance>(this);
+    if (builtinConformance->getGenericSignature()
+        && !builtinConformance->getGenericSignature()->isCanonical()) {
+      return false;
+    }
+    // Check that the satisfied conditional requirements are canonical.
+    for (auto &requirement : builtinConformance->getConditionalRequirements()) {
+      if (!requirement.isCanonical()) {
+        return false;
+      }
+    }
     return true;
   }
   case ProtocolConformanceKind::Inherited: {
@@ -1638,10 +1431,24 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
 
   switch (getKind()) {
   case ProtocolConformanceKind::Self:
-  case ProtocolConformanceKind::Normal:
-  case ProtocolConformanceKind::Builtin: {
+  case ProtocolConformanceKind::Normal: {
     // Root conformances are always canonical by construction.
     return this;
+  }
+  case ProtocolConformanceKind::Builtin: {
+    // Canonicalize the subject type of the builtin conformance.
+    auto &Ctx = getType()->getASTContext();
+    auto builtinConformance = cast<BuiltinProtocolConformance>(this);
+    SmallVector<Requirement, 4> canonicalRequirements;
+    for (auto &reqt : builtinConformance->getConditionalRequirements()) {
+      canonicalRequirements.push_back(reqt.getCanonical());
+    }
+    return Ctx.getBuiltinConformance(
+      builtinConformance->getType()->getCanonicalType(),
+      builtinConformance->getProtocol(),
+      builtinConformance->getGenericSignature().getCanonicalSignature(),
+      canonicalRequirements,
+      builtinConformance->getBuiltinConformanceKind());
   }
 
   case ProtocolConformanceKind::Inherited: {
@@ -1660,25 +1467,12 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     auto genericConformance = spec->getGenericConformance();
     return Ctx.getSpecializedConformance(
                                 getType()->getCanonicalType(),
-                                genericConformance->getCanonicalConformance(),
+                                cast<RootProtocolConformance>(
+                                    genericConformance->getCanonicalConformance()),
                                 spec->getSubstitutionMap().getCanonical());
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
-}
-
-/// Check of all types used by the conformance are canonical.
-bool ProtocolConformanceRef::isCanonical() const {
-  if (isAbstract() || isInvalid())
-    return true;
-  return getConcrete()->isCanonical();
-}
-
-ProtocolConformanceRef
-ProtocolConformanceRef::getCanonicalConformanceRef() const {
-  if (isAbstract() || isInvalid())
-    return *this;
-  return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
 }
 
 BuiltinProtocolConformance::BuiltinProtocolConformance(
@@ -1739,77 +1533,4 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 SourceLoc swift::extractNearestSourceLoc(const ProtocolConformance *conformance) {
   return extractNearestSourceLoc(conformance->getDeclContext());
-}
-
-void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {
-  if (conformanceRef.isAbstract()) {
-    simple_display(out, conformanceRef.getAbstract());
-  } else if (conformanceRef.isConcrete()) {
-    simple_display(out, conformanceRef.getConcrete());
-  }
-}
-
-SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef) {
-  if (conformanceRef.isAbstract()) {
-    return extractNearestSourceLoc(conformanceRef.getAbstract());
-  } else if (conformanceRef.isConcrete()) {
-    return extractNearestSourceLoc(conformanceRef.getConcrete());
-  }
-  return SourceLoc();
-}
-
-bool ProtocolConformanceRef::hasUnavailableConformance() const {
-  if (isInvalid())
-    return false;
-
-  // Abstract conformances are never unavailable.
-  if (!isConcrete())
-    return false;
-
-  // Check whether this conformance is on an unavailable extension.
-  auto concrete = getConcrete();
-  auto ext = dyn_cast<ExtensionDecl>(concrete->getDeclContext());
-  if (ext && AvailableAttr::isUnavailable(ext))
-    return true;
-
-  // Check the conformances in the substitution map.
-  auto module = concrete->getDeclContext()->getParentModule();
-  auto subMap = concrete->getSubstitutions(module);
-  for (auto subConformance : subMap.getConformances()) {
-    if (subConformance.hasUnavailableConformance())
-      return true;
-  }
-
-  return false;
-}
-
-bool ProtocolConformanceRef::hasMissingConformance(ModuleDecl *module) const {
-  return forEachMissingConformance(module,
-      [](BuiltinProtocolConformance *builtin) {
-        return true;
-      });
-}
-
-bool ProtocolConformanceRef::forEachMissingConformance(
-    ModuleDecl *module,
-    llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const {
-  if (!isConcrete())
-    return false;
-
-  // Is this a missing conformance?
-  ProtocolConformance *concreteConf = getConcrete();
-  RootProtocolConformance *rootConf = concreteConf->getRootConformance();
-  if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
-    if (builtinConformance->isMissing() && fn(builtinConformance))
-      return true;
-  }
-
-  // Check conformances that are part of this conformance.
-  auto subMap = concreteConf->getSubstitutions(module);
-  for (auto conformance : subMap.getConformances()) {
-    if (conformance.forEachMissingConformance(module, fn))
-      return true;
-  }
-
-  return false;
 }

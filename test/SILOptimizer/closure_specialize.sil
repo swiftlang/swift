@@ -177,8 +177,8 @@ bb0(%0 : $@callee_owned (@owned A) -> ()):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil shared {{.*}} @$s17use_closure_throw{{.*}}Tf{{.*}} : $@convention(thin) (@owned A) -> @error Error {
-sil hidden [noinline] @use_closure_throw : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> @error Error {
+// CHECK-LABEL: sil shared {{.*}} @$s17use_closure_throw{{.*}}Tf{{.*}} : $@convention(thin) (@owned A) -> @error any Error {
+sil hidden [noinline] @use_closure_throw : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> @error any Error {
 bb0(%0 : $@callee_owned (@owned A) -> ()):
   %1 = alloc_ref $A
   %2 = apply %0(%1) : $@callee_owned (@owned A) -> ()
@@ -395,7 +395,7 @@ bb3:
 // CHECK-NEXT:   strong_release %0
 // CHECK-NEXT:   release_value %0
 // CHECK-NEXT:   br bb4
-// CHECK: bb3(%{{[0-9]+}} : $Error):
+// CHECK: bb3(%{{[0-9]+}} : $any Error):
 // CHECK-NEXT:   strong_release %0
 // CHECK-NEXT:   release_value %0
 // CHECK-NEXT:   br bb4
@@ -561,13 +561,13 @@ sil @testClosureConvertHelper : $(Int) -> ()
 
 // specialized testClosureConvertThunk
 // FIXME: Need to handle closures with multiple exceptional exits.
-// CHECK-LABEL: sil shared @$s23testClosureConvertThunk0abC6HelperSiTf1nc_n : $@convention(thin) (Int) -> (@out (), @error Error) {
+// CHECK-LABEL: sil shared @$s23testClosureConvertThunk0abC6HelperSiTf1nc_n : $@convention(thin) (Int) -> (@out (), @error any Error) {
 // CHECK: bb0(%0 : $*(), %1 : $Int):
 // CHECK:   [[F:%.*]] = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
 // CHECK:   [[PA:%.*]] = partial_apply [[F]](%1) : $@convention(thin) (Int) -> ()
 // CHECK:   [[CVT1:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
-// CHECK:   [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
-// CHECK:   try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
+// CHECK:   [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error any Error
+// CHECK:   try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error any Error, normal bb1, error bb2
 // CHECK:  bb1
 // CHECK: release_value [[PA]]
 // CHECK: return

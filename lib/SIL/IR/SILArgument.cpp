@@ -236,7 +236,7 @@ bool SILPhiArgument::visitTransitiveIncomingPhiOperands(
   worklist.initialize(this);
 
   while (auto *argument = worklist.pop()) {
-    llvm::SmallVector<Operand *> operands;
+    SmallVector<Operand *> operands;
     argument->getIncomingPhiOperands(operands);
 
     for (auto *operand : operands) {

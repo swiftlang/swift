@@ -77,7 +77,7 @@ def vars_of_args(args):
 # of each of "old" and "new", and the stats are those found in the respective
 # dirs.
 def load_paired_stats_dirs(args):
-    assert(len(args.remainder) == 2)
+    assert len(args.remainder) == 2
     paired_stats = []
     (old, new) = args.remainder
     vargs = vars_of_args(args)

@@ -1163,9 +1163,8 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
   const auto &RegionCounterMap = SP->getRegionCounterMap();
   auto CounterIt = RegionCounterMap.find(N);
 
-  // TODO: Assert that this cannot happen (rdar://42792053).
-  if (CounterIt == RegionCounterMap.end())
-    return;
+  assert(CounterIt != RegionCounterMap.end() &&
+         "cannot increment non-existent counter");
 
   auto Int32Ty = getLoweredType(BuiltinIntegerType::get(32, C));
   auto Int64Ty = getLoweredType(BuiltinIntegerType::get(64, C));

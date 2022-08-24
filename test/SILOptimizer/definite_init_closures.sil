@@ -31,9 +31,9 @@ bb0(%0 : $Bool):
   %8 = struct_element_addr %7 : $*SimpleStruct, #SimpleStruct.x
   assign %0 to %8 : $*Bool
   end_access %7 : $*SimpleStruct
-  %16 = function_ref @implicit_closure_struct : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error Error)
-  %17 = partial_apply [callee_guaranteed] %16(%2) : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error Error)
-  destroy_value %17 : $@callee_guaranteed () -> (Bool, @error Error)
+  %16 = function_ref @implicit_closure_struct : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error any Error)
+  %17 = partial_apply [callee_guaranteed] %16(%2) : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error any Error)
+  destroy_value %17 : $@callee_guaranteed () -> (Bool, @error any Error)
   %23 = begin_access [modify] [static] %2 : $*SimpleStruct
   %24 = struct_element_addr %23 : $*SimpleStruct, #SimpleStruct.y
   assign %0 to %24 : $*Bool
@@ -43,7 +43,7 @@ bb0(%0 : $Bool):
   return %27 : $SimpleStruct
 }
 
-sil private [transparent] [ossa] @implicit_closure_struct : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error Error) {
+sil private [transparent] [ossa] @implicit_closure_struct : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error any Error) {
 bb0(%0 : $*SimpleStruct):
   debug_value %0 : $*SimpleStruct, var, name "self", argno 2, expr op_deref
   %3 = begin_access [read] [static] %0 : $*SimpleStruct
@@ -61,17 +61,17 @@ bb0(%0 : $Bool, %1 : @owned $SimpleClass):
   assign %0 to %6 : $*Bool
   end_borrow %5 : $SimpleClass
   %9 = begin_borrow %4 : $SimpleClass
-  %11 = function_ref @implicit_closure_class : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error Error)
+  %11 = function_ref @implicit_closure_class : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error any Error)
   %12 = copy_value %4 : $SimpleClass
-  %13 = partial_apply [callee_guaranteed] %11(%12) : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error Error)
-  destroy_value %13 : $@callee_guaranteed () -> (Bool, @error Error)
+  %13 = partial_apply [callee_guaranteed] %11(%12) : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error any Error)
+  destroy_value %13 : $@callee_guaranteed () -> (Bool, @error any Error)
   %19 = ref_element_addr %9 : $SimpleClass, #SimpleClass.y
   assign %0 to %19 : $*Bool
   end_borrow %9 : $SimpleClass
   return %4 : $SimpleClass
 }
 
-sil private [transparent] [ossa] @implicit_closure_class : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error Error) {
+sil private [transparent] [ossa] @implicit_closure_class : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error any Error) {
 bb0(%0 : @guaranteed $SimpleClass):
   debug_value %0 : $SimpleClass, let, name "self", argno 2
   %3 = ref_element_addr %0 : $SimpleClass, #SimpleClass.x

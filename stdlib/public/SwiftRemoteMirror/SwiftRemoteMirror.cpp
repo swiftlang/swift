@@ -278,7 +278,7 @@ int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
   auto Context = ContextRef->nativeContext;
-  return Context->addImage(RemoteAddress(imageStart));
+  return Context->addImage(RemoteAddress(imageStart)).hasValue();
 }
 
 int

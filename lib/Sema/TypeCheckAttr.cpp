@@ -245,6 +245,7 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
+  void visitExposeAttr(ExposeAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -311,10 +312,15 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *attr);
 
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
+  
+  void visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr);
 
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
+
+  void visitEagerMoveAttr(EagerMoveAttr *attr);
+  void visitLexicalAttr(LexicalAttr *attr);
 
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
@@ -379,6 +385,10 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
     diagnoseAndRemoveAttr(attr, error);
     return;
   }
+}
+
+void AttributeChecker::visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr) {
+  return;
 }
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
@@ -1141,9 +1151,11 @@ static bool checkObjCDeclContext(Decl *D) {
   return false;
 }
 
-static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl,
+static void diagnoseObjCAttrWithoutFoundation(DeclAttribute *attr, Decl *decl,
                                               ObjCReason reason,
                                               DiagnosticBehavior behavior) {
+  assert(attr->getKind() == DeclAttrKind::DAK_ObjC ||
+         attr->getKind() == DeclAttrKind::DAK_ObjCMembers);
   auto *SF = decl->getDeclContext()->getParentSourceFile();
   assert(SF);
 
@@ -1363,6 +1375,10 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
 void AttributeChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
   if (!isa<ClassDecl>(D))
     diagnoseAndRemoveAttr(attr, diag::objcmembers_attribute_nonclass);
+
+  auto reason = ObjCReason(ObjCReason::ExplicitlyObjCMembers, attr);
+  auto behavior = behaviorLimitForObjCReason(reason, Ctx);
+  diagnoseObjCAttrWithoutFoundation(attr, D, reason, behavior);
 }
 
 void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
@@ -1826,6 +1842,29 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   // The name must not be empty.
   if (attr->Name.empty())
     diagnose(attr->getLocation(), diag::cdecl_empty_name);
+}
+
+void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
+  const auto *VD = cast<ValueDecl>(D);
+  // Expose cannot be mixed with '@objc'/'@_cdecl' declarations.
+  if (VD->isObjC())
+    diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@objc");
+  if (VD->getAttrs().hasAttribute<CDeclAttr>())
+    diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@_cdecl");
+
+  // Nested exposed declarations are expected to be inside
+  // of other exposed declarations.
+  bool hasExpose = true;
+  const ValueDecl *decl = VD;
+  while (const NominalTypeDecl *NMT =
+             dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
+    decl = NMT;
+    hasExpose = NMT->getAttrs().hasAttribute<ExposeAttr>();
+  }
+  if (!hasExpose) {
+    diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl,
+             decl->getName());
+  }
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
@@ -2478,6 +2517,9 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
     }
 
     switch (specializedReq.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
       ctx.Diags.diagnose(attr->getLocation(),
@@ -2511,7 +2553,7 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
 
   for (auto *paramTy : specializedSig.getGenericParams()) {
     auto canTy = paramTy->getCanonicalType();
-    if (specializedSig->isCanonicalTypeInContext(canTy) &&
+    if (specializedSig->isReducedType(canTy) &&
         (!specializedSig->getLayoutConstraint(canTy) ||
          originalSig->getLayoutConstraint(canTy))) {
       unspecializedParams.push_back(paramTy);
@@ -2720,6 +2762,10 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                const ValueDecl *replacement,
                                SmallVectorImpl<ValueDecl *> &results) {
   auto *declCtxt = replacement->getDeclContext();
+
+  // Hop up to the FileUnit if we're in top-level code
+  if (auto *toplevel = dyn_cast<TopLevelCodeDecl>(declCtxt))
+    declCtxt = toplevel->getDeclContext();
 
   // Look at the accessors' storage's context.
   if (auto *accessor = dyn_cast<AccessorDecl>(replacement)) {
@@ -3287,14 +3333,22 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     // Check that the decl we're decorating is a member of a type that actually
     // conforms to the specified protocol.
     NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
-    SmallVector<ProtocolConformance *, 2> conformances;
-    if (!NTD->lookupConformance(PD, conformances)) {
-      diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_not_conformed_to,
-               NTD->getName(), PD->getName())
-        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
+      if (!OtherPD->inheritsFrom(PD)) {
+        diagnose(attr->getLocation(),
+                 diag::implements_attr_protocol_not_conformed_to,
+                 NTD->getName(), PD->getName())
+          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+      }
+    } else {
+      SmallVector<ProtocolConformance *, 2> conformances;
+      if (!NTD->lookupConformance(PD, conformances)) {
+        diagnose(attr->getLocation(),
+                 diag::implements_attr_protocol_not_conformed_to,
+                 NTD->getName(), PD->getName())
+          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+      }
     }
-
   } else {
     diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
       .highlight(attr->getProtocolTypeRepr()->getSourceRange());
@@ -4541,7 +4595,7 @@ static bool checkFunctionSignature(
                     auto xInstanceTy = x.getOldType()->getMetatypeInstanceType();
                     auto yInstanceTy = y.getOldType()->getMetatypeInstanceType();
                     return xInstanceTy->isEqual(
-                        requiredGenSig.getCanonicalTypeInContext(yInstanceTy));
+                        requiredGenSig.getReducedType(yInstanceTy));
                   }))
     return false;
 
@@ -4549,7 +4603,7 @@ static bool checkFunctionSignature(
   // match exactly.
   auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
   auto candidateResultTy =
-      requiredGenSig.getCanonicalTypeInContext(candidateFnTy.getResult());
+      requiredGenSig.getReducedType(candidateFnTy.getResult());
   if (!requiredResultFnTy) {
     auto requiredResultTupleTy = dyn_cast<TupleType>(required.getResult());
     auto candidateResultTupleTy = dyn_cast<TupleType>(candidateResultTy);
@@ -6020,6 +6074,14 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       }
     }
 
+    // Using 'nonisolated' with wrapped properties is unsupported, because
+    // backing storage is a stored 'var' that is part of the internal state
+    // of the actor which could only be accessed in actor's isolation context.
+    if (var->hasAttachedPropertyWrapper()) {
+      diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property);
+      return;
+    }
+
     // nonisolated can not be applied to local properties.
     if (dc->isLocalContext()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_local_var);
@@ -6194,6 +6256,16 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   auto fn = cast<FuncDecl>(D);
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  }
+}
+
+void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {}
+
+void AttributeChecker::visitLexicalAttr(LexicalAttr *attr) {
+  // @_lexical and @_eagerMove are opposites and can't be combined.
+  if (D->getAttrs().hasAttribute<EagerMoveAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::eagermove_and_lexical_combined);
+    return;
   }
 }
 

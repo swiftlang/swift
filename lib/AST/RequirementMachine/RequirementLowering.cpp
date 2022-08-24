@@ -361,6 +361,9 @@ swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Conformance:
     desugarConformanceRequirement(firstType, req.getSecondType(),
                                   loc, result, errors);
@@ -465,8 +468,7 @@ struct InferRequirementsWalker : public TypeWalker {
       auto decl = typeAlias->getDecl();
       auto subMap = typeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
-        if (auto req = rawReq.subst(subMap))
-          desugarRequirement(*req, SourceLoc(), reqs, errors);
+        desugarRequirement(rawReq.subst(subMap), SourceLoc(), reqs, errors);
       }
 
       return Action::Continue;
@@ -532,8 +534,8 @@ struct InferRequirementsWalker : public TypeWalker {
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
-      if (auto req = rawReq.subst(subMap))
-        desugarRequirement(*req, SourceLoc(), reqs, errors);
+      auto req = rawReq.subst(subMap);
+      desugarRequirement(req, SourceLoc(), reqs, errors);
     }
 
     return Action::Continue;
@@ -575,6 +577,9 @@ void swift::rewriting::realizeRequirement(
   auto *moduleForInference = dc->getParentModule();
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
     auto secondType = req.getSecondType();

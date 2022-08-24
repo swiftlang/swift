@@ -774,7 +774,8 @@ public:
   }
 
   void emitEndBorrowOperation(SILLocation loc, SILValue v) {
-    if (!hasOwnership() || v->getOwnershipKind() == OwnershipKind::None)
+    if (!hasOwnership() || (!v->getType().isAddress() &&
+                            v->getOwnershipKind() == OwnershipKind::None))
       return;
     createEndBorrow(loc, v);
   }
@@ -1034,6 +1035,14 @@ public:
                                IsInitialization_t isInitialize) {
     assert(srcAddr->getType() == destAddr->getType());
     return insert(new (getModule()) CopyAddrInst(
+        getSILDebugLocation(Loc), srcAddr, destAddr, isTake, isInitialize));
+  }
+
+  ExplicitCopyAddrInst *
+  createExplicitCopyAddr(SILLocation Loc, SILValue srcAddr, SILValue destAddr,
+                         IsTake_t isTake, IsInitialization_t isInitialize) {
+    assert(srcAddr->getType() == destAddr->getType());
+    return insert(new (getModule()) ExplicitCopyAddrInst(
         getSILDebugLocation(Loc), srcAddr, destAddr, isTake, isInitialize));
   }
 

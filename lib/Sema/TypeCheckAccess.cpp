@@ -41,6 +41,7 @@ static void forAllRequirementTypes(
   std::move(source).visitRequirements(TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
@@ -108,6 +109,8 @@ public:
   void checkGenericParamAccess(
     const GenericContext *ownerCtx,
     const ValueDecl *ownerDecl);
+
+  void checkGlobalActorAccess(const Decl *D);
 };
 
 class TypeAccessScopeDiagnoser : private ASTWalker {
@@ -409,6 +412,41 @@ void AccessControlCheckerBase::checkGenericParamAccess(
                           ownerDecl->getFormalAccess());
 }
 
+void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return;
+
+  auto globalActorAttr = D->getGlobalActorAttr();
+  if (!globalActorAttr)
+    return;
+
+  auto customAttr = globalActorAttr->first;
+  auto globalActorDecl = globalActorAttr->second;
+  checkTypeAccess(
+      customAttr->getType(), customAttr->getTypeRepr(), VD,
+      /*mayBeInferred*/ false,
+      [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+          DowngradeToWarning downgradeToWarning) {
+        if (checkUsableFromInline) {
+          auto diag = D->diagnose(diag::global_actor_not_usable_from_inline,
+                                  D->getDescriptiveKind(), VD->getName());
+          highlightOffendingType(diag, complainRepr);
+          return;
+        }
+
+        auto globalActorAccess = typeAccessScope.accessLevelForDiagnostics();
+        bool isExplicit = D->getAttrs().hasAttribute<AccessControlAttr>();
+        auto declAccess = isExplicit
+                              ? VD->getFormalAccess()
+                              : typeAccessScope.requiredAccessForDiagnostics();
+        auto diag = D->diagnose(diag::global_actor_access, declAccess,
+                                D->getDescriptiveKind(), VD->getName(),
+                                globalActorAccess, globalActorDecl->getName());
+        highlightOffendingType(diag, complainRepr);
+      });
+}
+
 namespace {
 class AccessControlChecker : public AccessControlCheckerBase,
                              public DeclVisitor<AccessControlChecker> {
@@ -425,6 +463,7 @@ public:
       return;
 
     DeclVisitor<AccessControlChecker>::visit(D);
+    checkGlobalActorAccess(D);
   }
 
   // Force all kinds to be handled at a lower level.
@@ -1047,6 +1086,7 @@ public:
         return;
 
     DeclVisitor<UsableFromInlineChecker>::visit(D);
+    checkGlobalActorAccess(D);
   }
 
   // Force all kinds to be handled at a lower level.
@@ -1516,7 +1556,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
     // just in this case.
     if (howImported == RestrictedImportKind::Implicit &&
         !SF->getASTContext().isSwiftVersionAtLeast(6) &&
-        !SF->hasImplementationOnlyImports()) {
+        !SF->hasImportsWithFlag(ImportFlags::ImplementationOnly)) {
       downgradeToWarning = DowngradeToWarning::Yes;
     }
 
@@ -1638,6 +1678,15 @@ public:
   explicit DeclAvailabilityChecker(ExportContext where)
     : Where(where) {}
 
+  void visit(Decl *D) {
+    DeclVisitor<DeclAvailabilityChecker>::visit(D);
+    
+    if (auto globalActor = D->getGlobalActorAttr()) {
+      auto customAttr = globalActor->first;
+      checkType(customAttr->getType(), customAttr->getTypeRepr(), D);
+    }
+  }
+  
   // Force all kinds to be handled at a lower level.
   void visitDecl(Decl *D) = delete;
   void visitValueDecl(ValueDecl *D) = delete;
@@ -1683,6 +1732,11 @@ public:
       return;
 
     checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar);
+
+    for (auto attr : theVar->getAttachedPropertyWrappers()) {
+      checkType(attr->getType(), attr->getTypeRepr(), theVar,
+                ExportabilityReason::PropertyWrapper);
+    }
   }
 
   /// \see visitPatternBindingDecl
@@ -1813,6 +1867,9 @@ public:
         auto wrapperType = P->getAttachedPropertyWrapperType(index);
         checkType(wrapperType, wrapperAttrs[index]->getTypeRepr(), fn);
       }
+
+      if (auto attr = P->getAttachedResultBuilder())
+        checkType(P->getResultBuilderType(), attr->getTypeRepr(), fn);
 
       checkType(P->getInterfaceType(), P->getTypeRepr(), fn);
     }

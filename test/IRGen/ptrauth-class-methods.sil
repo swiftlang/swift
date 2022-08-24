@@ -61,7 +61,7 @@ bb0(%0 : $A):
 // CHECK-NEXT: [[FN:%.*]] = load void (%T4test1AC*)*, void (%T4test1AC*)** [[SLOT]]
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint void (%T4test1AC*)** [[SLOT]] to i64
 //   Discriminator value is arbitrary, but must be the same as the next test.
-// CHECK-NEXT: [[DISCRIMINATOR:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 23008)
+// CHECK-NEXT: [[DISCRIMINATOR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 23008)
 // CHECK-NEXT: call swiftcc void [[FN]](%T4test1AC* swiftself %0) [ "ptrauth"(i32 0, i64 [[DISCRIMINATOR]]) ]
 // CHECK-NEXT: ret void
 
@@ -79,7 +79,7 @@ bb0(%0 : $B):
 // CHECK-NEXT: [[FN:%.*]] = load void (%T4test1BC*)*, void (%T4test1BC*)** [[SLOT]]
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint void (%T4test1BC*)** [[SLOT]] to i64
 //   Discriminator value is arbitrary, but must be the same as the previous test.
-// CHECK-NEXT: [[DISCRIMINATOR:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 23008)
+// CHECK-NEXT: [[DISCRIMINATOR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 23008)
 // CHECK-NEXT: call swiftcc void [[FN]](%T4test1BC* swiftself %0) [ "ptrauth"(i32 0, i64 [[DISCRIMINATOR]]) ]
 // CHECK-NEXT: ret void
 
@@ -98,6 +98,6 @@ bb0(%0 : $G<T>):
 // CHECK-NEXT: [[FN:%.*]] = load void (%T4test1GC*)*, void (%T4test1GC*)** [[SLOT]]
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint void (%T4test1GC*)** [[SLOT]] to i64
 //   Discriminator value is arbitrary, but must be the same as the previous test.
-// CHECK-NEXT: [[DISCRIMINATOR:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 47035)
+// CHECK-NEXT: [[DISCRIMINATOR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 47035)
 // CHECK-NEXT: call swiftcc void [[FN]](%T4test1GC* swiftself %0) [ "ptrauth"(i32 0, i64 [[DISCRIMINATOR]]) ]
 // CHECK-NEXT: ret void

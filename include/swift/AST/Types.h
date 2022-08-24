@@ -503,9 +503,9 @@ public:
     return const_cast<TypeBase*>(this)->computeCanonicalType();
   }
 
-  /// getCanonicalType - Stronger canonicalization which folds away equivalent
+  /// getReducedType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature sig);
+  CanType getReducedType(GenericSignature sig);
 
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
@@ -653,6 +653,11 @@ public:
   /// Retrieve the set of root opened archetypes that occur within this type.
   void getRootOpenedExistentials(
       SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
+
+  /// Retrieve the set of type sequence generic parameters that occur
+  /// within this type.
+  void getTypeSequenceParameters(
+      SmallVectorImpl<Type> &rootTypeSequenceParams) const;
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
@@ -1253,6 +1258,9 @@ public:
   /// Return the type T after looking through all of the optional
   /// types.
   Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
+
+  /// Return the number of optionals this type is wrapped with.
+  unsigned int getOptionalityDepth();
 
   /// Remove concurrency-related types and constraints from the given
   /// type
@@ -2267,10 +2275,11 @@ class TupleType final : public TypeBase, public llvm::FoldingSetNode,
   
 public:
   /// get - Return the uniqued tuple type with the specified elements.
-  /// Returns a ParenType instead if there is exactly one element which
-  /// is unlabeled and not varargs, so it doesn't accidentally construct
-  /// a tuple which is impossible to write.
-  static Type get(ArrayRef<TupleTypeElt> Elements, const ASTContext &C);
+  ///
+  /// This can construct one-element tuple types, which are impossible to
+  /// write in the source language. The caller should check for that case
+  /// first it a bona fide 'r-value' type is desired.
+  static TupleType *get(ArrayRef<TupleTypeElt> Elements, const ASTContext &C);
 
   /// getEmpty - Return the empty tuple type '()'.
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
@@ -6375,7 +6384,7 @@ public:
   }
 
 public:
-  void Profile(llvm::FoldingSetNodeID &ID) {
+  void Profile(llvm::FoldingSetNodeID &ID) const {
     Profile(ID, getElementTypes());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements);
@@ -6424,24 +6433,33 @@ class PackExpansionType : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   Type patternType;
+  Type countType;
 
 public:
   /// Create a pack expansion type from the given pattern type.
   ///
-  /// It is not required that the pattern type actually contain a reference to
-  /// a variadic generic parameter.
-  static PackExpansionType *get(Type pattern);
+  /// It is not required that \p pattern actually contain a reference to
+  /// a variadic generic parameter, but any variadic generic parameters
+  /// appearing in the pattern type must have the same count as \p countType.
+  ///
+  /// As for \p countType itself, it must be a type sequence generic parameter
+  /// type, or a sequence archetype type.
+  static PackExpansionType *get(Type pattern, Type countType);
 
 public:
   /// Retrieves the pattern type of this pack expansion.
   Type getPatternType() const { return patternType; }
 
+  /// Retrieves the count type of this pack expansion.
+  Type getCountType() const { return countType; }
+
 public:
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getPatternType());
+    Profile(ID, getPatternType(), getCountType());
   }
 
-  static void Profile(llvm::FoldingSetNodeID &ID, Type patternType);
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      Type patternType, Type countType);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -6449,15 +6467,17 @@ public:
   }
 
 private:
-  PackExpansionType(Type patternType, const ASTContext *CanCtx)
-    : TypeBase(TypeKind::PackExpansion, CanCtx,
-               patternType->getRecursiveProperties()), patternType(patternType) {
-      assert(patternType);
-    }
+  PackExpansionType(Type patternType, Type countType,
+                    RecursiveTypeProperties properties,
+                    const ASTContext *ctx);
 };
 BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
   CanType getPatternType() const {
     return CanType(getPointer()->getPatternType());
+  }
+
+  CanType getCountType() const {
+    return CanType(getPointer()->getCountType());
   }
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
 

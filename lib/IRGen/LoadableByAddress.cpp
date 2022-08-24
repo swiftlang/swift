@@ -1711,6 +1711,8 @@ private:
   bool recreateDifferentiabilityWitnessFunction(
       SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete);
 
+  bool shouldTransformGlobal(SILGlobalVariable *global);
+
 private:
   llvm::SetVector<SILFunction *> modFuncs;
   llvm::SetVector<SingleValueInstruction *> conversionInstrs;
@@ -2907,6 +2909,24 @@ void LoadableByAddress::updateLoweredTypes(SILFunction *F) {
   F->rewriteLoweredTypeUnsafe(newFuncTy);
 }
 
+bool LoadableByAddress::shouldTransformGlobal(SILGlobalVariable *global) {
+  SILInstruction *init = global->getStaticInitializerValue();
+  if (!init)
+    return false;
+  auto silTy = global->getLoweredType();
+  if (!isa<SILFunctionType>(silTy.getASTType()))
+    return false;
+
+  auto *decl = global->getDecl();
+  IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(
+      decl ? decl->getDeclContext() : nullptr);
+  auto silFnTy = global->getLoweredFunctionType();
+  GenericEnvironment *genEnv = getSubstGenericEnvironment(silFnTy);
+  if (MapperCache.shouldTransformFunctionType(genEnv, silFnTy, *currIRMod))
+    return true;
+  return false;
+}
+
 /// The entry point to this function transformation.
 void LoadableByAddress::run() {  
   // Set the SIL state before the PassManager has a chance to run
@@ -2922,10 +2942,23 @@ void LoadableByAddress::run() {
 
   // Scan the module for all references of the modified functions:
   llvm::SetVector<FunctionRefBaseInst *> funcRefs;
+  llvm::SetVector<SILInstruction *> globalRefs;
   for (SILFunction &CurrF : *getModule()) {
     for (SILBasicBlock &BB : CurrF) {
       for (SILInstruction &I : BB) {
-        if (auto *FRI = dyn_cast<FunctionRefBaseInst>(&I)) {
+        if (auto *allocGlobal = dyn_cast<AllocGlobalInst>(&I)) {
+          auto *global = allocGlobal->getReferencedGlobal();
+          if (shouldTransformGlobal(global))
+            globalRefs.insert(allocGlobal);
+        } else if (auto *globalAddr = dyn_cast<GlobalAddrInst>(&I)) {
+          auto *global = globalAddr->getReferencedGlobal();
+          if (shouldTransformGlobal(global))
+            globalRefs.insert(globalAddr);
+        } else if (auto *globalVal = dyn_cast<GlobalValueInst>(&I)) {
+          auto *global = globalVal->getReferencedGlobal();
+          if (shouldTransformGlobal(global))
+            globalRefs.insert(globalVal);
+        } else if (auto *FRI = dyn_cast<FunctionRefBaseInst>(&I)) {
           SILFunction *RefF = FRI->getInitiallyReferencedFunction();
           if (modFuncs.count(RefF) != 0) {
             // Go over the uses and add them to lists to modify
@@ -2954,7 +2987,7 @@ void LoadableByAddress::run() {
               case SILInstructionKind::LinearFunctionExtractInst:
               case SILInstructionKind::DifferentiableFunctionExtractInst: {
                 conversionInstrs.insert(
-                              cast<SingleValueInstruction>(currInstr));
+                    cast<SingleValueInstruction>(currInstr));
                 break;
               }
               case SILInstructionKind::BuiltinInst: {
@@ -3030,6 +3063,99 @@ void LoadableByAddress::run() {
   for (auto *F : modFuncs) {
     // Update the lowered type of the Function
     updateLoweredTypes(F);
+  }
+
+  auto computeNewResultType = [&](SILType ty, IRGenModule *mod) -> SILType {
+    auto currSILFunctionType = ty.castTo<SILFunctionType>();
+    GenericEnvironment *genEnv =
+        getSubstGenericEnvironment(currSILFunctionType);
+    return SILType::getPrimitiveObjectType(
+        MapperCache.getNewSILFunctionType(genEnv, currSILFunctionType, *mod));
+  };
+
+  // Update globals' initializer.
+  SmallVector<SILGlobalVariable *, 16> deadGlobals;
+  for (SILGlobalVariable &global : getModule()->getSILGlobals()) {
+    SILInstruction *init = global.getStaticInitializerValue();
+    if (!init)
+      continue;
+    auto silTy = global.getLoweredType();
+    if (!isa<SILFunctionType>(silTy.getASTType()))
+      continue;
+    auto *decl = global.getDecl();
+    IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(
+        decl ? decl->getDeclContext() : nullptr);
+    auto silFnTy = global.getLoweredFunctionType();
+    GenericEnvironment *genEnv = getSubstGenericEnvironment(silFnTy);
+
+    // Update the global's type.
+    if (MapperCache.shouldTransformFunctionType(genEnv, silFnTy, *currIRMod)) {
+      auto newSILFnType =
+          MapperCache.getNewSILFunctionType(genEnv, silFnTy, *currIRMod);
+      global.unsafeSetLoweredType(
+          SILType::getPrimitiveObjectType(newSILFnType));
+
+      // Rewrite the init basic block...
+      SmallVector<SILInstruction *, 8> initBlockInsts;
+      for (auto it = global.begin(), end = global.end(); it != end; ++it) {
+        initBlockInsts.push_back(const_cast<SILInstruction *>(&*it));
+      }
+      for (auto *oldInst : initBlockInsts) {
+        if (auto *f = dyn_cast<FunctionRefInst>(oldInst)) {
+          SILBuilder builder(&global);
+          auto *newInst = builder.createFunctionRef(
+              f->getLoc(), f->getInitiallyReferencedFunction(), f->getKind());
+          f->replaceAllUsesWith(newInst);
+          global.unsafeRemove(f, *getModule());
+        } else if (auto *cvt = dyn_cast<ConvertFunctionInst>(oldInst)) {
+          auto newType = computeNewResultType(cvt->getType(), currIRMod);
+          SILBuilder builder(&global);
+          auto *newInst = builder.createConvertFunction(
+              cvt->getLoc(), cvt->getOperand(), newType,
+              cvt->withoutActuallyEscaping());
+          cvt->replaceAllUsesWith(newInst);
+          global.unsafeRemove(cvt, *getModule());
+        } else if (auto *thinToThick =
+                       dyn_cast<ThinToThickFunctionInst>(oldInst)) {
+          auto newType =
+              computeNewResultType(thinToThick->getType(), currIRMod);
+          SILBuilder builder(&global);
+          auto *newInstr = builder.createThinToThickFunction(
+              thinToThick->getLoc(), thinToThick->getOperand(), newType);
+          thinToThick->replaceAllUsesWith(newInstr);
+          global.unsafeRemove(thinToThick, *getModule());
+        } else {
+          auto *sv = cast<SingleValueInstruction>(oldInst);
+          auto *newInst = cast<SingleValueInstruction>(oldInst->clone());
+          global.unsafeAppend(newInst);
+          sv->replaceAllUsesWith(newInst);
+          global.unsafeRemove(oldInst, *getModule());
+        }
+      }
+    }
+  }
+
+  // Rewrite global variable users.
+  for (auto *inst : globalRefs) {
+    if (auto *allocGlobal = dyn_cast<AllocGlobalInst>(inst)) {
+      // alloc_global produces no results.
+      SILBuilderWithScope builder(inst);
+      builder.createAllocGlobal(allocGlobal->getLoc(),
+                                allocGlobal->getReferencedGlobal());
+      allocGlobal->eraseFromParent();
+    } else if (auto *globalAddr = dyn_cast<GlobalAddrInst>(inst)) {
+      SILBuilderWithScope builder(inst);
+      auto *newInst = builder.createGlobalAddr(
+          globalAddr->getLoc(), globalAddr->getReferencedGlobal());
+      globalAddr->replaceAllUsesWith(newInst);
+      globalAddr->eraseFromParent();
+    } else if (auto *globalVal = dyn_cast<GlobalValueInst>(inst)) {
+      SILBuilderWithScope builder(inst);
+      auto *newInst = builder.createGlobalValue(
+          globalVal->getLoc(), globalVal->getReferencedGlobal());
+      globalVal->replaceAllUsesWith(newInst);
+      globalVal->eraseFromParent();
+    }
   }
 
   // Update all references:

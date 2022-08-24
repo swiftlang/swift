@@ -135,22 +135,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
-    // Just consume the incoming argument.
-    assert(args.size() == 1 && "Expecting one incoming argument");
-    (void)args.claimAll();
-    return;
-  }
-
-  if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteed) {
-    // Just forward the incoming argument.
-    assert(args.size() == 1 && "Expecting one incoming argument");
-    out = std::move(args);
-    // This is a token.
-    out.add(llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0));
-    return;
-  }
-
   if (Builtin.ID == BuiltinValueKind::OnFastPath) {
     // The onFastPath builtin has only an effect on SIL level, so we lower it
     // to a no-op.
@@ -456,7 +440,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
     NameGEP = llvm::ConstantExpr::getGetElementPtr(
-        ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
+        ((llvm::PointerType *)FuncNamePtr->getType())->getPointerElementType(),
         FuncNamePtr, makeArrayRef(Indices));
 
     // Replace the placeholder value with the new GEP.

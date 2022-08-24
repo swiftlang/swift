@@ -58,8 +58,8 @@ bb0:
   return %31 : $Int32
 } 
 
-// CHECK-LABEL: sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
-// CHECK: bb0(%0 : $*P):
+// CHECK-LABEL: sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout any P) -> Int32 {
+// CHECK: bb0(%0 : $*any P):
 // CHECK:  debug_value {{.*}} expr op_deref
 // CHECK:  alloc_stack
 // CHECK:  copy_addr
@@ -75,9 +75,9 @@ bb0(%0 : $*P):
   debug_value %0 : $*P, var, name "a", argno 1, expr op_deref
   %2 = alloc_stack $P                             
   copy_addr %0 to [initialization] %2 : $*P      
-  %4 = open_existential_addr immutable_access %2 : $*P to $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P
-  %5 = witness_method $@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %4 : $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
-  %6 = apply %5<@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %4 = open_existential_addr immutable_access %2 : $*P to $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B", P) Self
+  %5 = witness_method $@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %4 : $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %6 = apply %5<@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B", P) Self>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %2 : $*P 
   dealloc_stack %2 : $*P
   return %6 : $Int32
@@ -92,8 +92,8 @@ bb0:
 
 sil_global hidden [let] @$global_var : $P
 
-// CHECK-LABEL: sil hidden [noinline] @$helper : $@convention(thin) (@in P) -> Int32 {
-// CHECK: bb0(%0 : $*P):
+// CHECK-LABEL: sil hidden [noinline] @$helper : $@convention(thin) (@in any P) -> Int32 {
+// CHECK: bb0(%0 : $*any P):
 // CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
@@ -110,9 +110,9 @@ bb0(%0 : $*P):
   %4 = alloc_stack $P
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P
-  %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
-  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
-  %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B", P) Self
+  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B", P) Self>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   dealloc_stack %4 : $*P
   return %8 : $Int32
 }
@@ -174,15 +174,15 @@ bb0(%0 : $*P, %1 : $*P):
   %4 = alloc_stack $P
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P
-  %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B") P
-  %7 = witness_method $@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
-  %8 = apply %7<@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B", P) Self
+  %7 = witness_method $@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %8 = apply %7<@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B", P) Self>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %9 = alloc_stack $P
   copy_addr %1 to [initialization] %9 : $*P
   destroy_addr %1 : $*P
-  %11 = open_existential_addr immutable_access %9 : $*P to $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P
-  %12 = witness_method $@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %11 : $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
-  %13 = apply %12<@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %11 = open_existential_addr immutable_access %9 : $*P to $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B", P) Self
+  %12 = witness_method $@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %11 : $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %13 = apply %12<@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B", P) Self>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %14 = struct_extract %8 : $Int32, #Int32._value
   %15 = struct_extract %13 : $Int32, #Int32._value
   %16 = integer_literal $Builtin.Int1, -1
@@ -237,9 +237,9 @@ struct Container<T> {
 // requirements).  Relies on assertions during specialization and on
 // the SILVerifier to catch other inconsistencies.
 //
-// CHECK-LABEL: sil shared @$s40testExistentialSpecializeCompositeHelperTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : PlotLayer, τ_0_0 : InView> (@owned τ_0_0, @inout Container<PlotLayer & InView & Plotable>) -> () {
-// CHECK: bb0(%0 : $τ_0_0, %1 : $*Container<PlotLayer & InView & Plotable>):
-// CHECK:   init_existential_ref %0 : $τ_0_0 : $τ_0_0, $PlotLayer & InView & Plotable
+// CHECK-LABEL: sil shared @$s40testExistentialSpecializeCompositeHelperTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : PlotLayer, τ_0_0 : InView> (@owned τ_0_0, @inout Container<any PlotLayer & InView & Plotable>) -> () {
+// CHECK: bb0(%0 : $τ_0_0, %1 : $*Container<any PlotLayer & InView & Plotable>):
+// CHECK:   init_existential_ref %0 : $τ_0_0 : $τ_0_0, $any PlotLayer & InView & Plotable
 // CHECK-LABEL: } // end sil function '$s40testExistentialSpecializeCompositeHelperTf4en_n'
 sil shared @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> () {
 bb0(%0 : $PlotLayer & Plotable & InView, %1 : $*Container<PlotLayer & Plotable & InView>):

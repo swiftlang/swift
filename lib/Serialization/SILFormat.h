@@ -287,6 +287,7 @@ namespace sil_block {
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
                      GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
+                     ModuleIDField, // Parent ModuleDecl *
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize and argument effects attributes
                      // followed by generic param list, if any

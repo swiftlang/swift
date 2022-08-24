@@ -28,10 +28,11 @@ sil [ossa] [transparent] @load_store_borrow_ossa_callee : $@convention(thin) (@o
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   %2 = alloc_stack $Builtin.NativeObject
-  store_borrow %1 to %2 : $*Builtin.NativeObject
-  end_borrow %1 : $Builtin.NativeObject
+  %sb = store_borrow %1 to %2 : $*Builtin.NativeObject
   %f = function_ref @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
-  apply %f(%2) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %f(%sb) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  end_borrow %sb : $*Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   dealloc_stack %2 : $*Builtin.NativeObject
 
   %3 = alloc_stack $Builtin.NativeObject

@@ -3222,7 +3222,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
       if (tryAdvanceToEndOfConflictMarker(CurPtr, BufferEnd)) {
         // Conflict marker.
         size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::GarbageText, Length);
+        Pieces.push_back(TriviaKind::UnexpectedText, Length);
         continue;
       }
       break;
@@ -3231,13 +3231,13 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
         // BOM marker.
         CurPtr = CurPtr + 2;
         size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::GarbageText, Length);
+        Pieces.push_back(TriviaKind::UnexpectedText, Length);
         continue;
       }
       break;
     case 0: {
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaKind::GarbageText, Length);
+      Pieces.push_back(TriviaKind::UnexpectedText, Length);
       continue;
     }
     default:
@@ -3267,7 +3267,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
     }
 
     size_t Length = CurPtr - TriviaStart;
-    Pieces.push_back(TriviaKind::GarbageText, Length);
+    Pieces.push_back(TriviaKind::UnexpectedText, Length);
     continue;
   }
 

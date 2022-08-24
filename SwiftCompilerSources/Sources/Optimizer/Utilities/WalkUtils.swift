@@ -69,6 +69,43 @@ protocol WalkingPath : Equatable {
 
 extension SmallProjectionPath : WalkingPath { }
 
+/// A `WalkingPath` where `push` and `pop` instructions
+/// are forwarded to an underlying `projectionPath`.
+protocol SmallProjectionWalkingPath : WalkingPath {
+  /// During the walk, a projection path indicates where the initial value is
+  /// contained in an aggregate.
+  /// Example for a walk-down:
+  /// \code
+  ///   %1 = alloc_ref                   // 1. initial value, path = empty
+  ///   %2 = struct $S (%1)              // 2. path = s0
+  ///   %3 = tuple (%other, %1)          // 3. path = t1.s0
+  ///   %4 = tuple_extract %3, 1         // 4. path = s0
+  ///   %5 = struct_extract %4, #field   // 5. path = empty
+  /// \endcode
+  ///
+  var projectionPath: SmallProjectionPath { get }
+  func with(projectionPath: SmallProjectionPath) -> Self
+}
+
+extension SmallProjectionWalkingPath {
+  func pop(kind: FieldKind) -> (index: Int, path: Self)? {
+    if let (idx, p) = projectionPath.pop(kind: kind) {
+      return (idx, with(projectionPath: p))
+    }
+    return nil
+  }
+
+  func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? {
+    if let p = projectionPath.popIfMatches(kind, index: index) {
+      return with(projectionPath: p)
+    }
+    return nil
+  }
+  func push(_ kind: FieldKind, index: Int) -> Self {
+    return with(projectionPath: projectionPath.push(kind, index: index))
+  }
+}
+
 /// Caches the state of a walk.
 ///
 /// A client must provide this cache in a `walkUpCache` or `walkDownCache` property.

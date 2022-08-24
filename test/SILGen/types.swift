@@ -28,8 +28,7 @@ struct S {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
     // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
-    // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
-    // CHECK: [[XADDR:%[0-9]+]] = project_box [[XLIFETIME]]
+    // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
     // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[XADDR]] : $*Int
     // CHECK: [[X:%.*]] = load [trivial] [[READ]] : $*Int
     // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[THIS]] : $*S

@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -typecheck %s
 
-// SR-5120 / rdar://problem/32618740
+// rdar://problem/32618740
+// https://github.com/apple/swift/issues/47696
+
 protocol InitCollection: Collection {
   init(_ array: [Iterator.Element])
 }

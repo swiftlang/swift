@@ -411,6 +411,9 @@ void CompletionOverrideLookup::addAssociatedTypes(NominalTypeDecl *NTD) {
        hasOverride || hasOverridabilityModifier || hasStaticOrClass))
     return;
 
+  if (isa<ProtocolDecl>(NTD))
+    return;
+
   for (auto Conformance : NTD->getAllConformances()) {
     auto Proto = Conformance->getProtocol();
     if (!Proto->isAccessibleFrom(CurrDeclContext))
@@ -462,6 +465,11 @@ StringRef CompletionOverrideLookup::getResultBuilderDocComment(
 
   case ResultBuilderBuildFunction::BuildOptional:
     return "Enables support for `if` statements that do not have an `else`";
+  case ResultBuilderBuildFunction::BuildPartialBlockFirst:
+    return "Builds a partial result component from the first component";
+  case ResultBuilderBuildFunction::BuildPartialBlockAccumulated:
+    return "Builds a partial result component by combining an accumulated "
+           "component and a new component";
   }
 }
 
@@ -514,6 +522,12 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletions(
       ResultBuilderBuildFunction::BuildLimitedAvailability);
   addResultBuilderBuildCompletion(builder, componentType,
                                   ResultBuilderBuildFunction::BuildFinalResult);
+  addResultBuilderBuildCompletion(
+      builder, componentType,
+      ResultBuilderBuildFunction::BuildPartialBlockFirst);
+  addResultBuilderBuildCompletion(
+      builder, componentType,
+      ResultBuilderBuildFunction::BuildPartialBlockAccumulated);
 }
 
 void CompletionOverrideLookup::getOverrideCompletions(SourceLoc Loc) {

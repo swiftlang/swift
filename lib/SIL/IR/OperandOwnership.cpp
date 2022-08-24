@@ -147,6 +147,7 @@ OPERAND_OWNERSHIP(TrivialUse, CheckedCastAddrBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondFail)
 OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
+OPERAND_OWNERSHIP(TrivialUse, ExplicitCopyAddr)
 OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
@@ -783,7 +784,6 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, USubOver)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UToSCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UToUCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Unreachable)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnsafeGuaranteedEnd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Xor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericXor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ZExt)
@@ -805,7 +805,6 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
-BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
 
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION = 2;
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION = 3;

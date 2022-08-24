@@ -2226,6 +2226,23 @@ public:
   }
 };
 
+/// Defines the `@_expose` attribute, used to expose declarations in the
+/// header used by C/C++ to interoperate with Swift.
+class ExposeAttr : public DeclAttribute {
+public:
+  ExposeAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+      : DeclAttribute(DAK_Expose, AtLoc, Range, Implicit), Name(Name) {}
+
+  ExposeAttr(StringRef Name, bool Implicit)
+      : ExposeAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The exposed declaration name.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Expose;
+  }
+};
 
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
@@ -2493,6 +2510,9 @@ public:
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
 
+  // For an opened existential type, the constraint type.
+  Optional<TypeRepr *> ConstraintType;
+
   // For a reference to an opaque return type, the mangled name and argument
   // index into the generic signature.
   struct OpaqueReturnTypeRef {
@@ -2500,6 +2520,9 @@ public:
     unsigned index;
   };
   Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
+
+  // Force construction of a one-element tuple type.
+  bool IsTuple = false;
 
   TypeAttributes() {}
 
@@ -2581,6 +2604,9 @@ public:
   bool hasOpenedID() const { return OpenedID.hasValue(); }
   UUID getOpenedID() const { return *OpenedID; }
 
+  bool hasConstraintType() const { return ConstraintType.hasValue(); }
+  TypeRepr *getConstraintType() const { return *ConstraintType; }
+
   /// Given a name like "autoclosure", return the type attribute ID that
   /// corresponds to it.  This returns TAK_Count on failure.
   ///
@@ -2625,6 +2651,10 @@ void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
   return attr->getLocation();
 }
+
+/// Determine whether the given attribute is available, looking up the
+/// attribute by name.
+bool hasAttribute(const LangOptions &langOpts, llvm::StringRef attributeName);
 
 } // end namespace swift
 

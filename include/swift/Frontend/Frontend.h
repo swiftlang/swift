@@ -563,6 +563,10 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftStringProcessing() const;
 
+  /// Whether the CxxShim library can be imported
+  /// i.e. if it can be found.
+  bool canImportCxxShim() const;
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.

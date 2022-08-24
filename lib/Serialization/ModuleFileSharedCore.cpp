@@ -564,6 +564,8 @@ void ModuleFileSharedCore::fatal(llvm::Error error) const {
   llvm::raw_svector_ostream out(errorStr);
 
   out << "*** DESERIALIZATION FAILURE ***\n";
+  out << "*** If any module named here was modified in the SDK, please delete the ***\n";
+  out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
   outputDiagnosticInfo(out);
   out << "\n";
   if (error) {
@@ -838,6 +840,10 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::GENERIC_SIGNATURE_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(GenericSignatures, scratch);
+        break;
+      case index_block::GENERIC_ENVIRONMENT_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(GenericEnvironments, scratch);
         break;
       case index_block::SUBSTITUTION_MAP_OFFSETS:
         assert(blobData.empty());

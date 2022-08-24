@@ -1044,7 +1044,8 @@ namespace {
 /// the given parsed type representation.
 static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
-                            TypeRepr *typeRepr, DeclContext *dc);
+                            TypeRepr *typeRepr, DeclContext *dc,
+                            bool allowUsableFromInline=false);
 
 /// Retrieve the set of type declarations that are directly referenced from
 /// the given type.
@@ -1726,12 +1727,17 @@ shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
   // bridging header? Some code bases implement ObjC methods in Swift even
   // though it's not exactly supported.
   auto newDeclModuleName = newDecl->getModuleContext()->getName();
+  auto newDeclPrivateModuleName = newDecl->getASTContext().getIdentifier(
+                     (llvm::Twine(newDeclModuleName.str()) + "_Private").str());
+  auto bridgingHeaderModuleName = newDecl->getASTContext().getIdentifier(
+                                                     CLANG_HEADER_MODULE_NAME);
   if (llvm::all_of(vec, [&](AbstractFunctionDecl *oldDecl) {
     if (!oldDecl->hasClangNode())
       return false;
     auto oldDeclModuleName = oldDecl->getModuleContext()->getName();
     return oldDeclModuleName == newDeclModuleName
-               || oldDeclModuleName.str() == CLANG_HEADER_MODULE_NAME;
+               || oldDeclModuleName == newDeclPrivateModuleName
+               || oldDeclModuleName == bridgingHeaderModuleName;
   }))
     return false;
 
@@ -2325,7 +2331,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 static DirectlyReferencedTypeDecls
 directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
                                          SourceLoc loc, DeclContext *dc,
-                                         LookupOuterResults lookupOuter) {
+                                         LookupOuterResults lookupOuter,
+                                         bool allowUsableFromInline=false) {
   // In a protocol or protocol extension, the 'where' clause can refer to
   // associated types without 'Self' qualification:
   //
@@ -2359,6 +2366,9 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
   if (lookupOuter == LookupOuterResults::Included)
     options |= UnqualifiedLookupFlags::IncludeOuterResults;
 
+  if (allowUsableFromInline)
+    options |= UnqualifiedLookupFlags::IncludeUsableFromInline;
+
   auto &ctx = dc->getASTContext();
   auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, options);
   auto lookup = evaluateOrDefault(ctx.evaluator,
@@ -2388,7 +2398,8 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        ASTContext &ctx,
                                        ArrayRef<TypeDecl *> baseTypes,
                                        DeclNameRef name,
-                                       DeclContext *dc) {
+                                       DeclContext *dc,
+                                       bool allowUsableFromInline=false) {
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
     for (auto decl : found){
@@ -2402,6 +2413,9 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
     // Look into the base types.
     SmallVector<ValueDecl *, 4> members;
     auto options = NL_RemoveNonVisible | NL_OnlyTypes;
+
+    if (allowUsableFromInline)
+      options |= NL_IncludeUsableFromInline;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -2433,7 +2447,7 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
 static DirectlyReferencedTypeDecls
 directReferencesForIdentTypeRepr(Evaluator &evaluator,
                                  ASTContext &ctx, IdentTypeRepr *ident,
-                                 DeclContext *dc) {
+                                 DeclContext *dc, bool allowUsableFromInline) {
   DirectlyReferencedTypeDecls current;
 
   for (const auto &component : ident->getComponentRange()) {
@@ -2449,7 +2463,8 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
         directReferencesForUnqualifiedTypeLookup(component->getNameRef(),
                                                  component->getLoc(),
                                                  dc,
-                                                 LookupOuterResults::Excluded);
+                                                 LookupOuterResults::Excluded,
+                                                 allowUsableFromInline);
 
       // If we didn't find anything, fail now.
       if (current.empty())
@@ -2461,7 +2476,8 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For subsequent components, perform qualified name lookup.
     current =
         directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
-                                               component->getNameRef(), dc);
+                                               component->getNameRef(), dc,
+                                               allowUsableFromInline);
     if (current.empty())
       return current;
   }
@@ -2472,7 +2488,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
 static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator,
                             ASTContext &ctx, TypeRepr *typeRepr,
-                            DeclContext *dc) {
+                            DeclContext *dc, bool allowUsableFromInline) {
   switch (typeRepr->getKind()) {
   case TypeReprKind::Array:
     return {1, ctx.getArrayDecl()};
@@ -2480,7 +2496,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Attributed: {
     auto attributed = cast<AttributedTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
-                                       attributed->getTypeRepr(), dc);
+                                       attributed->getTypeRepr(), dc,
+                                       allowUsableFromInline);
   }
 
   case TypeReprKind::Composition: {
@@ -2488,7 +2505,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     auto composition = cast<CompositionTypeRepr>(typeRepr);
     for (auto component : composition->getTypes()) {
       auto componentResult =
-          directReferencesForTypeRepr(evaluator, ctx, component, dc);
+          directReferencesForTypeRepr(evaluator, ctx, component, dc,
+                                      allowUsableFromInline);
       result.insert(result.end(),
                     componentResult.begin(),
                     componentResult.end());
@@ -2500,7 +2518,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::GenericIdent:
   case TypeReprKind::SimpleIdent:
     return directReferencesForIdentTypeRepr(evaluator, ctx,
-                                            cast<IdentTypeRepr>(typeRepr), dc);
+                                            cast<IdentTypeRepr>(typeRepr), dc,
+                                            allowUsableFromInline);
 
   case TypeReprKind::Dictionary:
     return { 1, ctx.getDictionaryDecl()};
@@ -2509,7 +2528,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     auto tupleRepr = cast<TupleTypeRepr>(typeRepr);
     if (tupleRepr->isParenType()) {
       return directReferencesForTypeRepr(evaluator, ctx,
-                                         tupleRepr->getElementType(0), dc);
+                                         tupleRepr->getElementType(0), dc,
+                                         allowUsableFromInline);
     }
     return { };
   }
@@ -2715,7 +2735,8 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = ext->getASTContext();
   DirectlyReferencedTypeDecls referenced =
-    directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext->getParent());
+    directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext->getParent(),
+                                ext->isInSpecializeExtensionContext());
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
@@ -3100,10 +3121,17 @@ static bool checkForDynamicAttribute(Evaluator &eval, NominalTypeDecl *decl) {
     return evaluateOrDefault(eval, Req{decl}, false);
   };
 
-  // Check the protocols the type conforms to.
-  for (auto *proto : decl->getAllProtocols()) {
-    if (hasAttribute(proto))
-      return true;
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    // Check inherited protocols of a protocol.
+    for (auto *otherProto : proto->getInheritedProtocols())
+      if (hasAttribute(otherProto))
+        return true;
+  } else {
+    // Check the protocols the type conforms to.
+    for (auto *otherProto : decl->getAllProtocols()) {
+      if (hasAttribute(otherProto))
+        return true;
+    }
   }
 
   // Check the superclass if present.

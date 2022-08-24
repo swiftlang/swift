@@ -1621,6 +1621,10 @@ static void computeDiagnostics(
       auto Diagnostics = DiagConsumer.getDiagnosticsForBuffer(BufferID);
       Receiver(RequestResult<DiagnosticsResult>::fromResult(Diagnostics));
     }
+
+    void cancelled() override {
+      Receiver(RequestResult<DiagnosticsResult>::cancelled());
+    }
   };
 
   auto Consumer = std::make_shared<DiagnosticsConsumer>(std::move(Receiver));

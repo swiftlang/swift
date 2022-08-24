@@ -151,6 +151,20 @@ isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
   return false;
 }
 
+StringRef
+swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
+                                      CustomNamesOnly_t customNamesOnly) {
+  if (const auto *Expose = VD->getAttrs().getAttribute<ExposeAttr>()) {
+    if (!Expose->Name.empty())
+      return Expose->Name;
+  }
+
+  if (customNamesOnly)
+    return StringRef();
+
+  return VD->getBaseIdentifier().str();
+}
+
 bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
                                             AccessLevel minRequiredAccess,
                                             bool checkParent) {

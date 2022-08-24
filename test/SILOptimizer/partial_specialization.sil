@@ -126,24 +126,24 @@ bb0(%0 : $*U):
 
 // Check that partial specialization is not performed for generic type parameters where
 // the substitution contains an open existential.
-// CHECK-LABEL: sil @simple_generic_caller4 : $@convention(thin) (@in P, Builtin.Int1) -> ()
+// CHECK-LABEL: sil @simple_generic_caller4 : $@convention(thin) (@in any P, Builtin.Int1) -> ()
 // CHECK: function_ref @$s21simple_generic_calleexBi1_Bi1_Rs_r0_lIetiy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int1> (@in τ_0_0, Builtin.Int1) -> ()
 // CHECK: // end sil function 'simple_generic_caller4' 
 sil @simple_generic_caller4 : $@convention(thin) (@in P, Builtin.Int1) -> () {
 bb0(%0 : $*P, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
-  %2 = open_existential_addr mutable_access %0 : $*P to $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
-  %3 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
-	copy_addr [take] %2 to [initialization] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
+  %2 = open_existential_addr mutable_access %0 : $*P to $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+  %3 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+	copy_addr [take] %2 to [initialization] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   %5 = alloc_stack $Builtin.Int1
   store %1 to %5 : $*Builtin.Int1
   // function_ref simple_generic_callee<A, B>(_:_:)
   %7 = function_ref @simple_generic_callee : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
-  %8 = apply %7<@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P, Builtin.Int1>(%3, %5) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  %8 = apply %7<@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self, Builtin.Int1>(%3, %5) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
   dealloc_stack %5 : $*Builtin.Int1
-  destroy_addr %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
-  dealloc_stack %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
+  destroy_addr %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+  dealloc_stack %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   br bb3
 bb2:
   destroy_addr %0 : $*P

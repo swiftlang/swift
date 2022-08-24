@@ -14,6 +14,7 @@
 #include "ClangSyntaxPrinter.h"
 #include "PrintClangValueType.h"
 #include "swift/AST/Decl.h"
+#include "swift/IRGen/Linking.h"
 
 using namespace swift;
 
@@ -23,32 +24,57 @@ void ClangClassTypePrinter::printClassTypeDecl(
 
   ClangSyntaxPrinter printer(os);
 
+  auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
+      typeDecl->getDeclaredType()->getCanonicalType());
+  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
+
   // Print out a forward declaration of the "hidden" _impl class.
   printer.printNamespace(cxx_synthesis::getCxxImplNamespaceName(),
                          [&](raw_ostream &os) {
                            os << "class ";
                            printCxxImplClassName(os, typeDecl);
                            os << ";\n";
+                           // Print out special functions, like functions that
+                           // access type metadata.
+                           printer.printCTypeMetadataTypeFunction(
+                               typeDecl, typeMetadataFuncName);
                          });
 
-  StringRef baseClassName = "RefCountedClass";
-  StringRef baseClassQualifiedName = "swift::_impl::RefCountedClass";
+  std::string baseClassName;
+  std::string baseClassQualifiedName;
+
+  if (auto *parentClass = typeDecl->getSuperclassDecl()) {
+    llvm::raw_string_ostream baseNameOS(baseClassName);
+    ClangSyntaxPrinter(baseNameOS).printBaseName(parentClass);
+    llvm::raw_string_ostream baseQualNameOS(baseClassQualifiedName);
+    ClangSyntaxPrinter(baseQualNameOS)
+        .printModuleNamespaceQualifiersIfNeeded(parentClass->getModuleContext(),
+                                                typeDecl->getModuleContext());
+    if (!baseQualNameOS.str().empty())
+      baseQualNameOS << "::";
+    baseQualNameOS << baseNameOS.str();
+  } else {
+    baseClassName = "RefCountedClass";
+    baseClassQualifiedName = "swift::_impl::RefCountedClass";
+  }
 
   os << "class ";
   printer.printBaseName(typeDecl);
-  // FIXME: Add support for inherintance.
-  os << " final : public " << baseClassQualifiedName;
+  if (typeDecl->isFinal())
+    os << " final";
+  os << " : public " << baseClassQualifiedName;
   os << " {\n";
   os << "public:\n";
 
   os << "  using " << baseClassName << "::" << baseClassName << ";\n";
   os << "  using " << baseClassName << "::operator=;\n";
-
-  os << "private:\n";
+  bodyPrinter();
+  os << "protected:\n";
   os << "  inline ";
   printer.printBaseName(typeDecl);
   os << "(void * _Nonnull ptr) noexcept : " << baseClassName << "(ptr) {}\n";
-  os << "\n  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  os << "private:\n";
+  os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
   os << "};\n\n";
@@ -67,6 +93,9 @@ void ClangClassTypePrinter::printClassTypeDecl(
         os << "(ptr); }\n";
         os << "};\n";
       });
+
+  ClangValueTypePrinter::printTypeGenericTraits(os, typeDecl,
+                                                typeMetadataFuncName);
 }
 
 void ClangClassTypePrinter::printClassTypeReturnScaffold(

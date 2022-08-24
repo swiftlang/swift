@@ -531,6 +531,9 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl,
+                                  DeclContext *newContext) override;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   void diagnoseTopLevelValue(const DeclName &name) override;

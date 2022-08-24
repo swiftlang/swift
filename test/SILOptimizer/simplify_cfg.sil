@@ -2481,7 +2481,7 @@ sil @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, 
 sil @non_throwing_closure : $@convention(thin) (Int) -> Int
 
 // CHECK-LABEL: sil @replace_try_apply_with_apply
-// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error any Error)) -> (Int, @error any Error)
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return [[R]] : $Int
 sil @replace_try_apply_with_apply : $@convention(thin) () -> Int {
@@ -2948,10 +2948,10 @@ class IsQ : Q {}
 // ---
 // CHECK-LABEL: sil @test_dead_checked_cast_br : $@convention(thin) (@in IsQ) -> () {
 // CHECK: bb0(%0 : $*IsQ):
-// CHECK:   [[Q:%.*]] = alloc_stack $Q
+// CHECK:   [[Q:%.*]] = alloc_stack $any Q
 // CHECK:   [[LD:%.*]] = load %0 : $*IsQ
 // CHECK:   strong_release [[LD]] : $IsQ
-// CHECK:   dealloc_stack [[Q]] : $*Q
+// CHECK:   dealloc_stack [[Q]] : $*any Q
 // CHECK:   [[R:%.*]] = tuple ()
 // CHECK:   return [[R]] : $()
 // CHECK-LABEL: } // end sil function 'test_dead_checked_cast_br'

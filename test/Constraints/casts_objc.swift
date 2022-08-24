@@ -43,8 +43,9 @@ func test(_ a : CFString!, b : CFString) {
 let r22507759: NSObject! = "test" as NSString
 let _: NSString! = unsafeDowncast(r22507759)  // expected-error {{missing argument for parameter 'to' in call}}
 
-// rdar://problem/29496775 / SR-3319
-func sr3319(f: CGFloat, n: NSNumber) {
+// rdar://problem/29496775
+// https://github.com/apple/swift/issues/45907
+func f_45907(f: CGFloat, n: NSNumber) {
   let _ = [f].map { $0 as NSNumber }
   let _ = [n].map { $0 as! CGFloat }
 }

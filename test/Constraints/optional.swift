@@ -201,29 +201,32 @@ func compare<T: PPPP>(v: T, u: T!) -> Bool {
   return v ++++ u
 }
 
-func sr2752(x: String?, y: String?) {
+// https://github.com/apple/swift/issues/45356
+func f_45356(x: String?, y: String?) {
   _ = x.map { xx in
     y.map { _ in "" } ?? "\(xx)"
   }
 }
 
-// SR-3248 - Invalid diagnostic calling implicitly unwrapped closure
-var sr3248 : ((Int) -> ())!
-sr3248?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
-sr3248!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
-sr3248(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
+// https://github.com/apple/swift/issues/45836
+// Invalid diagnostic calling implicitly unwrapped closure
+do {
+  var x : ((Int) -> ())!
+  x?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
+  x!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
+  x(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
 
-struct SR_3248 {
+  struct S {
     var callback: (([AnyObject]) -> Void)!
+  }
+
+  S().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+  S().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+  S().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+
+  _? = nil  // expected-error {{'nil' requires a contextual type}}
+  _?? = nil // expected-error {{'nil' requires a contextual type}}
 }
-
-SR_3248().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
-SR_3248().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
-SR_3248().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
-
-_? = nil  // expected-error {{'nil' requires a contextual type}}
-_?? = nil // expected-error {{'nil' requires a contextual type}}
-
 
 // rdar://problem/29993596
 func takeAnyObjects(_ lhs: AnyObject?, _ rhs: AnyObject?) { }
@@ -238,7 +241,8 @@ func testAnyObjectImplicitForce(lhs: AnyObject?!, rhs: AnyObject?) {
   takeAnyObjects(lhs, rhs)
 }
 
-// SR-4056
+// https://github.com/apple/swift/issues/46639
+
 protocol P1 { }
 
 class C1: P1 { }
@@ -305,8 +309,11 @@ func rdar45218255(_ i: Int) {
   _ = S<Int>([i!]) // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{16-17=}}
 }
 
-// rdar://problem/47967277 - cannot assign through '!': '$0' is immutable
-func sr_9893_1() {
+// rdar://problem/47967277
+// https://github.com/apple/swift/issues/52299
+// Cannot assign through '!': '$0' is immutable
+
+func f1_52299() {
   func foo<T : Equatable>(_: @autoclosure () throws -> T,
                           _: @autoclosure () throws -> T) {}
 
@@ -321,7 +328,7 @@ func sr_9893_1() {
   foo(Set(arr1.map { $0.bar! }), Set([r1, r2].map { $0.bar! })) // Ok
 }
 
-func sr_9893_2(cString: UnsafePointer<CChar>) {
+func f2_52299(cString: UnsafePointer<CChar>) {
   struct S {
     var a: Int32 = 0
     var b = ContiguousArray<CChar>(repeating: 0, count: 10)
@@ -376,8 +383,9 @@ func rdar_53238058() {
   }
 }
 
-// SR-8411 - Inconsistent ambiguity with optional and non-optional inout-to-pointer
-func sr8411() {
+// https://github.com/apple/swift/issues/50936
+// Inconsistent ambiguity with optional and non-optional inout-to-pointer
+do {
   struct S {
     init(_ x: UnsafeMutablePointer<Int>) {}
     init(_ x: UnsafeMutablePointer<Int>?) {}
@@ -397,8 +405,9 @@ func sr8411() {
   S.bar(&foo, 42) // Ok
 }
 
-// SR-11104 - Slightly misleading diagnostics for contextual failures with multiple fixes
-func sr_11104() {
+// https://github.com/apple/swift/issues/53499
+// Slightly misleading diagnostics for contextual failures with multiple fixes
+do {
   func bar(_: Int) {}
 
   bar(["hello"].first)
@@ -430,8 +439,9 @@ func invalidOptionalChaining(a: Any) {
   // expected-note@-2 {{requirement from conditional conformance of 'Any?' to 'Equatable'}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
-// SR-12309 - Force unwrapping 'nil' compiles without warning
-func sr_12309() {
+/// https://github.com/apple/swift/issues/54739
+/// Force unwrapping `nil` compiles without warning
+do {
   struct S {
     var foo: Int
   }
@@ -512,3 +522,46 @@ func rdar85166519() {
 
 // https://github.com/apple/swift/issues/58539
 if let x = nil {} // expected-error{{'nil' requires a contextual type}}
+
+// https://github.com/apple/swift/issues/56699
+let singleOptionalClosure: (() -> Void)? = nil
+let doubleOptionalClosure: (() -> Void)?? = nil
+singleOptionalClosure()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{22-22=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{22-22=??}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure?()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{23-23=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+doubleOptionalClosure!()
+// expected-error@-1 {{value of optional type}}
+// expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{23-23=?}}
+// expected-note@-3 {{coalesce}}
+// expected-note@-4 {{force-unwrap}}
+
+struct FunctionContainer {
+  func test() {}
+}
+
+func testFunctionContainerMethodCall(container: FunctionContainer?) {
+  let fn = container?.test
+   // expected-note@-1 {{short-circuit}}
+   // expected-note@-2 {{coalesce}}
+   // expected-note@-3 {{force-unwrap}}
+  fn()
+  // expected-error@-1 {{value of optional type}}
+  // expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{5-5=?}}
+  // expected-note@-3 {{coalesce}}
+  // expected-note@-4 {{force-unwrap}}
+}

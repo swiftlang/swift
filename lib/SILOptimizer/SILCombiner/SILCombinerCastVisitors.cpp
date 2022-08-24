@@ -291,7 +291,8 @@ SILCombiner::optimizeAlignment(PointerToAddressInst *ptrAdrInst) {
   if (match(alignOper,
             m_ApplyInst(BuiltinValueKind::Alignof))) {
     CanType formalType = cast<BuiltinInst>(alignOper)->getSubstitutions()
-      .getReplacementTypes()[0]->getCanonicalType(ptrAdrInst->getFunction()->getGenericSignature());
+      .getReplacementTypes()[0]->getReducedType(
+          ptrAdrInst->getFunction()->getGenericSignature());
 
     SILType instanceType = ptrAdrInst->getFunction()->getLoweredType(
       Lowering::AbstractionPattern::getOpaque(), formalType);

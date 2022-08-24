@@ -264,6 +264,24 @@ struct ClosureOperandState {
 
 } // namespace
 
+/// Is this a reinit instruction that we know how to convert into its init form.
+static bool isReinitToInitConvertibleInst(Operand *memUse) {
+  auto *memInst = memUse->getUser();
+  switch (memInst->getKind()) {
+  default:
+    return false;
+
+  case SILInstructionKind::CopyAddrInst: {
+    auto *cai = cast<CopyAddrInst>(memInst);
+    return !cai->isInitializationOfDest();
+  }
+  case SILInstructionKind::StoreInst: {
+    auto *si = cast<StoreInst>(memInst);
+    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
+  }
+  }
+}
+
 static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
   switch (memInst->getKind()) {
   default:
@@ -932,7 +950,7 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
   }
 
-  if (memInstMustReinitialize(op)) {
+  if (isReinitToInitConvertibleInst(op)) {
     if (stripAccessMarkers(op->get()) != useState.address) {
       LLVM_DEBUG(llvm::dbgs()
                  << "!!! Error! Found reinit use not on base address: "
@@ -1308,7 +1326,7 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
     return true;
   }
 
-  if (memInstMustReinitialize(op)) {
+  if (isReinitToInitConvertibleInst(op)) {
     if (stripAccessMarkers(op->get()) != useState.address) {
       LLVM_DEBUG(llvm::dbgs()
                  << "!!! Error! Found reinit use not on base address: "

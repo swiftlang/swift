@@ -135,7 +135,8 @@ case let x?: break // expected-warning{{immutable value 'x' was never used; cons
 case nil: break
 }
 
-func SR2066(x: Int?) {
+// https://github.com/apple/swift/issues/44675
+func f_44675(x: Int?) {
     // nil literals should still work when wrapped in parentheses
     switch x {
     case (nil): break
@@ -247,15 +248,15 @@ func ugly(_ a: A<EE>) {
   }
 }
 
-// SR-2057
+// https://github.com/apple/swift/issues/44666
+do {
+  enum E {
+    case foo
+  }
 
-enum SR2057 {
-  case foo
+  let x: E?
+  if case .foo = x { } // Ok
 }
-
-let sr2057: SR2057?
-if case .foo = sr2057 { } // Ok
-
 
 // Invalid 'is' pattern
 class SomeClass {}
@@ -337,7 +338,8 @@ func rdar32241441() {
 }
 
 
-// SR-6100
+// https://github.com/apple/swift/issues/48655
+
 struct One<Two> { // expected-note{{'Two' declared as parameter to type 'One'}}
     public enum E: Error {
         // if you remove associated value, everything works
@@ -352,9 +354,10 @@ func testOne() {
   }
 }
 
-// SR-8347
-// constrain initializer expressions of optional some pattern bindings to be optional
-func test8347() -> String {
+// https://github.com/apple/swift/issues/50875
+// Constrain initializer expressions of optional some pattern bindings to
+// be optional.
+func test_50875() -> String {
   struct C {
     subscript (s: String) -> String? {
       return ""
@@ -404,29 +407,32 @@ func test8347() -> String {
   }
 }
 
-enum SR_7799 {
- case baz
- case bar
+// https://github.com/apple/swift/issues/50338
+do {
+  enum E {
+   case baz
+   case bar
+  }
+
+  let oe: E? = .bar
+
+  switch oe {
+   case .bar?: break // Ok
+   case .baz: break // Ok
+   default: break
+  }
+
+  let ooe: E?? = .baz
+
+  switch ooe {
+   case .bar?: break // Ok
+   case .baz: break // Ok
+   default: break
+  }
+
+  if case .baz = ooe {} // Ok
+  if case .bar? = ooe {} // Ok
 }
-
-let sr7799: SR_7799? = .bar
-
-switch sr7799 {
- case .bar?: break // Ok
- case .baz: break // Ok
- default: break
-}
-
-let sr7799_1: SR_7799?? = .baz
-
-switch sr7799_1 {
- case .bar?: break // Ok
- case .baz: break // Ok
- default: break
-}
-
-if case .baz = sr7799_1 {} // Ok
-if case .bar? = sr7799_1 {} // Ok
 
 // rdar://problem/60048356 - `if case` fails when `_` pattern doesn't have a label
 func rdar_60048356() {
@@ -486,6 +492,7 @@ func rdar63510989() {
   }
 
   func test(e: E) {
+    if case .single(_) = e {} // Ok
     if case .single(_ as Value) = e {} // Ok
     if case .single(let v as Value) = e {} // Ok
     // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
@@ -519,4 +526,17 @@ func rdar64157451() {
 func rdar80797176 () {
   for x: Int in [1, 2] where x.bitWidth == 32 { // Ok
   }
+}
+
+// https://github.com/apple/swift/issues/60029
+for (key, values) in oldName { // expected-error{{cannot find 'oldName' in scope}}
+  for (idx, value) in values.enumerated() {
+    print(key, idx, value)
+  }
+}
+
+// https://github.com/apple/swift/issues/60503
+func f60503() {
+  let (key, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
+  let (_, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
 }

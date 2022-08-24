@@ -56,7 +56,8 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::MemberRefBase:
   case ConstraintLocator::UnresolvedMember:
   case ConstraintLocator::ParentType:
-  case ConstraintLocator::ExistentialSuperclassType:
+  case ConstraintLocator::ExistentialConstraintType:
+  case ConstraintLocator::ProtocolCompositionSuperclassType:
   case ConstraintLocator::LValueConversion:
   case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
@@ -98,6 +99,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PackElement:
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
+  case ConstraintLocator::AnyPatternDecl:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -120,6 +122,9 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   auto dumpReqKind = [&out](RequirementKind kind) {
     out << " (";
     switch (kind) {
+    case RequirementKind::SameCount:
+      out << "same_length";
+      break;
     case RequirementKind::Conformance:
       out << "conformance";
       break;
@@ -246,8 +251,12 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "parent type";
     break;
 
-  case ConstraintLocator::ExistentialSuperclassType:
-    out << "existential superclass type";
+  case ConstraintLocator::ExistentialConstraintType:
+    out << "existential constraint type";
+    break;
+
+  case ConstraintLocator::ProtocolCompositionSuperclassType:
+    out << "protocol composition superclass type";
     break;
 
   case ConstraintLocator::LValueConversion:
@@ -445,6 +454,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::NamedPatternDecl: {
     out << "named pattern decl";
+    break;
+  }
+
+  case ConstraintLocator::AnyPatternDecl: {
+    out << "'_' pattern decl";
     break;
   }
   }

@@ -2483,7 +2483,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
 
   // The literal can produce any type that conforms to its ExpressibleBy
   // protocol. Figure out as which type we want to show it in code completion.
-  auto *P = Ctx.getProtocol(protocolForLiteralKind(kind));
+  auto *PD = Ctx.getProtocol(protocolForLiteralKind(kind));
   for (auto T : expectedTypeContext.getPossibleTypes()) {
     if (!T)
       continue;
@@ -2497,9 +2497,8 @@ void CompletionLookup::addTypeRelationFromProtocol(
     }
 
     // Check for conformance to the literal protocol.
-    if (auto *NTD = T->getAnyNominal()) {
-      SmallVector<ProtocolConformance *, 2> conformances;
-      if (NTD->lookupConformance(P, conformances)) {
+    if (T->getAnyNominal()) {
+      if (CurrModule->lookupConformance(T, PD)) {
         literalType = T;
         break;
       }

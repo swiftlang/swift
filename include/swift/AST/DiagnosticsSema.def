@@ -979,6 +979,10 @@ REMARK(cross_import_added,none,
 REMARK(module_loaded,none,
        "loaded module at %0",
        (StringRef))
+       
+REMARK(explicit_interface_build_skipped,none,
+       "Skipped rebuilding module at %0 - up-to-date",
+       (StringRef))
 
 WARNING(cannot_find_project_version,none,
         "cannot find user version number for %0 module '%1'; version number ignored", (StringRef, StringRef))
@@ -1166,6 +1170,9 @@ NOTE(unwrap_iuo_initializer,none,
 NOTE(unwrap_with_guard,none,
      "short-circuit using 'guard' to exit this function early "
      "if the optional value contains 'nil'", ())
+NOTE(perform_optional_chain_on_function_type, none,
+     "use optional chaining to call this value of function type when optional "
+     "is non-'nil'", ())
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
@@ -1473,6 +1480,11 @@ ERROR(cdecl_empty_name,none,
       "@_cdecl symbol name cannot be empty", ())
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
+
+ERROR(expose_only_non_other_attr,none,
+      "@_expose attribute cannot be applied to an '%0' declaration", (StringRef))
+ERROR(expose_inside_unexposed_decl,none,
+      "@_expose attribute cannot be applied inside of unexposed declaration %0", (DeclName))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -1919,7 +1931,7 @@ NOTE(extension_stored_property_fixit,none,
      "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
-      (Identifier))
+      (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause",
       (Identifier))
@@ -1935,6 +1947,8 @@ ERROR(invalid_nominal_extension,none,
       (Type, Type))
 NOTE(invalid_nominal_extension_rewrite,none,
      "did you mean to extend %0 instead?", (Type))
+ERROR(synthesized_nominal_extension,none,
+      "cannot extend synthesized type %0", (Type))
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -2335,10 +2349,10 @@ NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
-     "was the same type as}2 %1", (Type, Type, unsigned))
+     "was the same type as|%error|%error}2 %1", (Type, Type, unsigned))
 NOTE(protocol_type_witness_missing_requirement,none,
      "candidate would match if the conformance required that %0 "
-     "%select{conformed to|subclassed|was the same type as}2 %1",
+     "%select{conformed to|subclassed|was the same type as|%error|%error}2 %1",
      (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
@@ -2460,11 +2474,13 @@ WARNING(append_interpolation_access_control,none,
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
-      "associated type %0 can only be used with a concrete type or "
-      "generic parameter base", (DeclNameRef))
+      "cannot access associated type %0 from %1; use a concrete type or "
+      "generic parameter base instead",
+      (DeclNameRef, Type))
 ERROR(typealias_outside_of_protocol,none,
-      "type alias %0 can only be used with a concrete type or "
-      "generic parameter base", (DeclNameRef))
+      "cannot access type alias %0 from %1; use a concrete type or "
+      "generic parameter base instead",
+      (DeclNameRef, Type))
 
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
@@ -2503,6 +2519,10 @@ ERROR(recursive_generic_signature,none,
       "%0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_generic_signature_extension,none,
       "extension of %0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
+ERROR(recursive_same_type_constraint,none,
+      "same-type constraint %0 == %1 is recursive", (Type, Type))
+ERROR(recursive_superclass_constraint,none,
+      "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
@@ -2969,6 +2989,13 @@ ERROR(implementation_only_override_import_without_attr,none,
       "override of %0 imported as implementation-only must be declared "
       "'@_implementationOnly'", (DescriptiveDeclKind))
 
+ERROR(import_attr_conflict,none,
+      "%0 inconsistently imported with %1",
+      (Identifier, DeclAttribute))
+NOTE(import_attr_conflict_here,none,
+     "imported with %0 here",
+     (DeclAttribute))
+
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
@@ -3190,6 +3217,10 @@ ERROR(reasync_without_async_parameter,none,
 
 ERROR(inherits_executor_without_async,none,
       "non-async functions cannot inherit an executor", ())
+
+ERROR(eagermove_and_lexical_combined,none,
+      "@_eagerMove and @_lexical attributes are alternate styles of lifetimes "
+      "and can't be combined", ())
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
@@ -3763,7 +3794,11 @@ ERROR(should_use_empty_dictionary_literal,none,
 // Dictionary literals
 ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
-
+WARNING(duplicated_literal_keys_in_dictionary_literal, none,
+        "dictionary literal of type %0 has duplicate entries for %1 literal key%select{ %3|}2",
+        (Type, StringRef, bool, StringRef))
+NOTE(duplicated_key_declared_here, none, 
+     "duplicate key declared here", ())
 
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,none,
@@ -4783,6 +4818,9 @@ ERROR(nonisolated_local_var,none,
 ERROR(nonisolated_actor_sync_init,none,
       "'nonisolated' on an actor's synchronous initializer is invalid",
       ())
+ERROR(nonisolated_wrapped_property,none,
+      "'nonisolated' is not supported on properties with property wrappers",
+      ())
 
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
@@ -4859,6 +4897,14 @@ ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
 ERROR(global_actor_top_level_var,none,
       "top-level code variables cannot have a global actor", ())
+ERROR(global_actor_access,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 "
+      "cannot have %select{private|fileprivate|internal|%error|%error}3 "
+      "global actor %4",
+      (AccessLevel, DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(global_actor_not_usable_from_inline,none,
+      "global actor for %0 %1 must be '@usableFromInline' or public",
+      (DescriptiveDeclKind, DeclName))
 
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
@@ -5084,8 +5130,10 @@ ERROR(differentiable_function_type_no_differentiability_parameters,
       (/*isLinear*/ bool))
 
 // SIL
-ERROR(opened_non_protocol,none,
-      "@opened cannot be applied to non-protocol type %0", (Type))
+ERROR(opened_bad_constraint_type,none,
+      "@opened constraint type %0 is not a protocol or protocol composition", (Type))
+ERROR(opened_bad_interface_type,none,
+      "@opened interface type %0 is not a type parameter", (Type))
 ERROR(sil_function_ellipsis,PointsToFirstBadToken,
       "SIL function types cannot be variadic", ())
 ERROR(sil_function_input_label,PointsToFirstBadToken,
@@ -5213,7 +5261,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "
@@ -5824,6 +5872,10 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "%4 was not imported by this file}5",
       (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 
+NOTE(missing_import_inserted,
+     none, "The missing import of module %0 will be added implicitly",
+     (Identifier))
+
 ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
       (unsigned))
@@ -6421,6 +6473,8 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
 
 ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' may only be applied to classes, structs, and enums", ())
+ERROR(move_expression_not_passed_lvalue,none,
+      "'move' can only be applied to lvalues", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

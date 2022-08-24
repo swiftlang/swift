@@ -229,7 +229,7 @@ public protocol P : class {
 // CHECK-LABEL: sil @dont_hoist_metatype
 // CHECK-NOT: metatype
 // CHECK-NOT: witness_method
-// CHECK: bb1({{%.*}} : $P)
+// CHECK: bb1({{%.*}} : $any P)
 // CHECK-NOT: metatype
 // CHECK-NOT: witness_method
 // CHECK: open_existential_ref
@@ -242,10 +242,10 @@ bb0(%0 : $*Builtin.Int1, %1 : $P):
 
 // Loop
 bb1(%existential : $P):
-  %2 = open_existential_ref %existential : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P
-  %3 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P).Type
-  %4 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo, %2 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
-  %5 = apply %4<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %2 = open_existential_ref %existential : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self
+  %3 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self).Type
+  %4 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self, #P.foo, %2 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %5 = apply %4<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
   %6 = load %0 : $*Builtin.Int1
   cond_br %6, bb3, bb1(%existential : $P)
 

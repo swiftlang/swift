@@ -58,7 +58,8 @@ TRIVIAS = [
            'A documentation block comment, starting with \'/**\' and ending '
            'with \'*/\'.',
            is_comment=True, serialization_code=11),
-    Trivia('GarbageText', 'Any skipped garbage text.', serialization_code=12),
+    Trivia('UnexpectedText', 'Any skipped unexpected text.',
+           serialization_code=12),
     Trivia('Shebang', 'A script command, starting with \'#!\'.',
            serialization_code=13),
 ]

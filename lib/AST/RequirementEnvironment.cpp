@@ -36,7 +36,7 @@ RequirementEnvironment::RequirementEnvironment(
                                            GenericSignature reqSig,
                                            ProtocolDecl *proto,
                                            ClassDecl *covariantSelf,
-                                           ProtocolConformance *conformance)
+                                           RootProtocolConformance *conformance)
     : reqSig(reqSig) {
   ASTContext &ctx = conformanceDC->getASTContext();
 
@@ -179,9 +179,9 @@ RequirementEnvironment::RequirementEnvironment(
 
   if (conformanceSig) {
     for (auto &rawReq : conformanceSig.getRequirements()) {
-      if (auto req = rawReq.subst(conformanceToWitnessThunkTypeFn,
-                                  conformanceToWitnessThunkConformanceFn))
-        requirements.push_back(*req);
+      auto req = rawReq.subst(conformanceToWitnessThunkTypeFn,
+                              conformanceToWitnessThunkConformanceFn);
+      requirements.push_back(req);
     }
   }
 
@@ -205,8 +205,8 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
   for (auto &rawReq : reqSig.getRequirements()) {
-    if (auto req = rawReq.subst(reqToWitnessThunkSigMap))
-      requirements.push_back(*req);
+    auto req = rawReq.subst(reqToWitnessThunkSigMap);
+    requirements.push_back(req);
   }
 
   witnessThunkSig = buildGenericSignature(ctx, GenericSignature(),

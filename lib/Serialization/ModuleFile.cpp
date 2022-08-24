@@ -79,15 +79,15 @@ static bool areCompatibleOSs(const llvm::Triple &moduleTarget,
 
 static bool isTargetTooNew(const llvm::Triple &moduleTarget,
                            const llvm::Triple &ctxTarget) {
-  unsigned major, minor, micro;
-
   if (moduleTarget.isMacOSX()) {
-    moduleTarget.getMacOSXVersion(major, minor, micro);
-    return ctxTarget.isMacOSXVersionLT(major, minor, micro);
+    llvm::VersionTuple osVersion;
+    moduleTarget.getMacOSXVersion(osVersion);
+    // TODO: Add isMacOSXVersionLT(Triple) API (or taking a VersionTuple)
+    return ctxTarget.isMacOSXVersionLT(osVersion.getMajor(),
+                                       osVersion.getMinor().getValueOr(0),
+                                       osVersion.getSubminor().getValueOr(0));
   }
-
-  moduleTarget.getOSVersion(major, minor, micro);
-  return ctxTarget.isOSVersionLT(major, minor, micro);
+  return ctxTarget.isOSVersionLT(moduleTarget);
 }
 
 ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
@@ -113,6 +113,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Types, core->Types);
   allocateBuffer(ClangTypes, core->ClangTypes);
   allocateBuffer(GenericSignatures, core->GenericSignatures);
+  allocateBuffer(GenericEnvironments, core->GenericEnvironments);
   allocateBuffer(SubstitutionMaps, core->SubstitutionMaps);
   allocateBuffer(Identifiers, core->Identifiers);
 }

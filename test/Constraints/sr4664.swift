@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/47241
+
 struct M<T> where T : Collection { // expected-note {{where 'T' = 'X.Y'}}
   static func f(a: T, b: T) -> [E<T.Iterator.Element>] {
   }

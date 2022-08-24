@@ -124,7 +124,7 @@ bb0:
 
   // CHECK: value_metatype $@thick C.Type, undef : $C
   value_metatype $@thick C.Type, undef : $C
-  // CHECK: existential_metatype $@thick P.Type, undef : $P
+  // CHECK: existential_metatype $@thick any P.Type, undef : $any P
   existential_metatype $@thick P.Type, undef : $P
 
   // Aggregate Types
@@ -171,25 +171,25 @@ bb0:
 
   // Protocol and Protocol Composition Types
 
-  // CHECK: init_existential_addr undef : $*P, $D
+  // CHECK: init_existential_addr undef : $*any P, $D
   init_existential_addr undef : $*P, $D
-  // CHECK: deinit_existential_addr undef : $*P
+  // CHECK: deinit_existential_addr undef : $*any P
   deinit_existential_addr undef : $*P
-  // CHECK: open_existential_addr immutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000") P
-  open_existential_addr immutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000") P
-  // CHECK: open_existential_addr mutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-100000000000") P
-  open_existential_addr mutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-100000000000") P
-  // CHECK: init_existential_ref undef : $D : $D, $ClassP
+  // CHECK: open_existential_addr immutable_access undef : $*any P to $*@opened("01234567-89AB-CDEF-0123-000000000000", any P) Self
+  open_existential_addr immutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000", P) Self
+  // CHECK: open_existential_addr mutable_access undef : $*any P to $*@opened("01234567-89AB-CDEF-0123-100000000000", any P) Self
+  open_existential_addr mutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-100000000000", P) Self
+  // CHECK: init_existential_ref undef : $D : $D, $any ClassP
   init_existential_ref undef : $D : $D, $ClassP
-  // CHECK: open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001") ClassP
-  open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001") ClassP
-  // CHECK: init_existential_metatype undef : $@thick D.Type, $@thick P.Type
+  // CHECK: open_existential_ref undef : $any ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001", any ClassP) Self
+  open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001", ClassP) Self
+  // CHECK: init_existential_metatype undef : $@thick D.Type, $@thick any P.Type
   init_existential_metatype undef : $@thick D.Type, $@thick P.Type
-  // CHECK: open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
-  open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
-  // CHECK: open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003") Error
-  open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003") Error
-  // CHECK: dealloc_existential_box undef : $Error, $()
+  // CHECK: open_existential_metatype undef : $@thick any P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002", any P) Self).Type
+  open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002", P) Self).Type
+  // CHECK: open_existential_box undef : $any Error to $*@opened("01234567-89AB-CDEF-0123-000000000003", any Error) Self
+  open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003", Error) Self
+  // CHECK: dealloc_existential_box undef : $any Error, $()
   dealloc_existential_box undef : $Error, $()
 
   // Blocks
@@ -331,7 +331,7 @@ bb3:
 
 sil @dynamic_method_br_test : $() -> () {
 bb0:
-  // CHECK: dynamic_method_br undef : $P, #C.fn!foreign, bb1, bb2
+  // CHECK: dynamic_method_br undef : $any P, #C.fn!foreign, bb1, bb2
   dynamic_method_br undef : $P, #C.fn!foreign, bb1, bb2
 bb1(%x : $@convention(objc_method) (P) -> ()):
   br bb3
@@ -368,7 +368,7 @@ bb3:
 
 sil @try_apply_test : $() -> () {
 bb0:
-  // CHECK: try_apply undef(undef) : $@convention(thin) (()) -> @error Error, normal bb1, error bb2
+  // CHECK: try_apply undef(undef) : $@convention(thin) (()) -> @error any Error, normal bb1, error bb2
   try_apply undef(undef) : $@convention(thin) (()) -> @error Error, normal bb1, error bb2
 bb1(%1 : $()):
   br bb3

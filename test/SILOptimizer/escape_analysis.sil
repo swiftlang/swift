@@ -731,10 +731,10 @@ bb2(%5 : $LinkedNode):
 // CHECK-NEXT:    Val [ref] %3 Esc: , Succ: (%0.1), %0
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %3
 // CHECK-NEXT:  End
-sil @call_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
+sil @call_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error any Error) {
 bb0(%0 : $X):
-  %1 = function_ref @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
-  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error Error), normal bb1, error bb2
+  %1 = function_ref @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error any Error)
+  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error any Error), normal bb1, error bb2
 
 bb1(%3 : $X):
   return %3 : $X
@@ -751,7 +751,7 @@ bb2(%5 : $Error):
 // CHECK-NEXT:    Con [ref] %3.1 Esc: G, Succ:
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %0
 // CHECK-NEXT:  End
-sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
+sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error any Error) {
 bb0(%0 : $X):
   cond_br undef, bb1, bb2
 
@@ -777,10 +777,10 @@ bb2:
 // CHECK-NEXT:    Con [ref] %3.2 Esc: G, Succ:
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %3
 // CHECK-NEXT:  End
-sil @call_unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
+sil @call_unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error any Error) {
 bb0(%0 : $X):
-  %1 = function_ref @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
-  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error Error), normal bb1, error bb2
+  %1 = function_ref @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error any Error)
+  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error any Error), normal bb1, error bb2
 
 bb1(%3 : $X):
   return %3 : $X
@@ -789,7 +789,7 @@ bb2(%5 : $Error):
   throw %5 : $Error
 }
 
-sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
+sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error any Error)
 
 // Test that the deinit of a box itself does not capture anything.
 
@@ -1027,8 +1027,8 @@ bb0(%0 : $Pointer):
   %1 = alloc_stack $P
   %2 = init_existential_addr %1 : $*P, $Pointer
   store %0 to %2 : $*Pointer
-  %4 = open_existential_addr immutable_access %1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
-  %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P, #P.foo, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %4 = open_existential_addr immutable_access %1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83", P) Self
+  %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83", P) Self, #P.foo, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %1 : $*P
   %7 = tuple ()
   return %7 : $()
@@ -1040,8 +1040,8 @@ bb0(%0 : $Pointer):
 sil @test_existential_ref : $@convention(thin) (@owned X) -> () {
 bb0(%0 : $X):
   %1 = init_existential_ref %0 : $X : $X, $ClassP
-  %2 = open_existential_ref %1 : $ClassP to $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP
-  %3 = witness_method $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP, #ClassP.foo, %2 : $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP : $@convention(witness_method: ClassP) <τ_0_0 where τ_0_0 : ClassP> (@guaranteed τ_0_0) -> ()
+  %2 = open_existential_ref %1 : $ClassP to $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83", ClassP) Self
+  %3 = witness_method $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83", ClassP) Self, #ClassP.foo, %2 : $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83", ClassP) Self : $@convention(witness_method: ClassP) <τ_0_0 where τ_0_0 : ClassP> (@guaranteed τ_0_0) -> ()
   %7 = tuple ()
   return %7 : $()
 }
@@ -1319,12 +1319,12 @@ bb0(%0 : $Array<X>):
 // CHECK-NEXT:    Val %3 Esc: , Succ: (%3.1)
 // CHECK-NEXT:    Con [ref] %3.1 Esc: %4, Succ: 
 // CHECK-NEXT: End
-sil @arraysemantics_withUnsafeMutableBufferPointer : $@convention(thin) (@inout Array<X>, @owned @callee_owned (@inout X) -> (@out (), @error Error)) -> () {
-bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error Error)):
+sil @arraysemantics_withUnsafeMutableBufferPointer : $@convention(thin) (@inout Array<X>, @owned @callee_owned (@inout X) -> (@out (), @error any Error)) -> () {
+bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error any Error)):
 
-  %2 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
+  %2 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error any Error), @inout Array<X>) -> (@out (), @error any Error)
   %3 = alloc_stack $()
-  %4 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
+  %4 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error any Error), @inout Array<X>) -> (@out (), @error any Error)
   dealloc_stack %3 : $*()
 
   %r = tuple()
@@ -1374,7 +1374,7 @@ bb0(%0 : @owned $X):
   return %5 : $Array<X>
 }
 
-sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
+sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error any Error), @inout Array<X>) -> (@out (), @error any Error)
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
 sil [_semantics "array.check_index"] @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()

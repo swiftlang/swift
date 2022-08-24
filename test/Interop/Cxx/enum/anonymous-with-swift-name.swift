@@ -44,4 +44,12 @@ AnonymousEnumsTestSuite.test("Parameter types") {
   expectEqual(all, .all)
 }
 
+AnonymousEnumsTestSuite.test("Computed properties") {
+  let parent = ParentStruct()
+
+  expectEqual(parent.colorProp, useCFColorMask(.red))
+  parent.colorProp = .green
+  expectEqual(parent.colorProp, useCFColorMask(.red))
+}
+
 runAllTests()

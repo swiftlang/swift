@@ -165,7 +165,6 @@ struct InterfaceSubContextDelegate {
                                           StringRef interfacePath,
                                           StringRef outputPath,
                                           SourceLoc diagLoc,
-                                          bool ignoreInterfaceProvidedOptions,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
                                        ArrayRef<StringRef>,
                                        ArrayRef<StringRef>, StringRef)> action) = 0;
@@ -173,7 +172,6 @@ struct InterfaceSubContextDelegate {
                                                    StringRef interfacePath,
                                                    StringRef outputPath,
                                                    SourceLoc diagLoc,
-                                                   bool ignoreInterfaceProvidedOptions,
     llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) = 0;
 
   virtual ~InterfaceSubContextDelegate() = default;

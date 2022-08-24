@@ -49,6 +49,8 @@ public:
     ExplicitlyDynamic,
     /// Has an explicit '@objc' attribute.
     ExplicitlyObjC,
+    /// Has an explicit '@objcmembers' attribute.
+    ExplicitlyObjCMembers,
     /// Has an explicit '@IBOutlet' attribute.
     ExplicitlyIBOutlet,
     /// Has an explicit '@IBAction' attribute.
@@ -101,6 +103,7 @@ private:
     case ExplicitlyCDecl:
     case ExplicitlyDynamic:
     case ExplicitlyObjC:
+    case ExplicitlyObjCMembers:
     case ExplicitlyIBOutlet:
     case ExplicitlyIBAction:
     case ExplicitlyIBSegueAction:

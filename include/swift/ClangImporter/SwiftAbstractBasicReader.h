@@ -89,6 +89,11 @@ public:
     clang::QualType type = asImpl().readTypeRef();
     return getASTContext().getQualifiedType(type, quals);
   }
+
+  const clang::BTFTypeTagAttr *readBTFTypeTagAttr() {
+    llvm::report_fatal_error("Read BTFTypeTagAttr that should never have been"
+                             " serialized");
+  }
 };
 
 }

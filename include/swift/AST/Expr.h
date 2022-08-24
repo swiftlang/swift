@@ -617,6 +617,9 @@ public:
   void setInitializer(ConcreteDeclRef initializer) {
     Initializer = initializer;
   }
+
+  /// Get description string for the literal expression.
+  StringRef getLiteralKindDescription() const;
 };
 
 /// BuiltinLiteralExpr - Common base class between all literals
@@ -2104,6 +2107,33 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Await;
   }
+};
+
+/// MoveExpr - A 'move' surrounding an lvalue expression marking the lvalue as
+/// needing to be moved.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'move' was written.
+class MoveExpr final : public IdentityExpr {
+  SourceLoc MoveLoc;
+
+public:
+  MoveExpr(SourceLoc moveLoc, Expr *sub, Type type = Type(),
+           bool implicit = false)
+      : IdentityExpr(ExprKind::Move, sub, type, implicit), MoveLoc(moveLoc) {}
+
+  static MoveExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc, Expr *sub,
+                                  Type type = Type()) {
+    return new (ctx) MoveExpr(moveLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return MoveLoc; }
+
+  SourceLoc getStartLoc() const { return MoveLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) { return e->getKind() == ExprKind::Move; }
 };
 
 /// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'. Note
@@ -4736,8 +4766,13 @@ class DotSyntaxCallExpr : public SelfApplyExpr {
   }
 
 public:
+  /// Create a new method reference to \p fnExpr on the base value \p baseArg.
+  /// 
+  /// If this is for a 'mutating' method, \p baseArg should be created using
+  /// \c Argument::implicitInOut. Otherwise, \p Argument::unlabeled should be
+  /// used. \p baseArg must not be labeled.
   static DotSyntaxCallExpr *create(ASTContext &ctx, Expr *fnExpr,
-                                   SourceLoc dotLoc, Expr *baseExpr,
+                                   SourceLoc dotLoc, Argument baseArg,
                                    Type ty = Type());
 
   SourceLoc getDotLoc() const { return DotLoc; }
@@ -5279,6 +5314,7 @@ public:
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
 
   Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::LazyInitializer;

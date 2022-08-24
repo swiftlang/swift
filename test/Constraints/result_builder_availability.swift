@@ -5,11 +5,14 @@
 @available(*, unavailable)
 @resultBuilder
 struct UnavailableBuilder {
-// expected-note@-1 {{'UnavailableBuilder' has been explicitly marked unavailable here}}
+// expected-note@-1 2 {{'UnavailableBuilder' has been explicitly marked unavailable here}}
   static func buildBlock() {}
 }
 
 @UnavailableBuilder public func usesUnavailableBuilder() {}
+// expected-error@-1 {{'UnavailableBuilder' is unavailable}}
+
+public func takesUnavailableBuilder(@UnavailableBuilder _ fn: () -> ()) {}
 // expected-error@-1 {{'UnavailableBuilder' is unavailable}}
 
 enum Either<T,U> {

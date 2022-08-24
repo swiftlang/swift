@@ -37,6 +37,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -331,12 +332,21 @@ struct ASTContext::Implementation {
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
 
+  /// A fake generic parameter list <Self> for parsing @opened archetypes
+  /// in textual SIL.
+  GenericParamList *SelfGenericParamList = nullptr;
+
   /// The single-parameter generic signature with no constraints, <T>.
   CanGenericSignature SingleGenericParameterSignature;
 
   /// The existential signature <T : P> for each P.
   llvm::DenseMap<std::pair<CanType, const GenericSignatureImpl *>, CanGenericSignature>
       ExistentialSignatures;
+
+  /// The element signature for a generic signature, constructed by dropping
+  /// @_typeSequence attributes from generic parameters.
+  llvm::DenseMap<const GenericSignatureImpl *,
+                 CanGenericSignature> ElementSignatures;
 
   /// Overridden declarations.
   llvm::DenseMap<const ValueDecl *, ArrayRef<ValueDecl *>> Overrides;
@@ -435,6 +445,9 @@ struct ASTContext::Implementation {
     /// The set of builtin protocol conformances.
     llvm::DenseMap<std::pair<Type, ProtocolDecl *>,
                    BuiltinProtocolConformance *> BuiltinConformances;
+
+    /// The set of pack conformances.
+    llvm::FoldingSet<PackConformance> PackConformances;
 
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
@@ -1050,6 +1063,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:
     M = getLoadedModule(Id_Distributed);
     break;
+  case KnownProtocolKind::CxxSequence:
   case KnownProtocolKind::UnsafeCxxInputIterator:
     M = getLoadedModule(Id_Cxx);
     break;
@@ -2387,48 +2401,28 @@ ASTContext::getBuiltinConformance(
   return entry;
 }
 
-/// If one of the ancestor conformances already has a matching type, use
-/// that instead.
-static ProtocolConformance *collapseSpecializedConformance(
-                                             Type type,
-                                             ProtocolConformance *conformance,
-                                             SubstitutionMap substitutions) {
-  while (true) {
-    switch (conformance->getKind()) {
-    case ProtocolConformanceKind::Specialized:
-      conformance = cast<SpecializedProtocolConformance>(conformance)
-                      ->getGenericConformance();
-      break;
+static bool collapseSpecializedConformance(Type type,
+                                           RootProtocolConformance *conformance,
+                                           SubstitutionMap substitutions) {
+  if (!conformance->getType()->isEqual(type))
+    return false;
 
-    case ProtocolConformanceKind::Normal:
-    case ProtocolConformanceKind::Inherited:
-    case ProtocolConformanceKind::Self:
-    case ProtocolConformanceKind::Builtin:
-      // If the conformance matches, return it.
-      if (conformance->getType()->isEqual(type)) {
-        for (auto subConformance : substitutions.getConformances())
-          if (!subConformance.isAbstract())
-            return nullptr;
-
-        return conformance;
-      }
-
-      return nullptr;
-    }
+  for (auto subConformance : substitutions.getConformances()) {
+    if (!subConformance.isAbstract())
+      return false;
   }
+
+  return true;
 }
 
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
-                                      ProtocolConformance *generic,
+                                      RootProtocolConformance *generic,
                                       SubstitutionMap substitutions) {
-  // If we are performing a substitution that would get us back to the
-  // a prior conformance (e.g., mapping into and then out of a conformance),
-  // return the existing conformance.
-  if (auto existing = collapseSpecializedConformance(type, generic,
-                                                     substitutions)) {
+  // If the specialization is a no-op, use the root conformance instead.
+  if (collapseSpecializedConformance(type, generic, substitutions)) {
     ++NumCollapsedSpecializedProtocolConformances;
-    return existing;
+    return generic;
   }
 
   llvm::FoldingSetNodeID id;
@@ -2456,6 +2450,14 @@ ASTContext::getSpecializedConformance(Type type,
 
 InheritedProtocolConformance *
 ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
+  // Collapse multiple levels of inherited conformance.
+  while (auto *otherInherited = dyn_cast<InheritedProtocolConformance>(inherited))
+    inherited = otherInherited->getInheritedConformance();
+
+  assert(isa<SpecializedProtocolConformance>(inherited) ||
+         isa<NormalProtocolConformance>(inherited) ||
+         isa<BuiltinProtocolConformance>(inherited));
+
   llvm::FoldingSetNodeID id;
   InheritedProtocolConformance::Profile(id, type, inherited);
 
@@ -2472,6 +2474,48 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   // Build a new normal protocol conformance.
   auto result = new (*this, arena) InheritedProtocolConformance(type, inherited);
   inheritedConformances.InsertNode(result, insertPos);
+  return result;
+}
+
+PackConformance *PackConformance::get(PackType *conformingType,
+                                      ProtocolDecl *protocol,
+                                      ArrayRef<ProtocolConformanceRef> conformances) {
+  auto properties = conformingType->getRecursiveProperties();
+
+  for (auto conformance : conformances) {
+    if (conformance.isAbstract() || conformance.isInvalid())
+      continue;
+
+    auto *concrete = conformance.getConcrete();
+    properties |= concrete->getType()->getRecursiveProperties();
+  }
+
+  auto &ctx = protocol->getASTContext();
+
+  llvm::FoldingSetNodeID id;
+  PackConformance::Profile(id, conformingType, protocol, conformances);
+
+  // Figure out which arena this conformance should go into.
+  AllocationArena arena = getArena(properties);
+
+  // Did we already record the pack conformance?
+  void *insertPos;
+  auto &packConformances = ctx.getImpl().getArena(arena).PackConformances;
+  if (auto result = packConformances.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new pack conformance.
+  auto size = totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
+  auto mem = ctx.Allocate(size, alignof(PackConformance), arena);
+
+  auto result
+    = new (mem) PackConformance(conformingType, protocol,
+                                conformances);
+  auto node = packConformances.FindNodeOrInsertPos(id, insertPos);
+  (void)node;
+  assert(!node);
+  packConformances.InsertNode(result, insertPos);
+
   return result;
 }
 
@@ -2860,10 +2904,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
-Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
-  if (Fields.size() == 1 && !Fields[0].hasName())
-    return ParenType::get(C, Fields[0].getType());
-
+TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {
     auto eltTy = Elt.getType();
@@ -2904,33 +2945,48 @@ TupleTypeElt::TupleTypeElt(Type ty, Identifier name)
   assert(!ty->is<InOutType>() && "Cannot have InOutType in a tuple");
 }
 
-PackExpansionType *PackExpansionType::get(Type patternTy) {
-  assert(patternTy && "Missing pattern type in expansion");
+PackExpansionType::PackExpansionType(Type patternType, Type countType,
+                                     RecursiveTypeProperties properties,
+                                     const ASTContext *canCtx)
+  : TypeBase(TypeKind::PackExpansion, canCtx, properties),
+    patternType(patternType), countType(countType) {
+  assert(countType->is<TypeVariableType>() ||
+         countType->is<SequenceArchetypeType>() ||
+         countType->castTo<GenericTypeParamType>()->isTypeSequence());
+}
 
-  auto properties = patternTy->getRecursiveProperties();
+PackExpansionType *PackExpansionType::get(Type patternType, Type countType) {
+  auto properties = patternType->getRecursiveProperties();
+  properties |= countType->getRecursiveProperties();
+
   auto arena = getArena(properties);
 
-  auto &context = patternTy->getASTContext();
+  auto &context = patternType->getASTContext();
   llvm::FoldingSetNodeID id;
-  PackExpansionType::Profile(id, patternTy);
+  PackExpansionType::Profile(id, patternType, countType);
 
   void *insertPos;
   if (PackExpansionType *expType =
-          context.getImpl()
-              .getArena(arena)
-              .PackExpansionTypes.FindNodeOrInsertPos(id, insertPos))
+        context.getImpl().getArena(arena)
+          .PackExpansionTypes.FindNodeOrInsertPos(id, insertPos))
     return expType;
 
-  const ASTContext *canCtx = patternTy->isCanonical() ? &context : nullptr;
-  PackExpansionType *expansionTy = new (context, AllocationArena::Permanent)
-      PackExpansionType(patternTy, canCtx);
-  context.getImpl().getArena(arena).PackExpansionTypes.InsertNode(expansionTy,
+  const ASTContext *canCtx =
+      (patternType->isCanonical() && countType->isCanonical())
+      ? &context : nullptr;
+  PackExpansionType *expansionType =
+      new (context, arena) PackExpansionType(patternType, countType, properties,
+                                             canCtx);
+  context.getImpl().getArena(arena).PackExpansionTypes.InsertNode(expansionType,
                                                                   insertPos);
-  return expansionTy;
+  return expansionType;
 }
 
-void PackExpansionType::Profile(llvm::FoldingSetNodeID &ID, Type patternType) {
+void PackExpansionType::Profile(llvm::FoldingSetNodeID &ID,
+                                Type patternType,
+                                Type countType) {
   ID.AddPointer(patternType.getPointer());
+  ID.AddPointer(countType.getPointer());
 }
 
 PackType *PackType::getEmpty(const ASTContext &C) {
@@ -3549,7 +3605,7 @@ isGenericFunctionTypeCanonical(GenericSignature sig,
     return false;
 
   for (auto param : params) {
-    if (!sig->isCanonicalTypeInContext(param.getPlainType()))
+    if (!sig->isReducedType(param.getPlainType()))
       return false;
     if (!param.getInternalLabel().empty()) {
       // Canonical types don't have internal labels
@@ -3557,7 +3613,7 @@ isGenericFunctionTypeCanonical(GenericSignature sig,
     }
   }
 
-  return sig->isCanonicalTypeInContext(result);
+  return sig->isReducedType(result);
 }
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
@@ -3600,6 +3656,8 @@ Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
     }
     elements.emplace_back(param.getParameterType(), param.getLabel());
   }
+  if (elements.size() == 1 && !elements[0].hasName())
+    return ParenType::get(ctx, elements[0].getType());
   return TupleType::get(elements, ctx);
 }
 
@@ -3779,7 +3837,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   }
 
   // We have to construct this generic function type. Determine whether
-  // it's canonical.  Unfortunately, isCanonicalTypeInContext can cause
+  // it's canonical.  Unfortunately, isReducedType() can cause
   // new GenericFunctionTypes to be created and thus invalidate our insertion
   // point.
   bool isCanonical = isGenericFunctionTypeCanonical(sig, params, result);
@@ -3796,7 +3854,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   if (info.hasValue())
     globalActor = info->getGlobalActor();
 
-  if (globalActor && !sig->isCanonicalTypeInContext(globalActor))
+  if (globalActor && !sig->isReducedType(globalActor))
     isCanonical = false;
 
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type>(
@@ -4444,42 +4502,13 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
                                                 Type interfaceType,
                                                 GenericSignature parentSig,
                                                 Optional<UUID> knownID) {
-  assert(existential->isExistentialType());
   assert(!interfaceType->hasArchetype() && "must be interface type");
-  // FIXME: Opened archetypes can't be transformed because the
-  // the identity of the archetype has to be preserved. This
-  // means that simplifying an opened archetype in the constraint
-  // system to replace type variables with fixed types is not
-  // yet supported. For now, assert that an opened archetype never
-  // contains type variables to catch cases where type variables
-  // would be applied to the type-checked AST.
-  assert(!existential->hasTypeVariable() &&
-         "opened existentials containing type variables cannot be simplified");
 
-  auto &ctx = existential->getASTContext();
-  auto &openedExistentialEnvironments =
-      ctx.getImpl().OpenedExistentialEnvironments;
-  // If we know the ID already...
-  if (knownID) {
-    // ... and we already have an archetype for that ID, return it.
-    auto found = openedExistentialEnvironments.find(*knownID);
-    
-    if (found != openedExistentialEnvironments.end()) {
-      assert(found->second->getOpenedExistentialType()->isEqual(existential) &&
-             "Retrieved the wrong generic environment?");
-      auto result = found->second->mapTypeIntoContext(interfaceType)
-          ->castTo<OpenedArchetypeType>();
-      return CanOpenedArchetypeType(result);
-    }
-  } else {
-    // Create a new ID.
+  if (!knownID)
     knownID = UUID::fromTime();
-  }
 
-  /// Create a generic environment for this opened archetype.
-  auto genericEnv =
+  auto *genericEnv =
       GenericEnvironment::forOpenedExistential(existential, parentSig, *knownID);
-  openedExistentialEnvironments[*knownID] = genericEnv;
 
   // Map the interface type into that environment.
   auto result = genericEnv->mapTypeIntoContext(interfaceType)
@@ -4645,8 +4674,7 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
   return newSig;
 }
 
-GenericEnvironment *GenericEnvironment::getIncomplete(
-                                             GenericSignature signature) {
+GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   auto &ctx = signature->getASTContext();
 
   // Allocate and construct the new environment.
@@ -4662,21 +4690,46 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
 GenericEnvironment *
 GenericEnvironment::forOpenedExistential(
     Type existential, GenericSignature parentSig, UUID uuid) {
-  auto &ctx = existential->getASTContext();
-  auto signature = ctx.getOpenedArchetypeSignature(existential, parentSig);
-  return GenericEnvironment::forOpenedArchetypeSignature(existential, signature, uuid);
-}
+  assert(existential->isExistentialType());
+  // FIXME: Opened archetypes can't be transformed because the
+  // the identity of the archetype has to be preserved. This
+  // means that simplifying an opened archetype in the constraint
+  // system to replace type variables with fixed types is not
+  // yet supported. For now, assert that an opened archetype never
+  // contains type variables to catch cases where type variables
+  // would be applied to the type-checked AST.
+  assert(!existential->hasTypeVariable() &&
+         "opened existentials containing type variables cannot be simplified");
 
-GenericEnvironment *GenericEnvironment::forOpenedArchetypeSignature(
-    Type existential, GenericSignature signature, UUID uuid) {
-  // Allocate and construct the new environment.
   auto &ctx = existential->getASTContext();
+
+  auto &openedExistentialEnvironments =
+      ctx.getImpl().OpenedExistentialEnvironments;
+  auto found = openedExistentialEnvironments.find(uuid);
+
+  if (found != openedExistentialEnvironments.end()) {
+    auto *existingEnv = found->second;
+    assert(existingEnv->getOpenedExistentialType()->isEqual(existential));
+    assert(existingEnv->getOpenedExistentialParentSignature().getPointer() == parentSig.getPointer());
+    assert(existingEnv->getOpenedExistentialUUID() == uuid);
+
+    return existingEnv;
+  }
+
+  auto signature = ctx.getOpenedExistentialSignature(existential, parentSig);
+
+  // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
   size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap,
                                   OpenedGenericEnvironmentData, Type>(
       0, 0, 1, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  return new (mem) GenericEnvironment(signature, existential, uuid);
+  auto *genericEnv =
+      new (mem) GenericEnvironment(signature, existential, parentSig, uuid);
+
+  openedExistentialEnvironments[uuid] = genericEnv;
+
+  return genericEnv;
 }
 
 /// Create a new generic environment for an opaque type with the given set of
@@ -5164,6 +5217,26 @@ ASTContext::getClangTypeForIRGen(Type ty) {
   return getClangTypeConverter().convert(ty).getTypePtrOrNull();
 }
 
+GenericParamList *ASTContext::getSelfGenericParamList(DeclContext *dc) const {
+  auto *theParamList = getImpl().SelfGenericParamList;
+  if (theParamList)
+    return theParamList;
+
+  // Note: we always return a GenericParamList rooted at the first
+  // DeclContext this was called with. Since this is just a giant
+  // hack for SIL mode, that should be OK.
+  auto *selfParam = GenericTypeParamDecl::create(
+      dc, Id_Self, SourceLoc(),
+      /*isTypeSequence=*/false, /*depth=*/0, /*index=*/0,
+      /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+
+  theParamList = GenericParamList::create(
+      const_cast<ASTContext &>(*this), SourceLoc(), {selfParam}, SourceLoc());
+  getImpl().SelfGenericParamList = theParamList;
+
+  return theParamList;
+}
+
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;
@@ -5187,7 +5260,7 @@ Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(GenericSignature paren
 }
 
 CanGenericSignature
-ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
+ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig) {
   assert(type->isExistentialType());
 
   if (auto existential = type->getAs<ExistentialType>())
@@ -5232,6 +5305,76 @@ ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
   (void) result;
 
   return canGenericSig;
+}
+
+CanGenericSignature
+ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
+  auto &sigs = getImpl().ElementSignatures;
+  auto found = sigs.find(baseGenericSig.getPointer());
+  if (found != sigs.end())
+    return found->second;
+
+  // This operation doesn't make sense if the input signature does not contain`
+  // any pack generic parameters.
+#ifndef NDEBUG
+  {
+    auto found = std::find_if(baseGenericSig.getGenericParams().begin(),
+                              baseGenericSig.getGenericParams().end(),
+                              [](GenericTypeParamType *paramType) {
+                                return paramType->isTypeSequence();
+                              });
+    assert(found != baseGenericSig.getGenericParams().end());
+  }
+#endif
+
+  SmallVector<GenericTypeParamType *, 2> genericParams;
+  SmallVector<Requirement, 2> requirements;
+
+  auto eraseTypeSequence = [&](GenericTypeParamType *paramType) {
+    return GenericTypeParamType::get(
+        paramType->getDepth(), paramType->getIndex(),
+        /*isTypeSequence=*/false, *this);
+  };
+
+  for (auto paramType : baseGenericSig.getGenericParams()) {
+    genericParams.push_back(eraseTypeSequence(paramType));
+  }
+
+  auto eraseTypeSequenceRec = [&](Type type) -> Type {
+    return type.transformRec([&](Type t) -> Optional<Type> {
+      if (auto *paramType = t->getAs<GenericTypeParamType>())
+        return Type(eraseTypeSequence(paramType));
+      return None;
+    });
+  };
+
+  for (auto requirement : baseGenericSig.getRequirements()) {
+    switch (requirement.getKind()) {
+    case RequirementKind::SameCount:
+      // Drop same-length requirements from the element signature.
+      break;
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      requirements.emplace_back(
+          requirement.getKind(),
+          eraseTypeSequenceRec(requirement.getFirstType()),
+          eraseTypeSequenceRec(requirement.getSecondType()));
+      break;
+    case RequirementKind::Layout:
+      requirements.emplace_back(
+          requirement.getKind(),
+          eraseTypeSequenceRec(requirement.getFirstType()),
+          requirement.getLayoutConstraint());
+      break;
+    }
+  }
+
+  auto elementSig = buildGenericSignature(
+      *this, GenericSignature(), genericParams, requirements)
+          .getCanonicalSignature();
+  sigs[baseGenericSig.getPointer()] = elementSig;
+  return elementSig;
 }
 
 GenericSignature 
@@ -5295,10 +5438,9 @@ ASTContext::getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
                         baseGenericSig, derivedParams);
 
   for (auto reqt : baseGenericSig.getRequirements()) {
-    if (auto substReqt = reqt.subst(QueryOverrideSubs(info),
-                                    LookUpConformanceInOverrideSubs(info))) {
-      addedRequirements.push_back(*substReqt);
-    }
+    auto substReqt = reqt.subst(QueryOverrideSubs(info),
+                                LookUpConformanceInOverrideSubs(info));
+    addedRequirements.push_back(substReqt);
   }
 
   auto genericSig = buildGenericSignature(*this, derivedNominalSig,

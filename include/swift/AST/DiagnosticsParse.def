@@ -517,6 +517,9 @@ ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
       "SILFunction and SILArgument have mismatching ValueOwnershipKinds. "
       "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
       (StringRef, StringRef))
+ERROR(sil_arg_both_lexical_and_eagerMove,none,
+      "Function argument is annotated both @_eagerMove and @_lexical, "
+      "but these are incompatible alternatives", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,
@@ -1851,11 +1854,20 @@ WARNING(likely_simulator_platform_condition,none,
       "use 'targetEnvironment(simulator)' instead",
       ())
 
-ERROR(canimport_two_parameters, none, "canImport can take only two parameters", ())
-
-ERROR(canimport_label, none, "2nd parameter of canImport should be labeled as _version or _underlyingVersion", ())
-
-ERROR(canimport_version, none, "cannot parse module version: %0", (StringRef))
+ERROR(canimport_two_parameters,none,
+      "canImport can take only two parameters", ())
+ERROR(canimport_label,none,
+      "2nd parameter of canImport should be labeled as "
+      "_version or _underlyingVersion", ())
+ERROR(canimport_invalid_version,none,
+      "cannot parse module version '%0'",
+      (StringRef))
+ERROR(canimport_empty_version,none,
+      "%0 argument cannot be empty",
+      (StringRef))
+WARNING(canimport_version_too_many_components,none,
+        "trailing components of version '%0' are ignored",
+        (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Availability query parsing diagnostics

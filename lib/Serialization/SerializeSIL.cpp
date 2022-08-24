@@ -459,6 +459,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (F.hasClangNode())
     clangNodeOwnerID = S.addDeclRef(F.getClangNodeOwner());
 
+  ModuleID parentModuleID;
+  if (auto *parentModule = F.getParentModule())
+    parentModuleID = S.addModuleRef(parentModule);
+
   IdentifierID replacedFunctionID = 0;
   if (auto *fun = F.getDynamicallyReplacedFunction()) {
     addReferencedSILFunction(fun, true);
@@ -505,7 +509,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isExactSelfClass(),
       (unsigned)F.isDistributed(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangNodeOwnerID, SemanticsIDs);
+      genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
     [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
@@ -620,8 +624,11 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     unsigned packedMetadata = 0;
     packedMetadata |= unsigned(SA->getType().getCategory());  // 8 bits
     packedMetadata |= unsigned(SA->getOwnershipKind()) << 8;  // 8 bits
-    packedMetadata |= unsigned(SA->isNoImplicitCopy()) << 16; // 1 bit
-    // Used: 17 bits. Free: 15.
+    if (auto *SFA = dyn_cast<SILFunctionArgument>(SA)) {
+      packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 16; // 1 bit
+      packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 17; // 2 bits
+    }
+    // Used: 19 bits. Free: 13.
     //
     // TODO: We should be able to shrink the packed metadata of the first two.
     Args.push_back(packedMetadata);
@@ -1921,6 +1928,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::CopyAddrInst:
+  case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst: {
@@ -1945,6 +1953,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = (CAI->isInitializationOfDest() << 1) | CAI->isTakeOfSrc();
       operand = cast<CopyAddrInst>(&SI)->getDest();
       value = cast<CopyAddrInst>(&SI)->getSrc();
+    } else if (SI.getKind() == SILInstructionKind::ExplicitCopyAddrInst) {
+      const auto *CAI = cast<ExplicitCopyAddrInst>(&SI);
+      Attr = (CAI->isInitializationOfDest() << 1) | CAI->isTakeOfSrc();
+      operand = cast<ExplicitCopyAddrInst>(&SI)->getDest();
+      value = cast<ExplicitCopyAddrInst>(&SI)->getSrc();
     } else if (SI.getKind() == SILInstructionKind::MarkUnresolvedMoveAddrInst) {
       auto *mai = cast<MarkUnresolvedMoveAddrInst>(&SI);
       operand = mai->getDest();

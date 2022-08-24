@@ -9,11 +9,6 @@ import Cxx
 
 var CxxSequenceTestSuite = TestSuite("CxxSequence")
 
-extension SimpleSequence: CxxSequence {}
-
-extension SimpleEmptySequence: CxxSequence {}
-
-
 CxxSequenceTestSuite.test("SimpleSequence as Swift.Sequence") {
   let seq = SimpleSequence()
   let contains = seq.contains(where: { $0 == 3 })

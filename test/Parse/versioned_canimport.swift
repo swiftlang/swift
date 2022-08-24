@@ -20,57 +20,131 @@ import Bar
 #endif
 
 func canImportVersioned() {
-#if canImport(Foo, _version: 113.331)
-  let a = 1
+#if canImport(Foo, _version: 0)
+  let majorZero = 1 // expected-warning {{initialization of immutable value 'majorZero' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, _version: 113.3000)
-  let b = 1
+#if canImport(Foo, _version: 112)
+  let majorSmaller = 1 // expected-warning {{initialization of immutable value 'majorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+  
+#if canImport(Foo, _version: 113)
+  let majorEqual = 1 // expected-warning {{initialization of immutable value 'majorEqual' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
 #if canImport(Foo, _version: 114)
-  let c = 1
+  let majorLarger = 1
 #endif
-
-#if canImport(Foo, _version: 4)
-  let d = 1 // expected-warning {{initialization of immutable value 'd' was never used; consider replacing with assignment to '_' or removing it}}
-#endif
-
-#if canImport(Foo, _version: 113.33)
-  let e = 1 // expected-warning {{initialization of immutable value 'e' was never used; consider replacing with assignment to '_' or removing it}}
-#endif
-
-#if canImport(Foo, _underlyingVersion: 113.33)
-  let ee = 1
-#endif
-
+  
 #if canImport(Foo, _version: 113.329)
-  let f = 1 // expected-warning {{initialization of immutable value 'f' was never used; consider replacing with assignment to '_' or removing it}}
+  let minorSmaller = 1 // expected-warning {{initialization of immutable value 'minorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
 #if canImport(Foo, _version: 113.330)
-  let g = 1 // expected-warning {{initialization of immutable value 'g' was never used; consider replacing with assignment to '_' or removing it}}
+  let minorEqual = 1 // expected-warning {{initialization of immutable value 'minorEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: 113.331)
+  let minorLarger = 1
+#endif
+  
+#if canImport(Foo, _version: 113.330.0)
+  let patchSmaller = 1 // expected-warning {{initialization of immutable value 'patchSmaller' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: 113.330.1)
+  let patchEqual = 1 // expected-warning {{initialization of immutable value 'patchEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+  
+#if canImport(Foo, _version: 113.330.2)
+  let patchLarger = 1
+#endif
+
+#if canImport(Foo, _version: 113.330.1.1)
+  let buildSmaller = 1 // expected-warning {{initialization of immutable value 'buildSmaller' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: 113.330.1.2)
+  let buildEqual = 1 // expected-warning {{initialization of immutable value 'buildEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+  
+#if canImport(Foo, _version: 113.330.1.3)
+  let buildLarger = 1
+#endif
+  
+#if canImport(Foo, _version: 113.330.1.2.0) // expected-warning {{trailing components of version '113.330.1.2' are ignored}}
+  let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _underlyingVersion: 113.33)
+  // Foo is a Swift module with no underlying clang module.
+  let underlyingMinorSmaller = 1
 #endif
 
 #if canImport(Foo)
-  let h = 1 // expected-warning {{initialization of immutable value 'h' was never used; consider replacing with assignment to '_' or removing it}}
+  let noVersion = 1 // expected-warning {{initialization of immutable value 'noVersion' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 }
 
 func canImportVersionedString() {
+#if canImport(Foo, _version: "0")
+  let majorZero = 1 // expected-warning {{initialization of immutable value 'majorZero' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: "112")
+  let majorSmaller = 1 // expected-warning {{initialization of immutable value 'majorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+  
+#if canImport(Foo, _version: "113")
+  let majorEqual = 1 // expected-warning {{initialization of immutable value 'majorEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: "114")
+  let majorLarger = 1
+#endif
+  
+#if canImport(Foo, _version: "113.329")
+  let minorSmaller = 1 // expected-warning {{initialization of immutable value 'minorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: "113.330")
+  let minorEqual = 1 // expected-warning {{initialization of immutable value 'minorEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
 #if canImport(Foo, _version: "113.331")
-  let a = 1
+  let minorLarger = 1
+#endif
+  
+#if canImport(Foo, _version: "113.330.0")
+  let patchSmaller = 1 // expected-warning {{initialization of immutable value 'patchSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, _version: "113.3000")
-  let b = 1
+#if canImport(Foo, _version: "113.330.1")
+  let patchEqual = 1 // expected-warning {{initialization of immutable value 'patchEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+  
+#if canImport(Foo, _version: "113.330.2")
+  let patchLarger = 1
 #endif
 
-#if canImport(Foo, _version: "4")
-  let d = 1 // expected-warning {{initialization of immutable value 'd' was never used; consider replacing with assignment to '_' or removing it}}
+#if canImport(Foo, _version: "113.330.1.1")
+  let buildSmaller = 1 // expected-warning {{initialization of immutable value 'buildSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, _version: "113.33")
-  let e = 1 // expected-warning {{initialization of immutable value 'e' was never used; consider replacing with assignment to '_' or removing it}}
+#if canImport(Foo, _version: "113.330.1.2")
+  let buildEqual = 1 // expected-warning {{initialization of immutable value 'buildEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+  
+#if canImport(Foo, _version: "113.330.1.3")
+  let buildLarger = 1
+#endif
+
+#if canImport(Foo, _version: "113.330.1.2.0") // expected-warning {{trailing components of version '113.330.1.2' are ignored}}
+  let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _underlyingVersion: 113.33)
+  // Foo is a Swift module with no underlying clang module.
+  let underlyingMinorSmaller = 1
 #endif
 }

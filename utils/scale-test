@@ -274,7 +274,7 @@ def converged(ctr, simplex, epsilon):
 def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
     # By the book: https://en.wikipedia.org/wiki/Nelder%E2%80%93Mead_method
     ndim = len(params)
-    assert(ndim >= 2)
+    assert ndim >= 2
 
     def named(tup):
         return params.__new__(params.__class__, *tup)
@@ -332,7 +332,7 @@ def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
             continue
 
         # 5. Contraction
-        assert(vr >= simplex[-2].val)
+        assert vr >= simplex[-2].val
         xc = tup_add(x0, tup_mul(rho, tup_sub(xw, x0)))
         vc = f(xc)
         if vc < vw:
@@ -362,7 +362,7 @@ def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
 # perfectly") and finally returns (fit_params, r_squared).
 def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
 
-    assert(len(ys) > 0)
+    assert len(ys) > 0
     mean_y = sum(ys) / len(ys)
     ss_total = sum((y - mean_y) ** 2 for y in ys)
     data = list(zip(xs, ys))

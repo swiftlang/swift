@@ -154,6 +154,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - Parameter duration: The duration to wait.
   @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
   public static func sleep(for duration: Duration) async throws {
     try await sleep(until: .now + duration, clock: .continuous)
   }

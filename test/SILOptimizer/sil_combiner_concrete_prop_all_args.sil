@@ -131,8 +131,8 @@ bb0(%0 : $SomeClass):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tF : $@convention(thin) (@guaranteed SomeProtocol) -> Int32 {
 bb0(%0 : $SomeProtocol):
   %1 = function_ref @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
-  %2 = open_existential_ref %0 : $SomeProtocol to $@opened("CC97E160-AC7C-11E8-B742-D0817AD4059B") SomeProtocol 
-  %3 = apply %1<@opened("CC97E160-AC7C-11E8-B742-D0817AD4059B") SomeProtocol>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
+  %2 = open_existential_ref %0 : $SomeProtocol to $@opened("CC97E160-AC7C-11E8-B742-D0817AD4059B", SomeProtocol) Self 
+  %3 = apply %1<@opened("CC97E160-AC7C-11E8-B742-D0817AD4059B", SomeProtocol) Self>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tF'
 
@@ -153,8 +153,8 @@ bb0:
   %2 = init_existential_ref %0 : $SomeClass : $SomeClass, $SomeProtocol 
   debug_value %2 : $SomeProtocol, let, name "magic1" 
   %4 = function_ref @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
-  %5 = open_existential_ref %2 : $SomeProtocol to $@opened("CC97E55C-AC7C-11E8-B742-D0817AD4059B") SomeProtocol 
-  %6 = apply %4<@opened("CC97E55C-AC7C-11E8-B742-D0817AD4059B") SomeProtocol>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
+  %5 = open_existential_ref %2 : $SomeProtocol to $@opened("CC97E55C-AC7C-11E8-B742-D0817AD4059B", SomeProtocol) Self 
+  %6 = apply %4<@opened("CC97E55C-AC7C-11E8-B742-D0817AD4059B", SomeProtocol) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
   strong_release %0 : $SomeClass                  
   %8 = tuple ()                                   
   return %8 : $()                                 
@@ -178,8 +178,8 @@ bb0(%0 : $*SomeNoClass):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocol) -> Int32 {
 bb0(%0 : $*SomeNoClassProtocol):
   %1 = function_ref @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
-  %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol 
-  %3 = apply %1<@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
+  %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocol) Self 
+  %3 = apply %1<@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocol) Self>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF'
 
@@ -201,8 +201,8 @@ bb0:
   %3 = init_existential_addr %0 : $*SomeNoClassProtocol, $SomeNoClass 
   store %1 to %3 : $*SomeNoClass                  
   %5 = function_ref @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
-  %6 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC9800F0-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol 
-  %7 = apply %5<@opened("CC9800F0-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
+  %6 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC9800F0-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocol) Self 
+  %7 = apply %5<@opened("CC9800F0-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocol) Self>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   destroy_addr %0 : $*SomeNoClassProtocol         
   dealloc_stack %0 : $*SomeNoClassProtocol        
   %10 = tuple ()                                  
@@ -240,8 +240,8 @@ bb0(%0 : $SomeClassComp):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tF : $@convention(thin) (@guaranteed SomeClassProtocolComp & SomeOtherClassProtocolComp) -> Int32 {
 bb0(%0 : $SomeClassProtocolComp & SomeOtherClassProtocolComp):
   %1 = function_ref @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
-  %2 = open_existential_ref %0 : $SomeClassProtocolComp & SomeOtherClassProtocolComp to $@opened("CC981856-AC7C-11E8-B742-D0817AD4059B") SomeClassProtocolComp & SomeOtherClassProtocolComp 
-  %3 = apply %1<@opened("CC981856-AC7C-11E8-B742-D0817AD4059B") SomeClassProtocolComp & SomeOtherClassProtocolComp>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
+  %2 = open_existential_ref %0 : $SomeClassProtocolComp & SomeOtherClassProtocolComp to $@opened("CC981856-AC7C-11E8-B742-D0817AD4059B", SomeClassProtocolComp & SomeOtherClassProtocolComp) Self
+  %3 = apply %1<@opened("CC981856-AC7C-11E8-B742-D0817AD4059B", SomeClassProtocolComp & SomeOtherClassProtocolComp) Self>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tF'
 
@@ -262,8 +262,8 @@ bb0:
   %2 = init_existential_ref %0 : $SomeClassComp : $SomeClassComp, $SomeClassProtocolComp & SomeOtherClassProtocolComp 
   debug_value %2 : $SomeClassProtocolComp & SomeOtherClassProtocolComp, let, name "magic3" 
   %4 = function_ref @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
-  %5 = open_existential_ref %2 : $SomeClassProtocolComp & SomeOtherClassProtocolComp to $@opened("CC981D1A-AC7C-11E8-B742-D0817AD4059B") SomeClassProtocolComp & SomeOtherClassProtocolComp 
-  %6 = apply %4<@opened("CC981D1A-AC7C-11E8-B742-D0817AD4059B") SomeClassProtocolComp & SomeOtherClassProtocolComp>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
+  %5 = open_existential_ref %2 : $SomeClassProtocolComp & SomeOtherClassProtocolComp to $@opened("CC981D1A-AC7C-11E8-B742-D0817AD4059B", SomeClassProtocolComp & SomeOtherClassProtocolComp) Self 
+  %6 = apply %4<@opened("CC981D1A-AC7C-11E8-B742-D0817AD4059B", SomeClassProtocolComp & SomeOtherClassProtocolComp) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
   strong_release %0 : $SomeClassComp              
   %8 = tuple ()                                   
   return %8 : $()                                 
@@ -302,8 +302,8 @@ bb0(%0 : $*SomeNoClassComp):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) -> Int32 {
 bb0(%0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp):
   %1 = function_ref @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
-  %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983642-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp 
-  %3 = apply %1<@opened("CC983642-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
+  %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983642-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) Self 
+  %3 = apply %1<@opened("CC983642-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) Self>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF'
 
@@ -325,8 +325,8 @@ bb0:
   %3 = init_existential_addr %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp, $SomeNoClassComp 
   store %1 to %3 : $*SomeNoClassComp              
   %5 = function_ref @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
-  %6 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983AFC-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp 
-  %7 = apply %5<@opened("CC983AFC-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
+  %6 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983AFC-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) Self 
+  %7 = apply %5<@opened("CC983AFC-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) Self>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   destroy_addr %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp 
   dealloc_stack %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp 
   %10 = tuple ()                                  
@@ -347,20 +347,20 @@ bb0(%0 : $K):
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform1KCAA1PA2aDP3foos5Int32VyFTW'
 
-// CHECK-LABEL: sil hidden [noinline] @$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF : $@convention(thin) (@guaranteed P) -> Int32 {
-// CHECK: bb0(%0 : $P):
-// CHECK:   debug_value %0 : $P, let, name "a", argno 1     
-// CHECK:   %2 = open_existential_ref %0 : $P to $@opened("{{.*}}") P 
-// CHECK:   %3 = witness_method $@opened("{{.*}}") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("{{.*}}") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
-// CHECK:   %4 = apply %3<@opened("{{.*}}") P>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
+// CHECK-LABEL: sil hidden [noinline] @$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF : $@convention(thin) (@guaranteed any P) -> Int32 {
+// CHECK: bb0(%0 : $any P):
+// CHECK:   debug_value %0 : $any P, let, name "a", argno 1
+// CHECK:   %2 = open_existential_ref %0 : $any P to $@opened("{{.*}}", any P) Self
+// CHECK:   %3 = witness_method $@opened("{{.*}}", any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("{{.*}}", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+// CHECK:   %4 = apply %3<@opened("{{.*}}", any P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
 // CHECK:   return %4 : $Int32                              
 // CHECK-LABEL: } // end sil function '$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF'
 sil hidden [noinline] @$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF : $@convention(thin) (@guaranteed P) -> Int32 {
 bb0(%0 : $P):
   debug_value %0 : $P, let, name "a", argno 1     
-  %2 = open_existential_ref %0 : $P to $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P 
-  %3 = witness_method $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
-  %4 = apply %3<@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
+  %2 = open_existential_ref %0 : $P to $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B", P) Self 
+  %3 = witness_method $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
+  %4 = apply %3<@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B", P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
   return %4 : $Int32                              
 } // end sil function '$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF'
 
@@ -383,26 +383,26 @@ sil hidden [noinline] @$s21existential_transform13wrap_inout_cp1as5Int32VAA2PP_p
 bb0(%0 : $*PP):
   debug_value %0 : $*PP, var, name "a", argno 1, expr op_deref
   %2 = load %0 : $*PP                             
-  %3 = open_existential_ref %2 : $PP to $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP 
-  %4 = witness_method $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP, #PP.foo : <Self where Self : PP> (Self) -> () -> Int32, %3 : $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int32 
+  %3 = open_existential_ref %2 : $PP to $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B", PP) Self 
+  %4 = witness_method $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B", PP) Self, #PP.foo : <Self where Self : PP> (Self) -> () -> Int32, %3 : $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B", PP) Self : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int32 
   strong_retain %2 : $PP                          
-  %6 = apply %4<@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP>(%3) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int32 
+  %6 = apply %4<@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B", PP) Self>(%3) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int32 
   strong_release %2 : $PP                         
   return %6 : $Int32                              
 } // end sil function '$s21existential_transform13wrap_inout_cp1as5Int32VAA2PP_pz_tF'
 
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform24do_not_optimize_inout_cpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:  %0 = alloc_stack $PP, var, name "magic5"        
+// CHECK:  %0 = alloc_stack $any PP, var, name "magic5"
 // CHECK:  %1 = alloc_ref $KK                              
 // CHECK:  debug_value %1 : $KK, let, name "self", argno 1 
-// CHECK:  %3 = init_existential_ref %1 : $KK : $KK, $PP   
-// CHECK:  store %3 to %0 : $*PP                           
-// CHECK:  %5 = function_ref @$s21existential_transform13wrap_inout_cp1as5Int32VAA2PP_pz_tF : $@convention(thin) (@inout PP) -> Int32 
-// CHECK:  %6 = apply %5(%0) : $@convention(thin) (@inout PP) -> Int32
-// CHECK:  %7 = load %0 : $*PP                             
-// CHECK:  strong_release %7 : $PP                         
-// CHECK:  dealloc_stack %0 : $*PP                         
+// CHECK:  %3 = init_existential_ref %1 : $KK : $KK, $any PP
+// CHECK:  store %3 to %0 : $*any PP
+// CHECK:  %5 = function_ref @$s21existential_transform13wrap_inout_cp1as5Int32VAA2PP_pz_tF : $@convention(thin) (@inout any PP) -> Int32
+// CHECK:  %6 = apply %5(%0) : $@convention(thin) (@inout any PP) -> Int32
+// CHECK:  %7 = load %0 : $*any PP
+// CHECK:  strong_release %7 : $any PP
+// CHECK:  dealloc_stack %0 : $*any PP
 // CHECK:  %10 = tuple ()                                  
 // CHECK:  return %10 : $()                                
 // CHECK: } // end sil function '$s21existential_transform24do_not_optimize_inout_cpyyF'
@@ -440,8 +440,8 @@ bb0(%0 : $*KKK):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tF : $@convention(thin) (@inout PPP) -> Int32 {
 bb0(%0 : $*PPP):
   %1 = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 
-  %2 = open_existential_addr mutable_access %0 : $*PPP to $*@opened("CC986BDA-AC7C-11E8-B742-D0817AD4059B") PPP 
-  %3 = apply %1<@opened("CC986BDA-AC7C-11E8-B742-D0817AD4059B") PPP>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 
+  %2 = open_existential_addr mutable_access %0 : $*PPP to $*@opened("CC986BDA-AC7C-11E8-B742-D0817AD4059B", PPP) Self 
+  %3 = apply %1<@opened("CC986BDA-AC7C-11E8-B742-D0817AD4059B", PPP) Self>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tF'
 
@@ -449,13 +449,13 @@ bb0(%0 : $*PPP):
 //
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:  [[ALLOC:%.*]] = alloc_stack $PPP, var, name "magic6"
+// CHECK:  [[ALLOC:%.*]] = alloc_stack $any PPP, var, name "magic6"
 // CHECK:  alloc_ref $KKK
-// CHECK:  [[ADR:%.*]] = open_existential_addr mutable_access [[ALLOC]] : $*PPP to $*@opened("{{.*}}") PPP
+// CHECK:  [[ADR:%.*]] = open_existential_addr mutable_access [[ALLOC]] : $*any PPP to $*@opened("{{.*}}", any PPP) Self
 // CHECK:  [[CAST:%.*]] = unchecked_addr_cast [[ADR]]
 // CHECK:  [[F:%.*]] = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n4main3KKKC_Tg5 : $@convention(thin) (@inout KKK) -> Int32
 // CHECK:  apply [[F]]([[CAST]])
-// CHECK:  dealloc_stack %0 : $*PPP
+// CHECK:  dealloc_stack %0 : $*any PPP
 // CHECK-LABEL: } // end sil function '$s21existential_transform9inout_ncpyyF'
 sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
 bb0:
@@ -465,8 +465,8 @@ bb0:
   %3 = init_existential_addr %0 : $*PPP, $KKK     
   store %1 to %3 : $*KKK                          
   %5 = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 
-  %6 = open_existential_addr mutable_access %0 : $*PPP to $*@opened("CC986F86-AC7C-11E8-B742-D0817AD4059B") PPP 
-  %7 = apply %5<@opened("CC986F86-AC7C-11E8-B742-D0817AD4059B") PPP>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 
+  %6 = open_existential_addr mutable_access %0 : $*PPP to $*@opened("CC986F86-AC7C-11E8-B742-D0817AD4059B", PPP) Self 
+  %7 = apply %5<@opened("CC986F86-AC7C-11E8-B742-D0817AD4059B", PPP) Self>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 
   destroy_addr %0 : $*PPP                         
   dealloc_stack %0 : $*PPP                        
   %10 = tuple ()                                  
@@ -490,8 +490,8 @@ bb0(%0 : $*SSSS):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tF : $@convention(thin) (@inout PPPP) -> Int32 {
 bb0(%0 : $*PPPP):
   %1 = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
-  %2 = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("CC98A1E0-AC7C-11E8-B742-D0817AD4059B") PPPP 
-  %3 = apply %1<@opened("CC98A1E0-AC7C-11E8-B742-D0817AD4059B") PPPP>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
+  %2 = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("CC98A1E0-AC7C-11E8-B742-D0817AD4059B", PPPP) Self 
+  %3 = apply %1<@opened("CC98A1E0-AC7C-11E8-B742-D0817AD4059B", PPPP) Self>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tF'
 
@@ -499,13 +499,13 @@ bb0(%0 : $*PPPP):
 //
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   [[ALLOC:%.*]] = alloc_stack $PPPP, var, name "magic7"      
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $any PPPP, var, name "magic7"      
 // CHECK:   struct $SSSS ()                            
-// CHECK:   [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("{{.*}}") PPPP
+// CHECK:   [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*any PPPP to $*@opened("{{.*}}", any PPPP) Self
 // CHECK:   [[CAST:%.*]] = unchecked_addr_cast [[ADR]]
 // CHECK:   [[F:%.*]] = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n4main4SSSSV_Tg5 : $@convention(thin) (@inout SSSS) -> Int32
 // CHECK:  apply [[F]]([[CAST]])
-// CHECK:   dealloc_stack [[ALLOC]] : $*PPPP
+// CHECK:   dealloc_stack [[ALLOC]] : $*any PPPP
 // CHECK-LABEL: } // end sil function '$s21existential_transform16struct_inout_ncpyyF'
 sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {
 bb0:
@@ -514,8 +514,8 @@ bb0:
   %2 = init_existential_addr %0 : $*PPPP, $SSSS   
   store %1 to %2 : $*SSSS                         
   %4 = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32
-  %5 = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("CC98A5E6-AC7C-11E8-B742-D0817AD4059B") PPPP
-  %6 = apply %4<@opened("CC98A5E6-AC7C-11E8-B742-D0817AD4059B") PPPP>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32
+  %5 = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("CC98A5E6-AC7C-11E8-B742-D0817AD4059B", PPPP) Self
+  %6 = apply %4<@opened("CC98A5E6-AC7C-11E8-B742-D0817AD4059B", PPPP) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32
   destroy_addr %0 : $*PPPP                        
   dealloc_stack %0 : $*PPPP                       
   %9 = tuple ()                                   

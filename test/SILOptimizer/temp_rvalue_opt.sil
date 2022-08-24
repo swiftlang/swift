@@ -585,9 +585,9 @@ bb1:
   %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
-  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
-  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %2 : $*Optional<P>
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
@@ -604,7 +604,7 @@ bb3:
   br bb2
 }
 // CHECK-LABEL: sil @open_existential_addr_blocks_optimization : $@convention(thin) () -> () {
-// CHECK: [[P:%.*]] = alloc_stack $P
+// CHECK: [[P:%.*]] = alloc_stack $any P
 // CHECK: copy_addr {{.*}} to [initialization] [[P]]
 // CHECK: }
 sil @open_existential_addr_blocks_optimization : $@convention(thin) () -> () {
@@ -619,9 +619,9 @@ bb1:
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
   destroy_addr %2 : $*Optional<P>
-  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P
-  %14 = witness_method $@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
+  %14 = witness_method $@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
   dealloc_stack %2 : $*Optional<P>
@@ -638,7 +638,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil @witness_method_blocks_optimization : $@convention(thin) () -> () {
-// CHECK: [[P:%.*]] = alloc_stack $P
+// CHECK: [[P:%.*]] = alloc_stack $any P
 // CHECK: copy_addr {{.*}} to [initialization] [[P]]
 // CHECK: }
 sil @witness_method_blocks_optimization : $@convention(thin) () -> () {
@@ -652,10 +652,10 @@ bb1:
   %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
-  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
   destroy_addr %2 : $*Optional<P>
-  %14 = witness_method $@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %14 = witness_method $@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
   dealloc_stack %2 : $*Optional<P>

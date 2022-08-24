@@ -3286,7 +3286,41 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   }
 
   // Handle existential types.
-  if (type1->isExistentialType() && type2->isExistentialType()) {
+  if (auto *existential1 = type1->getAs<ExistentialType>()) {
+    auto existential2 = type2->castTo<ExistentialType>();
+
+    auto result = matchTypes(existential1->getConstraintType(),
+                             existential2->getConstraintType(),
+                             ConstraintKind::Bind, subflags,
+                             locator.withPathElement(
+                               ConstraintLocator::ExistentialConstraintType));
+
+    if (result.isFailure())
+      return result;
+
+    return getTypeMatchSuccess();
+  }
+
+  // Arguments of parameterized protocol types have to match on the nose.
+  if (auto ppt1 = type1->getAs<ParameterizedProtocolType>()) {
+    auto ppt2 = type2->castTo<ParameterizedProtocolType>();
+
+    auto result = matchTypes(ppt1->getBaseType(),
+                             ppt2->getBaseType(),
+                             ConstraintKind::Bind, subflags,
+                             locator.withPathElement(
+                               ConstraintLocator::ParentType));
+
+    if (result.isFailure())
+      return result;
+
+    return matchDeepTypeArguments(*this, subflags,
+                                  ppt1->getArgs(),
+                                  ppt2->getArgs(),
+                                  locator);
+  }
+
+  if (type1->isExistentialType()) {
     auto layout1 = type1->getExistentialLayout();
     auto layout2 = type2->getExistentialLayout();
 
@@ -3309,22 +3343,14 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
         return getTypeMatchFailure(locator);
 
+      auto subLocator = locator.withPathElement(
+                          ConstraintLocator::ProtocolCompositionSuperclassType);
       auto result = matchTypes(layout1.explicitSuperclass,
                                layout2.explicitSuperclass,
                                ConstraintKind::Bind, subflags,
-                               locator.withPathElement(
-                                 ConstraintLocator::ExistentialSuperclassType));
+                               subLocator);
       if (result.isFailure())
         return result;
-    }
-
-    // Arguments of parameterized protocol types have to match on the nose.
-    if (auto ppt1 = type1->getAs<ParameterizedProtocolType>()) {
-      auto ppt2 = type2->castTo<ParameterizedProtocolType>();
-      return matchDeepTypeArguments(*this, subflags,
-                                    ppt1->getArgs(),
-                                    ppt2->getArgs(),
-                                    locator);
     }
 
     return getTypeMatchSuccess();
@@ -3788,6 +3814,13 @@ ConstraintSystem::matchTypesBindTypeVar(
       // let's ignore this mismatch and mark affected type variable as a hole
       // because something else has to be fixed already for this to happen.
       if (type->is<DependentMemberType>() && !type->hasTypeVariable()) {
+        // Since the binding couldn't be performed, the type variable is a
+        // hole regardless whether it would be bound later to some other
+        // type or not. If this is not reflected in constraint system
+        // it would let the solver to form a _valid_ solution as if the
+        // constraint between the type variable and the unresolved dependent
+        // member type never existed.
+        increaseScore(SK_Hole);
         recordPotentialHole(typeVar);
         return getTypeMatchSuccess();
       }
@@ -3946,6 +3979,9 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
   switch (req.getRequirementKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::SameType: {
     return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
   }
@@ -6367,7 +6403,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // If we are matching types for equality, we might still have
         // type variables inside the protocol composition's superclass
         // constraint.
-        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+        if (desugar1->getKind() == desugar2->getKind())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
         break;
 
       default:
@@ -7328,7 +7365,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
             TypeChecker::conformsToProtocol(rawValue, protocol,
                                             DC->getParentModule())) {
           auto *fix = UseRawValue::create(*this, type, protocolTy, loc);
-          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          // Since this is a conformance requirement failure (where the
+          // source is most likely an argument), let's increase its impact
+          // to disambiguate vs. conversion failure of the same kind.
+          return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
+                                              : SolutionKind::Solved;
         }
       }
 
@@ -8055,16 +8096,12 @@ allFromConditionalConformances(DeclContext *DC, Type baseTy,
     }
 
     if (auto *protocol = candidateDC->getSelfProtocolDecl()) {
-      SmallVector<ProtocolConformance *, 4> conformances;
-      if (!NTD->lookupConformance(protocol, conformances))
+      auto conformance = DC->getParentModule()->lookupConformance(
+          baseTy, protocol);
+      if (!conformance.isConcrete())
         return false;
 
-      // This is opportunistic, there should be a way to narrow the
-      // list down to a particular declaration member comes from.
-      return llvm::any_of(
-          conformances, [](const ProtocolConformance *conformance) {
-            return !conformance->getConditionalRequirements().empty();
-          });
+      return !conformance.getConcrete()->getConditionalRequirements().empty();
     }
 
     return false;
@@ -9972,7 +10009,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         wrappedValueType = createTypeVariable(getConstraintLocator(paramDecl),
                                               TVO_CanBindToHole | TVO_CanBindToLValue);
       } else {
-        auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
+        auto *wrapperAttr = paramDecl->getOutermostAttachedPropertyWrapper();
         auto wrapperType = paramDecl->getAttachedPropertyWrapperType(0);
         backingType = replaceInferableTypesWithTypeVars(
             wrapperType, getConstraintLocator(wrapperAttr->getTypeRepr()));
@@ -11156,7 +11193,7 @@ retry_after_fail:
     if (isDebugMode()) {
       PrintOptions PO;
       PO.PrintTypesForDebugging = true;
-      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
+      llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
         << commonResultType.getString(PO)
         << ")\n";
@@ -12662,7 +12699,7 @@ static bool isAugmentingFix(ConstraintFix *fix) {
 bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log.indent(solverState ? solverState->depth * 2 : 0)
+    log.indent(solverState ? solverState->getCurrentIndent() : 0)
       << "(attempting fix ";
     fix->print(log);
     log << ")\n";
@@ -12858,7 +12895,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       }
     }
     auto matchingType =
-        TupleType::get(newTupleTypes, getASTContext())->castTo<TupleType>();
+        TupleType::get(newTupleTypes, getASTContext());
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
@@ -12938,7 +12975,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidASTNode: {
     return recordFix(fix, 10) ? SolutionKind::Error : SolutionKind::Solved;
   }
-  case FixKind::IgnoreInvalidNamedPattern: {
+  case FixKind::IgnoreUnresolvedPatternVar: {
     return recordFix(fix, 100) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -13401,6 +13438,9 @@ void ConstraintSystem::addConstraint(Requirement req,
   bool conformsToAnyObject = false;
   Optional<ConstraintKind> kind;
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Conformance:
     kind = ConstraintKind::ConformsTo;
     break;
