@@ -44,7 +44,7 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   }
 
   public func getIndexOfEnumCase(withName name: String) -> Int? {
-    let idx = name._withStringRef {
+    let idx = name.withStringRef {
       SILType_getCaseIdxOfEnumType(bridged, $0)
     }
     return idx >= 0 ? idx : nil
@@ -75,7 +75,7 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   }
 
   public func getIndexOfField(withName name: String) -> Int? {
-    let idx = name._withStringRef {
+    let idx = name.withStringRef {
       SILType_getFieldIdxOfNominalType(type.bridged, $0)
     }
     return idx >= 0 ? idx : nil

@@ -130,7 +130,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       // writeFn
       { (f: BridgedFunction, os: BridgedOStream, idx: Int) in
         let s = f.function.effects.argumentEffects[idx].description
-        s._withStringRef { OStream_write(os, $0) }
+        s.withStringRef { OStream_write(os, $0) }
       },
       // parseFn:
       { (f: BridgedFunction, str: llvm.StringRef, fromSIL: Int, isDerived: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in

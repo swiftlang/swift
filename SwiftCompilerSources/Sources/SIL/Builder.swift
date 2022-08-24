@@ -61,7 +61,7 @@ public struct Builder {
       operandType: Type, resultType: Type, arguments: [Value]) -> BuiltinInst {
     notifyInstructionsChanged()
     return arguments.withBridgedValues { valuesRef in
-      return name._withStringRef { nameStr in
+      return name.withStringRef { nameStr in
         let bi = SILBuilder_createBuiltinBinaryFunction(
           bridged, nameStr, operandType.bridged, resultType.bridged, valuesRef)
         return bi.getAs(BuiltinInst.self)
@@ -71,7 +71,7 @@ public struct Builder {
 
   public func createCondFail(condition: Value, message: String) -> CondFailInst {
     notifyInstructionsChanged()
-    return message._withStringRef { messageStr in
+    return message.withStringRef { messageStr in
       let cf = SILBuilder_createCondFail(bridged, condition.bridged, messageStr)
       return cf.getAs(CondFailInst.self)
     }
