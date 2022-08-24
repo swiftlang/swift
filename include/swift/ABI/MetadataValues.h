@@ -1428,6 +1428,9 @@ namespace SpecialPointerAuthDiscriminators {
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
 
+  // C type TaskContinuationFunction* descriminator.
+  const uint16_t ClangTypeTaskContinuationFunction = 0x2abe; // = 10942
+
   /// Dispatch integration.
   const uint16_t DispatchInvokeFunction = 0xf493; // = 62611
 
