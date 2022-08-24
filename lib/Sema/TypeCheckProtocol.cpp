@@ -3060,6 +3060,11 @@ Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
     diagnoseNonSendableTypesInReference(
         getConcreteWitness(), DC, loc, SendableCheckReason::Conformance);
 
+    // If the witness is accessible across actors, we don't need to consider it
+    // isolated.
+    if (isAccessibleAcrossActors(witness, refResult.isolation, DC))
+      return None;
+
     if (refResult.isolation.isActorIsolated() && isAsyncDecl(requirement) &&
         !isAsyncDecl(witness))
       return refResult.isolation;
