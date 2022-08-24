@@ -361,6 +361,9 @@ swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Conformance:
     desugarConformanceRequirement(firstType, req.getSecondType(),
                                   loc, result, errors);
@@ -574,6 +577,9 @@ void swift::rewriting::realizeRequirement(
   auto *moduleForInference = dc->getParentModule();
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
     auto secondType = req.getSecondType();

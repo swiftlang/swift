@@ -2860,6 +2860,18 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
 
+  // In SIL mode only, build one-element tuples.
+  if (attrs.has(TAK_tuple)) {
+    SmallVector<TupleTypeElt, 1> elements;
+    if (auto *parenTy = dyn_cast<ParenType>(ty.getPointer()))
+      ty = parenTy->getUnderlyingType();
+
+    elements.emplace_back(ty);
+    ty = TupleType::get(elements, getASTContext());
+
+    attrs.clearAttribute(TAK_tuple);
+  }
+
   // Type aliases inside protocols are not yet resolved in the structural
   // stage of type resolution
   if (ty->is<DependentMemberType>() &&
@@ -4018,13 +4030,19 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       if (patternTy->hasError())
         complained = true;
 
+      // Find the first type sequence parameter and use that as the count type.
+      SmallVector<Type, 1> rootTypeSequenceParams;
+      patternTy->getTypeSequenceParameters(rootTypeSequenceParams);
+
       // If there's no reference to a variadic generic parameter, complain
       // - the pack won't actually expand to anything meaningful.
-      if (!patternTy->hasTypeSequence())
+      if (rootTypeSequenceParams.empty()) {
         diagnose(repr->getLoc(), diag::expansion_not_variadic, patternTy)
           .highlight(repr->getParens());
+        return ErrorType::get(getASTContext());
+      }
 
-      return PackExpansionType::get(patternTy);
+      return PackExpansionType::get(patternTy, rootTypeSequenceParams[0]);
     } else {
       // Variadic tuples are not permitted.
       //
@@ -4080,6 +4098,9 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   if (foundDupLabel) {
     diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
+
+  if (elements.size() == 1 && !elements[0].hasName())
+    return ParenType::get(getASTContext(), elements[0].getType());
 
   return TupleType::get(elements, getASTContext());
 }

@@ -58,6 +58,7 @@ TYPE_ATTR(Sendable)
 TYPE_ATTR(unchecked)
 TYPE_ATTR(_typeSequence)
 TYPE_ATTR(_local)
+TYPE_ATTR(tuple)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)

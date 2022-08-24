@@ -599,6 +599,7 @@ bool Requirement::isCanonical() const {
     return false;
 
   switch (getKind()) {
+  case RequirementKind::SameCount:
   case RequirementKind::Conformance:
   case RequirementKind::SameType:
   case RequirementKind::Superclass:
@@ -618,6 +619,7 @@ Requirement Requirement::getCanonical() const {
   Type firstType = getFirstType()->getCanonicalType();
 
   switch (getKind()) {
+  case RequirementKind::SameCount:
   case RequirementKind::Conformance:
   case RequirementKind::SameType:
   case RequirementKind::Superclass: {
@@ -640,6 +642,9 @@ bool
 Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
                          bool allowMissing) const {
   switch (getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirements not supported here");
+
   case RequirementKind::Conformance: {
     auto *proto = getProtocolDecl();
     auto *module = proto->getParentModule();
@@ -678,6 +683,9 @@ Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
 
 bool Requirement::canBeSatisfied() const {
   switch (getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirements not supported here");
+
   case RequirementKind::Conformance:
     return getFirstType()->is<ArchetypeType>();
 
@@ -705,6 +713,7 @@ bool Requirement::canBeSatisfied() const {
 /// Determine the canonical ordering of requirements.
 static unsigned getRequirementKindOrder(RequirementKind kind) {
   switch (kind) {
+  case RequirementKind::SameCount: return 4;
   case RequirementKind::Conformance: return 2;
   case RequirementKind::Superclass: return 0;
   case RequirementKind::SameType: return 3;
@@ -852,6 +861,36 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
 
     // Check canonicalization of requirement itself.
     switch (reqt.getKind()) {
+    case RequirementKind::SameCount:
+      if (!reqt.getFirstType()->is<GenericTypeParamType>()) {
+        llvm::errs() << "Left hand side is not a generic parameter: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
+      if (!reqt.getFirstType()->castTo<GenericTypeParamType>()->isTypeSequence()) {
+        llvm::errs() << "Left hand side is not a type sequence: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
+      if (!reqt.getSecondType()->is<GenericTypeParamType>()) {
+        llvm::errs() << "Right hand side is not a generic parameter: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
+      if (!reqt.getSecondType()->castTo<GenericTypeParamType>()->isTypeSequence()) {
+        llvm::errs() << "Right hand side is not a type sequence: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
+      break;
     case RequirementKind::Superclass:
       if (!canSig->isReducedType(reqt.getSecondType())) {
         llvm::errs() << "Right-hand side is not reduced: ";
@@ -1020,6 +1059,10 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
   auto subjectType = stripBoundDependentMemberTypes(req.getFirstType());
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    // Same-count requirements do not involve dependent member types.
+    return req;
+
   case RequirementKind::Conformance:
     return Requirement(RequirementKind::Conformance, subjectType,
                        req.getSecondType());

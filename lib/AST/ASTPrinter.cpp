@@ -240,6 +240,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             if (!isPublicOrUsableFromInline(req.getSecondType()))
               return false;
             break;
+          case RequirementKind::SameCount:
           case RequirementKind::Layout:
             break;
           }
@@ -1414,6 +1415,8 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   bool inWhereClause;
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirements not supported here");
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
   case RequirementKind::Superclass: {
@@ -1505,7 +1508,8 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
     return getDepthOfType(req.getFirstType());
 
   case RequirementKind::Superclass:
-  case RequirementKind::SameType: {
+  case RequirementKind::SameType:
+  case RequirementKind::SameCount: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());
     unsigned secondDepth = getDepthOfType(req.getSecondType());
@@ -1752,6 +1756,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
         // We only print the second part of a requirement in the "inherited"
         // clause.
         switch (req.getKind()) {
+        case RequirementKind::SameCount:
+          llvm_unreachable("Same-count requirement not supported here");
+
         case RequirementKind::Layout:
           req.getLayoutConstraint()->print(Printer, Options);
           break;
@@ -1780,6 +1787,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   printTransformedType(req.getFirstType());
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    Printer << ".count == ";
+    printTransformedType(req.getSecondType());
+    Printer << ".count";
+    return;
   case RequirementKind::Layout:
     Printer << " : ";
     req.getLayoutConstraint()->print(Printer, Options);
@@ -5540,14 +5552,20 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
-    Printer << "(";
     visit(T->getPatternType());
-    Printer << "..." << ")";
+    Printer << "...";
   }
 
   void visitTupleType(TupleType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
+
+    // Single-element tuples can only appear in SIL mode.
+    if (T->getNumElements() == 1 &&
+        !T->getElement(0).hasName() &&
+        !T->getElementType(0)->is<PackExpansionType>()) {
+      Printer << "@tuple ";
+    }
 
     Printer << "(";
 
@@ -6611,14 +6629,6 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   }
 }
 
-void LayoutConstraint::dump() const {
-  if (!*this) {
-    llvm::errs() << "(null)\n";
-    return;
-  }
-  getPointer()->print(llvm::errs());
-}
-
 void GenericSignatureImpl::print(raw_ostream &OS, PrintOptions PO) const {
   GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(OS, PO);
 }
@@ -6640,43 +6650,6 @@ void GenericSignature::print(ASTPrinter &Printer,
   PrintAST(Printer, Opts).printGenericSignature(*this,
                                                 PrintAST::PrintParams |
                                                 PrintAST::PrintRequirements);
-}
-
-void GenericSignature::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
-
-void Requirement::dump() const {
-  dump(llvm::errs());
-  llvm::errs() << '\n';
-}
-void Requirement::dump(raw_ostream &out) const {
-  switch (getKind()) {
-  case RequirementKind::Conformance:
-    out << "conforms_to: ";
-    break;
-  case RequirementKind::Layout:
-    out << "layout: ";
-    break;
-  case RequirementKind::Superclass:
-    out << "superclass: ";
-    break;
-  case RequirementKind::SameType:
-    out << "same_type: ";
-    break;
-  }
-
-  PrintOptions opts;
-  opts.ProtocolQualifiedDependentMemberTypes = true;
-
-  getFirstType().print(out, opts);
-  out << " ";
-
-  if (getKind() != RequirementKind::Layout && getSecondType())
-    getSecondType().print(out, opts);
-  else if (getLayoutConstraint())
-    out << getLayoutConstraint();
 }
 
 void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {
@@ -6735,10 +6708,6 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
   llvm_unreachable("bad checked cast name");
 }
 
-void SILParameterInfo::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
 void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
@@ -6767,10 +6736,6 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   llvm_unreachable("bad result convention");
 }
 
-void SILResultInfo::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
 void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
@@ -7035,11 +7000,6 @@ swift::getInheritedForPrinting(
 //  Generic param list printing.
 //===----------------------------------------------------------------------===//
 
-void RequirementRepr::dump() const {
-  print(llvm::errs());
-  llvm::errs() << "\n";
-}
-
 void RequirementRepr::print(raw_ostream &out) const {
   StreamPrinter printer(out);
   print(printer);
@@ -7080,11 +7040,6 @@ void RequirementRepr::print(ASTPrinter &out) const {
     }
     break;
   }
-}
-
-void GenericParamList::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
 }
 
 void GenericParamList::print(raw_ostream &out, const PrintOptions &PO) const {

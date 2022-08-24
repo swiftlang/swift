@@ -635,6 +635,8 @@ Type ASTBuilder::createConstrainedExistentialType(
   llvm::SmallDenseMap<Identifier, Type> cmap;
   for (const auto &req : constraints) {
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::Layout:

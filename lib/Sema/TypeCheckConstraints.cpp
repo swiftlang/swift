@@ -642,6 +642,9 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       auto &requirement = requirements[reqIdx];
 
       switch (requirement.getKind()) {
+      case RequirementKind::SameCount:
+        llvm_unreachable("Same-count requirement not supported here");
+
       case RequirementKind::SameType: {
         auto lhsTy = requirement.getFirstType();
         auto rhsTy = requirement.getSecondType();
