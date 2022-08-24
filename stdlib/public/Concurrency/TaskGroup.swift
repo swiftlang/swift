@@ -100,14 +100,14 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// you can use a `for`-`await`-`in` loop:
 ///
 ///     var sum = 0
-///     for await result in group {
+///     for try await result in group {
 ///         sum += result
 ///     }
 ///
 /// If you need more control or only a few results,
 /// you can call `next()` directly:
 ///
-///     guard let first = await group.next() else {
+///     guard let first = try await group.next() else {
 ///         group.cancelAll()
 ///         return 0
 ///     }
@@ -580,7 +580,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
-  ///     for await try value in group {
+  ///     for try await value in group {
   ///         collected += value
   ///     }
   ///
