@@ -2826,6 +2826,7 @@ CollectedOpaqueReprs swift::collectTypeReprs(TypeRepr *r) {
     bool walkToTypeReprPre(TypeRepr *repr) override {
       if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)){
           Reprs.push_back(opaqueRepr);
+          return false;
       } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)){
           Reprs.push_back(compositionRepr);
       } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)){
