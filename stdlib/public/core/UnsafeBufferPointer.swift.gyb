@@ -763,7 +763,7 @@ extension Unsafe${Mutable}BufferPointer {
   @_alwaysEmitIntoClient
   public func update<S: Sequence>(
     from source: S
-  ) -> (unwritten: S.Iterator, updated: Index) where S.Element == Element {
+  ) -> (unwritten: S.Iterator, index: Index) where S.Element == Element {
     var iterator = source.makeIterator()
     guard var pointer = baseAddress else { return (iterator, startIndex) }
     for index in indices {

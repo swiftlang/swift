@@ -863,6 +863,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`.
+  @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
   public func moveInitializeMemory<T>(

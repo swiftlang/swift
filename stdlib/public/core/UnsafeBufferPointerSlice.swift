@@ -156,6 +156,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this slice, and its count is equal to `source.count`.
+  @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
   public func moveInitializeMemory<T>(
@@ -193,6 +194,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this slice, and its count is equal to `source.count`.
+  @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
   public func moveInitializeMemory<T>(
@@ -720,7 +722,7 @@ extension Slice {
   @_alwaysEmitIntoClient
   public func initialize<S>(
     from source: S
-  ) -> (S.Iterator, Index)
+  ) -> (unwritten: S.Iterator, index: Index)
     where S: Sequence, Base == UnsafeMutableBufferPointer<S.Element> {
     let buffer = Base(rebasing: self)
     let (iterator, index) = buffer.initialize(from: source)
@@ -743,10 +745,12 @@ extension Slice {
   /// as the buffer slice can hold, the returned index is equal to
   /// to the slice's `endIndex`.
   ///
+  /// - Precondition: `self.count` >= `source.count`
+  ///
   /// - Parameter source: A collection of elements to be used to
   ///     initialize the buffer's storage.
   /// - Returns: An index to the next uninitialized element in the
-  ///     buffer slice, or `endIndex`.  @discardableResult
+  ///     buffer slice, or `endIndex`.
   @inlinable
   @_alwaysEmitIntoClient
   public func initialize<C>(
@@ -788,7 +792,7 @@ extension Slice {
   @_alwaysEmitIntoClient
   public func update<S>(
     from source: S
-  ) -> (unwritten: S.Iterator, updated: Index)
+  ) -> (unwritten: S.Iterator, index: Index)
     where S: Sequence, Base == UnsafeMutableBufferPointer<S.Element> {
     let buffer = Base(rebasing: self)
     let (iterator, index) = buffer.update(from: source)
