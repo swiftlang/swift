@@ -3115,6 +3115,23 @@ swift::determineClosureActorIsolation(AbstractClosureExpr *closure) {
   return checker.determineClosureIsolation(closure);
 }
 
+/// Determine whethere there is an explicit isolation attribute
+/// of any kind.
+static bool hasExplicitIsolationAttribute(const Decl *decl) {
+  if (auto nonisolatedAttr =
+      decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+    if (!nonisolatedAttr->isImplicit())
+      return true;
+  }
+
+  if (auto globalActorAttr = decl->getGlobalActorAttr()) {
+    if (!globalActorAttr->first->isImplicit())
+      return true;
+  }
+
+  return false;
+}
+
 /// Determine actor isolation solely from attributes.
 ///
 /// \returns the actor isolation determined from attributes alone (with no
@@ -4085,8 +4102,7 @@ bool swift::contextRequiresStrictConcurrencyChecking(
     } else if (auto decl = dc->getAsDecl()) {
       // If any isolation attributes are present, we're using concurrency
       // features.
-      if (getIsolationFromAttributes(
-              decl, /*shouldDiagnose=*/false, /*onlyExplicit=*/true))
+      if (hasExplicitIsolationAttribute(decl))
         return true;
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
