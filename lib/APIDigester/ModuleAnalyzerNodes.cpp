@@ -50,7 +50,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
   SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *D);
   SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID);
-  SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform);
+  SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform);
   SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
@@ -1459,17 +1459,21 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
   Name = PrintedName = Ctx.buffer(content);
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform):
-    SDKNodeInitInfo(Ctx, Conform->getProtocol()) {
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
+    SDKNodeInitInfo(Ctx, Conform.getRequirement()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
-  GenericSig = printGenericSignature(Ctx, Conform, Ctx.checkingABI());
-  SugaredGenericSig = Ctx.checkingABI() ?
-    printGenericSignature(Ctx, Conform, false): StringRef();
-  // Whether this conformance is ABI placeholder depends on the decl context
-  // of this conformance.
-  IsABIPlaceholder = isABIPlaceholderRecursive(Conform->getDeclContext()->
-                                               getAsDecl());
+  if (Conform.isConcrete()) {
+    auto *Concrete = Conform.getConcrete();
+
+    GenericSig = printGenericSignature(Ctx, Concrete, Ctx.checkingABI());
+    SugaredGenericSig = Ctx.checkingABI() ?
+      printGenericSignature(Ctx, Concrete, false): StringRef();
+    // Whether this conformance is ABI placeholder depends on the decl context
+    // of this conformance.
+    IsABIPlaceholder = isABIPlaceholderRecursive(Concrete->getDeclContext()->
+                                                 getAsDecl());
+  }
 }
 
 static bool isProtocolRequirement(ValueDecl *VD) {
@@ -1910,7 +1914,7 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
   if (Ctx.checkingABI())
     Conform = Conform->getCanonicalConformance();
   auto ConfNode = cast<SDKNodeConformance>(SDKNodeInitInfo(Ctx,
-    Conform).createSDKNode(SDKNodeKind::Conformance));
+    ProtocolConformanceRef(Conform)).createSDKNode(SDKNodeKind::Conformance));
   Conform->forEachTypeWitness(
     [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) -> bool {
       ConfNode->addChild(constructTypeWitnessNode(assoc, ty));
@@ -1922,12 +1926,25 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
 void swift::ide::api::
 SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
                                               NominalTypeDecl *NTD) {
-  // Avoid adding the same conformance twice.
-  SmallPtrSet<ProtocolConformance*, 4> Seen;
-  for (auto &Conf: NTD->getAllConformances()) {
-    if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
-      Root->addConformance(constructConformanceNode(Conf));
-    Seen.insert(Conf);
+  if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+    PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+      if (PD != inherited && !Ctx.shouldIgnore(inherited)) {
+        ProtocolConformanceRef Conf(inherited);
+        auto ConfNode = SDKNodeInitInfo(Ctx, Conf)
+            .createSDKNode(SDKNodeKind::Conformance);
+        Root->addConformance(ConfNode);
+      }
+
+      return TypeWalker::Action::Continue;
+    });
+  } else {
+    // Avoid adding the same conformance twice.
+    SmallPtrSet<ProtocolConformance*, 4> Seen;
+    for (auto &Conf: NTD->getAllConformances()) {
+      if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
+        Root->addConformance(constructConformanceNode(Conf));
+      Seen.insert(Conf);
+    }
   }
 }
 

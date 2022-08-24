@@ -182,6 +182,28 @@ def tar(source, destination):
     shell.call(args + [source], stderr=shell.DEVNULL)
 
 
+def process_system_exit(e: SystemExit) -> int:
+    # According to Python's documents, `SystemExit.code` is the exit status
+    # or error message that is passed to the constructor. (Defaults to None.)
+    #
+    # This means that `SystemExit.code` is either `None`, an `int` object or
+    # a `string` object of error message.
+    if e.code is None:
+        # Fallback to 1 if there is no error code but a `SystemExit`.
+        return 1
+    try:
+        numeric_code = int(e.code)
+        return numeric_code
+    except ValueError:
+        # Fallback to 1 if it is an error message and print that message.
+        print(e)
+        return 1
+    finally:
+        # Fallback to 1 and do nothing, since there is only ValueError as
+        # expected exception.
+        return 1
+
+
 # -----------------------------------------------------------------------------
 # Argument Validation
 
@@ -388,6 +410,21 @@ def apply_default_arguments(toolchain, args):
         args.extra_cmake_options.append(
             '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
                 args.swift_darwin_module_archs))
+
+    if (args.infer_cross_compile_hosts_on_darwin and
+            platform.system() == "Darwin"):
+        args.cross_compile_hosts = _infer_cross_compile_hosts_on_darwin()
+        print("Inferred the following hosts for cross compilations: "
+              f"{args.cross_compile_hosts}")
+        sys.stdout.flush()
+
+
+def _infer_cross_compile_hosts_on_darwin():
+    if platform.machine() == "x86_64":
+        return ["macosx-arm64"]
+    else:
+        return ["macosx-x86_64"]
+
 
 # -----------------------------------------------------------------------------
 # Main (preset)
@@ -718,6 +755,9 @@ def main():
 if __name__ == "__main__":
     try:
         exit_code = main()
+    except SystemExit as e:
+        error_code = process_system_exit(e)
+        os._exit(error_code)
     except KeyboardInterrupt:
         sys.exit(1)
     finally:

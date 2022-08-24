@@ -194,8 +194,9 @@ func overloadedMethod<T>() {} // expected-note {{in call to function 'overloaded
 overloadedMethod()
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
-// Ensure we select the overload of '??' returning T? rather than T.
-func SR3817(_ d: [String : Any], _ s: String, _ t: String) -> Any {
+/// https://github.com/apple/swift/issues/46402
+/// Ensure we select the overload of `??` returning `T?` rather than `T`.
+func f_46402(_ d: [String : Any], _ s: String, _ t: String) -> Any {
   if let r = d[s] ?? d[t] {
     return r
   } else {
@@ -256,13 +257,6 @@ func rdar79672230() {
 
   var t: MyType = MyType()
   test(&t) // expected-error {{no exact matches in call to local function 'test'}}
-}
-
-// https://github.com/apple/swift/issues/60029
-for (key, values) in oldName { // expected-error{{cannot find 'oldName' in scope}}
-  for (idx, value) in values.enumerated() {
-    print(key, idx, value)
-  }
 }
 
 // rdar://97396399 - crash in swift::DiagnosticEngine::formatDiagnosticText

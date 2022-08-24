@@ -104,7 +104,7 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
 
     // If completion failed, we'll have a totally empty requirement signature,
     // but to maintain invariants around what constitutes a valid rewrite term
-    // between getTypeForTerm() and isValidTypeInContext(), we need to add rules
+    // between getTypeForTerm() and isValidTypeParameter(), we need to add rules
     // for inherited protocols.
     if (reqs.getErrors().contains(GenericSignatureErrorFlags::CompletionFailed)) {
       for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
@@ -298,6 +298,9 @@ void RuleBuilder::addRequirement(const Requirement &req,
   MutableTerm constraintTerm;
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Conformance: {
     // A conformance requirement T : P becomes a rewrite rule
     //

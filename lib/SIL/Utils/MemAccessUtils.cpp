@@ -1415,6 +1415,10 @@ void swift::visitProductLeafAccessPathNodes(
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
+      if (decl->isCxxNonTrivial()) {
+        visitor(AccessPath::PathNode(node), silType);
+        continue;
+      }
       unsigned index = 0;
       for (auto *field : decl->getStoredProperties()) {
         auto *fieldNode = node->getChild(index);
@@ -1935,6 +1939,11 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
       return true;
     }
   }
+  if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser())) {
+    if (use->get() == sbi->getDest()) {
+      pushUsers(sbi, dfs);
+    }
+  }
   if (isa<EndBorrowInst>(use->getUser())) {
     return true;
   }
@@ -2103,6 +2112,7 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
   case SILInstructionKind::InjectEnumAddrInst:
     return visitor.visitStore(use);
 
+  case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::CopyAddrInst:
     if (operIdx == CopyLikeInstruction::Dest) {
       return visitor.visitStore(use);
@@ -2139,6 +2149,10 @@ bool swift::memInstMustInitialize(Operand *memOper) {
 
   case SILInstructionKind::CopyAddrInst: {
     auto *CAI = cast<CopyAddrInst>(memInst);
+    return CAI->getDest() == address && CAI->isInitializationOfDest();
+  }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return CAI->getDest() == address && CAI->isInitializationOfDest();
   }
   case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
@@ -2479,8 +2493,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::Unreachable:
     case BuiltinValueKind::CondUnreachable:
     case BuiltinValueKind::DestroyArray:
-    case BuiltinValueKind::UnsafeGuaranteed:
-    case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::IntInstrprofIncrement:
@@ -2589,6 +2601,11 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::CopyAddrInst:
     visitor(&I->getAllOperands()[CopyAddrInst::Src]);
     visitor(&I->getAllOperands()[CopyAddrInst::Dest]);
+    return;
+
+  case SILInstructionKind::ExplicitCopyAddrInst:
+    visitor(&I->getAllOperands()[ExplicitCopyAddrInst::Src]);
+    visitor(&I->getAllOperands()[ExplicitCopyAddrInst::Dest]);
     return;
 
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:

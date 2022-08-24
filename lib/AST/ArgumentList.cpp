@@ -35,6 +35,19 @@ SourceRange Argument::getSourceRange() const {
   return SourceRange(labelLoc, exprEndLoc);
 }
 
+Argument Argument::implicitInOut(ASTContext &ctx, Expr *expr) {
+  assert(!isa<InOutExpr>(expr) && "Cannot nest InOutExpr");
+
+  // Eventually this will set an 'inout' bit on Argument, but for now,
+  // synthesize in the InOutExpr.
+  Type objectTy;
+  if (auto subTy = expr->getType())
+    objectTy = subTy->castTo<LValueType>()->getObjectType();
+
+  return Argument::unlabeled(
+      new (ctx) InOutExpr(SourceLoc(), expr, objectTy, /*isImplicit*/ true));
+}
+
 bool Argument::isInOut() const {
   return ArgExpr->isSemanticallyInOutExpr();
 }

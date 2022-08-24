@@ -87,9 +87,9 @@ bb0(%0 : $@callee_owned () -> ()):
 
 // Check that a specialization of address_closure_noescape_user was generated which does not
 // take a closure as a parameter anymore.
-// CHECK-LABEL: sil shared @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable P) -> ()
-// CHECK: function_ref @address_closure_existential : $@convention(thin) (@inout_aliasable P) -> ()
-// CHECK: partial_apply %{{.*}} : $@convention(thin) (@inout_aliasable P) -> ()
+// CHECK-LABEL: sil shared @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable any P) -> ()
+// CHECK: function_ref @address_closure_existential : $@convention(thin) (@inout_aliasable any P) -> ()
+// CHECK: partial_apply %{{.*}} : $@convention(thin) (@inout_aliasable any P) -> ()
 // CHECK: apply
 // CHECK: return
 
@@ -298,9 +298,9 @@ bb0(%0 : $*Q, %1 : $*Q, %2 : $*Q, %3 : $*Q):
 
 // Check that a specialization of address_closure_user_out_result was generated which does not
 // take a closure as a parameter anymore.
-// CHECK-LABEL: sil shared @{{.*}}address_closure_user_out_result{{.*}} : $@convention(thin) (@inout_aliasable Q, @inout_aliasable Q) -> @out Q
-// CHECK: function_ref @address_closure_out_result : $@convention(thin) (@in Q, @inout_aliasable Q, @inout_aliasable Q) -> @out Q
-// CHECK: [[PARTIAL_APPLY:%.*]] = partial_apply %{{.*}} : $@convention(thin) (@in Q, @inout_aliasable Q, @inout_aliasable Q) -> @out Q
+// CHECK-LABEL: sil shared @{{.*}}address_closure_user_out_result{{.*}} : $@convention(thin) (@inout_aliasable any Q, @inout_aliasable any Q) -> @out any Q
+// CHECK: function_ref @address_closure_out_result : $@convention(thin) (@in any Q, @inout_aliasable any Q, @inout_aliasable any Q) -> @out any Q
+// CHECK: [[PARTIAL_APPLY:%.*]] = partial_apply %{{.*}} : $@convention(thin) (@in any Q, @inout_aliasable any Q, @inout_aliasable any Q) -> @out any Q
 // CHECK: apply [[PARTIAL_APPLY]]
 // CHECK: return
 
@@ -322,9 +322,9 @@ bb0(%0 : $*Q, %1 : $@noescape @callee_owned (@in Q) -> @out Q):
 // unsupported address type arguments (e.g. @in or @out), but the partial_apply has only
 // supported address type arguments, i.e. @inout or @inout_aliasable.
 //
-// CHECK-LABEL: sil @address_caller_out_result : $@convention(thin) (@in Q, @in Q) -> @out Q
+// CHECK-LABEL: sil @address_caller_out_result : $@convention(thin) (@in any Q, @in any Q) -> @out any Q
 // CHECK-NOT: partial_apply
-// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user_out_result{{.*}} : $@convention(thin) (@inout_aliasable Q, @inout_aliasable Q) -> @out Q
+// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user_out_result{{.*}} : $@convention(thin) (@inout_aliasable any Q, @inout_aliasable any Q) -> @out any Q
 // CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
 // CHECK: return
@@ -343,8 +343,8 @@ bb0(%0 : $*Q, %1 : $*Q, %2 : $*Q):
 
 // CHECK-LABEL: sil @address_caller_existential
 // CHECK-NOT: partial_apply
-// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable P) -> ()
-// CHECK:  [[SPECIALIZED_FN2:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable P) -> ()
+// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable any P) -> ()
+// CHECK:  [[SPECIALIZED_FN2:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable any P) -> ()
 // CHECK: apply [[SPECIALIZED_FN2]]{{.*}}
 // CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
@@ -564,8 +564,8 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
   release_value %3 : $Builtin.NativeObject
   throw %5 : $Error
 }
-// CHECK-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> () {
-// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $Error):
+// CHECK-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned any Error) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $any Error):
 // CHECK: [[OLD_CLOSURE_CALLEE1:%.*]] = function_ref @large_closure_callee
 // CHECK: [[OLD_CLOSURE_CALLEE2:%.*]] = function_ref @small_closure_callee
 // CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
@@ -600,8 +600,8 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
 // CHECK-NEXT: release_value [[DEAD_CLOSURE_1]]
 // CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
 
-// REMOVECLOSURES-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> () {
-// REMOVECLOSURES: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $Error):
+// REMOVECLOSURES-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned any Error) -> () {
+// REMOVECLOSURES: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $any Error):
 // REMOVECLOSURES: [[OLD_CLOSURE_CALLEE1:%.*]] = function_ref @large_closure_callee
 // REMOVECLOSURES: [[OLD_CLOSURE_CALLEE2:%.*]] = function_ref @small_closure_callee
 // REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
@@ -669,19 +669,19 @@ bb4:
 // Make sure we do not try to specialize a closure if we are not closing over a
 // direct function ref.
 
-// CHECK-LABEL: @$s4test3barSiAA1P_p_SitF : $@convention(thin) (@in P, Int32) -> Int32 {
+// CHECK-LABEL: @$s4test3barSiAA1P_p_SitF : $@convention(thin) (@in any P, Int32) -> Int32 {
 // CHECK: partial_apply
 // CHECK: apply
 sil [noinline] @$s4test3barSiAA1P_p_SitF : $@convention(thin) (@in P, Int32) -> Int32 {
 bb0(%0 : $*P, %1 : $Int32):
-  %2 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
-  %3 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo, %2 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) @callee_owned <T: P> (@callee_owned (Int32) -> Int32, Int32, @inout T) -> Int32
+  %2 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000", P) Self
+  %3 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", P) Self, #P.foo, %2 : $*@opened("01234567-89ab-cdef-0123-000000000000", P) Self : $@convention(witness_method: P) @callee_owned <T: P> (@callee_owned (Int32) -> Int32, Int32, @inout T) -> Int32
   %4 = integer_literal $Builtin.Int32, 2
   %5 = struct $Int32 (%4 : $Builtin.Int32)
   // function_ref test.baz (Swift.Int32)(m : Swift.Int32) -> Swift.Int32
   %6 = function_ref @$s4test3bazSiSi1m_tcSiF : $@convention(thin) (Int32, Int32) -> Int32
   %7 = partial_apply %6(%5) : $@convention(thin) (Int32, Int32) -> Int32
-  %8 = apply %3<@opened("01234567-89ab-cdef-0123-000000000000") P>(%7, %1, %2) : $@convention(witness_method: P) @callee_owned <T: P> (@callee_owned (Int32) -> Int32, Int32, @inout T) -> Int32
+  %8 = apply %3<@opened("01234567-89ab-cdef-0123-000000000000", P) Self>(%7, %1, %2) : $@convention(witness_method: P) @callee_owned <T: P> (@callee_owned (Int32) -> Int32, Int32, @inout T) -> Int32
   destroy_addr %0 : $*P
   return %8 : $Int32
 }

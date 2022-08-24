@@ -841,7 +841,7 @@ bad(%15 : @owned $Error):
 // CHECK:       [[GOOD]]({{%[^,]+}} : $()):
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         destroy_value [[INSTANCE]]
-// CHECK:       [[BAD]]([[ERROR:%[^,]+]] : @owned $Error):
+// CHECK:       [[BAD]]([[ERROR:%[^,]+]] : @owned $any Error):
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         throw [[ERROR]]
@@ -927,7 +927,7 @@ entry(%instance : @owned $C, %input : $S):
 // which can have the same sorts of side-effects as function calls.
 //
 // CHECK-LABEL: sil [ossa] @dont_hoist_over_abort_apply : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[REGISTER_1:%[^,]+]] : $Error):
+// CHECK:       {{bb[0-9]+}}([[REGISTER_1:%[^,]+]] : $any Error):
 // CHECK:         abort_apply
 // CHECK:         end_borrow
 // CHECK:         destroy_value

@@ -32,11 +32,11 @@ func asyncFunc() async {
 // CHECK-EXEC-NEXT: 43
 
 // static MyProgram.main()
-// CHECK-SIL-LABEL: sil hidden @$s10async_main9MyProgramV0B0yyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error Error
+// CHECK-SIL-LABEL: sil hidden @$s10async_main9MyProgramV0B0yyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error any Error
 
 
 // static MyProgram.$main()
-// CHECK-SIL-LABEL: sil hidden @$s10async_main9MyProgramV5$mainyyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error Error
+// CHECK-SIL-LABEL: sil hidden @$s10async_main9MyProgramV5$mainyyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error any Error
 
 
 // async_Main
@@ -44,8 +44,8 @@ func asyncFunc() async {
 // call main
 // CHECK-SIL:  %0 = metatype $@thin MyProgram.Type             // user: %2
 // CHECK-SIL-NEXT:  // function_ref static MyProgram.$main()
-// CHECK-SIL-NEXT:  %1 = function_ref @$s10async_main9MyProgramV5$mainyyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error Error // user: %2
-// CHECK-SIL-NEXT:  try_apply %1(%0) : $@convention(method) @async (@thin MyProgram.Type) -> @error Error, normal bb1, error bb2 // id: %2
+// CHECK-SIL-NEXT:  %1 = function_ref @$s10async_main9MyProgramV5$mainyyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error any Error // user: %2
+// CHECK-SIL-NEXT:  try_apply %1(%0) : $@convention(method) @async (@thin MyProgram.Type) -> @error any Error, normal bb1, error bb2 // id: %2
 
 // unwrap error and exit or explode
 // CHECK-SIL: bb1(%3 : $()):
@@ -56,8 +56,8 @@ func asyncFunc() async {
 // CHECK-SIL-NEXT:  %7 = apply %6(%5) : $@convention(c) (Int32) -> Never
 // CHECK-SIL-NEXT:  unreachable
 
-// CHECK-SIL: bb2(%9 : $Error):
-// CHECK-SIL-NEXT:  %10 = builtin "errorInMain"(%9 : $Error) : $()
+// CHECK-SIL: bb2(%9 : $any Error):
+// CHECK-SIL-NEXT:  %10 = builtin "errorInMain"(%9 : $any Error) : $()
 // CHECK-SIL-NEXT:  unreachable
 
 // main
@@ -68,12 +68,12 @@ func asyncFunc() async {
 // CHECK-SIL-NEXT:  %3 = integer_literal $Builtin.Int64, 2048
 // CHECK-SIL-NEXT:  %4 = struct $Int (%3 : $Builtin.Int64)
 // CHECK-SIL-NEXT:  %5 = metatype $@thick ().Type
-// CHECK-SIL-NEXT:  %6 = init_existential_metatype %5 : $@thick ().Type, $@thick Any.Type
+// CHECK-SIL-NEXT:  %6 = init_existential_metatype %5 : $@thick ().Type, $@thick any Any.Type
 // CHECK-SIL-NEXT:  // function_ref thunk for @escaping @convention(thin) @async () -> ()
-// CHECK-SIL-NEXT:  %7 = function_ref @$sIetH_yts5Error_pIegHrzo_TR : $@convention(thin) @async (@convention(thin) @async () -> ()) -> (@out (), @error Error)
-// CHECK-SIL-NEXT:  %8 = partial_apply [callee_guaranteed] %7(%2) : $@convention(thin) @async (@convention(thin) @async () -> ()) -> (@out (), @error Error)
-// CHECK-SIL-NEXT:  %9 = convert_function %8 : $@async @callee_guaranteed () -> (@out (), @error Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>
-// CHECK-SIL-NEXT:  %10 = builtin "createAsyncTask"<()>(%4 : $Int, %6 : $@thick Any.Type, %9 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
+// CHECK-SIL-NEXT:  %7 = function_ref @$sIetH_yts5Error_pIegHrzo_TR : $@convention(thin) @async (@convention(thin) @async () -> ()) -> (@out (), @error any Error)
+// CHECK-SIL-NEXT:  %8 = partial_apply [callee_guaranteed] %7(%2) : $@convention(thin) @async (@convention(thin) @async () -> ()) -> (@out (), @error any Error)
+// CHECK-SIL-NEXT:  %9 = convert_function %8 : $@async @callee_guaranteed () -> (@out (), @error any Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+// CHECK-SIL-NEXT:  %10 = builtin "createAsyncTask"<()>(%4 : $Int, %6 : $@thick any Any.Type, %9 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
 // CHECK-SIL-NEXT:  %11 = tuple_extract %10 : $(Builtin.NativeObject, Builtin.RawPointer), 0
 // CHECK-SIL-NEXT:  // function_ref swift_job_run
 // CHECK-SIL-NEXT:  %12 = function_ref @swift_job_run : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()

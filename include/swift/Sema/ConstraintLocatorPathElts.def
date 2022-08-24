@@ -72,8 +72,11 @@ CUSTOM_LOCATOR_PATH_ELT(ContextualType)
 /// A result of an expression involving dynamic lookup.
 SIMPLE_LOCATOR_PATH_ELT(DynamicLookupResult)
 
-/// The superclass of a protocol existential type.
-SIMPLE_LOCATOR_PATH_ELT(ExistentialSuperclassType)
+/// The superclass of a protocol composition type.
+SIMPLE_LOCATOR_PATH_ELT(ProtocolCompositionSuperclassType)
+
+/// The constraint of an existential type.
+SIMPLE_LOCATOR_PATH_ELT(ExistentialConstraintType)
 
 /// The argument type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionArgument)
@@ -239,8 +242,12 @@ CUSTOM_LOCATOR_PATH_ELT(SyntacticElement)
 /// The element of the pattern binding declaration.
 CUSTOM_LOCATOR_PATH_ELT(PatternBindingElement)
 
-/// The variable declared by a named pattern.
-SIMPLE_LOCATOR_PATH_ELT(NamedPatternDecl)
+/// A declaration introduced by a pattern: name (i.e. `x`) or `_`
+ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
+  /// The variable declared by a named pattern.
+  CUSTOM_LOCATOR_PATH_ELT(NamedPatternDecl)
+  /// The anonymous variable declared by a `_` pattern.
+  CUSTOM_LOCATOR_PATH_ELT(AnyPatternDecl)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

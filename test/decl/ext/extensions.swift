@@ -104,6 +104,7 @@ var c = C()
 var x = c.p1
 c.p1 = 1
 
+// Reject extension of nominal type via inferred associated type
 protocol P3 {
   associatedtype Assoc
   func foo() -> Assoc
@@ -113,6 +114,8 @@ struct X3 : P3 {
 }
 
 extension X3.Assoc {
+// expected-error@-1 {{extension of type 'X3.Assoc' (aka 'Int') must be declared as an extension of 'Int'}}
+// expected-note@-2 {{did you mean to extend 'Int' instead?}}
 }
 
 extension X3 {
@@ -331,7 +334,7 @@ extension ImposeClassReq2 {
   }
 }
 
-// Reject extension of nominal type via parameterized typealias
+// Reject extension of nominal type via typealias with dependent underlying type
 
 struct Nest<Egg> { typealias Contents = Egg }
 struct Tree { 

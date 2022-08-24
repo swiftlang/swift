@@ -12,7 +12,9 @@
 
 #include "ClangSyntaxPrinter.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SwiftNameTranslation.h"
 
 using namespace swift;
 using namespace cxx_synthesis;
@@ -51,7 +53,7 @@ void ClangSyntaxPrinter::printIdentifier(StringRef name) {
 
 void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) {
   assert(decl->getName().isSimpleName());
-  printIdentifier(decl->getBaseIdentifier().str());
+  printIdentifier(cxx_translation::getNameForCxx(decl));
 }
 
 void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
@@ -167,4 +169,15 @@ void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
   os << std::string(indent, ' ');
   os << "auto *" << vwTableVariable << " = *vwTableAddr;\n";
   os << "#endif\n";
+}
+
+void ClangSyntaxPrinter::printCTypeMetadataTypeFunction(
+    const NominalTypeDecl *typeDecl, StringRef typeMetadataFuncName) {
+  os << "// Type metadata accessor for " << typeDecl->getNameStr() << "\n";
+  os << "SWIFT_EXTERN ";
+  printSwiftImplQualifier();
+  os << "MetadataResponseTy " << typeMetadataFuncName << '(';
+  printSwiftImplQualifier();
+  os << "MetadataRequestTy)";
+  os << " SWIFT_NOEXCEPT SWIFT_CALL;\n\n";
 }

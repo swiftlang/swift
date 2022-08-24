@@ -47,5 +47,13 @@ int main() {
 
   smallStructWithProps.setLargeStructWithProps(largeStructWithProps);
 // CHECK-NEXT: SET: LargeStruct(x1: 0, x2: 2, x3: -72, x4: 3, x5: 4, x6: 5), FirstSmallStruct(x: 999)
+
+  auto propsInClass = createPropsInClass(-1234);
+  assert(propsInClass.getStoredInt() == -1234);
+  propsInClass.setStoredInt(45);
+  assert(propsInClass.getStoredInt() == 45);
+  propsInClass.setComputedInt(-11);
+  assert(propsInClass.getComputedInt() == -11);
+  assert(propsInClass.getStoredInt() == -13);
   return 0;
 }

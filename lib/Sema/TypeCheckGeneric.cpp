@@ -356,6 +356,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
     Type second;
 
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
       second = req.getSecondType();
@@ -786,6 +787,9 @@ void TypeChecker::diagnoseRequirementFailure(
 
   const auto reqKind = req.getKind();
   switch (reqKind) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Conformance: {
     diagnoseConformanceFailure(substReq.getFirstType(),
                                substReq.getProtocolDecl(), module, errorLoc);
@@ -868,9 +872,10 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       Requirement substReq = req;
       if (isPrimaryReq) {
         // Primary requirements do not have substitutions applied.
-        if (auto resolved =
-                req.subst(substitutions, LookUpConformanceInModule(module))) {
-          substReq = *resolved;
+        auto resolved =
+            req.subst(substitutions, LookUpConformanceInModule(module));
+        if (!resolved.hasError()) {
+          substReq = resolved;
         } else {
           // Another requirement might fail later; just continue.
           hadSubstFailure = true;
@@ -912,9 +917,10 @@ CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
   bool valid = true;
 
   for (auto req : requirements) {
-    if (auto resolved = req.subst(substitutions,
-                                  LookUpConformanceInModule(module), options)) {
-      worklist.push_back(*resolved);
+    auto resolved = req.subst(substitutions,
+                              LookUpConformanceInModule(module), options);
+    if (!resolved.hasError()) {
+      worklist.push_back(resolved);
     } else {
       valid = false;
     }

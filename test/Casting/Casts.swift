@@ -41,7 +41,8 @@ private func runtimeCast<T,U>(_ from: T, to: U.Type) -> U? {
 
 let CastsTests = TestSuite("Casts")
 
-// Test for SR-426: missing release for some types after failed conversion
+// https://github.com/apple/swift/issues/43043
+// Missing release for some types after failed conversion
 CastsTests.test("No leak for failed tuple casts") {
     let t: Any = (1, LifetimeTracked(0))
     expectFalse(t is Any.Type)
@@ -50,10 +51,10 @@ CastsTests.test("No leak for failed tuple casts") {
 protocol P {}
 class ErrClass : Error { }
 
+// https://github.com/apple/swift/issues/43009
 CastsTests.test("No overrelease of existential boxes in failed casts") {
-    // Test for crash from SR-392
-    // We fail casts of an existential box repeatedly
-    // to ensure it does not get over-released.
+    // We fail casts of an existential box repeatedly to ensure it does not get
+    // over-released.
     func bar<T>(_ t: T) {
         for _ in 0..<10 {
             if case let a as P = t {
@@ -68,8 +69,10 @@ CastsTests.test("No overrelease of existential boxes in failed casts") {
 
 extension Int : P {}
 
-// Test for SR-7664: Inconsistent optional casting behaviour with generics
-// Runtime failed to unwrap multiple levels of Optional when casting.
+/// https://github.com/apple/swift/issues/50204
+/// Inconsistent optional casting behaviour with generics
+///
+/// Runtime failed to unwrap multiple levels of `Optional` when casting.
 CastsTests.test("Multi-level optionals can be casted") {
   func testSuccess<From, To>(_ x: From, from: From.Type, to: To.Type) {
     expectNotNil(x as? To)
@@ -88,7 +91,8 @@ CastsTests.test("Multi-level optionals can be casted") {
   testFailure(42, from: Int???.self, to: String.self)
 }
 
-// Test for SR-9837: Optional<T>.none not casting to Optional<U>.none in generic context
+/// https://github.com/apple/swift/issues/52251
+/// `Optional<T>.none` not casting to `Optional<U>.none` in generic context
 CastsTests.test("Optional<T>.none can be casted to Optional<U>.none in generic context") {
   func test<T>(_ type: T.Type) -> T? {
     return Any?.none as? T
@@ -98,10 +102,11 @@ CastsTests.test("Optional<T>.none can be casted to Optional<U>.none in generic c
   expectEqual(type(of: test(Bool?.self)), Bool??.self)
 }
 
-// Test for SR-3871: Cannot cast from ObjC existential without going through AnyObject
+/// https://github.com/apple/swift/issues/46456
+/// Failure to cast from ObjC existential without going through `AnyObject`
 #if _runtime(_ObjC)
 protocol P2 {}
-CastsTests.test("Cast from ObjC existential to Protocol (SR-3871)") {
+CastsTests.test("Cast from ObjC existential to Protocol") {
   if #available(SwiftStdlib 5.3, *) {
     struct S: P2 {}
 
@@ -111,7 +116,8 @@ CastsTests.test("Cast from ObjC existential to Protocol (SR-3871)") {
     }
     let a = ObjCWrapper().any
     expectTrue(a is P2)
-    // In SR-3871, the following cast failed (everything else here succeeded)
+    // The following cast failed in the above issue (everything else here
+    // succeeded).
     expectNotNil(a as? P2)
     expectNotNil(a as? S)
     let b = a as AnyObject
@@ -139,6 +145,26 @@ CastsTests.test("Cast from Swift existential to Protocol") {
   expectNotNil(b as? S)
 }
 
+/// Another test for https://github.com/apple/swift/issues/46456
+/// User type in a `_SwiftValue` in an `Optional<Any>` not casting to a
+/// protocol
+///
+/// Note: This uses the (misnamed) `_bridgeAnythingToObjectiveC` so it can
+/// test these paths on Linux as well.
+protocol P4 {}
+CastsTests.test("struct -> Obj-C -> Protocol") {
+  struct S: P4 {
+    let value: Int
+    let tracker = LifetimeTracked(13)
+  }
+
+  let a: P4 = S(value: 13)
+
+  let b = _bridgeAnythingToObjectiveC(a)
+  let d = b as? Any
+  let e = d as? P4
+  expectNotNil(e)
+}
 
 #if _runtime(_ObjC)
 extension CFBitVector : P {
@@ -160,7 +186,8 @@ func isP<T>(_ t: T) -> Bool {
   return t is P
 }
 
-CastsTests.test("Dynamic casts of CF types to protocol existentials (SR-2289)")
+// https://github.com/apple/swift/issues/44896
+CastsTests.test("Dynamic casts of CF types to protocol existentials")
 .skip(.custom({
       !_isDebugAssertConfiguration()
     },
@@ -174,37 +201,18 @@ CastsTests.test("Dynamic casts of CF types to protocol existentials (SR-2289)")
 }
 #endif
 
-// Another test for SR-3871, SR-5590, SR-6309, SR-8651:
-// user type in a _SwiftValue in an Optional<Any> can't be cast to a protocol.
-// Note: This uses the (misnamed) _bridgeAnythingToObjectiveC so it can
-// test these paths on Linux as well.
-protocol P6309 {}
-CastsTests.test("Casting struct -> Obj-C -> Protocol fails (SR-3871, SR-5590, SR-6309, SR-8651)") {
-  struct S: P6309 {
-    let value: Int
-    let tracker = LifetimeTracked(13)
-  }
-
-  let a: P6309 = S(value: 13)
-
-  let b = _bridgeAnythingToObjectiveC(a)
-  let d = b as? Any
-  let e = d as? P6309
-  expectNotNil(e)
-}
-
-
-protocol P4552 {}
+// https://github.com/apple/swift/issues/47129
+protocol P_47129 {}
 if #available(SwiftStdlib 5.5, *) {
-CastsTests.test("Casting Any(Optional(T)) -> Protocol fails (SR-4552)") {
-  struct S: P4552 {
+CastsTests.test("Any(Optional(T)) -> Protocol") {
+  struct S: P_47129 {
     let tracker = LifetimeTracked(13)
   }
 
   let a = S()
   let b: S? = a
   let c = b as? Any
-  let d = c as? P4552
+  let d = c as? P_47129
   expectNotNil(d)
 }
 }
@@ -264,8 +272,9 @@ CastsTests.test("Store Swift metatype in ObjC property and cast back to Any.Type
 }
 #endif
 
-// rdar://37793004 ([dynamic casting] [SR-7049]: Enums don't cast back from AnyHashable)
-CastsTests.test("Enums don't cast back from AnyHashable (SR-7049)") {
+/// rdar://37793004
+/// https://github.com/apple/swift/issues/49597
+CastsTests.test("Cast enum back from AnyHashable") {
   enum E {
     case a
   }
@@ -282,8 +291,10 @@ CastsTests.test("Enums don't cast back from AnyHashable (SR-7049)") {
   expectEqual((ea as? E), E.a)
 }
 
+/// rdar://39415812
+/// https://github.com/apple/swift/issues/49975
+/// Failure to see through boxed `_SwiftValue` when casting from `@objc` Type
 #if _runtime(_ObjC)
-//rdar://39415812 ([dynamic casting] [SR-7432]: Can't see through boxed _SwiftValue when casting from @objc Type)
 @objc(Exporter)
 protocol Exporter: NSObjectProtocol {
   var type: Any { get }
@@ -318,15 +329,25 @@ CastsTests.test("Conditional NSNumber -> Bool casts") {
 }
 #endif
 
-// rdar://45217461 ([dynamic casting] [SR-8964]: Type check operator (is) fails for Any! variable holding an Error (struct) value)
+/// rdar://45217461
+/// https://github.com/apple/swift/issues/51469
+/// Type check operator (`is`) fails for `Any!` variable holding an `Error`
+/// (struct) value
 if #available(SwiftStdlib 5.5, *) {
-CastsTests.test("Casts from Any(struct) to Error (SR-8964)") {
+CastsTests.test("Casts from Any(struct) to Error") {
   struct MyError: Error { }
 
   let a: Any! = MyError()
   let b: Any = a
   expectTrue(b is Error)
 }
+}
+
+CastsTests.test("Cast failure for Any! holding Error struct") {
+  struct MyError: Error {}
+  let a: Any! = MyError()
+  let b: Any = a
+  expectTrue(b is Error)
 }
 
 #if _runtime(_ObjC)
@@ -342,9 +363,9 @@ CastsTests.test("Dynamic cast to ObjC protocol") {
 }
 #endif
 
-// SR-6126
+// https://github.com/apple/swift/issues/48681
 if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
-CastsTests.test("Nil handling for Optionals and Arrays (SR-6126)") {
+CastsTests.test("Nil handling for Optionals and Arrays") {
   func check(_ arg: Int??) -> String {
     switch arg {
     case .none:
@@ -471,10 +492,11 @@ CastsTests.test("String/NSString extension compat") {
 }
 #endif
 
-protocol P1999 {}
+// https://github.com/apple/swift/issues/44608
+protocol P_44608 {}
 if #available(SwiftStdlib 5.5, *) {
-CastsTests.test("Cast Any(Optional(class)) to Protocol type (SR-1999)") {
-  class Foo: P1999 { }
+CastsTests.test("Cast Any(Optional(class)) to Protocol type") {
+  class Foo: P_44608 { }
 
   let optionalFoo : Foo? = Foo()
   let anyValue: Any = optionalFoo
@@ -482,19 +504,34 @@ CastsTests.test("Cast Any(Optional(class)) to Protocol type (SR-1999)") {
   let foo1 = anyValue as? Foo
   expectNotNil(foo1)
 
-  let foo2 = anyValue as? P1999
+  let foo2 = anyValue as? P_44608
   expectNotNil(foo2)
 
   let foo3 = runtimeCast(anyValue, to: Foo.self)
   expectNotNil(foo3)
 
-  let foo4 = runtimeCast(anyValue, to: P1999.self)
+  let foo4 = runtimeCast(anyValue, to: P_44608.self)
   expectNotNil(foo4)
 }
 }
 
+CastsTests.test("Cast from Any? to Existential") {
+  let a = Float(1) as Any as? Float
+  expectNotNil(a)
+
+  let b = Float(1) as Any as? CustomStringConvertible
+  expectNotNil(b)
+
+  let c = Optional.some(Float(1)) as Any as? Float
+  expectNotNil(c)
+
+  let d = Optional.some(Float(1)) as Any as? CustomStringConvertible
+  expectNotNil(d)
+}
+
+// https://github.com/apple/swift/issues/45505
 #if _runtime(_ObjC)
-CastsTests.test("Dict value casting (SR-2911)") {
+CastsTests.test("Dict value casting") {
   var dict: [AnyHashable: String] = [:]
   dict["Key"] = "Value"
   expectNotNil(dict["Key"] as? NSString)
@@ -502,8 +539,9 @@ CastsTests.test("Dict value casting (SR-2911)") {
 }
 #endif
 
+// https://github.com/apple/swift-corelibs-foundation/issues/3279
 #if _runtime(_ObjC)
-CastsTests.test("String coercions should work on Linux (SR-12020)") {
+CastsTests.test("String coercions should work on Linux") {
   let a = "abc" as Substring as NSString
   let b = "abc" as NSString
   expectEqual(a, b)
@@ -535,9 +573,10 @@ CastsTests.test("AnyHashable(Class) -> Obj-C -> Class") {
   expectNotNil(e)
 }
 
-#if _runtime(_ObjC)
 // rdar://58999120
-CastsTests.test("Error -> NSError -> Protocol transitivity (SR-12095)") {
+// https://github.com/apple/swift-corelibs-foundation/issues/3274
+#if _runtime(_ObjC)
+CastsTests.test("Error -> NSError -> Protocol transitivity") {
   enum NonConformingError: Error {
   case ok
   }
@@ -802,8 +841,9 @@ CastsTests.test("AnyObject.Type -> AnyObject") {
 }
 #endif
 
+// https://github.com/apple/swift/issues/56209
 protocol Fruit {}
-CastsTests.test("Generic type validation [SR-13812]") {
+CastsTests.test("Generic type validation") {
   func check<A, B>(a: A.Type, b: B.Type) -> Bool {
     return (a is B.Type)
   }
@@ -813,29 +853,9 @@ CastsTests.test("Generic type validation [SR-13812]") {
   expectTrue(Apple.self is Fruit.Type)
 }
 
-CastsTests.test("Cast failure for Any! holding Error struct [SR-8964]") {
-  struct MyError: Error {}
-  let a: Any! = MyError()
-  let b: Any = a
-  expectTrue(b is Error)
-}
-
-CastsTests.test("Cannot cast from Any? to Existential [SR-1999]") {
-  let a = Float(1) as Any as? Float
-  expectNotNil(a)
-
-  let b = Float(1) as Any as? CustomStringConvertible
-  expectNotNil(b)
-
-  let c = Optional.some(Float(1)) as Any as? Float
-  expectNotNil(c)
-
-  let d = Optional.some(Float(1)) as Any as? CustomStringConvertible
-  expectNotNil(d)
-}
-
+// https://github.com/apple/swift/issues/48829
 protocol A {}
-CastsTests.test("Failing cast from Any to Optional<Protocol> [SR-6279]") {
+CastsTests.test("Cast from Any to Optional<Protocol>") {
   struct B: A {}
 
   // If we have an optional instance, stored as an `Any`
@@ -865,11 +885,12 @@ CastsTests.test("Casting Objects retained from KeyPaths to Protocols is not work
   expectNotNil(value as? SuperProtocol)
 }
 
+// https://github.com/apple/swift/issues/54462
+// FIXME: Known to still be broken, but we can document the issue here.
 #if _runtime(_ObjC)
-// Known to still be broken, but we can document the issue here
 public protocol SomeProtocol {}
 extension NSString: SomeProtocol {}
-CastsTests.test("NSDictionary -> Dictionary casting [SR-12025]") {
+CastsTests.test("NSDictionary -> Dictionary casting") {
   // Create NSDictionary with one entry
   var a = NSMutableDictionary()
   a[NSString("key")] = NSString("value")
@@ -897,7 +918,8 @@ CastsTests.test("Optional cast to AnyHashable") {
   // We've deliberately tried to preserve that behavior in Swift 5.4
   let d2 = d as [AnyHashable: String]
 
-  // After SR-9047, all four of the following should work:
+  // After https://github.com/apple/swift/issues/51550 all four of the following
+  // should work:
   let d3 = d2["FooKey" as String? as AnyHashable]
   expectNil(d3)
   let d4 = d2["FooKey" as String?]
@@ -921,7 +943,8 @@ CastsTests.test("Optional cast to AnyHashable") {
   // Direct casts that don't go through the runtime don't unwrap the optional
   // This is inconsistent with the runtime cast behavior above.  We should
   // probably change the runtime behavior above to work the same as this,
-  // but that should wait until SR-9047 lands.
+  // but that should wait until https://github.com/apple/swift/issues/51550
+  // lands.
   let x: String = "Baz"
   let xh = x as AnyHashable
   let y: String? = x
@@ -954,16 +977,17 @@ CastsTests.test("Recursive AnyHashable") {
   expectEqual(s.x, p)
 }
 
-// SR-14635 (aka rdar://78224322)
+// rdar://78224322
+// https://github.com/apple/swift/issues/56987
 #if _runtime(_ObjC)
 CastsTests.test("Do not overuse __SwiftValue")
-.skip(.osxAny("SR-14635 not yet fully enabled for Apple OSes"))
-.skip(.iOSAny("SR-14635 not yet fully enabled for Apple OSes"))
-.skip(.iOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
-.skip(.tvOSAny("SR-14635 not yet fully enabled for Apple OSes"))
-.skip(.tvOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
-.skip(.watchOSAny("SR-14635 not yet fully enabled for Apple OSes"))
-.skip(.watchOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.osxAny("Not yet fully enabled for Apple OSes"))
+.skip(.iOSAny("Not yet fully enabled for Apple OSes"))
+.skip(.iOSSimulatorAny("Not yet fully enabled for Apple OSes"))
+.skip(.tvOSAny("Not yet fully enabled for Apple OSes"))
+.skip(.tvOSSimulatorAny("Not yet fully enabled for Apple OSes"))
+.skip(.watchOSAny("Not yet fully enabled for Apple OSes"))
+.skip(.watchOSSimulatorAny("Not yet fully enabled for Apple OSes"))
 .code {
   struct Bar {}
   // This used to succeed because of overeager __SwiftValue

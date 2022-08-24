@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -enable-objc-interop -import-objc-header %S/Inputs/enum-anon.h -DDIAGS -verify
+// RUN: %target-swift-frontend -typecheck %s -enable-objc-interop -import-objc-header %S/Inputs/enum-anon.h -verify
 
 func testDiags() {
 #if _runtime(_ObjC)
@@ -17,6 +17,7 @@ func testDiags() {
 
   // The nested anonymous enum value should still have top-level scope, because
   // that's how C works. It should also have the same type as the field (above).
-  let _: String = SR2511.SR2511B // expected-error {{type 'SR2511' has no member 'SR2511B'}}
+  let _: String = Struct.NestedConstant2
+  // expected-error@-1 {{type 'Struct' has no member 'NestedConstant2'}}
 }
 

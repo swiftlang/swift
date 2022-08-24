@@ -558,6 +558,11 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
   if (Ctx.getOpts().SkipRemoveDeprecatedCheck &&
       D->isDeprecated())
     return;
+  // Don't complain about removing importation of SwiftOnoneSupport.
+  if (D->getKind() == SDKNodeKind::DeclImport &&
+      D->getName() == "SwiftOnoneSupport") {
+    return;
+  }
   D->emitDiag(SourceLoc(), diag::removed_decl, false);
 }
 
@@ -690,6 +695,21 @@ public:
             // Ignore protocol requirement additions if the protocol has been added
             // to the allowlist.
             ShouldComplain = false;
+          }
+          if (ShouldComplain) {
+            // Providing a default implementation via a protocol extension for
+            // a protocol requirement is both ABI and API safe.
+            if (auto *PD = dyn_cast<SDKNodeDecl>(D->getParent())) {
+              for (auto *SIB: PD->getChildren()) {
+                if (auto *SIBD = dyn_cast<SDKNodeDecl>(SIB)) {
+                  if (SIBD->isFromExtension() &&
+                      SIBD->getPrintedName() == D->getPrintedName()) {
+                    ShouldComplain = false;
+                    break;
+                  }
+                }
+              }
+            }
           }
           if (ShouldComplain)
             D->emitDiag(D->getLoc(), diag::protocol_req_added);

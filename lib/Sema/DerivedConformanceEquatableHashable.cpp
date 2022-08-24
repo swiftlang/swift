@@ -129,8 +129,8 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                     AccessSemantics::Ordinary, fnType);
 
     fnType = fnType->getResult()->castTo<FunctionType>();
-    auto *callExpr =
-        DotSyntaxCallExpr::create(C, ref, SourceLoc(), base, fnType);
+    auto *callExpr = DotSyntaxCallExpr::create(
+        C, ref, SourceLoc(), Argument::unlabeled(base), fnType);
     callExpr->setImplicit();
     callExpr->setThrows(false);
     cmpFuncExpr = callExpr;

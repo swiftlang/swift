@@ -17,6 +17,8 @@
 // RUN: %line-directive %t/tgmath.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
+// REQUIRES: rdar94452524
+
 #if canImport(Darwin)
   import Darwin.C.tgmath
 #elseif canImport(Glibc)

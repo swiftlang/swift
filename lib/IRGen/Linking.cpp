@@ -1177,7 +1177,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::SILFunction:
   case Kind::DistributedAccessor: {
-    return getSILFunction()->isWeakImported();
+    return getSILFunction()->isWeakImported(module);
   }
 
   case Kind::AssociatedConformanceDescriptor:

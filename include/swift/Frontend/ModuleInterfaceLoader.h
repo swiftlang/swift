@@ -300,7 +300,6 @@ struct ModuleInterfaceLoaderOptions {
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
   bool downgradeInterfaceVerificationError = false;
-  bool ignoreInterfaceProvidedOptions = false;
   std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
@@ -308,7 +307,6 @@ struct ModuleInterfaceLoaderOptions {
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
     disableBuildingInterface(Opts.DisableBuildingInterface),
     downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
-    ignoreInterfaceProvidedOptions(Opts.IgnoreInterfaceProvidedOptions),
     mainExecutablePath(Opts.MainExecutablePath)
   {
     switch (Opts.RequestedAction) {
@@ -442,6 +440,21 @@ public:
       bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules);
+
+  /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
+  /// a swiftmodule file).
+  ///
+  /// Unlike the above `buildSwiftModuleFromSwiftInterface`, this method
+  /// bypasses the instantiation of a `CompilerInstance` from the compiler
+  /// configuration flags in the interface and instead directly uses the
+  /// supplied \p Instance
+  static bool buildExplicitSwiftModuleFromSwiftInterface(
+      CompilerInstance &Instance, const StringRef moduleCachePath,
+      const StringRef backupInterfaceDir, const StringRef prebuiltCachePath,
+      const StringRef ABIDescriptorPath, StringRef interfacePath,
+      StringRef outputPath, bool ShouldSerializeDeps,
+      ArrayRef<std::string> CompiledCandidates,
+      DependencyTracker *tracker = nullptr);
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -460,13 +473,8 @@ private:
   InFlightDiagnostic diagnose(StringRef interfacePath,
                               SourceLoc diagnosticLoc,
                               Diag<ArgTypes...> ID,
-                        typename detail::PassArgument<ArgTypes>::type... Args) {
-    SourceLoc loc = diagnosticLoc;
-    if (diagnosticLoc.isInvalid()) {
-      // Diagnose this inside the interface file, if possible.
-      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
-    }
-    return Diags->diagnose(loc, ID, std::move(Args)...);
+                              typename detail::PassArgument<ArgTypes>::type... Args) {
+    return InterfaceSubContextDelegateImpl::diagnose(interfacePath, diagnosticLoc, SM, Diags, ID, std::move(Args)...);
   }
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
@@ -476,8 +484,7 @@ private:
                                            SmallVectorImpl<const char *> &SubArgs,
                                            std::string &CompilerVersion,
                                            StringRef interfacePath,
-                                           SourceLoc diagnosticLoc,
-                                           bool ignoreInterfaceProvidedOptions);
+                                           SourceLoc diagnosticLoc);
 public:
   InterfaceSubContextDelegateImpl(
       SourceManager &SM, DiagnosticEngine *Diags,
@@ -488,11 +495,26 @@ public:
       StringRef backupModuleInterfaceDir,
       bool serializeDependencyHashes, bool trackSystemDependencies,
       RequireOSSAModules_t requireOSSAModules);
+
+  template<typename ...ArgTypes>
+  static InFlightDiagnostic diagnose(StringRef interfacePath,
+                                     SourceLoc diagnosticLoc,
+                                     SourceManager &SM,
+                                     DiagnosticEngine *Diags,
+                                     Diag<ArgTypes...> ID,
+                                     typename detail::PassArgument<ArgTypes>::type... Args) {
+    SourceLoc loc = diagnosticLoc;
+    if (diagnosticLoc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
+    }
+    return Diags->diagnose(loc, ID, std::move(Args)...);
+  }
+
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
                                   StringRef outputPath,
                                   SourceLoc diagLoc,
-                                  bool ignoreInterfaceProvidedOptions,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
                                        ArrayRef<StringRef>, ArrayRef<StringRef>,
                                        StringRef)> action) override;
@@ -500,7 +522,6 @@ public:
                                            StringRef interfacePath,
                                            StringRef outputPath,
                                            SourceLoc diagLoc,
-                                           bool ignoreInterfaceProvidedOptions,
     llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) override;
 
   ~InterfaceSubContextDelegateImpl() = default;

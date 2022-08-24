@@ -11,11 +11,35 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangDerivedConformances.h"
-#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 
 using namespace swift;
+
+/// Alternative to `NominalTypeDecl::lookupDirect`.
+/// This function does not attempt to load extensions of the nominal decl.
+static TinyPtrVector<ValueDecl *>
+lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
+  // First see if there is a Clang decl with the given name.
+  TinyPtrVector<ValueDecl *> result = evaluateOrDefault(
+      decl->getASTContext().evaluator, ClangRecordMemberLookup({decl, id}), {});
+
+  // Check if there are any synthesized Swift members that match the name.
+  for (auto member : decl->getMembers()) {
+    if (auto namedMember = dyn_cast<ValueDecl>(member)) {
+      if (namedMember->hasName() && !namedMember->getName().isSpecial() &&
+          namedMember->getName().getBaseIdentifier().is(id.str()) &&
+          // Make sure we don't add duplicate entries, as that would wrongly
+          // imply that lookup is ambiguous.
+          !llvm::is_contained(result, namedMember)) {
+        result.push_back(namedMember);
+      }
+    }
+  }
+  return result;
+}
 
 static clang::TypeDecl *
 getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
@@ -55,7 +79,7 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
   };
 
   // First look for `func ==` declared as a member.
-  auto memberResults = decl->lookupDirect(id);
+  auto memberResults = lookupDirectWithoutExtensions(decl, id);
   for (const auto &member : memberResults) {
     if (isValid(member))
       return member;
@@ -64,7 +88,7 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
   // If no member `func ==` was found, look for out-of-class definitions in the
   // same module.
   auto module = decl->getModuleContext();
-  llvm::SmallVector<ValueDecl *> nonMemberResults;
+  SmallVector<ValueDecl *> nonMemberResults;
   module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
   for (const auto &nonMember : nonMemberResults) {
     if (isValid(nonMember))
@@ -131,7 +155,7 @@ void swift::conformToCxxIteratorIfNeeded(
 
   // Check if present: `var pointee: Pointee { get }`
   auto pointeeId = ctx.getIdentifier("pointee");
-  auto pointees = decl->lookupDirect(pointeeId);
+  auto pointees = lookupDirectWithoutExtensions(decl, pointeeId);
   if (pointees.size() != 1)
     return;
   auto pointee = dyn_cast<VarDecl>(pointees.front());
@@ -140,7 +164,7 @@ void swift::conformToCxxIteratorIfNeeded(
 
   // Check if present: `func successor() -> Self`
   auto successorId = ctx.getIdentifier("successor");
-  auto successors = decl->lookupDirect(successorId);
+  auto successors = lookupDirectWithoutExtensions(decl, successorId);
   if (successors.size() != 1)
     return;
   auto successor = dyn_cast<FuncDecl>(successors.front());
@@ -159,4 +183,81 @@ void swift::conformToCxxIteratorIfNeeded(
                                pointee->getType());
   impl.addSynthesizedProtocolAttrs(decl,
                                    {KnownProtocolKind::UnsafeCxxInputIterator});
+}
+
+void swift::conformToCxxSequenceIfNeeded(
+    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
+    const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxSequence", decl);
+
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+
+  ProtocolDecl *cxxIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  ProtocolDecl *cxxSequenceProto =
+      ctx.getProtocol(KnownProtocolKind::CxxSequence);
+  // If the Cxx module is missing, or does not include one of the necessary
+  // protocols, bail.
+  if (!cxxIteratorProto || !cxxSequenceProto)
+    return;
+
+  // Check if present: `mutating func __beginUnsafe() -> RawIterator`
+  auto beginId = ctx.getIdentifier("__beginUnsafe");
+  auto begins = lookupDirectWithoutExtensions(decl, beginId);
+  if (begins.size() != 1)
+    return;
+  auto begin = dyn_cast<FuncDecl>(begins.front());
+  if (!begin)
+    return;
+  auto rawIteratorTy = begin->getResultInterfaceType();
+
+  // Check if present: `mutating func __endUnsafe() -> RawIterator`
+  auto endId = ctx.getIdentifier("__endUnsafe");
+  auto ends = lookupDirectWithoutExtensions(decl, endId);
+  if (ends.size() != 1)
+    return;
+  auto end = dyn_cast<FuncDecl>(ends.front());
+  if (!end)
+    return;
+
+  // Check if `__beginUnsafe` and `__endUnsafe` have the same return type.
+  auto endTy = end->getResultInterfaceType();
+  if (!endTy || endTy->getCanonicalType() != rawIteratorTy->getCanonicalType())
+    return;
+
+  // Check if RawIterator conforms to UnsafeCxxInputIterator.
+  auto rawIteratorConformanceRef = decl->getModuleContext()->lookupConformance(
+      rawIteratorTy, cxxIteratorProto);
+  if (!rawIteratorConformanceRef.isConcrete())
+    return;
+  auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
+  auto pointeeDecl =
+      cxxIteratorProto->getAssociatedType(ctx.getIdentifier("Pointee"));
+  assert(pointeeDecl &&
+         "UnsafeCxxInputIterator must have a Pointee associated type");
+  auto pointeeTy = rawIteratorConformance->getTypeWitness(pointeeDecl);
+  assert(pointeeTy && "valid conformance must have a Pointee witness");
+
+  // Take the default definition of `Iterator` from CxxSequence protocol. This
+  // type is currently `CxxIterator<Self>`.
+  auto iteratorDecl = cxxSequenceProto->getAssociatedType(ctx.Id_Iterator);
+  auto iteratorTy = iteratorDecl->getDefaultDefinitionType();
+  // Substitute generic `Self` parameter.
+  auto cxxSequenceSelfTy = cxxSequenceProto->getSelfInterfaceType();
+  auto declSelfTy = decl->getDeclaredInterfaceType();
+  iteratorTy = iteratorTy.subst(
+      [&](SubstitutableType *dependentType) {
+        if (dependentType->isEqual(cxxSequenceSelfTy))
+          return declSelfTy;
+        return Type(dependentType);
+      },
+      LookUpConformanceInModule(decl->getModuleContext()));
+
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
+  impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               rawIteratorTy);
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSequence});
 }

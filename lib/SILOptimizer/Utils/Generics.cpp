@@ -812,7 +812,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   // First substitute concrete types into the existing function type.
   CanSILFunctionType FnTy =
-      cast<SILFunctionType>(CanSpecializedGenericSig.getCanonicalTypeInContext(
+      cast<SILFunctionType>(CanSpecializedGenericSig.getReducedType(
           OrigF->getLoweredFunctionType()
               ->substGenericArgs(M, SubstMap, getResilienceExpansion())
               ->getUnsubstitutedType(M)));
@@ -960,6 +960,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
       // FIXME: Second type of a superclass requirement may contain
       // generic parameters.
       continue;
+    case RequirementKind::SameCount:
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
       // If this is the case, then these archetypes are interdependent and
@@ -1011,6 +1012,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
           CurrentGP)
         CollectedReqs.push_back(Req);
       continue;
+    case RequirementKind::SameCount:
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
       // If this is the case, then these archetypes are interdependent and
@@ -1449,7 +1451,7 @@ void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams() {
   for (auto GP : CalleeGenericSig.getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
-    auto CanTyInContext = CalleeGenericSig.getCanonicalTypeInContext(CanTy);
+    auto CanTyInContext = CalleeGenericSig.getReducedType(CanTy);
     auto Replacement = CanTyInContext.subst(CalleeInterfaceToCallerArchetypeMap);
     LLVM_DEBUG(llvm::dbgs() << "\n\nChecking callee generic parameter:\n";
                CanTy->dump(llvm::dbgs()));
@@ -1553,7 +1555,7 @@ void FunctionSignaturePartialSpecializer::addRequirements(
   for (auto &reqReq : Reqs) {
     LLVM_DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n";
                reqReq.dump(llvm::dbgs()));
-    AllRequirements.push_back(*reqReq.subst(SubsMap));
+    AllRequirements.push_back(reqReq.subst(SubsMap));
   }
 }
 

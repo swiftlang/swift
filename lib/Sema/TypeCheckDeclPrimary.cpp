@@ -1132,6 +1132,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
       TypeResolutionStage::Interface,
       [proto](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
+        case RequirementKind::SameCount:
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
@@ -3037,11 +3038,11 @@ public:
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
-    auto nominal = ED->computeExtendedNominal();
+    auto *nominal = ED->getExtendedNominal();
     if (nominal == nullptr) {
       const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();
-      if (extType && !extType->hasError() && extType->getAnyNominal()) {
+      if (!extType->hasError() && extType->getAnyNominal()) {
         // If we've got here, then we have some kind of extension of a prima
         // fascie non-nominal type.  This can come up when we're projecting
         // typealiases out of bound generic types.
@@ -3051,22 +3052,30 @@ public:
         //
         // Offer to rewrite it to the underlying nominal type.
         auto canExtType = extType->getCanonicalType();
-        ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
-          .highlight(ED->getExtendedTypeRepr()->getSourceRange());
-        ED->diagnose(diag::invalid_nominal_extension_rewrite, canExtType)
-          .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
-                        canExtType->getString());
-      } else if (!wasAlreadyInvalid) {
+        if (canExtType.getPointer() != extType.getPointer()) {
+          ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
+            .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+          ED->diagnose(diag::invalid_nominal_extension_rewrite, canExtType)
+            .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                          canExtType->getString());
+          return;
+        }
+      }
+
+      if (!wasAlreadyInvalid) {
         // If nothing else applies, fall back to a generic diagnostic.
         ED->diagnose(diag::non_nominal_extension, extType);
       }
+
       return;
     }
 
-    // Produce any diagnostics for the generic signature.
-    (void) ED->getGenericSignature();
+    // Record a dependency from TypeCheckSourceFileRequest to
+    // ExtendedNominalRequest, since the call to getExtendedNominal()
+    // above doesn't record a dependency when reading a cached value.
+    ED->computeExtendedNominal();
 
-    if (extType && !extType->hasError()) {
+    if (!extType->hasError()) {
       // The first condition catches syntactic forms like
       //     protocol A & B { ... } // may be protocols or typealiases
       // The second condition also looks through typealiases and catches
@@ -3082,9 +3091,8 @@ public:
         extTypeNominal && extTypeNominal != nominal;
       if (isa<CompositionTypeRepr>(extTypeRepr)
           || firstNominalIsNotMostSpecific) {
-        auto firstNominalType = nominal->getDeclaredType();
         auto diag = ED->diagnose(diag::composition_in_extended_type,
-                                 firstNominalType);
+                                 nominal->getDeclaredType());
         diag.highlight(extTypeRepr->getSourceRange());
         if (firstNominalIsNotMostSpecific) {
           diag.flush();
@@ -3095,10 +3103,13 @@ public:
                           mostSpecificProtocol->getString());
         } else {
           diag.fixItReplace(extTypeRepr->getSourceRange(),
-                            firstNominalType->getString());
+                            nominal->getDeclaredType()->getString());
         }
       }
     }
+
+    // Produce any diagnostics for the generic signature.
+    (void) ED->getGenericSignature();
 
     checkInheritanceClause(ED);
 
@@ -3107,7 +3118,7 @@ public:
     if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
       if (!ED->getGenericParams() && !ED->isInvalid()) {
         ED->diagnose(diag::extension_nongeneric_trailing_where,
-                     nominal->getName())
+                     nominal->getDeclaredType())
           .highlight(trailingWhereClause->getSourceRange());
       }
     }

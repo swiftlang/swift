@@ -1566,6 +1566,26 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   emitDiagnosticAt(unwrappedExpr->getLoc(), diag::optional_not_unwrapped,
                    baseType, unwrappedType);
 
+  // If this is a function type, suggest using optional chaining to
+  // call it.
+  if (unwrappedType->lookThroughAllOptionalTypes()->is<FunctionType>()) {
+    bool isDeclRefExpr = false;
+    if (isa<DeclRefExpr>(unwrappedExpr)) {
+      isDeclRefExpr = true;
+    } else if (auto fve = dyn_cast<ForceValueExpr>(unwrappedExpr)) {
+      isDeclRefExpr = isa<DeclRefExpr>(fve->getSubExpr());
+    } else if (auto boe = dyn_cast<BindOptionalExpr>(unwrappedExpr)) {
+      isDeclRefExpr = isa<DeclRefExpr>(boe->getSubExpr());
+    }
+    if (isDeclRefExpr) {
+      auto depth = baseType->getOptionalityDepth();
+      auto diag = emitDiagnosticAt(unwrappedExpr->getLoc(),
+                                   diag::perform_optional_chain_on_function_type);
+      auto fixItString = std::string(depth, '?');
+      diag.fixItInsertAfter(unwrappedExpr->getEndLoc(), fixItString);
+    }
+  }
+
   // If the expression we're unwrapping is the only reference to a
   // local variable whose type isn't explicit in the source, then
   // offer unwrapping fixits on the initializer as well.
@@ -3595,7 +3615,7 @@ bool InvalidProjectedValueArgument::diagnoseAsError() {
   if (!param->hasAttachedPropertyWrapper()) {
     param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
   } else if (!param->hasImplicitPropertyWrapper() &&
-             param->getAttachedPropertyWrappers().front()->hasArgs()) {
+             param->getOutermostAttachedPropertyWrapper()->hasArgs()) {
     param->diagnose(diag::property_wrapper_param_attr_arg);
   } else {
     Type backingType;
@@ -3956,16 +3976,13 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   if (!parentExpr)
     return false;
 
-  auto parentType = getType(parentExpr);
-
-  if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
-    return false;
-
-  if (isa<TupleExpr>(parentExpr)) {
+  // This could happen if collection is a dictionary literal i.e.
+  // ["a": .test] - the element is a tuple - ("a", .test).
+  if (isExpr<TupleExpr>(parentExpr))
     parentExpr = findParentExpr(parentExpr);
-    if (!parentExpr)
-      return false;
-  }
+
+  if (!isExpr<CollectionExpr>(parentExpr))
+    return false;
 
   if (auto *defaultableVar =
           getRawType(parentExpr)->getAs<TypeVariableType>()) {
@@ -4277,7 +4294,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
   }
 
-  if (BaseType->is<AnyMetatypeType>() && !Member->isStatic()) {
+  bool isStaticOrTypeMember = Member->isStatic() || isa<TypeDecl>(Member);
+  if (BaseType->is<AnyMetatypeType>() && !isStaticOrTypeMember) {
     auto instanceTy = BaseType;
 
     if (auto *AMT = instanceTy->getAs<AnyMetatypeType>()) {
@@ -4385,10 +4403,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // static members doesn't make a whole lot of sense
         if (isa<TypeAliasDecl>(Member)) {
           Diag.emplace(
-              emitDiagnostic(diag::typealias_outside_of_protocol, Name));
+              emitDiagnostic(diag::typealias_outside_of_protocol, Name, instanceTy));
         } else if (isa<AssociatedTypeDecl>(Member)) {
           Diag.emplace(
-              emitDiagnostic(diag::assoc_type_outside_of_protocol, Name));
+              emitDiagnostic(diag::assoc_type_outside_of_protocol, Name, instanceTy));
         } else if (isa<ConstructorDecl>(Member)) {
           Diag.emplace(
               emitDiagnostic(diag::construct_protocol_by_name, instanceTy));

@@ -154,10 +154,15 @@ void DifferentiableActivityInfo::propagateVaried(
       propagateVariedInwardsThroughProjections(si->getDest(), i);              \
   }
   PROPAGATE_VARIED_THROUGH_STORE(Store)
-  PROPAGATE_VARIED_THROUGH_STORE(StoreBorrow)
   PROPAGATE_VARIED_THROUGH_STORE(CopyAddr)
   PROPAGATE_VARIED_THROUGH_STORE(UnconditionalCheckedCastAddr)
 #undef PROPAGATE_VARIED_THROUGH_STORE
+  else if (auto *sbi = dyn_cast<StoreBorrowInst>(inst)) {
+    if (isVaried(sbi->getSrc(), i)) {
+      setVariedAndPropagateToUsers(sbi, i);
+      propagateVariedInwardsThroughProjections(sbi, i);
+    }
+  }
   // Handle `tuple_element_addr`.
   else if (auto *teai = dyn_cast<TupleElementAddrInst>(inst)) {
     if (isVaried(teai->getOperand(), i)) {

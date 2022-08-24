@@ -178,7 +178,7 @@ func test_magic_defaults() {
   let _: String = generic_with_magic()
 }
 
-// SR-16069
+// https://github.com/apple/swift/issues/58330
 func test_allow_same_type_between_dependent_types() {
   struct Default : P {
     typealias X = Int

@@ -89,9 +89,10 @@ bb0:
   %9 = struct_extract %8 : $OSLogMessageStub, #OSLogMessageStub.interpolation
   %10 = struct_extract %9 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
   %11 = alloc_stack $String
-  store_borrow %10 to %11 : $*String
+  %12 = store_borrow %10 to %11 : $*String
   %13 = function_ref @useFormatStringIndirect : $@convention(thin) (@in_guaranteed String) -> ()
-  %14 = apply %13(%11) : $@convention(thin) (@in_guaranteed String) -> ()
+  %14 = apply %13(%12) : $@convention(thin) (@in_guaranteed String) -> ()
+  end_borrow %12 : $*String
   end_borrow %8 : $OSLogMessageStub
   destroy_value %7 : $OSLogMessageStub
   dealloc_stack %11 : $*String

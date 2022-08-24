@@ -111,7 +111,6 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
                                               moduleInterfacePath.str(),
                                               StringRef(),
                                               SourceLoc(),
-                                              false,
                 [&](ASTContext &Ctx, ModuleDecl *mainMod,
                     ArrayRef<StringRef> Args,
                     ArrayRef<StringRef> PCMArgs, StringRef Hash) {

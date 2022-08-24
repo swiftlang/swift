@@ -184,7 +184,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
         ParsedTypeLoc.getTypeRepr(), P.Context,
         /*isSILMode=*/false,
         /*isSILType=*/false,
-        CurDeclContext->getGenericEnvironmentOfContext(),
+        CurDeclContext->getGenericSignatureOfContext(),
         /*GenericParams=*/nullptr,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);

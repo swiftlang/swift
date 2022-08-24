@@ -105,7 +105,14 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
-        out << "#if __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <type_traits>\n";
+        // FIXME: Look for the header in the SDK.
+        out << "// Look for the C++ interop support header relative to clang's resource dir:\n";
+        out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.\n";
+        out << "#if __has_include(<../../../swift/shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <../../../swift/shims/_SwiftCxxInteroperability.h>\n";
+        out << "// Alternatively, allow user to find the header using additional include path into 'swift'.\n";
+        out << "#elif __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
         out << "#include <shims/_SwiftCxxInteroperability.h>\n";
         out << "#endif\n";
       },
@@ -484,11 +491,13 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
 
 static std::string
 getModuleContentsCxxString(ModuleDecl &M,
-                           SwiftToClangInteropContext &interopContext) {
+                           SwiftToClangInteropContext &interopContext,
+                           bool requiresExposedAttribute) {
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-  printModuleContentsAsCxx(moduleContents, imports, M, interopContext);
+  printModuleContentsAsCxx(moduleContents, imports, M, interopContext,
+                           requiresExposedAttribute);
   return moduleContents.str();
 }
 
@@ -511,8 +520,11 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
-    if (ExposePublicDeclsInClangHeader) {
-      os << getModuleContentsCxxString(*M, interopContext);
+    if (ExposePublicDeclsInClangHeader ||
+        M->DeclContext::getASTContext().LangOpts.EnableCXXInterop) {
+      os << getModuleContentsCxxString(
+          *M, interopContext,
+          /*requiresExposedAttribute=*/!ExposePublicDeclsInClangHeader);
     }
   });
   writeEpilogue(os);

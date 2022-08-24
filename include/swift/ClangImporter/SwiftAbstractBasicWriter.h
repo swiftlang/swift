@@ -21,6 +21,7 @@
 #define SWIFT_CLANGIMPORTER_SWIFTABSTRACTBASICWRITER_H
 
 #include "clang/AST/AbstractTypeWriter.h"
+#include "clang/AST/Type.h"
 
 namespace swift {
 
@@ -80,10 +81,23 @@ public:
     assert(!type.isNull());
 
     auto split = type.split();
-    asImpl().writeQualifiers(split.Quals);
+    auto qualifiers = split.Quals;
 
+    // Unwrap BTFTagAttributeType and merge any of its qualifiers.
+    while (auto btfType = dyn_cast<clang::BTFTagAttributedType>(split.Ty)) {
+      split = btfType->getWrappedType().split();
+      qualifiers.addQualifiers(split.Quals);
+    }
+
+    asImpl().writeQualifiers(qualifiers);
     // Just recursively visit the given type.
     asImpl().writeTypeRef(split.Ty);
+  }
+
+  void writeBTFTypeTagAttr(const clang::BTFTypeTagAttr *attr) {
+    // BTFTagAttributeType is explicitly unwrapped above, so we should never
+    // hit any of its attributes.
+    llvm::report_fatal_error("Should never hit BTFTypeTagAttr serialization");
   }
 };
 

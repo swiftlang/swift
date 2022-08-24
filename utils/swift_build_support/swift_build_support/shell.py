@@ -183,13 +183,14 @@ def rmtree(path, dry_run=None, echo=True):
         shutil.rmtree(path)
 
 
-def copytree(src, dest, dry_run=None, echo=True):
+def copytree(src, dest, dry_run=None, ignore_pattern=None, echo=True):
     dry_run = _coerce_dry_run(dry_run)
     if dry_run or echo:
         _echo_command(dry_run, ['cp', '-r', src, dest])
     if dry_run:
         return
-    shutil.copytree(src, dest)
+    ignore = shutil.ignore_patterns(ignore_pattern) if ignore_pattern else None
+    shutil.copytree(src, dest, ignore=ignore)
 
 
 def symlink(source, dest, dry_run=None, echo=True):
@@ -213,7 +214,7 @@ def run(*args, **kwargs):
     prefix = kwargs.pop('prefix', '')
     if dry_run:
         _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
-        return(None, 0, args)
+        return (None, 0, args)
 
     my_pipe = subprocess.Popen(
         *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

@@ -151,7 +151,7 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   auto genericSig =
       decl->getInnermostDeclContext()->getGenericSignatureOfContext();
 
-  auto canDeclTy = declTy->getCanonicalType(genericSig);
+  auto canDeclTy = declTy->getReducedType(genericSig);
 
   auto declIUOAttr = decl->isImplicitlyUnwrappedOptional();
   auto parentDeclIUOAttr = parentDecl->isImplicitlyUnwrappedOptional();
@@ -198,7 +198,7 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   if (parentDeclTy->hasError())
     return false;
 
-  auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
+  auto canParentDeclTy = parentDeclTy->getReducedType(genericSig);
 
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
@@ -1264,7 +1264,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     auto parentPropertyTy = getSuperMemberDeclType(baseDecl);
 
     CanType parentPropertyCanTy =
-      parentPropertyTy->getCanonicalType(
+      parentPropertyTy->getReducedType(
         decl->getInnermostDeclContext()->getGenericSignatureOfContext());
     if (!propertyTy->matches(parentPropertyCanTy,
                              TypeMatchFlags::AllowOverride)) {
@@ -1513,6 +1513,7 @@ namespace  {
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
+    UNINTERESTING_ATTR(Expose)
     UNINTERESTING_ATTR(Final)
     UNINTERESTING_ATTR(MoveOnly)
     UNINTERESTING_ATTR(FixedLayout)
@@ -1613,6 +1614,10 @@ namespace  {
 
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
     UNINTERESTING_ATTR(CompilerInitialized)
+    UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
+
+    UNINTERESTING_ATTR(EagerMove)
+    UNINTERESTING_ATTR(Lexical)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

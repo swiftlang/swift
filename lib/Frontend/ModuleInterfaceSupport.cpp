@@ -219,6 +219,10 @@ static void printImports(raw_ostream &out,
 
   SmallVector<ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
+
+  if (Opts.PrintMissingImports)
+    M->getMissingImportedModules(allImports);
+
   ImportedModule::removeDuplicates(allImports);
   diagnoseScopedImports(M->getASTContext().Diags, allImports);
 

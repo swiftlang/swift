@@ -222,7 +222,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    - If you use an editor other than Xcode and/or you want somewhat faster builds,
      go with Ninja.
    - If you are comfortable with using Xcode and would prefer to use it,
-     go with Xcode.
+     go with Xcode. If you run into issues building with Xcode, you can alternatively [integrate a Ninja build into Xcode](#integrate-a-ninja-build-with-xcode).
    There is also a third option, which is somewhat more involved:
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
@@ -238,9 +238,11 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```sh
      utils/build-script --skip-build-benchmarks \
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --swift-disable-dead-stripping --test \
+       --sccache --release-debuginfo --swift-disable-dead-stripping \
        --xcode
      ```
+     **Note:** Building `--xcode` together with `--test` is a common source of issues. So to run
+     tests is recommended to use `ninja` because is normally more stable. 
    Linux (uses Ninja):
      ```sh
      utils/build-script --release-debuginfo --test --skip-early-swift-driver
@@ -267,7 +269,7 @@ In the following sections, for simplicity, we will assume that you are using a
 unless explicitly mentioned otherwise. You will need to slightly tweak the paths
 for other build configurations.
 
-#### Using both Ninja and Xcode
+### Using both Ninja and Xcode
 
 Some contributors find it more convenient to use both Ninja and Xcode.
 Typically this configuration consists of:
@@ -282,7 +284,8 @@ The additional flexibility comes with two issues: (1) consuming much more disk
 space and (2) you need to maintain the two builds in sync, which needs extra
 care when moving across branches.
 
-It is even possible to integrate the Ninja build into Xcode. For details on how to set this up see [Using Ninja with Xcode in DevelopmentTips.md](/docs/DevelopmentTips.md#using-ninja-with-xcode).
+### Integrate a Ninja build with Xcode
+It is possible to integrate the Ninja build into Xcode. For details on how to set this up see [Using Ninja with Xcode in DevelopmentTips.md](/docs/DevelopmentTips.md#using-ninja-with-xcode).
 
 ### Troubleshooting build issues
 
@@ -305,16 +308,23 @@ It is even possible to integrate the Ninja build into Xcode. For details on how 
   In many situations, there are several errors, so scrolling further back
   and looking at the first error may be more helpful than simply looking
   at the last error.
-- Check if others have encountered the same issue on the Swift forums or on
-  [Swift repository 'Issues' tab][Swift Issues].
-- Create a new Swift forums thread in the Development category. Include
-  information about your configuration and the errors you are seeing.
+- Check if others have encountered the same issue on the [Swift Forums](https://forums.swift.org/c/development/compiler) or on [Swift repository 'Issues' tab][Swift Issues]. Here is a list of threads that describe common issues:
+  * [Problems with `build-script` building compiler with `–xcode`](https://forums.swift.org/t/problems-with-build-script-building-compiler-with-xcode/53477)
+  * [Error building the compiler (even with ninja)](https://forums.swift.org/t/error-building-the-compiler-even-with-ninja/54834)
+  * [Build failure on Apple MacBook Pro with Apple M1 Chip](https://forums.swift.org/t/build-failure-on-apple-silicon-m1-mac-mini/45011)
+  * [CMake cannot compile a test program](https://forums.swift.org/t/build-failure-locally/55695)
+  * [Building Swift compiler from source fails when not using Ninja](https://forums.swift.org/t/building-swift-compiler-from-source-fails-when-not-using-ninja/54656)
+  * [ALL_BUILD Target failing at validation](https://forums.swift.org/t/help-building-swift-in-xcode-error/49728)
+  * [“gtest/gtest.h” not found while compiling the compiler](https://forums.swift.org/t/gtest-gtest-h-not-found-in-typeref-cpp-while-compiling-the-compiler/44399)
+- If you still could not find a solution to your issue, feel free to create a new Swift Forums thread in the [Development/Compiler](https://forums.swift.org/c/development/compiler) category: 
+  - Include information about your configuration and the errors you are seeing.
   - You can [create a gist](https://gist.github.com) with the entire build
     output and link it, while highlighting the most important part of the
     build log in the post.
   - Include the output of `utils/update-checkout --dump-hashes`.
 
 [Swift Issues]: https://github.com/apple/swift/issues
+[Swift Forums]: https://forums.swift.org
 
 ## Editing code
 
@@ -353,7 +363,7 @@ select the following schemes:
 - `swift-frontend`: If you will be working on the compiler.
 - `check-swift-all`: This can be used to run the tests. The test runner does
   not integrate with Xcode though, so it may be easier to run tests directly
-  on the commandline for more fine-grained control over which exact tests are
+  on the command line for more fine-grained control over which exact tests are
   run.
 <!-- TODO: Insert SourceKit/stdlib specific instructions? -->
 
@@ -424,7 +434,7 @@ This should print your updated version string.
 
 Starter bugs typically have small code examples that fit within a single file.
 You can reproduce such an issue in various ways, such as compiling it from the
-commandline using `/path/to/swiftc MyFile.swift`, pasting the code into
+command line using `/path/to/swiftc MyFile.swift`, pasting the code into
 [Compiler Explorer][] (aka godbolt) or using an Xcode Playground.
 
 [Compiler Explorer]: https://godbolt.org

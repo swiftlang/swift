@@ -172,6 +172,23 @@ ParsedTupleTypeElementSyntax
 ParsedSyntaxRecorder::makeTupleTypeElement(ParsedTypeSyntax Type,
                                     llvm::Optional<ParsedTokenSyntax> TrailingComma,
                                     SyntaxParsingContext &SPCtx) {
-  return makeTupleTypeElement(None, None, None, None, std::move(Type), None, None,
-                              std::move(TrailingComma), SPCtx);
+  return makeTupleTypeElement(
+    /*UnexpectedNodes=*/None,
+    /*InOut=*/None,
+    /*UnexpectedNodes=*/None,
+    /*Name=*/None,
+    /*UnexpectedNodes=*/None,
+    /*SecondName=*/None,
+    /*UnexpectedNodes=*/None,
+    /*Colon=*/None,
+    /*UnexpectedNodes=*/None,
+    std::move(Type),
+    /*UnexpectedNodes=*/None,
+    /*Ellipsis=*/None,
+    /*UnexpectedNodes=*/None,
+    /*Initializer=*/None,
+    /*UnexpectedNodes=*/None,
+    std::move(TrailingComma),
+    SPCtx
+  );
 }

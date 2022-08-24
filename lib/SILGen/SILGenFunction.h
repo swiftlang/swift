@@ -1544,6 +1544,10 @@ public:
   emitFormalEvaluationManagedBeginBorrow(SILLocation loc, SILValue v,
                                          const TypeLowering &lowering);
 
+  ManagedValue emitFormalEvaluationManagedStoreBorrow(SILLocation loc,
+                                                      SILValue v,
+                                                      SILValue addr);
+
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
                                             const TypeLowering &lowering);

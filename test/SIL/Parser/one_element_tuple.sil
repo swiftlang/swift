@@ -1,0 +1,19 @@
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+// CHECK-LABEL: sil [ossa] @tuple_test : $@convention(thin) (@tuple (Int)) -> @tuple (Int) {
+// CHECK:       bb0(%0 : $@tuple (Int)):
+// CHECK-NEXT:    %1 = tuple_extract %0 : $@tuple (Int), 0
+// CHECK-NEXT:    %2 = tuple (%1 : $Int)
+// CHECK-NEXT:    return %2 : $@tuple (Int)
+// CHECK-NEXT:  }
+
+sil [ossa] @tuple_test : $@convention(thin) (@tuple (Int)) -> @tuple (Int) {
+bb0(%0 : $@tuple (Int)):
+  %1 = tuple_extract %0 : $@tuple (Int), 0
+  %2 = tuple $@tuple (Int) (%1)
+  return %2 : $@tuple (Int)
+}

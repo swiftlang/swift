@@ -260,9 +260,10 @@ func testMirrored(instance: ClassWithAsync) async {
 @available(SwiftStdlib 5.5, *)
 @SomeGlobalActor func sgActorFn() {}
 
-// Check inferred isolation for overridden decls from ObjC.
-// Note that even if the override is not present, it
-// can have an affect. -- rdar://87217618 / SR-15694
+// rdar://87217618
+// https://github.com/apple/swift/issues/57973
+// Check inferred isolation for overridden decls from ObjC. Note that even if
+// the override is not present, it can have an affect.
 @MainActor
 @available(SwiftStdlib 5.5, *)
 class FooFrame: PictureFrame {
@@ -310,6 +311,7 @@ class BazFrame: NotIsolatedPictureFrame {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 class BazFrameIso: PictureFrame { // expected-error {{global actor 'SomeGlobalActor'-isolated class 'BazFrameIso' has different actor isolation from main actor-isolated superclass 'PictureFrame'}}
 }
@@ -386,6 +388,7 @@ extension SomeWrapper: Sendable where T: Sendable {}
 
 
 // rdar://96830159
+@available(SwiftStdlib 5.5, *)
 @MainActor class SendableCompletionHandler {
   var isolatedThing: [String] = []
   // expected-note@-1 {{property declared here}}
@@ -396,4 +399,12 @@ extension SomeWrapper: Sendable where T: Sendable {}
       // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure; this is an error in Swift 6}}
     }
   }
+}
+
+// rdar://97646309 -- lookup and direct call of an optional global-actor constrained method would crash in SILGen
+@available(SwiftStdlib 5.5, *)
+extension CoffeeDelegate  {
+    @MainActor func test() async -> (NSObject?, NSObject, NSObject) {
+        return await self.icedMochaServiceGenerateMocha!(NSObject())
+    }
 }

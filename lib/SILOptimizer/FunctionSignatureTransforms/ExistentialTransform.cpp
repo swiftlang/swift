@@ -345,11 +345,6 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
                                         std::move(GenericParams),
                                         std::move(Requirements));
 
-  /// Create a lambda for GenericParams.
-  auto getCanonicalType = [&](Type t) -> CanType {
-    return t->getCanonicalType(NewGenericSig);
-  };
-
   /// Original list of parameters
   SmallVector<SILParameterInfo, 4> params;
   params.append(FTy->getParameters().begin(), FTy->getParameters().end());
@@ -362,7 +357,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
     auto iter = ArgToGenericTypeMap.find(Idx);
     if (iter != ArgToGenericTypeMap.end()) {
       auto GenericParam = iter->second;
-      InterfaceParams.push_back(SILParameterInfo(getCanonicalType(GenericParam),
+      InterfaceParams.push_back(SILParameterInfo(GenericParam->getReducedType(NewGenericSig),
                                                  param.getConvention()));
     } else {
       InterfaceParams.push_back(param);

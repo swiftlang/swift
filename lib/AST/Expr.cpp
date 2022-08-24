@@ -365,6 +365,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnresolvedMemberChainResult, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Await, getSubExpr);
+  PASS_THROUGH_REFERENCE(Move, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
@@ -703,6 +704,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::Await:
+  case ExprKind::Move:
   case ExprKind::Try:
   case ExprKind::ForceTry:
   case ExprKind::OptionalTry:
@@ -881,6 +883,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Sequence:
   case ExprKind::Paren:
   case ExprKind::Await:
+  case ExprKind::Move:
   case ExprKind::UnresolvedMemberChainResult:
   case ExprKind::Try:
   case ExprKind::ForceTry:
@@ -968,6 +971,38 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
+
+StringRef LiteralExpr::getLiteralKindDescription() const {
+  switch (getKind()) {
+  case ExprKind::IntegerLiteral:
+    return "integer";
+  case ExprKind::FloatLiteral:
+    return "floating-point";
+  case ExprKind::BooleanLiteral:
+    return "boolean";
+  case ExprKind::StringLiteral:
+    return "string";
+  case ExprKind::InterpolatedStringLiteral:
+    return "string";
+  case ExprKind::RegexLiteral:
+    return "regular expression";
+  case ExprKind::MagicIdentifierLiteral:
+    return MagicIdentifierLiteralExpr::getKindString(
+        cast<MagicIdentifierLiteralExpr>(this)->getKind());
+  case ExprKind::NilLiteral:
+    return "nil";
+  case ExprKind::ObjectLiteral:
+    return "object";
+  // Define an unreachable case for all non-literal expressions.
+  // This way, if a new literal is added in the future, the compiler
+  // will warn that a case is missing from this switch.
+  #define LITERAL_EXPR(Id, Parent)
+  #define EXPR(Id, Parent) case ExprKind::Id:
+  #include "swift/AST/ExprNodes.def"
+    llvm_unreachable("Not a literal expression");
+  }
+  llvm_unreachable("Unhandled literal");
+}
 
 IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value) {
   llvm::SmallString<8> Scratch;
@@ -1571,9 +1606,10 @@ BinaryExpr *BinaryExpr::create(ASTContext &ctx, Expr *lhs, Expr *fn, Expr *rhs,
 }
 
 DotSyntaxCallExpr *DotSyntaxCallExpr::create(ASTContext &ctx, Expr *fnExpr,
-                                             SourceLoc dotLoc, Expr *baseExpr,
+                                             SourceLoc dotLoc, Argument baseArg,
                                              Type ty) {
-  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseExpr});
+  assert(!baseArg.hasLabel());
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseArg.getExpr()});
   return new (ctx) DotSyntaxCallExpr(fnExpr, dotLoc, argList, ty);
 }
 

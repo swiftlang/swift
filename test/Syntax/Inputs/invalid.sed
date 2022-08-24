@@ -1,7 +1,7 @@
 
 # [0xC2] is utf8 2 byte character start byte.
 # 0xC2 without second byte is invalid UTF-8 sequence.
-# It becomes garbage text trivia.
+# It becomes unexpected text trivia.
 # Marker(1) is replaced to this sequence.
 s/Z1/�/g
 
@@ -26,7 +26,7 @@ s/Z4/”/g
 
 # [0xE1, 0x9A, 0x80] in UTF-8 is U+1680.
 # This character is invalid for swift source.
-# It becomes garbage trivia.
+# It becomes unexpected trivia.
 # Marker(5) is replaced to this sequence.
 s/Z5/ /g
 

@@ -44,16 +44,16 @@ protocol Existentiable {
 func protocol_method(x: Existentiable) -> Loadable {
   return x.foo()
 }
-// CHECK-LABEL: sil hidden [ossa] @$s9witnesses15protocol_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed Existentiable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Existentiable]], #Existentiable.foo :
+// CHECK-LABEL: sil hidden [ossa] @$s9witnesses15protocol_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed any Existentiable) -> Loadable {
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened\(.*, any Existentiable\) Self]], #Existentiable.foo :
 // CHECK:         apply [[METHOD]]<[[OPENED]]>({{%.*}})
 // CHECK:       }
 
 func protocol_generic_method(x: Existentiable) -> Loadable {
   return x.generic()
 }
-// CHECK-LABEL: sil hidden [ossa] @$s9witnesses23protocol_generic_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed Existentiable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Existentiable]], #Existentiable.generic :
+// CHECK-LABEL: sil hidden [ossa] @$s9witnesses23protocol_generic_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed any Existentiable) -> Loadable {
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened\(.*, any Existentiable\) Self]], #Existentiable.generic :
 // CHECK:         apply [[METHOD]]<[[OPENED]], Loadable>({{%.*}}, {{%.*}})
 // CHECK:       }
 
@@ -61,8 +61,8 @@ func protocol_generic_method(x: Existentiable) -> Loadable {
   func foo()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s9witnesses20protocol_objc_method1xyAA8ObjCAble_p_tF : $@convention(thin) (@guaranteed ObjCAble) -> ()
-// CHECK:         objc_method {{%.*}} : $@opened({{.*}}) ObjCAble, #ObjCAble.foo!foreign
+// CHECK-LABEL: sil hidden [ossa] @$s9witnesses20protocol_objc_method1xyAA8ObjCAble_p_tF : $@convention(thin) (@guaranteed any ObjCAble) -> ()
+// CHECK:         objc_method {{%.*}} : $@opened({{.*}}, any ObjCAble) Self, #ObjCAble.foo!foreign
 func protocol_objc_method(x: ObjCAble) {
   x.foo()
 }
@@ -122,10 +122,10 @@ struct ConformingStruct : X {
   mutating
   func addrOnly(x: AddrOnly) -> AddrOnly { return x }
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses16ConformingStructVAA1XA2aDP8addrOnly{{[_0-9a-zA-Z]*}}FTW :
-  // CHECK:       bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformingStruct):
+  // CHECK:       bb0(%0 : $*any AddrOnly, %1 : $*any AddrOnly, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
-  // CHECK-NEXT:    %3 = function_ref @$s9witnesses16ConformingStructV8addrOnly{{[_0-9a-zA-Z]*}}F : $@convention(method) (@in_guaranteed AddrOnly, @inout ConformingStruct) -> @out AddrOnly
-  // CHECK-NEXT:    %4 = apply %3(%0, %1, %2) : $@convention(method) (@in_guaranteed AddrOnly, @inout ConformingStruct) -> @out AddrOnly
+  // CHECK-NEXT:    %3 = function_ref @$s9witnesses16ConformingStructV8addrOnly{{[_0-9a-zA-Z]*}}F : $@convention(method) (@in_guaranteed any AddrOnly, @inout ConformingStruct) -> @out any AddrOnly
+  // CHECK-NEXT:    %4 = apply %3(%0, %1, %2) : $@convention(method) (@in_guaranteed any AddrOnly, @inout ConformingStruct) -> @out any AddrOnly
   // CHECK-NEXT:    %5 = tuple ()
   // CHECK-NEXT:    return %5 : $()
   // CHECK-NEXT:  }
@@ -226,10 +226,10 @@ struct ConformsWithMoreGeneric : X, Y {
   mutating
   func addrOnly<G>(x: G) -> G { return x }
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses23ConformsWithMoreGenericVAA1XA2aDP8addrOnly{{[_0-9a-zA-Z]*}}FTW :
-  // CHECK:       bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformsWithMoreGeneric):
+  // CHECK:       bb0(%0 : $*any AddrOnly, %1 : $*any AddrOnly, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @$s9witnesses23ConformsWithMoreGenericV8addrOnly{{[_0-9a-zA-Z]*}}F : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
-  // CHECK-NEXT:    %4 = apply %3<AddrOnly>(%0, %1, %2) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
+  // CHECK-NEXT:    %4 = apply %3<any AddrOnly>(%0, %1, %2) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
   // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
   // CHECK-NEXT:    return [[RESULT]] : $()
   // CHECK-NEXT:  }

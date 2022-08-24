@@ -25,7 +25,7 @@ class NamedDecl;
 namespace swift {
 
 class AbstractClosureExpr;
-class ConformanceAccessPath;
+class ConformancePath;
 class RootProtocolConformance;
 
 namespace Mangle {
@@ -560,7 +560,7 @@ protected:
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance,
                                         GenericSignature sig);
-  void appendDependentProtocolConformance(const ConformanceAccessPath &path,
+  void appendDependentProtocolConformance(const ConformancePath &path,
                                           GenericSignature sig);
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   

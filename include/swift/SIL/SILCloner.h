@@ -254,13 +254,10 @@ public:
     assert(archetypeTy->isRoot());
 
     auto sig = Builder.getFunction().getGenericSignature();
-    auto existentialTy = archetypeTy->getExistentialType()->getCanonicalType();
-    auto env = GenericEnvironment::forOpenedExistential(
-        getOpASTType(existentialTy), sig, UUID::fromTime());
-    auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(sig, existentialTy->getASTContext());
-    auto replacementTy =
-        env->mapTypeIntoContext(interfaceTy)
-            ->template castTo<OpenedArchetypeType>();
+    auto origExistentialTy = archetypeTy->getExistentialType()
+        ->getCanonicalType();
+    auto substExistentialTy = getOpASTType(origExistentialTy);
+    auto replacementTy = OpenedArchetypeType::get(substExistentialTy, sig);
     registerOpenedExistentialRemapping(archetypeTy, replacementTy);
   }
 
@@ -1163,12 +1160,10 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   if (!getBuilder().hasOwnership()) {
-    // TODO: Eliminate store_borrow result so we can use
-    // recordClonedInstruction. It is not "technically" necessary, but it is
-    // better from an invariant perspective.
     getBuilder().createStore(
         getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
         getOpValue(Inst->getDest()), StoreOwnershipQualifier::Unqualified);
+    mapValue(Inst, getOpValue(Inst->getDest()));
     return;
   }
 
@@ -1378,6 +1373,17 @@ SILCloner<ImplClass>::visitCopyAddrInst(CopyAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createCopyAddr(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
+                getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
+                Inst->isInitializationOfDest()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitExplicitCopyAddrInst(
+    ExplicitCopyAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createExplicitCopyAddr(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
                 getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
                 Inst->isInitializationOfDest()));

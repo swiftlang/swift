@@ -118,7 +118,9 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
   disableAddressSanitizer(*this, var);
   
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
   case llvm::Triple::MachO:
@@ -406,7 +408,7 @@ void IRGenModule::addVTableTypeMetadata(
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
   }
 
-  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getValue();
+  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getKnownMinValue();
   setVCallVisibility(var, vis,
                      std::make_pair(minOffset, maxOffset + relptrSize));
 }
@@ -2189,7 +2191,7 @@ namespace {
 
         auto *genericParam = O->getOpaqueGenericParams()[opaqueParamIdx];
         auto underlyingType =
-            Type(genericParam).subst(*unique)->getCanonicalType(sig);
+            Type(genericParam).subst(*unique)->getReducedType(sig);
         return IGM
             .getTypeRef(underlyingType, contextSig,
                         MangledTypeRefRole::Metadata)
@@ -2450,7 +2452,7 @@ namespace {
         auto type =
             Type(O->getOpaqueGenericParams()[OpaqueParamIndex])
                 .subst(substitutions)
-                ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
+                ->getReducedType(O->getOpaqueInterfaceGenericSignature());
 
         type = genericEnv
                    ? genericEnv->mapTypeIntoContext(type)->getCanonicalType()
@@ -4335,7 +4337,7 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
   // Create the alias.
   auto *ptrTy = cast<llvm::PointerType>(metadata->getType());
   auto *alias = llvm::GlobalAlias::create(
-      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      ptrTy->getPointerElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
       link.getName(), metadata, &IGM.Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
       .to(alias, link.isForDefinition());
@@ -5806,6 +5808,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::DistributedTargetInvocationEncoder:
   case KnownProtocolKind::DistributedTargetInvocationDecoder:
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:
+  case KnownProtocolKind::CxxSequence:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
@@ -5900,6 +5903,9 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
   GenericRequirementsMetadata metadata;
   for (auto &requirement : requirements) {
     switch (auto kind = requirement.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::Layout:
       ++metadata.NumRequirements;
 
@@ -6168,7 +6174,7 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     }
 
     CanGenericSignature reqSig =
-      IGM.Context.getOpenedArchetypeSignature(existentialType, genSig);
+      IGM.Context.getOpenedExistentialSignature(existentialType, genSig);
 
     CanType typeExpression;
     if (metatypeDepth > 0) {

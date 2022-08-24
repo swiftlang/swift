@@ -29,6 +29,7 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/StorageImpl.h"
@@ -1416,10 +1417,6 @@ public:
 
   bool hasValidParent() const;
 
-  /// Determine whether this extension has already been bound to a nominal
-  /// type declaration.
-  bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
-
   /// Retrieve the extended type definition as written in the source, if it exists.
   ///
   /// Repr would not be available if the extension was been loaded
@@ -2717,6 +2714,15 @@ public:
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
+
+  LifetimeAnnotation getLifetimeAnnotation() const {
+    auto &attrs = getAttrs();
+    if (attrs.hasAttribute<EagerMoveAttr>())
+      return LifetimeAnnotation::EagerMove;
+    if (attrs.hasAttribute<LexicalAttr>())
+      return LifetimeAnnotation::Lexical;
+    return LifetimeAnnotation::None;
+  }
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -5446,6 +5452,20 @@ public:
   /// attributes in source order, which means the outermost wrapper attribute
   /// is provided first.
   llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
+
+  /// Retrieve the outermost property wrapper attribute associated with
+  /// this declaration. For example:
+  ///
+  /// \code
+  /// @A @B @C var <name>: Bool = ...
+  /// \endcode
+  ///
+  /// The outermost attribute in this case is `@A` and it has
+  /// complete wrapper type `A<B<C<Bool>>>`.
+  CustomAttr *getOutermostAttachedPropertyWrapper() const {
+    auto wrappers = getAttachedPropertyWrappers();
+    return wrappers.empty() ? nullptr : wrappers.front();
+  }
 
   /// Whether this property has any attached property wrappers.
   bool hasAttachedPropertyWrapper() const;

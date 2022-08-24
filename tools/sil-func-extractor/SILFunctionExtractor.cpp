@@ -356,7 +356,7 @@ int main(int argc, char **argv) {
     }
 
     SerializationOptions serializationOpts;
-    serializationOpts.OutputPath = OutputFile.c_str();
+    serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = true;
     serializationOpts.IsSIB = true;
 

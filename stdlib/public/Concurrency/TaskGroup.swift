@@ -65,6 +65,7 @@ import Swift
 /// use the `withThrowingTaskGroup(of:returning:body:)` method instead.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
+@_unsafeInheritExecutor
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -99,14 +100,14 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// you can use a `for`-`await`-`in` loop:
 ///
 ///     var sum = 0
-///     for await result in group {
+///     for try await result in group {
 ///         sum += result
 ///     }
 ///
 /// If you need more control or only a few results,
 /// you can call `next()` directly:
 ///
-///     guard let first = await group.next() else {
+///     guard let first = try await group.next() else {
 ///         group.cancelAll()
 ///         return 0
 ///     }
@@ -157,6 +158,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// or to let the group rethrow the error.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
+@_unsafeInheritExecutor
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -578,7 +580,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
-  ///     for await try value in group {
+  ///     for try await value in group {
   ///         collected += value
   ///     }
   ///

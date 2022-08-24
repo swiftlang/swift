@@ -68,9 +68,10 @@ public:
     assert(box && "buffer never emitted before activating cleanup?!");
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      auto *bbi = cast<BeginBorrowInst>(theBox);
-      SGF.B.createEndBorrow(loc, bbi);
-      theBox = bbi->getOperand();
+      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+        SGF.B.createEndBorrow(loc, bbi);
+        theBox = bbi->getOperand();
+      }
     }
     SGF.B.createDeallocBox(loc, theBox);
   }
@@ -179,7 +180,7 @@ public:
         layoutSubs.getGenericSignature().getCanonicalSignature();
     auto boxLayout =
         SILLayout::get(SGF.getASTContext(), layoutSig,
-                       SILField(layoutTy->getCanonicalType(layoutSig), true),
+                       SILField(layoutTy->getReducedType(layoutSig), true),
                        /*captures generics*/ false);
 
     resultBox = SGF.B.createAllocBox(loc,
@@ -576,8 +577,8 @@ public:
     SILFunction *impl =
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
-                impFnTy->mapTypeOutOfContext()->getCanonicalType(sig)),
-            continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
+                impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
+            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
             origFormalType, sig, *calleeTypeInfo.foreign.async,
             calleeTypeInfo.foreign.error);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
@@ -660,7 +661,7 @@ public:
         auto sig = env ? env->getGenericSignature().getCanonicalSignature()
                        : CanGenericSignature();
         auto mappedContinuationTy =
-            continuationBGT->mapTypeOutOfContext()->getCanonicalType(sig);
+            continuationBGT->mapTypeOutOfContext()->getReducedType(sig);
         auto resumeType =
             cast<BoundGenericType>(mappedContinuationTy).getGenericArgs()[0];
         auto continuationTy = continuationBGT->getCanonicalType();

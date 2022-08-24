@@ -267,6 +267,13 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'MissingStmt': 263,
     'MissingType': 264,
     'MissingPattern': 265,
+    'UnexpectedNodes' : 266,
+    'LabeledStmt': 267,
+    'InfixOperatorExpr': 268,
+    'MoveExpr': 269,
+    'UnresolvedTernaryExpr': 270,
+    'UnresolvedIsExpr': 271,
+    'UnresolvedAsExpr': 272,
 }
 
 

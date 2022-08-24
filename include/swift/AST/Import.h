@@ -84,12 +84,17 @@ enum class ImportFlags {
   /// concurrency.
   Preconcurrency = 0x20,
 
+  /// The module's symbols are linked weakly.
+  WeakLinked = 0x40,
+
   /// Used for DenseMap.
   Reserved = 0x80
 };
 
 /// \see ImportFlags
 using ImportOptions = OptionSet<ImportFlags>;
+
+void simple_display(llvm::raw_ostream &out, ImportOptions options);
 
 // MARK: - Import Paths
 

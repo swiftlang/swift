@@ -260,8 +260,8 @@ TEST(IndexSubset, Lowering) {
       FunctionType::get({
           FunctionType::Param(C.TheAnyType),
           FunctionType::Param(
-              TupleType::get({
-                  TupleType::get({C.TheAnyType, C.TheAnyType}, C)}, C)),
+              ParenType::get(C,
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C))),
           FunctionType::Param(
             TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
           FunctionType::Param(C.TheAnyType)},

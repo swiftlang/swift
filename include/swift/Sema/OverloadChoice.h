@@ -310,6 +310,9 @@ public:
     assert(isDecl() && "only makes sense for declaration choices");
     return TheFunctionRefKind;
   }
+
+  /// Print selected overload choice kind found for Solution in debug output.
+  void dump(Type adjustedOpenedType, SourceManager *sm, raw_ostream &out) const;
 };
 
 } // end namespace constraints

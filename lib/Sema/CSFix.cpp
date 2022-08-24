@@ -2004,18 +2004,18 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
       IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
 }
 
-bool IgnoreInvalidNamedPattern::diagnose(const Solution &solution,
-                                         bool asNote) const {
+bool IgnoreUnresolvedPatternVar::diagnose(const Solution &solution,
+                                          bool asNote) const {
   // Not being able to infer the type of a pattern should already have been
   // diagnosed on the pattern's initializer or as a structural issue of the AST.
   return true;
 }
 
-IgnoreInvalidNamedPattern *
-IgnoreInvalidNamedPattern::create(ConstraintSystem &cs, NamedPattern *pattern,
-                                  ConstraintLocator *locator) {
+IgnoreUnresolvedPatternVar *
+IgnoreUnresolvedPatternVar::create(ConstraintSystem &cs, Pattern *pattern,
+                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      IgnoreInvalidNamedPattern(cs, pattern, locator);
+      IgnoreUnresolvedPatternVar(cs, pattern, locator);
 }
 
 bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
@@ -2413,6 +2413,9 @@ bool AddExplicitExistentialCoercion::isRequired(
                                   ArrayRef<Requirement> requirements) {
       for (const auto &req : requirements) {
         switch (req.getKind()) {
+        case RequirementKind::SameCount:
+          llvm_unreachable("Same-count requirement not supported here");
+
         case RequirementKind::Superclass:
         case RequirementKind::Conformance:
         case RequirementKind::Layout: {
@@ -2446,6 +2449,9 @@ bool AddExplicitExistentialCoercion::isRequired(
         auto requirementSig = protocol->getRequirementSignature();
         for (const auto &req : requirementSig.getRequirements()) {
           switch (req.getKind()) {
+          case RequirementKind::SameCount:
+            llvm_unreachable("Same-count requirement not supported here");
+
           case RequirementKind::Conformance:
           case RequirementKind::Layout:
           case RequirementKind::Superclass: {

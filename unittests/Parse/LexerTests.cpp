@@ -422,7 +422,7 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
   ParsedTrivia LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
   ParsedTrivia TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
   ASSERT_EQ((ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::GarbageText, strlen("\xEF\xBB\xBF")),
+    ParsedTriviaPiece(TriviaKind::UnexpectedText, strlen("\xEF\xBB\xBF")),
     ParsedTriviaPiece(TriviaKind::LineComment, strlen("// comment")),
     ParsedTriviaPiece(TriviaKind::Newline, 1)
   }}), LeadingTriviaPieces);
@@ -472,7 +472,7 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
   ParsedTrivia LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
   ParsedTrivia TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
   ASSERT_EQ((ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::GarbageText, strlen("\xEF\xBB\xBF")),
+    ParsedTriviaPiece(TriviaKind::UnexpectedText, strlen("\xEF\xBB\xBF")),
     ParsedTriviaPiece(TriviaKind::LineComment, strlen("// comment")),
     ParsedTriviaPiece(TriviaKind::Newline, 1)
   }}), LeadingTriviaPieces);

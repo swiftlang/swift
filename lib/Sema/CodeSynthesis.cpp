@@ -96,6 +96,15 @@ Expr *swift::buildSelfReference(VarDecl *selfDecl,
   llvm_unreachable("bad self access kind");
 }
 
+Argument swift::buildSelfArgument(VarDecl *selfDecl,
+                                  SelfAccessorKind selfAccessorKind,
+                                  bool isMutable) {
+  auto &ctx = selfDecl->getASTContext();
+  auto *selfRef = buildSelfReference(selfDecl, selfAccessorKind, isMutable);
+  return isMutable ? Argument::implicitInOut(ctx, selfRef)
+                   : Argument::unlabeled(selfRef);
+}
+
 /// Build an argument list that forwards references to the specified parameter
 /// list.
 ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
@@ -540,8 +549,8 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
 
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
-  auto *superRef = buildSelfReference(selfDecl, SelfAccessorKind::Super,
-                                      /*isLValue=*/false);
+  auto superArg = buildSelfArgument(selfDecl, SelfAccessorKind::Super,
+                                    /*isMutable*/ false);
 
   SubstitutionMap subs;
   if (auto *genericEnv = fn->getGenericEnvironment())
@@ -558,7 +567,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   if (auto *funcTy = type->getAs<FunctionType>())
     type = funcTy->getResult();
   auto *superclassCtorRefExpr =
-      DotSyntaxCallExpr::create(ctx, ctorRefExpr, SourceLoc(), superRef, type);
+      DotSyntaxCallExpr::create(ctx, ctorRefExpr, SourceLoc(), superArg, type);
   superclassCtorRefExpr->setThrows(false);
 
   auto *bodyParams = ctor->getParameters();
@@ -838,15 +847,16 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
       for (auto idx : range(pbd->getNumPatternEntries())) {
         bool HasStorage = false;
         bool CheckDefaultInitializer = true;
-        pbd->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
-          // If one of the bound variables is @NSManaged, go ahead no matter
-          // what.
-          if (VD->getAttrs().hasAttribute<NSManagedAttr>())
-            CheckDefaultInitializer = false;
+        pbd->getPattern(idx)->forEachVariable(
+            [&HasStorage, &CheckDefaultInitializer](VarDecl *VD) {
+              // If one of the bound variables is @NSManaged, go ahead no matter
+              // what.
+              if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+                CheckDefaultInitializer = false;
 
-          if (VD->hasStorageOrWrapsStorage())
-            HasStorage = true;
-        });
+              if (VD->hasStorageOrWrapsStorage())
+                HasStorage = true;
+            });
 
         if (!HasStorage) continue;
 

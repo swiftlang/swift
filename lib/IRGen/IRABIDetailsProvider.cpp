@@ -126,14 +126,18 @@ public:
     return {returnTy, {paramTy}};
   }
 
-  llvm::MapVector<EnumElementDecl *, unsigned> getEnumTagMapping(EnumDecl *ED) {
-    llvm::MapVector<EnumElementDecl *, unsigned> elements;
+  llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
+  getEnumTagMapping(const EnumDecl *ED) {
+    llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
+        elements;
     auto &enumImplStrat =
         getEnumImplStrategy(IGM, ED->getDeclaredType()->getCanonicalType());
 
     for (auto *element : ED->getAllElements()) {
       auto tagIdx = enumImplStrat.getTagIndex(element);
-      elements.insert({element, tagIdx});
+      auto *global = cast<llvm::GlobalVariable>(
+          IGM.getAddrOfEnumCase(element, NotForDefinition).getAddress());
+      elements.insert({element, {tagIdx, global->getName()}});
     }
 
     return elements;
@@ -217,7 +221,7 @@ IRABIDetailsProvider::getTypeMetadataAccessFunctionSignature() {
   return impl->getTypeMetadataAccessFunctionSignature();
 }
 
-llvm::MapVector<EnumElementDecl *, unsigned>
-IRABIDetailsProvider::getEnumTagMapping(EnumDecl *ED) {
+llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
+IRABIDetailsProvider::getEnumTagMapping(const EnumDecl *ED) {
   return impl->getEnumTagMapping(ED);
 }

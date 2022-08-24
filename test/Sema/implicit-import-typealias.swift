@@ -11,6 +11,19 @@
 // RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesImplementationOnlyImport.swift -I %t
 // RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesWithImport.swift  -I %t
 
+/// The swiftinterface is broken by the missing import without the workaround.
+// RUN: %target-swift-emit-module-interface(%t/UsesAliasesNoImport.swiftinterface) %t/UsesAliasesNoImport.swift -I %t \
+// RUN:   -disable-print-missing-imports-in-module-interface
+// RUN: not %target-swift-typecheck-module-from-interface(%t/UsesAliasesNoImport.swiftinterface) -I %t
+
+/// The swiftinterface parses fine with the workaround adding the missing imports.
+// RUN: %target-swift-emit-module-interface(%t/UsesAliasesNoImportFixed.swiftinterface) %t/UsesAliasesNoImport.swift -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/UsesAliasesNoImportFixed.swiftinterface) -I %t
+
+/// The module with an implementation-only import is not affected by the workaround and remains broken.
+// RUN: %target-swift-emit-module-interface(%t/UsesAliasesImplementationOnlyImport.swiftinterface) %t/UsesAliasesImplementationOnlyImport.swift -I %t \
+// RUN:   -disable-print-missing-imports-in-module-interface
+// RUN: not %target-swift-typecheck-module-from-interface(%t/UsesAliasesImplementationOnlyImport.swiftinterface) -I %t
 
 //--- Original.swift
 
@@ -47,23 +60,28 @@ public typealias WrapperAlias = Wrapper
 
 import Aliases
 
-// expected-warning@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported by this file; this is an error in Swift 6}}
+// expected-warning@+2 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported by this file; this is an error in Swift 6}}
+// expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
 public class InheritsFromClazzAlias: ClazzAlias {}
 
 @inlinable public func inlinableFunc() {
-  // expected-warning@+1 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an '@inlinable' function because 'Original' was not imported by this file; this is an error in Swift 6}}
+  // expected-warning@+2 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an '@inlinable' function because 'Original' was not imported by this file; this is an error in Swift 6}}
+  // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
   _ = StructAlias.self
 }
 
-// expected-warning@+1 {{'ProtoAlias' aliases 'Original.Proto' and cannot be used here because 'Original' was not imported by this file; this is an error in Swift 6}}
+// expected-warning@+2 {{'ProtoAlias' aliases 'Original.Proto' and cannot be used here because 'Original' was not imported by this file; this is an error in Swift 6}}
+// expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
 public func takesGeneric<T: ProtoAlias>(_ t: T) {}
 
 public struct HasMembers {
-  // expected-warning@+1 {{'WrapperAlias' aliases 'Original.Wrapper' and cannot be used as property wrapper here because 'Original' was not imported by this file; this is an error in Swift 6}}
+  // expected-warning@+2 {{'WrapperAlias' aliases 'Original.Wrapper' and cannot be used as property wrapper here because 'Original' was not imported by this file; this is an error in Swift 6}}
+ // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
   @WrapperAlias public var wrapped: Int
 }
 
-// expected-warning@+1 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an extension with public or '@usableFromInline' members because 'Original' was not imported by this file; this is an error in Swift 6}}
+// expected-warning@+2 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an extension with public or '@usableFromInline' members because 'Original' was not imported by this file; this is an error in Swift 6}}
+// expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
 extension StructAlias {
   public func someFunc() {}
 }

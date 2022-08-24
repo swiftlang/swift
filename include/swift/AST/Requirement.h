@@ -53,21 +53,16 @@ public:
 
   /// Subst the types involved in this requirement.
   ///
-  /// The \c args arguments are passed through to Type::subst. This doesn't
-  /// touch the superclasses, protocols or layout constraints.
+  /// The \c args arguments are passed through to Type::subst.
   template <typename ...Args>
-  llvm::Optional<Requirement> subst(Args &&...args) const {
+  Requirement subst(Args &&...args) const {
     auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
-    if (newFirst->hasError())
-      return None;
-
     switch (getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType: {
       auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
-      if (newSecond->hasError())
-        return None;
       return Requirement(getKind(), newFirst, newSecond);
     }
     case RequirementKind::Layout:

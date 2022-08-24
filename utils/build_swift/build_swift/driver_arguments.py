@@ -580,6 +580,11 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
+    option('--infer-cross-compile-hosts-on-darwin', toggle_true,
+           help="When building on Darwin, automatically populate cross-compile-hosts "
+                "based on the architecture build-script is running on. "
+                "Has precedence over cross-compile-hosts")
+
     option('--cross-compile-deps-path', store_path,
            help='The path to a directory that contains prebuilt cross-compiled '
                 'library dependencies of the corelibs and other Swift repos, '
@@ -1103,10 +1108,6 @@ def create_argument_parser():
     option('--skip-test-ios-simulator',
            toggle_false('test_ios_simulator'),
            help='skip testing iOS simulator targets')
-    option('--skip-test-ios-32bit-simulator',
-           toggle_false('test_ios_32bit_simulator'),
-           default=False,
-           help='skip testing iOS 32 bit simulator targets')
     option('--skip-test-watchos-32bit-simulator',
            toggle_false('test_watchos_32bit_simulator'),
            default=False,
