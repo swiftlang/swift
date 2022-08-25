@@ -16,6 +16,9 @@
 
 // REQUIRES: executable_test
 
+// Older runtimes have a bug (fixed by PR#42131) that causes this test to fail.
+// UNSUPPORTED: use_os_stdlib || back_deployment_runtime
+
 import ResilientEnum
 
 @inline(never)
