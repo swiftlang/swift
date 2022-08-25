@@ -2732,8 +2732,9 @@ public:
     if (auto schema = IGF.IGM.getOptions().PointerAuth.FunctionPointers) {
       // Use the Clang type for TaskContinuationFunction*
       // to make this work with type diversity.
-      schema =
-          IGF.IGM.getOptions().PointerAuth.ClangTypeTaskContinuationFunction;
+      if (schema.hasOtherDiscrimination())
+        schema =
+            IGF.IGM.getOptions().PointerAuth.ClangTypeTaskContinuationFunction;
       auto authInfo =
           PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
       signedResumeFn = emitPointerAuthSign(IGF, signedResumeFn, authInfo);
