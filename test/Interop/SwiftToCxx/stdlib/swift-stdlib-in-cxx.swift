@@ -14,6 +14,12 @@
 // CHECK:  }
 // CHECK-NEXT:  inline String(String &&) = default;
 // CHECK-NEXT:  static inline String init();
+// CHECK-NEXT:  #if defined(__OBJC__)
+// CHECK-NEXT:  inline __attribute__((always_inline)) operator NSString * _Nonnull () const noexcept {
+// CHECK-NEXT:    return (__bridge_transfer NSString *)(_impl::$sSS23_bridgeToObjectiveCImplyXlyF(_impl::swift_interop_passDirect_Swift_String(_getOpaquePointer())));
+// CHECK-NEXT:   }
+// CHECK-EMPTY:
+// CHECK-NEXT:  #endif
 // CHECK-NEXT: private:
 
 // CHECK: } // namespace Swift

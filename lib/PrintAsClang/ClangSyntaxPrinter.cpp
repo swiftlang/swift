@@ -98,8 +98,21 @@ void ClangSyntaxPrinter::printExternC(
   os << "#endif\n";
 }
 
+void ClangSyntaxPrinter::printObjCBlock(
+    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
+  os << "#if defined(__OBJC__)\n";
+  bodyPrinter(os);
+  os << "\n#endif\n";
+}
+
 void ClangSyntaxPrinter::printSwiftImplQualifier() const {
   os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+}
+
+void ClangSyntaxPrinter::printInlineForThunk() const {
+  // FIXME: make a macro and add 'nodebug', and
+  // migrate all other 'inline' uses.
+  os << "inline __attribute__((always_inline)) ";
 }
 
 void ClangSyntaxPrinter::printNullability(
