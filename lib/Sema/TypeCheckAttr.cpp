@@ -296,6 +296,7 @@ public:
   void visitResultBuilderAttr(ResultBuilderAttr *attr);
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
+  void visitSPIOnlyAttr(SPIOnlyAttr *attr);
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
   void checkOriginalDefinedInAttrs(ArrayRef<OriginallyDefinedInAttr *> Attrs);
 
@@ -3906,6 +3907,10 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
   // FIXME: When compiling without library evolution enabled, this should also
   // check whether VD or any of its accessors need a new vtable entry, even if
   // it won't necessarily be able to say why.
+}
+
+void
+AttributeChecker::visitSPIOnlyAttr(SPIOnlyAttr *attr) {
 }
 
 void AttributeChecker::visitTypeSequenceAttr(TypeSequenceAttr *attr) {
