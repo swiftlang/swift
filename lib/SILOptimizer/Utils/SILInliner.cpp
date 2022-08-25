@@ -462,7 +462,7 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
           continue;
 
         auto storage = AccessStorageWithBase::compute(callArg);
-        if (auto *asi = dyn_cast<AllocStackInst>(storage.base))
+        if (auto *asi = dyn_cast_or_null<AllocStackInst>(storage.base))
           asi->setIsLexical();
       } else {
         // Insert begin/end borrow for guaranteed arguments.
