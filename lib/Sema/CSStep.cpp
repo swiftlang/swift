@@ -358,15 +358,11 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto *disjunction = CS.selectDisjunction();
 
   if (CS.isDebugMode()) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-
-    auto &log = getDebugLogger();
     if (!potentialBindings.empty()) {
+      auto &log = getDebugLogger();
       log << "(Potential Binding(s): " << '\n';
       log << potentialBindings;
     }
-    log.indent(CS.solverState->getCurrentIndent());
 
     SmallVector<Constraint *, 4> disjunctions;
     CS.collectDisjunctions(disjunctions);
@@ -392,7 +388,6 @@ StepResult ComponentStep::take(bool prevFailed) {
         log << ")\n";
       }
     }
-    log << ")\n";
   }
 
   if (CS.shouldAttemptFixes()) {
