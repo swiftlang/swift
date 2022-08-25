@@ -755,7 +755,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // Build ParameterizedProtocolType if the protocol has a primary associated
     // type and we're in a supported context (for now just generic requirements,
     // inheritance clause, extension binding).
-    if (resolution.getOptions().isConstraintImplicitExistential()) {
+    if (resolution.getOptions().isConstraintImplicitExistential() && !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       diags.diagnose(loc, diag::existential_requires_any,
                      protoDecl->getDeclaredInterfaceType(),
                      protoDecl->getExistentialType(),
@@ -4686,7 +4686,7 @@ public:
 
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
-      if (proto->existentialRequiresAny()) {
+      if (proto->existentialRequiresAny() && !Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
@@ -4703,7 +4703,7 @@ public:
       if (type->isConstraintType()) {
         auto layout = type->getExistentialLayout();
         for (auto *protoDecl : layout.getProtocols()) {
-          if (!protoDecl->existentialRequiresAny())
+          if (!protoDecl->existentialRequiresAny() || Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
             continue;
 
           Ctx.Diags.diagnose(comp->getNameLoc(),
