@@ -2397,6 +2397,11 @@ static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
 }
 
 static bool hasExposeAttr(const ValueDecl *VD) {
+  if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
+    if (VD == VD->getASTContext().getStringDecl())
+      return true;
+    return false;
+  }
   if (VD->getAttrs().hasAttribute<ExposeAttr>())
     return true;
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
