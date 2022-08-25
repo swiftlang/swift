@@ -36,6 +36,10 @@ public struct ExposedStruct {
     public func method() {}
 }
 
+public struct NotExposedStruct {
+    public var x: Int
+}
+
 @_expose(Cxx, "ExposedStruct2")
 public struct ExposedStructRenamed {
     public var y: Int
@@ -48,6 +52,15 @@ public struct ExposedStructRenamed {
 
     @_expose(Cxx, "renamedMethod")
     public func method() {}
+
+    public func getNonExposedStruct() -> NotExposedStruct {
+        return NotExposedStruct(x: 2)
+    }
+    // FIXME: if 'getNonExposedStruct' has explicit @_expose we should error in Sema.
+
+    public func passNonExposedStruct(_ x: NotExposedStruct) {
+    }
+    // FIXME: if 'passNonExposedStruct' has explicit @_expose we should error in Sema.
 }
 
 @_expose(Cxx)
@@ -58,6 +71,14 @@ public final class ExposedClass {
 // CHECK: class ExposedClass final
 // CHECK: class ExposedStruct final {
 // CHECK: class ExposedStruct2 final {
+// CHECK: ExposedStruct2(ExposedStruct2 &&) = default;
+// CHECK-NEXT: swift::Int getY() const;
+// CHECK-NEXT: void setY(swift::Int value);
+// CHECK-NEXT: swift::Int getRenamedProp() const;
+// CHECK-NEXT: void setRenamedProp(swift::Int value);
+// CHECK-NEXT: swift::Int getProp3() const;
+// CHECK-NEXT: void renamedMethod() const;
+// CHECK-NEXT: private:
 
 // CHECK: inline void exposed1() noexcept {
 // CHECK-NEXT:   return _impl::$s6Expose8exposed1yyF();
@@ -83,4 +104,6 @@ public final class ExposedClass {
 // CHECK: void ExposedStruct2::setRenamedProp(swift::Int value) {
 // CHECK: swift::Int ExposedStruct2::getProp3() const {
 // CHECK: void ExposedStruct2::renamedMethod() const {
+
+// CHECK-NOT: NonExposedStruct
 
