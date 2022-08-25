@@ -1301,6 +1301,16 @@ void swift::ide::deliverCompletionResults(
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
+        llvm::SmallVector<std::string, 2> spiGroups;
+        for (auto Import : SF.getImports()) {
+          if (Import.module.importedModule == TheModule) {
+            for (auto SpiGroup : Import.spiGroups) {
+              spiGroups.push_back(SpiGroup.str().str());
+            }
+            break;
+          }
+        }
+        llvm::sort(spiGroups);
         CodeCompletionCache::Key K{
             ModuleFilename.str(),
             std::string(TheModule->getName()),
@@ -1312,6 +1322,7 @@ void swift::ide::deliverCompletionResults(
             SF.hasTestableOrPrivateImport(
                 AccessLevel::Internal, TheModule,
                 SourceFile::ImportQueryKind::PrivateOnly),
+            spiGroups,
             CompletionContext.getAddInitsToTopLevel(),
             CompletionContext.addCallWithNoDefaultArgs(),
             CompletionContext.getAnnotateResult()};
@@ -1351,9 +1362,12 @@ void swift::ide::deliverCompletionResults(
       // Add results for all imported modules.
       SmallVector<ImportedModule, 4> Imports;
       SF.getImportedModules(
-          Imports, {ModuleDecl::ImportFilterKind::Exported,
-                    ModuleDecl::ImportFilterKind::Default,
-                    ModuleDecl::ImportFilterKind::ImplementationOnly});
+          Imports, {
+                       ModuleDecl::ImportFilterKind::Exported,
+                       ModuleDecl::ImportFilterKind::Default,
+                       ModuleDecl::ImportFilterKind::ImplementationOnly,
+                       ModuleDecl::ImportFilterKind::SPIAccessControl,
+                   });
 
       for (auto Imported : Imports) {
         for (auto Import : namelookup::getAllImports(Imported.importedModule))
