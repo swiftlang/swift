@@ -45,7 +45,7 @@
 /// following form for a floating-point value `x` of type `F`, where `**` is
 /// exponentiation:
 ///
-///     x.significand * F.radix ** x.exponent
+///     x.significand * (F.radix ** x.exponent)
 ///
 /// Here's an example of the number -8.5 represented as an instance of the
 /// `Double` type, which defines a radix of 2.
@@ -432,7 +432,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// type `F`, the magnitude can be calculated as the following, where `**`
   /// is exponentiation:
   ///
-  ///     let magnitude = x.significand * F.radix ** x.exponent
+  ///     x.significand * (F.radix ** x.exponent)
   ///
   /// In the next example, `y` has a value of `21.5`, which is encoded as
   /// `1.34375 * 2 ** 4`. The significand of `y` is therefore 1.34375.
@@ -458,7 +458,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// The magnitude of a floating-point value `x` of type `F` can be calculated
   /// by using the following formula, where `**` is exponentiation:
   ///
-  ///     let magnitude = x.significand * F.radix ** x.exponent
+  ///     x.significand * (F.radix ** x.exponent)
   ///
   /// In the next example, `y` has a value of `21.5`, which is encoded as
   /// `1.34375 * 2 ** 4`. The significand of `y` is therefore 1.34375.
