@@ -6792,7 +6792,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::DoubleToCGFloat: {
       auto conversionKind = knownRestriction->second;
 
-      auto *argExpr = locator.trySimplifyToExpr();
+      // If conversion wraps the whole body of a single-expression closure,
+      // let's use the passed-in expression since the closure itself doesn't
+      // get updated until coercion is done.
+      auto *argExpr = locator.endsWith<LocatorPathElt::ClosureBody>()
+                          ? expr
+                          : locator.trySimplifyToExpr();
       assert(argExpr);
 
       // Source requires implicit conversion to match destination
@@ -9081,11 +9086,28 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
+      ConstraintLocator *locator = nullptr;
+      // Bodies of single-expression closures use a special locator
+      // for contextual type conversion to make sure that result is
+      // convertible to `Void` when `return` is not used explicitly.
+      if (target.getExprContextualTypePurpose() == CTP_ClosureResult) {
+        auto *closure = cast<ClosureExpr>(target.getDeclContext());
+        auto *returnStmt =
+            castToStmt<ReturnStmt>(closure->getBody()->getLastElement());
+
+        locator = cs.getConstraintLocator(
+            closure, LocatorPathElt::ClosureBody(
+                         /*hasReturn=*/!returnStmt->isImplicit()));
+      } else {
+        locator = cs.getConstraintLocator(
+            resultExpr, LocatorPathElt::ContextualType(
+                            target.getExprContextualTypePurpose()));
+      }
+
+      assert(locator);
+
       resultExpr = Rewriter.coerceToType(
-          resultExpr, solution.simplifyType(convertType),
-          cs.getConstraintLocator(resultExpr,
-                                  LocatorPathElt::ContextualType(
-                                      target.getExprContextualTypePurpose())));
+          resultExpr, solution.simplifyType(convertType), locator);
     } else if (cs.getType(resultExpr)->hasLValueType() &&
                !target.isDiscardedExpr()) {
       // We referenced an lvalue. Load it.
