@@ -695,6 +695,9 @@ struct PGOMapping : public ASTWalker {
   }
 };
 
+/// Produce coverage mapping information for a function. This involves taking
+/// the counters computed by MapRegionCounters, and annotating the source with
+/// regions that are defined in terms of those counters.
 struct CoverageMapping : public ASTWalker {
 private:
   const SourceManager &SM;
@@ -976,6 +979,8 @@ public:
     if (S->isImplicit() && S != ImplicitTopLevelBody)
       return {true, S};
 
+    // If we're in an 'incomplete' region, update it to include this node. This
+    // ensures we only create the region if needed.
     if (!RegionStack.empty())
       extendRegion(S);
 
@@ -986,7 +991,13 @@ public:
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
       if (auto *Cond = getConditionNode(IS->getCond()))
         assignCounter(Cond, CounterExpr::Ref(getCurrentCounter()));
+
+      // The counter for the if statement itself tracks the number of jumps to
+      // it by break statements.
       assignCounter(IS, CounterExpr::Zero());
+
+      // We emit a counter for the then block, and define the else block in
+      // terms of it.
       CounterExpr &ThenCounter = assignCounter(IS->getThenStmt());
       if (IS->getElseStmt())
         assignCounter(IS->getElseStmt(),
@@ -996,18 +1007,26 @@ public:
       assignCounter(GS->getBody());
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
+      // The counter for the while statement itself tracks the number of jumps
+      // to it by break and continue statements.
       assignCounter(WS, CounterExpr::Zero());
+
       if (auto *E = getConditionNode(WS->getCond()))
         assignCounter(E, CounterExpr::Ref(getCurrentCounter()));
       assignCounter(WS->getBody());
 
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+      // The counter for the while statement itself tracks the number of jumps
+      // to it by break and continue statements.
       assignCounter(RWS, CounterExpr::Zero());
+
       CounterExpr &BodyCounter = assignCounter(RWS->getBody());
       assignCounter(RWS->getCond(), CounterExpr::Ref(BodyCounter));
       RepeatWhileStack.push_back(RWS);
 
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
+      // The counter for the for statement itself tracks the number of jumps
+      // to it by break and continue statements.
       assignCounter(FES, CounterExpr::Zero());
       assignCounter(FES->getBody());
 
@@ -1021,7 +1040,10 @@ public:
       if (caseStmt->getParentKind() == CaseParentKind::Switch)
         pushRegion(S);
     } else if (auto *DS = dyn_cast<DoStmt>(S)) {
+      // The counter for the do statement itself tracks the number of jumps
+      // to it by break statements.
       assignCounter(DS, CounterExpr::Zero());
+
       assignCounter(DS->getBody(), CounterExpr::Ref(getCurrentCounter()));
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
@@ -1125,6 +1147,8 @@ public:
     if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
       return {false, E};
 
+    // If we're in an 'incomplete' region, update it to include this node. This
+    // ensures we only create the region if needed.
     if (!RegionStack.empty())
       extendRegion(E);
 
