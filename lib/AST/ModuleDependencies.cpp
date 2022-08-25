@@ -517,8 +517,9 @@ ModuleDependenciesCache::getDependencyReferencesMap(
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(
-    GlobalModuleDependenciesCache &globalCache)
-    : globalCache(globalCache) {
+    GlobalModuleDependenciesCache &globalCache,
+    StringRef mainModuleName)
+    : globalCache(globalCache), mainModuleName(mainModuleName) {
   for (auto kind = ModuleDependenciesKind::FirstKind;
        kind != ModuleDependenciesKind::LastKind; ++kind) {
     ModuleDependenciesMap.insert(
@@ -566,11 +567,21 @@ bool ModuleDependenciesCache::hasDependencies(
 
 void ModuleDependenciesCache::recordDependencies(
     StringRef moduleName, ModuleDependencies dependencies) {
-  auto globalDepPtr = globalCache.recordDependencies(moduleName, dependencies);
-  auto kind = globalDepPtr->getKind();
-  auto &map = getDependencyReferencesMap(kind);
+  auto dependenciesKind = dependencies.getKind();
+
+  // The underlying Clang module needs to be cached in this invocation,
+  // but should not make it to the global cache since it will look slightly
+  // differently for clients of this module than it does for the module itself.
+  const ModuleDependencies* recordedDependencies;
+  if (moduleName == mainModuleName && dependencies.isClangModule()) {
+    underlyingClangModuleDependency = std::make_unique<ModuleDependencies>(std::move(dependencies));
+    recordedDependencies = underlyingClangModuleDependency.get();
+  } else
+    recordedDependencies = globalCache.recordDependencies(moduleName, dependencies);
+
+  auto &map = getDependencyReferencesMap(dependenciesKind);
   assert(map.count(moduleName) == 0 && "Already added to map");
-  map.insert({moduleName, globalDepPtr});
+  map.insert({moduleName, recordedDependencies});
 }
 
 void ModuleDependenciesCache::updateDependencies(
