@@ -136,11 +136,12 @@ public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
                llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
                SwiftToClangInteropContext &interopContext, AccessLevel access,
-               OutputLanguageMode outputLang)
+               bool requiresExposedAttribute, OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
         outOfLineDefinitionsOS(outOfLineDefinitions),
         printer(M, os, prologueOS, outOfLineDefinitionsOS, delayedMembers,
-                typeMapping, interopContext, access, outputLang),
+                typeMapping, interopContext, access, requiresExposedAttribute,
+                outputLang),
         outputLangMode(outputLang) {}
 
   PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
@@ -672,13 +673,14 @@ void swift::printModuleContentsAsObjC(
     ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
   llvm::raw_null_ostream prologueOS;
   ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
-               OutputLanguageMode::ObjC)
+               /*requiresExposedAttribute=*/false, OutputLanguageMode::ObjC)
       .write();
 }
 
 void swift::printModuleContentsAsCxx(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    bool requiresExposedAttribute) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -686,7 +688,8 @@ void swift::printModuleContentsAsCxx(
 
   // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, imports, M, interopContext,
-                      AccessLevel::Public, OutputLanguageMode::Cxx);
+                      AccessLevel::Public, requiresExposedAttribute,
+                      OutputLanguageMode::Cxx);
   writer.write();
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
