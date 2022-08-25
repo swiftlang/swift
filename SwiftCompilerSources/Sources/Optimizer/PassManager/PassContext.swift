@@ -117,8 +117,8 @@ struct PassContext {
   }
 
   func modifyEffects(in function: Function, _ body: (inout FunctionEffects) -> ()) {
+    notifyFunctionDataChanged()
     function._modifyEffects(body)
-    // TODO: do we need to notify any changes?
   }
 
   //===--------------------------------------------------------------------===//
@@ -135,6 +135,10 @@ struct PassContext {
 
   fileprivate func notifyBranchesChanged() {
     PassContext_notifyChanges(_bridged, branchesChanged)
+  }
+
+  fileprivate func notifyFunctionDataChanged() {
+    PassContext_notifyChanges(_bridged, functionDataChanged)
   }
 }
 

@@ -23,13 +23,16 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 enum {
   BridgedOperandSize = 4 * sizeof(uintptr_t),
-  BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t)
+  BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t),
+  BridgedVTableEntrySize = 5 * sizeof(uintptr_t),
+  BridgedWitnessTableEntrySize = 5 * sizeof(uintptr_t)
 };
 
 enum ChangeNotificationKind {
   instructionsChanged,
   callsChanged,
-  branchesChanged
+  branchesChanged,
+  functionDataChanged
 };
 
 typedef struct {
@@ -66,6 +69,41 @@ typedef struct {
 typedef struct {
   const void * _Nullable succ;
 } OptionalBridgedSuccessor;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedVTable;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedVTableEntry;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedWitnessTable;
+
+typedef struct {
+  const void * _Nullable ptr;
+} OptionalBridgedWitnessTable;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedDefaultWitnessTable;
+
+typedef struct {
+  const void * _Nullable ptr;
+} OptionalBridgedDefaultWitnessTable;
+
+typedef struct {
+  const void * _Nonnull ptr;
+} BridgedWitnessTableEntry;
+
+typedef enum {
+  SILWitnessTableEntry_Method,
+  SILWitnessTableEntry_AssociatedType,
+  SILWitnessTableEntry_AssociatedTypeProtocol,
+  SILWitnessTableEntry_BaseProtocol
+} SILWitnessTableEntryKind;
 
 typedef struct {
   SwiftObject obj;
@@ -223,12 +261,27 @@ SwiftInt SILFunction_getNumSILArguments(BridgedFunction function);
 BridgedType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx);
 BridgedType SILFunction_getSILResultType(BridgedFunction function);
 SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function);
+SwiftInt SILFunction_isPossiblyUsedExternally(BridgedFunction function);
+SwiftInt SILFunction_isAvailableExternally(BridgedFunction function);
 SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
                                       llvm::StringRef attrName);
 
 llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global);
+
+std::string SILVTable_debugDescription(BridgedVTable vTable);
+BridgedArrayRef SILVTable_getEntries(BridgedVTable vTable);
+std::string SILVTableEntry_debugDescription(BridgedVTableEntry entry);
+BridgedFunction SILVTableEntry_getFunction(BridgedVTableEntry entry);
+
+std::string SILWitnessTable_debugDescription(BridgedWitnessTable table);
+BridgedArrayRef SILWitnessTable_getEntries(BridgedWitnessTable table);
+std::string SILDefaultWitnessTable_debugDescription(BridgedDefaultWitnessTable table);
+BridgedArrayRef SILDefaultWitnessTable_getEntries(BridgedDefaultWitnessTable table);
+std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry);
+SILWitnessTableEntryKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry);
+OptionalBridgedFunction SILWitnessTableEntry_getMethodFunction(BridgedWitnessTableEntry entry);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
@@ -304,7 +357,7 @@ BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
 llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi);
 BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
-BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri);
+BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri);
 llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli);
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
@@ -338,6 +391,14 @@ void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);
 bool RefCountingInst_getIsAtomic(BridgedInstruction rc);
 SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr);
 
+struct KeyPathFunctionResults {
+  enum { maxFunctions = 5 };
+  BridgedFunction functions[maxFunctions];
+  SwiftInt numFunctions;
+};
+SwiftInt KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
+                                            KeyPathFunctionResults * _Nonnull results);
+
 BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);
 BridgedArgumentConvention
 ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx);
@@ -351,6 +412,11 @@ BridgedInstruction SILBuilder_createCondFail(BridgedBuilder builder,
           BridgedValue condition, llvm::StringRef message);
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder builder,
           BridgedType type, SwiftInt value);
+BridgedInstruction SILBuilder_createAllocStack(BridgedBuilder builder,
+          BridgedType type, SwiftInt hasDynamicLifetime, SwiftInt isLexical,
+          SwiftInt wasMoved);
+BridgedInstruction SILBuilder_createDeallocStack(BridgedBuilder builder,
+          BridgedValue operand);
 BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder builder,
           BridgedValue operand);
 BridgedInstruction SILBuilder_createUncheckedRefCast(BridgedBuilder builder,
@@ -361,6 +427,9 @@ BridgedInstruction SILBuilder_createFunctionRef(BridgedBuilder builder,
           BridgedFunction function);
 BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder builder,
           BridgedValue op);
+BridgedInstruction SILBuilder_createCopyAddr(BridgedBuilder builder,
+          BridgedValue from, BridgedValue to,
+          SwiftInt takeSource, SwiftInt initializeDest);
 BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder builder,
           BridgedValue op);
 BridgedInstruction SILBuilder_createApply(BridgedBuilder builder,

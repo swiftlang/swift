@@ -341,9 +341,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(LiteralInst, SingleValueInstruction)
     BRIDGED_SINGLE_VALUE_INST(FunctionRefInst, function_ref,
                       LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(DynamicFunctionRefInst, dynamic_function_ref,
+    BRIDGED_SINGLE_VALUE_INST(DynamicFunctionRefInst, dynamic_function_ref,
                       LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(PreviousDynamicFunctionRefInst, prev_dynamic_function_ref,
+    BRIDGED_SINGLE_VALUE_INST(PreviousDynamicFunctionRefInst, prev_dynamic_function_ref,
                       LiteralInst, None, DoesNotRelease)
     BRIDGED_SINGLE_VALUE_INST(GlobalAddrInst, global_addr,
                       LiteralInst, None, DoesNotRelease)
@@ -644,7 +644,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path
   // object; is there a more specific effect?
-  SINGLE_VALUE_INST(KeyPathInst, keypath,
+  BRIDGED_SINGLE_VALUE_INST(KeyPathInst, keypath,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // BindMemory and RebindMemory have no physical side effect. Semantically they

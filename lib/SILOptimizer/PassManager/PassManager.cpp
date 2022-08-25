@@ -727,11 +727,14 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
     verifyAnalyses();
   }
 
+  swiftPassInvocation.startModulePassRun(SMT);
+
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   SMT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->flushDeletedInsts();
+  swiftPassInvocation.finishedModulePassRun();
 
   std::chrono::nanoseconds duration = std::chrono::system_clock::now() - StartTime;
   totalPassRuntime += duration;
@@ -1279,6 +1282,12 @@ void SwiftPassInvocation::freeNodeSet(NodeSet *set) {
   }
 }
 
+void SwiftPassInvocation::startModulePassRun(SILModuleTransform *transform) {
+  assert(!this->function && !this->transform && "a pass is already running");
+  this->function = nullptr;
+  this->transform = transform;
+}
+
 void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
   assert(!this->function && !this->transform && "a pass is already running");
   this->function = transform->getFunction();
@@ -1288,6 +1297,12 @@ void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) 
 void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
   assert(inst->getFunction() == function &&
          "running instruction pass on wrong function");
+}
+
+void SwiftPassInvocation::finishedModulePassRun() {
+  endPassRunChecks();
+  assert(!function && transform && "not running a pass");
+  transform = nullptr;
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
@@ -1380,6 +1395,9 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
   case branchesChanged:
     inv->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     break;
+  case functionDataChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::FunctionData);
+    break;
   }
 }
 
@@ -1466,8 +1484,8 @@ SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock bloc
   return castToBlockSet(set)->contains(castToBasicBlock(block)) ? 1 : 0;
 }
 
-void BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  castToBlockSet(set)->insert(castToBasicBlock(block));
+SwiftInt BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
+  return castToBlockSet(set)->insert(castToBasicBlock(block)) ? 1 : 0;
 }
 
 void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
@@ -1491,8 +1509,8 @@ SwiftInt NodeSet_containsValue(BridgedNodeSet set, BridgedValue value) {
   return castToNodeSet(set)->contains(castToSILValue(value)) ? 1 : 0;
 }
 
-void NodeSet_insertValue(BridgedNodeSet set, BridgedValue value) {
-  castToNodeSet(set)->insert(castToSILValue(value));
+SwiftInt NodeSet_insertValue(BridgedNodeSet set, BridgedValue value) {
+  return castToNodeSet(set)->insert(castToSILValue(value)) ? 1 : 0;
 }
 
 void NodeSet_eraseValue(BridgedNodeSet set, BridgedValue value) {
@@ -1503,8 +1521,8 @@ SwiftInt NodeSet_containsInstruction(BridgedNodeSet set, BridgedInstruction inst
   return castToNodeSet(set)->contains(castToInst(inst)->asSILNode()) ? 1 : 0;
 }
 
-void NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  castToNodeSet(set)->insert(castToInst(inst)->asSILNode());
+SwiftInt NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst) {
+  return castToNodeSet(set)->insert(castToInst(inst)->asSILNode()) ? 1 : 0;
 }
 
 void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst) {
@@ -1528,6 +1546,71 @@ PassContext_getContextSubstitutionMap(BridgedPassContext context,
   auto *m = pm->getModule()->getSwiftModule();
   
   return {type.getASTType()->getContextSubstitutionMap(m, ntd).getOpaqueValue()};
+}
+
+void PassContext_beginTransformFunction(BridgedFunction function, BridgedPassContext ctxt) {
+  castToPassInvocation(ctxt)->beginTransformFunction(castToFunction(function));
+}
+
+void PassContext_endTransformFunction(BridgedPassContext ctxt) {
+  castToPassInvocation(ctxt)->endTransformFunction();
+}
+
+OptionalBridgedFunction
+PassContext_firstFunctionInModule(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  if (mod->getFunctions().empty())
+    return {nullptr};
+  return {&*mod->getFunctions().begin()};
+}
+
+OptionalBridgedFunction
+PassContext_nextFunctionInModule(BridgedFunction function) {
+  auto *f = castToFunction(function);
+  auto nextIter = std::next(f->getIterator());
+  if (nextIter == f->getModule().getFunctions().end())
+    return {nullptr};
+  return {&*nextIter};
+}
+
+BridgedVTableArray PassContext_getVTables(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  auto vTables = mod->getVTables();
+  return {(const BridgedVTable *)vTables.data(), vTables.size()};
+}
+
+OptionalBridgedWitnessTable
+PassContext_firstWitnessTableInModule(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  if (mod->getWitnessTables().empty())
+    return {nullptr};
+  return {&*mod->getWitnessTables().begin()};
+}
+
+OptionalBridgedWitnessTable
+PassContext_nextWitnessTableInModule(BridgedWitnessTable table) {
+  auto *t = castToWitnessTable(table);
+  auto nextIter = std::next(t->getIterator());
+  if (nextIter == t->getModule().getWitnessTables().end())
+    return {nullptr};
+  return {&*nextIter};
+}
+
+OptionalBridgedDefaultWitnessTable
+PassContext_firstDefaultWitnessTableInModule(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  if (mod->getDefaultWitnessTables().empty())
+    return {nullptr};
+  return {&*mod->getDefaultWitnessTables().begin()};
+}
+
+OptionalBridgedDefaultWitnessTable
+PassContext_nextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
+  auto *t = castToDefaultWitnessTable(table);
+  auto nextIter = std::next(t->getIterator());
+  if (nextIter == t->getModule().getDefaultWitnessTables().end())
+    return {nullptr};
+  return {&*nextIter};
 }
 
 OptionalBridgedFunction

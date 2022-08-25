@@ -217,6 +217,14 @@ SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
     ctxt.getSwift51Availability());
 }
 
+SwiftInt SILFunction_isPossiblyUsedExternally(BridgedFunction function) {
+  return castToFunction(function)->isPossiblyUsedExternally() ? 1 : 0;
+}
+
+SwiftInt SILFunction_isAvailableExternally(BridgedFunction function) {
+  return castToFunction(function)->isAvailableExternally() ? 1 : 0;
+}
+
 SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
                                       StringRef attrName) {
   SILFunction *f = castToFunction(function);
@@ -542,6 +550,99 @@ SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global) {
 }
 
 //===----------------------------------------------------------------------===//
+//                            SILVTable
+//===----------------------------------------------------------------------===//
+
+static_assert(BridgedVTableEntrySize == sizeof(SILVTableEntry),
+              "wrong bridged VTableEntry size");
+
+std::string SILVTable_debugDescription(BridgedVTable vTable) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToVTable(vTable)->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+BridgedArrayRef SILVTable_getEntries(BridgedVTable vTable) {
+  auto entries = castToVTable(vTable)->getEntries();
+  return {(const unsigned char *)entries.data(), entries.size()};
+}
+
+std::string SILVTableEntry_debugDescription(BridgedVTableEntry entry) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToVTableEntry(entry)->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+BridgedFunction SILVTableEntry_getFunction(BridgedVTableEntry entry) {
+  return {castToVTableEntry(entry)->getImplementation()};
+}
+
+//===----------------------------------------------------------------------===//
+//                    SILVWitnessTable, SILDefaultWitnessTable
+//===----------------------------------------------------------------------===//
+
+static_assert(BridgedWitnessTableEntrySize == sizeof(SILWitnessTable::Entry),
+              "wrong bridged WitnessTable entry size");
+
+std::string SILWitnessTable_debugDescription(BridgedWitnessTable table) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToWitnessTable(table)->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+BridgedArrayRef SILWitnessTable_getEntries(BridgedWitnessTable table) {
+  auto entries = castToWitnessTable(table)->getEntries();
+  return {(const unsigned char *)entries.data(), entries.size()};
+}
+
+std::string SILDefaultWitnessTable_debugDescription(BridgedDefaultWitnessTable table) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToDefaultWitnessTable(table)->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+BridgedArrayRef SILDefaultWitnessTable_getEntries(BridgedDefaultWitnessTable table) {
+  auto entries = castToDefaultWitnessTable(table)->getEntries();
+  return {(const unsigned char *)entries.data(), entries.size()};
+}
+
+std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToWitnessTableEntry(entry)->print(os, /*verbose=*/ false,
+                                        PrintOptions::printSIL());
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
+SILWitnessTableEntryKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry) {
+  switch (castToWitnessTableEntry(entry)->getKind()) {
+    case SILWitnessTable::Method:
+      return SILWitnessTableEntry_Method;
+    case SILWitnessTable::AssociatedType:
+      return SILWitnessTableEntry_AssociatedType;
+    case SILWitnessTable::AssociatedTypeProtocol:
+      return SILWitnessTableEntry_AssociatedTypeProtocol;
+    case SILWitnessTable::BaseProtocol:
+      return SILWitnessTableEntry_BaseProtocol;
+    default:
+      llvm_unreachable("wrong witness table entry kind");
+  }
+}
+
+OptionalBridgedFunction SILWitnessTableEntry_getMethodFunction(BridgedWitnessTableEntry entry) {
+  return {castToWitnessTableEntry(entry)->getMethodWitness().Witness};
+}
+
+//===----------------------------------------------------------------------===//
 //                               SILInstruction
 //===----------------------------------------------------------------------===//
 
@@ -629,8 +730,8 @@ BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst) {
   return {castToInst<GlobalAccessInst>(globalInst)->getReferencedGlobal()};
 }
 
-BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri) {
-  return {castToInst<FunctionRefInst>(fri)->getReferencedFunction()};
+BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri) {
+  return {castToInst<FunctionRefBaseInst>(fri)->getInitiallyReferencedFunction()};
 }
 
 llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli) {
@@ -776,6 +877,21 @@ SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr) {
   return castToInst<CondBranchInst>(cbr)->getNumTrueArgs();
 }
 
+SwiftInt KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
+                                            KeyPathFunctionResults * _Nonnull results) {
+  KeyPathPattern *pattern = castToInst<KeyPathInst>(kpi)->getPattern();
+  const KeyPathPatternComponent &comp = pattern->getComponents()[componentIdx];
+  results->numFunctions = 0;
+
+  comp.visitReferencedFunctionsAndMethods([results](SILFunction *func) {
+      assert(results->numFunctions < KeyPathFunctionResults::maxFunctions);
+      results->functions[results->numFunctions++] = {func};
+    }, [](SILDeclRef) {});
+
+  ++componentIdx;
+  return componentIdx < (int)pattern->getComponents().size() ? componentIdx : -1;
+}
+
 BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst) {
   auto as = ApplySite(castToInst(inst));
   return {as.getSubstitutionMap().getOpaqueValue()};
@@ -844,6 +960,23 @@ BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder b,
                                        getSILType(type), value)};
 }
 
+BridgedInstruction SILBuilder_createAllocStack(BridgedBuilder b,
+          BridgedType type, SwiftInt hasDynamicLifetime, SwiftInt isLexical,
+          SwiftInt wasMoved) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createAllocStack(getRegularLocation(b.loc), getSILType(type),
+            None, hasDynamicLifetime != 0, isLexical != 0, wasMoved != 0)};
+}
+
+BridgedInstruction SILBuilder_createDeallocStack(BridgedBuilder b,
+          BridgedValue operand) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createDeallocStack(getRegularLocation(b.loc),
+                                     castToSILValue(operand))};
+}
+
 BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder b,
           BridgedValue operand) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
@@ -887,6 +1020,16 @@ BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder b,
                      getSILDebugScope(b.loc));
   return {builder.createCopyValue(getRegularLocation(b.loc),
                                   castToSILValue(op))};
+}
+
+BridgedInstruction SILBuilder_createCopyAddr(BridgedBuilder b,
+          BridgedValue from, BridgedValue to,
+          SwiftInt takeSource, SwiftInt initializeDest) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     getSILDebugScope(b.loc));
+  return {builder.createCopyAddr(getRegularLocation(b.loc), castToSILValue(from),
+            castToSILValue(to), IsTake_t(takeSource != 0),
+                                IsInitialization_t(initializeDest != 0))};
 }
 
 BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder b,

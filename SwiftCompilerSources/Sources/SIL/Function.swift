@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-final public class Function : CustomStringConvertible, HasShortDescription {
+final public class Function : CustomStringConvertible, HasShortDescription, Hashable {
   public private(set) var effects = FunctionEffects()
 
   public var name: StringRef {
@@ -27,6 +27,10 @@ final public class Function : CustomStringConvertible, HasShortDescription {
 
   public var shortDescription: String { name.string }
 
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
+
   public var hasOwnership: Bool { SILFunction_hasOwnership(bridged) != 0 }
 
   public var entryBlock: BasicBlock {
@@ -39,6 +43,11 @@ final public class Function : CustomStringConvertible, HasShortDescription {
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
     entryBlock.arguments.lazy.map { $0 as! FunctionArgument }
+  }
+
+  /// All instructions of all blocks.
+  public var instructions: LazySequence<FlattenSequence<LazyMapSequence<List<BasicBlock>, List<Instruction>>>> {
+    blocks.lazy.flatMap { $0.instructions }
   }
 
   public var numIndirectResultArguments: Int {
@@ -63,6 +72,22 @@ final public class Function : CustomStringConvertible, HasShortDescription {
       if let retInst = block.terminator as? ReturnInst { return retInst }
     }
     return nil
+  }
+
+  /// True, if the linkage of the function indicates that it is visible outside the current
+  /// compilation unit and therefore not all of its uses are known.
+  ///
+  /// For example, `public` linkage.
+  public var isPossiblyUsedExternally: Bool {
+    return SILFunction_isPossiblyUsedExternally(bridged) != 0
+  }
+
+  /// True, if the linkage of the function indicates that it has a definition outside the
+  /// current compilation unit.
+  ///
+  /// For example, `public_external` linkage.
+  public var isAvailableExternally: Bool {
+    return SILFunction_isAvailableExternally(bridged) != 0
   }
 
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {

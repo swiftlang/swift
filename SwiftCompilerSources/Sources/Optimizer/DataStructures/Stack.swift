@@ -26,7 +26,7 @@ import SIL
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct Stack<Element> : CollectionLikeSequence {
 
-  private let context: PassContext
+  private let bridgedContext: BridgedPassContext
   private var firstSlab = BridgedSlab(data: nil)
   private var lastSlab = BridgedSlab(data: nil)
   private var endIndex: Int = 0
@@ -61,7 +61,8 @@ struct Stack<Element> : CollectionLikeSequence {
     }
   }
   
-  init(_ context: PassContext) { self.context = context }
+  init(_ context: PassContext) { self.bridgedContext = context._bridged }
+  init(_ context: ModulePassContext) { self.bridgedContext = context._bridged }
 
   func makeIterator() -> Iterator {
     return Iterator(slab: firstSlab, index: 0, lastSlab: lastSlab, endIndex: endIndex)
@@ -77,11 +78,11 @@ struct Stack<Element> : CollectionLikeSequence {
 
   mutating func push(_ element: Element) {
     if endIndex >= Stack.slabCapacity {
-      lastSlab = PassContext_allocSlab(context._bridged, lastSlab)
+      lastSlab = PassContext_allocSlab(bridgedContext, lastSlab)
       endIndex = 0
     } else if firstSlab.data == nil {
       assert(endIndex == 0)
-      firstSlab = PassContext_allocSlab(context._bridged, lastSlab)
+      firstSlab = PassContext_allocSlab(bridgedContext, lastSlab)
       lastSlab = firstSlab
     }
     (Stack.bind(lastSlab) + endIndex).initialize(to: element)
@@ -109,12 +110,12 @@ struct Stack<Element> : CollectionLikeSequence {
     
     if endIndex == 0 {
       if lastSlab.data == firstSlab.data {
-        _ = PassContext_freeSlab(context._bridged, lastSlab)
+        _ = PassContext_freeSlab(bridgedContext, lastSlab)
         firstSlab.data = nil
         lastSlab.data = nil
         endIndex = 0
       } else {
-        lastSlab = PassContext_freeSlab(context._bridged, lastSlab)
+        lastSlab = PassContext_freeSlab(bridgedContext, lastSlab)
         endIndex = Stack.slabCapacity
       }
     }
