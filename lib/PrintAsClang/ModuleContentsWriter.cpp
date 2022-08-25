@@ -281,6 +281,10 @@ public:
       forwardDeclare(ED);
     } else if (isa<AbstractTypeParamDecl>(TD)) {
       llvm_unreachable("should not see type params here");
+    } else if (isa<StructDecl>(TD) &&
+               TD->getModuleContext()->isStdlibModule()) {
+      // stdlib has some @_cdecl functions with structs.
+      return;
     } else {
       assert(false && "unknown local type decl");
     }
