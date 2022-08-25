@@ -1059,3 +1059,28 @@ suite.test("String.replaceSubrange index validation")
     }
   }
 }
+
+suite.test("Substring.removeSubrange entire range") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // This is a regression found in 5.7+
+    return
+  }
+
+  var a: Substring = "abcdef"
+  let aStart = a.startIndex
+  let aEnd = a.endIndex
+
+  a.removeSubrange(aStart ..< aEnd)
+
+  expectTrue(a.isEmpty)
+
+#if _runtime(_ObjC)
+  var b: Substring = ("å∫ç∂éƒ" as NSString) as Substring
+  let bStart = b.startIndex
+  let bEnd = b.endIndex
+
+  b.removeSubrange(bStart ..< bEnd)
+
+  expectTrue(b.isEmpty)
+#endif
+}
