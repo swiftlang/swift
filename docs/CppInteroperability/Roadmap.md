@@ -21,48 +21,52 @@
 
 “Reverse” interoperability (using Swift APIs from C++) is another extremely important part of the interoperability story, however, reverse interoperability has largely different goals and constraints, which necessarily mean a different design and roadmap. Alex Lorenz will be putting together a roadmap for reverse interoperability which outlines these goals and will shed light onto the differences between the two halves of the projects. In the future this roadmap will need to be updated to explain how these two halves fit together and present the “bi-directional” interoperability story that is C++ and Swift interoperability as a whole. 
 
-**C++, as a language:** C++ is an stubbornly un-opinionated language. There is little to no consensus on anything from naming, to generic programming, value categories, or error handling (to name a few things). This lack of opinion is in sharp contrast to Swift where there is generally one, specific way to do things. Even in the C++ Standard Library there is a rather un-standard set of API models. The un-opinionated nature of C++ means there are few, if any guarantees about a given C++ API, because the same functionality may be implemented using many different language features or programming paradigms. When consuming an arbitrary C++ API, you must be prepared for *anything*. When consuming Swift APIs, this is not the case. Swift is an opinionated language which means rather than consuming *any* API pattern you are consuming *some*, specific API pattern. Swift clearly defines patterns for naming, generic programming, value categories, error handling, etc. and it is rare that a codebase deviates from the standard practice. 
-
-**C and Objective-C interoperability:** C++ interoperability will have to build off of the previous art of C and Objective-C interoperability. Starting with the name, C++ is a superset of C, which means C++ interoperability has a great starting place to build off of. C is a simple language without many high level constructs, so importing C APIs is, relatively, simple. On the other hand, Objective-C adds some high level constructs, such as reference types and a generics model. However, unlike C++, Objective-C has strong idioms; there are only so many patterns for doing some specific thing. Further, Objective-C was able to be updated to better interoperate with Swift, the generics model is a good example of this. So, while C and Objective-C interoperability is a good starting place, the model for importing these languages cannot be taken wholesale for C++ interoperability. 
+**C and Objective-C interoperability:** C++ interoperability will have to build off of the previous art of C and Objective-C interoperability, not only to preserve existing Swift codebases and provide a incremental story, but also to reduce unnecessary cognitivie burdon on developers. Starting with the name, C++ inherits much of C, which means C++ interoperability has a great starting place to build off of. C is a simple language without many high level constructs, so importing C APIs is, relatively, simple. On the other hand, Objective-C adds some high level constructs, such as reference types and a generics model. However, unlike C++, Objective-C has strong idioms; there are only so many patterns for doing some specific thing. So, while C and Objective-C interoperability is a good starting place, the model for importing these languages cannot be taken wholesale for C++ interoperability. 
 
 ## Goals
 
-Safety is a top priority. The compiler should not import APIs that would be less safe in Swift than they are in C++ and interop should strive to make imported APIs *safer* in Swift than they are in C++ by providing safe API interfaces for common, unsafe C++ API patterns (such as iterators).
+Safety is a top priority for the Swift programming language. Therefore, the Swift compiler should not import APIs that will likely be less safe in Swift than they are in C++ and interop should strive to make imported APIs *safer* in Swift than they are in C++ by providing safe API interfaces for common, unsafe C++ API patterns (such as iterators). This means that, while some common C++ APIs will be exposed through a safer interface in Swift, most C++ APIs will be imported with the same level of unsafety as they have in C++. 
 
-C++ interoperability aims to provide a clear, well-defined mapping for APIs that can be imported, and to draw a clear boundary between these APIs and APIs that cannot be imported. A user should be able to read the C++ interoperability documentation and have a good idea of both how much of their C++ API will be able to be imported in Swift and what that API will look like once it is imported. 
+In a similar vein, the Swift programming language strives to be fast. C++ interoperability should follow suite, making it a goal not to have hidden performance traps. C++ APIs should have similar performance in Swift as C++ and should be called directly when possible.
 
-It is a goal not to have hidden performance traps. C++ APIs should have similar performance in Swift as C++ and should be called directly when possible. Imported APIs, especially containers, should not be implicitly converted to Swift types (in contrast to the automatic Objective-C bridging for NSArray and NSString). 
+C++ is an un-opinionated language. There is little to no consensus on anything from naming, to generic programming, value categories, or error handling (to name a few things). This lack of opinion is in sharp contrast to Swift where there is generally one, specific way to do things. Even in the C++ Standard Library there is a rather un-standard set of API models. The un-opinionated nature of C++ means there are few, if any guarantees about a given C++ API, because the same functionality may be implemented using many different language features or programming paradigms. When consuming an arbitrary C++ API, you must be prepared for *anything*. Types with reference semantics (referred to as “reference types” in this document) are one example of this. Taking the reference type from our examples section:
 
-It is a goal to preserve the semantics (including performance semantics) that an API was written with by understanding the API’s semantics and mapping it to a Swift idiom that represents the same thing. 
+```
+// StatefulObject has object identity and reference semantcs: 
+// it should be constructed with "create" and used via a pointer.
+struct StatefulObject {
+  StatefulObject(const StatefulObject&) = delete;
+  StatefulObject() = delete;
 
-Swift programmers have used C++ APIs since Swift 1.0 through an Objective-C or C bridging layer. It is important that programmers are able to *incrementally* remove these (potentially huge) bridging layers and start using their C++ APIs directly. To make this transition incremental, C++ interoperability must not change the way Swift imports any existing C or Objective-C APIs, even when C++ interoperability is enabled. 
+  StatefulObject *create() { return new StatefulObject(); }
+};
+```
 
-It is *not* a goal to import every C++ API into Swift. APIs that are imported by Swift should feel Swifty and idiomatic. There must be an easy way to add annotations so that APIs become importable, especially when updating APIs directly is not an option (because the source code is not available). 
+This type has specific reference semantics (described in the comment). The copy constructor is deleted, preventing some mis-use, but the semantics are largely not communicated. The C++ programmer is responsible for reading the comment to know how to use the type correctly; there is no concrete attribute that specifies `StatefulObject` should be used as a reference type. 
+
+In Swift, reference types have their own language construct (`class`es). Swift clearly defines patterns for naming, generic programming, value categories, error handling, etc. and it is rare that a codebase deviates from the standard practice. Idiomatic, expressive Swift code uses these well-defined programming patterns, so, to align with the goals of the Swift programming language, and allow consumers of C++ APIs to have a similar experience, the Swift compiler should map C++ APIs to one of these specific patterns (editorial: re-word this crazy sentence to make it more clear/concise). To be able to map *any* C++ APIs to *some* specific Swift pattern, the Swift compiler must have some semantic information about the API. This semantic information may be provided through annotations or heuristics in the compiler. In the above example, the user should annotate `StatefulObject` as a reference type so that the Swift compiler can import it as a Swift `class`. 
+
+To be able to follow the “Swift API model,” that is to have expressive APIs with strong idioms, the following goals are nessisary:
+
+* C++ interoperability aims to provide a clear, well-defined mapping for APIs that can be imported, and to draw a clear boundary between these APIs and APIs that cannot be imported. A user should be able to read the C++ interoperability documentation and have a good idea of both how much of their C++ API will be able to be imported in Swift and what that API will look like once it is imported. 
+* It is a goal to preserve the semantics (including performance semantics) that an API was written with by using information provided by the user to understand an API's semantics and mapping those semantics to a Swift idiom that represents the same thing.
+* It is *not* a goal to import every C++ API into Swift. APIs that are imported by Swift should feel Swifty and idiomatic. There must be an easy way to add annotations so that APIs become importable, especially when updating APIs directly is not an option (because the source code is not available). 
+
+
+Finally, Swift programmers have used C++ APIs since Swift 1.0 through an Objective-C or C bridging layer. It is important that programmers are able to *incrementally* remove these (potentially huge) bridging layers and start using their C++ APIs directly. To make this transition incremental, C++ interoperability must not change the way Swift imports any existing C or Objective-C APIs, even when C++ interoperability is enabled. 
+
 
 ## The approach
 
-The approach for importing C++ APIs into Swift is derived from the fact that both our goals, and C++ as a language, necessitate that not all APIs are imported, and to import an API the user must provide semantic information in some cases. Further, in order to realize our goals (especially the goals of safety and clear, well defined mappings), it is impossible to import any arbitrary C++ API. APIs that are imported by Swift must fall into one of our understood categories or be annotated with semantic information that can be used to classify them into a Swift idiom. 
+The approach for importing C++ APIs into Swift is derived from the fact that both our goals, necessitate that not all APIs are imported automatically; to import an API the user must provide semantic information in some cases. Further, in order to realize our goals (especially the goals of safety and clear, well defined mappings), it is impossible to import any arbitrary C++ API. APIs that are imported by Swift must fall into one of our understood categories or be annotated with semantic information that can be used to classify them into a Swift idiom. 
 
 In this section, the roadmap will discuss several of the most common C++ API patterns and how they might be imported by the Swift compiler using the goals outlined above.
-
-### Definitions
-
-**Reference types** have reference semantics and object identity. A reference type is a pointer (or “reference”) to some object which means there is a layer of indirection. When a reference type is copied, the pointer’s value is copied rather than the object’s storage. This means reference types can be used to represent non-copyable types in C++.
-
-**Owned types** “own” some storage which can be copied and destroyed. An owned type must be copyable and destructible. The copy constructor must copy any storage that is owned by the type and the destructor must destroy that storage. Copies and destroys must balance out and these operations must not have side effects. Examples of owned types include `std::vector` and `std::string`. 
-
-**An iterator** represents a point in a range. Iterator types must provide a comparison operator and increment operator. Iterators can be returned by `begin` and `end` methods to form a range.
-
-**Trivial types** can be copied by copying the bits of a value of the trivial type and do not need any special destruction logic. Trivial types own their storage.
-
-**Projections** are references to storage. Projections of owned types are usually unsafe. Most iterators are projections. 
-
 
 ### Reference types
 
 Swift types fall into two categories: value types and reference types. The same is true for Objective-C types, which makes importing types easy: structs are imported as value types and Objective-C classes are imported as Swift class types. The same is not true for C++. In typical C++ fashion, there is no clear idiom for defining reference types. All types in C++ are declared in the same way, but some types have reference semantics and others don’t. To be able to express reference types in Swift natively, users must annotate their reference types as such, which will tell the compiler to import them as Swift classes (which have the same semantics). 
 
-When importing a reference type, there are three main sub-categories that reference type can fall into: 1) **immortal** reference types are “intentionally leaked” and live for the duration of the program 2) **manually managed** reference types are constructed and destroyed manually by the programmer, these are unsafe reference types and should maybe be renamed accordingly 3) **automatically managed** reference types provide retain and release operations which are used to safely destroy a value of the type after its last use. 
+When importing a reference type, there are three main sub-categories that reference type can fall into: 1) **immortal** reference types are “intentionally leaked” and live for the duration of the program 2) **manually managed** reference types are constructed and destroyed manually by the programmer, these are unsafe reference types and should maybe be renamed accordingly 3) **automatically managed** reference types provide retain and release operations which are used to safely destroy a value of the type after its last use. [(Examples below.)](## Examples and Definitions)
 
 Reference types, their instances, methods on reference types, and other APIs that use reference types generally fit well into the existing Swift model and their use should be allowed without restriction. While it is possible to define unsafe APIs that use reference types, these APIs will not be any less safe than their Swift or C++ counterpart, so there is no reason to dis-allow them. Note: the only case where C++ APIs using reference types must be dis-allowed is when there is not one level of indirection provided (either a reference or pointer). In this case, the C++ API is not using the type as a reference types, and thus breaks the reference type definition (above).
 
@@ -99,7 +103,22 @@ Here, because Swift inserts a copy before the call to begin, v projects a dangli
 
 To make these APIs safe and usable, Swift cannot import unsafe projections of types that own memory, because they don’t fit the Swift model. Instead, the Swift compiler can try to infer what, semantically, the API is trying to do, or the library author can provide this information via annotations. In this case, the Swift compiler can infer that begin returns an iterator, which Swift can represent through the existing, safe Swift iterator interface. In the future, Swift may gain the necessary ownership features to import and use projections of types that own memory in a safe way, but today, this is not possible, and importing these projections would result in a *less safe* API in Swift than in C++ (violating the first goal above). Other than methods which project owned memory, owned types, their instances, methods on owned types, and other APIs that use owned types are generally considered to be safe and usable.
 
-Note: in the example above, “start” is a pointer type. The use of this pointer in the “begin” API is unsafe, but the type of start itself is not unsafe. In other words, safety restrictions need not be applied to pointer types themselves but rather their unsafe uses. 
+Note: in the example above, “start” is a pointer type. The use of this pointer in the “begin” API is unsafe, but the type of start itself is not unsafe. In other words, safety restrictions need not be applied to pointer types themselves but rather their unsafe uses.
+
+Editorial note: the following three paragraphs have a lot of overlap with the above section and should be folded together somehow. 
+
+C++ often projects the storage of owned types. C++ is able to tie the lifetime of the projection to the source using lexcal scopes. Because there is a well-defined, lexical point in which objects are destroyed, C++ users can reason about projection’s lifetimes. While these safety properties are less formal than Swift, they are safety properties none-the-less, and they are a model that works in C++. 
+
+This model cannot be adopted in Swift, however, because the the same lexical lifetime model does not exist. Further, projections of owned types are completely foreign concept in Swift, meaning users aren’t used to programming in terms of this model, and may not be aware of the added (implicit) constraints (that is, when objects are destroyed). Swift’s language model is such that returning projections from a copied value, even in smaller lexical scope, should be safe. In order to allow projections of owned types, this assumption must be broken, or C++ interoperability must take advantage of Swift ownership features to associate the lifetime of the projection to the source. 
+
+The following example highlights the case described above:
+
+```
+func getCString(str: std.string) -> UnsafePointer<CChar> { str.c_str() }
+```
+
+The above function returns a dangling reference to `str`‘s inner storage. In C++, it is assumed that the programmer understands this is a bug, and generally would be expected to take `str` by reference. This is not the case in Swift. To represent this idiomatically in Swift, the lifetimes must be associated through a projection. Using the tools provided in the ownership manifesto this would mean yielding the value returned by `c_str` out of a [generalized accessor](https://github.com/apple/swift/blob/main/docs/OwnershipManifesto.md#generalized-accessors)(resulting in an error when the pointer is returned). 
+ 
 
 ### Iterators
 
@@ -130,12 +149,119 @@ This roadmap outlines a strategy for importing APIs that relies on semantic info
 Egor Zhdan will discuss importing the standard library, the Swift C++ standard library overlay, etc. :)
 * * *
 
-## Thoughts not incorporated into the above document:
+## Examples and Definitions
 
-* Maybe discuss drawing lines for other things. The patterns you cover talk about memory ownership specifically. What about virtual inheritance? What about templates? What about mutexes and file opens?
-* Safety: It is convention in C and Objective-C to traffic in pointers. In Swift this is written as “unsafe” meaning the unsafety is clearly disclosed. C++ often prefers value types and “fancy pointers” which do not disclosure their unsafety in their name.
-* Safety: because C++‘s un-oppionated APIs are funneled into Swift, they are generally forced through unsafe pointer which loses information. This loss of semantic information leads to mis-use, if more information was captured it would be more difficult, or even impossible, to make such mistakes. 
-* Safety: the subtly different paradims for automatic lifetime management in Swift and C++ mean there is added unsafety to a language like c where lifetime is manually managed, or a language like objc where the lifetime matches swift’s paradims. 
-* Memory safety: lifetimes, reference counting, type safety: importing types as “Any” or “OpaquePointer” is not type safe. Also: use after free, bound checking, null pointer, etc. 
-* Reference types: added safety via two levels of indirection (assert that reference count is zero on deallocation). 
+*Reference Types* 
 
+Reference types have reference semantics and object identity. A reference type is a pointer (or “reference”) to some object which means there is a layer of indirection. When a reference type is copied, the pointer’s value is copied rather than the object’s storage. This means reference types can be used to represent non-copyable types in C++.
+
+*Manually Managed Reference Types*
+
+Here a programmer has written a very large `StatefulObject` which contains many fields:
+
+```
+struct StatefulObject {
+  std::array<std::string, 32> names;
+  std::array<std::string, 32> places;
+  // ...
+  
+  StatefulObject(const StatefulObject&) = delete;
+  StatefulObject() = delete;
+
+  StatefulObject *create() { return new StatefulObject(); }
+};
+```
+
+
+Because this object is so expensive to copy, the programmer decided to delete the copy constructor. The programmer also decided that this object should be allocated on the heap, so they decided to delete the default constructor, and provide a create method in its place. 
+
+In Swift, this `StatefulObject` should be imported as a reference type, as it has reference semantics.
+
+*API Incorrectly Using Reference Types*
+
+Here someone has written an API that uses `StatefulObject` as a value type.
+
+```
+StatefulObject makeAppState();
+```
+
+This will invoke a copy of `StatefulObject` which violates the semantics that the API was written with. To be useable from Swift, this API needs to be updated to pass the object indirectly (by reference):
+
+```
+StatefulObject *makeAppState(); // OK
+const StatefulObject *makeAppState(); // OK
+StatefulObject &makeAppState(); // OK
+const StatefulObject &makeAppState(); // OK
+```
+
+*Immortal Reference Types*
+
+Instances of StatefulObject above are manually managed by the programmer, they create it with the create method and are responsible for destroying it once it is no longer needed. However, some reference types need to exist for the duration of the program, these references types are known as “immortal.” Examples of these immortal reference types might be pool allocators or app contexts. Let’s look at a GameContext object which allocates (and owns) various game elements:
+
+```
+struct GameContext {
+  // ...
+  
+  GameContext(const GameContext&) = delete;
+
+  Player *createPlayer();
+  Scene  *createScene();
+  Camera *createCamera();
+};
+```
+
+Here the GameContext is meant to last for the entire game as a global allocator/state. Because the context will never be deallocated, it is known as an “immortal reference type” and the Swift compiler can make certain assumptions about it. 
+
+*Automatically Managed Reference Types*
+
+While the `GameContext` will live for the duration of the program, individual `GameObject` should be released once they’re done being used. One such object is Player:
+
+```
+struct GameObject {
+  int referenceCount;
+  
+  GameObject(const GameObject&) = delete;
+};
+
+void gameObjectRetain(GameObject *obj);
+void gameObjectRelease(GameObject *obj);
+
+struct Player : GameObject {
+  // ...
+};
+```
+
+Here Player uses the `gameObjectRetain` and `gameObjectRelease` function to manually manage its reference count in C++. Once the `referenceCount` hits `0`, the Player will be destroyed. Manually managing the reference count is prone to errors, as programmers may forget to retain or release the object. Fortunately, this kind of reference counting is something that Swift is very good at. To enable automatic reference counting, the user can specify the retain and release operations via attributes directly on the `GameObject`. This means the programmer no longer needs to manually call `gameObjectRetain` and `gameObjectRelease`; Swift will do this for them. They will also benefit from the suite of ARC optimizations that Swift has built up over the years. 
+
+*Owned types*
+
+Owned types “own” some storage which can be copied and destroyed. An owned type must be copyable and destructible. The copy constructor must copy any storage that is owned by the type and the destructor must destroy that storage. Copies and destroys must balance out and these operations must not have side effects. Examples of owned types include `std::vector` and `std::string`.
+
+*Trivial types*
+
+Trivial types are a subset of owned types. They can be copied by copying the bits of a value of the trivial type and do not need any special destruction logic. Examples of trivial types are `std::array` and `std::pair<int, int>`. 
+
+*Pointer Types*
+
+Pointer types are trivial types that hold pointers or references to some un-owned storage (storage that is not destroyed when the object is destroyed). Pointer types are not a subset of trivial types or owned types. Examples of pointer types include `std::string_view` and `std::span` and raw pointer types such as `int *` or `void *`.
+
+*Projections*
+
+Projections are values rather than types. An example of a method which yields a projection is the `c_str` method on `std::string`.
+
+```
+struct string { // String is an owned type.
+  char *storage;
+  size_t size;
+  
+  char *c_str() { return storage; } // Projects internal storage
+```
+
+Iterators are also projections:
+
+```
+  char *begin() { return storage; } // Projects internal storage
+  char *end() { return storage + size; } // Projects internal storage
+```
+
+Because `string` is an owned type, the Swift compiler cannot represent a projection of its storage, so the `begin`, `end`, and `c_str` APIs are not imported.
