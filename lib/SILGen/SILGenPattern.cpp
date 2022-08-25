@@ -2814,7 +2814,6 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emission.emitAddressOnlyAllocations();
 
   SILBasicBlock *contBB = createBasicBlock();
-  emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
   LexicalScope switchScope(*this, CleanupLocation(S));

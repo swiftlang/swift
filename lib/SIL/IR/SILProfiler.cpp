@@ -259,8 +259,6 @@ struct MapRegionCounters : public ASTWalker {
       mapRegion(RWS->getBody());
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       mapRegion(FES->getBody());
-    } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
-      mapRegion(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
       mapRegion(getProfilerStmtForCase(CS));
     }
@@ -647,8 +645,6 @@ struct PGOMapping : public ASTWalker {
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       setKnownExecutionCount(FES->getBody());
       setExecutionCount(FES, parentCount);
-    } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
-      setKnownExecutionCount(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
       setKnownExecutionCount(getProfilerStmtForCase(CS));
     }
@@ -695,6 +691,9 @@ struct PGOMapping : public ASTWalker {
   }
 };
 
+/// Produce coverage mapping information for a function. This involves taking
+/// the counters computed by MapRegionCounters, and annotating the source with
+/// regions that are defined in terms of those counters.
 struct CoverageMapping : public ASTWalker {
 private:
   const SourceManager &SM;
@@ -820,17 +819,7 @@ private:
     if (ControlFlowAdjust)
       Count = &createCounter(CounterExpr::Sub(*Count, *ControlFlowAdjust));
 
-    if (Count->isSemanticallyZero()) {
-      // If the counter is semantically zero, form an 'incomplete' region with
-      // no starting location. This prevents forming unreachable regions unless
-      // there is a following statement or expression to extend the region.
-      RegionStack.emplace_back(ASTNode(), *Count, None, None);
-    } else {
-      // Otherwise, we have a non-zero counter, so form a new region starting
-      // at the end of the previous scope. This ensures the user covers both
-      // branches of a condition.
-      RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
-    }
+    replaceCount(Count, getEndLoc(Scope));
   }
 
   /// Push a region covering \c Node onto the stack.
@@ -844,10 +833,24 @@ private:
     });
   }
 
-  /// Replace the current region's count by pushing an incomplete region.
-  void replaceCount(CounterExpr &&Expr, Optional<SourceLoc> Start = None) {
-    CounterExpr &Counter = createCounter(std::move(Expr));
-    RegionStack.emplace_back(ASTNode(), Counter, Start, None);
+  /// Replace the current region at \p Start with a new counter. If \p Start is
+  /// \c None, or the counter is semantically zero, an 'incomplete' region is
+  /// formed, which is not recorded unless followed by additional AST nodes.
+  void replaceCount(CounterExpr *Counter, Optional<SourceLoc> Start) {
+    // If the counter is semantically zero, form an 'incomplete' region with
+    // no starting location. This prevents forming unreachable regions unless
+    // there is a following statement or expression to extend the region.
+    if (Start && Counter->isSemanticallyZero())
+      Start = None;
+
+    RegionStack.emplace_back(ASTNode(), *Counter, Start, None);
+  }
+
+  /// Replace the current region at \p Start with a new counter. If \p Start is
+  /// \c None, or the counter is semantically zero, an 'incomplete' region is
+  /// formed, which is not recorded unless followed by additional AST nodes.
+  void replaceCount(CounterExpr &&Expr, Optional<SourceLoc> Start) {
+    replaceCount(&createCounter(std::move(Expr)), Start);
   }
 
   /// Get the location for the end of the last token in \c Node.
@@ -909,7 +912,7 @@ private:
     SourceMappingRegion &Region = getRegion();
     if (!Region.hasEndLoc())
       Region.setEndLoc(getEndLoc(S));
-    replaceCount(CounterExpr::Zero());
+    replaceCount(CounterExpr::Zero(), /*Start*/ None);
   }
 
   Expr *getConditionNode(StmtCondition SC) {
@@ -976,6 +979,8 @@ public:
     if (S->isImplicit() && S != ImplicitTopLevelBody)
       return {true, S};
 
+    // If we're in an 'incomplete' region, update it to include this node. This
+    // ensures we only create the region if needed.
     if (!RegionStack.empty())
       extendRegion(S);
 
@@ -986,7 +991,13 @@ public:
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
       if (auto *Cond = getConditionNode(IS->getCond()))
         assignCounter(Cond, CounterExpr::Ref(getCurrentCounter()));
+
+      // The counter for the if statement itself tracks the number of jumps to
+      // it by break statements.
       assignCounter(IS, CounterExpr::Zero());
+
+      // We emit a counter for the then block, and define the else block in
+      // terms of it.
       CounterExpr &ThenCounter = assignCounter(IS->getThenStmt());
       if (IS->getElseStmt())
         assignCounter(IS->getElseStmt(),
@@ -996,23 +1007,38 @@ public:
       assignCounter(GS->getBody());
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
+      // The counter for the while statement itself tracks the number of jumps
+      // to it by break and continue statements.
       assignCounter(WS, CounterExpr::Zero());
+
       if (auto *E = getConditionNode(WS->getCond()))
         assignCounter(E, CounterExpr::Ref(getCurrentCounter()));
       assignCounter(WS->getBody());
 
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+      // The counter for the while statement itself tracks the number of jumps
+      // to it by break and continue statements.
       assignCounter(RWS, CounterExpr::Zero());
+
       CounterExpr &BodyCounter = assignCounter(RWS->getBody());
       assignCounter(RWS->getCond(), CounterExpr::Ref(BodyCounter));
       RepeatWhileStack.push_back(RWS);
 
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
+      // The counter for the for statement itself tracks the number of jumps
+      // to it by break and continue statements.
       assignCounter(FES, CounterExpr::Zero());
       assignCounter(FES->getBody());
 
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
-      assignCounter(SS);
+      // The counter for the switch statement itself tracks the number of jumps
+      // to it by break statements, including the implicit breaks at the end of
+      // cases.
+      assignCounter(SS, CounterExpr::Zero());
+
+      assignCounter(SS->getSubjectExpr(),
+                    CounterExpr::Ref(getCurrentCounter()));
+
       // Assign counters for cases so they're available for fallthrough.
       for (CaseStmt *Case : SS->getCases())
         assignCounter(Case);
@@ -1021,7 +1047,10 @@ public:
       if (caseStmt->getParentKind() == CaseParentKind::Switch)
         pushRegion(S);
     } else if (auto *DS = dyn_cast<DoStmt>(S)) {
+      // The counter for the do statement itself tracks the number of jumps
+      // to it by break statements.
       assignCounter(DS, CounterExpr::Zero());
+
       assignCounter(DS->getBody(), CounterExpr::Ref(getCurrentCounter()));
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
@@ -1075,7 +1104,8 @@ public:
       Stmt *BreakTarget = BS->getTarget();
       if (auto *RWS = dyn_cast<RepeatWhileStmt>(BreakTarget)) {
         subtractFromCounter(RWS->getCond(), getCurrentCounter());
-      } else if (!isa<SwitchStmt>(BreakTarget)) {
+      } else {
+        // Update the exit counter for the target.
         addToCounter(BS->getTarget(), getCurrentCounter());
       }
 
@@ -1093,9 +1123,12 @@ public:
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
 
     } else if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
-      if (caseStmt->getParentKind() == CaseParentKind::Switch)
+      if (caseStmt->getParentKind() == CaseParentKind::Switch) {
+        // The end of a case block is an implicit break, update the exit
+        // counter to reflect this.
+        addToCounter(caseStmt->getParentStmt(), getCurrentCounter());
         popRegions(S);
-
+      }
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       assert(DoCatchStack.back() == DCS && "Malformed do-catch stack");
       DoCatchStack.pop_back();
@@ -1125,6 +1158,8 @@ public:
     if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
       return {false, E};
 
+    // If we're in an 'incomplete' region, update it to include this node. This
+    // ensures we only create the region if needed.
     if (!RegionStack.empty())
       extendRegion(E);
 
