@@ -17,6 +17,7 @@
 /// protocol and should not generally be used directly.
 ///
 /// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator
+@available(SwiftStdlib 5.8, *)
 public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   associatedtype Distance: BinaryInteger
 
@@ -24,10 +25,13 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   static func +=(lhs: inout Self, rhs: Distance)
 }
 
+@available(SwiftStdlib 5.8, *)
 extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
 
+@available(SwiftStdlib 5.8, *)
 extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
 
+@available(SwiftStdlib 5.8, *)
 public protocol CxxRandomAccessCollection: CxxSequence, RandomAccessCollection {
   override associatedtype RawIterator: UnsafeCxxRandomAccessIterator
   override associatedtype Iterator = CxxIterator<Self>
@@ -43,6 +47,7 @@ public protocol CxxRandomAccessCollection: CxxSequence, RandomAccessCollection {
   func __endUnsafe() -> RawIterator
 }
 
+@available(SwiftStdlib 5.8, *)
 extension CxxRandomAccessCollection {
   @inlinable
   public var startIndex: Int {

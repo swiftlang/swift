@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A C++ type that can be converted to a Swift collection.
+@available(SwiftStdlib 5.8, *)
 public protocol CxxConvertibleToCollection {
   associatedtype RawIterator: UnsafeCxxInputIterator
 
@@ -21,6 +22,7 @@ public protocol CxxConvertibleToCollection {
   mutating func __endUnsafe() -> RawIterator
 }
 
+@available(SwiftStdlib 5.8, *)
 @inlinable @inline(__always)
 internal func forEachElement<C: CxxConvertibleToCollection>(
   of c: C,
@@ -45,6 +47,7 @@ extension Array {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the C++
   ///   collection.
+  @available(SwiftStdlib 5.8, *)
   public init<C: CxxConvertibleToCollection>(_ c: C)
     where C.RawIterator.Pointee == Element {
 
@@ -61,6 +64,7 @@ extension Set {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the C++
   ///   collection.
+  @available(SwiftStdlib 5.8, *)
   public init<C: CxxConvertibleToCollection>(_ c: C)
     where C.RawIterator.Pointee == Element {
 
