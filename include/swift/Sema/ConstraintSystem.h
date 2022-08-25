@@ -4444,6 +4444,13 @@ public:
     // Add this constraint to the constraint graph.
     CG.addConstraint(constraint);
 
+    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+      auto &log = llvm::errs();
+      log.indent(solverState->getCurrentIndent() + 2) << "(added constraint: ";
+      constraint->print(log, &getASTContext().SourceMgr);
+      log << ")\n";
+    }
+
     // Record this as a newly-generated constraint.
     if (solverState)
       solverState->addGeneratedConstraint(constraint);
@@ -4453,6 +4460,14 @@ public:
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
     InactiveConstraints.erase(constraint);
+
+    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+      auto &log = llvm::errs();
+      log.indent(solverState->getCurrentIndent() + 2)
+          << "(removed constraint: ";
+      constraint->print(log, &getASTContext().SourceMgr);
+      log << ")\n";
+    }
 
     if (solverState)
       solverState->retireConstraint(constraint);
