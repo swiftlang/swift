@@ -4940,6 +4940,10 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     auto named = found.get<clang::NamedDecl *>();
     if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
         recordDecl->getClangDecl()) {
+      // Don't import constructors on foreign reference types.
+      if (isa<clang::CXXConstructorDecl>(named) && isa<ClassDecl>(recordDecl))
+        continue;
+
       if (auto import = clangModuleLoader->importDeclDirectly(named))
         result.push_back(cast<ValueDecl>(import));
     }
