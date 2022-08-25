@@ -4590,6 +4590,10 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'Distributed' module not imported, required for 'distributed actor'",
       ())
+ERROR(distributed_func_cannot_overload_on_async_only,none,
+      "ambiguous distributed func declaration %0, cannot overload distributed methods on effect only", (DeclName))
+NOTE(distributed_func_other_ambiguous_overload_here,none,
+      "ambiguous distributed func %0 declared here", (DeclName))
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
       "%select{| implicitly}2 'async' function call",
