@@ -43,6 +43,17 @@
 #define IRGEN_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
 #endif
 
+/// SWIFT_MODULE_PASS(Id, Tag, Description)
+///   This macro follows the same conventions as PASS(Id, Tag, Description),
+///   but is used for module passes which are implemented in Swift.
+///
+///   No further code is need on the C++ side. On the swift swift a module
+///   pass with the same name must be registered with 'registerPass()'.
+///
+#ifndef SWIFT_MODULE_PASS
+#define SWIFT_MODULE_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
+#endif
+
 /// SWIFT_FUNCTION_PASS(Id, Tag, Description)
 ///   This macro follows the same conventions as PASS(Id, Tag, Description),
 ///   but is used for function passes which are implemented in Swift.
@@ -388,6 +399,8 @@ SWIFT_FUNCTION_PASS(RunUnitTests, "run-unit-tests",
      "Runs the compiler internal unit tests")
 SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
      "Test pass which prints the SIL of a function")
+SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
+     "Dump the results of FunctionUses")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
@@ -468,6 +481,7 @@ SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongRetainInst, "simplify-strong_retain")
 SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongReleaseInst, "simplify-strong_release")
 
 #undef IRGEN_PASS
+#undef SWIFT_MODULE_PASS
 #undef SWIFT_FUNCTION_PASS
 #undef SWIFT_FUNCTION_PASS_WITH_LEGACY
 #undef SWIFT_INSTRUCTION_PASS

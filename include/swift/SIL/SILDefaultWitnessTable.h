@@ -105,6 +105,8 @@ public:
 
   ~SILDefaultWitnessTable();
 
+  SILModule &getModule() const { return Mod; }
+
   /// Return true if this is a declaration with no body.
   bool isDeclaration() const { return IsDeclaration; }
 

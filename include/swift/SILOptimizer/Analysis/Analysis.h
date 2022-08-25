@@ -64,6 +64,12 @@ public:
     /// has been modified.
     Branches = 0x4,
 
+    /// Any function data other than its body.
+    ///
+    /// It does not trigger any analysis invalidation, but tells the pass
+    /// manager that some changes were made.
+    FunctionData = 0x8,
+
     /// Convenience states:
     FunctionBody = Calls | Branches | Instructions,
 
@@ -71,7 +77,7 @@ public:
 
     BranchesAndInstructions = Branches | Instructions,
 
-    Everything = Calls | Branches | Instructions,
+    Everything = Calls | Branches | Instructions | FunctionData,
   };
 
 private:

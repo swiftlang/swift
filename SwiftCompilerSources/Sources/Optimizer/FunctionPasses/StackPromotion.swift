@@ -44,23 +44,21 @@ let stackPromotion = FunctionPass(name: "stack-promotion", {
   let deadEndBlocks = context.deadEndBlocks
 
   var changed = false
-  for block in function.blocks {
-    for inst in block.instructions {
-      if let ar = inst as? AllocRefInstBase {
-        if deadEndBlocks.isDeadEnd(block) {
-          // Don't stack promote any allocation inside a code region which ends up
-          // in a no-return block. Such allocations may missing their final release.
-          // We would insert the deallocation too early, which may result in a
-          // use-after-free problem.
-          continue
-        }
-        if !context.continueWithNextSubpassRun(for: ar) {
-          break
-        }
+  for inst in function.instructions {
+    if let ar = inst as? AllocRefInstBase {
+      if deadEndBlocks.isDeadEnd(ar.block) {
+        // Don't stack promote any allocation inside a code region which ends up
+        // in a no-return block. Such allocations may missing their final release.
+        // We would insert the deallocation too early, which may result in a
+        // use-after-free problem.
+        continue
+      }
+      if !context.continueWithNextSubpassRun(for: ar) {
+        break
+      }
 
-        if tryPromoteAlloc(ar, deadEndBlocks, context) {
-          changed = true
-        }
+      if tryPromoteAlloc(ar, deadEndBlocks, context) {
+        changed = true
       }
     }
   }
@@ -177,13 +175,13 @@ func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   for exitInst in innerRange.exits {
     if !deadEndBlocks.isDeadEnd(exitInst.block) {
       let builder = Builder(at: exitInst, context)
-      _ = builder.createDeallocStackRef(allocRef)
+      builder.createDeallocStackRef(allocRef)
     }
   }
 
   for endInst in innerRange.ends {
     Builder.insert(after: endInst, location: allocRef.location, context) {
-      (builder) in _ = builder.createDeallocStackRef(allocRef)
+      (builder) in builder.createDeallocStackRef(allocRef)
     }
   }
 
