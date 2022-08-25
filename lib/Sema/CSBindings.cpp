@@ -1766,35 +1766,50 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
         out << "(default type of literal) ";
         break;
       }
-      out << BindingType.getString(PO);
+      BindingType.print(out);
     }
   };
 
   out << "[with possible bindings: ";
-  interleave(Bindings, printBinding, [&]() { out << "; "; });
-  if (!Literals.empty()) {
-    std::vector<std::string> defaultLiterals;
-    for (const auto &literal : Literals) {
-      if (literal.second.viableAsBinding()) {
-        auto defaultWithType = "(default type of literal) " +
-                               literal.second.getDefaultType().getString(PO);
-        defaultLiterals.push_back(defaultWithType);
-      }
+  SmallVector<PrintableBinding, 2> potentialBindings;
+  for (const auto &binding : Bindings) {
+    switch (binding.Kind) {
+    case AllowedBindingKind::Exact:
+      potentialBindings.push_back(PrintableBinding::exact(binding.BindingType));
+      break;
+    case AllowedBindingKind::Supertypes:
+      potentialBindings.push_back(
+          PrintableBinding::supertypesOf(binding.BindingType));
+      break;
+    case AllowedBindingKind::Subtypes:
+      potentialBindings.push_back(
+          PrintableBinding::subtypesOf(binding.BindingType));
+      break;
     }
-    interleave(defaultLiterals, out, ", ");
   }
-  if (Bindings.empty() && Literals.empty()) {
+  for (const auto &literal : Literals) {
+    if (literal.second.viableAsBinding()) {
+      potentialBindings.push_back(PrintableBinding::literalDefaultType(
+          literal.second.getDefaultType()));
+    }
+  }
+  if (potentialBindings.empty()) {
     out << "<empty>";
+  } else {
+    interleave(
+        potentialBindings,
+        [&](const PrintableBinding &binding) { binding.print(out, PO); },
+        [&] { out << ", "; });
   }
   out << "]";
 
   if (!Defaults.empty()) {
-    out << "[defaults: ";
+    out << " [defaults: ";
     for (const auto &entry : Defaults) {
       auto *constraint = entry.second;
-      PotentialBinding binding{constraint->getSecondType(),
-                               AllowedBindingKind::Exact, constraint};
-      printBinding(binding);
+      auto defaultBinding =
+          PrintableBinding::exact(constraint->getSecondType());
+      defaultBinding.print(out, PO);
     }
     out << "]";
   }
