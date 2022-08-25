@@ -99,19 +99,19 @@ UnsafeMutableBufferPointerSliceTests.test(
 }
 
 UnsafeMutableBufferPointerSliceTests.test(
-  "slice.of.UnsafeMutableBufferPointer.initialize.fromElements.Collection"
+  "slice.of.UnsafeMutableBufferPointer.initialize.fromContentsOf.Collection"
 ) {
   let c = 4
   let mb = UnsafeMutableBufferPointer<String>.allocate(capacity: c)
   defer { mb.deallocate() }
 
-  var ct = mb.initialize(fromElements: (1...c).map(String.init))
+  var ct = mb.initialize(fromContentsOf: (1...c).map(String.init))
   expectEqual(ct, c)
   expectEqual(mb.compactMap(Int.init).reduce(0,+), c*(c+1)/2)
   var rb = mb.deinitialize()
   expectEqual(rb.count, c*MemoryLayout<String>.stride)
 
-  ct = mb[...].initialize(fromElements: (1...c).map(String.init))
+  ct = mb[...].initialize(fromContentsOf: (1...c).map(String.init))
   expectEqual(ct, c)
   expectEqual(mb.compactMap(Int.init).reduce(0,+), c*(c+1)/2)
   rb = mb[...].deinitialize()
@@ -152,13 +152,13 @@ UnsafeMutableBufferPointerSliceTests.test(
   expectEqual(a, b)
 
   var i = a.withContiguousMutableStorageIfAvailable {
-    $0.update(fromElements: (0..<c).map(String.init))
+    $0.update(fromContentsOf: (0..<c).map(String.init))
   }
   expectEqual(i, c)
   expectEqual(a.compactMap(Int.init).reduce(0,+), c*(c-1)/2)
 
   i = b.withContiguousMutableStorageIfAvailable {
-    $0[...].update(fromElements: (0..<c).map(String.init))
+    $0[...].update(fromContentsOf: (0..<c).map(String.init))
   }
   expectEqual(i, c)
   expectEqual(a, b)
@@ -179,25 +179,25 @@ UnsafeMutableBufferPointerSliceTests.test(
   let b = UnsafeMutableBufferPointer<String>.allocate(capacity: c)
   defer { b.deallocate() }
 
-  var i = buffer.initialize(fromElements: source)
+  var i = buffer.initialize(fromContentsOf: source)
   expectEqual(i, c)
-  i = a.moveInitialize(fromElements: buffer)
+  i = a.moveInitialize(fromContentsOf: buffer)
   expectEqual(i, c)
   expectTrue(a.elementsEqual(source))
-  i = buffer.initialize(fromElements: source)
+  i = buffer.initialize(fromContentsOf: source)
   expectEqual(i, c)
-  i = b[...].moveInitialize(fromElements: buffer)
+  i = b[...].moveInitialize(fromContentsOf: buffer)
   expectEqual(i, c)
   expectTrue(b.elementsEqual(source))
 
-  i = buffer.initialize(fromElements: source.prefix(n))
+  i = buffer.initialize(fromContentsOf: source.prefix(n))
   expectEqual(i, n)
-  i = a.moveInitialize(fromElements: buffer.prefix(n))
+  i = a.moveInitialize(fromContentsOf: buffer.prefix(n))
   expectEqual(i, n)
   expectTrue(a[..<n].elementsEqual(source.prefix(n)))
-  i = buffer.initialize(fromElements: source.prefix(n))
+  i = buffer.initialize(fromContentsOf: source.prefix(n))
   expectEqual(i, n)
-  i = b[...].moveInitialize(fromElements: buffer[..<n])
+  i = b[...].moveInitialize(fromContentsOf: buffer[..<n])
   expectEqual(i, n)
   expectTrue(b.prefix(n).elementsEqual(a[..<n]))
 }
@@ -216,32 +216,32 @@ UnsafeMutableBufferPointerSliceTests.test(
   var b = a
 
   var i: Int?
-  i = buffer.initialize(fromElements: source)
+  i = buffer.initialize(fromContentsOf: source)
   expectEqual(i, c)
   i = a.withContiguousMutableStorageIfAvailable {
-    $0.moveUpdate(fromElements: buffer)
+    $0.moveUpdate(fromContentsOf: buffer)
   }
   expectEqual(i, c)
   expectEqual(a, source)
-  i = buffer.initialize(fromElements: source)
+  i = buffer.initialize(fromContentsOf: source)
   expectEqual(i, c)
   i = b.withContiguousMutableStorageIfAvailable {
-    $0[...].moveUpdate(fromElements: buffer)
+    $0[...].moveUpdate(fromContentsOf: buffer)
   }
   expectEqual(i, c)
   expectEqual(a, b)
 
-  i = buffer.initialize(fromElements: source.prefix(n))
+  i = buffer.initialize(fromContentsOf: source.prefix(n))
   expectEqual(i, n)
   i = a.withContiguousMutableStorageIfAvailable {
-    $0.moveUpdate(fromElements: buffer[..<n])
+    $0.moveUpdate(fromContentsOf: buffer[..<n])
   }
   expectEqual(i, n)
   expectEqual(a[..<n], source[..<n])
-  i = buffer.initialize(fromElements: source.prefix(n))
+  i = buffer.initialize(fromContentsOf: source.prefix(n))
   expectEqual(i, n)
   i = b.withContiguousMutableStorageIfAvailable {
-    $0.moveUpdate(fromElements: buffer[..<n])
+    $0.moveUpdate(fromContentsOf: buffer[..<n])
   }
   expectEqual(i, n)
   expectEqual(a[..<n], b[..<n])
@@ -279,17 +279,17 @@ UnsafeMutableBufferPointerSliceTests.test(
 
   var a = UnsafeMutableBufferPointer<String>.allocate(capacity: c)
   defer { a.deallocate() }
-  a.initialize(fromElements: Array(repeating: ".", count: c))
+  a.initialize(fromContentsOf: Array(repeating: ".", count: c))
   defer { a.deinitialize() }
 
   var i = a.withContiguousMutableStorageIfAvailable {
-    $0.update(fromElements: Array(repeating: " ", count: c))
+    $0.update(fromContentsOf: Array(repeating: " ", count: c))
   }
   expectEqual(i, c)
   expectTrue(a.allSatisfy({ $0 == " " }))
 
   i = a[...].withContiguousMutableStorageIfAvailable {
-    $0.update(fromElements: Array(repeating: "?", count: c))
+    $0.update(fromContentsOf: Array(repeating: "?", count: c))
   }
   expectEqual(i, c)
   expectTrue(a.allSatisfy({ $0 == "?" }))
@@ -432,7 +432,7 @@ UnsafeMutableRawBufferPointerSliceTests.test(
 }
 
 UnsafeMutableBufferPointerSliceTests.test(
-  "slice.of.UnsafeMutableRawBufferpointer.initializeMemory.fromElements"
+  "slice.of.UnsafeMutableRawBufferpointer.initializeMemory.fromContentsOf"
 ) {
   let c = 4
   let mb = UnsafeMutableRawBufferPointer.allocate(
@@ -441,14 +441,14 @@ UnsafeMutableBufferPointerSliceTests.test(
   )
   defer { mb.deallocate() }
 
-  var tb = mb.initializeMemory(as: Int.self, fromElements: 0..<c)
+  var tb = mb.initializeMemory(as: Int.self, fromContentsOf: 0..<c)
   expectEqual(tb.count, c)
   expectTrue(tb.elementsEqual(0..<c))
   var rb = tb.deinitialize()
   expectEqual(rb.baseAddress, mb.baseAddress)
   expectEqual(rb.count, mb.count)
 
-  tb = mb[...].initializeMemory(as: Int.self, fromElements: 0..<c)
+  tb = mb[...].initializeMemory(as: Int.self, fromContentsOf: 0..<c)
   expectEqual(tb.count, c)
   expectTrue(tb.elementsEqual(0..<c))
   rb = tb.deinitialize()
@@ -477,13 +477,13 @@ UnsafeMutableBufferPointerSliceTests.test(
   )
   defer { rbb.deallocate() }
 
-  expectEqual(buffer.initialize(fromElements: source), c)
-  var tba = rba.moveInitializeMemory(as: Int.self, fromElements: buffer)
+  expectEqual(buffer.initialize(fromContentsOf: source), c)
+  var tba = rba.moveInitializeMemory(as: Int.self, fromContentsOf: buffer)
   expectEqual(tba.count, c)
   expectTrue(tba.elementsEqual(source))
 
-  expectEqual(buffer.initialize(fromElements: source), c)
-  var tbb = rbb[...].moveInitializeMemory(as: Int.self, fromElements: buffer)
+  expectEqual(buffer.initialize(fromContentsOf: source), c)
+  var tbb = rbb[...].moveInitializeMemory(as: Int.self, fromContentsOf: buffer)
   expectEqual(tbb.count, c)
   expectTrue(tbb.elementsEqual(tba))
 
@@ -492,13 +492,13 @@ UnsafeMutableBufferPointerSliceTests.test(
   expectEqual(dba.count, rba.count)
   expectEqual(dbb.count, rbb.count)
 
-  expectEqual(buffer.initialize(fromElements: source.prefix(n)), n)
-  tba = rba.moveInitializeMemory(as: Int.self, fromElements: buffer.prefix(n))
+  expectEqual(buffer.initialize(fromContentsOf: source.prefix(n)), n)
+  tba = rba.moveInitializeMemory(as: Int.self, fromContentsOf: buffer.prefix(n))
   expectEqual(tba.count, n)
   expectTrue(tba.elementsEqual(source.prefix(n)))
 
-  expectEqual(buffer.initialize(fromElements: source.prefix(n)), n)
-  tbb = rbb[...].moveInitializeMemory(as: Int.self, fromElements: buffer[..<n])
+  expectEqual(buffer.initialize(fromContentsOf: source.prefix(n)), n)
+  tbb = rbb[...].moveInitializeMemory(as: Int.self, fromContentsOf: buffer[..<n])
   expectEqual(tbb.count, n)
   expectTrue(tbb.elementsEqual(tba))
 
