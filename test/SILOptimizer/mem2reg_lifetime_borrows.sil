@@ -7,17 +7,22 @@ struct WrapperStruct {
   var val:Klass
 }
 
+public enum FakeOptional {
+  case none
+  case some(Klass)
+}
+
 sil [ossa] @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
 sil [ossa] @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @use_owned : $@convention(thin) (@owned Klass) -> ()
 sil [ossa] @get_owned : $@convention(thin) () -> @owned Klass
 
 // CHECK-LABEL: sil [ossa] @test_no_storeborrow1 :
-// CHECK-NOT: alloc_stack
+// CHECK-NOT: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test_no_storeborrow1'
 sil [ossa] @test_no_storeborrow1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  %stk = alloc_stack $Klass
+  %stk = alloc_stack [lexical] $Klass
   store %0 to [init] %stk : $*Klass
   %ld = load_borrow %stk : $*Klass
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
@@ -30,11 +35,11 @@ bb0(%0 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @test_no_storeborrow2 :
-// CHECK-NOT: alloc_stack
+// CHECK-NOT: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test_no_storeborrow2'
 sil [ossa] @test_no_storeborrow2 : $@convention(method) (@owned Klass) -> () { 
 bb0(%0 : @owned $Klass):
-  %stk = alloc_stack $Klass
+  %stk = alloc_stack [lexical] $Klass
   store %0 to [init] %stk : $*Klass
   %ld1 = load_borrow %stk : $*Klass
   %f = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
@@ -63,11 +68,28 @@ bb4:
 }
 
 // CHECK-LABEL: sil [ossa] @test_no_storeborrow3 :
-// CHECK-NOT: alloc_stack
+// CHECK-NOT: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test_no_storeborrow3'
 sil [ossa] @test_no_storeborrow3 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  %1 = alloc_stack $Klass
+  %1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load_borrow %1 : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_storeborrow4 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_no_storeborrow4'
+sil [ossa] @test_no_storeborrow4 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
   store %0 to [init] %1 : $*Klass
   %2 = load_borrow %1 : $*Klass
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
@@ -81,11 +103,11 @@ bb0(%0 : @owned $Klass):
 
 // load_borrow of projections are not optimized
 // CHECK-LABEL: sil [ossa] @test_with_structs_and_borrows1 :
-// CHECK: alloc_stack
+// CHECK: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test_with_structs_and_borrows1'
 sil [ossa] @test_with_structs_and_borrows1 : $@convention(thin) (@guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct):
-  %stk = alloc_stack $WrapperStruct
+  %stk = alloc_stack [lexical] $WrapperStruct
   %sb = store_borrow %0 to %stk : $*WrapperStruct
   %ele = struct_element_addr %sb : $*WrapperStruct, #WrapperStruct.val
   %ld = load_borrow %ele : $*Klass
@@ -97,40 +119,24 @@ bb0(%0 : @guaranteed $WrapperStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: sil [ossa] @storeborrow_only_allocas :
-// CHECK-NOT: alloc_stack
-// CHECK-LABEL: } // end sil function 'storeborrow_only_allocas'
-sil [ossa] @storeborrow_only_allocas : $@convention(thin) (@guaranteed Klass) -> () {
+
+// CHECK-LABEL: sil [ossa] @storeborrow_only_lexicalallocas :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'storeborrow_only_lexicalallocas'
+sil [ossa] @storeborrow_only_lexicalallocas : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %1 = alloc_stack $Klass
-  %2 = store_borrow %0 to %1 : $*Klass
-  end_borrow %2 : $*Klass
-  dealloc_stack %1 : $*Klass
+  %1 = alloc_stack [lexical] $Klass
+  %sb = store_borrow %0 to %1 : $*Klass
+  end_borrow %sb : $*Klass
+  dealloc_stack  %1 : $*Klass
   %6 = tuple ()
   return %6 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @test1 :
-// CHECK-NOT: alloc_stack
+// CHECK-NOT: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test1'
 sil [ossa] @test1 : $@convention(thin) (@guaranteed Klass) -> () {
-bb0(%0 : @guaranteed $Klass):
-  %1 = alloc_stack $Klass
-  %sb = store_borrow %0 to %1 : $*Klass
-  %2 = load_borrow %sb : $*Klass
-  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %2 : $Klass
-  end_borrow %sb : $*Klass
-  dealloc_stack %1 : $*Klass
-  %6 = tuple ()
-  return %6 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @test1_lexical :
-// CHECK-NOT: alloc_stack
-// CHECK-LABEL: } // end sil function 'test1_lexical'
-sil [ossa] @test1_lexical : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = alloc_stack [lexical] $Klass
   %sb = store_borrow %0 to %1 : $*Klass
@@ -139,17 +145,17 @@ bb0(%0 : @guaranteed $Klass):
   %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
   end_borrow %2 : $Klass
   end_borrow %sb : $*Klass
-  dealloc_stack  %1 : $*Klass
+  dealloc_stack %1 : $*Klass
   %6 = tuple ()
   return %6 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @test2 :
-// CHECK-NOT: alloc_stack
+// CHECK-NOT: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test2'
 sil [ossa] @test2 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %1 = alloc_stack $Klass
+  %1 = alloc_stack [lexical] $Klass
   %sb = store_borrow %0 to %1 : $*Klass
   %2 = load_borrow %sb : $*Klass
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
@@ -166,11 +172,11 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @test3 :
-// CHECK-NOT: alloc_stack
+// CHECK-NOT: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test3'
 sil [ossa] @test3 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
-  %2 = alloc_stack $Klass
+  %2 = alloc_stack [lexical] $Klass
   %sb1 = store_borrow %0 to %2 : $*Klass
   %3 = load_borrow %sb1 : $*Klass
   %4 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
@@ -188,31 +194,31 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @test4 :
-// CHECK-NOT: alloc_stack
+// CHECK-NOT: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test4'
 sil [ossa] @test4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %1 = alloc_stack $Klass
+  %1 = alloc_stack [lexical] $Klass
   %sb = store_borrow %0 to %1 : $*Klass
-  %2 = load_borrow %sb: $*Klass
+  %2 = load_borrow %sb : $*Klass
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
   %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
   end_borrow %2 : $Klass
   %5 = load [copy] %sb : $*Klass
+  end_borrow %sb : $*Klass
   %6 = function_ref @use_owned : $@convention(thin) (@owned Klass) -> ()
   %7 = apply %6(%5) : $@convention(thin) (@owned Klass) -> ()
-  end_borrow %sb : $*Klass
   dealloc_stack %1 : $*Klass
   %8 = tuple ()
   return %8 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @test6 :
-// CHECK-NOT: alloc_stack
+// CHECK-NOT: alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'test6'
 sil [ossa] @test6 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  %1 = alloc_stack $Klass
+  %1 = alloc_stack [lexical] $Klass
   %b = begin_borrow %0 : $Klass
   %sb = store_borrow %b to %1 : $*Klass
   %2 = load_borrow %sb : $*Klass
@@ -227,9 +233,50 @@ bb0(%0 : @owned $Klass):
   return %6 : $()
 }
 
-sil [ossa] @test_control_flow1 : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-LABEL: sil [ossa] @test7 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test7'
+sil [ossa] @test7 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  %b = begin_borrow %0 : $Klass
+  %sb = store_borrow %b to %1 : $*Klass
+  %2 = load_borrow %sb : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  end_borrow %sb : $*Klass
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test8 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test8'
+sil [ossa] @test8 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  %b = begin_borrow %0 : $Klass
+  %sb = store_borrow %b to %1 : $*Klass
+  %2 = load [copy] %sb : $*Klass
+  end_borrow %sb : $*Klass
+  end_borrow %b : $Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %2 : $Klass
+  destroy_value %0 : $Klass
+  dealloc_stack %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_control_flow4 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_control_flow4'
+sil [ossa] @test_control_flow4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %stk = alloc_stack $Klass
+  %stk = alloc_stack [lexical] $Klass
   %sb = store_borrow %0 to %stk : $*Klass
   cond_br undef, bb1, bb2
 
@@ -251,67 +298,10 @@ bb2:
   unreachable
 }
 
-// CHECK-LABEL: sil [ossa] @test_control_flow2 :
-// CHECK-NOT: alloc_stack
-// CHECK-LABEL: } // end sil function 'test_control_flow2'
-sil [ossa] @test_control_flow2 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
-bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
-  %stk = alloc_stack $Klass
-  cond_br undef, bb1, bb2
-
-bb1:
-  %copy1 = copy_value %0 : $Klass
-  store %copy1 to [init] %stk : $*Klass
-  br bb3
-
-bb2:
-  %copy2 = copy_value %1 : $Klass
-  store %copy2 to [init] %stk : $*Klass
-  br bb3
-
-bb3:
-  %2 = load_borrow %stk : $*Klass
-  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %2 : $Klass
-  destroy_addr %stk : $*Klass
-  dealloc_stack %stk : $*Klass
-  %8 = tuple ()
-  return %8 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @test_control_flow3 :
-// CHECK-NOT: alloc_stack
-// CHECK-LABEL: } // end sil function 'test_control_flow3'
-sil [ossa] @test_control_flow3 : $@convention(thin) () -> () {
-bb0:
-  %4 = alloc_stack [lexical] $Klass
-  %f = function_ref @get_owned : $@convention(thin) () -> @owned Klass
-  %5 = apply %f() : $@convention(thin) () -> @owned Klass
-  store %5 to [init] %4 : $*Klass
-  %7 = load_borrow %4 : $*Klass
-  end_borrow %7 : $Klass
-  cond_br undef, bb1, bb2
-
-bb1:
-  br bb3
-
-bb2:
-  %28 = load_borrow %4 : $*Klass
-  end_borrow %28 : $Klass
-  br bb3
-
-bb3:
-  destroy_addr %4 : $*Klass
-  dealloc_stack %4 : $*Klass
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil [ossa] @test_control_flow4 :
-// CHECK-NOT: alloc_stack
-// CHECK-LABEL: } // end sil function 'test_control_flow4'
-sil [ossa] @test_control_flow4 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+// CHECK-LABEL: sil [ossa] @test_control_flow5 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_control_flow5'
+sil [ossa] @test_control_flow5 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
   %stk = alloc_stack [lexical] $Klass
   cond_br undef, bb1, bb2
@@ -337,3 +327,128 @@ bb3:
   return %8 : $()
 }
 
+// Test no ownership verifier error
+// CHECK-LABEL: sil [ossa] @test_control_flow6 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_control_flow6'
+sil [ossa] @test_control_flow6 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_owned : $@convention(thin) () -> @owned Klass
+  %1 = alloc_stack [lexical] $Klass
+  %2 = apply %0() : $@convention(thin) () -> @owned Klass
+  store %2 to [init] %1 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = apply %0() : $@convention(thin) () -> @owned Klass
+  store %5 to [assign] %1 : $*Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9 = load_borrow %1 : $*Klass
+  end_borrow %9 : $Klass
+  br bb4
+
+bb4:
+  cond_br undef, bb8, bb9
+
+bb8:
+  br bb4
+
+bb9:
+  cond_br undef, bb10, bb11
+
+bb10:
+  br bb12
+
+bb11:
+  %19 = load [copy] %1 : $*Klass
+  %20 = function_ref @use_owned : $@convention(thin) (@owned Klass) -> ()
+  %21 = apply %20(%19) : $@convention(thin) (@owned Klass) -> ()
+  br bb12
+
+bb12:
+  %23 = apply %0() : $@convention(thin) () -> @owned Klass
+  store %23 to [assign] %1 : $*Klass
+  cond_br undef, bb13, bb14
+
+bb13:
+  %26 = load [take] %1 : $*Klass
+  destroy_value %26 : $Klass
+  dealloc_stack %1 : $*Klass
+  %29 = tuple ()
+  return %29 : $()
+
+bb14:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_control_flow7 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_control_flow7'
+sil [ossa] @test_control_flow7 : $@convention(thin) () -> () {
+bb0:
+  %4 = alloc_stack [lexical] $Klass
+  %f = function_ref @get_owned : $@convention(thin) () -> @owned Klass
+  %5 = apply %f() : $@convention(thin) () -> @owned Klass
+  store %5 to [init] %4 : $*Klass
+  %7 = load_borrow %4 : $*Klass
+  end_borrow %7 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %28 = load_borrow %4 : $*Klass
+  end_borrow %28 : $Klass
+  br bb3
+
+bb3:
+  destroy_addr %4 : $*Klass
+  dealloc_stack %4 : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test no ownership verifier error
+// CHECK-LABEL: sil [ossa] @test_two_stacklocs :
+// CHECK: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_two_stacklocs'
+sil [ossa] @test_two_stacklocs : $@convention(method) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct):
+  %2 = struct_extract %0 : $WrapperStruct, #WrapperStruct.val
+  %3 = alloc_stack [lexical] $Klass
+  %4 = store_borrow %2 to %3 : $*Klass
+  %5 = load_borrow %4 : $*Klass
+  %6 = alloc_stack [lexical] $Klass
+  %7 = store_borrow %5 to %6 : $*Klass
+  %f = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  apply %f(%7) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  end_borrow %7 : $*Klass
+  end_borrow %5 : $Klass
+  end_borrow %4 : $*Klass
+  dealloc_stack %6 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_optional :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_optional'
+sil [ossa] @test_optional : $@convention(thin) () -> () {
+bb0:
+  %stk = alloc_stack [lexical] $FakeOptional
+  %none = enum $FakeOptional, #FakeOptional.none!enumelt
+  %sb = store_borrow %none to %stk : $*FakeOptional
+  %ld1 = load_borrow %sb : $*FakeOptional
+  end_borrow %ld1 : $FakeOptional
+  end_borrow %sb : $*FakeOptional
+  dealloc_stack %stk : $*FakeOptional
+  %r = tuple ()
+  return %r : $()
+}

@@ -88,7 +88,7 @@ deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> termOperands,
 // Our implementation assumes that our caller is attempting to remove a dead
 // SILPhiArgument from a SILBasicBlock and has already RAUWed the argument.
 TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
-                                 size_t argIndex) {
+                                 size_t argIndex, bool cleanupDeadPhiOps) {
   if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
     SmallVector<SILValue, 8> trueArgs;
     SmallVector<SILValue, 8> falseArgs;
@@ -97,14 +97,18 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     llvm::copy(cbi->getFalseArgs(), std::back_inserter(falseArgs));
 
     if (destBlock == cbi->getTrueBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(),
-                                                argIndex);
+      if (cleanupDeadPhiOps) {
+        deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(),
+                                                  argIndex);
+      }
       trueArgs.erase(trueArgs.begin() + argIndex);
     }
 
     if (destBlock == cbi->getFalseBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(),
-                                                argIndex);
+      if (cleanupDeadPhiOps) {
+        deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(),
+                                                  argIndex);
+      }
       falseArgs.erase(falseArgs.begin() + argIndex);
     }
 
@@ -120,8 +124,9 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
   if (auto *bi = dyn_cast<BranchInst>(branch)) {
     SmallVector<SILValue, 8> args;
     llvm::copy(bi->getArgs(), std::back_inserter(args));
-
-    deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
+    if (cleanupDeadPhiOps) {
+      deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
+    }
     args.erase(args.begin() + argIndex);
     auto *result = SILBuilderWithScope(bi).createBranch(bi->getLoc(),
                                                         bi->getDestBB(), args);
@@ -132,7 +137,8 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
   llvm_unreachable("unsupported terminator");
 }
 
-void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
+void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
+                             bool cleanupDeadPhiOps) {
   assert(block->getArgument(argIndex)->isPhi()
          && "Only should be used on phi arguments");
   block->eraseArgument(argIndex);
@@ -149,7 +155,7 @@ void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
     predBlocks.insert(pred);
 
   for (auto *pred : predBlocks)
-    deleteEdgeValue(pred->getTerminator(), block, argIndex);
+    deleteEdgeValue(pred->getTerminator(), block, argIndex, cleanupDeadPhiOps);
 }
 
 /// Changes the edge value between a branch and destination basic block
