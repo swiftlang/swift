@@ -432,12 +432,7 @@ protected:
     // If the builder supports `buildPartialBlock(first:)` and
     // `buildPartialBlock(accumulated:next:)`, use this to combine
     // subexpressions pairwise.
-    if (!expressions.empty() &&
-        builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
-                         /*checkAvailability*/ true) &&
-        builder.supports(ctx.Id_buildPartialBlock,
-                         {ctx.Id_accumulated, ctx.Id_next},
-                         /*checkAvailability*/ true)) {
+    if (!expressions.empty() && builder.canUseBuildPartialBlock()) {
       // NOTE: The current implementation uses one-way constraints in between
       // subexpressions. It's functionally equivalent to the following:
       //   let v0 = Builder.buildPartialBlock(first: arg_0)
@@ -1087,12 +1082,7 @@ protected:
       // If the builder supports `buildPartialBlock(first:)` and
       // `buildPartialBlock(accumulated:next:)`, use this to combine
       // sub-expressions pairwise.
-      if (!buildBlockArguments.empty() &&
-          builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
-                           /*checkAvailability*/ true) &&
-          builder.supports(ctx.Id_buildPartialBlock,
-                           {ctx.Id_accumulated, ctx.Id_next},
-                           /*checkAvailability*/ true)) {
+      if (!buildBlockArguments.empty() && builder.canUseBuildPartialBlock()) {
         //   let v0 = Builder.buildPartialBlock(first: arg_0)
         //   let v1 = Builder.buildPartialBlock(accumulated: v0, next: arg_1)
         //   ...
@@ -2822,6 +2812,12 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
     return foundUnavailable ? ResultBuilderOpSupport::Unavailable
                             : ResultBuilderOpSupport::Unsupported;
   }
+  // If the builder type itself isn't available, don't consider any builder
+  // method available.
+  if (auto *D = builderType->getAnyNominal()) {
+    if (isUnavailable(D))
+      return ResultBuilderOpSupport::Unavailable;
+  }
   return ResultBuilderOpSupport::Supported;
 }
 
@@ -2986,6 +2982,31 @@ ResultBuilder::ResultBuilder(ConstraintSystem *CS, DeclContext *DC,
     BuilderSelf->setImplicit();
     CS->setType(BuilderSelf, MetatypeType::get(BuilderType));
   }
+}
+
+bool ResultBuilder::supportsBuildPartialBlock(bool checkAvailability) {
+  auto &ctx = DC->getASTContext();
+  return supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
+                  checkAvailability) &&
+         supports(ctx.Id_buildPartialBlock, {ctx.Id_accumulated, ctx.Id_next},
+                  checkAvailability);
+}
+
+bool ResultBuilder::canUseBuildPartialBlock() {
+  // If buildPartialBlock doesn't exist at all, we can't use it.
+  if (!supportsBuildPartialBlock(/*checkAvailability*/ false))
+    return false;
+
+  // If buildPartialBlock exists and is available, use it.
+  if (supportsBuildPartialBlock(/*checkAvailability*/ true))
+    return true;
+
+  // We have buildPartialBlock, but it is unavailable. We can however still
+  // use it if buildBlock is also unavailable.
+  auto &ctx = DC->getASTContext();
+  return supports(ctx.Id_buildBlock) &&
+         !supports(ctx.Id_buildBlock, /*labels*/ {},
+                   /*checkAvailability*/ true);
 }
 
 bool ResultBuilder::supports(Identifier fnBaseName,

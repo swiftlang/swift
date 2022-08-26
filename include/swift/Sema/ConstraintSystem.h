@@ -172,6 +172,13 @@ public:
 
   bool supportsOptional() { return supports(getBuildOptionalId()); }
 
+  /// Checks whether the `buildPartialBlock` method is supported.
+  bool supportsBuildPartialBlock(bool checkAvailability);
+
+  /// Checks whether the builder can use `buildPartialBlock` to combine
+  /// expressions, instead of `buildBlock`.
+  bool canUseBuildPartialBlock();
+
   Expr *buildCall(SourceLoc loc, Identifier fnName,
                   ArrayRef<Expr *> argExprs,
                   ArrayRef<Identifier> argLabels) const;
