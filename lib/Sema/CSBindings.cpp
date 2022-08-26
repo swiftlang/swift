@@ -1726,23 +1726,48 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   if (numDefaultable > 0)
     out << "[#defaultable_bindings: " << numDefaultable << "] ";
 
-  auto printBinding = [&](const PotentialBinding &binding) {
-    auto type = binding.BindingType;
-    switch (binding.Kind) {
-    case AllowedBindingKind::Exact:
-      break;
+  struct PrintableBinding {
+  private:
+    enum class BindingKind { Exact, Subtypes, Supertypes, Literal };
+    BindingKind Kind;
+    Type BindingType;
+    PrintableBinding(BindingKind kind, Type bindingType)
+        : Kind(kind), BindingType(bindingType) {}
 
-    case AllowedBindingKind::Subtypes:
-      out << "(subtypes of) ";
-      break;
-
-    case AllowedBindingKind::Supertypes:
-      out << "(supertypes of) ";
-      break;
+  public:
+    static PrintableBinding supertypesOf(Type binding) {
+      return PrintableBinding{BindingKind::Supertypes, binding};
     }
-    if (auto *literal = binding.getDefaultedLiteralProtocol())
-      out << "(default from " << literal->getName() << ") ";
-    out << type.getString(PO);
+    
+    static PrintableBinding subtypesOf(Type binding) {
+      return PrintableBinding{BindingKind::Subtypes, binding};
+    }
+    
+    static PrintableBinding exact(Type binding) {
+      return PrintableBinding{BindingKind::Exact, binding};
+    }
+    
+    static PrintableBinding literalDefaultType(Type binding) {
+      return PrintableBinding{BindingKind::Literal, binding};
+    }
+
+    void print(llvm::raw_ostream &out, const PrintOptions &PO,
+               unsigned indent = 0) const {
+      switch (Kind) {
+      case BindingKind::Exact:
+        break;
+      case BindingKind::Subtypes:
+        out << "(subtypes of) ";
+        break;
+      case BindingKind::Supertypes:
+        out << "(supertypes of) ";
+        break;
+      case BindingKind::Literal:
+        out << "(default type of literal) ";
+        break;
+      }
+      out << BindingType.getString(PO);
+    }
   };
 
   out << "[with possible bindings: ";
