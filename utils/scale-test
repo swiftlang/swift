@@ -173,7 +173,7 @@ def run_once_with_primary(args, ast, rng, primary_idx):
         if not args.save_temps:
             shutil.rmtree(d)
 
-    return {k: v for (k, v) in r.items() if args.select in k and 
+    return {k: v for (k, v) in r.items() if args.select in k and
             not (args.exclude_timers and k.startswith('time.'))}
 
 
