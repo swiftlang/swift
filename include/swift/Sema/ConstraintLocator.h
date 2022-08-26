@@ -1295,6 +1295,16 @@ public:
     return None;
   }
 
+  /// Check whether this locator has the given locator path element
+  /// at the end of its path.
+  template <class Kind>
+  bool endsWith() const {
+    if (auto lastElt = last()) {
+      return lastElt->is<Kind>();
+    }
+    return false;
+  }
+
   /// Produce a debugging dump of this locator.
   SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
   SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));

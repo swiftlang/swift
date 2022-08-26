@@ -6792,7 +6792,25 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::DoubleToCGFloat: {
       auto conversionKind = knownRestriction->second;
 
-      auto *argExpr = locator.trySimplifyToExpr();
+      auto shouldUseCoercedExpr = [&]() {
+        // If conversion wraps the whole body of a single-expression closure,
+        // let's use the passed-in expression since the closure itself doesn't
+        // get updated until coercion is done.
+        if (locator.endsWith<LocatorPathElt::ClosureBody>())
+          return true;
+
+        // Contextual type locator always uses the original version of
+        // expression (before any coercions have been applied) because
+        // otherwise it wouldn't be possible to find the overload choice.
+        if (locator.endsWith<LocatorPathElt::ContextualType>())
+          return true;
+
+        // In all other cases use the expression associated with locator.
+        return false;
+      };
+
+      auto *argExpr =
+          shouldUseCoercedExpr() ? expr : locator.trySimplifyToExpr();
       assert(argExpr);
 
       // Source requires implicit conversion to match destination
@@ -8570,7 +8588,7 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   // Convert the initializer to the type of the pattern.
   auto &cs = solution.getConstraintSystem();
   auto locator = cs.getConstraintLocator(
-      initializer, LocatorPathElt::ContextualType(CTP_Initialization));
+      target.getAsExpr(), LocatorPathElt::ContextualType(CTP_Initialization));
   initializer = solution.coerceToType(initializer, initType, locator);
   if (!initializer)
     return None;
@@ -9081,17 +9099,35 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
+      ConstraintLocator *locator = nullptr;
+
+      auto contextualTypePurpose = target.getExprContextualTypePurpose();
+      // Bodies of single-expression closures use a special locator
+      // for contextual type conversion to make sure that result is
+      // convertible to `Void` when `return` is not used explicitly.
+      if (contextualTypePurpose == CTP_ClosureResult) {
+        auto *closure = cast<ClosureExpr>(target.getDeclContext());
+        auto *returnStmt =
+            castToStmt<ReturnStmt>(closure->getBody()->getLastElement());
+
+        locator = cs.getConstraintLocator(
+            closure, LocatorPathElt::ClosureBody(
+                         /*hasReturn=*/!returnStmt->isImplicit()));
+      } else {
+        locator = cs.getConstraintLocator(
+            expr, LocatorPathElt::ContextualType(contextualTypePurpose));
+      }
+
+      assert(locator);
+
       resultExpr = Rewriter.coerceToType(
-          resultExpr, solution.simplifyType(convertType),
-          cs.getConstraintLocator(resultExpr,
-                                  LocatorPathElt::ContextualType(
-                                      target.getExprContextualTypePurpose())));
+          resultExpr, solution.simplifyType(convertType), locator);
     } else if (cs.getType(resultExpr)->hasLValueType() &&
                !target.isDiscardedExpr()) {
       // We referenced an lvalue. Load it.
       resultExpr = Rewriter.coerceToType(
           resultExpr, cs.getType(resultExpr)->getRValueType(),
-          cs.getConstraintLocator(resultExpr,
+          cs.getConstraintLocator(expr,
                                   LocatorPathElt::ContextualType(
                                       target.getExprContextualTypePurpose())));
     }

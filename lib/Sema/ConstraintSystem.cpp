@@ -444,15 +444,6 @@ ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
       break;
     }
 
-    // If the conversion is associated with a contextual type e.g.
-    // `_: Double = CGFloat(1)` then drop `ContextualType` so that
-    // it's easy to find when the underlying expression has been
-    // rewritten.
-    if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
-      anchor = ASTNode();
-      path.clear();
-    }
-
     // If conversion is for a tuple element, let's drop `TupleType`
     // components from the path since they carry information for
     // diagnostics that `ExprRewriter` won't be able to re-construct
