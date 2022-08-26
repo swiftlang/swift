@@ -625,6 +625,8 @@ std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry
 
 SILWitnessTableEntryKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry) {
   switch (castToWitnessTableEntry(entry)->getKind()) {
+    case SILWitnessTable::Invalid:
+      return SILWitnessTableEntry_Invalid;
     case SILWitnessTable::Method:
       return SILWitnessTableEntry_Method;
     case SILWitnessTable::AssociatedType:
@@ -633,8 +635,6 @@ SILWitnessTableEntryKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry e
       return SILWitnessTableEntry_AssociatedTypeProtocol;
     case SILWitnessTable::BaseProtocol:
       return SILWitnessTableEntry_BaseProtocol;
-    default:
-      llvm_unreachable("wrong witness table entry kind");
   }
 }
 

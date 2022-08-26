@@ -99,6 +99,7 @@ typedef struct {
 } BridgedWitnessTableEntry;
 
 typedef enum {
+  SILWitnessTableEntry_Invalid,
   SILWitnessTableEntry_Method,
   SILWitnessTableEntry_AssociatedType,
   SILWitnessTableEntry_AssociatedTypeProtocol,
