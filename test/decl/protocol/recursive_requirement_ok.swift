@@ -15,7 +15,8 @@ func testP<T: P>(_ t: T) {
   testP(t.assoc.assoc.assoc.assoc.assoc.assoc.assoc)
 }
 
-// SR-5485
+// https://github.com/apple/swift/issues/48057
+
 protocol P1 {
   associatedtype X : P2
 }
@@ -27,7 +28,8 @@ protocol P2 {
   associatedtype Z : P1
 }
 
-// SR-5473
+// https://github.com/apple/swift/issues/48045
+
 protocol P3 {
 	associatedtype X : P4
 }
@@ -53,7 +55,8 @@ protocol P6 : P5 {
 // CHECK: Generic signature: <Self where Self : P6, Self.[P5]X == Self.[P6]Y.[P5]X>
 extension P6 where X == Y.X { }
 
-// SR-5601
+// https://github.com/apple/swift/issues/48173
+
 protocol P7 {
     associatedtype X: P9 where X.Q == Self, X.R == UInt8
     associatedtype Y: P9 where Y.Q == Self, Y.R == UInt16
@@ -73,7 +76,8 @@ struct S9<E> : P9 {
     typealias Q = A7
 }
 
-// SR-5610
+// https://github.com/apple/swift/issues/48180
+
 protocol P10 {
   associatedtype X : P11 where X.Q == Self
 }
