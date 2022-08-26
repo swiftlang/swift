@@ -199,12 +199,15 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return false
   }
     
+    // TODO: Merge the functionality of _computeOffsetForPureStructKeypath,
+    // _recalculateOffsetForPureStructKeyPath() and _storedInlineOffset.
+
     // If this keypath traverses structs only, it'll have a predictable memory layout.
     // We can then jump to the value directly in _projectReadOnly().
-    internal func _computeOffsets() -> (offset: Int, isPureStruct: Bool, isTuple: Bool) {
+    internal func _computeOffsetForPureStructKeypath() {
       _pureStructValueOffset = 0
       var isPureStruct = true
-      var _isTuple = false
+      var exitEarly = false
       defer {
         _isPureStructKeyPath = isPureStruct
       }
@@ -215,17 +218,18 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
             isPureStruct = false
           }
         } else {
-          while true {
+          while !exitEarly {
             let (rawComponent, optNextType) = buffer.next()
             if isTuple(optNextType as Any) {
               isPureStruct = false
-              _isTuple = true
+              break
             }
             switch rawComponent.header.kind {
             case .struct:
               _pureStructValueOffset += rawComponent._structOrClassOffset
             case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
               isPureStruct = false
+              exitEarly = true
             }
             if optNextType == nil {
               break
@@ -233,25 +237,50 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
           }
         }
       }
-      return (_pureStructValueOffset, isPureStruct, _isTuple)
     }
 
-    internal func _computeOffsetForPureStructKeypath() {
-      _ = _computeOffsets()
+    // Recalculates the offset in the case where one pure struct keypath is appended to another.
+    internal func _recalculateOffsetForPureStructKeyPath() {
+      _pureStructValueOffset = 0
+      withBuffer {
+        var buffer = $0
+        while true {
+          let (rawComponent, optNextType) = buffer.next()
+          switch rawComponent.header.kind {
+          case .struct:
+            _pureStructValueOffset += rawComponent._structOrClassOffset
+          case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
+            return
+          }
+          if optNextType == nil {
+            break
+          }
+        }
+      }
     }
 
-    // This function was refactored since _computeOffsets() was performing
-    // essentially the same computation.
     @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
     internal var _storedInlineOffset: Int? {
-      // TODO: Cache this value in a similar manner to _pureStructValueOffset.
-      // The current design assumes keypath read and write operations will be called
-      // much more often than MemoryLayout<Root>.offset(of:).
-      let offsetInformation = _computeOffsets()
-      if offsetInformation.isPureStruct || offsetInformation.isTuple {
-        return .some(offsetInformation.offset)
-      } else {
-        return .none
+      return withBuffer {
+        var buffer = $0
+
+        // The identity key path is effectively a stored keypath of type Self
+        // at offset zero
+        if buffer.data.isEmpty { return 0 }
+
+        var offset = 0
+        while true {
+          let (rawComponent, optNextType) = buffer.next()
+          switch rawComponent.header.kind {
+          case .struct:
+            offset += rawComponent._structOrClassOffset
+
+          case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
+            return .none
+          }
+
+          if optNextType == nil { return .some(offset) }
+        }
       }
     }
   }
