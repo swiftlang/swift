@@ -530,9 +530,6 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     forcePrecomputeAnalyses(F);
   }
   
-  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
-         && "change notifications not cleared");
-
   llvm::sys::TimePoint<> startTime = std::chrono::system_clock::now();
   std::chrono::nanoseconds duration(0);
 
@@ -553,24 +550,21 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     // Run it!
     SFT->run();
 
-    if (CurrentPassHasInvalidated ||
-        changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
+    swiftPassInvocation.finishedFunctionPassRun();
+
+    if (CurrentPassHasInvalidated) {
       // Pause time measurement while invalidating analysis and restoring the snapshot.
       duration += (std::chrono::system_clock::now() - startTime);
 
       if (runIdx < numRepeats - 1) {
         invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
         F->restoreFromSnapshot(SnapshotID);
-      } else if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
-        invalidateAnalysis(F, changeNotifications);
       }
-      changeNotifications = SILAnalysis::InvalidationKind::Nothing;
       
       // Continue time measurement (including flushing deleted instructions).
       startTime = std::chrono::system_clock::now();
     }
     Mod->flushDeletedInsts();
-    swiftPassInvocation.finishedFunctionPassRun();
   }
 
   duration += (std::chrono::system_clock::now() - startTime);
@@ -1289,9 +1283,9 @@ void SwiftPassInvocation::startModulePassRun(SILModuleTransform *transform) {
 }
 
 void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
-  assert(!this->function && !this->transform && "a pass is already running");
-  this->function = transform->getFunction();
+  assert(!this->transform && "a pass is already running");
   this->transform = transform;
+  beginTransformFunction(transform->getFunction());
 }
 
 void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
@@ -1302,13 +1296,15 @@ void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
 void SwiftPassInvocation::finishedModulePassRun() {
   endPassRunChecks();
   assert(!function && transform && "not running a pass");
+  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
+         && "unhandled change notifications at end of module pass");
   transform = nullptr;
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
   endPassRunChecks();
-  assert(function && transform && "not running a pass");
-  function = nullptr;
+  endTransformFunction();
+  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   transform = nullptr;
 }
 
@@ -1318,6 +1314,24 @@ void SwiftPassInvocation::finishedInstructionPassRun() {
 
 void SwiftPassInvocation::endPassRunChecks() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
+  assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
+  assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+}
+
+void SwiftPassInvocation::beginTransformFunction(SILFunction *function) {
+  assert(!this->function && transform && "not running a pass");
+  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
+         && "change notifications not cleared");
+  this->function = function;
+}
+
+void SwiftPassInvocation::endTransformFunction() {
+  assert(function && transform && "not running a pass");
+  if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
+    passManager->invalidateAnalysis(function, changeNotifications);
+    changeNotifications = SILAnalysis::InvalidationKind::Nothing;
+  }
+  function = nullptr;
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
 }
