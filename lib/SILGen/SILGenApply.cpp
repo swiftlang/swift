@@ -3886,7 +3886,7 @@ class CallEmission {
 
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
-  Optional<ImplicitActorHopTarget> implicitActorHopTarget;
+  Optional<ActorIsolation> implicitActorHopTarget;
   bool implicitlyThrows;
 
 public:
@@ -3937,7 +3937,7 @@ public:
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
   void setImplicitlyAsync(
-      Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
+      Optional<ActorIsolation> implicitActorHopTarget) {
     this->implicitActorHopTarget = implicitActorHopTarget;
   }
 
@@ -4573,7 +4573,7 @@ RValue SILGenFunction::emitApply(
     ArrayRef<ManagedValue> args,
     const CalleeTypeInfo &calleeTypeInfo,
     ApplyOptions options, SGFContext evalContext,
-    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
+    Optional<ActorIsolation> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
@@ -4672,18 +4672,24 @@ RValue SILGenFunction::emitApply(
 
     SILValue executor;
     switch (*implicitActorHopTarget) {
-    case ImplicitActorHopTarget::InstanceSelf:
-      executor = emitLoadActorExecutor(loc, args.back());
+    case ActorIsolation::ActorInstance:
+      if (unsigned paramIndex =
+              implicitActorHopTarget->getActorInstanceParameter()) {
+        executor = emitLoadActorExecutor(loc, args[paramIndex-1]);
+      } else {
+        executor = emitLoadActorExecutor(loc, args.back());
+      }
       break;
 
-    case ImplicitActorHopTarget::GlobalActor:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
       executor = emitLoadGlobalActorExecutor(
           implicitActorHopTarget->getGlobalActor());
       break;
 
-    case ImplicitActorHopTarget::IsolatedParameter:
-      executor = emitLoadActorExecutor(
-          loc, args[implicitActorHopTarget->getIsolatedParameterIndex()]);
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+      llvm_unreachable("Not isolated");
       break;
     }
 
@@ -5897,7 +5903,7 @@ RValue SILGenFunction::emitGetAccessor(
     PreparedArguments &&subscriptIndices,
     SGFContext c,
     bool isOnSelfParameter,
-    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
+    Optional<ActorIsolation> implicitActorHopTarget) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 

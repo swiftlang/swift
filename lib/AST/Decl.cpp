@@ -9235,7 +9235,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       auto actor = selfDecl->getType()->getReferenceStorageReferent()
           ->getAnyActor();
       assert(actor && "Bad closure actor isolation?");
-      return ActorIsolation::forActorInstance(actor)
+      // FIXME: This could be a parameter... or a capture... hmmm.
+      return ActorIsolation::forActorInstanceSelf(actor)
         .withPreconcurrency(isolation.preconcurrency());
     }
     }
