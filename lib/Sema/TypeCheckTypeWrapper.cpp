@@ -164,7 +164,7 @@ GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
 
   storage->setImplicit();
   storage->setSynthesized();
-  storage->copyFormalAccessFrom(parent, /*sourceIsParentContext=*/true);
+  storage->setAccess(AccessLevel::Internal);
 
   parent->addMember(storage);
 
