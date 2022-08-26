@@ -122,7 +122,7 @@ extension OtherOuter5 {
   class Super {}
 }
 
-/// SR-5993
+/// https://github.com/apple/swift/issues/48550
 
 enum Outer5A {}
 
