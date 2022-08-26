@@ -157,18 +157,29 @@ extension Builder {
     self.init(insertAt: .before(insPnt), location: insPnt.location, passContext: context._bridged)
   }
 
+  /// Creates a builder which inserts _after_ `insPnt`, using a custom `location`.
+  init(after insPnt: Instruction, location: Location, _ context: PassContext) {
+    if let nextInst = insPnt.next {
+      self.init(insertAt: .before(nextInst), location: location, passContext: context._bridged)
+    } else {
+      self.init(insertAt: .atEndOf(insPnt.block), location: location, passContext: context._bridged)
+    }
+  }
+
   /// Creates a builder which inserts _after_ `insPnt`, using the location of `insPnt`.
   init(after insPnt: Instruction, _ context: PassContext) {
-    if let nextInst = insPnt.next {
-      self.init(insertAt: .before(nextInst), location: insPnt.location, passContext: context._bridged)
-    } else {
-      self.init(insertAt: .atEndOf(insPnt.block), location: insPnt.location, passContext: context._bridged)
-    }
+    self.init(after: insPnt, location: insPnt.location, context)
   }
 
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
   init(atEndOf block: BasicBlock, location: Location, _ context: PassContext) {
     self.init(insertAt: .atEndOf(block), location: location, passContext: context._bridged)
+  }
+
+  /// Creates a builder which inserts at the begin of `block`, using a custom `location`.
+  init(atBeginOf block: BasicBlock, location: Location, _ context: PassContext) {
+    let firstInst = block.instructions.first!
+    self.init(insertAt: .before(firstInst), location: location, passContext: context._bridged)
   }
 
   /// Creates a builder which inserts at the begin of `block`, using the location of the first
