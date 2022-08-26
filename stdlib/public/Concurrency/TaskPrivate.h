@@ -40,7 +40,7 @@ namespace swift {
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
 #if 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
-  fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
+  fprintf(stderr, "[%#lx] [%s:%d](%s) " fmt "\n",                               \
           (unsigned long)Thread::current()::platformThreadId(), __FILE__,      \
           __LINE__, __FUNCTION__, __VA_ARGS__)
 #else

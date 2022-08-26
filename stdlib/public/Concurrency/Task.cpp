@@ -704,6 +704,9 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     }
     case TaskOptionRecordKind::RunInline: {
       runInlineOption = cast<RunInlineTaskOptionRecord>(option);
+      // TODO (rokhinip): We seem to be creating runInline tasks like detached
+      // tasks but they need to maintain the voucher and priority of calling
+      // thread and therefore need to behave a bit more like SC child tasks.
       break;
     }
     }
@@ -974,6 +977,15 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Attach to the group, if needed.
   if (group) {
     swift_taskGroup_attachChild(group, task);
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    // We need to take a retain here to keep the child task for the task group
+    // alive. In the non-task-to-thread model, we'd always take this retain
+    // below since we'd enqueue the child task. But since we're not going to be
+    // enqueueing the child task in this model, we need to take this +1 to
+    // balance out the release that exists after the task group child task
+    // creation
+    swift_retain(task);
+#endif
   }
 
   // If we're supposed to copy task locals, do so now.
@@ -988,6 +1000,9 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    assert(false && "Should not be enqueuing tasks in task-to-thread model");
+#endif
     swift_retain(task);
     task->flagAsAndEnqueueOnExecutor(executor);
   }

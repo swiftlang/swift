@@ -1,5 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library  -Xfrontend -disable-availability-checking -Xfrontend -concurrency-model=task-to-thread)
-
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -disable-availability-checking -Xfrontend -concurrency-model=task-to-thread -g -Xlinker -object_path_lto -Xlinker /tmp/abc.o)
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: freestanding
@@ -13,11 +12,13 @@ var a = 0;
 
 func foo() async -> Int {
   a += 1
+  print("a is now \(a)")
   return a
 }
 
 func bar() async -> Int {
   a += 2
+  print("a is now \(a)")
   return a
 }
 
@@ -66,6 +67,39 @@ func fib(_ n: Int) -> Int {
       Task.runInline {
         let result = await asyncFib(10, pthread_self())
         expectEqual(result, fib(10))
+      }
+    }
+
+    tests.test("Task group execute child task on await simple") {
+      a = 0
+      Task.runInline {
+        await withTaskGroup(of: Int.self, body : { group in
+          let currentThread = pthread_self()
+          group.addTask {
+            expectEqual(pthread_self(), currentThread);
+            return await foo()
+          }
+
+          group.addTask {
+            expectEqual(pthread_self(), currentThread);
+            return await bar()
+          }
+        })
+      }
+    }
+
+    tests.test("Task groups with nested structured concurrency") {
+      Task.runInline {
+        await withTaskGroup(of: Int.self, body : { group in
+          let currentThread = pthread_self()
+          group.addTask {
+            return await asyncFib(10, currentThread);
+          }
+
+          group.addTask {
+            return await asyncFib(5, currentThread);
+          }
+        })
       }
     }
 
