@@ -21,6 +21,7 @@ public struct WitnessTable : CustomStringConvertible, CustomReflectable {
     fileprivate let bridged: BridgedWitnessTableEntry
     
     public enum Kind {
+      case invalid
       case method
       case associatedType
       case associatedTypeProtocol
@@ -29,6 +30,7 @@ public struct WitnessTable : CustomStringConvertible, CustomReflectable {
     
     public var kind: Kind {
       switch SILWitnessTableEntry_getKind(bridged) {
+        case SILWitnessTableEntry_Invalid:                return .invalid
         case SILWitnessTableEntry_Method:                 return .method
         case SILWitnessTableEntry_AssociatedType:         return .associatedType
         case SILWitnessTableEntry_AssociatedTypeProtocol: return .associatedTypeProtocol

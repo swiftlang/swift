@@ -153,12 +153,26 @@ sil_default_witness_table RP {
   method #RP.default_witness: @default_witness
 }
 
+public protocol RP2 {
+}
+
+sil_default_witness_table RP2 {
+  no_default
+}
+
 protocol P {
   func witness()
+  func witness2()
 }
 
 struct SP : P {
   func witness()
+  func witness2()
+}
+
+struct SP2 : P {
+  func witness()
+  func witness2()
 }
 
 // CHECK-LABEL: Uses of witness
@@ -172,8 +186,20 @@ bb0(%0 : $*SP):
   return %7 : $()
 }
 
+sil @witness2 : $@convention(witness_method: P) (@inout SP) -> () {
+bb0(%0 : $*SP):
+  %7 = tuple ()
+  return %7 : $()
+}
+
 sil_witness_table SP: P module witness_tables {
   method #P.witness: @witness
+  method #P.witness2: @witness2
+}
+
+sil_witness_table SP2: P module witness_tables {
+  method #P.witness: @witness
+  method #P.witness2: @witness2
 }
 
 // CHECK-LABEL: Uses of hash_func

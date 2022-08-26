@@ -480,9 +480,8 @@ final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {}
 final public class KeyPathInst : SingleValueInstruction {
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
     var results = KeyPathFunctionResults()
-    var componentIdx = 0
-    repeat {
-      componentIdx = KeyPathInst_getReferencedFunctions(bridged, componentIdx, &results)
+    for componentIdx in 0..<KeyPathInst_getNumComponents(bridged) {
+      KeyPathInst_getReferencedFunctions(bridged, componentIdx, &results)
       let numFuncs = results.numFunctions
       withUnsafePointer(to: &results) {
         $0.withMemoryRebound(to: BridgedFunction.self, capacity: numFuncs) {
@@ -492,7 +491,7 @@ final public class KeyPathInst : SingleValueInstruction {
           }
         }
       }
-    } while componentIdx >= 0
+    }
   }
 }
 
