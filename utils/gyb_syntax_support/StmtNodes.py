@@ -75,14 +75,14 @@ STMT_NODES = [
              Child('GuardResult', kind='Expr'),
          ]),
 
-    # for-in-stmt -> label? ':'? 
+    # for-in-stmt -> label? ':'?
     #   'for' 'try'? 'await'? 'case'? pattern 'in' expr 'where'?
     #   expr code-block ';'?
     Node('ForInStmt', kind='Stmt',
          traits=['WithCodeBlock'],
          children=[
              Child('ForKeyword', kind='ForToken'),
-             Child('TryKeyword', kind='TryToken', 
+             Child('TryKeyword', kind='TryToken',
                    is_optional=True),
              Child('AwaitKeyword', kind='IdentifierToken',
                    classification='Keyword',

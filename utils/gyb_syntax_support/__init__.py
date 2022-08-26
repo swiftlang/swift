@@ -129,7 +129,7 @@ def make_missing_swift_child(child):
         elif child.syntax_kind in SYNTAX_BASE_KINDS:
             missing_kind = f"missing{child.syntax_kind}"
         else:
-            missing_kind = child.swift_syntax_kind 
+            missing_kind = child.swift_syntax_kind
         return f'RawSyntax.makeEmptyLayout(kind: SyntaxKind.{missing_kind}, ' + \
             'arena: .default)'
 

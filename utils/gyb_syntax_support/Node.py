@@ -13,7 +13,7 @@ class Node(object):
 
     def __init__(self, name, description=None, kind=None, traits=None,
                  children=[], element=None, element_name=None,
-                 element_choices=None, omit_when_empty=False, 
+                 element_choices=None, omit_when_empty=False,
                  elements_separated_by_newline=False):
         self.syntax_kind = name
         self.element_name = element_name
@@ -24,7 +24,7 @@ class Node(object):
 
         self.traits = traits or []
         self.children = []
-        # Add implicitly generated UnexpectedNodes children in between any two 
+        # Add implicitly generated UnexpectedNodes children in between any two
         # defined children
         if kind != 'SyntaxCollection':
             for i in range(2 * len(children)):
@@ -35,8 +35,8 @@ class Node(object):
                         name = 'UnexpectedBetween%sAnd%s' % \
                             (children[int(i / 2) - 1].name, children[int(i / 2)].name)
                     self.children.append(Child(
-                        name, 
-                        kind='UnexpectedNodes', 
+                        name,
+                        kind='UnexpectedNodes',
                         collection_element_name=name,
                         is_optional=True
                     ))
