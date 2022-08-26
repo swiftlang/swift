@@ -61,6 +61,10 @@ class SwiftPassInvocation {
   /// Non-null if this is an instruction pass, invoked from SILCombine.
   SILCombiner *silCombiner = nullptr;
 
+  /// Change notifications, collected during a pass run.
+  SILAnalysis::InvalidationKind changeNotifications =
+      SILAnalysis::InvalidationKind::Nothing;
+
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
@@ -126,17 +130,9 @@ public:
   /// Called by the SILCombiner when the instruction pass has finished.
   void finishedInstructionPassRun();
   
-  void beginTransformFunction(SILFunction *function) {
-    assert(!this->function && transform && "not running a module pass");
-    this->function = function;
-  }
+  void beginTransformFunction(SILFunction *function);
 
-  void endTransformFunction() {
-    assert(function && "beginTransformFunction not called");
-    function = nullptr;
-    assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
-    assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
-  }
+  void endTransformFunction();
 };
 
 /// The SIL pass manager.
@@ -183,10 +179,6 @@ class SILPassManager {
 
   /// For invoking Swift passes.
   SwiftPassInvocation swiftPassInvocation;
-
-  /// Change notifications, collected during a bridged pass run.
-  SILAnalysis::InvalidationKind changeNotifications =
-      SILAnalysis::InvalidationKind::Nothing;
 
   /// A mask which has one bit for each pass. A one for a pass-bit means that
   /// the pass doesn't need to run, because nothing has changed since the
@@ -341,11 +333,6 @@ public:
     CompletedPassesMap[F].reset();
   }
 
-  void notifyPassChanges(SILAnalysis::InvalidationKind invalidationKind) {
-    changeNotifications = (SILAnalysis::InvalidationKind)
-        (changeNotifications | invalidationKind);
-  }
-
   /// Reset the state of the pass manager and remove all transformation
   /// owned by the pass manager. Analysis passes will be kept.
   void resetAndRemoveTransformations();
@@ -440,7 +427,8 @@ private:
 
 inline void SwiftPassInvocation::
 notifyChanges(SILAnalysis::InvalidationKind invalidationKind) {
-  passManager->notifyPassChanges(invalidationKind);
+    changeNotifications = (SILAnalysis::InvalidationKind)
+        (changeNotifications | invalidationKind);
 }
 
 } // end namespace swift
