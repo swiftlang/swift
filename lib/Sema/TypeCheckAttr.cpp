@@ -1950,6 +1950,13 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 }
 
 void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
+  if (!D->getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
+    auto error =
+        diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
   if (isa<NominalTypeDecl>(D))
     return;
 
