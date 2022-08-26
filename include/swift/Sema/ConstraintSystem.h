@@ -107,6 +107,33 @@ enum class FreeTypeVariableBinding {
   UnresolvedType
 };
 
+/// Describes whether or not a result builder method is supported.
+struct ResultBuilderOpSupport {
+  enum Classification {
+    Unsupported,
+    Unavailable,
+    Supported
+  };
+  Classification Kind;
+
+  ResultBuilderOpSupport(Classification Kind) : Kind(Kind) {}
+
+  /// Returns whether or not the builder method is supported. If
+  /// \p requireAvailable is true, an unavailable method will be considered
+  /// unsupported.
+  bool isSupported(bool requireAvailable) const {
+    switch (Kind) {
+    case Unsupported:
+      return false;
+    case Unavailable:
+      return !requireAvailable;
+    case Supported:
+      return true;
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+};
+
 namespace constraints {
 
 struct ResultBuilder {
@@ -115,7 +142,9 @@ private:
   /// An implicit variable that represents `Self` type of the result builder.
   VarDecl *BuilderSelf;
   Type BuilderType;
-  llvm::SmallDenseMap<DeclName, bool> SupportedOps;
+
+  /// Cache of supported result builder operations.
+  llvm::SmallDenseMap<DeclName, ResultBuilderOpSupport> SupportedOps;
 
   Identifier BuildOptionalId;
 

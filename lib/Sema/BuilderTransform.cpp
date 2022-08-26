@@ -2770,11 +2770,22 @@ std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
   return precheck.getReturnStmts();
 }
 
-bool TypeChecker::typeSupportsBuilderOp(
+ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
     Type builderType, DeclContext *dc, Identifier fnName,
-    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults,
-    bool checkAvailability) {
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+
+  auto isUnavailable = [&](Decl *D) -> bool {
+    if (AvailableAttr::isUnavailable(D))
+      return true;
+
+    auto loc = extractNearestSourceLoc(dc);
+    auto context = ExportContext::forFunctionBody(dc, loc);
+    return TypeChecker::checkDeclarationAvailability(D, context).hasValue();
+  };
+
   bool foundMatch = false;
+  bool foundUnavailable = false;
+
   SmallVector<ValueDecl *, 4> foundDecls;
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
@@ -2793,17 +2804,12 @@ bool TypeChecker::typeSupportsBuilderOp(
           continue;
       }
 
-      // If we are checking availability, the candidate must have enough
-      // availability in the calling context.
-      if (checkAvailability) {
-        if (AvailableAttr::isUnavailable(func))
-          continue;
-        if (TypeChecker::checkDeclarationAvailability(
-                func, ExportContext::forFunctionBody(
-                    dc, extractNearestSourceLoc(dc))))
-          continue;
+      // Check if the the candidate has a suitable availability for the
+      // calling context.
+      if (isUnavailable(func)) {
+        foundUnavailable = true;
+        continue;
       }
-
       foundMatch = true;
       break;
     }
@@ -2812,7 +2818,18 @@ bool TypeChecker::typeSupportsBuilderOp(
   if (allResults)
     allResults->append(foundDecls.begin(), foundDecls.end());
 
-  return foundMatch;
+  if (!foundMatch) {
+    return foundUnavailable ? ResultBuilderOpSupport::Unavailable
+                            : ResultBuilderOpSupport::Unsupported;
+  }
+  return ResultBuilderOpSupport::Supported;
+}
+
+bool TypeChecker::typeSupportsBuilderOp(
+    Type builderType, DeclContext *dc, Identifier fnName,
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+  return checkBuilderOpSupport(builderType, dc, fnName, argLabels, allResults)
+      .isSupported(/*requireAvailable*/ false);
 }
 
 Type swift::inferResultBuilderComponentType(NominalTypeDecl *builder) {
@@ -2976,13 +2993,13 @@ bool ResultBuilder::supports(Identifier fnBaseName,
                              bool checkAvailability) {
   DeclName name(DC->getASTContext(), fnBaseName, argLabels);
   auto known = SupportedOps.find(name);
-  if (known != SupportedOps.end()) {
-    return known->second;
-  }
+  if (known != SupportedOps.end())
+    return known->second.isSupported(checkAvailability);
 
-  return SupportedOps[name] = TypeChecker::typeSupportsBuilderOp(
-             BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {},
-             checkAvailability);
+  auto support = TypeChecker::checkBuilderOpSupport(
+      BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {});
+  SupportedOps.insert({name, support});
+  return support.isSupported(checkAvailability);
 }
 
 Expr *ResultBuilder::buildCall(SourceLoc loc, Identifier fnName,
