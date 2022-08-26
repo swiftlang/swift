@@ -1323,6 +1323,16 @@ void setSwiftString(swift::String &other, const std::string &str) {
 }
 ```
 
+In Objective-C++ mode, you can also convert a `swift::String` to an `NSString *` value using
+a cast or by assigning to an `NSString *` value directly:
+
+```c++
+void useObjCString(const swift::String &swStr) {
+  // This cast will bridge the Swift String to an Objective-C NSString value.
+  NSString *nsStr = swStr;
+}
+```
+
 Open questions:
 
 * How do the  `StringLiteralConvertible` rules work in practice?
