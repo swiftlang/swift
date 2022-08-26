@@ -168,7 +168,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return try f(KeyPathBuffer(base: base))
   }
 
-  public var isPureStructKeyPath: Bool {
+  internal var isPureStructKeyPath: Bool {
     return _isPureStructKeyPath ?? false
   }
 
