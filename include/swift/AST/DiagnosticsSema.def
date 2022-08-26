@@ -2931,6 +2931,7 @@ ERROR(decl_from_hidden_module,none,
       "%select{%3 has been imported as implementation-only|"
       "it is an SPI imported from %3|"
       "it is SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
@@ -2939,7 +2940,7 @@ WARNING(decl_from_hidden_module_warn,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
-      "<<ERROR>>|<<ERROR>>|"
+      "<<ERROR>>|<<ERROR>>|<<ERROR>>|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
@@ -2951,6 +2952,7 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
+      "%4 was imported for SPI only|"
       "%4 was not imported by this file}5",
       (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
@@ -2961,6 +2963,7 @@ ERROR(conformance_from_implementation_only_module,none,
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
@@ -5860,12 +5863,13 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "because %select{%3 was imported implementation-only|"
       "it is an SPI imported from %3|"
       "it is SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
-      "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|"
+      "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|<<ERROR>>|"
       "%3 was not imported by this file}4"
       "; this is an error in Swift 6",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
@@ -5875,6 +5879,7 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
+      "%4 was imported for SPI only|"
       "%4 was not imported by this file}5",
       (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 

@@ -2527,21 +2527,25 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::Implicit;
 
+  // Workaround for the cases where the bridging header isn't properly
+  // imported implicitly.
   if (module->getName().str() == CLANG_HEADER_MODULE_NAME)
     return RestrictedImportKind::None;
 
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
-    // Ignore implementation-only imports.
     if (desc.options.contains(ImportFlags::ImplementationOnly)) {
-      if (imports.isImportedBy(module, desc.module.importedModule))
+      if (importKind < RestrictedImportKind::ImplementationOnly &&
+          imports.isImportedBy(module, desc.module.importedModule))
         importKind = RestrictedImportKind::ImplementationOnly;
-      continue;
     }
-
-    // If the module is imported publicly, it's not imported
-    // implementation-only.
-    if (imports.isImportedBy(module, desc.module.importedModule))
+    else if (desc.options.contains(ImportFlags::SPIOnly)) {
+      if (importKind < RestrictedImportKind::SPIOnly &&
+          imports.isImportedBy(module, desc.module.importedModule))
+        importKind = RestrictedImportKind::SPIOnly;
+    }
+    // If the module is imported publicly, there's no restriction.
+    else if (imports.isImportedBy(module, desc.module.importedModule))
       return RestrictedImportKind::None;
   }
 
