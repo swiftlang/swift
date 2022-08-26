@@ -418,19 +418,19 @@ void verifyKeyPathComponent(SILModule &M,
     break;
   }
   case KeyPathPatternComponent::Kind::TupleElement: {
-    require(loweredBaseTy.is<TupleType>(),
+    require(baseTy->is<TupleType>(),
             "invalid baseTy, should have been a TupleType");
       
-    auto tupleTy = loweredBaseTy.castTo<TupleType>();
+    auto tupleTy = baseTy->castTo<TupleType>();
     auto eltIdx = component.getTupleIndex();
       
     require(eltIdx < tupleTy->getNumElements(),
             "invalid element index, greater than # of tuple elements");
 
-    auto eltTy = tupleTy.getElementType(eltIdx)
-      .getReferenceStorageReferent();
+    auto eltTy = tupleTy->getElementType(eltIdx)
+      ->getReferenceStorageReferent();
     
-    require(eltTy == componentTy,
+    require(eltTy->isEqual(componentTy),
             "tuple element type should match the type of the component");
 
     break;
