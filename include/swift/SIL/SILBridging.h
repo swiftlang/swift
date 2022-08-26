@@ -399,7 +399,8 @@ struct KeyPathFunctionResults {
   BridgedFunction functions[maxFunctions];
   SwiftInt numFunctions;
 };
-SwiftInt KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
+SwiftInt KeyPathInst_getNumComponents(BridgedInstruction kpi);
+void KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
                                             KeyPathFunctionResults * _Nonnull results);
 
 BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);

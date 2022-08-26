@@ -886,7 +886,14 @@ SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr) {
   return castToInst<CondBranchInst>(cbr)->getNumTrueArgs();
 }
 
-SwiftInt KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
+SwiftInt KeyPathInst_getNumComponents(BridgedInstruction kpi) {
+  if (KeyPathPattern *pattern = castToInst<KeyPathInst>(kpi)->getPattern()) {
+    return (SwiftInt)pattern->getComponents().size();
+  }
+  return 0;
+}
+
+void KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
                                             KeyPathFunctionResults * _Nonnull results) {
   KeyPathPattern *pattern = castToInst<KeyPathInst>(kpi)->getPattern();
   const KeyPathPatternComponent &comp = pattern->getComponents()[componentIdx];
@@ -896,9 +903,6 @@ SwiftInt KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt com
       assert(results->numFunctions < KeyPathFunctionResults::maxFunctions);
       results->functions[results->numFunctions++] = {func};
     }, [](SILDeclRef) {});
-
-  ++componentIdx;
-  return componentIdx < (int)pattern->getComponents().size() ? componentIdx : -1;
 }
 
 BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst) {
