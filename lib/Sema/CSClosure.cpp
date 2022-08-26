@@ -1662,7 +1662,7 @@ private:
       assert(isSingleExpression);
       resultTarget = SolutionApplicationTarget(
           resultExpr, context.getAsDeclContext(),
-          mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
+          mode == convertToResult ? CTP_ClosureResult : CTP_Unused,
           mode == convertToResult ? resultType : Type(),
           /*isDiscarded=*/false);
     }
