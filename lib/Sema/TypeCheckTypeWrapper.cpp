@@ -28,6 +28,7 @@ using namespace swift;
 /// Create a property declaration and inject it into the given type.
 static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
                                Type type, VarDecl::Introducer introducer,
+                               AccessLevel accessLevel,
                                Expr *initializer = nullptr) {
   auto &ctx = parent->getASTContext();
 
@@ -36,7 +37,7 @@ static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
 
   var->setImplicit();
   var->setSynthesized();
-  var->copyFormalAccessFrom(parent, /*sourceIsParentContext=*/true);
+  var->setAccess(accessLevel);
   var->setInterfaceType(type);
 
   Pattern *pattern = NamedPattern::createImplicit(ctx, var);
@@ -193,8 +194,8 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
       typeWrapper, /*Parent=*/typeWrapperType->getParent(),
       /*genericArgs=*/{storage->getInterfaceType()->getMetatypeInstanceType()});
 
-  return injectProperty(parent, ctx.Id_TypeWrapperProperty,
-                        propertyTy, VarDecl::Introducer::Var);
+  return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
+                        VarDecl::Introducer::Var, AccessLevel::Private);
 }
 
 VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
@@ -215,7 +216,7 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
 
   return injectProperty(storage, property->getName(),
                         property->getValueInterfaceType(),
-                        property->getIntroducer());
+                        property->getIntroducer(), AccessLevel::Internal);
 }
 
 /// Given the property create a subscript to reach its type wrapper storage:
