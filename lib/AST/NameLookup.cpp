@@ -2895,6 +2895,11 @@ createOpaqueParameterGenericParams(Evaluator &evaluator,GenericContext *genericC
                   { TypeLoc(opaque->getConstraint()) }
               };
               gp->setInherited(ctx.AllocateCopy(inherited));
+        } else {
+            InheritedEntry inherited[1] = {
+                { TypeLoc(repr) }
+            };
+            gp->setInherited(ctx.AllocateCopy(inherited));
         }
       implicitGenericParams.push_back(gp);
     }

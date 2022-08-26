@@ -3825,7 +3825,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 
-    if ( ctx.LangOpts.hasFeature(Feature::ImplicitSome)){
+    if ( ctx.LangOpts.hasFeature(Feature::ImplicitSome) & !options.is(TypeResolverContext::Inherited) ){
         // Check whether any of the generic parameters in the context represents
         // this opaque type. If so, return that generic parameter.
         if (auto declDC = dc->getAsDecl()) {
