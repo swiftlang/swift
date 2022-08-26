@@ -610,6 +610,15 @@ private:
   /// Additional information needed for Clang dependency scanning.
   ClangModuleDependenciesCacheImpl *clangImpl = nullptr;
 
+  /// Name of the main Swift module of this scan
+  StringRef mainModuleName;
+  /// Underlying Clang module is seen differently by the main
+  /// module and by module clients. For this reason, we do not wish subsequent
+  /// scans to be able to re-use this dependency info and therefore we avoid
+  /// adding it to the global cache. The dependency storage is therefore tied
+  /// to this, local, cache.
+  std::unique_ptr<ModuleDependencies> underlyingClangModuleDependency = nullptr;
+
   /// Function that will delete \c clangImpl properly.
   void (*clangImplDeleter)(ClangModuleDependenciesCacheImpl *) = nullptr;
 
@@ -638,7 +647,8 @@ private:
                    Optional<ModuleDependenciesKind> kind) const;
 
 public:
-  ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache);
+  ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache,
+                          StringRef mainModuleName);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
   virtual ~ModuleDependenciesCache() { destroyClangImpl(); }
