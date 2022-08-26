@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements -enable-experimental-implicit-some
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-implicit-some
 
 protocol P { }
 
@@ -30,23 +29,23 @@ extension Set: Q where Element: P, Element: Equatable { // expected-warning {{re
   func takesA(_: Element) {}
 }
 
-// expected-note@+2{{where 'some Q' = 'Int'}}
-// expected-note@+1{{in call to function 'takesQ'}}
-func takesQ(_ q: some Q) -> Bool {
-  // expected-error@+1 {{cannot convert value of type 'Int' to expected argument type '(some Q).A'}}
+// expected-note@+2{{where 'Q' = 'Int'}}
+// expected-note@+1{{in call to function 'takesImplicitQ'}}
+func takesImplicitQ(_ q: Q) -> Bool {
+  // expected-error@+1 {{cannot convert value of type 'Int' to expected argument type '(Q).A'}}
   q.takesA(1)
 
   return q.f() == q.f()
 }
 
-func testTakesQ(arrayOfInts: [Int], setOfStrings: Set<String>, i: Int) {
-  _ = takesQ(arrayOfInts)
-  _ = takesQ(setOfStrings)
-  _ = takesQ(i) // expected-error{{global function 'takesQ' requires that 'Int' conform to 'Q'}}
+func testTakesImplicitQ(arrayOfInts: [Int], setOfStrings: Set<String>, i: Int) {
+  _ = takesImplicitQ(arrayOfInts)
+  _ = takesImplicitQ(setOfStrings)
+  _ = takesImplicitQ(i) // expected-error{{global function 'takesImplicitQ' requires that 'Int' conform to 'Q'}}
 
-  let f = takesQ // expected-error{{generic parameter 'some Q' could not be inferred}}
-  let _: ([String]) -> Bool = takesQ
-  let _: ([Double]) -> Bool = takesQ // expected-error{{global function 'takesQ' requires that 'Double' conform to 'P'}}
+  let f = takesImplicitQ // expected-error{{generic parameter 'Q' could not be inferred}}
+  let _: ([String]) -> Bool = takesImplicitQ
+  let _: ([Double]) -> Bool = takesImplicitQ // expected-error{{global function 'takesImplicitQ' requires that 'Double' conform to 'P'}}
   _ = f
 }
 
@@ -61,19 +60,11 @@ func testTakeMultiple(
 }
 
 // inout
+func implicitInOut(_: inout P) { }
 
-func anyInOut(_: inout some P) { }
-
-func testAnyInOut() {
+func testInOut() {
   var i = 17
-  anyInOut(&i)
-}
-
-// In structural positions.
-func anyDictionary(_ dict: [some Hashable: some Any]) { }
-
-func testAnyDictionary(numberNames: [Int: String]) {
-  anyDictionary(numberNames)
+  implicitInOut(&i)
 }
 
 // Combine with parameterized protocol types
@@ -83,8 +74,8 @@ extension Array: PrimaryCollection { }
 extension Set: PrimaryCollection { }
 
 func takePrimaryCollections(
-  _ strings: some PrimaryCollection<String>,
-  _ ints : some PrimaryCollection<Int>
+  _ strings: PrimaryCollection<String>,
+  _ ints : PrimaryCollection<Int>
 ) {
   for s in strings {
     let _: String = s
@@ -96,7 +87,7 @@ func takePrimaryCollections(
 }
 
 func takeMatchedPrimaryCollections<T: Equatable>(
-  _ first: some PrimaryCollection<T>, _ second: some PrimaryCollection<T>
+  _ first: PrimaryCollection<T>, _ second: PrimaryCollection<T>
 ) -> Bool {
   first.elementsEqual(second)
 }
@@ -110,9 +101,8 @@ func testPrimaries(
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without more context}}
 }
 
-
 // Prohibit use of opaque parameters in consuming positions.
 typealias FnType<T> = (T) -> Void
 
-func consumingA(fn: (some P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}
-func consumingB(fn: FnType<some P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}
+func consumingA(fn: (P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
+func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}

@@ -136,79 +136,70 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
   } else {
-      if (ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-          opaqueReprs = collectTypeReprs(repr);
-      } else {
-          opaqueReprs = collectOpaqueReturnTypeReprs(repr);
-      }
+    opaqueReprs = collectOpaqueReturnTypeReprs(repr, ctx, dc);
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> requirements;
-      for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
-          auto *currentRepr = opaqueReprs[i];
+    for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
+      auto *currentRepr = opaqueReprs[i];
 
-          if (isa<IdentTypeRepr>(currentRepr)){
-              if(!isProtocol(evaluator, currentRepr, ctx, dc))
-                continue;
-          }
+      if( auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr) ) {
+        // Usually, we resolve the opaque constraint and bail if it isn't a class
+        // or existential type (see below). However, in this case we know we will
+        // fail, so we can bail early and provide a better diagnostic.
+        if (auto *optionalRepr =
+                dyn_cast<OptionalTypeRepr>(opaqueReturn->getConstraint())) {
+          std::string buf;
+          llvm::raw_string_ostream stream(buf);
+          stream << "(some " << optionalRepr->getBase() << ")?";
 
-          if( auto opaqueReturnRepr = dyn_cast<OpaqueReturnTypeRepr>(currentRepr) ) {
-              // Usually, we resolve the opaque constraint and bail if it isn't a class
-              // or existential type (see below). However, in this case we know we will
-              // fail, so we can bail early and provide a better diagnostic.
-              if (auto *optionalRepr =
-                  dyn_cast<OptionalTypeRepr>(opaqueReturnRepr->getConstraint())) {
-                  std::string buf;
-                  llvm::raw_string_ostream stream(buf);
-                  stream << "(some " << optionalRepr->getBase() << ")?";
+          ctx.Diags.diagnose(currentRepr->getLoc(),
+                             diag::opaque_type_invalid_constraint);
+          ctx.Diags
+             .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
+             .fixItReplaceChars(currentRepr->getStartLoc(),
+                                currentRepr->getEndLoc(), stream.str());
+          return nullptr;
+        }
+      }
 
-                  ctx.Diags.diagnose(currentRepr->getLoc(),
-                                     diag::opaque_type_invalid_constraint);
-                  ctx.Diags
-                      .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
-                      .fixItReplaceChars(currentRepr->getStartLoc(),
-                                         currentRepr->getEndLoc(), stream.str());
-                  return nullptr;
-              }
-          }
+      auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
+                                                  opaqueSignatureDepth, i, ctx);
+      genericParamTypes.push_back(paramType);
+    
+      TypeRepr *constraint = currentRepr;
+      //auto constraint = currentRepr;
+      
+      if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)){
+        constraint = opaqueReturn->getConstraint();
+      }
+      // Try to resolve the constraint repr in the parent decl context. It
+      // should be some kind of existential type. Pass along the error type if
+      // resolving the repr failed.
+      auto constraintType = TypeResolution::forInterface(
+                                dc, TypeResolverContext::GenericRequirement,
+                                // Unbound generics and placeholders are
+                                // meaningless in opaque types.
+                                /*unboundTyOpener*/ nullptr,
+                                /*placeholderHandler*/ nullptr)
+                                .resolveType(constraint);
 
-          auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
-                                            opaqueSignatureDepth, i, ctx);
-          genericParamTypes.push_back(paramType);
+      if (constraintType->hasError())
+        return nullptr;
 
-          if( auto opaqueReturnRepr = dyn_cast<OpaqueReturnTypeRepr>(currentRepr) ) {
-          // Try to resolve the constraint repr in the parent decl context. It
-          // should be some kind of existential type. Pass along the error type if
-          // resolving the repr failed.
-          auto constraintType = TypeResolution::forInterface(
-                                                             dc, TypeResolverContext::GenericRequirement,
-                                                             // Unbound generics and placeholders are
-                                                             // meaningless in opaque types.
-                                                             /*unboundTyOpener*/ nullptr,
-                                                             /*placeholderHandler*/ nullptr)
-                                                            .resolveType(opaqueReturnRepr->getConstraint());
+      RequirementKind kind;
+      if (constraintType->isConstraintType())
+        kind = RequirementKind::Conformance;
+      else if (constraintType->getClassOrBoundGenericClass())
+        kind = RequirementKind::Superclass;
+      else {
+        // Error out if the constraint type isn't a class or existential type.
+        ctx.Diags.diagnose(currentRepr->getLoc(),
+                           diag::opaque_type_invalid_constraint);
+        return nullptr;
+      }
 
-          if (constraintType->hasError())
-              return nullptr;
-
-          RequirementKind kind;
-          if (constraintType->isConstraintType())
-              kind = RequirementKind::Conformance;
-          else if (constraintType->getClassOrBoundGenericClass())
-              kind = RequirementKind::Superclass;
-          else {
-              // Error out if the constraint type isn't a class or existential type.
-              ctx.Diags.diagnose(currentRepr->getLoc(),
-                                 diag::opaque_type_invalid_constraint);
-              return nullptr;
-          }
-
-          assert(!constraintType->hasArchetype());
-          requirements.emplace_back(kind, paramType, constraintType);
-
-          }
-//          else if (auto opaqueReturnRepr = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)) {
-//
-//          }
+      assert(!constraintType->hasArchetype());
+      requirements.emplace_back(kind, paramType, constraintType);
     }
 
     interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,

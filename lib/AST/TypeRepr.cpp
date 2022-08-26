@@ -29,6 +29,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
+//using namespace swift::namelookup;
 
 #define TYPEREPR(Id, _) \
   static_assert(IsTriviallyDestructible<Id##TypeRepr>::value, \

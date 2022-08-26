@@ -2765,7 +2765,7 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
   return true;
 }
 
-/// Whether there are only protocol decl types in the set of declarations.
+/// Verify there are only protocols in the set of declarations.
 static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   if (decls.empty())
     return false;
@@ -2774,8 +2774,13 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
     if (!isa<ProtocolDecl>(decl))
         return false;
   }
-
   return true;
+}
+
+bool TypeRepr::isProtocol(DeclContext *dc){
+  auto &ctx = dc->getASTContext();
+  DirectlyReferencedTypeDecls d = directReferencesForTypeRepr(ctx.evaluator, ctx, this, dc);
+  return declsAreProtocols(d);
 }
 
 static GenericParamList *
@@ -2797,54 +2802,48 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
-CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r) {
+CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext &ctx, DeclContext *d) {
   class Walker : public ASTWalker {
     CollectedOpaqueReprs &Reprs;
+    ASTContext &Ctx;
+    DeclContext *dc;
 
   public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
+    explicit Walker(CollectedOpaqueReprs &reprs, ASTContext &ctx, DeclContext *d) : Reprs(reprs), Ctx(ctx), dc(d) {}
 
     bool walkToTypeReprPre(TypeRepr *repr) override {
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
-        Reprs.push_back(opaqueRepr);
-      return true;
-    }
-  };
-
-  CollectedOpaqueReprs reprs;
-  r->walk(Walker(reprs));
-  return reprs;
-}
-
-CollectedOpaqueReprs swift::collectTypeReprs(TypeRepr *r) {
-  class Walker : public ASTWalker {
-    CollectedOpaqueReprs &Reprs;
-
-  public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
-
-    bool walkToTypeReprPre(TypeRepr *repr) override {
+      if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
+        return false;
+      }
+      
       if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)){
-          Reprs.push_back(opaqueRepr);
+        Reprs.push_back(opaqueRepr);
+        if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
           return false;
-      } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)){
-          Reprs.push_back(compositionRepr);
-      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)){
-          Reprs.push_back(identRepr);
+      }
+      
+      if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)){
+        if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)){
+          if (!compositionRepr->isTypeReprAny())
+            Reprs.push_back(compositionRepr);
+        } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
+          if (identRepr->isProtocol(dc))
+            Reprs.push_back(identRepr);
+        }
       }
     return true;
     }
   };
 
   CollectedOpaqueReprs reprs;
-  r->walk(Walker(reprs));
+  r->walk(Walker(reprs, ctx, d));
   return reprs;
 }
 
 /// If there are opaque parameters in the given declaration, create the
 /// generic parameters associated with them.
 static SmallVector<GenericTypeParamDecl *, 2>
-createOpaqueParameterGenericParams(Evaluator &evaluator,GenericContext *genericContext, GenericParamList *parsedGenericParams) {
+createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamList *parsedGenericParams) {
   ASTContext &ctx = genericContext->getASTContext();
     
   auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
@@ -2871,49 +2870,35 @@ createOpaqueParameterGenericParams(Evaluator &evaluator,GenericContext *genericC
 
     // Plain protocols should imply 'some' with experimetal feature
     CollectedOpaqueReprs typeReprs;
-    if (ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-        typeReprs = collectTypeReprs(typeRepr);
-    } else {  typeReprs = collectOpaqueReturnTypeReprs(typeRepr); }
+    typeReprs = collectOpaqueReturnTypeReprs(typeRepr, ctx, dc);
 
-      for (auto repr : typeReprs) {
+    for (auto repr : typeReprs) {
    
-        if (isa<IdentTypeRepr>(repr)){
-            if(!isProtocol(evaluator,repr, ctx, dc))
-              continue;
-        }
       // Allocate a new generic parameter to represent this opaque type.
-        auto gp = GenericTypeParamDecl::create(
+      auto gp = GenericTypeParamDecl::create(
           dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
           GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
           repr);
-        gp->setImplicit();
+      gp->setImplicit();
 
       // Use the underlying constraint as the constraint on the generic parameter.
       //  The underlying constraint is only present for OpaqueReturnTypeReprs
-        if( auto opaque = dyn_cast<OpaqueReturnTypeRepr>(repr)){
+      if (auto opaque = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
               InheritedEntry inherited[1] = {
                   { TypeLoc(opaque->getConstraint()) }
               };
               gp->setInherited(ctx.AllocateCopy(inherited));
-        } else {
+      } else {
             InheritedEntry inherited[1] = {
                 { TypeLoc(repr) }
             };
             gp->setInherited(ctx.AllocateCopy(inherited));
-        }
+      }
       implicitGenericParams.push_back(gp);
     }
   }
 
   return implicitGenericParams;
-}
-
-
-bool swift::isProtocol( Evaluator &evaluator, TypeRepr *r, ASTContext &ctx, DeclContext *dc) {
-    DirectlyReferencedTypeDecls d = directReferencesForTypeRepr(evaluator, ctx, r, dc);
-    if(declsAreProtocols(d)){
-        return true;
-    } else { return false; }
 }
 
 GenericParamList *
@@ -2986,7 +2971,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
   // Create implicit generic parameters due to opaque parameters, if we need
   // them.
   auto implicitGenericParams =
-      createOpaqueParameterGenericParams(evaluator, value, parsedGenericParams);
+      createOpaqueParameterGenericParams(value, parsedGenericParams);
   if (implicitGenericParams.empty())
     return parsedGenericParams;
 

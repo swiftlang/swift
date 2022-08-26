@@ -3826,18 +3826,18 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     auto &ctx = getASTContext();
 
     if ( ctx.LangOpts.hasFeature(Feature::ImplicitSome) & !options.is(TypeResolverContext::Inherited) ){
-        // Check whether any of the generic parameters in the context represents
-        // this opaque type. If so, return that generic parameter.
-        if (auto declDC = dc->getAsDecl()) {
-            if (auto genericContext = declDC->getAsGenericContext()) {
-                if (auto genericParams = genericContext->getGenericParams()) {
-                    for (auto genericParam : *genericParams) {
-                        if (genericParam->getOpaqueTypeRepr() == IdType)
-                            return genericParam->getDeclaredInterfaceType();
-                    }
-                }
+      // Check whether any of the generic parameters in the context represents
+      // this opaque type. If so, return that generic parameter.
+      if (auto declDC = dc->getAsDecl()) {
+        if (auto genericContext = declDC->getAsGenericContext()) {
+          if (auto genericParams = genericContext->getGenericParams()) {
+            for (auto genericParam : *genericParams) {
+              if (genericParam->getOpaqueTypeRepr() == IdType)
+                return genericParam->getDeclaredInterfaceType();
             }
+          }
         }
+      }
     }
 
   if (result->isConstraintType() &&

@@ -45,19 +45,9 @@ class ASTSourceFileScope;
 class ASTScopeImpl;
 } // namespace ast_scope
 
-using CollectedOpaqueReprs = SmallVector<TypeRepr *, 2>;
-
 /// Walk the type representation recursively, collecting any
-/// `OpaqueReturnTypeRepr`s.
-CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *);
-
-/// Walk the type representation recursively, collecting any
-/// `CompositionTypeRepr`s and `IdentTypeRepr`s.
-CollectedOpaqueReprs collectTypeReprs(TypeRepr *);
-
-/// Given a Type Representation, decide if it is a protocol
-bool isProtocol(Evaluator &evaluator, TypeRepr *r, ASTContext &ctx, DeclContext *dc);
-
+/// `OpaqueReturnTypeRepr`s, `CompositionTypeRepr`s  or `IdentTypeRepr`s.
+CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *, ASTContext &ctx, DeclContext *dc);
 
 /// LookupResultEntry - One result of unqualified lookup.
 struct LookupResultEntry {
@@ -537,7 +527,6 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 
 } // end namespace namelookup
 
-
 /// Describes an inherited nominal entry.
 struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   /// The location of the "unchecked" attribute, if present.
@@ -656,7 +645,6 @@ private:
   
 };
   
-
 /// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
 class AbstractASTScopeDeclConsumer {
