@@ -298,6 +298,11 @@ private:
   /// ending". end_borrows do not end a liverange that may include owned copies.
   PrunedLiveness liveness;
 
+  /// The destroys of the value.  These are not uses, but need to be recorded so
+  /// that we know when the last use in a consuming block is (without having to
+  /// repeatedly do use-def walks from destroys).
+  SmallPtrSet<SILInstruction *, 8> destroys;
+
   /// remnantLiveOutBlocks are part of the original extended lifetime that are
   /// not in canonical pruned liveness. There is a path from a PrunedLiveness
   /// boundary to an original destroy that passes through a remnant block.

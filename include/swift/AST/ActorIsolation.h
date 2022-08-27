@@ -74,14 +74,17 @@ private:
     Type globalActor;
     void *pointer;
   };
-  uint8_t kind : 3;
-  uint8_t isolatedByPreconcurrency : 1;
+  unsigned kind : 3;
+  unsigned isolatedByPreconcurrency : 1;
+  unsigned parameterIndex : 28;
 
-  ActorIsolation(Kind kind, NominalTypeDecl *actor)
-      : actor(actor), kind(kind), isolatedByPreconcurrency(false) { }
+  ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex)
+      : actor(actor), kind(kind), isolatedByPreconcurrency(false),
+        parameterIndex(parameterIndex) { }
 
   ActorIsolation(Kind kind, Type globalActor)
-      : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false) { }
+      : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
+        parameterIndex(0) { }
 
 public:
   static ActorIsolation forUnspecified() {
@@ -92,8 +95,13 @@ public:
     return ActorIsolation(Independent, nullptr);
   }
 
-  static ActorIsolation forActorInstance(NominalTypeDecl *actor) {
-    return ActorIsolation(ActorInstance, actor);
+  static ActorIsolation forActorInstanceSelf(NominalTypeDecl *actor) {
+    return ActorIsolation(ActorInstance, actor, 0);
+  }
+
+  static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
+                                                  unsigned parameterIndex) {
+    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
   }
 
   static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
@@ -108,6 +116,14 @@ public:
   bool isUnspecified() const { return kind == Unspecified; }
   
   bool isIndependent() const { return kind == Independent; }
+
+  /// Retrieve the parameter to which actor-instance isolation applies.
+  ///
+  /// Parameter 0 is `self`.
+  unsigned getActorInstanceParameter() const {
+    assert(getKind() == ActorInstance);
+    return parameterIndex;
+  }
 
   bool isActorIsolated() const {
     switch (getKind()) {
@@ -169,7 +185,7 @@ public:
       return true;
 
     case ActorInstance:
-      return lhs.actor == rhs.actor;
+      return lhs.actor == rhs.actor && lhs.parameterIndex == rhs.parameterIndex;
 
     case GlobalActor:
     case GlobalActorUnsafe:
@@ -183,7 +199,9 @@ public:
   }
 
   friend llvm::hash_code hash_value(const ActorIsolation &state) {
-    return llvm::hash_combine(state.kind, state.pointer);
+    return llvm::hash_combine(
+        state.kind, state.pointer, state.isolatedByPreconcurrency,
+        state.parameterIndex);
   }
 };
 

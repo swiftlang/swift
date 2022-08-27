@@ -1648,23 +1648,13 @@ namespace {
       RValue rvalue;
       FormalEvaluationScope scope(SGF);
 
-      // FIXME: This somewhat silly, because the original expression should
-      // already have one of these.
-      Optional<ImplicitActorHopTarget> implicitActorHopTarget;
-      if (ActorIso) {
-        implicitActorHopTarget = ActorIso->isGlobalActor()
-            ? ImplicitActorHopTarget::forGlobalActor(
-              ActorIso->getGlobalActor())
-            : ImplicitActorHopTarget::forInstanceSelf();
-      }
-
       auto args =
           std::move(*this).prepareAccessorArgs(SGF, loc, base, getter);
 
       rvalue = SGF.emitGetAccessor(
           loc, getter, Substitutions, std::move(args.base), IsSuper,
           IsDirectAccessorUse, std::move(args.Indices), c,
-          IsOnSelfParameter, implicitActorHopTarget);
+          IsOnSelfParameter, ActorIso);
 
       return rvalue;
     }

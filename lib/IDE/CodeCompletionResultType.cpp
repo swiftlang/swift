@@ -195,6 +195,16 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
     return USRBasedType::null(Arena);
   }
 
+  // ParameterizedProtocolType should always be wrapped in ExistentialType and
+  // cannot be mangled on its own.
+  // But ParameterizedProtocolType can currently occur in 'typealias'
+  // declarations. rdar://99176683
+  // To avoid crashing in USR generation, simply return a null type until the
+  // underlying issue has been fixed.
+  if (Ty->is<ParameterizedProtocolType>()) {
+    return USRBasedType::null(Arena);
+  }
+
   SmallString<32> USR;
   llvm::raw_svector_ostream OS(USR);
   printTypeUSR(Ty, OS);

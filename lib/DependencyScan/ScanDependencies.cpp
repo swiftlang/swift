@@ -1089,32 +1089,33 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
 
       // Create a new instance by the arguments and save it in the map.
       auto newGlobalCache = std::make_unique<GlobalModuleDependenciesCache>();
-      subInstanceMap->insert(
-          {entry.arguments,
-           std::make_tuple(std::make_unique<CompilerInstance>(),
-                           std::move(newGlobalCache),
-                           std::make_unique<ModuleDependenciesCache>(*newGlobalCache))});
+      auto newInstance = std::make_unique<CompilerInstance>();
 
-      pInstance = std::get<0>((*subInstanceMap)[entry.arguments]).get();
-      auto globalCache = std::get<1>((*subInstanceMap)[entry.arguments]).get();
-      pCache = std::get<2>((*subInstanceMap)[entry.arguments]).get();
       SmallVector<const char *, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
       CompilerInvocation subInvoke = invoke;
-      pInstance->addDiagnosticConsumer(&FDC);
+      newInstance->addDiagnosticConsumer(&FDC);
       if (subInvoke.parseArgs(args, diags)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
       std::string InstanceSetupError;
-      if (pInstance->setup(subInvoke, InstanceSetupError)) {
+      if (newInstance->setup(subInvoke, InstanceSetupError)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
-      globalCache->configureForTriple(pInstance->getInvocation()
-                                                .getLangOptions().Target.str());
+      newGlobalCache->configureForTriple(
+          newInstance->getInvocation().getLangOptions().Target.str());
+      auto newLocalCache = std::make_unique<ModuleDependenciesCache>(
+          *newGlobalCache, newInstance->getMainModule()->getNameStr());
+      pInstance = newInstance.get();
+      pCache = newLocalCache.get();
+      subInstanceMap->insert(
+          {entry.arguments,
+           std::make_tuple(std::move(newInstance), std::move(newGlobalCache),
+                           std::move(newLocalCache))});
     }
     assert(pInstance);
     assert(pCache);
@@ -1252,7 +1253,8 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   if (opts.ReuseDependencyScannerCache)
     deserializeDependencyCache(instance, globalCache);
 
-  ModuleDependenciesCache cache(globalCache);
+  ModuleDependenciesCache cache(globalCache,
+                                instance.getMainModule()->getNameStr());
 
   // Execute scan
   auto dependenciesOrErr = performModuleScan(instance, cache);
@@ -1287,7 +1289,8 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache);
+  ModuleDependenciesCache cache(singleUseGlobalCache,
+                                instance.getMainModule()->getNameStr());
   if (out.has_error() || EC) {
     Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
                            EC.message());
@@ -1318,7 +1321,8 @@ bool swift::dependencies::batchScanDependencies(
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache);
+  ModuleDependenciesCache cache(singleUseGlobalCache,
+                                instance.getMainModule()->getNameStr());
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -1353,7 +1357,8 @@ bool swift::dependencies::batchPrescanDependencies(
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache);
+  ModuleDependenciesCache cache(singleUseGlobalCache,
+                                instance.getMainModule()->getNameStr());
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
