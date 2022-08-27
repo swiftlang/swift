@@ -205,6 +205,14 @@ class AndroidPlatform(Platform):
         return config_file
 
 
+class OpenBSDPlatform(Platform):
+    def cmake_options(self, args):
+        toolchain_file = os.getenv('OPENBSD_USE_TOOLCHAIN_FILE')
+        if not toolchain_file:
+            return ''
+        return f'-DCMAKE_TOOLCHAIN_FILE="${toolchain_file}"'
+
+
 class Target(object):
     """
     Abstract representation of a target Swift can run on.
@@ -265,7 +273,7 @@ class StdlibDeploymentTarget(object):
 
     FreeBSD = Platform("freebsd", archs=["x86_64"])
 
-    OpenBSD = Platform("openbsd", archs=["amd64"])
+    OpenBSD = OpenBSDPlatform("openbsd", archs=["amd64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
