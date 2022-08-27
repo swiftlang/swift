@@ -1848,6 +1848,7 @@ public:
       auto importer = ID->getModuleContext();
       if (target &&
           !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+          !ID->getAttrs().hasAttribute<SPIOnlyAttr>() &&
           target->getLibraryLevel() == LibraryLevel::SPI) {
 
         auto &diags = ID->getASTContext().Diags;
