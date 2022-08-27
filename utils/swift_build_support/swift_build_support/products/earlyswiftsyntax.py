@@ -10,11 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
-import os
-
 from . import cmake_product
-from . import product
-from .. import shell
 from .. import toolchain
 
 
