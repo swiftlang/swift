@@ -1839,6 +1839,7 @@ public:
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
+  ParserResult<PoundHasSymbolInfo> parseStmtConditionPoundHasSymbol();
   ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo,
                                  bool IfWasImplicitlyInserted = false);
   ParserResult<Stmt> parseStmtGuard();

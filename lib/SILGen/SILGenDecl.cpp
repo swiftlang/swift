@@ -1483,7 +1483,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       booleanTestLoc = expr;
       break;
     }
-    case StmtConditionElement::CK_Availability:
+
+    case StmtConditionElement::CK_Availability: {
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
       PoundAvailableInfo *availability = elt.getAvailability();
@@ -1513,6 +1514,12 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
         }
       }
       break;
+    }
+
+    case StmtConditionElement::CK_HasSymbol: {
+      llvm::report_fatal_error("Can't SILGen #_hasSymbol yet!");
+      break;
+    }
     }
 
     // Now that we have a boolean test as a Builtin.i1, emit the branch.

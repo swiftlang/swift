@@ -1280,7 +1280,7 @@ ERROR(string_literal_no_atsign,none,
 ERROR(invalid_float_literal_missing_leading_zero,none,
       "'.%0' is not a valid floating point literal; it must be written '0.%0'",
       (StringRef))
-ERROR(availability_query_outside_if_stmt_guard, none,
+ERROR(special_condition_outside_if_stmt_guard, none,
       "%0 may only be used as condition of an 'if', 'guard'"
       " or 'while' statement", (StringRef))
 
@@ -1934,6 +1934,19 @@ ERROR(availability_cannot_be_mixed,none,
 
 ERROR(false_available_is_called_unavailable,none,
       "#available cannot be used as an expression, did you mean to use '#unavailable'?", ())
+
+//------------------------------------------------------------------------------
+// MARK: #_hasSymbol query parsing diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(has_symbol_expected_lparen,PointsToFirstBadToken,
+      "expected '(' in #_hasSymbol directive", ())
+
+ERROR(has_symbol_expected_expr,PointsToFirstBadToken,
+      "expected expression in #_hasSymbol", ())
+
+ERROR(has_symbol_expected_rparen,PointsToFirstBadToken,
+      "expected ')' in #_hasSymbol condition", ())
 
 ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
