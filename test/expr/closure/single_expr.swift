@@ -100,7 +100,7 @@ let backupPlan: () -> Int = { haltAndCatchFire() }
 func missionCritical(storage: () -> String) {}
 missionCritical(storage: { haltAndCatchFire() })
 
-// <https://bugs.swift.org/browse/SR-4963>
+// https://github.com/apple/swift/issues/47540
 enum E { }
 func takesAnotherUninhabitedType(e: () -> E) {}
 takesAnotherUninhabitedType { haltAndCatchFire() }

@@ -513,26 +513,24 @@ let closure = {
   return helper
 }
 
-// SR-9839
-func SR9839(_ x: @escaping @convention(block) () -> Void) {}
+// https://github.com/apple/swift/issues/52253
+do {
+  func f(_: @escaping @convention(block) () -> Void) {}
 
-func id<T>(_ x: T) -> T {
-  return x
+  func id<T>(_: T) -> T {}
+
+  let qux: () -> Void
+
+  f(qux)
+  f(id(qux)) // expected-error {{conflicting arguments to generic parameter 'T' ('() -> Void' vs. '@convention(block) () -> Void')}}
+
+  func forceUnwrap<T>(_: T?) -> T {}
+
+  let qux1: (() -> Void)?
+
+  f(qux1!)
+  f(forceUnwrap(qux1))
 }
-
-var qux: () -> Void = {}
-
-SR9839(qux)
-SR9839(id(qux)) // expected-error {{conflicting arguments to generic parameter 'T' ('() -> Void' vs. '@convention(block) () -> Void')}}
-
-func forceUnwrap<T>(_ x: T?) -> T {
-  return x!
-}
-
-var qux1: (() -> Void)? = {}
-
-SR9839(qux1!)
-SR9839(forceUnwrap(qux1))
 
 // rdar://problem/65155671 - crash referencing parameter of outer closure
 func rdar65155671(x: Int) {
@@ -541,21 +539,22 @@ func rdar65155671(x: Int) {
     }(x)
 }
 
-func sr3186<T, U>(_ f: (@escaping (@escaping (T) -> U) -> ((T) -> U))) -> ((T) -> U) {
-    return { x in return f(sr3186(f))(x) }
-}
+// https://github.com/apple/swift/issues/45774
+do {
+  func f<T, U>(_: (@escaping (@escaping (T) -> U) -> ((T) -> U))) -> ((T) -> U) {}
 
-class SR3186 {
-  init() {
-    // expected-warning@+1{{capture 'self' was never used}}
-    let v = sr3186 { f in { [unowned self, f] x in x != 1000 ? f(x + 1) : "success" } }(0)
-    print("\(v)")
+  class C {
+    init() {
+      // expected-warning@+1{{capture 'self' was never used}}
+      let _ = f { fn in { [unowned self, fn] x in x != 1000 ? fn(x + 1) : "success" } }(0)
+    }
   }
 }
 
+// https://github.com/apple/swift/issues/56501
 // Apply the explicit 'self' rule even if it refers to a capture, if
-// we're inside a nested closure
-class SR14120 {
+// we're inside a nested closure.
+class C_56501 {
   func operation() {}
 
   func test1() {
@@ -613,24 +612,25 @@ class SR14120 {
   }
 }
 
-// SR-14678
-func call<T>(_ : Int, _ f: () -> (T, Int)) -> (T, Int) {
-  f()
-}
+// https://github.com/apple/swift/issues/57029
+do {
+  func call<T>(_ : Int, _ f: () -> (T, Int)) -> (T, Int) {}
 
-func testSR14678() -> (Int, Int) {
-  call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
-     (print("hello"), 0)
+  func f() -> (Int, Int) {
+    call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
+       ((), 0)
+    }
+  }
+
+  func f_Optional() -> (Int, Int)? {
+    call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
+       ((), 0)
+    }
   }
 }
 
-func testSR14678_Optional() -> (Int, Int)? {
-  call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
-     (print("hello"), 0)
-  }
-}
+// https://github.com/apple/swift/issues/55680
 
-// SR-13239
 func callit<T>(_ f: () -> T) -> T {
   f()
 }
@@ -655,7 +655,7 @@ func callitVariadic<T>(_ fs: () -> T...) -> T {
   fs.first!()
 }
 
-func testSR13239_Tuple() -> Int {
+func test_55680_Tuple() -> Int {
   // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
   // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
   callitTuple(1) { // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
@@ -663,7 +663,7 @@ func testSR13239_Tuple() -> Int {
   }
 }
 
-func testSR13239() -> Int {
+func test_55680() -> Int {
   // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
   // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
   callit { // expected-note@:10{{generic parameter 'T' inferred as '()' from closure return expression}}
@@ -671,7 +671,7 @@ func testSR13239() -> Int {
   }
 }
 
-func testSR13239_Args() -> Int {
+func test_55680_Args() -> Int {
   // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
   // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
   callitArgs(1) { // expected-note@:17{{generic parameter 'T' inferred as '()' from closure return expression}}
@@ -679,7 +679,7 @@ func testSR13239_Args() -> Int {
   }
 }
 
-func testSR13239_ArgsFn() -> Int {
+func test_55680_ArgsFn() -> Int {
   // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
   // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
   callitArgsFn(1) { // expected-note@:19{{generic parameter 'T' inferred as '()' from closure return expression}}
@@ -687,21 +687,21 @@ func testSR13239_ArgsFn() -> Int {
   }
 }
 
-func testSR13239MultiExpr() -> Int {
+func test_55680_MultiExpr() -> Int {
   callit {
     print("hello") 
     return print("hello") // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
   }
 }
 
-func testSR13239_GenericArg() -> Int {
+func test_55680_GenericArg() -> Int {
   // Generic argument is inferred as Int from first argument literal, so no conflict in this case.
   callitGenericArg(1) {
     print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
   }
 }
 
-func testSR13239_Variadic() -> Int {
+func test_55680_Variadic() -> Int {
   // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
   // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
   callitVariadic({ // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
@@ -709,7 +709,7 @@ func testSR13239_Variadic() -> Int {
   })
 }
 
-func testSR13239_Variadic_Twos() -> Int {
+func test_55680_Variadic_Twos() -> Int {
   // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
   callitVariadic({
     print("hello")
