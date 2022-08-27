@@ -651,6 +651,9 @@ def create_argument_parser():
     option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
            help='build swiftSyntax')
 
+    option(['--early-swiftsyntax'], toggle_true('build_early_swiftsyntax'),
+           help='build early SwiftSyntax')
+
     option(['--skstresstester'], toggle_true('build_skstresstester'),
            help='build the SourceKit stress tester')
 

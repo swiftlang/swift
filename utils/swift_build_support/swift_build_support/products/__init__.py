@@ -14,6 +14,7 @@ from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
 from .curl import LibCurl
+from .earlyswiftsyntax import EarlySwiftSyntax
 from .earlyswiftdriver import EarlySwiftDriver
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
