@@ -42,7 +42,7 @@ func implicitCastOfLiteralToOptional() {
 }
 
 // A nil value can be cast to any other optional type.
-// https://bugs.swift.org/browse/SR-3505
+// https://github.com/apple/swift/issues/46093
 func castUnrelatedOptionalTypes(x: Int?) {
   let _ = x as String? // expected-error {{cannot convert value}}
   let _ = x as? String? // no-warning
