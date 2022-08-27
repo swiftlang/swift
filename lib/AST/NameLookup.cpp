@@ -2062,8 +2062,6 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
 
-    SmallVector<ProtocolDecl *, 4> protocols;
-
     if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
       // If we haven't seen a class declaration yet, look into the protocol.
       if (!sawClassDecl) {

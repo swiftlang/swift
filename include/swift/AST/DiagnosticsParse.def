@@ -231,8 +231,6 @@ ERROR(disallowed_var_multiple_getset,none,
 
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
-ERROR(var_init_self_referential,none,
-      "variable used within its own initial value", ())
 
 ERROR(disallowed_enum_element,none,
       "enum 'case' is not allowed outside of an enum", ())
