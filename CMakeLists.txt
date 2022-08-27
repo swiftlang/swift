@@ -1163,6 +1163,9 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
+  # Some of the things below depend on the threading library
+  add_subdirectory(stdlib/public/Threading)
+
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)
   endif()
