@@ -1009,6 +1009,17 @@ StringRef Parser::copyAndStripUnderscores(StringRef orig) {
   return StringRef(start, p - start);
 }
 
+StringRef Parser::stripUnderscoresIfNeeded(StringRef text,
+                                           SmallVectorImpl<char> &buffer) {
+  if (text.contains('_')) {
+    buffer.clear();
+    llvm::copy_if(text, std::back_inserter(buffer),
+                  [](char ch) { return ch != '_'; });
+    return StringRef(buffer.data(), buffer.size());
+  }
+  return text;
+}
+
 /// Disambiguate the parse after '{' token that is in a place that might be
 /// the start of a trailing closure, or start the variable accessor block.
 ///

@@ -1653,6 +1653,8 @@ public:
   ParserResult<Expr> parseExprRegexLiteral();
 
   StringRef copyAndStripUnderscores(StringRef text);
+  StringRef stripUnderscoresIfNeeded(StringRef text,
+                                     SmallVectorImpl<char> &buffer);
 
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                    Token EntireTok,
