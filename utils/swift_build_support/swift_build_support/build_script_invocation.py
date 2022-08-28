@@ -548,6 +548,10 @@ class BuildScriptInvocation(object):
         builder = ProductPipelineListBuilder(self.args)
 
         builder.begin_pipeline()
+
+        builder.add_product(products.EarlySwiftSyntax,
+                            is_enabled=self.args.build_early_swiftsyntax)
+
         # If --skip-early-swift-driver is passed in, swift will be built
         # as usual, but relying on its own C++-based (Legacy) driver.
         # Otherwise, we build an "early" swift-driver using the host
