@@ -795,14 +795,15 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
         continue;
       }
       if (!runningVals.hasValue()) {
-        assert(!deinitializationPoints[blockPromotingWithin]);
-        deinitializationPoints[blockPromotingWithin] = inst;
         continue;
       }
       if (sbi->getSrc() != runningVals->value.stored) {
         continue;
       }
+      // Mark storage as invalid and mark end_borrow as a deinit point.
       runningVals->isStorageValid = false;
+      assert(!deinitializationPoints[blockPromotingWithin]);
+      deinitializationPoints[blockPromotingWithin] = inst;
       if (!canEndLexicalLifetime(runningVals->value)) {
         continue;
       }

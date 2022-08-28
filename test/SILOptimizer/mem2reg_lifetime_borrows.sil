@@ -452,3 +452,35 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_deinit_point :
+// CHECK: alloc_stack 
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_deinit_point'
+sil [ossa] @test_deinit_point : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %tmp = alloc_stack $Klass
+  %sb = store_borrow %0 to %tmp : $*Klass
+  %f = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %c = apply %f(%sb) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  end_borrow %sb : $*Klass
+  dealloc_stack %tmp : $*Klass
+  %copy = copy_value %0 : $Klass
+  store %copy to [init] %stk : $*Klass
+  %l = load [take] %stk : $*Klass
+  destroy_value %l : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %stk : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
+
