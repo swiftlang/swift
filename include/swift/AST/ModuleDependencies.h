@@ -527,7 +527,6 @@ public:
   GlobalModuleDependenciesCache(const GlobalModuleDependenciesCache &) = delete;
   GlobalModuleDependenciesCache &
   operator=(const GlobalModuleDependenciesCache &) = delete;
-
   virtual ~GlobalModuleDependenciesCache() {}
 
   void configureForTriple(std::string triple);
@@ -603,24 +602,18 @@ class ModuleDependenciesCache {
 private:
   GlobalModuleDependenciesCache &globalCache;
 
-  /// References to data in `globalCache` for dependencies accimulated during
+  /// References to data in `globalCache` for Swift dependencies and
+  /// `clangModuleDependencies` for Clang dependencies accimulated during
   /// the current scanning action.
   ModuleDependenciesKindRefMap ModuleDependenciesMap;
 
-  /// Additional information needed for Clang dependency scanning.
-  ClangModuleDependenciesCacheImpl *clangImpl = nullptr;
-
-  /// Name of the main Swift module of this scan
-  StringRef mainModuleName;
-  /// Underlying Clang module is seen differently by the main
-  /// module and by module clients. For this reason, we do not wish subsequent
-  /// scans to be able to re-use this dependency info and therefore we avoid
-  /// adding it to the global cache. The dependency storage is therefore tied
-  /// to this, local, cache.
-  std::unique_ptr<ModuleDependencies> underlyingClangModuleDependency = nullptr;
+  /// Discovered Clang modules are only cached locally.
+  llvm::StringMap<ModuleDependenciesVector> clangModuleDependencies;
 
   /// Function that will delete \c clangImpl properly.
   void (*clangImplDeleter)(ClangModuleDependenciesCacheImpl *) = nullptr;
+  /// Additional information needed for Clang dependency scanning.
+  ClangModuleDependenciesCacheImpl *clangImpl = nullptr;
 
   /// Free up the storage associated with the Clang implementation.
   void destroyClangImpl() {
@@ -647,8 +640,7 @@ private:
                    Optional<ModuleDependenciesKind> kind) const;
 
 public:
-  ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache,
-                          StringRef mainModuleName);
+  ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
   virtual ~ModuleDependenciesCache() { destroyClangImpl(); }

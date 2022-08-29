@@ -1109,7 +1109,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       newGlobalCache->configureForTriple(
           newInstance->getInvocation().getLangOptions().Target.str());
       auto newLocalCache = std::make_unique<ModuleDependenciesCache>(
-          *newGlobalCache, newInstance->getMainModule()->getNameStr());
+          *newGlobalCache);
       pInstance = newInstance.get();
       pCache = newLocalCache.get();
       subInstanceMap->insert(
@@ -1253,8 +1253,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   if (opts.ReuseDependencyScannerCache)
     deserializeDependencyCache(instance, globalCache);
 
-  ModuleDependenciesCache cache(globalCache,
-                                instance.getMainModule()->getNameStr());
+  ModuleDependenciesCache cache(globalCache);
 
   // Execute scan
   auto dependenciesOrErr = performModuleScan(instance, cache);
@@ -1289,8 +1288,7 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache,
-                                instance.getMainModule()->getNameStr());
+  ModuleDependenciesCache cache(singleUseGlobalCache);
   if (out.has_error() || EC) {
     Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
                            EC.message());
@@ -1321,8 +1319,7 @@ bool swift::dependencies::batchScanDependencies(
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache,
-                                instance.getMainModule()->getNameStr());
+  ModuleDependenciesCache cache(singleUseGlobalCache);
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -1357,8 +1354,7 @@ bool swift::dependencies::batchPrescanDependencies(
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache,
-                                instance.getMainModule()->getNameStr());
+  ModuleDependenciesCache cache(singleUseGlobalCache);
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
