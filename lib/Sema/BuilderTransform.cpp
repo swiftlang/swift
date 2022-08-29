@@ -1016,13 +1016,6 @@ protected:
 
       if (auto *decl = element.dyn_cast<Decl *>()) {
         switch (decl->getKind()) {
-        case DeclKind::PatternBinding: {
-          if (!isValidPatternBinding(cast<PatternBindingDecl>(decl)))
-            return failTransform(decl);
-
-          LLVM_FALLTHROUGH;
-        }
-
         // Just ignore #if; the chosen children should appear in
         // the surrounding context.  This isn't good for source
         // tools but it at least works.
@@ -1030,8 +1023,7 @@ protected:
         // Skip #warning/#error; we'll handle them when applying
         // the builder.
         case DeclKind::PoundDiagnostic:
-        // Ignore variable declarations, because they're always
-        // handled within their enclosing pattern bindings.
+        case DeclKind::PatternBinding:
         case DeclKind::Var:
         case DeclKind::Param:
           newBody.push_back(element);
@@ -1582,30 +1574,6 @@ protected:
     }
 
     return DoStmt::createImplicit(ctx, LabeledStmtInfo(), doBody);
-  }
-
-  bool isValidPatternBinding(PatternBindingDecl *PB) {
-    // Enforce some restrictions on local variables inside a result builder.
-    for (unsigned i : range(PB->getNumPatternEntries())) {
-      // The pattern binding must have an initial value expression.
-      if (!PB->isExplicitlyInitialized(i))
-        return false;
-
-      // Each variable bound by the pattern must be stored, and cannot
-      // have observers.
-      SmallVector<VarDecl *, 8> variables;
-      PB->getPattern(i)->collectVariables(variables);
-
-      for (auto *var : variables) {
-        if (!var->getImplInfo().isSimpleStored())
-          return false;
-
-        // Also check for invalid attributes.
-        TypeChecker::checkDeclAttributes(var);
-      }
-    }
-
-    return true;
   }
 
   UNSUPPORTED_STMT(Throw)
