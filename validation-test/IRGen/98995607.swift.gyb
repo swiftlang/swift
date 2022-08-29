@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swiftgyb
 
+// REQUIRES: executable_test
+
 %for N in range(0, 100):
 
 protocol P${N}<A, B> {
