@@ -4706,7 +4706,8 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   // Property delegates allow their type to be an unbound generic.
-  if (typeKind == CustomAttrTypeKind::PropertyWrapper) {
+  if (typeKind == CustomAttrTypeKind::PropertyWrapper ||
+      typeKind == CustomAttrTypeKind::TypeWrapper) {
     unboundTyOpener = [](auto unboundTy) {
       // FIXME: Don't let unbound generic types
       // escape type resolution. For now, just
