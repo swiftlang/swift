@@ -4039,7 +4039,8 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
               return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
                      fix->getKind() == FixKind::AllowTupleTypeMismatch ||
-                     fix->getKind() == FixKind::GenericArgumentsMismatch;
+                     fix->getKind() == FixKind::GenericArgumentsMismatch ||
+                     fix->getKind() == FixKind::InsertCall;
             });
       });
 
@@ -4515,7 +4516,9 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
 
     auto argParamMatch = argMatching->second.parameterBindings[i];
     auto param = applyFnType->getParams()[argParamMatch.front()];
-    auto paramFnType = param.getPlainType()->castTo<FunctionType>();
+    auto paramFnType = param.getPlainType()->getAs<FunctionType>();
+    if (!paramFnType)
+      continue;
 
     if (cs.typeVarOccursInType(resultTypeVar, paramFnType->getResult()))
       closureArguments.push_back(closure);
