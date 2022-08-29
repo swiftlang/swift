@@ -1606,7 +1606,7 @@ for host in "${ALL_HOSTS[@]}"; do
             )
         fi
 
-        if [[ "${host}" == "openbsd-"* && "${OPENBSD_USE_TOOLCHAIN_FILE}" != "" ]]; then
+        if [[ "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
             llvm_cmake_options=(
                 "${llvm_cmake_options[@]}"
                 -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
@@ -1894,7 +1894,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ $(is_cross_tools_host ${host}) && "${host}" == "openbsd-"* && "${OPENBSD_USE_TOOLCHAIN_FILE}" != "" ]]; then
+                if [[ $(is_cross_tools_host ${host}) && "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
