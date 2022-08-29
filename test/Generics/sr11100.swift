@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/53495
+
 protocol P1 {
   associatedtype A
 }

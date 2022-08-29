@@ -378,15 +378,15 @@ func passesConditionallyNotF7(x21: X2<X1>) {
   takesF7(x21) // expected-error{{global function 'takesF7' requires that 'X1.A' (aka 'X0') conform to 'P7'}}
 }
 
-
-public struct SR6990<T, U> {}
-extension SR6990: Sequence where T == Int {
+// https://github.com/apple/swift/issues/49538
+public struct S_49538<T, U> {}
+extension S_49538: Sequence where T == Int {
     public typealias Element = Float
     public typealias Iterator = IndexingIterator<[Float]>
     public func makeIterator() -> Iterator { fatalError() }
 }
 
-// SR-8324
+// https://github.com/apple/swift/issues/50852
 protocol ElementProtocol {
   associatedtype BaseElement: BaseElementProtocol = Self
 }
@@ -403,7 +403,8 @@ extension Array: NestedArrayProtocol where Element: ElementProtocol, Element: Ar
   // typealias BaseElement = Element.BaseElement
 }
 
-// SR-8337
+// https://github.com/apple/swift/issues/50865
+
 struct Foo<Bar> {}
 
 protocol P {
@@ -426,13 +427,13 @@ extension BinaryInteger {
   }
 }
 
-// SR-10992
+// https://github.com/apple/swift/issues/53382
 
-protocol SR_10992_P {}
-struct SR_10992_S<T> {}
-extension SR_10992_S: SR_10992_P where T: SR_10992_P {} // expected-note {{requirement from conditional conformance of 'SR_10992_S<String>' to 'SR_10992_P'}}
+protocol P_53382 {}
+struct S_53382<T> {}
+extension S_53382: P_53382 where T: P_53382 {} // expected-note {{requirement from conditional conformance of 'S_53382<String>' to 'P_53382'}}
 	
-func sr_10992_foo(_ fn: (SR_10992_S<String>) -> Void) {}
-func sr_10992_bar(_ fn: (SR_10992_P) -> Void) {
-  sr_10992_foo(fn) // expected-error {{global function 'sr_10992_foo' requires that 'String' conform to 'SR_10992_P'}}
+func f1_53382(_ fn: (S_53382<String>) -> Void) {}
+func f2_53382(_ fn: (P_53382) -> Void) {
+  f1_53382(fn) // expected-error {{global function 'f1_53382' requires that 'String' conform to 'P_53382'}}
 }

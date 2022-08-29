@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/53142
+
 // CHECK: sr10752.(file).P@
 // CHECK-NEXT: Requirement signature: <Self where Self.[P]A : P, Self.[P]A == Self.[P]A.[P]A>
 protocol P {

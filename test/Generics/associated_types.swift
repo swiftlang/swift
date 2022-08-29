@@ -152,8 +152,9 @@ struct V<T> : Fooable {
 var w = W.AssocType()
 var v = V<String>.AssocType()
 
-//
-// SR-427
+
+// https://github.com/apple/swift/issues/43044
+
 protocol A {
   func c()
 }
@@ -176,8 +177,8 @@ struct CC : B {
 
 C<CC>().c()
 
-// SR-511
-protocol sr511 {
+// https://github.com/apple/swift/issues/43128
+protocol P_43128 {
   typealias Foo // expected-error {{type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
 }
 
@@ -200,27 +201,28 @@ extension M {
   }
 }
 
-// SR-6097
-protocol sr6097 {
+// https://github.com/apple/swift/issues/48652
+
+protocol P11a {
   associatedtype A : AnyObject
   var aProperty: A { get }
 }
 
 class C1 {}
-class C2 : sr6097 {
+class C2 : P11a {
   unowned let aProperty: C1 // should deduce A == C1 despite 'unowned'
   init() { fatalError() }
 }
 
-protocol sr6097_b {
+protocol P11b {
   associatedtype A : AnyObject
   var aProperty: A? { get }
 }
-class C3 : sr6097_b {
+class C3 : P11b {
   weak var aProperty: C1? // and same here, despite 'weak'
   init() { fatalError() }
 }
-class G<T> : sr6097_b where T : AnyObject {
+class G<T> : P11b where T : AnyObject {
   weak var aProperty: T?
 }
 

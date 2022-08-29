@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 // RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/56862
+
 // CHECK-LABEL: Requirement signature: <Self where Self == Self.[Adjoint]Dual.[Adjoint]Dual, Self.[Adjoint]Dual : Adjoint>
 public protocol Adjoint {
   associatedtype Dual: Adjoint where Self.Dual.Dual == Self

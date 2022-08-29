@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/sr8945-other.swift -emit-module-path %t/other.swiftmodule -module-name other
 // RUN: %target-swift-frontend -emit-silgen %s -I%t -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/51450
+
 import other
 
 public class C : P {

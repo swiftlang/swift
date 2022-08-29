@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/55182
+
 // CHECK: sr12736.(file).ColorModel@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[ColorModel]Float32Components.[ColorComponents]Model, Self.[ColorModel]Float32Components : ColorComponents>
 public protocol ColorModel {

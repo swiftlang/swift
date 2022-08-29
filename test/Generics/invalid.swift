@@ -105,7 +105,8 @@ class P<N> {
   // expected-error@-1 {{type 'N' constrained to non-protocol, non-class type 'A.XYZ'}}
 }
 
-// SR-5579
+// https://github.com/apple/swift/issues/48151
+
 protocol Foo {
     associatedtype Bar where Bar.Nonsense == Int // expected-error{{'Nonsense' is not a member type of type 'Self.Bar'}}
 }

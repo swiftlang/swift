@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/54974
+
 protocol AnyPropertyProtocol {
     associatedtype Root = Any
     associatedtype Value = Any

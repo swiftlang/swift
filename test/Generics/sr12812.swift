@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -debug-generic-signatures -emit-ir %s 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/55258
+
 public protocol DefaultInitializable {
   init()
 }
@@ -80,7 +82,7 @@ public extension GeneralAdjacencyList
   where VertexIDToIndex == IdentityVertexIDToIndex<Spine>,
         Spine: RangeReplaceableCollection,
         Spine.Element.Edges: RangeReplaceableCollection
-          & BidirectionalCollection // Because https://bugs.swift.org/browse/SR-12810
+          & BidirectionalCollection // Because https://github.com/apple/swift/issues/55257
 {
   func addVertex(storing properties: VertexProperties) -> VertexID {
     return spine.indices.first!

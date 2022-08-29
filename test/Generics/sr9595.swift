@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/52042
+
 protocol R {}
 
 protocol Q {

@@ -31,7 +31,10 @@ func callTestP(_ x1: X1) {
   testP(x1)
 }
 
-// SR-10251: unable to infer associated type in child protocol
+// https://github.com/apple/swift/issues/52651
+// Unable to infer associated type in child protocol
+// FIXME: We already have a test case for this in test/decl/protocol/req/associated_type_inference_fixed_type.swift
+
 protocol P2 { associatedtype T }
 
 protocol P3: P2 where T == Self {}
