@@ -262,7 +262,7 @@ END_VALUE_WITNESS_RANGE(TypeLayoutWitness,
 /// [0..NumElements-1].
 FUNCTION_VALUE_WITNESS(getEnumTag,
                        GetEnumTag,
-                       INT_TYPE,
+                       UINT_TYPE,
                        (IMMUTABLE_VALUE_TYPE, TYPE_TYPE))
 
 BEGIN_VALUE_WITNESS_RANGE(EnumValueWitness,

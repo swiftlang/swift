@@ -207,8 +207,7 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
-// CHECK:      private:
-// CHECK:      inline int _getEnumTag() const {
+// CHECK:      inline unsigned _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums12BoolWithCaseOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -271,7 +270,7 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
-// CHECK:      inline int _getEnumTag() const {
+// CHECK:      inline unsigned _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums9CLikeEnumOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -317,7 +316,7 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
-// CHECK:      inline int _getEnumTag() const {
+// CHECK:      inline unsigned _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums8DataCaseOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -402,7 +401,7 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
-// CHECK:      inline int _getEnumTag() const {
+// CHECK:      inline unsigned _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums17IntDoubleOrBignumOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -473,8 +472,7 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     case 2: return cases::PosInfinity;
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
-// CHECK-NEXT: } 
-// CHECK:      inline int _getEnumTag() const {
+// CHECK:      inline unsigned _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums13IntOrInfinityOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -568,7 +566,7 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
-// CHECK:      inline int _getEnumTag() const {
+// CHECK:      inline unsigned _getEnumTag() const {
 // CHECK-NEXT:   auto metadata = _impl::$s5Enums20MultipleBoolWithCaseOMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
