@@ -2751,6 +2751,13 @@ static std::pair<bool, unsigned>
 isInvalidPartialApplication(ConstraintSystem &cs,
                             const AbstractFunctionDecl *member,
                             ConstraintLocator *locator) {
+  // If this is a compiler synthesized implicit conversion, let's skip
+  // the check because the base of `UDE` is not the base of the injected
+  // initializer.
+  if (locator->isLastElement<LocatorPathElt::ConstructorMember>() &&
+      locator->findFirst<LocatorPathElt::ImplicitConversion>())
+    return {false, 0};
+
   auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
   if (UDE == nullptr)
     return {false,0};
