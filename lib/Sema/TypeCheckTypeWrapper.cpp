@@ -25,19 +25,17 @@
 
 using namespace swift;
 
-/// Create a property declaration and inject it into the given type.
-static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
-                               Type type, VarDecl::Introducer introducer,
-                               AccessLevel accessLevel,
-                               Expr *initializer = nullptr) {
-  auto &ctx = parent->getASTContext();
+static PatternBindingDecl *injectVariable(DeclContext *DC, Identifier name,
+                                          Type type,
+                                          VarDecl::Introducer introducer,
+                                          Expr *initializer = nullptr) {
+  auto &ctx = DC->getASTContext();
 
   auto *var = new (ctx) VarDecl(/*isStatic=*/false, introducer,
-                                /*nameLoc=*/SourceLoc(), name, parent);
+                                /*nameLoc=*/SourceLoc(), name, DC);
 
   var->setImplicit();
   var->setSynthesized();
-  var->setAccess(accessLevel);
   var->setInterfaceType(type);
 
   Pattern *pattern = NamedPattern::createImplicit(ctx, var);
@@ -45,8 +43,19 @@ static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
 
   pattern = TypedPattern::createImplicit(ctx, pattern, type);
 
-  auto *PBD = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
-                                                 pattern, initializer, parent);
+  return PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
+                                            pattern, initializer, DC);
+}
+
+/// Create a property declaration and inject it into the given type.
+static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
+                               Type type, VarDecl::Introducer introducer,
+                               AccessLevel accessLevel,
+                               Expr *initializer = nullptr) {
+  auto *PBD = injectVariable(parent, name, type, introducer, initializer);
+  auto *var = PBD->getSingleVar();
+
+  var->setAccess(accessLevel);
 
   parent->addMember(PBD);
   parent->addMember(var);
@@ -471,4 +480,34 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
 
   return BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(), body,
                            /*rbloc=*/ctor->getLoc(), /*implicit=*/true);
+}
+
+VarDecl *SynthesizeLocalVariableForTypeWrapperStorage::evaluate(
+    Evaluator &evaluator, ConstructorDecl *ctor) const {
+  auto &ctx = ctor->getASTContext();
+
+  if (ctor->isImplicit() || !ctor->isDesignatedInit())
+    return nullptr;
+
+  auto *DC = ctor->getDeclContext()->getSelfNominalTypeDecl();
+  if (!(DC && DC->hasTypeWrapper()))
+    return nullptr;
+
+  auto *storageDecl =
+      evaluateOrDefault(evaluator, GetTypeWrapperStorage{DC}, nullptr);
+  assert(storageDecl);
+
+  SmallVector<TupleTypeElt, 4> members;
+  for (auto *member : storageDecl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      assert(var->hasStorage() &&
+             "$Storage should have stored properties only");
+      members.push_back({var->getValueInterfaceType(), var->getName()});
+    }
+  }
+
+  auto *PBD =
+      injectVariable(ctor, ctx.Id_localStorageVar, TupleType::get(members, ctx),
+                     VarDecl::Introducer::Var);
+  return PBD->getSingleVar();
 }

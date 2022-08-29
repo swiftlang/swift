@@ -3705,6 +3705,21 @@ public:
   bool isCached() const { return true; }
 };
 
+class SynthesizeLocalVariableForTypeWrapperStorage
+    : public SimpleRequest<SynthesizeLocalVariableForTypeWrapperStorage,
+                           VarDecl *(ConstructorDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);

@@ -7649,6 +7649,12 @@ public:
   /// \endcode
   bool isObjCZeroParameterWithLongSelector() const;
 
+  /// If this is a user-defined constructor that belongs to
+  /// a type wrapped type return a local `_storage` variable
+  /// injected by the compiler for aid with type wrapper
+  /// initialization.
+  VarDecl *getLocalTypeWrapperStorageVar() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }

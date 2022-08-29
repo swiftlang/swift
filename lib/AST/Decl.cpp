@@ -8789,6 +8789,13 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   return params->get(0)->getInterfaceType()->isVoid();
 }
 
+VarDecl *ConstructorDecl::getLocalTypeWrapperStorageVar() const {
+  auto &ctx = getASTContext();
+  auto *mutableSelf = const_cast<ConstructorDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, SynthesizeLocalVariableForTypeWrapperStorage{mutableSelf},
+      nullptr);
+}
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
