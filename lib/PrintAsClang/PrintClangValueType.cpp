@@ -51,20 +51,24 @@ void ClangValueTypePrinter::printCxxImplClassName(raw_ostream &os,
 }
 
 void ClangValueTypePrinter::printMetadataAccessAsVariable(
-    raw_ostream &os, StringRef metadataFuncName, int indent,
+    raw_ostream &os, StringRef metadataFuncName,
+    ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef varName) {
   ClangSyntaxPrinter printer(os);
   os << std::string(indent, ' ') << "auto " << varName << " = "
      << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  printer.printSwiftTypeMetadataAccessFunctionCall(metadataFuncName);
+  printer.printSwiftTypeMetadataAccessFunctionCall(metadataFuncName,
+                                                   genericRequirements);
   os << ";\n";
 }
 
 void ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-    raw_ostream &os, StringRef metadataFuncName, int indent,
+    raw_ostream &os, StringRef metadataFuncName,
+    ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef metadataVarName, StringRef vwTableVarName) {
   ClangSyntaxPrinter printer(os);
-  printMetadataAccessAsVariable(os, metadataFuncName, indent, metadataVarName);
+  printMetadataAccessAsVariable(os, metadataFuncName, genericRequirements,
+                                indent, metadataVarName);
   printer.printValueWitnessTableAccessSequenceFromTypeMetadata(
       metadataVarName, vwTableVarName, indent);
 }
@@ -115,10 +119,26 @@ void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl,
     llvm::function_ref<void(void)> bodyPrinter) {
   // FIXME: Add support for generic structs.
-  if (typeDecl->isGeneric())
-    return;
   llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
-  if (!typeDecl->isResilient()) {
+  Optional<CanGenericSignature> genericSignature;
+  auto printGenericSignature = [&](raw_ostream &os) {
+    if (!genericSignature)
+      return;
+    ClangSyntaxPrinter(os).printGenericSignature(*genericSignature);
+  };
+  auto printGenericParamRefs = [&](raw_ostream &os) {
+    if (!genericSignature)
+      return;
+    ClangSyntaxPrinter(os).printGenericSignatureParams(*genericSignature);
+  };
+  if (typeDecl->isGeneric()) {
+    genericSignature = typeDecl->getGenericSignature().getCanonicalSignature();
+    // FIXME: Support generic requirements.
+    if (!genericSignature->getRequirements().empty())
+      return;
+    // FIXME: Can we make some better layout than opaque layout for generic
+    // types.
+  } else if (!typeDecl->isResilient()) {
 
     typeSizeAlign =
         interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
@@ -135,10 +155,15 @@ void ClangValueTypePrinter::printValueTypeDecl(
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
   std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
+  auto typeMetadataFuncGenericParams =
+      interopContext.getIrABIDetails()
+          .getTypeMetadataAccessFunctionGenericRequirementParameters(
+              const_cast<NominalTypeDecl *>(typeDecl));
 
   // Print out a forward declaration of the "hidden" _impl class.
   printer.printNamespace(cxx_synthesis::getCxxImplNamespaceName(),
                          [&](raw_ostream &os) {
+                           printGenericSignature(os);
                            os << "class ";
                            printCxxImplClassName(os, typeDecl);
                            os << ";\n\n";
@@ -146,7 +171,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
                            // Print out special functions, like functions that
                            // access type metadata.
                            printer.printCTypeMetadataTypeFunction(
-                               typeDecl, typeMetadataFuncName);
+                               typeDecl, typeMetadataFuncName,
+                               typeMetadataFuncGenericParams);
                            // Print out global variables for resilient enum
                            // cases
                            if (isa<EnumDecl>(typeDecl) && isOpaqueLayout) {
@@ -170,7 +196,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
                                       StringRef enumVWTableName =
                                           "enumVWTable") {
     ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-        os, typeMetadataFuncName);
+        os, typeMetadataFuncName, typeMetadataFuncGenericParams);
     os << "    const auto *" << enumVWTableName << " = reinterpret_cast<";
     ClangSyntaxPrinter(os).printSwiftImplQualifier();
     os << "EnumValueWitnessTable";
@@ -178,6 +204,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   };
 
   // Print out the C++ class itself.
+  printGenericSignature(os);
   os << "class ";
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << " final {\n";
@@ -188,7 +215,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printer.printBaseName(typeDecl);
   os << "() {\n";
   ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-      os, typeMetadataFuncName);
+      os, typeMetadataFuncName, typeMetadataFuncGenericParams);
   os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
   os << "  }\n";
 
@@ -198,7 +225,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printer.printBaseName(typeDecl);
   os << " &other) {\n";
   ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-      os, typeMetadataFuncName);
+      os, typeMetadataFuncName, typeMetadataFuncGenericParams);
   if (isOpaqueLayout) {
     os << "    _storage = ";
     printer.printSwiftImplQualifier();
@@ -242,7 +269,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (isOpaqueLayout) {
     os << "\n";
     ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-        os, typeMetadataFuncName);
+        os, typeMetadataFuncName, typeMetadataFuncGenericParams);
     os << "    return ";
     printer.printBaseName(typeDecl);
     os << "(vwTable);\n  }\n";
@@ -300,6 +327,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // Wrap up the value type.
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
+  printGenericParamRefs(os);
   os << ";\n";
   os << "};\n";
   os << '\n';
@@ -308,6 +336,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // Print out the "hidden" _impl class.
   printer.printNamespace(
       cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
+        printGenericSignature(os);
         os << "class ";
         printCxxImplClassName(os, typeDecl);
         os << " {\n";
@@ -315,18 +344,22 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
         os << "  static inline char * _Nonnull getOpaquePointer(";
         printCxxTypeName(os, typeDecl, moduleContext);
+        printGenericParamRefs(os);
         os << " &object) { return object._getOpaquePointer(); }\n";
 
         os << "  static inline const char * _Nonnull getOpaquePointer(const ";
         printCxxTypeName(os, typeDecl, moduleContext);
+        printGenericParamRefs(os);
         os << " &object) { return object._getOpaquePointer(); }\n";
 
         os << "  template<class T>\n";
         os << "  static inline ";
         printCxxTypeName(os, typeDecl, moduleContext);
+        printGenericParamRefs(os);
         os << " returnNewValue(T callable) {\n";
         os << "    auto result = ";
         printCxxTypeName(os, typeDecl, moduleContext);
+        printGenericParamRefs(os);
         os << "::_make();\n";
         os << "    callable(result._getOpaquePointer());\n";
         os << "    return result;\n";
@@ -335,7 +368,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "  static inline void initializeWithTake(char * _Nonnull "
               "destStorage, char * _Nonnull srcStorage) {\n";
         ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-            os, typeMetadataFuncName);
+            os, typeMetadataFuncName, typeMetadataFuncGenericParams);
         os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
               "metadata._0);\n";
         os << "  }\n";
@@ -345,6 +378,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (!isOpaqueLayout)
     printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
 
+  // FIXME: Type traits for generic structs.
+  if (genericSignature)
+    return;
   printTypeGenericTraits(os, typeDecl, typeMetadataFuncName);
 }
 

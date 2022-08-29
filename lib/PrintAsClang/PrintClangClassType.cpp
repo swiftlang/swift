@@ -37,7 +37,7 @@ void ClangClassTypePrinter::printClassTypeDecl(
                            // Print out special functions, like functions that
                            // access type metadata.
                            printer.printCTypeMetadataTypeFunction(
-                               typeDecl, typeMetadataFuncName);
+                               typeDecl, typeMetadataFuncName, {});
                          });
 
   std::string baseClassName;

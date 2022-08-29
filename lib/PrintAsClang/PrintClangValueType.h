@@ -14,6 +14,7 @@
 #define SWIFT_PRINTASCLANG_PRINTCLANGVALUETYPE_H
 
 #include "OutputLanguageMode.h"
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
@@ -82,15 +83,16 @@ public:
                                     const NominalTypeDecl *type);
 
   /// Print a variable that can be used to access type's metadata function
-  static void printMetadataAccessAsVariable(raw_ostream &os,
-                                            StringRef metadataFuncName,
-                                            int indent = 4,
-                                            StringRef varName = "metadata");
+  static void printMetadataAccessAsVariable(
+      raw_ostream &os, StringRef metadataFuncName,
+      ArrayRef<GenericRequirement> genericRequirements, int indent = 4,
+      StringRef varName = "metadata");
 
   /// Print a variable that can be used to access type's metadata function and
   /// value witness table
   static void printValueWitnessTableAccessAsVariable(
-      raw_ostream &os, StringRef metadataFuncName, int indent = 4,
+      raw_ostream &os, StringRef metadataFuncName,
+      ArrayRef<GenericRequirement> genericRequirements, int indent = 4,
       StringRef metadataVarName = "metadata",
       StringRef vwTableVarName = "vwTable");
 

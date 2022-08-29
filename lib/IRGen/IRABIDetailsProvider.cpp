@@ -15,6 +15,7 @@
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
 #include "GenType.h"
+#include "GenericRequirement.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
 #include "NativeConventionSchema.h"
@@ -126,6 +127,16 @@ public:
     return {returnTy, {paramTy}};
   }
 
+  SmallVector<GenericRequirement, 2>
+  getTypeMetadataAccessFunctionGenericRequirementParameters(
+      NominalTypeDecl *nominal) {
+    GenericTypeRequirements requirements(IGM, nominal);
+    SmallVector<GenericRequirement, 2> result;
+    for (const auto &req : requirements.getRequirements())
+      result.push_back(req);
+    return result;
+  }
+
   llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
   getEnumTagMapping(const EnumDecl *ED) {
     llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
@@ -219,6 +230,13 @@ bool IRABIDetailsProvider::enumerateDirectPassingRecordMembers(
 IRABIDetailsProvider::FunctionABISignature
 IRABIDetailsProvider::getTypeMetadataAccessFunctionSignature() {
   return impl->getTypeMetadataAccessFunctionSignature();
+}
+
+SmallVector<GenericRequirement, 2>
+IRABIDetailsProvider::getTypeMetadataAccessFunctionGenericRequirementParameters(
+    NominalTypeDecl *nominal) {
+  return impl->getTypeMetadataAccessFunctionGenericRequirementParameters(
+      nominal);
 }
 
 llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
