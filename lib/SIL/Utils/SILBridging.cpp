@@ -327,9 +327,32 @@ BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
   return {castToArgument(argument)->getParent()};
 }
 
-SwiftInt SILArgument_isExclusiveIndirectParameter(BridgedArgument argument) {
+static BridgedArgumentConvention bridgeArgumentConvention(SILArgumentConvention convention) {
+  switch (convention) {
+    case SILArgumentConvention::Indirect_Inout:
+      return ArgumentConvention_Indirect_Inout;
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      return ArgumentConvention_Indirect_InoutAliasable;
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      return ArgumentConvention_Indirect_In_Guaranteed;
+    case SILArgumentConvention::Indirect_In:
+      return ArgumentConvention_Indirect_In;
+    case SILArgumentConvention::Indirect_In_Constant:
+      return ArgumentConvention_Indirect_In_Constant;
+    case SILArgumentConvention::Indirect_Out:
+      return ArgumentConvention_Indirect_Out;
+    case SILArgumentConvention::Direct_Unowned:
+      return ArgumentConvention_Direct_Unowned;
+    case SILArgumentConvention::Direct_Owned:
+      return ArgumentConvention_Direct_Owned;
+    case SILArgumentConvention::Direct_Guaranteed:
+      return ArgumentConvention_Direct_Guaranteed;
+  }
+}
+
+BridgedArgumentConvention SILArgument_getConvention(BridgedArgument argument) {
   auto *arg = castToArgument<SILFunctionArgument>(argument);
-  return arg->getArgumentConvention().isExclusiveIndirectParameter();
+  return bridgeArgumentConvention(arg->getArgumentConvention());
 }
 
 //===----------------------------------------------------------------------===//
@@ -914,26 +937,7 @@ BridgedArgumentConvention
 ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx) {
   auto as = ApplySite(castToInst(inst));
   auto conv = as.getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
-  switch (conv.Value) {
-    case SILArgumentConvention::Indirect_Inout:
-      return ArgumentConvention_Indirect_In;
-    case SILArgumentConvention::Indirect_InoutAliasable:
-      return ArgumentConvention_Indirect_In_Constant;
-    case SILArgumentConvention::Indirect_In_Guaranteed:
-      return ArgumentConvention_Indirect_In_Guaranteed;
-    case SILArgumentConvention::Indirect_In:
-      return ArgumentConvention_Indirect_Inout;
-    case SILArgumentConvention::Indirect_In_Constant:
-      return ArgumentConvention_Indirect_InoutAliasable;
-    case SILArgumentConvention::Indirect_Out:
-      return ArgumentConvention_Indirect_Out;
-    case SILArgumentConvention::Direct_Unowned:
-      return ArgumentConvention_Direct_Owned;
-    case SILArgumentConvention::Direct_Owned:
-      return ArgumentConvention_Direct_Unowned;
-    case SILArgumentConvention::Direct_Guaranteed:
-      return ArgumentConvention_Direct_Guaranteed;
-  }
+  return bridgeArgumentConvention(conv.Value);
 }
 
 SwiftInt ApplySite_getNumArguments(BridgedInstruction inst) {

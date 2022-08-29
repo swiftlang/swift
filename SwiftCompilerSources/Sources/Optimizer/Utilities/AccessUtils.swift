@@ -174,7 +174,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
     }
 
     func argIsDistinct(_ arg: FunctionArgument, from other: AccessBase) -> Bool {
-      if arg.isExclusiveIndirectParameter {
+      if arg.convention.isExclusiveIndirect {
         // Exclusive indirect arguments cannot alias with an address for which we know that it
         // is not derived from that argument (which might be the case for `pointer` and `yield`).
         return other.hasKnownStorageKind
@@ -199,7 +199,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
     case (.tail(let rta), .tail(let otherRta)):
       return isDifferentAllocation(rta.operand, otherRta.operand)
     case (.argument(let arg), .argument(let otherArg)):
-      return (arg.isExclusiveIndirectParameter || otherArg.isExclusiveIndirectParameter) && arg != otherArg
+      return (arg.convention.isExclusiveIndirect || otherArg.convention.isExclusiveIndirect) && arg != otherArg
       
     // Handle arguments vs non-arguments
     case (.argument(let arg), _):
