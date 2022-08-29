@@ -697,6 +697,16 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   }
 }
 
+static StringRef getConstructorName(const AbstractFunctionDecl *FD) {
+  auto name = cxx_translation::getNameForCxx(
+      FD, cxx_translation::CustomNamesOnly_t::CustomNamesOnly);
+  if (!name.empty()) {
+    assert(name.startswith("init"));
+    return name;
+  }
+  return "init";
+}
+
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
@@ -713,8 +723,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   modifiers.isConst =
       !isa<ClassDecl>(typeDeclContext) && !isMutating && !isConstructor;
   auto result = printFunctionSignature(
-      FD, isConstructor ? "init" : cxx_translation::getNameForCxx(FD), resultTy,
-      FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
+      FD,
+      isConstructor ? getConstructorName(FD)
+                    : cxx_translation::getNameForCxx(FD),
+      resultTy, FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too");
 
   if (!isDefinition) {
