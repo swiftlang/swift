@@ -990,12 +990,6 @@ WARNING(parameter_unnamed_warn,none,
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
 
-ERROR(availability_cannot_be_mixed,none,
-      "#available and #unavailable cannot be in the same statement", ())
-
-ERROR(false_available_is_called_unavailable,none,
-      "#available cannot be used as an expression, did you mean to use '#unavailable'?", ())
-
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
 
@@ -1934,6 +1928,12 @@ ERROR(pound_available_package_description_not_allowed, none,
 
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
+
+ERROR(availability_cannot_be_mixed,none,
+      "#available and #unavailable cannot be in the same statement", ())
+
+ERROR(false_available_is_called_unavailable,none,
+      "#available cannot be used as an expression, did you mean to use '#unavailable'?", ())
 
 ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
