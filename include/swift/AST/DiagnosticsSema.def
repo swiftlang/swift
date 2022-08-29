@@ -1485,6 +1485,9 @@ ERROR(expose_only_non_other_attr,none,
       "@_expose attribute cannot be applied to an '%0' declaration", (StringRef))
 ERROR(expose_inside_unexposed_decl,none,
       "@_expose attribute cannot be applied inside of unexposed declaration %0", (DeclName))
+ERROR(expose_invalid_name_pattern_init,none,
+      "invalid declaration name '%0' specified in an @_expose attribute; "
+      "exposed initializer name must start with 'init'", (StringRef))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))

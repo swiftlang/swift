@@ -44,6 +44,12 @@ public struct NotExposedStruct {
 public struct ExposedStructRenamed {
     public var y: Int
 
+    @_expose(Cxx)
+    public init() { y = 42; prop = 0; prop2 = 0; }
+
+    @_expose(Cxx, "initWithValue")
+    public init(why x: Int) { y = x; prop = 0; prop2 = 0; }
+
     @_expose(Cxx, "renamedProp")
     public var prop: Int
 
@@ -74,6 +80,8 @@ public final class ExposedClass {
 // CHECK: ExposedStruct2(ExposedStruct2 &&) = default;
 // CHECK-NEXT: swift::Int getY() const;
 // CHECK-NEXT: void setY(swift::Int value);
+// CHECK-NEXT: static inline ExposedStruct2 init();
+// CHECK-NEXT: static inline ExposedStruct2 initWithValue(swift::Int x);
 // CHECK-NEXT: swift::Int getRenamedProp() const;
 // CHECK-NEXT: void setRenamedProp(swift::Int value);
 // CHECK-NEXT: swift::Int getProp3() const;
@@ -100,6 +108,8 @@ public final class ExposedClass {
 // CHECK: void ExposedStruct::method() const {
 // CHECK: swift::Int ExposedStruct2::getY() const {
 // CHECK: void ExposedStruct2::setY(swift::Int value) {
+// CHECK: ExposedStruct2 ExposedStruct2::init() {
+// CHECK: ExposedStruct2 ExposedStruct2::initWithValue(swift::Int x) {
 // CHECK: swift::Int ExposedStruct2::getRenamedProp() const {
 // CHECK: void ExposedStruct2::setRenamedProp(swift::Int value) {
 // CHECK: swift::Int ExposedStruct2::getProp3() const {

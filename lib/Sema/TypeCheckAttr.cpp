@@ -1865,6 +1865,14 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl,
              decl->getName());
   }
+
+  // Verify that the name mentioned in the expose
+  // attribute matches the supported name pattern.
+  if (!attr->Name.empty()) {
+    if (isa<ConstructorDecl>(VD) && !attr->Name.startswith("init"))
+      diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
+               attr->Name);
+  }
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(

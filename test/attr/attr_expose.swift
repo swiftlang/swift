@@ -24,3 +24,12 @@ struct NotExposedStruct {
     @_expose(Cxx) // expected-error {{@_expose attribute cannot be applied inside of unexposed declaration 'NotExposedStruct'}}
     func errorOnInnerExpose() {}
 }
+
+@_expose(Cxx)
+struct ExposedStruct {
+    @_expose(Cxx, "create") // expected-error {{invalid declaration name 'create' specified in an @_expose attribute; exposed initializer name must start with 'init'}}
+    init() {}
+
+    @_expose(Cxx, "initWith")
+    init(with y: Int) {}
+}
