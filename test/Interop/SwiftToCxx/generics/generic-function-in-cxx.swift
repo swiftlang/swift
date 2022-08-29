@@ -35,6 +35,12 @@ public func genericRet<T>(_ x: T) -> T {
     return x
 }
 
+public func genericRequirementProtocol<T: Hashable>(_ x: T) {
+}
+
+public func genericRequirementClass<T>(_ x: T) where T: TestClass {
+}
+
 public class TestClass {
     let field: Int
 
@@ -83,6 +89,8 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions26genericPrintFunctionTwoArgyyx_SitlF(const void * _Nonnull x, ptrdiff_t y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionTwoArg(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions10genericRetyxxlF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericRet(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions11genericSwapyyxz_xztlF(void * _Nonnull x, void * _Nonnull y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericSwap(_:_:)
+
+// CHECK-NOT: genericRequirement
 
 // Skip templates in impl classes.
 // CHECK: _impl_TestSmallStruct
