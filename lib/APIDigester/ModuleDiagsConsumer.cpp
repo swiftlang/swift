@@ -124,8 +124,27 @@ swift::ide::api::ModuleDifferDiagsConsumer::~ModuleDifferDiagsConsumer() {
   }
 }
 
-bool swift::ide::api::
-FilteringDiagnosticConsumer::shouldProceed(const DiagnosticInfo &Info) {
+void swift::ide::api::FilteringDiagnosticConsumer::flush() {
+  for (auto &consumer: subConsumers) {
+    consumer->flush();
+  }
+}
+
+void swift::ide::api::
+FilteringDiagnosticConsumer::informDriverOfIncompleteBatchModeCompilation() {
+  for (auto &consumer: subConsumers) {
+    consumer->informDriverOfIncompleteBatchModeCompilation();
+  }
+}
+
+bool swift::ide::api::FilteringDiagnosticConsumer::finishProcessing() {
+  for (auto &consumer: subConsumers) {
+    consumer->finishProcessing();
+  }
+  return false;
+}
+
+bool swift::ide::api::FilteringDiagnosticConsumer::shouldProceed(const DiagnosticInfo &Info) {
   if (allowedBreakages->empty()) {
     return true;
   }
@@ -145,6 +164,8 @@ FilteringDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     if (Info.Kind == DiagnosticKind::Error) {
       HasError = true;
     }
-    subConsumer->handleDiagnostic(SM, Info);
+    for (auto &consumer: subConsumers) {
+      consumer->handleDiagnostic(SM, Info);
+    }
   }
 }
