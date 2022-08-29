@@ -399,3 +399,33 @@ SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
 SWIFT_REQUEST(TypeChecker, GetSourceFileAsyncNode,
               AwaitExpr *(const SourceFile *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapper,
+              NominalTypeDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperType,
+              Type(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperStorage,
+              NominalTypeDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperProperty,
+              VarDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperStorageForProperty,
+              VarDecl *(VarDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedPropertyGetterBody,
+              BraceStmt *(AccessorDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedPropertySetterBody,
+              BraceStmt *(AccessorDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsPropertyAccessedViaTypeWrapper,
+              bool(VarDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrapperInitializer,
+              ConstructorDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrapperInitializerBody,
+              BraceStmt *(ConstructorDecl *),
+              Cached, NoLocationInfo)

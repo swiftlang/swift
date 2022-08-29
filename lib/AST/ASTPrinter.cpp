@@ -2935,6 +2935,10 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureTypeWrappers(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TypeWrapperAttr>();
+}
+
 static void suppressingFeatureSpecializeAttributeWithAvailability(
                                         PrintOptions &options,
                                         llvm::function_ref<void()> action) {

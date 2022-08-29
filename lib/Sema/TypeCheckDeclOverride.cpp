@@ -1584,6 +1584,7 @@ namespace  {
     UNINTERESTING_ATTR(ImplementationOnly)
     UNINTERESTING_ATTR(Custom)
     UNINTERESTING_ATTR(PropertyWrapper)
+    UNINTERESTING_ATTR(TypeWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(ResultBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)

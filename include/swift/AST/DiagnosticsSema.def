@@ -1485,6 +1485,9 @@ ERROR(expose_only_non_other_attr,none,
       "@_expose attribute cannot be applied to an '%0' declaration", (StringRef))
 ERROR(expose_inside_unexposed_decl,none,
       "@_expose attribute cannot be applied inside of unexposed declaration %0", (DeclName))
+ERROR(expose_invalid_name_pattern_init,none,
+      "invalid declaration name '%0' specified in an @_expose attribute; "
+      "exposed initializer name must start with 'init'", (StringRef))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -6475,6 +6478,47 @@ ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' may only be applied to classes, structs, and enums", ())
 ERROR(move_expression_not_passed_lvalue,none,
       "'move' can only be applied to lvalues", ())
+
+//------------------------------------------------------------------------------
+// MARK: Type Wrappers
+//------------------------------------------------------------------------------
+
+ERROR(type_wrappers_are_experimental,none,
+      "type wrappers are an experimental feature", ())
+
+ERROR(type_wrapper_attribute_not_allowed_here,none,
+      "type wrapper attribute %0 can only be applied to a class, struct",
+      (Identifier))
+
+ERROR(type_wrapper_requires_a_single_generic_param,none,
+      "type wrapper has to declare a single generic parameter "
+      "for underlying storage type", ())
+
+ERROR(cannot_use_multiple_type_wrappers,none,
+      "type %0 cannot use more than one type wrapper", ())
+
+ERROR(type_wrapper_requires_memberwise_init,none,
+      "type wrapper type %0 does not contain a required initializer"
+      " - init(memberwise:)",
+      (DeclName))
+
+ERROR(type_wrapper_requires_subscript,none,
+      "type wrapper type %0 does not contain a required subscript"
+      " - subscript(storedKeyPath:)",
+      (DeclName))
+
+ERROR(type_wrapper_failable_init,none,
+      "type wrapper initializer %0 cannot be failable", (DeclName))
+
+ERROR(type_wrapper_invalid_subscript_param_type, none,
+      "type wrapper subscript expects a key path parameter type (got: %0)",
+      (Type))
+
+ERROR(type_wrapper_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing type wrapper type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
