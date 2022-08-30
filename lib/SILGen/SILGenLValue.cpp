@@ -327,6 +327,9 @@ public:
                                      LValueOptions options);
   LValue visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
                        LValueOptions options);
+  LValue visitABISafeConversionExpr(ABISafeConversionExpr *e,
+                                    SGFAccessKind accessKind,
+                                    LValueOptions options);
 
   // Expressions that wrap lvalues
   
@@ -2194,6 +2197,29 @@ namespace {
       OS.indent(indent) << "PhysicalKeyPathApplicationComponent\n";
     }
   };
+
+  /// A physical component which performs an unchecked_addr_cast
+  class ABISafeConversionComponent final : public PhysicalPathComponent {
+  public:
+    ABISafeConversionComponent(LValueTypeData typeData)
+      : PhysicalPathComponent(typeData, ABISafeConversionKind,
+                              /*actorIsolation=*/None) {}
+
+    ManagedValue project(SILGenFunction &SGF, SILLocation loc,
+                         ManagedValue base) && override {
+      auto toType = SGF.getLoweredType(getTypeData().SubstFormalType)
+                       .getAddressType();
+
+      if (base.getType() == toType)
+        return base; // nothing to do
+
+      return SGF.B.createUncheckedAddrCast(loc, base, toType);
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "ABISafeConversionComponent\n";
+    }
+  };
 } // end anonymous namespace
 
 RValue
@@ -3722,6 +3748,17 @@ LValue SILGenLValue::visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
   return LValue::forValue(SGFAccessKind::BorrowedAddressRead,
                           temp->getManagedAddress(),
                           toAddr->getType().getASTType());
+}
+
+LValue SILGenLValue::visitABISafeConversionExpr(ABISafeConversionExpr *e,
+                                    SGFAccessKind accessKind,
+                                    LValueOptions options) {
+  LValue lval = visitRec(e->getSubExpr(), accessKind, options);
+  auto typeData = getValueTypeData(SGF, accessKind, e);
+
+  lval.add<ABISafeConversionComponent>(typeData);
+
+  return lval;
 }
 
 /// Emit an lvalue that refers to the given property.  This is

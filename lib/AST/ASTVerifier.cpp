@@ -240,6 +240,17 @@ class Verifier : public ASTWalker {
     pushScope(DC);
   }
 
+  /// Emit an error message and abort, optionally dumping the expression.
+  /// \param E if non-null, the expression to dump() followed by a new-line.
+  void error(llvm::StringRef msg, Expr *E = nullptr) {
+    Out << msg << "\n";
+    if (E) {
+      E->dump(Out);
+      Out << "\n";
+    }
+    abort();
+  }
+
 public:
   Verifier(ModuleDecl *M, DeclContext *DC)
       : Verifier(PointerUnion<ModuleDecl *, SourceFile *>(M), DC) {}
@@ -2304,6 +2315,34 @@ public:
       }
 
       verifyCheckedBase(E);
+    }
+
+    void verifyChecked(ABISafeConversionExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verify ABISafeConversionExpr", E);
+
+      auto toType = E->getType();
+      auto fromType = E->getSubExpr()->getType();
+
+      if (!fromType->hasLValueType())
+        error("conversion source must be an l-value", E);
+
+      if (!toType->hasLValueType())
+        error("conversion result must be an l-value", E);
+
+      {
+        // At the moment, "ABI Safe" means concurrency features can be stripped.
+        // Since we don't know how deeply the stripping is happening, to verify
+        // in a fuzzy way, strip everything to see if they're the same type.
+        auto strippedFrom = fromType->getRValueType()
+                                    ->stripConcurrency(/*recurse*/true,
+                                                       /*dropGlobalActor*/true);
+        auto strippedTo = toType->getRValueType()
+                                ->stripConcurrency(/*recurse*/true,
+                                                   /*dropGlobalActor*/true);
+
+        if (!strippedFrom->isEqual(strippedTo))
+          error("possibly non-ABI safe conversion", E);
+      }
     }
 
     void verifyChecked(ValueDecl *VD) {

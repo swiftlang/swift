@@ -105,6 +105,7 @@ public:
     CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
     PhysicalKeyPathApplicationKind, // applying a key path
+    ABISafeConversionKind,        // unchecked_addr_cast
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter

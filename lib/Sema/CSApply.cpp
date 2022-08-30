@@ -919,6 +919,24 @@ namespace {
 
       auto &context = cs.getASTContext();
 
+      // For an RValue function type, use a standard function conversion.
+      if (openedType->is<AnyFunctionType>()) {
+        expr = new (context) FunctionConversionExpr(
+            expr, getNewType(adjustedOpenedType));
+        cs.cacheType(expr);
+        return expr;
+      }
+
+      // For any kind of LValue, use an ABISafeConversion.
+      if (openedType->hasLValueType()) {
+        assert(adjustedOpenedType->hasLValueType() && "lvalueness mismatch?");
+
+        expr = new (context) ABISafeConversionExpr(
+                                expr, getNewType(adjustedOpenedType));
+        cs.cacheType(expr);
+        return expr;
+      }
+
       // If we have an optional type, wrap it up in a monadic '?' and recurse.
       if (Type objectType = openedType->getOptionalObjectType()) {
         Type adjustedRefType = getNewType(adjustedOpenedType);
@@ -931,14 +949,6 @@ namespace {
         expr = new (context) InjectIntoOptionalExpr(expr, adjustedRefType);
         cs.cacheType(expr);
         expr = new (context) OptionalEvaluationExpr(expr, adjustedRefType);
-        cs.cacheType(expr);
-        return expr;
-      }
-
-      // For a function type, perform a function conversion.
-      if (openedType->is<AnyFunctionType>()) {
-        expr = new (context) FunctionConversionExpr(
-            expr, getNewType(adjustedOpenedType));
         cs.cacheType(expr);
         return expr;
       }
@@ -1669,10 +1679,17 @@ namespace {
           adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
               containerTy, 1);
         }
-        cs.setType(memberRefExpr, refTy->castTo<FunctionType>()->getResult());
+
+        // \returns result of the given function type
+        auto resultType = [](Type fnTy) -> Type {
+          return fnTy->castTo<FunctionType>()->getResult();
+        };
+
+        cs.setType(memberRefExpr, resultType(refTy));
 
         Expr *result = memberRefExpr;
-        result = adjustTypeForDeclReference(result, refTy, adjustedRefTy);
+        result = adjustTypeForDeclReference(result, resultType(refTy),
+                                                    resultType(adjustedRefTy));
         closeExistentials(result, locator);
 
         // If the property is of dynamic 'Self' type, wrap an implicit
