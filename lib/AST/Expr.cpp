@@ -320,12 +320,12 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
                  ->GetSubExpr()->getReferencedDecl(stopAtParenExpr)
 
   NO_REFERENCE(Error);
-  NO_REFERENCE(NilLiteral);
-  NO_REFERENCE(IntegerLiteral);
-  NO_REFERENCE(FloatLiteral);
-  NO_REFERENCE(BooleanLiteral);
-  NO_REFERENCE(StringLiteral);
-  NO_REFERENCE(InterpolatedStringLiteral);
+  SIMPLE_REFERENCE(NilLiteral, getInitializer);
+  SIMPLE_REFERENCE(IntegerLiteral, getInitializer);
+  SIMPLE_REFERENCE(FloatLiteral, getInitializer);
+  SIMPLE_REFERENCE(BooleanLiteral, getInitializer);
+  SIMPLE_REFERENCE(StringLiteral, getInitializer);
+  SIMPLE_REFERENCE(InterpolatedStringLiteral, getInitializer);
   NO_REFERENCE(RegexLiteral);
   NO_REFERENCE(ObjectLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
@@ -371,8 +371,8 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
 
   NO_REFERENCE(Tuple);
-  NO_REFERENCE(Array);
-  NO_REFERENCE(Dictionary);
+  SIMPLE_REFERENCE(Array, getInitializer);
+  SIMPLE_REFERENCE(Dictionary, getInitializer);
 
   case ExprKind::Subscript: {
     auto subscript = cast<SubscriptExpr>(this);
