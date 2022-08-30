@@ -623,6 +623,11 @@ if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
 endif()
 
+# Make sure we know where swift-syntax is because we need it to build the parser.
+if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
+  message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
+endif()
+
 # Use dispatch as the system scheduler by default.
 # For convenience, we set this to false when concurrency is disabled.
 set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
