@@ -2298,6 +2298,11 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitABISafeConversionExpr(ABISafeConversionExpr *E) {
+    printCommon(E, "abi_safe_conversion_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
     printCommon(E, "metatype_conversion_expr") << '\n';
     printRec(E->getSubExpr());
