@@ -1040,6 +1040,22 @@ public func withUnsafeBytes<T, Result>(
 /// Invokes the given closure with a buffer pointer covering the raw bytes of
 /// the given argument.
 ///
+/// This function is similar to `withUnsafeBytes`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafeBytes<T, Result>(
+  of value: inout T,
+  _ body: (UnsafeRawBufferPointer) throws -> Result
+) rethrows -> Result
+{
+  return try _withUnprotectedUnsafePointer(to: &value) {
+    try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
+  }
+}
+
+/// Invokes the given closure with a buffer pointer covering the raw bytes of
+/// the given argument.
+///
 /// The buffer pointer argument to the `body` closure provides a collection
 /// interface to the raw bytes of `value`. The buffer is the size of the
 /// instance passed as `value` and does not include any remote storage.
@@ -1062,6 +1078,21 @@ public func withUnsafeBytes<T, Result>(
   _ body: (UnsafeRawBufferPointer) throws -> Result
 ) rethrows -> Result {
   let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
+  let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
+  return try body(buffer)
+}
+
+/// Invokes the given closure with a buffer pointer covering the raw bytes of
+/// the given argument.
+///
+/// This function is similar to `withUnsafeBytes`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafeBytes<T, Result>(
+  of value: T,
+  _ body: (UnsafeRawBufferPointer) throws -> Result
+) rethrows -> Result {
+  let addr = UnsafeRawPointer(Builtin.unprotectedAddressOfBorrow(value))
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
 }

@@ -82,6 +82,19 @@ public func withUnsafeMutablePointer<T, Result>(
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
+/// Calls the given closure with a mutable pointer to the given argument.
+///
+/// This function is similar to `withUnsafeMutablePointer`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafeMutablePointer<T, Result>(
+  to value: inout T,
+  _ body: (UnsafeMutablePointer<T>) throws -> Result
+) rethrows -> Result
+{
+  return try body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))
+}
+
 /// Invokes the given closure with a pointer to the given argument.
 ///
 /// The `withUnsafePointer(to:_:)` function is useful for calling Objective-C
@@ -142,6 +155,19 @@ public func withUnsafePointer<T, Result>(
 ) rethrows -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressof(&value)))
+}
+
+/// Invokes the given closure with a pointer to the given argument.
+///
+/// This function is similar to `withUnsafePointer`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafePointer<T, Result>(
+  to value: inout T,
+  _ body: (UnsafePointer<T>) throws -> Result
+) rethrows -> Result
+{
+  return try body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
 }
 
 extension String {
