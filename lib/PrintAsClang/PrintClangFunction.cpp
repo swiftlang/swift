@@ -318,24 +318,32 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, StringRef name, Type resultTy,
     FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams,
     FunctionSignatureModifiers modifiers) {
-  if (kind == FunctionSignatureKind::CxxInlineThunk && FD->isGeneric()) {
-    os << "template<";
-    llvm::interleaveComma(FD->getGenericParams()->getParams(), os,
-                          [&](const GenericTypeParamDecl *genericParam) {
-                            os << "class ";
-                            ClangSyntaxPrinter(os).printBaseName(genericParam);
-                          });
-    os << ">\n";
-    os << "requires ";
-    llvm::interleave(
-        FD->getGenericParams()->getParams(), os,
-        [&](const GenericTypeParamDecl *genericParam) {
-          os << "swift::isUsableInGenericContext<";
-          ClangSyntaxPrinter(os).printBaseName(genericParam);
-          os << ">";
-        },
-        " && ");
-    os << "\n";
+  if (FD->isGeneric()) {
+    auto Signature = FD->getGenericSignature();
+    auto Requirements = Signature.getRequirements();
+    // FIXME: Support generic requirements.
+    if (!Requirements.empty())
+      return ClangRepresentation::unsupported;
+    if (kind == FunctionSignatureKind::CxxInlineThunk) {
+      os << "template<";
+      llvm::interleaveComma(FD->getGenericParams()->getParams(), os,
+                            [&](const GenericTypeParamDecl *genericParam) {
+                              os << "class ";
+                              ClangSyntaxPrinter(os).printBaseName(
+                                  genericParam);
+                            });
+      os << ">\n";
+      os << "requires ";
+      llvm::interleave(
+          FD->getGenericParams()->getParams(), os,
+          [&](const GenericTypeParamDecl *genericParam) {
+            os << "swift::isUsableInGenericContext<";
+            ClangSyntaxPrinter(os).printBaseName(genericParam);
+            os << ">";
+          },
+          " && ");
+      os << "\n";
+    }
   }
   auto emittedModule = FD->getModuleContext();
   OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
