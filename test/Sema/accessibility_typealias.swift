@@ -27,7 +27,7 @@ public final class ReplayableGenerator<S: Sequence> : IteratorProtocol {
 }
 
 struct Generic<T> {
-  fileprivate typealias Dependent = T
+  fileprivate typealias Dependent = T // expected-note 2{{type declared here}}
 }
 
 var x: Generic<Int>.Dependent = 3 // expected-error {{variable must be declared private or fileprivate because its type uses a fileprivate type}}
