@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
-// SR-11996 - Warning when a immutable decodable property has an initial value
+// https://github.com/apple/swift/issues/54430
+// Warning when a immutable decodable property has an initial value
 
 // Implicit CodingKeys enum //
 
