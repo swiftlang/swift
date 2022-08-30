@@ -381,8 +381,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         continue;
 
       if (!var->isAccessedViaTypeWrapper()) {
-        // $_storage itself.
-        if (var->getName() == ctx.Id_TypeWrapperProperty)
+        // Compiler synthesized properties are not included.
+        if (var->isImplicit())
           continue;
 
         // Computed properties are not included.
