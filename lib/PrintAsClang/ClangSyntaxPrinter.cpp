@@ -265,3 +265,11 @@ void ClangSyntaxPrinter::printGenericRequirementsInstantiantions(
                           printGenericRequirementInstantiantion(requirement);
                         });
 }
+
+void ClangSyntaxPrinter::printPrimaryCxxTypeName(
+    const NominalTypeDecl *type, const ModuleDecl *moduleContext) {
+  printModuleNamespaceQualifiersIfNeeded(type->getModuleContext(),
+                                         moduleContext);
+  // FIXME: Print class qualifiers for nested class references.
+  printBaseName(type);
+}

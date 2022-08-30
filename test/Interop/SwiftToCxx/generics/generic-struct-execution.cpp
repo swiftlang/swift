@@ -19,7 +19,7 @@ int main() {
   using namespace Generics;
 
   auto x = makeGenericPair<int, int>(11, 42);
-  puts("no\n");
-// CHECK: no
+  takeGenericPair(x);
+// CHECK: GenericPair<Int32, Int32>(x: 11, y: 42)
   return 0;
 }

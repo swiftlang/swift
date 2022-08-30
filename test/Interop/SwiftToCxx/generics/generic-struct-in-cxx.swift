@@ -18,6 +18,10 @@ public func makeGenericPair<T, T1>(_ x: T, _ y: T1) -> GenericPair<T, T1> {
     return GenericPair<T, T1>(x: x, y: y);
 }
 
+public func takeGenericPair<T, T1>(_ x: GenericPair<T, T1>) {
+    print(x)
+}
+
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: class _impl_GenericPair;
@@ -60,3 +64,9 @@ public func makeGenericPair<T, T1>(_ x: T, _ y: T1) -> GenericPair<T, T1> {
 // CHECK-NEXT:     _impl::$s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(result, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T>(), swift::getTypeMetadata<T1>());
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
+
+// CHECK: template<class T, class T1>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T> && swift::isUsableInGenericContext<T1>
+// CHECK-NEXT: inline void takeGenericPair(const GenericPair<T, T1>& x) noexcept {
+// CHECK-NEXT:  return _impl::$s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(_impl::_impl_GenericPair<T, T1>::getOpaquePointer(x), swift::getTypeMetadata<T>(), swift::getTypeMetadata<T1>());
+// CHECK-NEXT:}

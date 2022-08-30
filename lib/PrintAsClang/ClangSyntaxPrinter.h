@@ -139,6 +139,11 @@ public:
       ArrayRef<GenericRequirement> requirements,
       LeadingTrivia leadingTrivia = LeadingTrivia::None);
 
+  // Print the C++ type name that corresponds to the primary user facing C++
+  // class for the given nominal type.
+  void printPrimaryCxxTypeName(const NominalTypeDecl *type,
+                               const ModuleDecl *moduleContext);
+
 protected:
   raw_ostream &os;
 };

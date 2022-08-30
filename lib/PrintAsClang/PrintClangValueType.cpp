@@ -37,11 +37,7 @@ static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type) {
 /// Print out the C++ type name of a struct/enum declaration.
 static void printCxxTypeName(raw_ostream &os, const NominalTypeDecl *type,
                              const ModuleDecl *moduleContext) {
-  // FIXME: Print class qualifiers for nested class references.
-  ClangSyntaxPrinter printer(os);
-  printer.printModuleNamespaceQualifiersIfNeeded(type->getModuleContext(),
-                                                 moduleContext);
-  printer.printBaseName(type);
+  ClangSyntaxPrinter(os).printPrimaryCxxTypeName(type, moduleContext);
 }
 
 void ClangValueTypePrinter::printCxxImplClassName(raw_ostream &os,
@@ -490,8 +486,8 @@ void ClangValueTypePrinter::printValueTypeParameterType(
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
     bool isIndirect, const NominalTypeDecl *type,
-    const ModuleDecl *moduleContext, llvm::function_ref<void()> cxxParamPrinter,
-    bool isInOut, bool isSelf) {
+    const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
+    llvm::function_ref<void()> cxxParamPrinter, bool isInOut, bool isSelf) {
   // A Swift value type is passed to its underlying Swift function
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   if (!isIndirect && !isInOut) {
@@ -503,10 +499,8 @@ void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
   if (isSelf) {
     os << "_getOpaquePointer()";
   } else {
-    ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
-        type->getModuleContext(), moduleContext);
-    os << cxx_synthesis::getCxxImplNamespaceName() << "::";
-    printCxxImplClassName(os, type);
+    // FIXME: can we propagate the _impl request here?
+    typePrinter();
     os << "::getOpaquePointer(";
     cxxParamPrinter();
     os << ')';
