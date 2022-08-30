@@ -152,7 +152,13 @@ public:
     if (printIfKnownSimpleType(alias, optionalKind, isInOutParam))
       return ClangRepresentation::representable;
 
-    return visitPart(aliasTy->getSinglyDesugaredType(), optionalKind,
+    return visitSugarType(aliasTy, optionalKind, isInOutParam);
+  }
+
+  ClangRepresentation visitSugarType(SugarType *sugarTy,
+                                     Optional<OptionalTypeKind> optionalKind,
+                                     bool isInOutParam) {
+    return visitPart(sugarTy->getSinglyDesugaredType(), optionalKind,
                      isInOutParam);
   }
 
