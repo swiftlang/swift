@@ -475,7 +475,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
         }
       } else if (param.role ==  AdditionalParam::Role::Error) {
         os << "SWIFT_ERROR_RESULT ";
-        os << "void ** _error";
+        os << "void * _Nullable * _Nullable _error";
       } else if (param.role == AdditionalParam::Role::GenericRequirement) {
         os << "void * _Nonnull ";
         if (param.genericRequirement->Protocol)
