@@ -25,11 +25,15 @@ public func takeGenericPair<T, T1>(_ x: GenericPair<T, T1>) {
     print(x)
 }
 
+public func passThroughGenericPair<T1, T>(_ x: GenericPair<T1, T>, _ y: T)  -> GenericPair<T1, T> {
+    return GenericPair<T1, T>(x: x.x, y: y)
+}
+
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: class _impl_GenericPair;
 // CHECK-EMPTY:
-// CHECK-NEXT: static_assert(2 <= 3, "unsupported generic requirement list for metadata func"); 
+// CHECK-NEXT: static_assert(2 <= 3, "unsupported generic requirement list for metadata func");
 // CHECK-NEXT: // Type metadata accessor for GenericPair
 // CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $s8Generics11GenericPairVMa(swift::_impl::MetadataRequestTy, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;
 
@@ -66,6 +70,14 @@ public func takeGenericPair<T, T1>(_ x: GenericPair<T, T1>) {
 // CHECK-NEXT: inline GenericPair<T, T1> makeGenericPair(const T & x, const T1 & y) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_GenericPair<T, T1>::returnNewValue([&](void * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(result, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T>(), swift::getTypeMetadata<T1>());
+// CHECK-NEXT:   });
+// CHECK-NEXT: }
+
+// CHECK: template<class T1, class T>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T1> && swift::isUsableInGenericContext<T>
+// CHECK-NEXT: inline GenericPair<T1, T> passThroughGenericPair(const GenericPair<T1, T>& x, const T & y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return _impl::_impl_GenericPair<T1, T>::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:     _impl::$s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(result, _impl::_impl_GenericPair<T1, T>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T1>(), swift::getTypeMetadata<T>());
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 

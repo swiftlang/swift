@@ -19,5 +19,10 @@ int main() {
   auto x = makeGenericPair<int, int>(11, 42);
   takeGenericPair(x);
 // CHECK: GenericPair<Int32, Int32>(x: 11, y: 42)
+  auto xprime = passThroughGenericPair(x, -995);
+  takeGenericPair(x);
+  takeGenericPair(xprime);
+// CHECK-NEXT: GenericPair<Int32, Int32>(x: 11, y: 42)
+// CHECK-NEXT: GenericPair<Int32, Int32>(x: 11, y: -995)
   return 0;
 }
