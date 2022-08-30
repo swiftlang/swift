@@ -270,11 +270,23 @@ void ClangValueTypePrinter::printValueTypeDecl(
           "metadata._0);\n";
     os << "    return _getOpaquePointer();\n";
     os << "  }\n";
+    os << "  inline void _destructiveInjectEnumTag(unsigned tag) {\n";
+    printEnumVWTableVariable();
+    os << "    enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), tag, "
+          "metadata._0);\n";
+    os << "  }\n";
     os << "  inline unsigned _getEnumTag() const {\n";
     printEnumVWTableVariable();
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
     os << "  }\n";
+
+    for (const auto &pair : interopContext.getIrABIDetails().getEnumTagMapping(
+             cast<EnumDecl>(typeDecl))) {
+      os << "  using _impl_" << pair.first->getNameStr() << " = decltype(";
+      ClangSyntaxPrinter(os).printIdentifier(pair.first->getNameStr());
+      os << ");\n";
+    }
   }
   // Print out the storage for the value type.
   os << "  ";

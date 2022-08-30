@@ -32,6 +32,30 @@ public func printFoo(_ x: Foo) {
     print(x)
 }
 
+public enum Empty {
+
+}
+
+// CHECK:         // Tags for resilient enum Empty
+// CHECK-NEXT:    extern "C" {
+// CHECK-NEXT:    }
+// CHECK-EMPTY:
+// CHECK-NEXT:    } // namespace _impl
+// CHECK-EMPTY:
+// CHECK-NEXT:    class Empty final {
+// CHECK:         enum class cases {
+// CHECK-NEXT:      unknownDefault
+// CHECK-NEXT:    };
+// CHECK-EMPTY:
+// CHECK-NEXT:    static struct {  // impl struct for case unknownDefault
+// CHECK-NEXT:      inline constexpr operator cases() const {
+// CHECK-NEXT:        return cases::unknownDefault;
+// CHECK-NEXT:      }
+// CHECK-NEXT:    } unknownDefault;
+// CHECK-NEXT:    inline bool isUnknownDefault() const;
+// CHECK:         inline operator cases() const {
+// CHECK-NEXT:      return cases::unknownDefault;
+// CHECK-NEXT:    }
 // CHECK:         // Tags for resilient enum Foo
 // CHECK-NEXT:    extern "C" {
 // CHECK-NEXT:    extern unsigned $s5Enums3FooO1ayACSdcACmFWC;
@@ -48,14 +72,14 @@ public func printFoo(_ x: Foo) {
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    }
 // CHECK:         static struct {  // impl struct for case unknownDefault
-// CHECK-NEXT:      constexpr operator cases() const {
+// CHECK-NEXT:      inline constexpr operator cases() const {
 // CHECK-NEXT:        return cases::unknownDefault;
 // CHECK-NEXT:      }
 // CHECK-NEXT:    } unknownDefault;
-// CHECK-NEXT:    inline bool isUnknownDefault() const {
-// CHECK-NEXT:      return *this == Foo::unknownDefault;
-// CHECK-NEXT:    }
-// CHECK:         inline operator cases() const {
+// CHECK-NEXT:    inline bool isUnknownDefault() const;
+// CHECK-EMPTY:
+// CHECK-EMPTY:
+// CHECK-NEXT:    inline operator cases() const {
 // CHECK-NEXT:      auto tag = _getEnumTag();
 // CHECK-NEXT:      if (tag == _impl::$s5Enums3FooO1ayACSdcACmFWC) return cases::a;
 // NEW_CASE-NEXT:   if (tag == _impl::$s5Enums3FooO1byACSicACmFWC) return cases::b;

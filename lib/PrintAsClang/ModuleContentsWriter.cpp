@@ -503,7 +503,11 @@ public:
   bool writeEnum(const EnumDecl *ED) {
     if (addImport(ED))
       return true;
-    
+
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      forwardDeclareMemberTypes(ED->getMembers(), ED);
+    }
+
     if (seenTypes[ED].first == EmissionState::Defined)
       return true;
     
