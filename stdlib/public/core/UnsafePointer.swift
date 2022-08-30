@@ -779,7 +779,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of consecutive elements to update.
   ///     `count` must not be negative.
   @inlinable
-  @_alwaysEmitIntoClient
   @_silgen_name("$sSp6assign9repeating5countyx_SitF")
   public func update(repeating repeatedValue: Pointee, count: Int) {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.assign(repeating:count:) with negative count")
@@ -791,7 +790,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(repeating:count:)")
-  @_silgen_name("_deprecated_assign_repeating_count")
+  @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_repeating_count")
   public func assign(repeating repeatedValue: Pointee, count: Int) {
     update(repeating: repeatedValue, count: count)
   }
@@ -813,7 +812,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to copy from the memory referenced by
   ///     `source` to this pointer's memory. `count` must not be negative.
   @inlinable
-  @_alwaysEmitIntoClient
   @_silgen_name("$sSp6assign4from5countySPyxG_SitF")
   public func update(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
@@ -843,7 +841,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(from:count:)")
-  @_silgen_name("_deprecated_assign_from_count")
+  @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_from_count")
   public func assign(from source: UnsafePointer<Pointee>, count: Int) {
     update(from: source, count: count)
   }
@@ -943,7 +941,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  @_alwaysEmitIntoClient
   @_silgen_name("$sSp10moveAssign4from5countySpyxG_SitF")
   public func moveUpdate(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
@@ -964,7 +961,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "moveUpdate(from:count:)")
-  @_silgen_name("_deprecated_moveAssign_from_count")
+  @_silgen_name("_swift_se0370_UnsafeMutablePointer_moveAssign_from_count")
   public func moveAssign(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {

@@ -737,7 +737,6 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameters:
   ///   - repeatedValue: The value used when updating this pointer's memory.
   @inlinable // unsafe-performance
-  @_alwaysEmitIntoClient
   @_silgen_name("$sSr6assign9repeatingyx_tF")
   public func update(repeating repeatedValue: Element) {
     guard let dstBase = _position else {
@@ -750,7 +749,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(repeating:)")
-  @_silgen_name("_deprecated_assign_repeating")
+  @_silgen_name("_swift_se0370_UnsageMutableBufferPointer_assign_repeating")
   public func assign(repeating repeatedValue: Element) {
     update(repeating: repeatedValue)
   }
