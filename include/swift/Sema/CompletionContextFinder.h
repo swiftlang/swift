@@ -64,9 +64,9 @@ public:
     InitialDC->walkContext(*this);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
 
-  Expr *walkToExprPost(Expr *E) override;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
 
   /// Check whether code completion expression is located inside of a
   /// multi-statement closure.

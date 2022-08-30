@@ -396,17 +396,18 @@ public:
 
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
-  std::pair<bool, ArgumentList *>
+  PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *ArgList) override;
-  ArgumentList *walkToArgumentListPost(ArgumentList *ArgList) override;
+  PostWalkResult<ArgumentList *>
+  walkToArgumentListPost(ArgumentList *ArgList) override;
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
-  Expr *walkToExprPost(Expr *E) override;
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override;
-  Stmt *walkToStmtPost(Stmt *S) override;
-  bool walkToDeclPre(Decl *D) override;
-  bool walkToDeclPost(Decl *D) override;
-  bool walkToTypeReprPre(TypeRepr *T) override;
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override;
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override;
+  PreWalkAction walkToDeclPre(Decl *D) override;
+  PostWalkAction walkToDeclPost(Decl *D) override;
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
   bool shouldWalkIntoGenericParams() override { return true; }
 
 private:
@@ -538,11 +539,11 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
              SM.getLineAndColumnInBuffer(Node.Range.getEnd()).first;
 }
 
-std::pair<bool, ArgumentList *>
+ASTWalker::PreWalkResult<ArgumentList *>
 ModelASTWalker::walkToArgumentListPre(ArgumentList *ArgList) {
   Expr *ParentExpr = Parent.getAsExpr();
   if (!ParentExpr)
-    return {true, ArgList};
+    return Action::Continue(ArgList);
 
   ParentArgsTy Mapping;
   Mapping.Parent = ParentExpr;
@@ -552,21 +553,22 @@ ModelASTWalker::walkToArgumentListPre(ArgumentList *ArgList) {
     (void)res;
   }
   ParentArgs.push_back(std::move(Mapping));
-  return {true, ArgList};
+  return Action::Continue(ArgList);
 }
 
-ArgumentList *ModelASTWalker::walkToArgumentListPost(ArgumentList *ArgList) {
+ASTWalker::PostWalkResult<ArgumentList *>
+ModelASTWalker::walkToArgumentListPost(ArgumentList *ArgList) {
   if (Expr *ParentExpr = Parent.getAsExpr()) {
     assert(ParentExpr == ParentArgs.back().Parent &&
            "Unmatched walkToArgumentList(Pre|Post)");
     ParentArgs.pop_back();
   }
-  return ArgList;
+  return Action::Continue(ArgList);
 }
 
-std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBefore(E))
-    return {false, E};
+    return Action::SkipChildren(E);
 
   auto addCallArgExpr = [&](const Argument &Arg) {
     auto *Elem = Arg.getExpr();
@@ -601,7 +603,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   }
 
   if (E->isImplicit())
-    return { true, E };
+    return Action::Continue(E);
 
   auto addExprElem = [&](const Expr *Elem, SyntaxStructureNode &SN) {
     if (isa<ErrorExpr>(Elem))
@@ -706,7 +708,11 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
       subExpr->walk(*this);
     }
-    return { false, walkToExprPost(SE) };
+    auto result = walkToExprPost(SE).Value;
+    if (!result)
+      return Action::Stop();
+
+    return Action::SkipChildren(*result);
   } else if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
     // Don't visit the child expressions directly. Instead visit the arguments
     // of each appendStringLiteral/appendInterpolation CallExpr so we don't
@@ -718,23 +724,27 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
           arg.getExpr()->walk(*this);
       }
     });
-    return { false, walkToExprPost(E) };
+    auto result = walkToExprPost(E).Value;
+    if (!result)
+      return Action::Stop();
+
+    return Action::SkipChildren(*result);
   }
 
-  return { true, E };
+  return Action::Continue(E);
 }
 
-Expr *ModelASTWalker::walkToExprPost(Expr *E) {
+ASTWalker::PostWalkResult<Expr *> ModelASTWalker::walkToExprPost(Expr *E) {
   while (!SubStructureStack.empty() &&
       SubStructureStack.back().ASTNode.getAsExpr() == E)
     popStructureNode();
 
-  return E;
+  return Action::Continue(E);
 }
 
-std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
+ASTWalker::PreWalkResult<Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
   if (isVisitedBefore(S)) {
-    return {false, S};
+    return Action::SkipChildren(S);
   }
   auto addExprElem = [&](SyntaxStructureElementKind K, const Expr *Elem,
                          SyntaxStructureNode &SN) {
@@ -862,25 +872,25 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       walkToStmtPost(DeferS);
     }
     // Already walked children.
-    return { false, DeferS };
+    return Action::SkipChildren(DeferS);
   }
 
-  return { true, S };
+  return Action::Continue(S);
 }
 
-Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
+ASTWalker::PostWalkResult<Stmt *> ModelASTWalker::walkToStmtPost(Stmt *S) {
   while (!SubStructureStack.empty() &&
       SubStructureStack.back().ASTNode.getAsStmt() == S)
     popStructureNode();
 
-  return S;
+  return Action::Continue(S);
 }
 
-bool ModelASTWalker::walkToDeclPre(Decl *D) {
+ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
   if (isVisitedBefore(D))
-    return false;
+    return Action::SkipChildren();
   if (D->isImplicit())
-    return false;
+    return Action::SkipChildren();
 
   // The attributes of EnumElementDecls and VarDecls are handled when visiting
   // their parent EnumCaseDecl/PatternBindingDecl (which the attributes are
@@ -888,7 +898,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   if (!isa<EnumElementDecl>(D) &&
       !(isa<VarDecl>(D) && cast<VarDecl>(D)->getParentPatternBinding())) {
     if (!handleAttrs(D->getAttrs()))
-      return false;
+      return Action::SkipChildren();
   }
 
   if (isa<AccessorDecl>(D)) {
@@ -985,7 +995,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       });
       if (Contained) {
         if (!handleAttrs(Contained->getAttrs()))
-          return false;
+          return Action::SkipChildren();
         break;
       }
     }
@@ -1032,7 +1042,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
     for (auto &Clause : ConfigD->getClauses()) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
-        return false;
+        return Action::SkipChildren();
 
       InactiveClauseRAII inactiveClauseRAII(inInactiveClause, !Clause.isActive);
       for (auto &Element : Clause.Elements) {
@@ -1057,7 +1067,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     // attach to enum element decls while syntactically locate before enum case decl.
     if (!EnumCaseD->getElements().empty()) {
       if (!handleAttrs(EnumCaseD->getElements().front()->getAttrs()))
-        return false;
+        return Action::SkipChildren();
     }
     if (pushStructureNode(SN, D)) {
       // FIXME: ASTWalker walks enum elements as members of the enum decl, not
@@ -1140,34 +1150,34 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, GenericParamD);
   }
 
-  return true;
+  return Action::Continue();
 }
 
-bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
+ASTWalker::PostWalkAction ModelASTWalker::walkToDeclPost(swift::Decl *D) {
   while (!SubStructureStack.empty() &&
       SubStructureStack.back().ASTNode.getAsDecl() == D)
     popStructureNode();
 
-  return true;
+  return Action::Continue();
 }
 
-bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
+ASTWalker::PreWalkAction ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
   if (auto AttrT = dyn_cast<AttributedTypeRepr>(T)) {
     if (!handleAttrs(AttrT->getAttrs()))
-      return false;
+      return Action::SkipChildren();
 
   } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (!passTokenNodesUntil(IdT->getStartLoc(),
                              ExcludeNodeAtLocation).shouldContinue)
-      return false;
+      return Action::SkipChildren();
     if (TokenNodes.empty() ||
         TokenNodes.front().Range.getStart() != IdT->getStartLoc())
-      return false;
+      return Action::SkipChildren();
     if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
-      return false;
+      return Action::SkipChildren();
     TokenNodes = TokenNodes.slice(1);
   }
-  return true;
+  return Action::Continue();
 }
 
 namespace {
@@ -1178,18 +1188,18 @@ class IdRefWalker : public ASTWalker {
 public:
   IdRefWalker(const FnTy &Fn) : Fn(Fn) {}
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto DRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
       if (!DRE->hasName())
-        return { true, E };
+        return Action::Continue(E);
       if (DRE->getRefKind() != DeclRefKind::Ordinary)
-        return { true, E };
+        return Action::Continue(E);
       if (!Fn(CharSourceRange(
               DRE->getSourceRange().Start,
               DRE->getName().getBaseName().userFacingName().size())))
-        return { false, nullptr };
+        return Action::Stop();
     }
-    return { true, E };
+    return Action::Continue(E);
   }
 };
 } // end anonymous namespace

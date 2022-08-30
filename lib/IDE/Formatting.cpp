@@ -475,14 +475,12 @@ private:
     return true;
   }
 
-  bool walkToDeclPre(Decl *D) override {
-    bool Continue = true, Stop = false;
-
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (!walkCustomAttributes(D))
-      return Stop;
+      return Action::SkipChildren();
 
     if (D->isImplicit())
-      return Continue;
+      return Action::Continue();
 
     // Walk into inactive config regions.
     if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
@@ -490,7 +488,7 @@ private:
         for (auto Member : Clause.Elements)
           Member.walk(*this);
       }
-      return false;
+      return Action::SkipChildren();
     }
 
     SourceLoc ContextLoc = D->getStartLoc();
@@ -504,44 +502,42 @@ private:
       if (SafeToAskForGenerics) {
         if (auto *GP = GC->getParsedGenericParams()) {
           if (!handleAngles(GP->getLAngleLoc(), GP->getRAngleLoc(), ContextLoc))
-            return Stop;
+            return Action::SkipChildren();
         }
       }
     }
 
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (!handleBraces(NTD->getBraces(), ContextLoc))
-        return Stop;
+        return Action::SkipChildren();
     } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       if (!handleBraces(ED->getBraces(), ContextLoc))
-        return Stop;
+        return Action::SkipChildren();
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (!handleBraces(VD->getBracesRange(), VD->getNameLoc()))
-        return Stop;
+        return Action::SkipChildren();
     } else if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
       if (isa<SubscriptDecl>(D)) {
         if (!handleBraces(cast<SubscriptDecl>(D)->getBracesRange(), ContextLoc))
-          return Stop;
+          return Action::SkipChildren();
       }
       auto *PL = getParameterList(cast<ValueDecl>(D));
       if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
-        return Stop;
+        return Action::SkipChildren();
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
-        return Stop;
+        return Action::SkipChildren();
     } else if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
       // TODO: add paren locations to PoundDiagnosticDecl
     }
 
-    return Continue;
+    return Action::Continue();
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    std::pair<bool, Stmt*> Continue = {true, S}, Stop = {false, nullptr};
-
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (S->isImplicit())
-      return Continue;
+      return Action::Continue(S);
 
     if (auto *LCS = dyn_cast<LabeledConditionalStmt>(S)) {
       for (auto &Elem: LCS->getCond()) {
@@ -549,7 +545,7 @@ private:
           PoundAvailableInfo *PA = Elem.getAvailability();
           if (!handleParens(PA->getLParenLoc(), PA->getRParenLoc(),
                             PA->getStartLoc()))
-            return Stop;
+            return Action::Stop();
         }
       }
     }
@@ -557,58 +553,56 @@ private:
     SourceLoc ContextLoc = S->getStartLoc();
     if (auto *BS = dyn_cast<BraceStmt>(S)) {
       if (!handleBraceStmt(BS, ContextLoc))
-        return Stop;
+        return Action::Stop();
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
       if (!handleBraceStmt(IS->getThenStmt(), IS->getIfLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
       if (!handleBraceStmt(GS->getBody(), GS->getGuardLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (auto *FS = dyn_cast<ForEachStmt>(S)) {
       if (!handleBraceStmt(FS->getBody(), FS->getForLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       SourceRange Braces(SS->getLBraceLoc(), SS->getRBraceLoc());
       if (!handleBraces(Braces, SS->getSwitchLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (auto *DS = dyn_cast<DoStmt>(S)) {
       if (!handleBraceStmt(DS->getBody(), DS->getDoLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       if (!handleBraceStmt(DCS->getBody(), DCS->getDoLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (isa<CaseStmt>(S) &&
                cast<CaseStmt>(S)->getParentKind() == CaseParentKind::DoCatch) {
       auto CS = cast<CaseStmt>(S);
       if (!handleBraceStmt(CS->getBody(), CS->getLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       if (!handleBraceStmt(RWS->getBody(), RWS->getRepeatLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       if (!handleBraceStmt(WS->getBody(), WS->getWhileLoc()))
-        return Stop;
+        return Action::Stop();
     } else if (auto *PAS = dyn_cast<PoundAssertStmt>(S)) {
       // TODO: add paren locations to PoundAssertStmt
     }
 
-    return Continue;
+    return Action::Continue(S);
   }
 
-  std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
-    std::pair<bool, Expr*> Stop = {false, nullptr}, Continue = {true, E};
-
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     // Walk through error expressions.
     if (auto *EE = dyn_cast<ErrorExpr>(E)) {
       if (auto *OE = EE->getOriginalExpr()) {
         llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
         OE->walk(*this);
       }
-      return Continue;
+      return Action::Continue(E);
     }
 
     if (E->isImplicit())
-      return Continue;
+      return Action::Continue(E);
 
     SourceLoc ContextLoc = E->getStartLoc();
     if (auto *PE = dyn_cast<ParenExpr>(E)) {
@@ -617,33 +611,33 @@ private:
       SourceLoc R = getLocIfKind(SM, PE->getRParenLoc(),
                                  {tok::r_paren, tok::r_square});
       if (L.isValid() && !handleRange(L, R, ContextLoc))
-        return Stop;
+        return Action::Stop();
     } else if (auto *TE = dyn_cast<TupleExpr>(E)) {
       SourceLoc L = getLocIfKind(SM, TE->getLParenLoc(),
                                  {tok::l_paren, tok::l_square});
       SourceLoc R = getLocIfKind(SM, TE->getRParenLoc(),
                                  {tok::r_paren, tok::r_square});
       if (L.isValid() && !handleRange(L, R, ContextLoc))
-        return Stop;
+        return Action::Stop();
     } else if (auto *CE = dyn_cast<CollectionExpr>(E)) {
       if (!handleSquares(CE->getLBracketLoc(), CE->getRBracketLoc(),
                          ContextLoc))
-        return Stop;
+        return Action::Stop();
     } else if (auto *CE = dyn_cast<ClosureExpr>(E)) {
       if (!handleBraceStmt(CE->getBody(), ContextLoc))
-        return Stop;
+        return Action::Stop();
       SourceRange Capture = CE->getBracketRange();
       if (!handleSquares(Capture.Start, Capture.End, Capture.Start))
-        return Stop;
+        return Action::Stop();
       if (auto *PL = CE->getParameters()) {
         if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(),
                           PL->getStartLoc()))
-          return Stop;
+          return Action::Stop();
       }
     } else if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(E)) {
       SourceLoc ContextLoc = getContextLocForArgs(SM, E);
       if (!handleAngles(USE->getLAngleLoc(), USE->getRAngleLoc(), ContextLoc))
-        return Stop;
+        return Action::Stop();
     } else if (isa<CallExpr>(E) || isa<SubscriptExpr>(E)) {
       SourceLoc ContextLoc = getContextLocForArgs(SM, E);
       auto *Args = E->getArgs();
@@ -653,17 +647,17 @@ private:
 
       if (isa<SubscriptExpr>(E)) {
         if (!handleSquares(lParenLoc, rParenLoc, ContextLoc))
-          return Stop;
+          return Action::Stop();
       } else {
         if (!handleParens(lParenLoc, rParenLoc, ContextLoc))
-          return Stop;
+          return Action::Stop();
       }
 
       if (Args->hasAnyTrailingClosures()) {
         if (auto *unaryArg = Args->getUnaryExpr()) {
           if (auto CE = findTrailingClosureFromArgument(unaryArg)) {
             if (!handleBraceStmt(CE->getBody(), ContextLoc))
-              return Stop;
+              return Action::Stop();
           }
         } else {
           handleImplicitRange(Args->getOriginalArgs()->getTrailingSourceRange(),
@@ -671,41 +665,36 @@ private:
         }
       }
     }
-    return Continue;
+    return Action::Continue(E);
   }
 
-  std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-    std::pair<bool, Pattern*> Continue = {true, P}, Stop = {false, nullptr};
-
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
     if (P->isImplicit())
-      return Continue;
+      return Action::Continue(P);
 
     if (isa<TuplePattern>(P) || isa<ParenPattern>(P)) {
       if (!handleParens(P->getStartLoc(), P->getEndLoc(), P->getStartLoc()))
-        return Stop;
+        return Action::Stop();
     }
 
-    return Continue;
+    return Action::Continue(P);
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
-    bool Continue = true, Stop = false;
-
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     if (auto *TT = dyn_cast<TupleTypeRepr>(T)) {
       SourceRange Parens = TT->getParens();
       if (!handleParens(Parens.Start, Parens.End, Parens.Start))
-        return Stop;
+        return Action::SkipChildren();
     } else if (isa<ArrayTypeRepr>(T) || isa<DictionaryTypeRepr>(T)) {
       if (!handleSquares(T->getStartLoc(), T->getEndLoc(), T->getStartLoc()))
-        return Stop;
+        return Action::SkipChildren();
     } else if (auto *GI = dyn_cast<GenericIdentTypeRepr>(T)) {
       SourceLoc ContextLoc = GI->getNameLoc().getBaseNameLoc();
       SourceRange Brackets = GI->getAngleBrackets();
       if (!handleAngles(Brackets.Start, Brackets.End, ContextLoc))
-        return Stop;
+        return Action::SkipChildren();
     }
-
-    return Continue;
+    return Action::Continue();
   }
 
   bool shouldWalkIntoGenericParams() override { return true; }
@@ -1362,9 +1351,9 @@ private:
     return true;
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (!walkCustomAttributes(D))
-      return false;
+      return Action::SkipChildren();
 
     auto Action = HandlePre(D, D->isImplicit());
     if (Action.shouldGenerateIndentContext()) {
@@ -1404,22 +1393,22 @@ private:
             Member.walk(*this);
         }
       }
-      return false;
+      return Action::SkipChildren();
     }
 
-    return Action.shouldVisitChildren();
+    return Action::VisitChildrenIf(Action.shouldVisitChildren());
   }
 
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     auto Action = HandlePre(S, S->isImplicit());
     if (Action.shouldGenerateIndentContext()) {
       if (auto IndentCtx = getIndentContextFrom(S, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
-    return {Action.shouldVisitChildren(), S};
+    return Action::VisitChildrenIf(Action.shouldVisitChildren(), S);
   }
 
-  std::pair<bool, ArgumentList *>
+  PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *Args) override {
     SourceLoc ContextLoc;
     if (auto *E = Parent.getAsExpr()) {
@@ -1435,10 +1424,10 @@ private:
       if (auto Ctx = getIndentContextFrom(Args, Action.Trailing, ContextLoc))
         InnermostCtx = Ctx;
     }
-    return {Action.shouldVisitChildren(), Args};
+    return Action::VisitChildrenIf(Action.shouldVisitChildren(), Args);
   }
 
-  std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (E->getKind() == ExprKind::StringLiteral &&
         SM.isBeforeInBuffer(E->getStartLoc(), TargetLocation) &&
         SM.isBeforeInBuffer(TargetLocation,
@@ -1493,7 +1482,7 @@ private:
           StringLiteralRange =
               Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
 
-        return {false, E};
+        return Action::SkipChildren(E);
       }
     }
 
@@ -1504,44 +1493,48 @@ private:
           llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
           OE->walk(*this);
         }
-        return {false, E};
+        return Action::SkipChildren(E);
       }
     }
 
-    return {Action.shouldVisitChildren(), E};
+    return Action::VisitChildrenIf(Action.shouldVisitChildren(), E);
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
     auto Action = HandlePre(P, P->isImplicit());
     if (Action.shouldGenerateIndentContext()) {
       if (auto IndentCtx = getIndentContextFrom(P, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
-    return {Action.shouldVisitChildren(), P};
+    return Action::VisitChildrenIf(Action.shouldVisitChildren(), P);
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     auto Action = HandlePre(T, false);
     if (Action.shouldGenerateIndentContext()) {
       if (auto IndentCtx = getIndentContextFrom(T, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
-    return Action.shouldVisitChildren();
+    return Action::VisitChildrenIf(Action.shouldVisitChildren());
   }
 
-  bool walkToDeclPost(Decl *D) override { return HandlePost(D); }
-  bool walkToTypeReprPost(TypeRepr *T) override { return HandlePost(T); }
-
-  Stmt* walkToStmtPost(Stmt *S) override {
-    return HandlePost(S)? S : nullptr;
+  PostWalkAction walkToDeclPost(Decl *D) override {
+    return HandlePost(D).Action;
+  }
+  PostWalkAction walkToTypeReprPost(TypeRepr *T) override {
+    return HandlePost(T).Action;
   }
 
-  Expr *walkToExprPost(Expr *E) override {
-    return HandlePost(E) ? E : nullptr;
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+    return HandlePost(S);
   }
 
-  Pattern * walkToPatternPost(Pattern *P) override {
-    return HandlePost(P) ? P : nullptr;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    return HandlePost(E);
+  }
+
+  PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
+    return HandlePost(P);
   }
 
   bool shouldWalkIntoGenericParams() override { return true; }
@@ -1575,8 +1568,11 @@ private:
   }
 
   template <typename T>
-  bool HandlePost(T* Node) {
-    return !SM.isBeforeInBuffer(TargetLocation, Node->getStartLoc());
+  PostWalkResult<T *> HandlePost(T* Node) {
+    if (SM.isBeforeInBuffer(TargetLocation, Node->getStartLoc()))
+      return Action::Stop();
+
+    return Action::Continue(Node);
   }
 
   void scanTokensUntil(SourceLoc Loc) {

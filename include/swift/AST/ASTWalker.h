@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_ASTWALKER_H
 #define SWIFT_AST_ASTWALKER_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include <utility>
@@ -72,6 +73,159 @@ enum class LazyInitializerWalking {
 /// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
+  struct Action {
+    struct _ContinueWalkAction {};
+    struct _SkipChildrenWalkAction {};
+    struct _SkipChildrenIfWalkAction { bool Cond; };
+    struct _StopIfWalkAction { bool Cond; };
+    struct _StopWalkAction {};
+
+    template<typename T> struct _ContinueWalkResult { T Value; };
+    template<typename T> struct _SkipChildrenWalkResult { T Value; };
+    template<typename T> struct _SkipChildrenIfWalkResult { bool Cond; T Value; };
+    template<typename T> struct _StopIfWalkResult { bool Cond; T Value; };
+
+    template<typename T>
+    static _ContinueWalkResult<T> Continue(T value) {
+      return { std::move(value) };
+    }
+    template<typename T>
+    static _SkipChildrenWalkResult<T> SkipChildren(T value) {
+      return { std::move(value) };
+    }
+    template<typename T>
+    static _SkipChildrenIfWalkResult<T> SkipChildrenIf(bool cond, T value) {
+      return { cond, std::move(value) };
+    }
+    template<typename T>
+    static _SkipChildrenIfWalkResult<T> VisitChildrenIf(bool cond, T value) {
+      return { !cond, std::move(value) };
+    }
+    template<typename T>
+    static _StopIfWalkResult<T> StopIf(bool cond, T value) {
+      return { cond, std::move(value) };
+    }
+
+    static _ContinueWalkAction Continue() {
+      return {};
+    }
+    static _SkipChildrenWalkAction SkipChildren() {
+      return {};
+    }
+    static _SkipChildrenIfWalkAction SkipChildrenIf(bool cond) {
+      return { cond };
+    }
+    static _SkipChildrenIfWalkAction VisitChildrenIf(bool cond) {
+      return { !cond };
+    }
+    static _StopWalkAction Stop() {
+      return {};
+    }
+    static _StopIfWalkAction StopIf(bool cond) {
+      return { cond };
+    }
+  };
+
+  /// Do not construct directly, use \c Action::<action> instead.
+  struct PreWalkAction {
+    enum Kind {
+      Stop,
+      SkipChildren,
+      Continue
+    };
+    Kind Action;
+
+    PreWalkAction(Kind action) : Action(action) {}
+
+    PreWalkAction(Action::_ContinueWalkAction) : Action(Continue) {}
+    PreWalkAction(Action::_SkipChildrenWalkAction) : Action(SkipChildren) {}
+    PreWalkAction(Action::_StopWalkAction) : Action(Stop) {}
+
+    PreWalkAction(Action::_SkipChildrenIfWalkAction action)
+      : Action(action.Cond ? SkipChildren : Continue) {}
+
+    PreWalkAction(Action::_StopIfWalkAction action)
+      : Action(action.Cond ? Stop : Continue) {}
+  };
+
+  /// Do not construct directly, use \c Action::<action> instead.
+  struct PostWalkAction {
+    enum Kind {
+      Stop,
+      Continue
+    };
+    Kind Action;
+
+    PostWalkAction(Kind action) : Action(action) {}
+
+    PostWalkAction(Action::_ContinueWalkAction) : Action(Continue) {}
+    PostWalkAction(Action::_StopWalkAction) : Action(Stop) {}
+
+    PostWalkAction(Action::_StopIfWalkAction action)
+      : Action(action.Cond ? Stop : Continue) {}
+  };
+
+  template<typename T>
+  struct PreWalkResult {
+    PreWalkAction Action;
+    Optional<T> Value;
+
+    template<typename U, typename std::enable_if<std::is_convertible<U, T>::value>::type * = nullptr>
+    PreWalkResult(const PreWalkResult<U> &Other)
+      : Action(Other.Action) {
+        if (Other.Value)
+          Value = *Other.Value;
+      }
+
+    template<typename U>
+    PreWalkResult(Action::_ContinueWalkResult<U> Result)
+      : Action(PreWalkAction::Continue), Value(std::move(Result.Value)) {}
+
+    PreWalkResult(Action::_StopWalkAction)
+      : Action(PreWalkAction::Stop), Value(None) {}
+
+    template<typename U>
+    PreWalkResult(Action::_SkipChildrenWalkResult<U> Result)
+      : Action(PreWalkAction::SkipChildren), Value(std::move(Result.Value)) {}
+
+    template<typename U>
+    PreWalkResult(Action::_SkipChildrenIfWalkResult<U> Result)
+      : Action(Result.Cond ? PreWalkAction::SkipChildren
+                           : PreWalkAction::Continue),
+        Value(std::move(Result.Value)) {}
+
+    template<typename U>
+    PreWalkResult(Action::_StopIfWalkResult<U> Result)
+      : Action(Result.Cond ? PreWalkAction::Stop
+                           : PreWalkAction::Continue),
+        Value(std::move(Result.Value)) {}
+  };
+  template<typename T>
+  struct PostWalkResult {
+    PostWalkAction Action;
+    Optional<T> Value;
+
+    template<typename U, typename std::enable_if<std::is_convertible<U, T>::value>::type * = nullptr>
+    PostWalkResult(const PostWalkResult<U> &Other)
+      : Action(Other.Action) {
+        if (Other.Value)
+          Value = *Other.Value;
+      }
+
+    template<typename U>
+    PostWalkResult(Action::_ContinueWalkResult<U> Result)
+      : Action(PostWalkAction::Continue), Value(std::move(Result.Value)) {}
+
+    PostWalkResult(Action::_StopWalkAction)
+      : Action(PostWalkAction::Stop), Value(None) {}
+
+    template<typename U>
+    PostWalkResult(Action::_StopIfWalkResult<U> Result)
+      : Action(Result.Cond ? PostWalkAction::Stop
+                           : PostWalkAction::Continue),
+        Value(std::move(Result.Value)) {}
+  };
+
   enum class ParentKind {
     Module, Decl, Stmt, Expr, Pattern, TypeRepr
   };
@@ -129,8 +283,8 @@ public:
   /// latter is null, the traversal will be terminated.
   ///
   /// The default implementation returns \c {true, E}.
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
-    return { true, E };
+  virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) {
+    return Action::Continue(E);
   }
 
   /// This method is called after visiting an expression's children.
@@ -139,7 +293,9 @@ public:
   /// previously appeared.
   ///
   /// The default implementation always returns its argument.
-  virtual Expr *walkToExprPost(Expr *E) { return E; }
+  virtual PostWalkResult<Expr *> walkToExprPost(Expr *E) {
+    return Action::Continue(E);
+  }
 
   /// This method is called when first visiting a statement before
   /// walking into its children.
@@ -151,8 +307,8 @@ public:
   /// latter is null, the traversal will be terminated.
   ///
   /// The default implementation returns \c {true, S}.
-  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) {
-    return { true, S };
+  virtual PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) {
+    return Action::Continue(S);
   }
 
   /// This method is called after visiting a statement's children.  If
@@ -161,7 +317,9 @@ public:
   /// appeared.
   ///
   /// The default implementation always returns its argument.
-  virtual Stmt *walkToStmtPost(Stmt *S) { return S; }
+  virtual PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) {
+    return Action::Continue(S);
+  }
 
   /// This method is called when first visiting a pattern before walking into
   /// its children.
@@ -173,8 +331,8 @@ public:
   /// latter is null, the traversal will be terminated.
   ///
   /// The default implementation returns \c {true, P}.
-  virtual std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) {
-    return { true, P };
+  virtual PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) {
+    return Action::Continue(P);
   }
 
   /// This method is called after visiting a pattern's children.  If
@@ -183,30 +341,40 @@ public:
   /// appeared.
   ///
   /// The default implementation always returns its argument.
-  virtual Pattern *walkToPatternPost(Pattern *P) { return P; }
+  virtual PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) {
+    return Action::Continue(P);
+  }
 
   /// walkToDeclPre - This method is called when first visiting a decl, before
   /// walking into its children.  If it returns false, the subtree is skipped.
   ///
   /// \param D The declaration to check. The callee may update this declaration
   /// in-place.
-  virtual bool walkToDeclPre(Decl *D) { return true; }
+  virtual PreWalkAction walkToDeclPre(Decl *D) {
+    return Action::Continue();
+  }
 
   /// walkToDeclPost - This method is called after visiting the children of a
   /// decl.  If it returns false, the remaining traversal is terminated and
   /// returns failure.
-  virtual bool walkToDeclPost(Decl *D) { return true; }
+  virtual PostWalkAction walkToDeclPost(Decl *D) {
+    return Action::Continue();
+  }
 
   /// This method is called when first visiting a TypeRepr, before
   /// walking into its children.  If it returns false, the subtree is skipped.
   ///
   /// \param T The TypeRepr to check.
-  virtual bool walkToTypeReprPre(TypeRepr *T) { return true; }
+  virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) {
+    return Action::Continue();
+  }
 
   /// This method is called after visiting the children of a TypeRepr.
   /// If it returns false, the remaining traversal is terminated and returns
   /// failure.
-  virtual bool walkToTypeReprPost(TypeRepr *T) { return true; }
+  virtual PostWalkAction walkToTypeReprPost(TypeRepr *T) {
+    return Action::Continue();
+  }
 
   /// This method configures whether the walker should explore into the generic
   /// params in AbstractFunctionDecl and NominalTypeDecl.
@@ -261,12 +429,16 @@ public:
   /// ParameterList, before walking into its parameters.  If it returns false,
   /// the subtree is skipped.
   ///
-  virtual bool walkToParameterListPre(ParameterList *PL) { return true; }
+  virtual PreWalkAction walkToParameterListPre(ParameterList *PL) {
+    return Action::Continue();
+  }
 
   /// walkToParameterListPost - This method is called after visiting the
   /// children of a parameter list.  If it returns false, the remaining
   /// traversal is terminated and returns failure.
-  virtual bool walkToParameterListPost(ParameterList *PL) { return true; }
+  virtual PostWalkAction walkToParameterListPost(ParameterList *PL) {
+    return Action::Continue();
+  }
 
   /// This method is called when first visiting an argument list before walking
   /// into its arguments.
@@ -278,9 +450,9 @@ public:
   /// the latter is null, the traversal will be terminated.
   ///
   /// The default implementation returns \c {true, ArgList}.
-  virtual std::pair<bool, ArgumentList *>
+  virtual PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *ArgList) {
-    return {true, ArgList};
+    return Action::Continue(ArgList);
   }
 
   /// This method is called after visiting the arguments in an argument list.
@@ -289,8 +461,9 @@ public:
   /// previously appeared.
   ///
   /// The default implementation always returns the argument list.
-  virtual ArgumentList *walkToArgumentListPost(ArgumentList *ArgList) {
-    return ArgList;
+  virtual PostWalkResult<ArgumentList *>
+  walkToArgumentListPost(ArgumentList *ArgList) {
+    return Action::Continue(ArgList);
   }
 
 protected:

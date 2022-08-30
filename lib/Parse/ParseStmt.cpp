@@ -2576,23 +2576,29 @@ struct FallthroughFinder : ASTWalker {
 
   // We walk through statements.  If we find a fallthrough, then we got what
   // we came for.
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *s) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *s) override {
     if (auto *f = dyn_cast<FallthroughStmt>(s)) {
       result = f;
     }
 
-    return {true, s};
+    return Action::Continue(s);
   }
 
   // Expressions, patterns and decls cannot contain fallthrough statements, so
   // there is no reason to walk into them.
-  std::pair<bool, Expr *> walkToExprPre(Expr *e) override { return {false, e}; }
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *p) override {
-    return {false, p};
+  PreWalkResult<Expr *> walkToExprPre(Expr *e) override {
+    return Action::SkipChildren(e);
+  }
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *p) override {
+    return Action::SkipChildren(p);
   }
 
-  bool walkToDeclPre(Decl *d) override { return false; }
-  bool walkToTypeReprPre(TypeRepr *t) override { return false; }
+  PreWalkAction walkToDeclPre(Decl *d) override {
+    return Action::SkipChildren();
+  }
+  PreWalkAction walkToTypeReprPre(TypeRepr *t) override {
+    return Action::SkipChildren();
+  }
 
   static FallthroughStmt *findFallthrough(Stmt *s) {
     FallthroughFinder finder;

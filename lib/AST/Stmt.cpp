@@ -168,41 +168,41 @@ ASTNode BraceStmt::findAsyncNode() {
   class FindInnerAsync : public ASTWalker {
     ASTNode AsyncNode;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found an 'await', record it and terminate the traversal.
       if (isa<AwaitExpr>(expr)) {
         AsyncNode = expr;
-        return {false, nullptr};
+        return Action::Stop();
       }
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return {false, expr};
+        return Action::SkipChildren(expr);
 
-      return {true, expr};
+      return Action::Continue(expr);
     }
 
-    bool walkToDeclPre(Decl *decl) override {
+    PreWalkAction walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
       if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         if (patternBinding->isAsyncLet())
           AsyncNode = patternBinding;
 
-        return true;
+        return Action::Continue();
       }
 
-      return false;
+      return Action::SkipChildren();
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
         if (forEach->getAwaitLoc().isValid()) {
           AsyncNode = forEach;
-          return {false, nullptr};
+          return Action::Stop();
         }
       }
 
-      return {true, stmt};
+      return Action::Continue(stmt);
     }
 
   public:

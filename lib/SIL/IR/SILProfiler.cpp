@@ -183,11 +183,12 @@ namespace {
 ///
 /// Apply \p Func if the function can be visited.
 template <typename F>
-bool visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
+ASTWalker::PreWalkAction
+visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
   bool continueWalk = Walker.Parent.isNull();
   if (continueWalk)
     Func();
-  return continueWalk;
+  return ASTWalker::Action::VisitChildrenIf(continueWalk);
 }
 
 /// Whether to skip visitation of an expression. Children of skipped exprs
@@ -236,19 +237,19 @@ struct MapRegionCounters : public ASTWalker {
     ++NextCounter;
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
-      return shouldWalkUnmappedDecl(D);
+      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] { mapRegion(AFD->getBody()); });
     } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       mapRegion(TLCD->getBody());
     }
-    return true;
+    return Action::Continue();
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       mapRegion(IS->getThenStmt());
     } else if (auto *US = dyn_cast<GuardStmt>(S)) {
@@ -262,17 +263,17 @@ struct MapRegionCounters : public ASTWalker {
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
       mapRegion(getProfilerStmtForCase(CS));
     }
-    return {true, S};
+    return Action::Continue(S);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (skipExpr(E))
-      return {true, E};
+      return Action::Continue(E);
 
     // Profiling for closures should be handled separately. Do not visit
     // closure expressions twice.
     if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
-      return {false, E};
+      return Action::SkipChildren(E);
 
     // If AST visitation begins with an expression, the counter map must be
     // empty. Set up a counter for the root.
@@ -288,7 +289,7 @@ struct MapRegionCounters : public ASTWalker {
     if (isa<LazyInitializerExpr>(E))
       mapRegion(E);
 
-    return {true, E};
+    return Action::Continue(E);
   }
 };
 
@@ -583,9 +584,9 @@ struct PGOMapping : public ASTWalker {
     LoadedCounterMap[Node] = count;
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
-      return shouldWalkUnmappedDecl(D);
+      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
         setKnownExecutionCount(AFD->getBody());
@@ -594,7 +595,7 @@ struct PGOMapping : public ASTWalker {
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
       setKnownExecutionCount(TLCD->getBody());
 
-    return true;
+    return Action::Continue();
   }
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
@@ -603,7 +604,7 @@ struct PGOMapping : public ASTWalker {
     return LazyInitializerWalking::InAccessor;
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     unsigned parent = getParentCounter();
     auto parentCount = LoadedCounts.Counts[parent];
     if (auto *IS = dyn_cast<IfStmt>(S)) {
@@ -648,17 +649,17 @@ struct PGOMapping : public ASTWalker {
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
       setKnownExecutionCount(getProfilerStmtForCase(CS));
     }
-    return {true, S};
+    return Action::Continue(S);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (skipExpr(E))
-      return {true, E};
+      return Action::Continue(E);
 
     // Profiling for closures should be handled separately. Do not visit
     // closure expressions twice.
     if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
-      return {false, E};
+      return Action::SkipChildren(E);
 
     unsigned parent = getParentCounter();
 
@@ -687,7 +688,7 @@ struct PGOMapping : public ASTWalker {
     if (isa<LazyInitializerExpr>(E))
       setKnownExecutionCount(E);
 
-    return {true, E};
+    return Action::Continue(E);
   }
 };
 
@@ -954,9 +955,9 @@ public:
                                   Builder.getExpressions());
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
-      return shouldWalkUnmappedDecl(D);
+      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
@@ -966,18 +967,18 @@ public:
       assignCounter(TLCD->getBody());
       ImplicitTopLevelBody = TLCD->getBody();
     }
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     if (isa<TopLevelCodeDecl>(D))
       ImplicitTopLevelBody = nullptr;
-    return true;
+    return Action::Continue();
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (S->isImplicit() && S != ImplicitTopLevelBody)
-      return {true, S};
+      return Action::Continue(S);
 
     // If we're in an 'incomplete' region, update it to include this node. This
     // ensures we only create the region if needed.
@@ -1065,12 +1066,12 @@ public:
       assignCounter(DCS, CounterExpr::Ref(getCurrentCounter()));
       DoCatchStack.push_back(DCS);
     }
-    return {true, S};
+    return Action::Continue(S);
   }
 
-  Stmt *walkToStmtPost(Stmt *S) override {
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     if (S->isImplicit() && S != ImplicitTopLevelBody)
-      return S;
+      return Action::Continue(S);
 
     if (isa<BraceStmt>(S)) {
       if (hasCounter(S)) {
@@ -1146,17 +1147,17 @@ public:
 
       terminateRegion(S);
     }
-    return S;
+    return Action::Continue(S);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (skipExpr(E))
-      return {true, E};
+      return Action::Continue(E);
 
     // Profiling for closures should be handled separately. Do not visit
     // closure expressions twice.
     if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
-      return {false, E};
+      return Action::SkipChildren(E);
 
     // If we're in an 'incomplete' region, update it to include this node. This
     // ensures we only create the region if needed.
@@ -1187,14 +1188,14 @@ public:
 
     if (hasCounter(E) && !Parent.isNull())
       pushRegion(E);
-    return {true, E};
+    return Action::Continue(E);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     if (hasCounter(E))
       popRegions(E);
 
-    return E;
+    return Action::Continue(E);
   }
 };
 

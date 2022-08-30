@@ -234,14 +234,14 @@ namespace {
     UnresolvedPatternFinder(bool &HadUnresolvedPattern)
       : HadUnresolvedPattern(HadUnresolvedPattern) {}
     
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find an UnresolvedPatternExpr, return true.
       if (isa<UnresolvedPatternExpr>(E)) {
         HadUnresolvedPattern = true;
-        return { false, E };
+        return Action::SkipChildren(E);
       }
       
-      return { true, E };
+      return Action::Continue(E);
     }
     
     static bool hasAny(Expr *E) {

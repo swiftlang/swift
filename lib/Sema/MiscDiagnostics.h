@@ -126,7 +126,7 @@ bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
                                            ForEachStmt *forEach);
 
 class BaseDiagnosticWalker : public ASTWalker {
-  bool walkToDeclPre(Decl *D) override;
+  PreWalkAction walkToDeclPre(Decl *D) override;
 
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;

@@ -3216,7 +3216,7 @@ public:
   ASTTypePrinter(SourceManager &SM, const PrintOptions &Options)
       : OS(llvm::outs()), SM(SM), Options(Options) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       OS.indent(IndentLevel * 2);
       OS << Decl::getKindName(VD->getKind()) << "Decl '''"
@@ -3225,15 +3225,15 @@ public:
       OS << "\n";
     }
     IndentLevel++;
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     IndentLevel--;
-    return true;
+    return Action::Continue();
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     StringRef SourceCode{ "<unknown>" };
     unsigned Line = ~0U;
 
@@ -3256,12 +3256,12 @@ public:
     E->getType().print(OS, Options);
     OS << "\n";
     IndentLevel++;
-    return { true, E };
+    return Action::Continue(E);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     IndentLevel--;
-    return E;
+    return Action::Continue(E);
   }
 };
 } // unnamed namespace
@@ -3299,16 +3299,16 @@ class ASTDocCommentDumper : public ASTWalker {
 public:
   ASTDocCommentDumper() : OS(llvm::outs()) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return true;
+      return Action::Continue();
 
     swift::markup::MarkupContext MC;
     auto DC = getSingleDocComment(MC, D);
     if (DC)
       swift::markup::dump(DC->getDocument(), OS);
 
-    return true;
+    return Action::Continue();
   }
 };
 } // end anonymous namespace
@@ -3453,9 +3453,9 @@ public:
     }
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return true;
+      return Action::Continue();
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       SourceLoc Loc = D->getLoc(/*SerializedOK=*/true);
@@ -3490,7 +3490,7 @@ public:
       printDocComment(D);
       OS << "\n";
     }
-    return true;
+    return Action::Continue();
   }
 };
 } // unnamed namespace

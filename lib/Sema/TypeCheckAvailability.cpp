@@ -470,7 +470,7 @@ public:
   }
 
 private:
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
 
     // Adds in a parent TRC for decls which are syntactically nested but are not
@@ -490,10 +490,10 @@ private:
 
     // Create TRCs that cover only the body of the declaration.
     buildContextsForBodyOfDecl(D);
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     while (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
@@ -503,7 +503,7 @@ private:
       DeclBodyContextStack.pop_back();
     }
 
-    return true;
+    return Action::Continue();
   }
 
   TypeRefinementContext *getEffectiveParentContextForDecl(Decl *D) {
@@ -778,32 +778,32 @@ private:
     }
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     PrettyStackTraceStmt trace(Context, stackTraceAction(), S);
 
     if (consumeDeclBodyContextIfNecessary(S)) {
-      return std::make_pair(true, S);
+      return Action::Continue(S);
     }
 
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       buildIfStmtRefinementContext(IS);
-      return std::make_pair(false, S);
+      return Action::SkipChildren(S);
     }
 
     if (auto *RS = dyn_cast<GuardStmt>(S)) {
       buildGuardStmtRefinementContext(RS);
-      return std::make_pair(false, S);
+      return Action::SkipChildren(S);
     }
 
     if (auto *WS = dyn_cast<WhileStmt>(S)) {
       buildWhileStmtRefinementContext(WS);
-      return std::make_pair(false, S);
+      return Action::SkipChildren(S);
     }
 
-    return std::make_pair(true, S);
+    return Action::Continue(S);
   }
 
-  Stmt *walkToStmtPost(Stmt *S) override {
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     // If we have multiple guard statements in the same block
     // then we may have multiple refinement contexts to pop
     // after walking that block.
@@ -812,7 +812,7 @@ private:
       ContextStack.pop_back();
     }
 
-    return S;
+    return Action::Continue(S);
   }
 
   /// Consumes the top TRC from \p DeclBodyContextStack and pushes it onto the
@@ -1199,12 +1199,12 @@ private:
     return AvailabilityContext(VersionRange::allGTE(Version));
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     if (ContextStack.back().ScopeNode.getAsExpr() == E) {
       ContextStack.pop_back();
     }
 
-    return E;
+    return Action::Continue(E);
   }
 };
   
@@ -1414,84 +1414,82 @@ public:
   /// the predicate.
   Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    return std::make_pair(walkToRangePre(E->getSourceRange()), E);
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    return getPreWalkResult(E);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    return std::make_pair(walkToRangePre(S->getSourceRange()), S);
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    return getPreWalkResult(S);
   }
 
-  bool walkToDeclPre(Decl *D) override {
-    return walkToRangePre(D->getSourceRange());
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    return getPreWalkResult(D).Action;
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-    return std::make_pair(walkToRangePre(P->getSourceRange()), P);
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+    return getPreWalkResult(P);
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
-    return walkToRangePre(T->getSourceRange());
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    return getPreWalkResult(T).Action;
   }
 
   /// Returns true if the walker should traverse an AST node with
   /// source range Range.
-  bool walkToRangePre(SourceRange Range) {
+  template<typename T>
+  PreWalkResult<T> getPreWalkResult(T Node) {
     // When walking down the tree, we traverse until we have found a node
     // inside the target range. Once we have found such a node, there is no
     // need to traverse any deeper.
     if (FoundTarget)
-      return false;
+      return Action::SkipChildren(Node);
 
     // If we haven't found our target yet and the node we are pre-visiting
     // doesn't have a valid range, we still have to traverse it because its
     // subtrees may have valid ranges.
+    auto Range = Node->getSourceRange();
     if (Range.isInvalid())
-      return true;
+      return Action::Continue(Node);
 
     // We have found our target if the range of the node we are visiting
     // is contained in the range we are looking for.
     FoundTarget = SM.rangeContains(TargetRange, Range);
 
     if (FoundTarget)
-      return false;
+      return Action::SkipChildren(Node);
 
     // Search the subtree if the target range is inside its range.
-    return SM.rangeContains(Range, TargetRange);
+    if (!SM.rangeContains(Range, TargetRange))
+      return Action::SkipChildren(Node);
+
+    return Action::Continue(Node);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
-    if (walkToNodePost(E)) {
-      return E;
-    }
-
-    return nullptr;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    return walkToNodePost(E);
   }
 
-  Stmt *walkToStmtPost(Stmt *S) override {
-    if (walkToNodePost(S)) {
-      return S;
-    }
-
-    return nullptr;
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+    return walkToNodePost(S);
   }
 
-  bool walkToDeclPost(Decl *D) override {
-    return walkToNodePost(D);
+  PostWalkAction walkToDeclPost(Decl *D) override {
+    return walkToNodePost(D).Action;
   }
 
   /// Once we have found the target node, look for the innermost ancestor
   /// matching our criteria on the way back up the spine of the tree.
-  bool walkToNodePost(ASTNode Node) {
+  template<typename T>
+  PostWalkResult<T> walkToNodePost(T Node) {
     if (!InnermostMatchingNode.hasValue() && Predicate(Node, Parent)) {
-      assert(Node.getSourceRange().isInvalid() ||
-             SM.rangeContains(Node.getSourceRange(), TargetRange));
+      assert(Node->getSourceRange().isInvalid() ||
+             SM.rangeContains(Node->getSourceRange(), TargetRange));
 
       InnermostMatchingNode = Node;
-      return false;
+      return Action::Stop();
     }
 
-    return true;
+    return Action::Continue(Node);
   }
 };
 
@@ -3221,15 +3219,14 @@ public:
 
   bool shouldWalkIntoTapExpression() override { return false; }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     auto *DC = Where.getDeclContext();
 
     ExprStack.push_back(E);
 
-    auto visitChildren = [&]() { return std::make_pair(true, E); };
     auto skipChildren = [&]() {
       ExprStack.pop_back();
-      return std::make_pair(false, E);
+      return Action::SkipChildren(E);
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
@@ -3321,17 +3318,17 @@ public:
       }
     }
 
-    return visitChildren();
+    return Action::Continue(E);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
 
-    return E;
+    return Action::Continue(E);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
 
     // We end up here when checking the output of the result builder transform,
     // which includes closures that are not "separately typechecked" and yet
@@ -3339,7 +3336,7 @@ public:
     // since these availability for these statements is not diagnosed from
     // typeCheckStmt() as usual.
     diagnoseStmtAvailability(S, Where.getDeclContext(), /*walkRecursively=*/true);
-    return std::make_pair(false, S);
+    return Action::SkipChildren(S);
   }
 
   bool diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
@@ -3900,32 +3897,32 @@ public:
   explicit StmtAvailabilityWalker(DeclContext *dc, bool walkRecursively)
     : DC(dc), WalkRecursively(walkRecursively) {}
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (!WalkRecursively && isa<BraceStmt>(S))
-      return std::make_pair(false, S);
+      return Action::SkipChildren(S);
 
-    return std::make_pair(true, S);
+    return Action::Continue(S);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (WalkRecursively)
       diagnoseExprAvailability(E, DC);
-    return std::make_pair(false, E);
+    return Action::SkipChildren(E);
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     auto where = ExportContext::forFunctionBody(DC, T->getStartLoc());
     diagnoseTypeReprAvailability(T, where);
-    return false;
+    return Action::SkipChildren();
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
     if (auto *IP = dyn_cast<IsPattern>(P)) {
       auto where = ExportContext::forFunctionBody(DC, P->getLoc());
       diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), where);
     }
 
-    return std::make_pair(true, P);
+    return Action::Continue(P);
   }
 };
 }
@@ -3975,7 +3972,7 @@ public:
                              DeclAvailabilityFlags flags)
       : where(where), flags(flags) {}
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     if (auto *ITR = dyn_cast<IdentTypeRepr>(T)) {
       if (auto *CTR = dyn_cast<CompoundIdentTypeRepr>(ITR)) {
         for (auto *comp : CTR->getComponents()) {
@@ -3997,10 +3994,10 @@ public:
 
       // We've already visited all the children above, so we don't
       // need to recurse.
-      return false;
+      return Action::SkipChildren();
     }
 
-    return true;
+    return Action::Continue();
   }
 };
 

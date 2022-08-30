@@ -8208,7 +8208,7 @@ namespace {
     explicit SetExprTypes(const Solution &solution)
         : solution(solution) {}
 
-    Expr *walkToExprPost(Expr *expr) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
       auto exprType = cs.getType(expr);
       exprType = solution.simplifyType(exprType);
@@ -8234,16 +8234,18 @@ namespace {
         }
       }
 
-      return expr;
+      return Action::Continue(expr);
     }
 
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
 
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
   };
 
   class ExprWalker : public ASTWalker {
@@ -8325,16 +8327,16 @@ namespace {
       return hadError;
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         rewriteFunction(closure);
 
         if (AnyFunctionRef(closure).hasExternalPropertyWrapperParameters()) {
-          return { false, rewriteClosure(closure) };
+          return Action::SkipChildren(rewriteClosure(closure));
         }
 
-        return { false, closure };
+        return Action::SkipChildren(closure);
       }
 
       if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
@@ -8351,20 +8353,26 @@ namespace {
       }
 
       Rewriter.walkToExprPre(expr);
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
-    Expr *walkToExprPost(Expr *expr) override {
-      return Rewriter.walkToExprPost(expr);
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
+      auto *result = Rewriter.walkToExprPost(expr);
+      if (!result)
+        return Action::Stop();
+
+      return Action::Continue(result);
     }
 
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
 
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
 
     /// Rewrite the target, producing a new target.
     Optional<SolutionApplicationTarget>

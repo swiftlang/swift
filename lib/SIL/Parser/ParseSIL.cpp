@@ -1336,7 +1336,7 @@ void SILParser::bindSILGenericParams(TypeRepr *TyR) {
   public:
     HandleSILGenericParamsWalker(SourceFile *SF) : SF(SF) {}
 
-    bool walkToTypeReprPre(TypeRepr *T) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (auto fnType = dyn_cast<FunctionTypeRepr>(T)) {
         if (auto *genericParams = fnType->getGenericParams()) {
           auto sig = handleSILGenericParams(genericParams, SF);
@@ -1356,7 +1356,7 @@ void SILParser::bindSILGenericParams(TypeRepr *TyR) {
         }
       }
 
-      return true;
+      return Action::Continue();
     }
   };
 

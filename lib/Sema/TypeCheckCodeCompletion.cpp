@@ -115,14 +115,14 @@ public:
   SanitizeExpr(ASTContext &C)
     : C(C) { }
 
-  std::pair<bool, ArgumentList *>
+  PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *argList) override {
     // Return the argument list to the state prior to being rewritten. This will
     // strip default arguments and expand variadic args.
-    return {true, argList->getOriginalArgs()};
+    return Action::Continue(argList->getOriginalArgs());
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     while (true) {
       // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
       if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
@@ -136,7 +136,7 @@ public:
 
         // Walk to and return the base expression to erase any existentials
         // within it.
-        return { false, OOE->getSubExpr()->walk(*this) };
+        return Action::SkipChildren(OOE->getSubExpr()->walk(*this));
       }
 
       // Hacky, this behaves just like an OpenedExistential in that it changes
@@ -210,11 +210,11 @@ public:
       }
 
       // Now, we're ready to walk into sub expressions.
-      return {true, expr};
+      return Action::Continue(expr);
     }
   }
 
-  Expr *walkToExprPost(Expr *expr) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
     assert(!isa<ImplicitConversionExpr>(expr) &&
            "ImplicitConversionExpr should be eliminated in walkToExprPre");
 
@@ -241,23 +241,25 @@ public:
                                                      memberLoc);
       if (memberAndFunctionRef.first) {
         assert(!isa<ImplicitConversionExpr>(dotCall->getBase()));
-        return buildMemberRef(dotCall->getType(),
-                              dotCall->getBase(),
-                              dotCall->getDotLoc(),
-                              memberAndFunctionRef.first,
-                              memberLoc, expr->isImplicit());
+        auto *ref = buildMemberRef(dotCall->getType(),
+                                   dotCall->getBase(),
+                                   dotCall->getDotLoc(),
+                                   memberAndFunctionRef.first,
+                                   memberLoc, expr->isImplicit());
+        return Action::Continue(ref);
       }
     }
 
     if (auto *dynamicMember = dyn_cast<DynamicMemberRefExpr>(expr)) {
       if (auto memberRef = dynamicMember->getMember()) {
         assert(!isa<ImplicitConversionExpr>(dynamicMember->getBase()));
-        return buildMemberRef(dynamicMember->getType(),
-                              dynamicMember->getBase(),
-                              dynamicMember->getDotLoc(),
-                              memberRef,
-                              dynamicMember->getNameLoc(),
-                              expr->isImplicit());
+        auto *ref = buildMemberRef(dynamicMember->getType(),
+                                   dynamicMember->getBase(),
+                                   dynamicMember->getDotLoc(),
+                                   memberRef,
+                                   dynamicMember->getNameLoc(),
+                                   expr->isImplicit());
+        return Action::Continue(ref);
       }
     }
 
@@ -271,18 +273,21 @@ public:
                                                      memberLoc);
       if (memberAndFunctionRef.first) {
         assert(!isa<ImplicitConversionExpr>(dotIgnored->getLHS()));
-        return buildMemberRef(dotIgnored->getType(),
-                              dotIgnored->getLHS(),
-                              dotIgnored->getDotLoc(),
-                              memberAndFunctionRef.first,
-                              memberLoc, expr->isImplicit());
+        auto *ref = buildMemberRef(dotIgnored->getType(),
+                                   dotIgnored->getLHS(),
+                                   dotIgnored->getDotLoc(),
+                                   memberAndFunctionRef.first,
+                                   memberLoc, expr->isImplicit());
+        return Action::Continue(ref);
       }
     }
-    return expr;
+    return Action::Continue(expr);
   }
 
   /// Ignore declarations.
-  bool walkToDeclPre(Decl *decl) override { return false; }
+  PreWalkAction walkToDeclPre(Decl *decl) override {
+    return Action::SkipChildren();
+  }
 };
 
 }  // end namespace

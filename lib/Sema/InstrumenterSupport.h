@@ -61,15 +61,15 @@ protected:
 
   public:
     ClosureFinder(InstrumenterBase &Inst) : I(Inst) {}
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (isa<BraceStmt>(S)) {
-        return {false, S}; // don't walk into brace statements; we
+        return Action::SkipChildren(S); // don't walk into brace statements; we
                            // need to respect nesting!
       } else {
-        return {true, S};
+        return Action::Continue(S);
       }
     }
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
@@ -79,7 +79,7 @@ protected:
           // be more than a single expression!
         }
       }
-      return {true, E};
+      return Action::Continue(E);
     }
   };
 

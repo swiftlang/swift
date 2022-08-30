@@ -119,30 +119,21 @@ class TypeAccessScopeDiagnoser : private ASTWalker {
   bool treatUsableFromInlineAsPublic;
   const ComponentIdentTypeRepr *offendingType = nullptr;
 
-  bool walkToTypeReprPre(TypeRepr *TR) override {
-    // Exit early if we've already found a problem type.
-    if (offendingType)
-      return false;
-
+  PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
     auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
     if (!CITR)
-      return true;
+      return Action::Continue();
 
     const ValueDecl *VD = CITR->getBoundDecl();
     if (!VD)
-      return true;
+      return Action::Continue();
 
     if (VD->getFormalAccessScope(useDC, treatUsableFromInlineAsPublic)
         != accessScope)
-      return true;
+      return Action::Continue();
 
     offendingType = CITR;
-    return false;
-  }
-
-  bool walkToTypeReprPost(TypeRepr *T) override {
-    // Exit early if we've already found a problem type.
-    return offendingType == nullptr;
+    return Action::Stop();
   }
 
   explicit TypeAccessScopeDiagnoser(AccessScope accessScope,

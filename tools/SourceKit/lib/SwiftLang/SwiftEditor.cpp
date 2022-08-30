@@ -1541,15 +1541,15 @@ private:
     : PlaceholderLoc(PlaceholderLoc), Found(Found) {
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<EditorPlaceholderExpr>(E) && E->getStartLoc() == PlaceholderLoc) {
         Found = cast<EditorPlaceholderExpr>(E);
-        return { false, nullptr };
+        return Action::Stop();
       }
-      return { true, E };
+      return Action::Continue(E);
     }
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
         // The base walker assumes the content of active IfConfigDecl clauses
         // has been injected into the parent context and will be walked there.
@@ -1560,9 +1560,9 @@ private:
             Elem.walk(*this);
           }
         }
-        return false;
+        return Action::SkipChildren();
       }
-      return true;
+      return Action::Continue();
     }
   };
 
@@ -1574,7 +1574,7 @@ private:
     explicit ClosureTypeWalker(SourceManager &SM, ClosureInfo &Info) : SM(SM),
       Info(Info) { }
 
-    bool walkToTypeReprPre(TypeRepr *T) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
         FoundFunctionTypeRepr = true;
         for (auto &ArgElt : FTR->getArgsTypeRepr()->getElements()) {
@@ -1595,14 +1595,11 @@ private:
           Info.ReturnTypeRange = CharSourceRange(SM, RTR->getStartLoc(), SRE);
         }
       }
-      return !FoundFunctionTypeRepr;
-    }
+      if (FoundFunctionTypeRepr)
+        return Action::Stop();
 
-    bool walkToTypeReprPost(TypeRepr *T) override {
-      // If we just visited the FunctionTypeRepr, end traversal.
-      return !FoundFunctionTypeRepr;
+      return Action::Continue();
     }
-
   };
 
   bool containClosure(Expr *E) {

@@ -968,15 +968,15 @@ public:
              llvm::MutableArrayRef<TextEntity*> FuncEnts)
     : SM(SM), BufferID(BufferID), FuncEnts(FuncEnts) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return false; // Skip body.
+      return Action::SkipChildren(); // Skip body.
 
     if (FuncEnts.empty())
-      return false;
+      return Action::SkipChildren();
 
     if (!isa<AbstractFunctionDecl>(D) && !isa<SubscriptDecl>(D))
-      return true;
+      return Action::Continue();
 
     unsigned Offset = SM.getLocOffsetInBuffer(D->getLoc(), BufferID);
     auto Found = FuncEnts.end();
@@ -989,14 +989,14 @@ public:
         });
     }
     if (Found == FuncEnts.end() || (*Found)->LocOffset != Offset)
-      return false;
+      return Action::SkipChildren();
     if (auto FD = dyn_cast<AbstractFunctionDecl>(D)) {
       addParameters(FD, **Found, SM, BufferID);
     } else {
       addParameters(cast<SubscriptDecl>(D), **Found, SM, BufferID);
     }
     FuncEnts = llvm::MutableArrayRef<TextEntity*>(Found+1, FuncEnts.end());
-    return false; // skip body.
+    return Action::SkipChildren(); // skip body.
   }
 };
 } // end anonymous namespace

@@ -69,7 +69,7 @@ namespace {
                           unsigned nextDiscriminator = 0)
       : ParentDC(parent), NextDiscriminator(nextDiscriminator) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
       // Reparenting is required with:
       //   - nested autoclosures, because the inner autoclosure will be
@@ -81,7 +81,7 @@ namespace {
         // underlying issue. -Joe
         if (CE->getParent() == ParentDC
             && CE->getDiscriminator() != AutoClosureExpr::InvalidDiscriminator)
-          return { false, E };
+          return Action::SkipChildren(E);
         
         assert(CE->getDiscriminator() == AutoClosureExpr::InvalidDiscriminator);
         CE->setDiscriminator(NextDiscriminator++);
@@ -95,7 +95,7 @@ namespace {
         ParentDC = oldParentDC;
 
         TypeChecker::computeCaptures(CE);
-        return { false, E };
+        return Action::SkipChildren(E);
       } 
 
       // Capture lists need to be reparented to enclosing autoclosures.
@@ -119,7 +119,7 @@ namespace {
           CE->getBody()->walk(ContextualizeClosures(CE));
 
         TypeChecker::computeCaptures(CE);
-        return { false, E };
+        return Action::SkipChildren(E);
       }
 
       // Caller-side default arguments need their @autoclosures checked.
@@ -127,14 +127,14 @@ namespace {
         if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
           DAE->getCallerSideDefaultExpr()->walk(*this);
 
-      return { true, E };
+      return Action::Continue(E);
     }
 
     /// We don't want to recurse into most local declarations.
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       // But we do want to walk into the initializers of local
       // variables.
-      return isa<PatternBindingDecl>(D);
+      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
     }
   };
 
@@ -1749,15 +1749,14 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   public:
     ApplyExpr *Found = nullptr;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto apply = dyn_cast<ApplyExpr>(E)) {
         if (isa<OtherConstructorDeclRefExpr>(apply->getSemanticFn())) {
           Found = apply;
-          return { false, E };
+          return Action::Stop();
         }
       }
-
-      return { Found == nullptr, E };
+      return Action::Continue(E);
     }
   };
 
@@ -1852,13 +1851,13 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
     DeclContext *getDeclContext() const { return DC; }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *brace = dyn_cast<BraceStmt>(S)) {
         auto braceCharRange = Lexer::getCharSourceRangeFromSourceRange(
             SM, brace->getSourceRange());
         // Unless this brace contains the loc, there's nothing to do.
         if (!braceCharRange.contains(Loc))
-          return {false, S};
+          return Action::SkipChildren(S);
 
         // Reset the node found in a parent context.
         if (!brace->isImplicit())
@@ -1886,40 +1885,40 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
           break;
         }
         // Already walked into.
-        return {false, nullptr};
+        return Action::Stop();
       }
 
-      return {true, S};
+      return Action::Continue(S);
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (SM.isBeforeInBuffer(Loc, E->getStartLoc()))
-        return {false, E};
+        return Action::SkipChildren(E);
 
       SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, E->getEndLoc());
       if (SM.isBeforeInBuffer(endLoc, Loc))
-        return {false, E};
+        return Action::SkipChildren(E);
 
       // Don't walk into 'TapExpr'. They should be type checked with parent
       // 'InterpolatedStringLiteralExpr'.
       if (isa<TapExpr>(E))
-        return {false, E};
+        return Action::SkipChildren(E);
 
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         // NOTE: When a client wants to type check a closure signature, it
         // requests with closure's 'getLoc()' location.
         if (Loc == closure->getLoc())
-          return {false, E};
+          return Action::SkipChildren(E);
 
         DC = closure;
       }
-      return {true, E};
+      return Action::Continue(E);
     }
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *newDC = dyn_cast<DeclContext>(D))
         DC = newDC;
-      return true;
+      return Action::Continue();
     }
 
   } finder(ctx.SourceMgr, Loc);

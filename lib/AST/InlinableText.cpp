@@ -49,7 +49,7 @@ class IsFeatureCheck : public ASTWalker {
 public:
   bool foundFeature = false;
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
       if (unresolved->getName().getBaseName().userFacingName().startswith("$"))
         foundFeature = true;
@@ -64,7 +64,7 @@ public:
       }
     }
 
-    return { !foundFeature, expr };
+    return Action::VisitChildrenIf(foundFeature, expr);
   }
 };
 
@@ -122,9 +122,9 @@ struct ExtractInactiveRanges : public ASTWalker {
     ranges.push_back(charRange);
   }
 
-  bool walkToDeclPre(Decl *d) override {
+  PreWalkAction walkToDeclPre(Decl *d) override {
     auto icd = dyn_cast<IfConfigDecl>(d);
-    if (!icd) return true;
+    if (!icd) return Action::Continue();
 
     auto start = Lexer::getLocForStartOfLine(sourceMgr, icd->getStartLoc());
     auto end = Lexer::getLocForEndOfLine(sourceMgr, icd->getEndLoc());
@@ -134,13 +134,13 @@ struct ExtractInactiveRanges : public ASTWalker {
     // If there's no active clause, add the entire #if...#endif block.
     if (!clause) {
       addRange(start, end);
-      return false;
+      return Action::SkipChildren();
     }
 
     // If the clause is checking for a particular feature with $ or a compiler
     // version, keep the whole thing.
     if (anyClauseIsFeatureCheck(icd->getClauses())) {
-      return false;
+      return Action::SkipChildren();
     }
 
     // Ignore range from beginning of '#if', '#elseif', or '#else' to the
@@ -163,7 +163,7 @@ struct ExtractInactiveRanges : public ASTWalker {
       if (elt.isDecl(DeclKind::IfConfig))
         elt.get<Decl *>()->walk(*this);
 
-    return false;
+    return Action::SkipChildren();
   }
 
   /// Gets the ignored ranges in source order.

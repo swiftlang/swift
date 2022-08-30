@@ -2387,15 +2387,15 @@ class ConstExtractor: public ASTWalker {
     }
     return false;
   }
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (E->isSemanticallyConstExpr()) {
       record(E, E);
-      return { false, E };
+      return Action::SkipChildren(E);
     }
     if (handleSimpleReference(E)) {
-      return { false, E };
+      return Action::SkipChildren(E);
     }
-    return { true, E };
+    return Action::Continue(E);
   }
 public:
   ConstExtractor(SDKContext &SCtx, ASTContext &Ctx): SCtx(SCtx),

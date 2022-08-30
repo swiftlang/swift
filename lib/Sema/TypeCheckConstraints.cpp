@@ -271,20 +271,20 @@ class FunctionSyntacticDiagnosticWalker : public ASTWalker {
 public:
   FunctionSyntacticDiagnosticWalker(DeclContext *dc) { dcStack.push_back(dc); }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
       if (closure->isSeparatelyTypeChecked()) {
         dcStack.push_back(closure);
-        return {true, expr};
+        return Action::Continue(expr);
       }
     }
 
-    return {false, expr};
+    return Action::SkipChildren(expr);
   }
 
-  Expr *walkToExprPost(Expr *expr) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
       if (closure->isSeparatelyTypeChecked()) {
         assert(dcStack.back() == closure);
@@ -292,20 +292,23 @@ public:
       }
     }
 
-    return expr;
+    return Action::Continue(expr);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
     performStmtDiagnostics(stmt, dcStack.back());
-    return {true, stmt};
+    return Action::Continue(stmt);
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
-    return {false, pattern};
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+    return Action::SkipChildren(pattern);
   }
-
-  bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
-  bool walkToParameterListPre(ParameterList *params) override { return false; }
+  PreWalkAction walkToTypeReprPre(TypeRepr *typeRepr) override {
+    return Action::SkipChildren();
+  }
+  PreWalkAction walkToParameterListPre(ParameterList *params) override {
+    return Action::SkipChildren();
+  }
 };
 } // end anonymous namespace
 
@@ -1108,27 +1111,27 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
     LoadAdder(ASTContext &ctx, GetTypeFn getType, SetTypeFn setType)
         : Ctx(ctx), getType(getType), setType(setType) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<ParenExpr>(E) || isa<ForceValueExpr>(E))
-        return { true, E };
+        return Action::Continue(E);
 
       // Since load expression is created by walker,
       // it's safe to stop as soon as it encounters first one
       // because it would be the one it just created.
       if (isa<LoadExpr>(E))
-        return { false, nullptr };
+        return Action::Stop();
 
-      return { false, createLoadExpr(E) };
+      return Action::SkipChildren(createLoadExpr(E));
     }
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (auto *FVE = dyn_cast<ForceValueExpr>(E))
         setType(E, getType(FVE->getSubExpr())->getOptionalObjectType());
 
       if (auto *PE = dyn_cast<ParenExpr>(E))
         setType(E, ParenType::get(Ctx, getType(PE->getSubExpr())));
 
-      return E;
+      return Action::Continue(E);
     }
 
   private:
@@ -2249,19 +2252,27 @@ void ConstraintSystem::forEachExpr(
                 llvm::function_ref<Expr *(Expr *)> callback)
         : CS(CS), callback(callback) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto *NewE = callback(E);
+      if (!NewE)
+        return Action::Stop();
+
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         if (!CS.participatesInInference(closure))
-          return { false, callback(E) };
+          return Action::SkipChildren(NewE);
       }
-      return { true, callback(E) };
+      return Action::Continue(NewE);
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      return Action::SkipChildren(P);
     }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipChildren();
+    }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
   };
 
   expr->walk(ChildWalker(*this, callback));

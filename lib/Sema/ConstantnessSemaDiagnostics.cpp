@@ -342,7 +342,7 @@ void swift::diagnoseConstantArgumentRequirement(
     // Descend until we find a call expressions. Note that the input expression
     // could be an assign expression or another expression that contains the
     // call.
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // Handle closure expressions separately as we may need to
       // manually descend into the body.
       if (auto *closureExpr = dyn_cast<ClosureExpr>(expr)) {
@@ -357,20 +357,20 @@ void swift::diagnoseConstantArgumentRequirement(
       // interpolated expressions if we are inside of a closure.
       if (!expr || isa<ErrorExpr>(expr) || !expr->getType() ||
           (isa<InterpolatedStringLiteralExpr>(expr) && !insideClosure))
-        return {false, expr};
+        return Action::SkipChildren(expr);
       if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
         diagnoseConstantArgumentRequirementOfCall(callExpr, DC->getASTContext());
       }
-      return {true, expr};
+      return Action::Continue(expr);
     }
     
-    std::pair<bool, Expr *> walkToClosureExprPre(ClosureExpr *closure) {
+    PreWalkResult<Expr *> walkToClosureExprPre(ClosureExpr *closure) {
       DC = closure;
       insideClosure = true;
-      return {true, closure};
+      return Action::Continue(closure);
     }
     
-    Expr *walkToExprPost(Expr *expr) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       if (auto *closureExpr = dyn_cast<ClosureExpr>(expr)) {
         // Reset the DeclContext to the outer scope if we descended
         // into a closure expr and check whether or not we are still
@@ -378,7 +378,7 @@ void swift::diagnoseConstantArgumentRequirement(
         DC = closureExpr->getParent();
         insideClosure = isa<ClosureExpr>(DC);
       }
-      return expr;
+      return Action::Continue(expr);
     }
   };
 

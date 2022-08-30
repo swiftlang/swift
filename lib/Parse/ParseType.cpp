@@ -537,14 +537,14 @@ ParserResult<TypeRepr> Parser::parseType(
     // Forget any generic parameters we saw in the type.
     class EraseTypeParamWalker : public ASTWalker {
     public:
-      bool walkToTypeReprPre(TypeRepr *T) override {
+      PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
               ident->overwriteNameRef(genericParam->createNameRef());
           }
         }
-        return true;
+        return Action::Continue();
       }
 
     } walker;

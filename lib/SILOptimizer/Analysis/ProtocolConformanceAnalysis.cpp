@@ -34,7 +34,7 @@ public:
                     &ProtocolConformanceCache)
       : ProtocolConformanceCache(ProtocolConformanceCache) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     /// (1) Walk over all NominalTypeDecls to determine conformances.
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (!isa<ProtocolDecl>(NTD)) {
@@ -60,7 +60,7 @@ public:
         }
       }
     }
-    return true;
+    return Action::Continue();
   }
 };
 } // end anonymous namespace

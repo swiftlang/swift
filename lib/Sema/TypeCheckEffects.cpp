@@ -399,7 +399,7 @@ template <class Impl>
 class EffectsHandlingWalker : public ASTWalker {
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 public:
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     ShouldRecurse_t recurse = ShouldRecurse;
     // Skip the implementations of all local declarations... except
     // PBD.  We should really just have a PatternBindingStmt.
@@ -411,10 +411,13 @@ public:
     } else {
       recurse = ShouldNotRecurse;
     }
-    return bool(recurse);
+    if (!recurse)
+      return Action::SkipChildren();
+
+    return Action::Continue();
   }
 
-  std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     visitExprPre(E);
     ShouldRecurse_t recurse = ShouldRecurse;
     if (isa<ErrorExpr>(E)) {
@@ -444,13 +447,16 @@ public:
     // type checking. If an unchecked expression is still around, the code was
     // invalid.
 #define UNCHECKED_EXPR(KIND, BASE) \
-    else if (isa<KIND##Expr>(E)) return {false, nullptr};
+    else if (isa<KIND##Expr>(E)) return Action::Stop();
 #include "swift/AST/ExprNodes.def"
 
-    return {bool(recurse), E};
+    if (!recurse)
+      return Action::SkipChildren(E);
+
+    return Action::Continue(E);
   }
 
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     ShouldRecurse_t recurse = ShouldRecurse;
     if (auto doCatch = dyn_cast<DoCatchStmt>(S)) {
       recurse = asImpl().checkDoCatch(doCatch);
@@ -459,7 +465,10 @@ public:
     } else if (auto forEach = dyn_cast<ForEachStmt>(S)) {
       recurse = asImpl().checkForEach(forEach);
     }
-    return {bool(recurse), S};
+    if (!recurse)
+      return Action::SkipChildren(S);
+
+    return Action::Continue(S);
   }
 
   ShouldRecurse_t checkDoCatch(DoCatchStmt *S) {
@@ -2572,17 +2581,17 @@ private:
       CheckEffectsCoverage &CEC;
       ConservativeThrowChecker(CheckEffectsCoverage &CEC) : CEC(CEC) {}
       
-      Expr *walkToExprPost(Expr *E) override {
+      PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
         if (isa<TryExpr>(E))
           CEC.Flags.set(ContextFlags::HasAnyThrowSite);
-        return E;
+        return Action::Continue(E);
       }
       
-      Stmt *walkToStmtPost(Stmt *S) override {
+      PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
         if (isa<ThrowStmt>(S))
           CEC.Flags.set(ContextFlags::HasAnyThrowSite);
 
-        return S;
+        return Action::Continue(S);
       }
     };
 
@@ -2884,15 +2893,15 @@ private:
 
 // Find nested functions and perform effects checking on them.
 struct LocalFunctionEffectsChecker : ASTWalker {
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
       if (func->getDeclContext()->isLocalContext())
         TypeChecker::checkFunctionEffects(func);
 
-      return false;
+      return Action::SkipChildren();
     }
 
-    return true;
+    return Action::Continue();
   }
 };
 

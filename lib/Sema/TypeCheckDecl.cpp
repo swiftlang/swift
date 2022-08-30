@@ -498,20 +498,23 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                                ASTContext &ctx)
         : Decl(decl), ctx(ctx) { }
 
-    bool walkToDeclPre(class Decl *D) override {
+    PreWalkAction walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
-      return !isa<NominalTypeDecl>(D);
+      if (isa<NominalTypeDecl>(D))
+        return Action::SkipChildren();
+
+      return Action::Continue();
     }
     
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
-        return { false, E };
+        return Action::SkipChildren(E);
       
       // Look for calls of a constructor on self or super.
       auto apply = dyn_cast<ApplyExpr>(E);
       if (!apply)
-        return { true, E };
+        return Action::Continue(E);
 
       auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
@@ -525,12 +528,12 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
         arg = CRE->getBase();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
         if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
-          return { true, E };
+          return Action::Continue(E);
 
         arg = dotExpr->getBase();
       } else {
         // Not a constructor call.
-        return { true, E };
+        return Action::Continue(E);
       }
 
       // Look for a base of 'self' or 'super'.
@@ -559,13 +562,13 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       }
       
       if (myKind == BodyInitKind::None)
-        return { true, E };
+        return Action::Continue(E);
 
       if (Kind == BodyInitKind::None) {
         Kind = myKind;
 
         InitExpr = apply;
-        return { true, E };
+        return Action::Continue(E);
       }
 
       // If the kind changed, complain.
@@ -576,7 +579,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                            Kind == BodyInitKind::Chained);
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
   };
 

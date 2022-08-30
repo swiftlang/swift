@@ -187,19 +187,19 @@ bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
 
       AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
 
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         if (E == Target)
-          return {false, E};
+          return Action::SkipChildren(E);
 
         if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
           if (conversionExpr->getSubExpr() == Target) {
             if (conversionExpr->getType()->is<AnyFunctionType>() &&
                 conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
               Result = true;
-            return {false, E};
+            return Action::SkipChildren(E);
           }
         }
-        return {true, E};
+        return Action::Continue(E);
       }
     } checker(closure);
     closure->getParent()->walkContext(checker);
@@ -3170,9 +3170,9 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
     LabelFinder(SourceManager &SM, SourceLoc TargetLoc, bool IsContinue)
         : SM(SM), TargetLoc(TargetLoc), IsContinue(IsContinue) {}
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
-        return {false, S};
+        return Action::SkipChildren(S);
 
       if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
         if (LS->getLabelInfo()) {
@@ -3184,15 +3184,17 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
         }
       }
 
-      return {true, S};
+      return Action::Continue(S);
     }
 
-    Stmt *walkToStmtPost(Stmt *S) override { return nullptr; }
+    PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+      return Action::Stop();
+    }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
-        return {false, E};
-      return {true, E};
+        return Action::SkipChildren(E);
+      return Action::Continue(E);
     }
   } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
   const_cast<DeclContext *>(CurrDeclContext)->walkContext(Finder);

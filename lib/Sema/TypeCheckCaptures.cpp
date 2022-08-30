@@ -217,7 +217,7 @@ public:
     return LazyInitializerWalking::None;
   }
 
-  std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
+  PreWalkResult<Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
     // HACK: $interpolation variables are seen as needing to be captured. 
@@ -226,7 +226,7 @@ public:
     // FIXME(TapExpr): This is probably caused by the scoping 
     // algorithm's ignorance of TapExpr. We should fix that.
     if (D->getBaseName() == Context.Id_dollarInterpolation)
-      return { false, DRE };
+      return Action::SkipChildren(DRE);
 
     // DC is the DeclContext where D was defined
     // CurDC is the DeclContext where D was referenced
@@ -247,11 +247,11 @@ public:
 
     // Don't "capture" type definitions at all.
     if (isa<TypeDecl>(D))
-      return { false, DRE };
+      return Action::SkipChildren(DRE);
 
     // A local reference is not a capture.
     if (CurDC == DC || isa<TopLevelCodeDecl>(CurDC))
-      return { false, DRE };
+      return Action::SkipChildren(DRE);
 
     auto TmpDC = CurDC;
     while (TmpDC != nullptr) {
@@ -305,7 +305,7 @@ public:
                           DescriptiveDeclKind::Type);
 
             D->diagnose(diag::decl_declared_here, D->getName());
-            return { false, DRE };
+            return Action::SkipChildren(DRE);
           }
         }
       }
@@ -316,12 +316,12 @@ public:
     // We walked all the way up to the root without finding the declaration,
     // so this is not a capture.
     if (TmpDC == nullptr)
-      return { false, DRE };
+      return Action::SkipChildren(DRE);
 
     // Only capture var decls at global scope.  Other things can be captured
     // if they are local.
     if (!isa<VarDecl>(D) && !D->isLocalCapture())
-      return { false, DRE };
+      return Action::SkipChildren(DRE);
 
     // We're going to capture this, compute flags for the capture.
     unsigned Flags = 0;
@@ -344,7 +344,7 @@ public:
       Flags |= CapturedValue::IsNoEscape;
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
-    return { false, DRE };
+    return Action::SkipChildren(DRE);
   }
 
   void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
@@ -388,19 +388,19 @@ public:
     }
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       TypeChecker::computeCaptures(AFD);
       propagateCaptures(AFD->getCaptureInfo(), AFD->getLoc());
-      return false;
+      return Action::SkipChildren();
     }
 
     // Don't walk into local types; we'll walk their initializers when we check
     // the local type itself.
     if (isa<NominalTypeDecl>(D))
-      return false;
+      return Action::SkipChildren();
 
-    return true;
+    return Action::Continue();
   }
 
   bool usesTypeMetadataOfFormalType(Expr *E) {
@@ -553,7 +553,7 @@ public:
     return true;
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (usesTypeMetadataOfFormalType(E)) {
       checkType(E->getType(), E->getLoc());
     }
@@ -561,12 +561,12 @@ public:
     // Some kinds of expression don't really evaluate their subexpression,
     // so we don't need to traverse.
     if (isa<ObjCSelectorExpr>(E)) {
-      return { false, E };
+      return Action::SkipChildren(E);
     }
 
     if (auto *ECE = dyn_cast<ExplicitCastExpr>(E)) {
       checkType(ECE->getCastType(), ECE->getLoc());
-      return { true, E };
+      return Action::Continue(E);
     }
 
     if (auto *DRE = dyn_cast<DeclRefExpr>(E))
@@ -575,7 +575,7 @@ public:
     // Look into lazy initializers.
     if (auto *LIE = dyn_cast<LazyInitializerExpr>(E)) {
       LIE->getSubExpr()->walk(*this);
-      return { true, E };
+      return Action::Continue(E);
     }
 
     // When we see a reference to the 'super' expression, capture 'self' decl.
@@ -584,7 +584,7 @@ public:
         if (CurDC->isChildContextOf(selfDecl->getDeclContext()))
           addCapture(CapturedValue(selfDecl, 0, superE->getLoc()));
       }
-      return { false, superE };
+      return Action::SkipChildren(superE);
     }
 
     // Don't recur into child closures. They should already have a capture
@@ -593,7 +593,7 @@ public:
     if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
       TypeChecker::computeCaptures(SubCE);
       propagateCaptures(SubCE->getCaptureInfo(), SubCE->getLoc());
-      return { false, E };
+      return Action::SkipChildren(E);
     }
 
     // Capture a placeholder opaque value.
@@ -601,11 +601,11 @@ public:
       if (opaqueValue->isPlaceholder()) {
         assert(!OpaqueValue || OpaqueValue == opaqueValue);
         OpaqueValue = opaqueValue;
-        return { true, E };
+        return Action::Continue(E);
       }
     }
 
-    return { true, E };
+    return Action::Continue(E);
   }
 };
 

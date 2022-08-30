@@ -3272,10 +3272,10 @@ private:
     CacheExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
         : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
 
-    Expr *walkToExprPost(Expr *expr) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       if (ExcludeRoot && expr == RootExpr) {
         assert(!expr->getType() && "Unexpected type in root of expression!");
-        return expr;
+        return Action::Continue(expr);
       }
 
       if (expr->getType())
@@ -3286,16 +3286,18 @@ private:
           if (kp->getComponents()[i].getComponentType())
             CS.cacheType(kp, i);
 
-      return expr;
+      return Action::Continue(expr);
     }
 
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
 
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
   };
 
 public:
@@ -6716,7 +6718,7 @@ public:
   : NumOverloads(overloads)
   {}
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
       // If we've found function application and it's
       // function is an overload set, count it.
@@ -6725,7 +6727,7 @@ public:
     }
 
     // Always recur into the children.
-    return { true, expr };
+    return Action::Continue(expr);
   }
 };
 

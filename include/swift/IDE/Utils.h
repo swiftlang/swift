@@ -284,18 +284,18 @@ class NameMatcher: public ASTWalker {
   bool handleCustomAttrs(Decl *D);
   ArgumentList *getApplicableArgsFor(Expr* E);
 
-  std::pair<bool, Expr*> walkToExprPre(Expr *E) override;
-  Expr* walkToExprPost(Expr *E) override;
-  bool walkToDeclPre(Decl *D) override;
-  bool walkToDeclPost(Decl *D) override;
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override;
-  Stmt* walkToStmtPost(Stmt *S) override;
-  bool walkToTypeReprPre(TypeRepr *T) override;
-  bool walkToTypeReprPost(TypeRepr *T) override;
-  std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
+  PreWalkAction walkToDeclPre(Decl *D) override;
+  PostWalkAction walkToDeclPost(Decl *D) override;
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override;
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override;
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
+  PostWalkAction walkToTypeReprPost(TypeRepr *T) override;
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override;
   bool shouldWalkIntoGenericParams() override { return true; }
 
-  std::pair<bool, ArgumentList *>
+  PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *ArgList) override;
 
   // FIXME: Remove this

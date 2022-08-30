@@ -66,7 +66,7 @@ class TypeReprIdentFinder : public ASTWalker {
   /// The function to call when a ComponentIdentTypeRepr is seen.
   llvm::function_ref<bool(const ComponentIdentTypeRepr *)> Callback;
 
-  bool walkToTypeReprPost(TypeRepr *TR) override;
+  PostWalkAction walkToTypeReprPost(TypeRepr *TR) override;
 public:
   explicit TypeReprIdentFinder(
       llvm::function_ref<bool(const ComponentIdentTypeRepr *)> callback)

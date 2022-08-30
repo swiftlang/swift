@@ -4446,55 +4446,58 @@ public:
   ExistentialTypeVisitor(ASTContext &ctx, bool checkStatements)
     : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     reprStack.push_back(T);
 
     if (T->isInvalid())
-      return false;
+      return Action::SkipChildren();
     if (auto compound = dyn_cast<CompoundIdentTypeRepr>(T)) {
       // Only visit the last component to check, because nested typealiases in
       // existentials are okay.
       visit(compound->getComponentRange().back());
-      return false;
+      return Action::SkipChildren();
     }
     // Arbitrary protocol constraints are OK on opaque types.
     if (isa<OpaqueReturnTypeRepr>(T))
-      return false;
+      return Action::SkipChildren();
 
     // Arbitrary protocol constraints are okay for 'any' types.
     if (isa<ExistentialTypeRepr>(T))
-      return false;
+      return Action::SkipChildren();
 
     visit(T);
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToTypeReprPost(TypeRepr *T) override {
+  PostWalkAction walkToTypeReprPost(TypeRepr *T) override {
     reprStack.pop_back();
-    return true;
+    return Action::Continue();
   }
 
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (checkStatements && !hitTopStmt) {
       hitTopStmt = true;
-      return { true, S };
+      return Action::Continue(S);
     }
 
-    return { false, S };
+    return Action::SkipChildren(S);
   }
 
-  bool walkToDeclPre(Decl *D) override {
-    return !checkStatements;
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (checkStatements)
+      return Action::SkipChildren();
+
+    return Action::Continue();
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     ++exprCount;
-    return {true, E};
+    return Action::Continue(E);
   }
 
-  Expr * walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     --exprCount;
-    return E;
+    return Action::Continue(E);
   }
 
   void visitTypeRepr(TypeRepr *T) {
