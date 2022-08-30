@@ -1902,6 +1902,9 @@ WARNING(spi_attribute_on_import_of_public_module,none,
         "'@_spi' import of %0 will not include any SPI symbols; "
         "%0 was built from the public interface at %1",
         (DeclName, StringRef))
+ERROR(spi_only_imports_not_enabled, none,
+      "'@_spiOnly' requires setting the frontend flag '-experimental-spi-only-imports'",
+      ())
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,

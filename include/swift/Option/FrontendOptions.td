@@ -317,6 +317,10 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
+
+def experimental_spi_only_imports :
+  Flag<["-"], "experimental-spi-only-imports">,
+  HelpText<"Enable use of @_spiOnly imports">;
 }
 
 // HIDDEN FLAGS

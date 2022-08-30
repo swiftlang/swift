@@ -456,6 +456,9 @@ namespace swift {
     // FrontendOptions.
     bool AllowModuleWithCompilerErrors = false;
 
+    /// Enable using @_spiOnly on import decls.
+    bool EnableSPIOnlyImports = false;
+
     /// A helper enum to represent whether or not we customized the default
     /// ASTVerifier behavior via a frontend flag. By default, we do not
     /// customize.

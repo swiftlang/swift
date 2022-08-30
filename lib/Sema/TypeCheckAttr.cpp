@@ -3911,6 +3911,9 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
 void
 AttributeChecker::visitSPIOnlyAttr(SPIOnlyAttr *attr) {
+  if (!Ctx.LangOpts.EnableSPIOnlyImports) {
+    diagnoseAndRemoveAttr(attr, diag::spi_only_imports_not_enabled);
+  }
 }
 
 void AttributeChecker::visitTypeSequenceAttr(TypeSequenceAttr *attr) {
