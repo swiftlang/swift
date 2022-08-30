@@ -574,12 +574,16 @@ static inline bool isUnspecified(JobPriority priority) {
   return priority == JobPriority::Unspecified;
 }
 
-static inline bool taskIsUnstructured(JobFlags jobFlags) {
-  return !jobFlags.task_isAsyncLetTask() && !jobFlags.task_isGroupChildTask();
+static inline bool taskIsStructured(JobFlags jobFlags) {
+  return jobFlags.task_isAsyncLetTask() || jobFlags.task_isGroupChildTask();
+}
+
+static inline bool taskIsUnstructured(TaskCreateFlags createFlags, JobFlags jobFlags) {
+  return !taskIsStructured(jobFlags) && !createFlags.isInlineTask();
 }
 
 static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags) {
-  return taskIsUnstructured(jobFlags) && !createFlags.copyTaskLocals();
+  return taskIsUnstructured(createFlags, jobFlags) && !createFlags.copyTaskLocals();
 }
 
 static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
@@ -692,20 +696,27 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Start with user specified priority at creation time (if any)
   JobPriority basePriority = (taskCreateFlags.getRequestedPriority());
 
-  if (taskIsDetached(taskCreateFlags, jobFlags)) {
-     SWIFT_TASK_DEBUG_LOG("Creating a detached task from %p", currentTask);
-    // Case 1: No priority specified
-    //    Base priority = UN
-    //    Escalated priority = UN
-    // Case 2: Priority specified
-    //    Base priority = user specified priority
-    //    Escalated priority = UN
-    //
-    // Task will be created with max priority = max(base priority, UN) = base
-    // priority. We shouldn't need to do any additional manipulations here since
-    // basePriority should already be the right value
+  if (taskCreateFlags.isInlineTask()) {
+     SWIFT_TASK_DEBUG_LOG("Creating an inline task from %p", currentTask);
 
-  } else if (taskIsUnstructured(jobFlags)) {
+     // We'll take the current priority and set it as base and escalated
+     // priority of the task. No UI->IN downgrade needed.
+     basePriority = swift_task_getCurrentThreadPriority();
+
+  } else if (taskIsDetached(taskCreateFlags, jobFlags)) {
+     SWIFT_TASK_DEBUG_LOG("Creating a detached task from %p", currentTask);
+     // Case 1: No priority specified
+     //    Base priority = UN
+     //    Escalated priority = UN
+     // Case 2: Priority specified
+     //    Base priority = user specified priority
+     //    Escalated priority = UN
+     //
+     // Task will be created with max priority = max(base priority, UN) = base
+     // priority. We shouldn't need to do any additional manipulations here since
+     // basePriority should already be the right value
+
+  } else if (taskIsUnstructured(taskCreateFlags, jobFlags)) {
      SWIFT_TASK_DEBUG_LOG("Creating an unstructured task from %p", currentTask);
 
     if (isUnspecified(basePriority)) {
@@ -1009,8 +1020,10 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   // containing a pointer to the allocation enabling us to provide our stack
   // allocation rather than swift_task_create_common having to malloc it.
   RunInlineTaskOptionRecord option(allocation, allocationBytes);
+  size_t taskCreateFlags = 1 << TaskCreateFlags::Task_IsInlineTask;
+
   auto taskAndContext = swift_task_create_common(
-      /*rawTaskCreateFlags=*/0, &option, futureResultType,
+      taskCreateFlags, &option, futureResultType,
       reinterpret_cast<TaskContinuationFunction *>(closure), closureContext,
       /*initialContextSize=*/closureContextSize);
 
