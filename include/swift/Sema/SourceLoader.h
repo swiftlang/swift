@@ -13,7 +13,6 @@
 #ifndef SWIFT_SEMA_SOURCELOADER_H
 #define SWIFT_SEMA_SOURCELOADER_H
 
-#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 
 namespace swift {
@@ -94,14 +93,10 @@ public:
     // Parsing populates the Objective-C method tables.
   }
 
-  Optional<ModuleDependencies> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate) override {
-    // FIXME: Implement?
-    return None;
-  }
+  Optional<ModuleDependencies>
+  getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
+                        InterfaceSubContextDelegate &delegate) override;
 };
-
 }
 
 #endif
