@@ -92,7 +92,11 @@ public func _withUnprotectedUnsafeMutablePointer<T, Result>(
   _ body: (UnsafeMutablePointer<T>) throws -> Result
 ) rethrows -> Result
 {
+#if $BuiltinUnprotectedAddressOf
   return try body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))
+#else
+  return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
+#endif
 }
 
 /// Invokes the given closure with a pointer to the given argument.
@@ -167,7 +171,11 @@ public func _withUnprotectedUnsafePointer<T, Result>(
   _ body: (UnsafePointer<T>) throws -> Result
 ) rethrows -> Result
 {
+#if $BuiltinUnprotectedAddressOf
   return try body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
+#else
+  return try body(UnsafePointer<T>(Builtin.addressof(&value)))
+#endif
 }
 
 extension String {

@@ -1951,7 +1951,8 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
       keyPath: _unsafeUncheckedDowncast(keyPath,
         to: ReferenceWritableKeyPath<Root, Value>.self))
   }
-  return keyPath._projectMutableAddress(from: &root)
+  let ptr = UnsafePointer<Root>(Builtin.unprotectedAddressOf(&root))
+  return keyPath._projectMutableAddress(from: ptr)
 }
 
 // The release that ends the access scope is guaranteed to happen
@@ -1980,7 +1981,8 @@ func _setAtWritableKeyPath<Root, Value>(
       value: value)
   }
   // TODO: we should be able to do this more efficiently than projecting.
-  let (addr, owner) = keyPath._projectMutableAddress(from: &root)
+  let ptr = UnsafePointer<Root>(Builtin.unprotectedAddressOf(&root))
+  let (addr, owner) = keyPath._projectMutableAddress(from: ptr)
   addr.pointee = value
   _fixLifetime(owner)
   // FIXME: this needs a deallocation barrier to ensure that the
@@ -3277,7 +3279,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
     _internalInvariant(_isPOD(T.self))
     let size = MemoryLayout<T>.size
     let (baseAddress, misalign) = adjustDestForAlignment(of: T.self)
-    withUnsafeBytes(of: value) {
+    _withUnprotectedUnsafeBytes(of: value) {
       _memcpy(dest: baseAddress, src: $0.baseAddress.unsafelyUnwrapped,
               size: UInt(size))
     }

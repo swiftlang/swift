@@ -1092,7 +1092,11 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
   of value: T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
 ) rethrows -> Result {
+#if $BuiltinUnprotectedAddressOf
   let addr = UnsafeRawPointer(Builtin.unprotectedAddressOfBorrow(value))
+#else
+  let addr = UnsafeRawPointer(Builtin.addressof(value))
+#endif
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
 }
