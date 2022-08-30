@@ -374,7 +374,14 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
 
+  bool IsImplicitDeclRefToExplicitDecl = false;
+
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+    auto ED = DRE->getDecl();
+    if (E->isImplicit() && ED && !ED->isImplicit()) {
+      IsImplicitDeclRefToExplicitDecl = true;
+    }
+
     auto *FD = dyn_cast<FuncDecl>(DRE->getDecl());
     // Handle implicit callAsFunction reference. An explicit reference will be
     // handled by the usual DeclRefExpr case below.
@@ -386,7 +393,8 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     }
   }
 
-  if (!isa<InOutExpr>(E) &&
+  if (!IsImplicitDeclRefToExplicitDecl &&
+      !isa<InOutExpr>(E) &&
       !isa<LoadExpr>(E) &&
       !isa<OpenExistentialExpr>(E) &&
       !isa<MakeTemporarilyEscapableExpr>(E) &&
