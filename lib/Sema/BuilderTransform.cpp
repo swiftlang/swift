@@ -1692,6 +1692,12 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     log << '\n';
   }
 
+  // Map type parameters into context. We don't want type
+  // parameters to appear in the result builder type, because
+  // the result builder type will only be used inside the body
+  // of this decl; it's not part of the interface type.
+  builderType = func->mapTypeIntoContext(builderType);
+
   if (auto result = cs.matchResultBuilder(
           func, builderType, resultContextType, resultConstraintKind,
           cs.getConstraintLocator(func->getBody()))) {
@@ -1781,6 +1787,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad result builder type");
   assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
+  assert(!builderType->hasTypeParameter());
 
   if (InvalidResultBuilderBodies.count(fn)) {
     (void)recordFix(IgnoreInvalidResultBuilderBody::create(
