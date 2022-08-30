@@ -274,10 +274,14 @@ std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
       // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
       // walk into the body.
       if (auto *FD = DeferS->getTempDecl()) {
-        auto *RetS = FD->getBody()->walk(*this);
+        auto *Body = FD->getBody();
+        if (!Body)
+          return { false, nullptr };
+
+        auto *RetS = Body->walk(*this);
         if (!RetS)
           return { false, nullptr };
-        assert(RetS == FD->getBody());
+        assert(RetS == Body);
       }
       bool Continue = SEWalker.walkToStmtPost(DeferS);
       if (!Continue)

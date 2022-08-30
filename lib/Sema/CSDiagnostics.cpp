@@ -1595,7 +1595,8 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
       AbstractFunctionDecl *AFD = nullptr;
       if ((AFD = dyn_cast<AbstractFunctionDecl>(varDecl->getDeclContext()))) {
         auto checker = VarDeclMultipleReferencesChecker(getDC(), varDecl);
-        AFD->getBody()->walk(checker);
+        if (auto *body = AFD->getBody())
+          body->walk(checker);
         singleUse = checker.referencesCount() == 1;
       }
 

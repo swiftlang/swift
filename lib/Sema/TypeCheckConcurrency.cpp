@@ -3052,7 +3052,8 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
 
 void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
   ActorIsolationChecker checker(decl);
-  decl->getBody()->walk(checker);
+  if (auto *body = decl->getBody())
+    body->walk(checker);
 }
 
 void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
