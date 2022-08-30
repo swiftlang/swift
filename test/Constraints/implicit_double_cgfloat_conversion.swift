@@ -315,3 +315,18 @@ do {
     }
   }
 }
+
+// rdar://99282938
+func test_implicit_conversion_clash_with_partial_application_check() {
+  class C {
+    var duration: CGFloat { 0.3 }
+
+    var use: Double {
+      duration // Ok
+    }
+
+    func transitionDuration() -> TimeInterval {
+      duration // Ok
+    }
+  }
+}
