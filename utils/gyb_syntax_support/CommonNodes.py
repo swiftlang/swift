@@ -2,30 +2,31 @@ from .Child import Child
 from .Node import Node  # noqa: I201
 
 COMMON_NODES = [
-    Node('Decl', kind='Syntax'),
-    Node('Expr', kind='Syntax'),
-    Node('Stmt', kind='Syntax'),
-    Node('Type', kind='Syntax'),
-    Node('Pattern', kind='Syntax'),
-    Node('UnknownDecl', kind='Decl'),
-    Node('UnknownExpr', kind='Expr'),
-    Node('UnknownStmt', kind='Stmt'),
-    Node('UnknownType', kind='Type'),
-    Node('UnknownPattern', kind='Pattern'),
-    Node('Missing', kind='Syntax'),
-    Node('MissingDecl', kind='Decl', children=[
+    Node('Decl', name_for_diagnostics='declaration', kind='Syntax'),
+    Node('Expr', name_for_diagnostics='expression', kind='Syntax'),
+    Node('Stmt', name_for_diagnostics='statement', kind='Syntax'),
+    Node('Type', name_for_diagnostics='type', kind='Syntax'),
+    Node('Pattern', name_for_diagnostics='pattern', kind='Syntax'),
+    Node('UnknownDecl', name_for_diagnostics='declaration', kind='Decl'),
+    Node('UnknownExpr', name_for_diagnostics='expression', kind='Expr'),
+    Node('UnknownStmt', name_for_diagnostics='statement', kind='Stmt'),
+    Node('UnknownType', name_for_diagnostics='type', kind='Type'),
+    Node('UnknownPattern', name_for_diagnostics='pattern', kind='Pattern'),
+    Node('Missing', name_for_diagnostics=None, kind='Syntax'),
+    Node('MissingDecl', name_for_diagnostics='declaration', kind='Decl', children=[
         Child('Attributes', kind='AttributeList',
               collection_element_name='Attribute', is_optional=True),
         Child('Modifiers', kind='ModifierList',
               collection_element_name='Modifier', is_optional=True),
     ]),
-    Node('MissingExpr', kind='Expr'),
-    Node('MissingStmt', kind='Stmt'),
-    Node('MissingType', kind='Type'),
-    Node('MissingPattern', kind='Pattern'),
+    Node('MissingExpr', name_for_diagnostics='expression', kind='Expr'),
+    Node('MissingStmt', name_for_diagnostics='statement', kind='Stmt'),
+    Node('MissingType', name_for_diagnostics='type', kind='Type'),
+    Node('MissingPattern', name_for_diagnostics='pattern', kind='Pattern'),
 
     # code-block-item = (decl | stmt | expr) ';'?
-    Node('CodeBlockItem', kind='Syntax', omit_when_empty=True,
+    Node('CodeBlockItem', name_for_diagnostics=None, kind='Syntax',
+         omit_when_empty=True,
          description="""
          A CodeBlockItem is any Syntax node that appears on its own line inside
          a CodeBlock.
@@ -49,11 +50,12 @@ COMMON_NODES = [
          ]),
 
     # code-block-item-list -> code-block-item code-block-item-list?
-    Node('CodeBlockItemList', kind='SyntaxCollection',
-         element='CodeBlockItem', elements_separated_by_newline=True),
+    Node('CodeBlockItemList', name_for_diagnostics=None,
+         kind='SyntaxCollection', element='CodeBlockItem',
+         elements_separated_by_newline=True),
 
     # code-block -> '{' stmt-list '}'
-    Node('CodeBlock', kind='Syntax',
+    Node('CodeBlock', name_for_diagnostics=None, kind='Syntax',
          traits=['Braced', 'WithStatements'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
@@ -63,7 +65,8 @@ COMMON_NODES = [
                    requires_leading_newline=True),
          ]),
 
-    Node('UnexpectedNodes', kind='SyntaxCollection', element='Syntax',
+    Node('UnexpectedNodes', name_for_diagnostics=None, kind='SyntaxCollection',
+         element='Syntax',
          description='''
          A collection of syntax nodes that occurred in the source code but
          could not be used to form a valid syntax tree.

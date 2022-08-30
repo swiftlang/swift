@@ -5,7 +5,7 @@ from .Node import Node
 
 DECL_NODES = [
     # type-assignment -> '=' type
-    Node('TypeInitializerClause', kind='Syntax',
+    Node('TypeInitializerClause', name_for_diagnostics=None, kind='Syntax',
          children=[
              Child('Equal', kind='EqualToken'),
              Child('Value', kind='Type'),
@@ -15,7 +15,8 @@ DECL_NODES = [
     #                            typealias-name generic-parameter-clause?
     #                            type-assignment
     # typealias-name -> identifier
-    Node('TypealiasDecl', kind='Decl', traits=['IdentifiedDecl'],
+    Node('TypealiasDecl', name_for_diagnostics='typealias declaration', kind='Decl',
+         traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -35,7 +36,8 @@ DECL_NODES = [
     #                                 inheritance-clause? type-assignment?
     #                                 generic-where-clause?
     # associatedtype-name -> identifier
-    Node('AssociatedtypeDecl', kind='Decl', traits=['IdentifiedDecl'],
+    Node('AssociatedtypeDecl', name_for_diagnostics='associatedtype declaration',
+         kind='Decl', traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -51,10 +53,10 @@ DECL_NODES = [
                    is_optional=True),
          ]),
 
-    Node('FunctionParameterList', kind='SyntaxCollection',
-         element='FunctionParameter'),
+    Node('FunctionParameterList', name_for_diagnostics='function parameter list',
+         kind='SyntaxCollection', element='FunctionParameter'),
 
-    Node('ParameterClause', kind='Syntax',
+    Node('ParameterClause', name_for_diagnostics='parameter clause', kind='Syntax',
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
@@ -64,7 +66,7 @@ DECL_NODES = [
          ]),
 
     # -> Type
-    Node('ReturnClause', kind='Syntax',
+    Node('ReturnClause', name_for_diagnostics='return clause', kind='Syntax',
          children=[
              Child('Arrow', kind='ArrowToken'),
              Child('ReturnType', kind='Type'),
@@ -72,7 +74,7 @@ DECL_NODES = [
 
     # function-signature ->
     #   '(' parameter-list? ')' async? (throws | rethrows)? '->'? type?
-    Node('FunctionSignature', kind='Syntax',
+    Node('FunctionSignature', name_for_diagnostics='function signature', kind='Syntax',
          children=[
              Child('Input', kind='ParameterClause'),
              Child('AsyncOrReasyncKeyword', kind='ContextualKeywordToken',
@@ -88,7 +90,8 @@ DECL_NODES = [
 
     # if-config-clause ->
     #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list)
-    Node('IfConfigClause', kind='Syntax',
+    Node('IfConfigClause', name_for_diagnostics="conditional compilation clause",
+         kind='Syntax',
          children=[
              Child('PoundKeyword', kind='Token',
                    classification='BuildConfigId',
@@ -108,12 +111,13 @@ DECL_NODES = [
                    ]),
          ]),
 
-    Node('IfConfigClauseList', kind='SyntaxCollection',
+    Node('IfConfigClauseList', name_for_diagnostics=None, kind='SyntaxCollection',
          element='IfConfigClause'),
 
     # if-config-decl -> '#if' expr stmt-list else-if-directive-clause-list
     #   else-clause? '#endif'
-    Node('IfConfigDecl', kind='Decl',
+    Node('IfConfigDecl', name_for_diagnostics='conditional compilation block',
+         kind='Decl',
          children=[
              Child('Clauses', kind='IfConfigClauseList',
                    collection_element_name='Clause'),
@@ -121,7 +125,7 @@ DECL_NODES = [
                    classification='BuildConfigId'),
          ]),
 
-    Node('PoundErrorDecl', kind='Decl',
+    Node('PoundErrorDecl', name_for_diagnostics="'#error' directive", kind='Decl',
          traits=['Parenthesized'],
          children=[
              Child('PoundError', kind='PoundErrorToken'),
@@ -130,7 +134,7 @@ DECL_NODES = [
              Child('RightParen', kind='RightParenToken')
          ]),
 
-    Node('PoundWarningDecl', kind='Decl',
+    Node('PoundWarningDecl', name_for_diagnostics="'#warning' directive", kind='Decl',
          traits=['Parenthesized'],
          children=[
              Child('PoundWarning', kind='PoundWarningToken'),
@@ -139,8 +143,8 @@ DECL_NODES = [
              Child('RightParen', kind='RightParenToken')
          ]),
 
-    Node('PoundSourceLocation', kind='Decl',
-         traits=['Parenthesized'],
+    Node('PoundSourceLocation', name_for_diagnostics="'#sourceLocation' directive",
+         kind='Decl', traits=['Parenthesized'],
          children=[
              Child('PoundSourceLocation', kind='PoundSourceLocationToken'),
              Child('LeftParen', kind='LeftParenToken'),
@@ -148,7 +152,8 @@ DECL_NODES = [
              Child('RightParen', kind='RightParenToken')
          ]),
 
-    Node('PoundSourceLocationArgs', kind='Syntax',
+    Node('PoundSourceLocationArgs', name_for_diagnostics="'#sourceLocation' arguments",
+         kind='Syntax',
          children=[
              Child('FileArgLabel', kind='IdentifierToken',
                    text_choices=['file']),
@@ -161,7 +166,7 @@ DECL_NODES = [
              Child('LineNumber', kind='IntegerLiteralToken'),
          ]),
 
-    Node('DeclModifierDetail', kind='Syntax',
+    Node('DeclModifierDetail', name_for_diagnostics=None, kind='Syntax',
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
@@ -169,7 +174,7 @@ DECL_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    Node('DeclModifier', kind='Syntax',
+    Node('DeclModifier', name_for_diagnostics='modifier', kind='Syntax',
          children=[
              Child('Name', kind='Token', classification='Attribute',
                    text_choices=[
@@ -184,18 +189,19 @@ DECL_NODES = [
              Child('Detail', kind='DeclModifierDetail', is_optional=True),
          ]),
 
-    Node('InheritedType', kind='Syntax',
+    Node('InheritedType', name_for_diagnostics='type', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
             Child('TypeName', kind='Type'),
             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    Node('InheritedTypeList', kind='SyntaxCollection',
+    Node('InheritedTypeList', name_for_diagnostics=None, kind='SyntaxCollection',
          element='InheritedType'),
 
     # type-inheritance-clause -> ':' type
-    Node('TypeInheritanceClause', kind='Syntax',
+    Node('TypeInheritanceClause', name_for_diagnostics='inheritance clause',
+         kind='Syntax',
          children=[
              Child('Colon', kind='ColonToken'),
              Child('InheritedTypeCollection', kind='InheritedTypeList',
@@ -209,7 +215,7 @@ DECL_NODES = [
     #                      generic-where-clause?
     #                     '{' class-members '}'
     # class-name -> identifier
-    Node('ClassDecl', kind='Decl',
+    Node('ClassDecl', name_for_diagnostics='class', kind='Decl',
          traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
@@ -234,7 +240,7 @@ DECL_NODES = [
     #                      generic-where-clause?
     #                     '{' actor-members '}'
     # actor-name -> identifier
-    Node('ActorDecl', kind='Decl',
+    Node('ActorDecl', name_for_diagnostics='actor', kind='Decl',
          traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
@@ -259,7 +265,7 @@ DECL_NODES = [
     #                         generic-where-clause?
     #                         '{' struct-members '}'
     # struct-name -> identifier
-    Node('StructDecl', kind='Decl',
+    Node('StructDecl', name_for_diagnostics='struct', kind='Decl',
          traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
@@ -277,7 +283,7 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
-    Node('ProtocolDecl', kind='Decl',
+    Node('ProtocolDecl', name_for_diagnostics='protocol', kind='Decl',
          traits=['DeclGroup', 'IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
@@ -302,7 +308,8 @@ DECL_NODES = [
     #                            generic-where-clause?
     #                            '{' extension-members '}'
     # extension-name -> identifier
-    Node('ExtensionDecl', kind='Decl', traits=['DeclGroup'],
+    Node('ExtensionDecl', name_for_diagnostics='extension', kind='Decl',
+         traits=['DeclGroup'],
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -317,21 +324,23 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
-    Node('MemberDeclBlock', kind='Syntax', traits=['Braced'],
+    Node('MemberDeclBlock', name_for_diagnostics=None, kind='Syntax',
+         traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Members', kind='MemberDeclList',
                    collection_element_name='Member', is_indented=True),
-             Child('RightBrace', kind='RightBraceToken', 
+             Child('RightBrace', kind='RightBraceToken',
                    requires_leading_newline=True),
          ]),
 
     # member-decl-list = member-decl member-decl-list?
-    Node('MemberDeclList', kind='SyntaxCollection',
+    Node('MemberDeclList', name_for_diagnostics=None, kind='SyntaxCollection',
          element='MemberDeclListItem', elements_separated_by_newline=True),
 
     # member-decl = decl ';'?
-    Node('MemberDeclListItem', kind='Syntax', omit_when_empty=True,
+    Node('MemberDeclListItem', name_for_diagnostics='member', kind='Syntax',
+         omit_when_empty=True,
          description='''
          A member declaration of a type consisting of a declaration and an
          optional semicolon;
@@ -344,7 +353,7 @@ DECL_NODES = [
          ]),
 
     # source-file = code-block-item-list eof
-    Node('SourceFile', kind='Syntax',
+    Node('SourceFile', name_for_diagnostics='source file', kind='Syntax',
          traits=['WithStatements'],
          children=[
              Child('Statements', kind='CodeBlockItemList',
@@ -353,7 +362,7 @@ DECL_NODES = [
          ]),
 
     # initializer -> '=' expr
-    Node('InitializerClause', kind='Syntax',
+    Node('InitializerClause', name_for_diagnostics=None, kind='Syntax',
          children=[
              Child('Equal', kind='EqualToken'),
              Child('Value', kind='Expr'),
@@ -362,7 +371,7 @@ DECL_NODES = [
     # parameter ->
     # external-parameter-name? local-parameter-name ':'
     #   type '...'? '='? expression? ','?
-    Node('FunctionParameter', kind='Syntax',
+    Node('FunctionParameter', name_for_diagnostics='function parameter', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
              Child('Attributes', kind='AttributeList',
@@ -415,12 +424,13 @@ DECL_NODES = [
     #                       | 'unowned(unsafe)'
     #                       | 'weak'
     # mutation-modifier -> 'mutating' | 'nonmutating'
-    Node('ModifierList', kind='SyntaxCollection',
+    Node('ModifierList', name_for_diagnostics=None, kind='SyntaxCollection',
          omit_when_empty=True,
          element='DeclModifier',
          element_name='Modifier'),
 
-    Node('FunctionDecl', kind='Decl', traits=['IdentifiedDecl'],
+    Node('FunctionDecl', name_for_diagnostics='function', kind='Decl',
+         traits=['IdentifiedDecl'],
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -444,7 +454,7 @@ DECL_NODES = [
              Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
-    Node('InitializerDecl', kind='Decl',
+    Node('InitializerDecl', name_for_diagnostics='initializer', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -467,7 +477,7 @@ DECL_NODES = [
              Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
-    Node('DeinitializerDecl', kind='Decl',
+    Node('DeinitializerDecl', name_for_diagnostics='deinitializer', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -477,7 +487,7 @@ DECL_NODES = [
              Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
-    Node('SubscriptDecl', kind='Decl',
+    Node('SubscriptDecl', name_for_diagnostics='subscript', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -502,7 +512,8 @@ DECL_NODES = [
     #                        | 'internal' | 'internal' '(' 'set' ')'
     #                        | 'public' | 'public' '(' 'set' ')'
     #                        | 'open' | 'open' '(' 'set' ')'
-    Node('AccessLevelModifier', kind='Syntax',
+    Node('AccessLevelModifier', name_for_diagnostics='access level modifier',
+         kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
              Child('Modifier', kind='DeclModifierDetail',
@@ -510,16 +521,17 @@ DECL_NODES = [
          ]),
 
     # FIXME: technically misnamed; should be "ImportPathComponent"
-    Node('AccessPathComponent', kind='Syntax',
+    Node('AccessPathComponent', name_for_diagnostics=None, kind='Syntax',
          children=[
             Child('Name', kind='IdentifierToken'),
             Child('TrailingDot', kind='PeriodToken', is_optional=True),
          ]),
 
     # FIXME: technically misnamed; should be "ImportPath"
-    Node('AccessPath', kind='SyntaxCollection', element='AccessPathComponent'),
+    Node('AccessPath', name_for_diagnostics=None, kind='SyntaxCollection',
+         element='AccessPathComponent'),
 
-    Node('ImportDecl', kind='Decl',
+    Node('ImportDecl', name_for_diagnostics='import', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -537,7 +549,7 @@ DECL_NODES = [
          ]),
 
     # (value)
-    Node('AccessorParameter', kind='Syntax',
+    Node('AccessorParameter', name_for_diagnostics=None, kind='Syntax',
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
@@ -545,7 +557,7 @@ DECL_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    Node('AccessorDecl', kind='Decl',
+    Node('AccessorDecl', name_for_diagnostics='accessor', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -571,9 +583,10 @@ DECL_NODES = [
              Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
-    Node('AccessorList', kind="SyntaxCollection", element='AccessorDecl'),
+    Node('AccessorList', name_for_diagnostics=None, kind="SyntaxCollection",
+         element='AccessorDecl'),
 
-    Node('AccessorBlock', kind="Syntax", traits=['Braced'],
+    Node('AccessorBlock', name_for_diagnostics=None, kind="Syntax", traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Accessors', kind='AccessorList',
@@ -582,7 +595,7 @@ DECL_NODES = [
          ]),
 
     # Pattern: Type = Value { get {} },
-    Node('PatternBinding', kind="Syntax",
+    Node('PatternBinding', name_for_diagnostics=None, kind="Syntax",
          traits=['WithTrailingComma'],
          children=[
              Child('Pattern', kind='Pattern'),
@@ -595,10 +608,10 @@ DECL_NODES = [
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    Node('PatternBindingList', kind="SyntaxCollection",
+    Node('PatternBindingList', name_for_diagnostics=None, kind="SyntaxCollection",
          element='PatternBinding'),
 
-    Node('VariableDecl', kind='Decl',
+    Node('VariableDecl', name_for_diagnostics='variable', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
@@ -612,7 +625,7 @@ DECL_NODES = [
                    collection_element_name='Binding'),
          ]),
 
-    Node('EnumCaseElement', kind='Syntax',
+    Node('EnumCaseElement', name_for_diagnostics=None, kind='Syntax',
          description='''
          An element of an enum case, containing the name of the case and,
          optionally, either associated values or an assignment to a raw value.
@@ -634,11 +647,11 @@ DECL_NODES = [
                    '''),
          ]),
 
-    Node('EnumCaseElementList', kind='SyntaxCollection',
+    Node('EnumCaseElementList', name_for_diagnostics=None, kind='SyntaxCollection',
          description='A collection of 0 or more `EnumCaseElement`s.',
          element='EnumCaseElement'),
 
-    Node('EnumCaseDecl', kind='Decl',
+    Node('EnumCaseDecl', name_for_diagnostics='enum case', kind='Decl',
          description='''
          A `case` declaration of a Swift `enum`. It can have 1 or more
          `EnumCaseElement`s inside, each declaring a different case of the
@@ -662,7 +675,8 @@ DECL_NODES = [
                    description='The elements this case declares.')
          ]),
 
-    Node('EnumDecl', kind='Decl', traits=['IdentifiedDecl'],
+    Node('EnumDecl', name_for_diagnostics='enum', kind='Decl',
+         traits=['IdentifiedDecl'],
          description='A Swift `enum` declaration.',
          children=[
              Child('Attributes', kind='AttributeList',
@@ -707,7 +721,8 @@ DECL_NODES = [
          ]),
 
     # operator-decl -> attribute? modifiers? 'operator' operator
-    Node('OperatorDecl', kind='Decl', traits=['IdentifiedDecl'],
+    Node('OperatorDecl', name_for_diagnostics='operator', kind='Decl',
+         traits=['IdentifiedDecl'],
          description='A Swift `operator` declaration.',
          children=[
              Child('Attributes', kind='AttributeList',
@@ -737,11 +752,11 @@ DECL_NODES = [
                    is_optional=True),
          ]),
 
-    Node('IdentifierList', kind='SyntaxCollection',
+    Node('IdentifierList', name_for_diagnostics=None, kind='SyntaxCollection',
          element='IdentifierToken'),
 
     # infix-operator-group -> ':' identifier ','? identifier?
-    Node('OperatorPrecedenceAndTypes', kind='Syntax',
+    Node('OperatorPrecedenceAndTypes', name_for_diagnostics=None, kind='Syntax',
          description='''
          A clause to specify precedence group in infix operator declarations, and designated types in any operator declaration.
          ''',
@@ -757,7 +772,8 @@ DECL_NODES = [
     # precedence-group-decl -> attributes? modifiers? 'precedencegroup'
     #                            identifier '{' precedence-group-attribute-list
     #                            '}'
-    Node('PrecedenceGroupDecl', kind='Decl', traits=['IdentifiedDecl'],
+    Node('PrecedenceGroupDecl', name_for_diagnostics='precedencegroup', kind='Decl',
+         traits=['IdentifiedDecl'],
          description='A Swift `precedencegroup` declaration.',
          children=[
              Child('Attributes', kind='AttributeList',
@@ -788,8 +804,9 @@ DECL_NODES = [
     # precedence-group-attribute-list ->
     #     (precedence-group-relation | precedence-group-assignment |
     #      precedence-group-associativity )*
-    Node('PrecedenceGroupAttributeList', kind='SyntaxCollection',
-         element='Syntax', element_name='PrecedenceGroupAttribute',
+    Node('PrecedenceGroupAttributeList', name_for_diagnostics=None,
+         kind='SyntaxCollection', element='Syntax',
+         element_name='PrecedenceGroupAttribute',
          element_choices=[
              'PrecedenceGroupRelation',
              'PrecedenceGroupAssignment',
@@ -798,7 +815,8 @@ DECL_NODES = [
 
     # precedence-group-relation ->
     #     ('higherThan' | 'lowerThan') ':' precedence-group-name-list
-    Node('PrecedenceGroupRelation', kind='Syntax',
+    Node('PrecedenceGroupRelation',
+         name_for_diagnostics="'relation' property of precedencegroup", kind='Syntax',
          description='''
          Specify the new precedence group's relation to existing precedence
          groups.
@@ -823,9 +841,9 @@ DECL_NODES = [
 
     # precedence-group-name-list ->
     #    identifier (',' identifier)*
-    Node('PrecedenceGroupNameList', kind='SyntaxCollection',
+    Node('PrecedenceGroupNameList', name_for_diagnostics=None, kind='SyntaxCollection',
          element='PrecedenceGroupNameElement'),
-    Node('PrecedenceGroupNameElement', kind='Syntax',
+    Node('PrecedenceGroupNameElement', name_for_diagnostics=None, kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
              Child('TrailingComma', kind='CommaToken',
@@ -834,7 +852,8 @@ DECL_NODES = [
 
     # precedence-group-assignment ->
     #     'assignment' ':' ('true' | 'false')
-    Node('PrecedenceGroupAssignment', kind='Syntax',
+    Node('PrecedenceGroupAssignment',
+         name_for_diagnostics="'assignment' property of precedencegroup", kind='Syntax',
          description='''
          Specifies the precedence of an operator when used in an operation
          that includes optional chaining.
@@ -859,7 +878,9 @@ DECL_NODES = [
 
     # precedence-group-associativity ->
     #     'associativity' ':' ('left' | 'right' | 'none')
-    Node('PrecedenceGroupAssociativity', kind='Syntax',
+    Node('PrecedenceGroupAssociativity',
+         name_for_diagnostics="'associativity' property of precedencegroup",
+         kind='Syntax',
          description='''
          Specifies how a sequence of operators with the same precedence level
          are grouped together in the absence of grouping parentheses.

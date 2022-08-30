@@ -12,11 +12,11 @@ class Child(object):
     def __init__(self, name, kind, description=None, is_optional=False,
                  token_choices=None, text_choices=None, node_choices=None,
                  collection_element_name=None,
-                 classification=None, force_classification=False, 
+                 classification=None, force_classification=False,
                  is_indented=False, requires_leading_newline=False):
         """
-        If a classification is passed, it specifies the color identifiers in 
-        that subtree should inherit for syntax coloring. Must be a member of 
+        If a classification is passed, it specifies the color identifiers in
+        that subtree should inherit for syntax coloring. Must be a member of
         SyntaxClassification in SyntaxClassifier.h.gyb
         If force_classification is also set to true, all child nodes (not only
         identifiers) inherit the syntax classification.
