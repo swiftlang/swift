@@ -339,10 +339,24 @@ BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 /// only valid for the duration of the original binding.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
+/// unprotectedAddressOf (inout T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a physical lvalue. The returned pointer is
+/// only valid for the duration of the original binding.
+/// In contrast to `addressof`, this builtin doesn't trigger an insertion of
+/// stack protectors.
+BUILTIN_SIL_OPERATION(UnprotectedAddressOf, "unprotectedAddressOf", Special)
+
 /// addressOfBorrow (__shared T) -> Builtin.RawPointer
 /// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
 /// valid within the scope of the borrow.
 BUILTIN_SIL_OPERATION(AddressOfBorrow, "addressOfBorrow", Special)
+
+/// unprotectedAddressOfBorrow (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
+/// valid within the scope of the borrow.
+/// In contrast to `addressOfBorrow`, this builtin doesn't trigger an insertion of
+/// stack protectors.
+BUILTIN_SIL_OPERATION(UnprotectedAddressOfBorrow, "unprotectedAddressOfBorrow", Special)
 
 /// GepRaw(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 ///

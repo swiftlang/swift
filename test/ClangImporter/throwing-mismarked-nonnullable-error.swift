@@ -14,7 +14,7 @@
 // CHECK: [[VAL:%.*]] = load [[STACK]] : $*Optional<NSError>
 // CHECK: [[UNMANAGED:%.*]] = ref_to_unmanaged [[VAL]]
 // CHECK: store [[UNMANAGED]] to [[NEXT_STACK]]
-// CHECK: [[PTR:%.*]] = address_to_pointer [[NEXT_STACK]]
+// CHECK: [[PTR:%.*]] = address_to_pointer [stack_protection] [[NEXT_STACK]]
 // CHECK: [[AUMP:%.*]] = struct $AutoreleasingUnsafeMutablePointer<NSError> ([[PTR]] :
 // CHECK: [[OPT_AUMP:%.*]] = enum $Optional<AutoreleasingUnsafeMutablePointer<NSError>>, #Optional.some!enumelt, [[AUMP]] : $AutoreleasingUnsafeMutablePointer<NSError>
 // CHECK: apply {{%.*}}([[OPT_AUMP]],

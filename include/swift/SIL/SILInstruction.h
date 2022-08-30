@@ -5350,9 +5350,18 @@ class AddressToPointerInst
                                 ConversionInst>
 {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
-  AddressToPointerInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  AddressToPointerInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+                       bool needsStackProtection)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+        sharedUInt8().AddressToPointerInst.needsStackProtection = needsStackProtection;
+      }
+
+public:
+  bool needsStackProtection() const {
+    return sharedUInt8().AddressToPointerInst.needsStackProtection;
+  }
 };
 
 /// PointerToAddressInst - Convert a Builtin.RawPointer value to a SIL address.
@@ -8132,11 +8141,20 @@ class IndexAddrInst
     : public InstructionBase<SILInstructionKind::IndexAddrInst,
                              IndexingInst> {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
   enum { Base, Index };
 
-  IndexAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Index)
-      : InstructionBase(DebugLoc, Operand->getType(), Operand, Index) {}
+  IndexAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Index,
+                bool needsStackProtection)
+      : InstructionBase(DebugLoc, Operand->getType(), Operand, Index) {
+    sharedUInt8().IndexAddrInst.needsStackProtection = needsStackProtection;
+  }
+
+public:
+  bool needsStackProtection() const {
+    return sharedUInt8().IndexAddrInst.needsStackProtection;
+  }
 };
 
 /// TailAddrInst - like IndexingInst, but aligns-up the resulting address to a

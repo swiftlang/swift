@@ -362,6 +362,8 @@ BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
 
 llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi);
 BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
+SwiftInt AddressToPointerInst_needsStackProtection(BridgedInstruction atp);
+SwiftInt IndexAddrInst_needsStackProtection(BridgedInstruction ia);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
 BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri);
 llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli);

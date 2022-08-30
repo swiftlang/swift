@@ -752,6 +752,23 @@ bb0:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @test_stack_protection_flags
+sil @test_stack_protection_flags : $@convention(thin) (@inout Builtin.Word) -> () {
+bb0(%0 : $*Builtin.Word):
+  // CHECK: address_to_pointer [stack_protection] %0
+  %1 = address_to_pointer [stack_protection] %0 : $*Builtin.Word to $Builtin.RawPointer
+  // CHECK: address_to_pointer %0
+  %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = integer_literal $Builtin.Word, 0
+  // CHECK: index_addr [stack_protection] %0
+  %4 = index_addr [stack_protection] %0 : $*Builtin.Word, %3 : $Builtin.Word
+  // CHECK: index_addr %0
+  %5 = index_addr %0 : $*Builtin.Word, %3 : $Builtin.Word
+
+  %6 = tuple ()
+  return %6 : $()
+}
+
 // CHECK-LABEL: sil @test_tail_elems
 sil @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):

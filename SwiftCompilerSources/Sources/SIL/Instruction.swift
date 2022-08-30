@@ -341,7 +341,11 @@ final public
 class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {}
+class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {
+  public var needsStackProtection: Bool {
+    AddressToPointerInst_needsStackProtection(bridged) != 0
+  }
+}
 
 final public
 class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {}
@@ -350,6 +354,10 @@ final public
 class IndexAddrInst : SingleValueInstruction {
   public var base: Value { operands[0].value }
   public var index: Value { operands[1].value }
+  
+  public var needsStackProtection: Bool {
+    IndexAddrInst_needsStackProtection(bridged) != 0
+  }
 }
 
 final public

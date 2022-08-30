@@ -684,6 +684,24 @@ bb0:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil public_external [transparent] @test_stack_protection_flags
+sil [transparent] [serialized] @test_stack_protection_flags : $@convention(thin) (@inout Builtin.Word) -> () {
+bb0(%0 : $*Builtin.Word):
+  // CHECK: address_to_pointer [stack_protection] %0
+  %1 = address_to_pointer [stack_protection] %0 : $*Builtin.Word to $Builtin.RawPointer
+  // CHECK: address_to_pointer %0
+  %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = integer_literal $Builtin.Word, 0
+  // CHECK: index_addr [stack_protection] %0
+  %4 = index_addr [stack_protection] %0 : $*Builtin.Word, %3 : $Builtin.Word
+  // CHECK: index_addr %0
+  %5 = index_addr %0 : $*Builtin.Word, %3 : $Builtin.Word
+
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
 // CHECK-LABEL: sil public_external [transparent] @test_tail_elems
 sil [transparent] [serialized] @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
@@ -1519,6 +1537,7 @@ bb0:
   %84 = function_ref @test_dealloc_partial_ref : $@convention(thin) () -> ()
   %85 = function_ref @test_dealloc_box : $@convention(thin) () -> ()
   %86 = function_ref @test_stack_flag : $@convention(thin) () -> ()
+  %86b = function_ref @test_stack_protection_flags : $@convention(thin) (@inout Builtin.Word) -> ()
   %87 = function_ref @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> ()
   %88 = function_ref @test_tail_elems_dynamic : $@convention(thin) (Builtin.Word, Builtin.Word, @thick Class1.Type) -> ()
   %89 = function_ref @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1

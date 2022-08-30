@@ -768,6 +768,14 @@ BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi) {
   return (BridgedBuiltinID)castToInst<BuiltinInst>(bi)->getBuiltinInfo().ID;
 }
 
+SwiftInt AddressToPointerInst_needsStackProtection(BridgedInstruction atp) {
+  return castToInst<AddressToPointerInst>(atp)->needsStackProtection() ? 1 : 0;
+}
+
+SwiftInt IndexAddrInst_needsStackProtection(BridgedInstruction ia) {
+  return castToInst<IndexAddrInst>(ia)->needsStackProtection() ? 1 : 0;
+}
+
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst) {
   return {castToInst<GlobalAccessInst>(globalInst)->getReferencedGlobal()};
 }

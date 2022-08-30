@@ -3769,6 +3769,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc ToLoc;
     bool not_guaranteed = false;
     bool without_actually_escaping = false;
+    bool needsStackProtection = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
@@ -3777,7 +3778,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         else
           return true;
       }
+    } if (Opcode == SILInstructionKind::AddressToPointerInst) {
+      if (parseSILOptional(needsStackProtection, *this, "stack_protection"))
+        return true;
     }
+  
     if (parseTypedValueRef(Val, B) ||
         parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                            "to"))
@@ -3841,7 +3846,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           B.createConvertEscapeToNoEscape(InstLoc, Val, Ty, !not_guaranteed);
       break;
     case SILInstructionKind::AddressToPointerInst:
-      ResultVal = B.createAddressToPointer(InstLoc, Val, Ty);
+      ResultVal = B.createAddressToPointer(InstLoc, Val, Ty, needsStackProtection);
       break;
     case SILInstructionKind::BridgeObjectToRefInst:
       ResultVal =
@@ -5167,11 +5172,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     case SILInstructionKind::IndexAddrInst: {
       SILValue IndexVal;
-      if (parseTypedValueRef(Val, B) ||
+      bool needsStackProtection = false;
+      if (parseSILOptional(needsStackProtection, *this, "stack_protection") ||
+          parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseTypedValueRef(IndexVal, B) || parseSILDebugLocation(InstLoc, B))
         return true;
-      ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal);
+      ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal, needsStackProtection);
       break;
     }
     case SILInstructionKind::TailAddrInst: {
