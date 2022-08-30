@@ -191,6 +191,11 @@ void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
 void ClangSyntaxPrinter::printCTypeMetadataTypeFunction(
     const NominalTypeDecl *typeDecl, StringRef typeMetadataFuncName,
     llvm::ArrayRef<GenericRequirement> genericRequirements) {
+  // FIXME: Support generic requirements > 3.
+  if (!genericRequirements.empty())
+    os << "static_assert(" << genericRequirements.size()
+       << " <= " << NumDirectGenericTypeMetadataAccessFunctionArgs
+       << ", \"unsupported generic requirement list for metadata func\");\n";
   os << "// Type metadata accessor for " << typeDecl->getNameStr() << "\n";
   os << "SWIFT_EXTERN ";
   printSwiftImplQualifier();

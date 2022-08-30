@@ -29,6 +29,7 @@ public func takeGenericPair<T, T1>(_ x: GenericPair<T, T1>) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: class _impl_GenericPair;
 // CHECK-EMPTY:
+// CHECK-NEXT: static_assert(2 <= 3, "unsupported generic requirement list for metadata func"); 
 // CHECK-NEXT: // Type metadata accessor for GenericPair
 // CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $s8Generics11GenericPairVMa(swift::_impl::MetadataRequestTy, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;
 
