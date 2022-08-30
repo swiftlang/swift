@@ -43,12 +43,6 @@ public:
   void printValueTypeDecl(const NominalTypeDecl *typeDecl,
                           llvm::function_ref<void(void)> bodyPrinter);
 
-  /// Print the pararameter type that referes to a Swift struct type in C/C++.
-  void printValueTypeParameterType(const NominalTypeDecl *type,
-                                   OutputLanguageMode outputLang,
-                                   const ModuleDecl *moduleContext,
-                                   bool isInOutParam);
-
   /// Print the use of a C++ struct/enum parameter value as it's passed to the
   /// underlying C function that represents the native Swift function.
   void printParameterCxxToCUseScaffold(
@@ -71,6 +65,14 @@ public:
                                 TypeUseKind typeUse,
                                 const ModuleDecl *moduleContext);
 
+  /// Prints out the C stub name used to pass/return value directly for the
+  /// given value type.
+  ///
+  /// If the C stub isn't declared yet in the emitted header, that declaration
+  /// will be emitted by this function.
+  void printCStubType(Type type, const NominalTypeDecl *typeDecl,
+                      ArrayRef<Type> genericArgs);
+
   /// Print the supporting code  that's required to indirectly return a C++
   /// class that represents a Swift value type as it's being indirectly passed
   /// from the C function that represents the native Swift function.
@@ -82,10 +84,10 @@ public:
   /// Print the supporting code  that's required to directly return a C++ class
   /// that represents a Swift value type as it's being returned from the C
   /// function that represents the native Swift function.
-  void
-  printValueTypeDirectReturnScaffold(const NominalTypeDecl *typeDecl,
-                                     const ModuleDecl *moduleContext,
-                                     llvm::function_ref<void()> bodyPrinter);
+  void printValueTypeDirectReturnScaffold(
+      const NominalTypeDecl *typeDecl, ArrayRef<Type> genericArgs,
+      const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
+      llvm::function_ref<void()> bodyPrinter);
 
   /// Print out the C++ type name of the implementation class that provides
   /// hidden access to the private class APIs.
@@ -113,13 +115,6 @@ public:
   static void forwardDeclType(raw_ostream &os, const NominalTypeDecl *typeDecl);
 
 private:
-  /// Prints out the C stub name used to pass/return value directly for the
-  /// given value type.
-  ///
-  /// If the C stub isn't declared yet in the emitted header, that declaration
-  /// will be emitted by this function.
-  void printCStubTypeName(const NominalTypeDecl *type);
-
   raw_ostream &os;
   raw_ostream &cPrologueOS;
   PrimitiveTypeMapping &typeMapping;

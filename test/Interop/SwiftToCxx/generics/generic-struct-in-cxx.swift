@@ -1,17 +1,18 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -module-name Generics -clang-header-expose-public-decls -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h)
+// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h -Wno-unused-function)
 
 // Check that an instantiation compiles too.
 // RUN: echo "constexpr int x = sizeof(Generics::GenericPair<int, int>);" >> %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h)
+// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h -Wno-unused-function)
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Generics -clang-header-expose-public-decls -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h)
+// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h -Wno-unused-function)
 
+@frozen
 public struct GenericPair<T, T2> {
     var x: T
     var y: T2
@@ -19,6 +20,10 @@ public struct GenericPair<T, T2> {
 
 public func makeGenericPair<T, T1>(_ x: T, _ y: T1) -> GenericPair<T, T1> {
     return GenericPair<T, T1>(x: x, y: y);
+}
+
+public func makeConcretePair(_ x: UInt32, _ y: UInt32) -> GenericPair<UInt32, UInt32> {
+    return GenericPair<UInt32, UInt32>(x: x, y: y)
 }
 
 public func takeGenericPair<T, T1>(_ x: GenericPair<T, T1>) {
@@ -34,6 +39,22 @@ public func inoutGenericPair<T1, T>(_ x: inout GenericPair<T1, T>, _ y: T1) {
 }
 
 // CHECK: SWIFT_EXTERN void $s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // inoutGenericPair(_:_:)
+// CHECK-NEXT: // Stub struct to be used to pass/return values to/from Swift functions.
+// CHECK-NEXT: struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V {
+// CHECK-NEXT:   uint64_t _1;
+// CHECK-NEXT: };
+// CHECK-EMPTY:
+// CHECK-NEXT: static inline void swift_interop_returnDirect_Generics_GenericPair_s6UInt32V_s6UInt32V(char * _Nonnull result, struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V value) __attribute__((always_inline)) {
+// CHECK-NEXT:   memcpy(result + 0, &value._1, 8);
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: static inline struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V swift_interop_passDirect_Generics_GenericPair_s6UInt32V_s6UInt32V(const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK-NEXT:   struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V result;
+// CHECK-NEXT:   memcpy(&result._1, value + 0, 8);
+// CHECK-NEXT:   return result;
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: SWIFT_EXTERN struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V $s8Generics16makeConcretePairyAA07GenericD0Vys6UInt32VAFGAF_AFtF(uint32_t x, uint32_t y) SWIFT_NOEXCEPT SWIFT_CALL; // makeConcretePair(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // makeGenericPair(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughGenericPair(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(const void * _Nonnull x, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // takeGenericPair(_:)

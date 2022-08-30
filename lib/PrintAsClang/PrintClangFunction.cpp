@@ -190,14 +190,14 @@ public:
   ClangRepresentation visitEnumType(EnumType *ET,
                                     Optional<OptionalTypeKind> optionalKind,
                                     bool isInOutParam) {
-    return visitValueType(ET->getNominalOrBoundGenericNominal(), ET,
+    return visitValueType(ET, ET->getNominalOrBoundGenericNominal(), ET,
                           optionalKind, isInOutParam);
   }
 
   ClangRepresentation visitStructType(StructType *ST,
                                       Optional<OptionalTypeKind> optionalKind,
                                       bool isInOutParam) {
-    return visitValueType(ST->getNominalOrBoundGenericNominal(), ST,
+    return visitValueType(ST, ST->getNominalOrBoundGenericNominal(), ST,
                           optionalKind, isInOutParam);
   }
 
@@ -218,11 +218,10 @@ public:
     return result;
   }
 
-  ClangRepresentation visitValueType(const NominalTypeDecl *decl,
-                                     NominalType *NT,
-                                     Optional<OptionalTypeKind> optionalKind,
-                                     bool isInOutParam,
-                                     ArrayRef<Type> genericArgs = {}) {
+  ClangRepresentation
+  visitValueType(TypeBase *type, const NominalTypeDecl *decl, NominalType *NT,
+                 Optional<OptionalTypeKind> optionalKind, bool isInOutParam,
+                 ArrayRef<Type> genericArgs = {}) {
     if (NT)
       assert(isa<StructType>(NT) || isa<EnumType>(NT));
     assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
@@ -255,9 +254,14 @@ public:
         }
 
       } else if (languageMode != OutputLanguageMode::Cxx) {
-        ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
-            .printValueTypeParameterType(decl, languageMode, moduleContext,
-                                         isInOutParam);
+        if (!isInOutParam) {
+          ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
+              .printCStubType(type, decl, genericArgs);
+        } else {
+          // Directly pass the pointer (from getOpaquePointer) to C interface
+          // when in inout mode
+          os << "char * _Nonnull";
+        }
       } else {
         if (!isInOutParam) {
           os << "const ";
@@ -268,15 +272,21 @@ public:
         return result;
       }
     } else {
-      ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
-          .printValueTypeReturnType(
-              decl, languageMode,
-              modifiersDelegate.mapValueTypeUseKind
-                  ? (*modifiersDelegate.mapValueTypeUseKind)(
-                        ClangValueTypePrinter::TypeUseKind::CxxTypeName)
-                  : ClangValueTypePrinter::TypeUseKind::CxxTypeName,
-              moduleContext);
-      return visitGenericArgs(genericArgs);
+      ClangValueTypePrinter printer(os, cPrologueOS, typeMapping,
+                                    interopContext);
+      if (languageMode != OutputLanguageMode::Cxx)
+        printer.printCStubType(type, decl, genericArgs);
+      else
+        printer.printValueTypeReturnType(
+            decl, languageMode,
+            modifiersDelegate.mapValueTypeUseKind
+                ? (*modifiersDelegate.mapValueTypeUseKind)(
+                      ClangValueTypePrinter::TypeUseKind::CxxTypeName)
+                : ClangValueTypePrinter::TypeUseKind::CxxTypeName,
+            moduleContext);
+      return languageMode != OutputLanguageMode::Cxx
+                 ? ClangRepresentation::representable
+                 : visitGenericArgs(genericArgs);
     }
     return ClangRepresentation::representable;
   }
@@ -311,8 +321,8 @@ public:
                               bool isInOutParam) {
     if (printIfKnownGenericStruct(BGT, optionalKind, isInOutParam))
       return ClangRepresentation::representable;
-    return visitValueType(BGT->getDecl(), nullptr, optionalKind, isInOutParam,
-                          BGT->getGenericArgs());
+    return visitValueType(BGT, BGT->getDecl(), nullptr, optionalKind,
+                          isInOutParam, BGT->getGenericArgs());
   }
 
   ClangRepresentation
@@ -743,8 +753,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
                 printCallToCFunc(/*additionalParam=*/returnParam);
               });
         } else {
+          ArrayRef<Type> genericArgs;
+          // FIXME: Do we need to account for any sugar?
+          if (const auto *bgt = resultTy->getAs<BoundGenericType>())
+            genericArgs = bgt->getGenericArgs();
           valueTypePrinter.printValueTypeDirectReturnScaffold(
-              decl, moduleContext,
+              decl, genericArgs, moduleContext,
+              [&]() { printTypeImplTypeSpecifier(resultTy, moduleContext); },
               [&]() { printCallToCFunc(/*additionalParam=*/None); });
         }
         return;
