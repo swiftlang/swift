@@ -550,6 +550,20 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   return resultingRepresentation;
 }
 
+void DeclAndTypeClangFunctionPrinter::printTypeImplTypeSpecifier(
+    Type type, const ModuleDecl *moduleContext) {
+  CFunctionSignatureTypePrinterModifierDelegate delegate;
+  delegate.mapValueTypeUseKind = [](ClangValueTypePrinter::TypeUseKind kind) {
+    return ClangValueTypePrinter::TypeUseKind::CxxImplTypeName;
+  };
+  CFunctionSignatureTypePrinter typePrinter(
+      os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx, interopContext,
+      delegate, moduleContext, declPrinter,
+      FunctionSignatureTypeUse::TypeReference);
+  auto result = typePrinter.visit(type, None, /*isInOut=*/false);
+  assert(!result.isUnsupported());
+}
+
 void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
     bool isIndirect, llvm::Optional<AdditionalParam::Role> paramRole) {
@@ -577,20 +591,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
                 isIndirect || decl->isResilient() || isGenericType(type) ||
                     interopContext.getIrABIDetails().shouldPassIndirectly(type),
                 decl, moduleContext,
-                [&]() {
-                  CFunctionSignatureTypePrinterModifierDelegate delegate;
-                  delegate.mapValueTypeUseKind = [](ClangValueTypePrinter::
-                                                        TypeUseKind kind) {
-                    return ClangValueTypePrinter::TypeUseKind::CxxImplTypeName;
-                  };
-                  CFunctionSignatureTypePrinter typePrinter(
-                      os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
-                      interopContext, delegate, moduleContext, declPrinter,
-                      FunctionSignatureTypeUse::TypeReference);
-                  auto result =
-                      typePrinter.visit(type, None, /*isInOut=*/false);
-                  assert(!result.isUnsupported());
-                },
+                [&]() { printTypeImplTypeSpecifier(type, moduleContext); },
                 namePrinter, isInOut,
                 /*isSelf=*/paramRole &&
                     *paramRole == AdditionalParam::Role::Self);
@@ -736,21 +737,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         if (isIndirect) {
           valueTypePrinter.printValueTypeIndirectReturnScaffold(
               decl, moduleContext,
-              [&]() {
-                CFunctionSignatureTypePrinterModifierDelegate delegate;
-                delegate
-                    .mapValueTypeUseKind = [](ClangValueTypePrinter::TypeUseKind
-                                                  kind) {
-                  return ClangValueTypePrinter::TypeUseKind::CxxImplTypeName;
-                };
-                CFunctionSignatureTypePrinter typePrinter(
-                    os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
-                    interopContext, delegate, moduleContext, declPrinter,
-                    FunctionSignatureTypeUse::TypeReference);
-                auto result =
-                    typePrinter.visit(resultTy, None, /*isInOut=*/false);
-                assert(!result.isUnsupported());
-              },
+              [&]() { printTypeImplTypeSpecifier(resultTy, moduleContext); },
               [&](StringRef returnParam) {
                 printCallToCFunc(/*additionalParam=*/returnParam);
               });
