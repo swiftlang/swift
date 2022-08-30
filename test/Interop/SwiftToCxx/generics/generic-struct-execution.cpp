@@ -24,5 +24,8 @@ int main() {
   takeGenericPair(xprime);
 // CHECK-NEXT: GenericPair<Int32, Int32>(x: 11, y: 42)
 // CHECK-NEXT: GenericPair<Int32, Int32>(x: 11, y: -995)
+  inoutGenericPair(x, 0xFF);
+  takeGenericPair(x);
+// CHECK-NEXT: GenericPair<Int32, Int32>(x: 255, y: 42)
   return 0;
 }

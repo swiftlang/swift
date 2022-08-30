@@ -13,8 +13,8 @@
 // RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h)
 
 public struct GenericPair<T, T2> {
-    let x: T
-    let y: T2
+    var x: T
+    var y: T2
 }
 
 public func makeGenericPair<T, T1>(_ x: T, _ y: T1) -> GenericPair<T, T1> {
@@ -28,6 +28,15 @@ public func takeGenericPair<T, T1>(_ x: GenericPair<T, T1>) {
 public func passThroughGenericPair<T1, T>(_ x: GenericPair<T1, T>, _ y: T)  -> GenericPair<T1, T> {
     return GenericPair<T1, T>(x: x.x, y: y)
 }
+
+public func inoutGenericPair<T1, T>(_ x: inout GenericPair<T1, T>, _ y: T1) {
+    x.x = y
+}
+
+// CHECK: SWIFT_EXTERN void $s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // inoutGenericPair(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // makeGenericPair(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughGenericPair(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(const void * _Nonnull x, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // takeGenericPair(_:)
 
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
@@ -65,7 +74,13 @@ public func passThroughGenericPair<T1, T>(_ x: GenericPair<T1, T>, _ y: T)  -> G
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: class GenericPair;
 // CHECK-EMPTY:
-// CHECK-NEXT: template<class T, class T1>
+// CHECK-NEXT: template<class T1, class T>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T1> && swift::isUsableInGenericContext<T>
+// CHECK-NEXT: inline void inoutGenericPair(GenericPair<T1, T>& x, const T1 & y) noexcept {
+// CHECK-NEXT:   return _impl::$s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(_impl::_impl_GenericPair<T1, T>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T1>(), swift::getTypeMetadata<T>());
+// CHECK-NEXT: }
+
+// CHECK: template<class T, class T1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T> && swift::isUsableInGenericContext<T1>
 // CHECK-NEXT: inline GenericPair<T, T1> makeGenericPair(const T & x, const T1 & y) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_GenericPair<T, T1>::returnNewValue([&](void * _Nonnull result) {

@@ -237,8 +237,9 @@ public:
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
       if (languageMode != OutputLanguageMode::Cxx && !genericArgs.empty()) {
         // FIXME: what about concrete generic type.
-        // FIXME: inout.
-        os << "const void * _Nonnull";
+        if (!isInOutParam)
+          os << "const ";
+        os << "void * _Nonnull";
         return ClangRepresentation::representable;
       }
       if (languageMode != OutputLanguageMode::Cxx &&
