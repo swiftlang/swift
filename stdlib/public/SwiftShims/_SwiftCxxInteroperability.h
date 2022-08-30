@@ -180,6 +180,7 @@ namespace swift {
 class Error {
 public:
   Error() {}
+  Error(void* _Nonnull swiftError) { opaqueValue = swiftError; }
   ~Error() {
     if (opaqueValue)
       swift_errorRelease(opaqueValue);

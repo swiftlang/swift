@@ -21,18 +21,18 @@ int main() {
 
   try {
     Functions::emptyThrowFunction();
-  } catch (swift::_impl::NaiveException& e) {
-    printf("%s\n", e.getMessage());
+  } catch (swift::_impl::swift::Error& e) {
+    printf("Exception\n");
   }
   try {
     Functions::throwFunction();
-  } catch (swift::_impl::NaiveException& e) {
-    printf("%s\n", e.getMessage());
+  } catch (swift::_impl::swift::Error& e) {
+     printf("Exception\n");
   }
   try {
     Functions::throwFunctionWithReturn();
-  } catch (swift::_impl::NaiveException& e) {
-    printf("%s\n", e.getMessage());
+  } catch (swift::_impl::swift::Error& e) {
+     printf("Exception\n");
   }
 
   return 0;

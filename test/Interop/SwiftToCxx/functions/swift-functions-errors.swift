@@ -25,7 +25,7 @@ public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 // CHECK: void* self = nullptr;
 // CHECK: _impl::$s9Functions18emptyThrowFunctionyyKF(self, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::_impl::NaiveException("Exception"));
+// CHECK: throw (swift::_impl::swift::Error(opaqueError))
 // CHECK: }
 
 public func throwFunction() throws {
@@ -38,7 +38,7 @@ public func throwFunction() throws {
 // CHECK: void* self = nullptr;
 // CHECK: _impl::$s9Functions13throwFunctionyyKF(self, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::_impl::NaiveException("Exception"));
+// CHECK: throw (swift::_impl::swift::Error(opaqueError))
 // CHECK: }
 
 public func throwFunctionWithReturn() throws -> Int {
@@ -52,6 +52,6 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: void* self = nullptr;
 // CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(self, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::_impl::NaiveException("Exception"));
+// CHECK: throw (swift::_impl::swift::Error(opaqueError))
 // CHECK: return returnValue;
 // CHECK: }

@@ -695,7 +695,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   // Create the condition and the statement to throw an exception.
   if (hasThrows) {
     os << "  if (opaqueError != nullptr)\n";
-    os << "    throw (swift::_impl::NaiveException(\"Exception\"));\n";
+    os << "    throw (swift::_impl::swift::Error(opaqueError));\n";
   }
 
   // Return the function result value if it doesn't throw.
