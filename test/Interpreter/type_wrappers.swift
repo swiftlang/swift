@@ -5,6 +5,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(type_wrapper_defs) | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: asserts
 
 import type_wrapper_defs
 
