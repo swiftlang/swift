@@ -413,17 +413,35 @@ def apply_default_arguments(toolchain, args):
 
     if (args.infer_cross_compile_hosts_on_darwin and
             platform.system() == "Darwin"):
-        args.cross_compile_hosts = _infer_cross_compile_hosts_on_darwin()
+        args.cross_compile_hosts = _infer_cross_compile_hosts_on_darwin(
+            get_running_arch(args.dry_run))
         print("Inferred the following hosts for cross compilations: "
               f"{args.cross_compile_hosts}")
         sys.stdout.flush()
 
 
-def _infer_cross_compile_hosts_on_darwin():
-    if platform.machine() == "x86_64":
+def _infer_cross_compile_hosts_on_darwin(arch_we_are_running_on):
+    if arch_we_are_running_on == "x86_64":
         return ["macosx-arm64"]
     else:
         return ["macosx-x86_64"]
+
+
+def get_running_arch(dry_run):
+    # We can override the detected arch to support
+    # BuildSystem/infer-cross-compile-hosts-on-darwin-macosx.test
+    # Given the narrow scenario, we preferred using
+    # an environment variable instead of a build-script
+    # argument to make this less discoverable on purpose
+    if dry_run:
+        injected_arch = os.environ.get(
+            'ARCH_FOR_BUILDSYSTEM_TESTS',
+            platform.machine())
+        print("DRY RUN: assume build-script is being run on a "
+              f"{injected_arch} machine")
+        return injected_arch
+    else:
+        return platform.machine()
 
 
 # -----------------------------------------------------------------------------
