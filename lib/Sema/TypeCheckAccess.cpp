@@ -1548,7 +1548,9 @@ swift::getDisallowedOriginKind(const Decl *decl,
   if (howImported != RestrictedImportKind::None) {
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
-    if (where.isSPI())
+    if (where.isSPI() &&
+        where.getFragileFunctionKind().kind == FragileFunctionKind::None &&
+        !SF->getASTContext().LangOpts.EnableSPIOnlyImports)
       downgradeToWarning = DowngradeToWarning::Yes;
 
     if (where.isSPI() && howImported == RestrictedImportKind::SPIOnly)
