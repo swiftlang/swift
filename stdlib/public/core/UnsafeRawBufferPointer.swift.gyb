@@ -766,6 +766,11 @@ extension Unsafe${Mutable}RawBufferPointer {
       return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
     }  
 
+    _debugPrecondition(
+      Int(bitPattern: base) % MemoryLayout<S.Element>.stride == 0,
+      "buffer base address must be properly aligned to access S.Element"
+    )
+
     _internalInvariant(_end != nil)
     for p in stride(from: base, 
       // only advance to as far as the last element that will fit
@@ -813,27 +818,57 @@ extension Unsafe${Mutable}RawBufferPointer {
     as type: C.Element.Type,
     fromContentsOf source: C
   ) -> UnsafeMutableBufferPointer<C.Element> {
-    var count = source.count
-    guard let base = _position, let end = _end, end > base, count > 0 else {
-      return UnsafeMutableBufferPointer(start: nil, count: 0)
-    }
-    count = Swift.min((end - base)/MemoryLayout<C.Element>.stride, count)
-
-    if let start = source.withContiguousStorageIfAvailable({
-      base.initializeMemory(
-        as: C.Element.self,
-        from: $0.baseAddress._unsafelyUnwrappedUnchecked,
-        count: count
+    let buffer: UnsafeMutableBufferPointer<C.Element>?
+    buffer = source.withContiguousStorageIfAvailable {
+      guard let sourceAddress = $0.baseAddress, !$0.isEmpty else {
+        return .init(start: nil, count: 0)
+      }
+      _debugPrecondition(
+        Int(bitPattern: baseAddress) % MemoryLayout<C.Element>.stride == 0,
+        "buffer base address must be properly aligned to access C.Element"
       )
-    }) {
-      return UnsafeMutableBufferPointer(start: start, count: count)
+      _precondition(
+        $0.count * MemoryLayout<C.Element>.stride < self.count,
+        "buffer cannot contain every element from source collection."
+      )
+      let start = baseAddress?.initializeMemory(
+        as: C.Element.self, from: sourceAddress, count: $0.count
+      )
+      return .init(start: start, count: $0.count)
+    }
+    if let buffer {
+      return buffer
     }
 
-    let start = base.bindMemory(to: C.Element.self, capacity: count)
-    for (pointer, element) in zip(start..<start.advanced(by: count), source) {
-      pointer.initialize(to: element)
+    guard let base = baseAddress else {
+      _precondition(
+        source.isEmpty,
+        "buffer cannot contain every element from source collection."
+      )
+      return .init(start: nil, count: 0)
     }
-    return UnsafeMutableBufferPointer(start: start, count: count)
+    _internalInvariant(_end != nil)
+    _debugPrecondition(
+      Int(bitPattern: baseAddress) % MemoryLayout<C.Element>.stride == 0,
+      "buffer base address must be properly aligned to access C.Element"
+    )
+    var iterator = source.makeIterator()
+    var element = base
+    var initialized = 0
+    let end = _end._unsafelyUnwrappedUnchecked - MemoryLayout<C.Element>.stride
+    while element <= end {
+      guard let value = iterator.next() else {
+        return .init(start: .init(base._rawValue), count: initialized)
+      }
+      element.initializeMemory(as: C.Element.self, to: value)
+      element = element.advanced(by: MemoryLayout<C.Element>.stride)
+      initialized += 1
+    }
+    _precondition(
+      iterator.next() == nil,
+      "buffer cannot contain every element from source collection."
+    )
+    return .init(start: .init(base._rawValue), count: initialized)
   }
 
   /// Moves every element of an initialized source buffer into the
@@ -870,17 +905,21 @@ extension Unsafe${Mutable}RawBufferPointer {
     as type: T.Type,
     fromContentsOf source: UnsafeMutableBufferPointer<T>
   ) -> UnsafeMutableBufferPointer<T> {
-    guard let sourceBase = source.baseAddress
-      else { return UnsafeMutableBufferPointer(start: nil, count: 0) }
-
-    let neededBytes = source.count*MemoryLayout<T>.stride
-    guard let base = _position, count >= neededBytes
-      else { _debugPreconditionFailure("destination has too few bytes") }
-
-    let initialized = base.moveInitializeMemory(as: T.self,
-                                                from: sourceBase,
-                                                count: source.count)
-    return UnsafeMutableBufferPointer(start: initialized, count: source.count)
+    guard let sourceAddress = source.baseAddress, !source.isEmpty else {
+      return .init(start: nil, count: 0)
+    }
+    _precondition(
+      source.count * MemoryLayout<T>.stride <= self.count,
+      "buffer cannot contain every element from source."
+    )
+    _debugPrecondition(
+      Int(bitPattern: baseAddress) % MemoryLayout<T>.stride == 0,
+      "buffer base address must be properly aligned to access T"
+    )
+    let initialized = baseAddress?.moveInitializeMemory(
+      as: T.self, from: sourceAddress, count: source.count
+    )
+    return .init(start: initialized, count: source.count)
   }
 
   /// Moves every element of an initialized source buffer slice into the

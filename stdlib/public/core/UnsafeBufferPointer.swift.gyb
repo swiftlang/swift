@@ -704,22 +704,27 @@ extension Unsafe${Mutable}BufferPointer {
   public func initialize(
     fromContentsOf source: some Collection<Element>
   ) -> Index {
-    let count = Swift.min(self.count, source.count)
-    guard count > 0, let base = baseAddress else { return startIndex }
-
-    if let _ = source.withContiguousStorageIfAvailable({
-      base.initialize(
-        from: $0.baseAddress._unsafelyUnwrappedUnchecked,
-        count: count
+    let count = source.withContiguousStorageIfAvailable {
+      guard let sourceAddress = $0.baseAddress, !$0.isEmpty else {
+        return 0
+      }
+      _precondition(
+        $0.count <= self.count,
+        "buffer cannot contain every element from source."
       )
-    }) {
+      baseAddress?.initialize(from: sourceAddress, count: $0.count)
+      return $0.count
+    }
+    if let count {
       return startIndex.advanced(by: count)
     }
 
-    for (p, e) in zip(base..<base.advanced(by: count), source) {
-      p.initialize(to: e)
-    }
-    return startIndex.advanced(by: count)
+    var (iterator, copied) = source._copySequenceContents(initializing: self)
+    _precondition(
+      iterator.next() == nil,
+      "buffer cannot contain every element from source."
+    )
+    return startIndex.advanced(by: copied)
   }
 
   /// Updates every element of this buffer's initialized memory.
@@ -799,20 +804,41 @@ extension Unsafe${Mutable}BufferPointer {
   public func update(
     fromContentsOf source: some Collection<Element>
   ) -> Index {
-    let count = Swift.min(source.count, self.count)
-    guard count > 0, let base = baseAddress else { return startIndex }
-
-    if let _ = source.withContiguousStorageIfAvailable({
-      base.update(from: $0.baseAddress._unsafelyUnwrappedUnchecked,
-                  count: count)
-    }) {
+    let count = source.withContiguousStorageIfAvailable {
+      guard let sourceAddress = $0.baseAddress else {
+        return 0
+      }
+      _precondition(
+        $0.count <= self.count,
+        "buffer cannot contain every element from source."
+      )
+      baseAddress?.update(from: sourceAddress, count: $0.count)
+      return $0.count
+    }
+    if let count {
       return startIndex.advanced(by: count)
     }
 
-    for (p, e) in zip(base..<base.advanced(by: count), source) {
-      p.pointee = e
+    guard var position = baseAddress else {
+      _precondition(
+        source.isEmpty,
+        "buffer cannot contain every element from source."
+      )
+      return startIndex
     }
-    return startIndex.advanced(by: count)
+    var iterator = source.makeIterator()
+    for index in indices {
+      guard let value = iterator.next() else {
+        return index
+      }
+      position.pointee = value
+      position = position.advanced(by: 1)
+    }
+    _precondition(
+      iterator.next() == nil,
+      "buffer cannot contain every element from source."
+    )
+    return endIndex
   }
 
   /// Moves every element of an initialized source buffer into the
@@ -844,10 +870,14 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func moveInitialize(fromContentsOf source: Self) -> Index {
-    guard let pointer = source.baseAddress, source.count > 0 else { return 0 }
-    _debugPrecondition(count >= source.count)
-    baseAddress._unsafelyUnwrappedUnchecked.moveInitialize(from: pointer,
-                                                           count: source.count)
+    guard let sourceAddress = source.baseAddress, !source.isEmpty else {
+      return startIndex
+    }
+    _precondition(
+      source.count <= self.count,
+      "buffer cannot contain every element from source."
+    )
+    baseAddress?.moveInitialize(from: sourceAddress, count: source.count)
     return startIndex.advanced(by: source.count)
   }
 
@@ -908,10 +938,14 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func moveUpdate(fromContentsOf source: Self) -> Index {
-    guard let pointer = source.baseAddress, source.count > 0 else { return 0 }
-    _debugPrecondition(count >= source.count)
-    baseAddress._unsafelyUnwrappedUnchecked.moveUpdate(from: pointer,
-                                                       count: source.count)
+    guard let sourceAddress = source.baseAddress, !source.isEmpty else {
+      return startIndex
+    }
+    _precondition(
+      source.count <= self.count,
+      "buffer cannot contain every element from source."
+    )
+    baseAddress?.moveUpdate(from: sourceAddress, count: source.count)
     return startIndex.advanced(by: source.count)
   }
 
