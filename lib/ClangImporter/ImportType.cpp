@@ -2295,12 +2295,14 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     ImportTypeKind importKind = getImportTypeKindForParam(param);
 
-    // Import the parameter type into Swift.
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
+
+    bool isInOut = false;
+    bool isParamTypeImplicitlyUnwrapped = false;
+
+    // Import the parameter type into Swift.
     auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
     Type swiftParamTy;
-    bool isParamTypeImplicitlyUnwrapped = false;
-    bool isInOut = false;
 
     // Sometimes we import unavailable typedefs as enums. If that's the case,
     // use the enum, not the typedef here.
@@ -2902,13 +2904,20 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
     bool paramIsCompletionHandler =
         asyncInfo && paramIndex == asyncInfo->completionHandlerParamIndex();
-
-    // Import the parameter type into Swift.
+    // Figure out if this is a completion handler parameter whose error
+    // parameter is used to indicate throwing.
+    Optional<unsigned> completionHandlerErrorParamIndex;
+    if (isAsync && paramIsCompletionHandler) {
+      completionHandlerErrorParamIndex =
+          asyncInfo->completionHandlerErrorParamIndex();
+    }
 
     // Check nullability of the parameter.
-    OptionalTypeKind optionalityOfParam
-        = getParamOptionality(param,
-                              !nonNullArgs.empty() && nonNullArgs[paramIndex]);
+    bool knownNonNull = !nonNullArgs.empty() && nonNullArgs[paramIndex];
+    OptionalTypeKind optionalityOfParam =
+        getParamOptionality(param, knownNonNull);
+
+    // Import the parameter type into Swift.
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {
@@ -2922,11 +2931,13 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
         allowNSUIntegerAsIntInParam = !nameContainsUnsigned(name);
     }
 
-    // Special case for NSDictionary's subscript.
     ImportTypeKind importKind = getImportTypeKindForParam(param);
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
-    Type swiftParamTy;
+
+    bool isInOut = false;
     bool paramIsIUO = false;
+
+    Type swiftParamTy;
     if (auto typedefType = dyn_cast<clang::TypedefType>(paramTy.getTypePtr())) {
       if (isUnavailableInSwift(typedefType->getDecl())) {
         if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
@@ -2941,6 +2952,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       }
     }
 
+    // Special case for NSDictionary's subscript.
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
       // Not using `getImportTypeAttrs()` is unprincipled but OK for this hack.
@@ -2953,14 +2965,6 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
       paramIsIUO = optionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
     } else if (!swiftParamTy) {
-      // Figure out if this is a completion handler parameter whose error
-      // parameter is used to indicate throwing.
-      Optional<unsigned> completionHandlerErrorParamIndex;
-      if (isAsync && paramIsCompletionHandler) {
-        completionHandlerErrorParamIndex =
-            asyncInfo->completionHandlerErrorParamIndex();
-      }
-
       bool sendableByDefault = paramIsCompletionHandler &&
         SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers);
 
@@ -3033,8 +3037,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     ++nameIndex;
 
     // Set up the parameter info
-    auto paramInfo = getParameterInfo(this, param, name, swiftParamTy,
-                                      /*isInOut=*/false, paramIsIUO);
+    auto paramInfo =
+        getParameterInfo(this, param, name, swiftParamTy, isInOut, paramIsIUO);
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||
