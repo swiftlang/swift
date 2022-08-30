@@ -1,4 +1,4 @@
-module Namespace {
+module Namespaces {
   header "namespace.h"
   requires cplusplus
 }
